@@ -1,0 +1,56 @@
+<%- /* 
+  * Admin-Footer-Partial
+  * Enthält den Fußbereich und das Ende des HTML-Dokuments für AdminLTE
+  * 
+  * @author FireDervil
+  */ %>
+
+    <!-- Hook: after_content -->
+    <% if (locals.hooks && hooks.getViewHooks) { %>
+      <% const afterContentHooks = hooks.getViewHooks('after_content'); %>
+      <% if (afterContentHooks && afterContentHooks.length > 0) { %>
+        <% afterContentHooks.forEach(hook => { %>
+          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
+        <% }); %>
+      <% } %>
+    <% } %>
+  </div>
+  <!-- /.content-wrapper -->
+  
+<!--begin::Footer-->
+<footer class="app-footer">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-12 col-sm-6">
+        <strong>
+          Copyright &copy; 2024 
+          <a href="https://dunebot.de" class="text-decoration-none">DuneBot</a>.
+        </strong>
+        All rights reserved.
+      </div>
+      <div class="col-12 col-sm-6 text-end">
+        <b>Dashboard Version:</b> <%= locals.dashboard_version %> | <b>Bot Version:</b> <%= locals.bot_version %>
+      </div>
+    </div>
+  </div>
+</footer>
+<!--end::Footer-->
+
+  <!-- Control Sidebar -->
+  <aside class="control-sidebar control-sidebar-dark">
+    <!-- Control sidebar content goes here -->
+  </aside>
+  <!-- /.control-sidebar -->
+</div>
+<!-- ./wrapper -->
+
+
+<!-- Hook: dashboard_footer_scripts -->
+<% if (locals.hooks && hooks.getViewHooks) { %>
+  <% const footerScriptsHooks = hooks.getViewHooks('dashboard_footer_scripts'); %>
+  <% if (footerScriptsHooks && footerScriptsHooks.length > 0) { %>
+    <% footerScriptsHooks.forEach(hook => { %>
+      <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
+    <% }); %>
+  <% } %>
+<% } %>

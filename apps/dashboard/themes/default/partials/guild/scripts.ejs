@@ -1,0 +1,82 @@
+<!-- SERVING SCRIPTS -->
+<!--begin::Third Party Plugin(OverlayScrollbars)-->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" crossorigin="anonymous"></script>
+<script src="/themes/default/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/themes/default/assets/js/adminlte.min.js"></script>
+<script src="/themes/default/assets/js/guild.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" crossorigin="anonymous"></script>
+
+<script>
+// Benachrichtigungen als gelesen markieren, wenn sie geschlossen werden
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.alert[data-notification-id]').forEach(alert => {
+        alert.addEventListener('closed.bs.alert', function() {
+            const id = this.dataset.notificationId;
+            fetch('/api/notifications/dismiss/' + id, { method: 'POST' })
+                .catch(err => console.error('Fehler beim Markieren der Benachrichtigung als gelesen:', err));
+        });
+    });
+});
+</script>
+
+ <script>
+      const SELECTOR_SIDEBAR_WRAPPER = '.sidebar-wrapper';
+      const Default = {
+        scrollbarTheme: 'os-theme-light',
+        scrollbarAutoHide: 'leave',
+        scrollbarClickScroll: true,
+      };
+      document.addEventListener('DOMContentLoaded', function () {
+        const sidebarWrapper = document.querySelector(SELECTOR_SIDEBAR_WRAPPER);
+        if (sidebarWrapper && OverlayScrollbarsGlobal?.OverlayScrollbars !== undefined) {
+          OverlayScrollbarsGlobal.OverlayScrollbars(sidebarWrapper, {
+            scrollbars: {
+              theme: Default.scrollbarTheme,
+              autoHide: Default.scrollbarAutoHide,
+              clickScroll: Default.scrollbarClickScroll,
+            },
+          });
+        }
+      });
+    </script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+  // Performance-Gauge initialisieren
+  const performanceGaugeEl = document.getElementById('performanceGauge');
+  
+  if (performanceGaugeEl) {
+    const pingTime = parseInt(performanceGaugeEl.getAttribute('data-ping') || '0');
+    
+    new Chart(performanceGaugeEl, {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [pingTime, 500 - pingTime],
+          backgroundColor: [
+            pingTime < 100 ? '#28a745' : pingTime < 300 ? '#ffc107' : '#dc3545',
+            '#f0f0f0'
+          ],
+          borderWidth: 0,
+          circumference: 180,
+          rotation: 270
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '70%',
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            enabled: false
+          }
+        }
+      }
+    });
+  }
+});
+</script>

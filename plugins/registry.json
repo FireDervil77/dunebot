@@ -1,0 +1,10 @@
+[
+    {
+        "name": "core",
+        "version": "0.1.0-beta",
+        "author": "FireDervil",
+        "repository": "https://github.com/firedervil77/dunebot-plugins",
+        "repositoryPath": "core",
+        "dependencies": []
+    }
+]

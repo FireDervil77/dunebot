@@ -1,0 +1,51 @@
+<footer id="footer" class="footer dark-background">
+
+    <div class="container footer-top">
+      <div class="row gy-4">
+        <div class="col-lg-5 col-md-12 footer-about">
+          <a href="/" class="logo d-flex align-items-center">
+            <span class="sitename"><%= tr('LANDING.BOTNAME') %></span>
+          </a>
+          <p><%= tr('FOOTER.DESCRIPTION') %></p>
+          <div class="social-links d-flex mt-4">
+           <!-- <a href=""><i class="bi bi-twitter-x"></i></a>
+            <a href=""><i class="bi bi-facebook"></i></a>
+            <a href=""><i class="bi bi-instagram"></i></a>
+            <a href=""><i class="bi bi-linkedin"></i></a>-->
+          </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6 footer-contact text-center text-md-start">
+          <h4><%= tr('LANDING.SERVICES') %></h4>
+          <ul>
+            <li><a href="<%= coreConfig.githubUrl %>"><%= tr('LANDING.GITHUB') %></a></li>
+            <li><a href="#"><%= tr('LANDING.DOCUMENTATION') %></a></li>
+            <li><a href="/dashboard"><%= tr('LANDING.DASHBOARD') %></a></li>
+            <li><a href="#"><%= tr('LANDING.PLUGINS') %></a></li>
+            <!--<li><a href="#"></a></li>-->
+          </ul>
+        </div>
+
+        <div class="col-lg-2 col-3 footer-links">
+          <h4><%= tr('FOOTER.USEFUL_LINKS') %></h4>
+          <ul>
+            <li><a href="/"><%= tr('LANDING.HOME') %></a></li>
+            <li><a href="/#features"><%= tr('LANDING.FEATURES') %></a></li>
+            <li><a href="/#news"><%= tr('LANDING.NEWS') %></a></li>
+            <li><a href="/tos"><%= tr('FOOTER.TERMS_OF_SERVICE') %></a></li>
+            <li><a href="/privacy"><%= tr('FOOTER.PRIVACY_POLICY') %></a></li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="container copyright text-center mt-4">
+      <p>© <span>Copyright</span> <strong class="px-1 sitename"><%= tr('LANDING.BOTNAME') %></strong> <span>All Rights Reserved</span></p>
+      <p>BOT-Version: <%= coreConfig.botVersion %> | Dashboard Version: <%= coreConfig.dashboardVersion %></p>
+      <div class="credits">
+        Design Modified by <a href="/"><%= tr('LANDING.BOTNAME') %></a> | Original made by <a href="https://bootstrapmade.com/" target="_blank">BootstrapMade</a>
+      </div>
+    </div>
+
+  </footer>

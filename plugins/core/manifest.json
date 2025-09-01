@@ -1,0 +1,25 @@
+{
+    "name": "core",
+    "displayName": "Core Plugin",
+    "description": "The Core Plugin of the Dunebot",
+    "version": "1.0.0",
+    "author": "FireDervil",
+    "repository": "https://github.com/firedervil77/dunebot-plugins",
+    "requires": {
+        "dunebot": ">=0.1.0",
+        "node": ">=14.0.0"
+    },
+    "dependencies": ["core"],
+    "tags": ["core", "system"],
+    "category": "core",
+    "bot": {
+        "commands": ["help", "ping", "plugin", "setlang", "setprefix"],
+        "events": ["ready", "guildCreate", "guildDelete", "guildUpdate", "guildUnavaible", "messageCreate", "interactionCreate", "error", "warn"],
+        "context": null
+    },
+    "dashboard": {
+        "routes": null,
+        "widgets": null,
+        "adminSections": null
+    }
+}

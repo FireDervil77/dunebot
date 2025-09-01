@@ -1,0 +1,14 @@
+{
+  "name": "core",
+  "version": "1.0.0",
+  "displayName": "DuneBot Core-Plugin",
+  "description": "Das Core-Plugin des Dunebots (Muss immer in allen Guilds Aktiviert sein!).",
+  "author": "FireDervil",
+  "main": "dashboard/index.js",
+  "bot": "bot/index.js",
+  "dashboard": "dashboard/index.js",
+  "repository": "https://github.com/firedervil77/dunebot-plugins",
+  "dependencies": {
+    "dunebot-sdk": "*"
+  }
+}

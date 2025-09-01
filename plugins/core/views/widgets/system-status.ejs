@@ -1,0 +1,16 @@
+<!-- filepath: /home/firedervil/dunebot_new/plugins/core/views/widgets/system-status.ejs -->
+<div class="system-status-widget">
+  <div class="row">
+    <div class="col-md-6">
+      <h5>Laufzeit</h5>
+      <p><%= Math.floor(context.uptime / 3600) %>h <%= Math.floor((context.uptime % 3600) / 60) %>m <%= Math.floor(context.uptime % 60) %>s</p>
+    </div>
+    <div class="col-md-6">
+      <h5>Speichernutzung</h5>
+      <p><%= Math.round(context.memory.heapUsed / 1024 / 1024) %> MB / <%= Math.round(context.memory.heapTotal / 1024 / 1024) %> MB</p>
+    </div>
+  </div>
+  <div class="progress mt-2">
+    <div class="progress-bar bg-info" role="progressbar" style="width: <%= Math.round(context.memory.heapUsed / context.memory.heapTotal * 100) %>%"></div>
+  </div>
+</div>

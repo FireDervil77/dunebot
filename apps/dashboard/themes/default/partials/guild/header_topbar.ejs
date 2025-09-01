@@ -1,0 +1,81 @@
+<%- /* 
+  * Admin-Topnav-Partial
+  * Enthält die obere Navigationsleiste für AdminLTE
+  * 
+  * @author FireDervil
+  */ %>
+
+<!--begin::Header-->
+      <nav class="app-header navbar navbar-expand bg-body">
+        <!--begin::Container-->
+        <div class="container-fluid">
+          <!--begin::Start Navbar Links-->
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button">
+                <i class="bi bi-list"></i>
+              </a>
+            </li>
+            <li class="nav-item d-none d-md-block"><a href="/guild" class="nav-link"><%= tr('SIDEBAR.HOME') %></a></li>
+            <li class="nav-item d-none d-md-block"><a href="<%= tr('SIDEBAR.SUPPORT_DISCORD_LINK') %>" class="nav-link"><%= tr('SIDEBAR.SUPPORT_DISCORD') %></a></li>
+          </ul>
+          <!--end::Start Navbar Links-->
+          <!--begin::End Navbar Links-->
+          <ul class="navbar-nav ms-auto">
+           
+            <!--begin::Fullscreen Toggle-->
+            <li class="nav-item">
+              <a class="nav-link" href="#" data-lte-toggle="fullscreen">
+                <i data-lte-icon="maximize" class="bi bi-arrows-fullscreen"></i>
+                <i data-lte-icon="minimize" class="bi bi-fullscreen-exit" style="display: none"></i>
+              </a>
+            </li>
+            <!--end::Fullscreen Toggle-->
+            <!--begin::User Menu Dropdown-->
+            <li class="nav-item dropdown user-menu">
+              <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
+                <img
+                  src="<%= `https://cdn.discordapp.com/avatars/${locals.user.info.id}/${locals.user.info.avatar}.png` %>"
+                  class="user-image rounded-circle shadow"
+                  alt="User Image"
+                />
+                <span class="d-none d-md-inline"><%= locals.user.username %></span>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+                <li class="user-header text-bg-primary">
+                  <img src="<%= `https://cdn.discordapp.com/avatars/${locals.user.info.id}/${locals.user.info.avatar}.png` %>"
+                    class="rounded-circle shadow" alt="User Image" />
+                  <p>
+                    <%= locals.user.username %> 
+                    <small><%= locals.user.createdAtFormatted || '-' %></small>
+                    <% 
+                      let createdAt = locals.user.createdAt;
+                      let days = '-';
+                      if (createdAt) {
+                        let dateObj = typeof createdAt === 'string' ? new Date(createdAt) : createdAt;
+                        if (!isNaN(dateObj.getTime())) {
+                          days = Math.floor((Date.now() - dateObj.getTime()) / (1000 * 60 * 60 * 24));
+                        }
+                      }
+                    %>
+                    <p>Mitglied seit <%= days %> Tagen</p>
+                  </p>
+                </li>
+                <li class="user-body">
+                  <div class="row">
+                    <!-- Hier können weitere Profilinfos ergänzt werden -->
+                  </div>
+                </li>
+                <li class="user-footer">
+                  <a href="/guild" class="btn btn-danger btn-flat">Guild</a>
+                  <a href="/auth/logout" class="btn btn-info btn-flat float-end"><%= tr('DASHBOARD.LOGOUT') %></a>
+                </li>
+              </ul>
+            </li>
+            <!--end::User Menu Dropdown-->
+          </ul>
+          <!--end::End Navbar Links-->
+        </div>
+        <!--end::Container-->
+      </nav>
+      <!--end::Header-->

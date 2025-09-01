@@ -1,0 +1,142 @@
+<aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+  <div class="sidebar-brand">
+    <!-- Logo immer anzeigen -->
+    <a href="/guild/<%= locals.guildId %>" class="brand-link">
+      <img src="/themes/default/assets/images/DuneBot.png" alt="DuneBot" class="brand-image opacity-75 shadow">
+      <span class="brand-text fw-light">DuneBot</span>
+    </a>
+  </div>
+
+  <div class="sidebar-wrapper">
+    <!-- Sidebar Menu -->
+    <nav class="mt-2">
+      <% try { %>
+        <!-- Core-Navigationspunkte (immer anzeigen) -->
+        <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+          <li class="nav-header">Core</li>
+          <!-- Dashboard -->
+          <li class="nav-item">
+            <a href="/guild/<%= locals.guildId %>" class="nav-link <%= activeMenu === '/guild/' + locals.guildId ? 'active' : '' %>">
+              <i class="bi bi-speedometer nav-icon"></i>
+              <p>Dashboard</p>
+            </a>
+          </li>
+          
+          <!-- Übersetzungen -->
+          <li class="nav-item">
+            <a href="/guild/<%= locals.guildId %>/locales" class="nav-link <%= activeMenu === '/guild/' + locals.guildId + '/locales' ? 'active' : '' %>">
+              <i class="bi bi-translate nav-icon"></i>
+              <p>Übersetzungen</p>
+            </a>
+          </li>
+          
+          <!-- Einstellungen -->
+          <li class="nav-item">
+            <a href="/guild/<%= locals.guildId %>/settings" class="nav-link <%= activeMenu === '/guild/' + locals.guildId + '/settings' ? 'active' : '' %>">
+              <i class="bi bi-gear nav-icon"></i>
+              <p>Einstellungen</p>
+            </a>
+          </li>
+          
+          <!-- Plugins -->
+          <li class="nav-item">
+            <a href="/guild/<%= locals.guildId %>/plugins" class="nav-link <%= activeMenu === '/guild/' + locals.guildId + '/plugins' ? 'active' : '' %>">
+              <i class="bi bi-puzzle nav-icon"></i>
+              <p>Plugins</p>
+            </a>
+          </li>
+        </ul>
+
+        <!-- Guild-Navigation aus der DB (adminNav) -->
+        <% if (locals.adminNav && adminNav.length > 0) { %>
+          <ul class="nav nav-pills nav-sidebar flex-column mt-2" data-widget="treeview" role="menu" data-accordion="false">
+            <li class="nav-header">Server-Navigation</li>
+            <% 
+              // Hauptmenüpunkte (parent ist null)
+              const mainItems = adminNav.filter(item => !item.parent);
+              
+              // Für jedes Hauptmenü
+              mainItems.forEach(item => { 
+                // Untermenüs finden
+                const children = adminNav.filter(child => child.parent === item.url);
+            %>
+              <li class="nav-item <%= (activeMenu === item.url || (item.url && activeMenu.startsWith(item.url))) ? 'menu-open' : '' %>">
+                <a href="<%= item.url %>" class="nav-link <%= activeMenu === item.url ? 'active' : '' %>">
+                  <i class="<%= item.icon.startsWith('bi') ? item.icon : 'bi bi-circle' %> nav-icon"></i>
+                  <p>
+                    <%= item.title %>
+                    <% if (children.length > 0) { %>
+                      <i class="bi bi-chevron-right right"></i>
+                    <% } %>
+                  </p>
+                </a>
+                <% if (children.length > 0) { %>
+                  <ul class="nav nav-treeview">
+                    <% children.forEach(child => { %>
+                      <li class="nav-item">
+                        <a href="<%= child.url %>" class="nav-link <%= activeMenu === child.url ? 'active' : '' %>">
+                          <i class="<%= child.icon.startsWith('bi') ? child.icon : 'bi bi-dot' %> nav-icon"></i>
+                          <p><%= child.title %></p>
+                        </a>
+                      </li>
+                    <% }); %>
+                  </ul>
+                <% } %>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+
+        <!-- Plugin-Navigationen dynamisch einfügen -->
+        <% if (locals.pluginNavs && pluginNavs.length > 0) { %>
+          <% pluginNavs.forEach(section => { %>
+            <% if (section.nav && section.nav.length > 0) { %>
+              <ul class="nav nav-pills nav-sidebar flex-column mt-2" data-widget="treeview" role="menu" data-accordion="false">
+                <li class="nav-header"><%= section.title %></li>
+                <% 
+                  // Hauptmenüpunkte (parent ist null)
+                  const pluginItems = section.nav.filter(item => !item.parent);
+                  
+                  // Für jedes Plugin-Menü
+                  pluginItems.forEach(item => { 
+                    // Untermenüs finden
+                    const pluginChildren = section.nav.filter(child => child.parent === item.url);
+                %>
+                  <li class="nav-item <%= (activeMenu === item.url || (item.url && activeMenu.startsWith(item.url))) ? 'menu-open' : '' %>">
+                    <a href="<%= item.url %>" class="nav-link <%= activeMenu === item.url ? 'active' : '' %>">
+                      <i class="<%= item.icon.startsWith('bi') ? item.icon : 'bi bi-circle' %> nav-icon"></i>
+                      <p>
+                        <%= item.title %>
+                        <% if (pluginChildren.length > 0) { %>
+                          <i class="bi bi-chevron-right right"></i>
+                        <% } %>
+                      </p>
+                    </a>
+                    <% if (pluginChildren.length > 0) { %>
+                      <ul class="nav nav-treeview">
+                        <% pluginChildren.forEach(child => { %>
+                          <li class="nav-item">
+                            <a href="<%= child.url %>" class="nav-link <%= activeMenu === child.url ? 'active' : '' %>">
+                              <i class="<%= child.icon.startsWith('bi') ? child.icon : 'bi bi-dot' %> nav-icon"></i>
+                              <p><%= child.title %></p>
+                            </a>
+                          </li>
+                        <% }); %>
+                      </ul>
+                    <% } %>
+                  </li>
+                <% }); %>
+              </ul>
+            <% } %>
+          <% }); %>
+        <% } %>
+
+      <% } catch (e) { %>
+        <div class="alert alert-danger">
+          Fehler beim Laden der Navigation:<br>
+          <%= e.message %>
+        </div>
+      <% } %>
+    </nav>
+  </div>
+</aside>

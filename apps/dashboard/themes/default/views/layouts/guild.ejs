@@ -1,0 +1,66 @@
+<%- /* 
+  * Admin-Layout
+  * Hauptlayout für alle Guild-Seiten
+  * 
+  * @author FireDervil
+  */ %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <%- theme.includePartial('guild/header', locals) %>
+</head>
+<body class="fixed-footer layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary">
+    
+    <!--begin::App Wrapper-->
+    <div class="app-wrapper">
+
+        <!--begin::Header-->
+          <%- theme.includePartial('guild/header_topbar', locals) %>
+        <!--end::Header-->
+
+        <!--begin::Sidebar-->
+          <%- theme.includePartial('guild/sidebar', locals) %>
+        <!--end::Sidebar-->
+
+        <!--begin::Breadcrumb-->
+        <%- theme.includePartial('guild/breadcrumb', locals) %>
+        <!--
+        <% if (locals.breadcrumb && locals.breadcrumb === true) { %>
+          <%- theme.includePartial('guild/breadcrumb', locals) %>
+        <% } %> 
+        -->
+
+        <!-- Begin::Global Notifications -->
+        <% if (locals.globalNotifications && globalNotifications.length > 0) { %>
+            <div class="container-fluid mt-3">
+                <% globalNotifications.forEach(notification => { %>
+                    <div class="alert alert-<%= notification.type %> alert-dismissible fade show" role="alert" data-notification-id="<%= notification._id %>">
+                        <% if (notification.title) { %>
+                            <strong><%= notification.title %></strong> 
+                        <% } %>
+                        <%= notification.message %>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schließen"></button>
+                    </div>
+                <% }); %>
+            </div>
+        <% } %>
+        <!-- End::Global Notifications -->
+        
+        <!--end::Breadcrumb-->  
+
+            <%- body %>
+
+            </main>
+            <!--end::App Main-->
+
+          <!--begin::Footer-->
+          <%- theme.includePartial('guild/footer', locals) %>
+        <!--end::Footer-->
+    </div>
+    <!--end::App Wrapper-->
+
+    <!--begin::Scripts-->
+    <%- theme.includePartial('guild/scripts', locals) %>
+    <!--end::Scripts-->
+</body>
+</html>

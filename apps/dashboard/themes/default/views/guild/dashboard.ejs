@@ -1,0 +1,325 @@
+<%- /* 
+  * Server-Dashboard-View
+  * Zeigt die Hauptübersicht für einen Discord-Server an
+  * 
+  * @author FireDervil
+  * @context {Object} guild - Discord Guild-Objekt
+  * @context {Array} widgets - Dashboard-Widgets
+  * @context {Array} enabledPlugins - Aktivierte Plugins für diese Guild
+  * @context {Object} stats - Server-Statistiken
+  */ %>
+
+<!--begin::App Content-->
+<div class="app-content">
+    <!--begin::Container-->
+    <div class="container-fluid">
+        <!--begin::Row-->
+        <div class="row">
+          
+    <!-- Hook: before_guild_dashboard -->
+    <% if (locals.hooks && hooks.getViewHooks) { %>
+      <% const beforeHooks = hooks.getViewHooks('before_guild_dashboard'); %>
+      <% if (beforeHooks && beforeHooks.length > 0) { %>
+        <% beforeHooks.forEach(hook => { %>
+          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {}, guild, guildId }) %>
+        <% }); %>
+      <% } %>
+    <% } %>
+
+    <!-- Server Info Card -->
+    <div class="row">
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Server-Informationen</h3>
+          </div>
+          <div class="card-body text-center">
+          <!-- Korrigierte Server-Icon-URL -->
+          <img src="<%= guild.icon ? guild.icon : (guild.iconURL ? guild.iconURL : '/themes/default/assets/images/DuneBot.png') %>" 
+     class="img-circle elevation-3" style="width: 100px; height: 100px;" alt="Server Icon">
+            <h3 class="profile-username text-center"><%= guild.name %></h3>
+            <p class="text-muted text-center">ID: <%= guildId %></p>
+            
+            <% if (locals.stats) { %>
+            <ul class="list-group list-group-unbordered mt-3">
+              <li class="list-group-item">
+                <b>Mitglieder</b> <a class="float-right"><%= stats?.memberCount || 'Unbekannt' %></a>
+              </li>
+              <li class="list-group-item">
+                <b>Kanäle</b> <a class="float-right"><%= stats?.channelCount || 'Unbekannt' %></a>
+              </li>
+              <li class="list-group-item">
+                <b>Rollen</b> <a class="float-right"><%= stats?.roleCount || 'Unbekannt' %></a>
+              </li>
+            </ul>
+            <% } %>
+            
+            <div class="mt-3">
+              <a href="/guild/<%= guildId %>/plugins" class="btn btn-info btn-block">
+                <i class="fas fa-puzzle-piece"></i> Plugins verwalten
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Performance-Metriken Card -->
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="bi bi-speedometer me-2"></i>Bot-Performance</h3>
+          </div>
+          <div class="card-body p-0">
+            <div class="position-relative">
+              <!-- Performance-Gauge -->
+              <canvas id="performanceGauge" style="height: 180px; width: 100%;"></canvas>
+              <div class="position-absolute top-50 start-50 translate-middle text-center">
+                <h3 class="mb-0"><%= stats?.performance?.pingTime || '?' %> ms</h3>
+                <small class="text-muted">Reaktionszeit</small>
+              </div>
+            </div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item d-flex justify-content-between">
+                <span><i class="bi bi-activity me-2"></i>Websocket</span>
+                <strong class="<%= (stats?.performance?.responseTime < 100) ? 'text-success' : ((stats?.performance?.responseTime < 300) ? 'text-warning' : 'text-danger') %>">
+                  <%= stats?.performance?.responseTime || '?' %> ms
+                </strong>
+              </li>
+              <li class="list-group-item d-flex justify-content-between">
+                <span><i class="bi bi-clock-history me-2"></i>Uptime</span>
+                <strong><%= stats?.performance?.uptime ? Math.floor(stats.performance.uptime/3600000) + 'h ' + Math.floor((stats.performance.uptime%3600000)/60000) + 'm' : '?' %></strong>
+              </li>
+              <li class="list-group-item d-flex justify-content-between">
+                <span><i class="bi bi-hdd-network me-2"></i>Shard Status</span>
+                <strong class="<%= (stats?.performance?.shardHealth === 0) ? 'text-success' : 'text-warning' %>">
+                  <%= (stats?.performance?.shardHealth === 0) ? 'Optimal' : 'Verbindend...' %>
+                </strong>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Erweiterte Server-Analyse -->
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="bi bi-bar-chart me-2"></i>Server-Analyse</h3>
+          </div>
+          <div class="card-body">
+            <div class="d-flex justify-content-between mb-3">
+              <div class="text-center">
+                <h4><%= stats?.cacheStats?.members?.total || '0' %></h4>
+                <small class="text-muted">Mitglieder</small>
+              </div>
+              <div class="text-center">
+                <h4><%= stats?.cacheStats?.channels || '0' %></h4>
+                <small class="text-muted">Kanäle</small>
+              </div>
+              <div class="text-center">
+                <h4><%= stats?.cacheStats?.roles || '0' %></h4>
+                <small class="text-muted">Rollen</small>
+              </div>
+            </div>
+            
+           <!-- Cache-Effektivität - Korrigiert -->
+            <h6 class="mt-4">Cache-Effektivität</h6>
+            <div class="progress" style="height: 20px;">
+              <% 
+              // Sicherer Cache-Ratio-Berechnungsausdruck
+              const cacheRatio = stats && stats.cacheStats && stats.cacheStats.members && stats.cacheStats.members.ratio ? 
+                Math.round(stats.cacheStats.members.ratio * 100) : 0;
+              %>
+              <div class="progress-bar bg-success" role="progressbar" 
+                  style="width: <%= cacheRatio %>%;" 
+                  aria-valuenow="<%= cacheRatio %>" 
+                  aria-valuemin="0" aria-valuemax="100">
+                <%= cacheRatio %>%
+              </div>
+            </div>
+            <small class="text-muted">Mitglieder im Cache: 
+              <%= stats?.cacheStats?.members?.cached || '0' %>/<%= stats?.cacheStats?.members?.total || '0' %>
+            </small>
+            
+            <!-- Server-Alter -->
+            <h6 class="mt-3">Server-Alter</h6>
+            <% if (stats?.guild?.createdAt) { 
+                const createdDate = new Date(stats.guild.createdAt);
+                const now = new Date();
+                const diffTime = Math.abs(now - createdDate);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+            %>
+              <p><i class="bi bi-calendar3 me-1"></i> <%= createdDate.toLocaleDateString() %> 
+                <span class="badge bg-secondary ms-2"><%= diffDays %> Tage</span>
+              </p>
+            <% } else { %>
+              <p>Keine Daten verfügbar</p>
+            <% } %>
+            
+            <!-- Premium-Status -->
+            <% if (stats?.guild?.premiumTier) { %>
+              <h6 class="mt-3">Premium-Status</h6>
+              <div class="d-flex align-items-center">
+                <% for(let i = 0; i < stats.guild.premiumTier; i++) { %>
+                  <i class="bi bi-stars text-warning me-1"></i>
+                <% } %>
+                <span class="ms-2">Level <%= stats.guild.premiumTier %></span>
+                <span class="badge bg-primary ms-2"><%= stats.guild.premiumSubscriptionCount || 0 %> Boosts</span>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bot-Berechtigungen -->
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="bi bi-shield-check me-2"></i>Bot-Berechtigungen</h3>
+          </div>
+          <div class="card-body">
+            <% if (stats?.botStats) { %>
+              <div class="d-flex align-items-center mb-3">
+                <% 
+                // Sichere Farbauswahl mit Fallback
+                const roleColor = stats.botStats && stats.botStats.highestRoleColor ? 
+                  stats.botStats.highestRoleColor : '#999999';
+                %>
+                <div style="width: 15px; height: 15px; background-color: <%= roleColor %>;" class="rounded-circle me-2"></div>
+                <span><%= stats.botStats.highestRole || 'Keine Rolle' %></span>
+              </div>
+              
+              <ul class="list-group mb-3">
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  Nachrichten senden
+                  <span>
+                    <% if (stats.botStats.canSendMessages) { %>
+                      <i class="bi bi-check-circle-fill text-success"></i>
+                    <% } else { %>
+                      <i class="bi bi-x-circle-fill text-danger"></i>
+                    <% } %>
+                  </span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  Server verwalten
+                  <span>
+                    <% if (stats.botStats.canManageServer) { %>
+                      <i class="bi bi-check-circle-fill text-success"></i>
+                    <% } else { %>
+                      <i class="bi bi-x-circle-fill text-danger"></i>
+                    <% } %>
+                  </span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  Rollen verwalten
+                  <span>
+                    <% if (stats.botStats.canManageRoles) { %>
+                      <i class="bi bi-check-circle-fill text-success"></i>
+                    <% } else { %>
+                      <i class="bi bi-x-circle-fill text-danger"></i>
+                    <% } %>
+                  </span>
+                </li>
+              </ul>
+              
+              <small class="text-muted">Bot beigetreten am: <%= new Date(stats.botStats.joinedAt).toLocaleDateString() %></small>
+            <% } else { %>
+              <div class="alert alert-warning">
+                Keine Bot-Berechtigungsdaten verfügbar
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div><!-- end: row-->
+
+     <!-- Neue Reihe für Aktivierte Plugins -->
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="bi bi-puzzle-fill me-2"></i>Aktivierte Plugins</h3>
+        <div class="card-tools">
+          <a href="/guild/<%= guildId %>/plugins" class="btn btn-tool" title="Plugins verwalten">
+            <i class="bi bi-gear"></i>
+          </a>
+        </div>
+      </div>
+      <div class="card-body">
+        <% if (locals.enabledPlugins && enabledPlugins.length > 0) { %>
+          <div class="row">
+            <% enabledPlugins.forEach(plugin => { %>
+              <div class="col-md-3 col-lg-2 mb-3">
+                <div class="plugin-card text-center">
+                  <div class="plugin-icon mb-2">
+                    <i class="bi bi-puzzle fs-3 text-primary"></i>
+                  </div>
+                  <h5 class="plugin-name mb-1"><%= plugin %></h5>
+                  <a href="/guild/<%= guildId %>/plugins/<%= plugin %>" class="btn btn-sm btn-primary">
+                    <i class="bi bi-gear-fill me-1"></i> Konfigurieren
+                  </a>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } else { %>
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            Keine Plugins aktiviert oder verfügbar für diesen Server.
+            <a href="/guild/<%= guildId %>/plugins" class="alert-link">Jetzt Plugins aktivieren</a>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <!-- Dashboard Widgets -->
+        <% if (locals.widgets && widgets.length > 0) { %>
+          <div class="row">
+            <% widgets.forEach(widget => { %>
+              <div class="col-md-<%= widget.size || 12 %>">
+                <div class="card <%= widget.cardClass || '' %>">
+                  <div class="card-header">
+                    <h3 class="card-title"><%= widget.title || 'Widget' %></h3>
+                    <% if (widget.actions && widget.actions.length > 0) { %>
+                      <div class="card-tools">
+                        <% widget.actions.forEach(action => { %>
+                          <button type="button" class="btn btn-tool" data-action="<%= action.id %>"
+                                  <% if (action.attributes) { Object.keys(action.attributes).forEach(attr => { %>
+                                    <%= attr %>="<%= action.attributes[attr] %>"
+                                  <% }); } %>>
+                            <i class="<%= action.icon || 'fas fa-wrench' %>"></i>
+                          </button>
+                        <% }); %>
+                      </div>
+                    <% } %>
+                  </div>
+                  <div class="card-body">
+                    <%- widget.content %>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Hook: after_guild_dashboard -->
+    <% if (locals.hooks && hooks.getViewHooks) { %>
+      <% const afterHooks = hooks.getViewHooks('after_guild_dashboard'); %>
+      <% if (afterHooks && afterHooks.length > 0) { %>
+        <% afterHooks.forEach(hook => { %>
+          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {}, guild, guildId }) %>
+        <% }); %>
+      <% } %>
+    <% } %>
+
+          
+        </div>
+        <!--end::Row-->
+    </div>
+    <!--end::Container-->
+</div>
+<!--end::App Content-->

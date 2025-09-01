@@ -1,0 +1,72 @@
+<!-- filepath: /home/firedervil/dunebot_new/plugins/core/views/admin/settings.ejs -->
+<div class="card">
+  <div class="card-header">
+    <h5>Core-Einstellungen</h5>
+  </div>
+  <div class="card-body">
+    <form id="core-settings-form">
+      <div class="mb-3">
+        <label for="defaultPrefix" class="form-label">Standard-Präfix</label>
+        <input type="text" class="form-control" id="defaultPrefix" name="defaultPrefix" value="!">
+        <div class="form-text">Das Standard-Präfix für Text-Befehle</div>
+      </div>
+      
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="enableDebugMode" name="enableDebugMode">
+        <label class="form-check-label" for="enableDebugMode">
+          Debug-Modus aktivieren
+        </label>
+        <div class="form-text">Zeigt zusätzliche Debug-Informationen in der Konsole an</div>
+      </div>
+      
+      <button type="submit" class="btn btn-primary">Speichern</button>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('core-settings-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const formData = new FormData(e.target);
+  const data = {
+    defaultPrefix: formData.get('defaultPrefix'),
+    enableDebugMode: formData.get('enableDebugMode') === 'on'
+  };
+  
+  try {
+    const response = await fetch('/api/core/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    if (response.ok) {
+      showAlert('success', 'Einstellungen gespeichert!');
+    } else {
+      showAlert('danger', 'Fehler beim Speichern der Einstellungen.');
+    }
+  } catch (err) {
+    showAlert('danger', `Fehler: ${err.message}`);
+  }
+});
+
+// Helper-Funktion für Benachrichtigungen
+function showAlert(type, message) {
+  const alertDiv = document.createElement('div');
+  alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+  alertDiv.innerHTML = `
+    ${message}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schließen"></button>
+  `;
+  
+  const form = document.getElementById('core-settings-form');
+  form.parentNode.insertBefore(alertDiv, form);
+  
+  // Nach 5 Sekunden automatisch ausblenden
+  setTimeout(() => {
+    alertDiv.classList.remove('show');
+    setTimeout(() => alertDiv.remove(), 150);
+  }, 5000);
+}
+</script>

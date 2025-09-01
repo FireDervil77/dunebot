@@ -1,0 +1,36 @@
+<%- /* 
+  * Admin-Breadcrumb-Partial
+  * Zeigt den Navigationspfad (Breadcrumb) im Admin-Bereich an
+  * 
+  * @author FireDervil
+  * @context {Array} breadcrumbs - Array von Objekten mit Eigenschaften title und url
+  */ %>
+
+<!--begin::App Main-->
+      <main class="app-main">
+        <!--begin::App Content Header-->
+        <div class="app-content-header">
+          <!--begin::Container-->
+          <div class="container-fluid">
+            
+            <!--begin::Row-->
+            <div class="row">
+              <div class="col-sm-6"><h3 class="mb-0"><%=title%></h3></div>
+              <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-end">
+                  <li class="breadcrumb-item"><a href="/guild/<%=locals.guildId%>"> <%= tr('SIDEBAR.SERVERS') %></a></li>
+                  <% if (locals.guild) { %>
+                    <li class="breadcrumb-item active" aria-current="page"><a href="/guild/<%=locals.guildId%>"><%=locals.guild.guild_name%></a></li>
+                  <% } %> <% if (locals.plugin) { %>
+                  <% const name = plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1); %>
+                    <li class="breadcrumb-item active" aria-current="page"><%=name%></li>
+                  <% } %>
+                </ol>
+              </div>
+              
+            </div>
+            <!--end::Row-->
+          </div>
+          <!--end::Container-->
+        </div>
+        <!--end::App Content Header-->

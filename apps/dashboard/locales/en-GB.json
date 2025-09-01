@@ -1,0 +1,161 @@
+{
+    "BTN_SAVE": "Save",
+    "BTN_SAVING": "Saving",
+    "BTN_ENABLE": "Enable",
+    "BTN_DISABLE": "Disable",
+    "BTN_CREATE": "Create",
+
+    "SETTINGS_SAVE": "Guild settings saved",
+    "SETTINGS_SAVE_ERROR": "Failed to save guild settings",
+    "CONFIG_SAVE": "Configuration saved",
+    "CONFIG_SAVE_ERROR": "Failed to save configuration",
+
+    "CHANNEL_SELECT": "Select Channel",
+    "ROLE_SELECT": "Select Role",
+    
+    "LANDING": {
+        "HERO": "The Ultimate Discord Dunebot Platform",
+        "SUBTITLE": "Build the perfect Discord experience for your community.",
+        "SUBTITLE2": "100% Customizable. Powered by a flexible plugin system.",
+        "BTN_DASHBOARD_TOP": "Dashboard",
+        "BTN_FEATURES_TOP": "Features",
+        "BTN_TOGGLE_LIGHT_MODE": "Toggle Light Mode",
+        "BTN_TOGGLE_DARK_MODE": "Toggle Dark Mode",
+        "BTN_GET_STARTED": "Get Started",
+        "BTN_LOGIN": "Login",
+        "BTN_REGISTER": "Register",
+        "BTN_DASHBOARD": "NOW Test",
+        "BTN_GITHUB": "View on GitHub"
+    },
+    "FEATURES": {
+        "TITLE": "Why Communities Choose DuneBots",
+        "CARD_ONE_TITLE": "Powerful Plugin System",
+        "CARD_ONE_DESCRIPTION": "Add, remove, or update plugins with a click. Choose from a growing library —no limits.",
+        "CARD_TWO_TITLE": "Extensible",
+        "CARD_TWO_DESCRIPTION": "Extend the bot with our own custom plugins and integrations.",
+        "CARD_THREE_TITLE": "Premium Features",
+        "CARD_THREE_DESCRIPTION": "Get access to exclusive premium plugins and features that enhance your community experience.",
+        "CARD_FOUR_TITLE": "Modern Dashboard",
+        "CARD_FOUR_DESCRIPTION": "Experience a modern dashboard design with advanced features and customization options.",
+        "CARD_FIVE_TITLE": "Scalable & Reliable",
+        "CARD_FIVE_DESCRIPTION": "Easily scale your community. DuneBot is optimized for large servers and provides reliable performance.",
+        "CARD_SIX_TITLE": "Customizable for Every Community",
+        "CARD_SIX_DESCRIPTION": "Tailor DuneBot to your needs with a variety of customization options.",
+        "STAR": "Planned Features"
+    },
+    
+    "SIDEBAR": {
+        "DASHBOARD": "Dashboard",
+        "SERVERS": "Servers",
+        "BACK_TO_SERVERS": "Back to Servers",
+
+        "BACK_TO_DASH": "Back to Dashboard",
+        "PLUGIN_MANAGEMENT": "Plugin Management",
+        "LOCALES": "Localization",
+        "HOME": "Home",
+        "PLUGINS": "Plugins",
+        "PLUGIN_CONFIGS": "Plugin Config",
+        "TIP_DOCUMENTATION": "Documentation",
+        "TIP_GITHUB": "GitHub Repository"
+    },
+
+    "NEWS": {
+        "TITLE": "News",
+        "DESCRIPTION": "Stay up to date with the latest developments, updates, and announcements regarding DuneBot.",
+        "NO_NEWS": "No news available",
+        "READ_MORE": "Read more",
+        "BACK_TO_NEWS": "Back to News"
+    },
+
+    "NAV": {
+        "ADMIN": "Admin",
+        "LOGOUT": "Logout",
+        "TIP_DARK_MODE": "Toggle Dark Mode",
+        "SR_USER_MENU": "Open User Menu" 
+    },
+
+    "BREADCRUMB": {
+        "ADMIN": "Admin"
+    },
+
+    "TABS": {
+        "SETTINGS": "Settings",
+        "PREFIX": "Prefix Commands",
+        "PREFIX_SHORT": "Prefix",
+        "SLASH": "Slash Commands",
+        "SLASH_SHORT": "Slash"
+    },
+
+    "SELECTOR": {
+        "BTN_MANAGE": "Manage",
+        "BTN_INVITE": "Invite"
+    },
+
+    "HOME": {
+        "MEMBERS": "Members",
+        "ROLES": "Roles",
+        "TXT_CHANNELS": "Text Channels",
+        "VC_CHANNELS": "Voice Channels",
+        "SUB_PLUGINS": "Plugins",
+        "LABEL_PREFIX": "Prefix",
+        "LABEL_SLASH": "Slash",
+
+        "BTN_PLUGIN_ACTIVE": "Active",
+        "BTN_PLUGIN_ENABLE": "Enable",
+
+        "PLUGIN_ENABLE_CONFIRM": "Are you sure you want to enable this plugin?",
+        "PLUGIN_CONFIRM_YES": "Yes, I'm sure",
+        "PLUGIN_CONFIRM_NO": "No, cancel"
+    },
+
+    "ADMIN_PAGE": {
+        "PLUGINS": "Plugin Management",
+        "DESCRIPTION": "Manage installed/enabled plugins.",
+        "LOADING": "Loading plugins...",
+        "VIEW_SOURCE": "View Source",
+        "NO_MATCH": "No plugins found matching the search term",
+        "INSTALL": "Install",
+        "INSTALLING": "Installing",
+        "UNINSTALL": "Uninstall",
+        "UNINSTALLING": "Uninstalling",
+        "INSTALLED": "Installed",
+        "TOTAL": "Total"
+    },
+
+    "LOCALES_PAGE": {
+        "TITLE": "Localizations",
+        "DESCRIPTION": "Manage localization keys for different plugins and languages.",
+        "APP_SELECT": "Select Application",
+        "PLUGIN_SELECT": "Select Plugin",
+        "LOCALE_SELECT": "Select Language",
+        "FETCH_FAIL": "Failed to fetch localization keys",
+        "UPDATE_SUCCESS": "Bot Localization updated successfully",
+        "UPDATE_ERROR": "Failed to update bot localization"
+    },
+
+    "EMBED_PREVIEW": {
+        "HEADER": "Embed Preview",
+        "CLOSE_BTN": "Close modal",
+        "CONTENT": "Content",
+        "OPTIONS": "Embed Options",
+        "TITLE": "Title",
+        "DESCRIPTION": "Description",
+        "COLOR": "Color",
+        "AUTHOR_NAME": "Author Name",
+        "AUTHOR_ICON": "Author Icon",
+        "FIELDS": "Fields",
+        "FIELD_NAME": "Field Name",
+        "FIELD_VALUE": "Field Value",
+        "FIELD_INLINE": "Inline?",
+        "ADD_FIELD": "Add Field",
+        "REMOVE_FIELD": "Remove Field",
+        "FOOTER_TEXT": "Footer Text",
+        "FOOTER_ICON": "Footer Icon",
+        "THUMBNAIL": "Thumbnail",
+        "TIMESTAMP": "Show Timestamp",
+        "URL_PLACEHOLDER": "https://...",
+        "PREVIEW_PLACEHOLDER": "Embed preview will be shown here"
+    },
+
+    "NO_SETTINGS": "This plugin does not have any settings."
+}

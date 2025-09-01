@@ -1,0 +1,139 @@
+<section class="mb-6">
+  <div class="border-border bg-bg-panel flex items-center justify-between rounded-lg border p-4 shadow-sm">
+    <div>
+      <h2 class="text-text text-lg font-semibold"><%= tr("LOCALES_PAGE.TITLE") %></h2>
+      <p class="text-text-muted text-sm"><%= tr("LOCALES_PAGE.DESCRIPTION") %></p>
+    </div>
+    <div class="flex items-center space-x-4"></div>
+  </div>
+</section>
+
+<section
+  class="mb-6"
+  x-data="{ 
+    localizationKeys: {},
+    selectedPlugin: '',
+    selectedLanguage: '',
+    loading: true,
+    saving: false,
+
+    async init() {
+      try {
+        const response = await fetch('/api/locales');
+        if (!response.ok) throw new Error('Failed to fetch locales');
+        
+        this.localizationKeys = await response.json();
+        const availablePlugins = Object.keys(this.localizationKeys);
+        
+        if (availablePlugins.length === 0) {
+          throw new Error('No plugins found');
+        }
+        
+        this.selectedPlugin = availablePlugins[0];
+        this.selectedLanguage = Object.keys(this.localizationKeys[this.selectedPlugin])[0];
+      } catch (error) {
+        Alpine.store('toast').show('<%=tr(`LOCALES_PAGE.FETCH_FAIL`)%>', 'error');
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    get currentKeys() {
+      return this.localizationKeys[this.selectedPlugin]?.[this.selectedLanguage] || {};
+    },
+
+    async saveChanges() {
+      this.saving = true;
+      const keys = {};
+      document.querySelectorAll('#keysSection input').forEach(input => {
+        keys[input.name] = input.value;
+      });
+
+      try {
+        const response = await fetch('/api/locales', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            plugin: this.selectedPlugin,
+            language: this.selectedLanguage,
+            keys
+          })
+        });
+
+        if (response.ok) {
+          Alpine.store('toast').show('<%=tr(`LOCALES_PAGE.UPDATE_SUCCESS`)%>', 'success');
+        } else {
+          throw new Error('Failed to update settings');
+        }
+      } catch (error) {
+        Alpine.store('toast').show('<%=tr(`LOCALES_PAGE.UPDATE_ERROR`)%>', 'error');
+      }
+      this.saving = false;
+    }
+  }">
+  <div class="border-border bg-bg-panel flex flex-col items-center justify-between rounded-lg border p-4 shadow-sm">
+    <div class="w-full">
+      <!-- START: Filters -->
+      <div class="border-border mb-6 flex w-full flex-col border-b pb-6 md:flex-row">
+        <div class="mb-3 flex-1 md:mb-0 md:pr-2">
+          <label class="text-text mb-2 block text-sm font-medium"> <%= tr("LOCALES_PAGE.PLUGIN_SELECT") %>: </label>
+          <select
+            x-model="selectedPlugin"
+            class="focus:border-primary focus:ring-primary border-border bg-bg-surface text-text block w-full rounded-lg border p-2 text-sm">
+            <template x-show="!loading" x-for="plugin in Object.keys(localizationKeys)" :key="plugin">
+              <option x-text="plugin" :value="plugin"></option>
+            </template>
+          </select>
+        </div>
+
+        <div class="mb-3 flex-1 md:mb-0 md:pr-2">
+          <label class="text-text mb-2 block text-sm font-medium"> <%= tr("LOCALES_PAGE.LOCALE_SELECT") %>: </label>
+          <select
+            x-model="selectedLanguage"
+            class="focus:border-primary focus:ring-primary border-border bg-bg-surface text-text block w-full rounded-lg border p-2 text-sm">
+            <% for (let language of availableLanguages) { %>
+            <option value="<%= language.value %>"><%= language.name %></option>
+            <% } %>
+          </select>
+        </div>
+      </div>
+      <!-- END: Filters -->
+
+      <!-- Loading State -->
+      <div x-show="loading" class="w-full p-4 text-center">
+        <div class="text-text-muted animate-pulse"><%=tr('LOADING')%>...</div>
+      </div>
+
+      <!-- Keys Section -->
+      <div x-show="!loading" id="keysSection" class="mb-4 w-full">
+        <template x-for="(value, key) in currentKeys" :key="key">
+          <div class="mb-4 flex flex-col items-center md:flex-row">
+            <div class="mb-2 w-full md:mb-0 md:w-1/3 md:pr-2">
+              <label class="text-text block text-xs font-semibold sm:text-sm" x-text="key + ':'"></label>
+            </div>
+            <div class="w-full md:w-2/3">
+              <input
+                type="text"
+                x-model="currentKeys[key]"
+                :name="key"
+                class="focus:border-primary focus:ring-primary border-border bg-bg-surface text-text block w-full rounded-lg border p-2 text-xs sm:p-2.5 sm:text-sm" />
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Save Button -->
+      <div class="border-border mt-4 flex w-full items-center justify-end border-t pt-3">
+        <button
+          type="button"
+          @click="saveChanges()"
+          :disabled="saving"
+          :class="{'opacity-50': saving}"
+          class="bg-primary hover:bg-primary-dark focus:ring-primary inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium text-white focus:ring-4">
+          <span x-show="!saving"><%= tr('BTN_SAVE') %></span>
+          <span x-show="saving"><%= tr('BTN_SAVING') %></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>

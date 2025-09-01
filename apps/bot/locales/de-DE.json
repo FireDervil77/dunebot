@@ -1,0 +1,21 @@
+{
+    "REQUESTED_BY": "Angefordert von {{user}}",
+    "INVALID_SUBCOMMAND": "Ungültiger Unterbefehl: {{sub}}",
+    "COLLECT_TIMEOUT": "Oops! Du hast zu lange gebraucht, um zu antworten. Bitte versuche es erneut.",
+    "NO_EMBED_PERM": "Ich habe keine Berechtigung, Links in diesem Kanal einzubetten. Bitte gib mir die Berechtigung `Embed Links` und versuche es erneut.",
+
+    "NO_MATCH_USER": "Kein Benutzer gefunden, der mit {{query}} übereinstimmt.",
+    "NO_MATCH_CHANNEL": "Kein Kanal gefunden, der mit {{query}} übereinstimmt.",
+    "MULTIPLE_MATCH_CHANNELS": "Mehrere Kanäle gefunden, die mit {{query}} übereinstimmen. Bitte seien Sie spezifischer.",
+
+    "NO_MATCH_ROLE": "Keine Rolle gefunden, die mit {{query}} übereinstimmt.",
+    "MULTIPLE_MATCH_ROLES": "Mehrere Rollen gefunden, die mit {{query}} übereinstimmen. Bitte seien Sie spezifischer.",
+
+    "API_ERROR": "Unerwarteter Backend-Fehler! Bitte versuche es später erneut oder kontaktiere den Support-Server.",
+
+    "YES": "Ja",
+    "NO": "Nein",
+
+    "ENABLED": "Aktiviert",
+    "DISABLED": "Deaktiviert"
+}

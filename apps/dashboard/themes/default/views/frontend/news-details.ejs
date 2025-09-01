@@ -1,0 +1,38 @@
+<!-- News Detail Section -->
+<main id="main">
+  <section class="news-detail section">
+    <div class="container" data-aos="fade-up">
+      <article class="news-article">
+        <div class="meta d-flex align-items-center mb-4">
+          <div class="d-flex align-items-center me-4">
+            <i class="bi bi-calendar me-2"></i>
+            <span><%= news.date %></span>
+          </div>
+          <% if (news.author) { %>
+            <div class="d-flex align-items-center">
+              <i class="bi bi-person me-2"></i>
+              <span><%= news.author %></span>
+            </div>
+          <% } %>
+        </div>
+
+        <% if (news.image_url) { %>
+          <div class="featured-image mb-4">
+            <img src="<%= theme.asset(news.image_url) %>" class="img-fluid rounded" alt="<%= news.title %>">
+          </div>
+        <% } %>
+        <div class="title"><h1><%= news.title %></h1></div>
+        <div class="content">
+          <%- news.news_text %>
+        </div>
+
+        <div class="mt-4">
+          <a href="/#news" class="btn btn-primary">
+            <i class="bi bi-arrow-left me-2"></i>
+            <%= tr('NEWS.BACK_TO_NEWS') %>
+          </a>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>

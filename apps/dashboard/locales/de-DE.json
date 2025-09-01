@@ -1,0 +1,188 @@
+{
+    "BTN_SAVE": "Speichern",
+    "BTN_SAVING": "Speichere",
+    "BTN_ENABLE": "Aktivieren",
+    "BTN_DISABLE": "Deaktivieren",
+    "BTN_CREATE": "Erstellen",
+
+    "SETTINGS_SAVE": "Guild Einstellungen gespeichert",
+    "SETTINGS_SAVE_ERROR": "Fehler beim speichern der Guild Einstellungen",
+    "CONFIG_SAVE": "Konfiguration gespeichert",
+    "CONFIG_SAVE_ERROR": "Fehler beim speichern der Konfiguration",
+
+    "CHANNEL_SELECT": "Channel auswählen",
+    "ROLE_SELECT": "Rolle auswählen",
+
+    "LANDING": {
+        "HOME": "Startseite",
+        "FEATURES": "Funktionen",
+        "NEWS": "Neuigkeiten",
+        "SERVICES": "Dienste",
+        "DASHBOARD": "Dashboard",
+        "BOTNAME": "DuneBot",
+        "GITHUB": "GitHub",
+        "DOCUMENTATION": "Dokumentation",
+        "PLUGINS": "Plugins",
+        "HERO": "Die Ultimative Discord DuneBot Plattform",
+        "SUBTITLE": "Gestalte das perfekte Discord-Erlebnis für deine Community.",
+        "SUBTITLE2": "100% Anpassbar. Powered by einem ultraflexiblen Plugin-System.",
+        "BTN_DASHBOARD_TOP": "Dashboard",
+        "BTN_FEATURES_TOP": "Funktionen",
+        "BTN_TOGGLE_LIGHT_MODE": "zum Hellen Modus",
+        "BTN_TOGGLE_DARK_MODE": "zum Dunklen Modus",
+        "BTN_DASHBOARD": "JETZT Testen",
+        "BTN_GITHUB": "zu GitHub"
+    },
+    
+    "FEATURES": {
+        "TITLE": "Warum Communities DuneBot wählen",
+        "CARD_ONE_TITLE": "Leistungsstarkes Plugin-System",
+        "CARD_ONE_DESCRIPTION": "Plugins mit einem Klick hinzufügen, entfernen oder aktualisieren. Wähle aus einer wachsenden Bibliothek – ohne Grenzen.",
+        "CARD_TWO_TITLE": "Erweiterbar",
+        "CARD_TWO_DESCRIPTION": "Erweitere den Bot & das Dashboard, zusammen, mit unseren benutzerdefinierten Plugins und Integrationen.",
+        "CARD_THREE_TITLE": "Premium Funktionen",
+        "CARD_THREE_DESCRIPTION": "Erhalte Zugriff auf exklusive Premium-Plugins und Funktionen, die deine Community-Erfahrung verbessern.",
+        "CARD_FOUR_TITLE": "Modernes Dashboard",
+        "CARD_FOUR_DESCRIPTION": "Erlebe ein modernes Dashboard-Design mit erweiterten Funktionen und Anpassungsoptionen.",
+        "CARD_FIVE_TITLE": "Skalierbar & Zuverlässig",
+        "CARD_FIVE_DESCRIPTION": "Skaliere deine Community mit Leichtigkeit. DuneBot ist für große Server optimiert und bietet eine zuverlässige Leistung.",
+        "CARD_SIX_TITLE": "Anpassbar für Jede Community",
+        "CARD_SIX_DESCRIPTION": "Gestalte DuneBot nach deinen Wünschen mit einer Vielzahl von Anpassungsoptionen.",
+        "STAR": "Geplante Funktionen"
+    },
+
+    "FOOTER": {
+        "TERMS_OF_SERVICE": "Nutzungsbedingungen",
+        "PRIVACY_POLICY": "Datenschutzrichtlinie",
+        "USEFUL_LINKS": "Nützliche Links",
+        "CONTACT": "Kontakt",
+        "DESCRIPTION": "DuneBot ist eine Discord Bot Plattform, die es dir ermöglicht, deinen Bot mit einem modernen Dashboard zu verwalten und anzupassen. Mit einer Fülle an Plugins, die sich einfach verwalten lassen."
+    },
+
+    "SIDEBAR": {
+        "DASHBOARD": "Dashboard",
+        "SERVERS": "Server",
+        "BACK_TO_SERVERS": "Zurück zu Servern",
+        "SUPPORT_DISCORD_LINK": "Discord Support LINK",
+        "SUPPORT_DISCORD": "Discord Support",
+        "BACK_TO_DASH": "Zurück zum Dashboard",
+
+        "PLUGIN_MANAGEMENT": "Plugin-Verwaltung",
+        "LOCALES": "Lokalisierung",
+        "HOME": "Startseite",
+        "PLUGINS": "Plugins",
+        "PLUGIN_CONFIGS": "Plugin-Konfiguration",
+        "TIP_DOCUMENTATION": "Dokumentation",
+        "TIP_GITHUB": "GitHub Repository"
+    },
+
+    "DASHBOARD": {
+        "TITLE": "Dashboard",
+        "DESCRIPTION": "Verwalte deine Server, Plugins und Einstellungen.",
+        "NO_SERVERS": "Keine Server gefunden",
+        "NO_PLUGINS": "Keine Plugins installiert",
+        "NO_LOCALES": "Keine Lokalisierungen verfügbar",
+        "SEARCH_PLACEHOLDER": "Suche nach Servern, Plugins oder Lokalisierungen...",
+        "LOGOUT": "Logout"
+    },
+
+    "NEWS": {
+        "TITLE": "Neuigkeiten",
+        "DESCRIPTION": "Bleibe auf dem Laufenden mit den neuesten Entwicklungen, Updates und Ankündigungen rund um DuneBot.",
+        "NO_NEWS": "Keine Neuigkeiten verfügbar",
+        "READ_MORE": "Mehr lesen",
+        "BACK_TO_NEWS": "Zurück zu den Neuigkeiten"
+    },
+
+    "NAV": {
+        "ADMIN": "Admin",
+        "LOGOUT": "Logout",
+        "TIP_DARK_MODE": "Toggle Dark Mode",
+        "SR_USER_MENU": "Open User Menu"   
+    },
+
+    "BREADCRUMB": {
+        "ADMIN": "Admin"
+    },
+
+    "TABS": {
+        "SETTINGS": "Settings",
+        "PREFIX": "Prefix Commands",
+        "PREFIX_SHORT": "Prefix",
+        "SLASH": "Slash Commands",
+        "SLASH_SHORT": "Slash"
+    },
+
+    "SELECTOR": {
+        "BTN_MANAGE": "Manage",
+        "BTN_INVITE": "Invite"
+    },
+
+    "HOME": {
+        "MEMBERS": "Members",
+        "ROLES": "Roles",
+        "TXT_CHANNELS": "Text Channels",
+        "VC_CHANNELS": "Voice Channels",
+        "SUB_PLUGINS": "Plugins",
+        "LABEL_PREFIX": "Prefix",
+        "LABEL_SLASH": "Slash",
+
+        "BTN_PLUGIN_ACTIVE": "Active",
+        "BTN_PLUGIN_ENABLE": "Enable",
+
+        "PLUGIN_ENABLE_CONFIRM": "Are you sure you want to enable this plugin?",
+        "PLUGIN_CONFIRM_YES": "Yes, I'm sure",
+        "PLUGIN_CONFIRM_NO": "No, cancel"
+    },
+
+    "ADMIN_PAGE": {
+        "PLUGINS": "Plugin Management",
+        "DESCRIPTION": "Manage installed/enabled plugins.",
+        "LOADING": "Loading plugins...",
+        "VIEW_SOURCE": "View Source",
+        "NO_MATCH": "No plugins found matching the search term",
+        "INSTALL": "Install",
+        "INSTALLING": "Installing",
+        "UNINSTALL": "Uninstall",
+        "UNINSTALLING": "Uninstalling",
+        "INSTALLED": "Installed",
+        "TOTAL": "Total"
+    },
+
+    "LOCALES_PAGE": {
+        "TITLE": "Localizations",
+        "DESCRIPTION": "Manage localization keys for different plugins and languages.",
+        "APP_SELECT": "Select Application",
+        "PLUGIN_SELECT": "Select Plugin",
+        "LOCALE_SELECT": "Select Language",
+        "FETCH_FAIL": "Failed to fetch localization keys",
+        "UPDATE_SUCCESS": "Bot Localization updated successfully",
+        "UPDATE_ERROR": "Failed to update bot localization"
+    },
+
+    "EMBED_PREVIEW": {
+        "HEADER": "Embed Preview",
+        "CLOSE_BTN": "Close modal",
+        "CONTENT": "Content",
+        "OPTIONS": "Embed Options",
+        "TITLE": "Title",
+        "DESCRIPTION": "Description",
+        "COLOR": "Color",
+        "AUTHOR_NAME": "Author Name",
+        "AUTHOR_ICON": "Author Icon",
+        "FIELDS": "Fields",
+        "FIELD_NAME": "Field Name",
+        "FIELD_VALUE": "Field Value",
+        "FIELD_INLINE": "Inline?",
+        "ADD_FIELD": "Add Field",
+        "REMOVE_FIELD": "Remove Field",
+        "FOOTER_TEXT": "Footer Text",
+        "FOOTER_ICON": "Footer Icon",
+        "THUMBNAIL": "Thumbnail",
+        "TIMESTAMP": "Show Timestamp",
+        "URL_PLACEHOLDER": "https://...",
+        "PREVIEW_PLACEHOLDER": "Embed preview will be shown here"
+    },
+
+    "NO_SETTINGS": "This plugin does not have any settings."
+}

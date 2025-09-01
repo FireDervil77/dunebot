@@ -1,0 +1,25 @@
+{
+    "LOCALE": {
+        "DEFAULT": "de-DE"
+    },
+    "THEME": {
+        "ENABLED": true,
+        "DEFAULT": "default",
+        "PATH": "./themes"
+    },
+    "DASHBOARD": {
+        "ENABLED": true,
+        "ENCRYPT": true,
+        "LOGO_NAME": "DuneBot",
+        "LOGO_URL": "/images/logo.png"
+    },
+    "PREFIX_COMMANDS": {
+        "ENABLED": true,
+        "DEFAULT_PREFIX": "!"
+    },
+    "INTERACTIONS": {
+        "SLASH": true,
+        "CONTEXT": false
+    },
+    "ENABLED_PLUGINS": ["core"]
+}
