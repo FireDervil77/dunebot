@@ -1,0 +1,39 @@
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<% if (locals.title) { %>
+    <title><%= locals.title %></title>
+<% } else { %>
+    <title><%= tr('DASHBOARD.BOTNAME') %> - Admin Area</title>
+<% } %>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+
+<% if (locals.title) { %>
+   <meta name="title" content="<%= locals.title %>" />
+<% } else { %>
+    <meta name="title" content="<%= tr('DASHBOARD.BOTNAME') %> - Admin Area" />
+<% } %>
+<meta name="author" content="FireDervil" />
+<meta name="description" content="DuneBot is very scalable Discord Bot Plattform in Javascript with a Dashboard."/>
+<meta name="keywords" content="TODO:KEYWORDS"/>
+<link rel="canonical" href="{{ .Permalink }}" />
+
+<!-- Google Font: Source Sans Pro -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+    crossorigin="anonymous"
+/>  
+<!-- SERVING FAVICONS -->
+<%- includePartial('guild/stylesheets') %>
+<%- includePartial('guild/analytics') %>
+  
+<!-- Hook: dashboard_head -->
+<% if (locals.hooks && hooks.getViewHooks) { %>
+  <% const headHooks = hooks.getViewHooks('dashboard_head'); %>
+  <% if (headHooks && headHooks.length > 0) { %>
+    <% headHooks.forEach(hook => { %>
+      <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
+    <% }); %>
+  <% } %>
+<% } %>
+<!-- Hook:end: dashboard_head -->

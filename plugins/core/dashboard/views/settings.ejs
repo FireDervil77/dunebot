@@ -1,0 +1,85 @@
+<section
+  class="border-border bg-bg-panel rounded-lg border p-4 shadow-sm"
+  x-data="{
+    prefix: '<%= settings.prefix %>', 
+    locale: '<%= settings.locale %>',
+    initialData: {
+      prefix: '<%= settings.prefix %>',
+      locale: '<%= settings.locale %>'
+    },
+    saving: false,
+    async saveSettings() {
+      this.saving = true;
+      try {
+        const response = await fetch(window.location.href, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            prefix: this.prefix, 
+            locale: this.locale 
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to save settings`);
+        }
+
+        Alpine.store('toast').show('<%=tr(`SETTINGS_SAVE`)%>', 'success');
+      } catch (error) {
+        this.prefix = this.initialData.prefix;
+        this.locale = this.initialData.locale;
+        Alpine.store('toast').show('<%=tr(`SETTINGS_SAVE_ERROR`)%>', 'error');
+      } finally {
+        this.saving = false;
+      }
+    }
+  }">
+  <div class="mb-3">
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+      <!-- START: Column 1 (Currency) -->
+      <div>
+        <div class="mb-2">
+          <label for="prefix" class="text-text text-sm font-semibold"><%= tr("core:PREFIX_TITLE") %></label>
+          <div class="text-text-muted text-sm font-normal"><%= tr("core:PREFIX_DESC") %></div>
+        </div>
+        <input
+          type="text"
+          x-model="prefix"
+          minlength="1"
+          maxlength="2"
+          class="focus:border-primary focus:ring-primary border-border bg-bg-interactive text-text block w-full rounded-lg border p-2.5 shadow-sm sm:text-sm" />
+      </div>
+
+      <!-- START: Column 2 (Locale) -->
+      <div>
+        <div class="mb-2">
+          <label for="locale" class="text-text text-sm font-semibold"><%= tr("core:LOCALE_TITLE") %></label>
+          <div class="text-text-muted text-sm font-normal"><%= tr("core:LOCALE_DESC") %></div>
+        </div>
+        <select
+          x-model="locale"
+          class="focus:ring-primary focus:border-primary border-border bg-bg-interactive text-text block w-full rounded-lg border p-2.5 text-sm">
+          <% languagesMeta.forEach((lang) => { %>
+          <option value="<%= lang.name %>"><%= lang.name %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- START: Footer -->
+  <div class="border-border mt-4 flex items-center justify-between border-t pt-3 sm:pt-6">
+    <div></div>
+    <div class="flex-shrink-0">
+      <button
+        type="button"
+        @click="saveSettings()"
+        :disabled="saving"
+        :class="{'opacity-50': saving}"
+        class="bg-primary hover:bg-primary-dark focus:ring-primary inline-flex items-center rounded-lg px-3 py-2 text-center text-sm font-medium text-white focus:outline-none focus:ring-4 disabled:opacity-50">
+        <span x-show="!saving"><%= tr('BTN_SAVE') %></span>
+        <span x-show="saving"><%= tr('BTN_SAVING') %></span>
+      </button>
+    </div>
+  </div>
+</section>

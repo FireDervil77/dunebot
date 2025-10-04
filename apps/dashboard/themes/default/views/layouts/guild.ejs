@@ -1,0 +1,158 @@
+<%# 
+  * Admin-Layout (Guild-Seiten)
+  * @author FireDervil
+  %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <%- includePartial('guild/header') %>
+</head>
+<body class="fixed-footer layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary">
+    
+    <!--begin::App Wrapper-->
+    <div class="app-wrapper">
+
+        <!--begin::Header-->
+          <%- includePartial('guild/header_topbar') %>
+        <!--end::Header-->
+
+        <!--begin::Sidebar-->
+          <%- includePartial('guild/sidebar') %>
+        <!--end::Sidebar-->
+
+        <!--begin::Breadcrumb-->
+                <!--begin::Breadcrumb-->
+        <%- includePartial('guild/breadcrumb') %>
+        <!--end::Breadcrumb-->
+        <!--
+        <% if (locals.breadcrumb && locals.breadcrumb === true) { %>
+          <%- includePartial('guild/breadcrumb', locals) %>
+        <% } %> 
+        -->
+
+        <!-- Begin::Global Notifications -->
+        <% if (locals.globalNotifications && globalNotifications.length > 0) { %>
+            <div class="container-fluid mt-3">
+                <% globalNotifications.forEach(notification => { %>
+                    <div class="alert alert-<%= notification.type %> alert-dismissible fade show" role="alert" data-notification-id="<%= notification.id %>">
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Schließen">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                        <% if (notification.title) { %>
+                            <h5><strong><%- notification.title %></strong></h5>
+                        <% } %>
+                        <p><%- notification.message %></p>
+                        <% if (notification.action_url && notification.action_text) { %>
+                            <hr Class="noshade">
+                            <p class="mb-0">
+                                <a href="<%- notification.action_url %>" class="btn btn-info position-right" target="_blank">
+                                    <%- notification.action_text %>
+                                </a>
+                            </p>
+                        <% } %>
+                    </div>
+                <% }); %>
+            </div>
+        <% } %>
+        <!-- End::Global Notifications -->
+        
+        <!--end::Breadcrumb-->  
+
+            <%- body %>
+
+            </main>
+            <!--end::App Main-->
+
+          <!--begin::Footer-->
+          <%- includePartial('guild/footer') %>
+        <!--end::Footer-->
+    </div>
+    <!--end::App Wrapper-->
+
+<!-- SERVING SCRIPTS -->
+<!--begin::Third Party Plugin(OverlayScrollbars)-->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script
+      src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"
+      crossorigin="anonymous"
+    ></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.5/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+
+<script src="/themes/default/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/themes/default/assets/js/adminlte.min.js"></script>
+<script src="/themes/default/assets/js/guild.js"></script>
+<script src="/themes/default/assets/js/guild-switcher.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" crossorigin="anonymous"></script>
+
+<script>
+// Benachrichtigungen als gelesen markieren, wenn sie geschlossen werden
+document.addEventListener('DOMContentLoaded', function() {
+    // Close-Button Click Event (manuelles Schließen)
+    document.querySelectorAll('.alert[data-notification-id] .close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', function() {
+            const alert = this.closest('.alert[data-notification-id]');
+            const id = alert.dataset.notificationId;
+            
+            // Als gelesen markieren
+            fetch('/api/notifications/dismiss/' + id, { method: 'POST' })
+                .then(() => {
+                    // Alert ausblenden (AdminLTE/Bootstrap 4 Stil)
+                    $(alert).alert('close');
+                })
+                .catch(err => console.error('Fehler beim Markieren der Benachrichtigung als gelesen:', err));
+        });
+    });
+});
+
+    document.addEventListener('DOMContentLoaded', function () {
+    // OverlayScrollbars sicher initialisieren
+    const SELECTOR_SIDEBAR_WRAPPER = '.sidebar-wrapper';
+    const sidebarWrapper = document.querySelector(SELECTOR_SIDEBAR_WRAPPER);
+    const OS = window.OverlayScrollbarsGlobal?.OverlayScrollbars;
+    if (sidebarWrapper && typeof OS === 'function') {
+        OS(sidebarWrapper, {
+            scrollbars: {
+                theme: 'os-theme-light',
+                autoHide: 'leave',
+                clickScroll: true
+            }
+        });
+    } else {
+        console.warn('[Guild] OverlayScrollbars nicht verfügbar – Sidebar ohne Custom Scrollbars.');
+    }
+
+    // Chart.js (nur wenn vorhanden)
+    if (window.Chart) {
+        // Beispiel: Performance Gauge (falls Element existiert)
+        const ctx = document.getElementById('performanceGauge');
+        if (ctx) {
+            try {
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['CPU', 'RAM', 'Netz'],
+                        datasets: [{
+                            data: [30, 45, 25],
+                            backgroundColor: ['#3498db', '#f39c12', '#2ecc71'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: false,
+                        maintainAspectRatio: false,
+                        cutout: '75%',
+                        plugins: { legend: { display:false } }
+                    }
+                });
+            } catch (e) {
+                console.error('[Guild] Chart Init Fehler:', e);
+            }
+        }
+    } else {
+        console.warn('[Guild] Chart.js nicht geladen – Diagramme werden übersprungen.');
+    }
+});
+</script>
+</body>
+</html>

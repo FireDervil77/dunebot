@@ -1,0 +1,36 @@
+{
+    "EXAMPLE": {
+        "DESCRIPTION": "Ein Beispiel-Command",
+        "OPTION_TEXT_DESC": "Ein Text-Argument",
+        "OPTION_NUMBER_DESC": "Eine Zahl zwischen 1 und 100",
+        "OPTION_USER_DESC": "Ein User (optional)",
+        
+        "EMBED_TITLE": "✅ Beispiel-Command ausgeführt",
+        "EMBED_DESCRIPTION": "Du hast folgenden Text eingegeben: **{{text}}**",
+        "FIELD_NUMBER": "Deine Zahl",
+        "FIELD_USER": "Ausgewählter User",
+        "FOOTER": "Ausgeführt von {{user}}",
+        
+        "MESSAGE_SUCCESS": "✅ **Erfolgreich!**\n\n📝 Text: `{{text}}`\n🔢 Zahl: `{{number}}`\n👤 User: `{{user}}`",
+        
+        "TEXT_TOO_LONG": "❌ Der Text darf maximal 200 Zeichen lang sein!",
+        "NUMBER_OUT_OF_RANGE": "❌ Die Zahl muss zwischen 1 und 100 liegen!",
+        "ERROR": "❌ Ein Fehler ist aufgetreten: {{error}}"
+    },
+    
+    "SETTINGS": {
+        "TITLE": "Template-Plugin Einstellungen",
+        "FEATURE_ENABLED": "Feature aktiviert",
+        "MAX_ITEMS": "Maximale Anzahl Items",
+        "COOLDOWN": "Cooldown (Sekunden)",
+        "SAVED": "✅ Einstellungen gespeichert!",
+        "LOAD_ERROR": "❌ Fehler beim Laden der Einstellungen"
+    },
+    
+    "ERRORS": {
+        "GENERIC": "Ein unerwarteter Fehler ist aufgetreten",
+        "NO_PERMISSION": "Du hast keine Berechtigung dafür",
+        "GUILD_ONLY": "Dieser Command kann nur auf einem Server ausgeführt werden",
+        "COOLDOWN": "⏱️ Bitte warte noch {{seconds}} Sekunden"
+    }
+}

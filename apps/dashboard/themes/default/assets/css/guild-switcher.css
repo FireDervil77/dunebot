@@ -1,0 +1,54 @@
+/* Guild Switcher Styles */
+.dropdown-item.active {
+    background-color: #e9ecef;
+    color: #212529;
+}
+
+.dropdown-item.active:hover {
+    background-color: #dee2e6;
+}
+
+#guildSwitcher {
+    cursor: pointer;
+}
+
+#guildSwitcher img {
+    object-fit: cover;
+}
+
+/* Guild Switcher Dropdown Animation */
+.dropdown-menu {
+    animation: slideDown 0.2s ease-in-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Guild Icon Placeholder */
+.guild-icon-placeholder {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    #guildSwitcher .d-none {
+        display: none !important;
+    }
+}

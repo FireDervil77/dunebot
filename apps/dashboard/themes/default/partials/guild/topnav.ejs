@@ -1,0 +1,109 @@
+<%#  
+  * Admin-Topnav-Partial
+  * Enthält die obere Navigationsleiste für AdminLTE
+  * 
+  * @author FireDervil
+    %>
+
+<!-- Right navbar links -->
+<ul class="navbar-nav ml-auto">
+  <!-- Messages Dropdown Menu -->
+  <li class="nav-item dropdown">
+    <a class="nav-link" data-toggle="dropdown" href="#">
+      <i class="far fa-comments"></i>
+      <span class="badge badge-danger navbar-badge"><%= locals.unreadMessages || 0 %></span>
+    </a>
+    <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+      <% if (locals.messages && messages.length > 0) { %>
+        <% messages.slice(0, 3).forEach(message => { %>
+          <a href="<%= message.url || '#' %>" class="dropdown-item">
+            <div class="media">
+              <img src="<%= message.avatar || '/themes/default/assets/images/default-avatar.png' %>" alt="User Avatar" class="img-size-50 mr-3 img-circle">
+              <div class="media-body">
+                <h3 class="dropdown-item-title">
+                  <%= message.sender %>
+                  <% if (message.priority === 'high') { %>
+                    <span class="float-right text-sm text-danger"><i class="fas fa-star"></i></span>
+                  <% } else if (message.priority === 'medium') { %>
+                    <span class="float-right text-sm text-warning"><i class="fas fa-star"></i></span>
+                  <% } %>
+                </h3>
+                <p class="text-sm"><%= message.content.substring(0, 60) %><%= message.content.length > 60 ? '...' : '' %></p>
+                <p class="text-sm text-muted"><i class="far fa-clock mr-1"></i> <%= message.time %></p>
+              </div>
+            </div>
+          </a>
+          <div class="dropdown-divider"></div>
+        <% }); %>
+        <a href="/guild/messages" class="dropdown-item dropdown-footer">Alle Nachrichten anzeigen</a>
+      <% } else { %>
+        <span class="dropdown-item dropdown-footer">Keine neuen Nachrichten</span>
+      <% } %>
+    </div>
+  </li>
+
+  <!-- Notifications Dropdown Menu -->
+  <li class="nav-item dropdown">
+    <a class="nav-link" data-toggle="dropdown" href="#">
+      <i class="far fa-bell"></i>
+      <span class="badge badge-warning navbar-badge"><%= locals.notifications?.length || 0 %></span>
+    </a>
+    <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+      <span class="dropdown-item dropdown-header"><%= locals.notifications?.length || 0 %> Benachrichtigungen</span>
+      <div class="dropdown-divider"></div>
+      
+      <% if (locals.notifications && notifications.length > 0) { %>
+        <% notifications.slice(0, 5).forEach(notification => { %>
+          <a href="<%= notification.url || '#' %>" class="dropdown-item">
+            <i class="<%= notification.icon || 'fas fa-envelope' %> mr-2"></i> <%= notification.text.substring(0, 40) %><%= notification.text.length > 40 ? '...' : '' %>
+            <span class="float-right text-muted text-sm"><%= notification.time %></span>
+          </a>
+          <div class="dropdown-divider"></div>
+        <% }); %>
+        <a href="/guild/notifications" class="dropdown-item dropdown-footer">Alle Benachrichtigungen anzeigen</a>
+      <% } else { %>
+        <span class="dropdown-item">Keine Benachrichtigungen</span>
+        <div class="dropdown-divider"></div>
+      <% } %>
+    </div>
+  </li>
+
+  <!-- Sprache wechseln -->
+  <li class="nav-item dropdown">
+    <a class="nav-link" data-toggle="dropdown" href="#">
+      <i class="fas fa-globe"></i>
+    </a>
+    <div class="dropdown-menu dropdown-menu-right p-0">
+      <a href="/guild/locale?lang=de-DE" class="dropdown-item <%= locals.locale === 'de-DE' ? 'active' : '' %>">
+        <i class="flag-icon flag-icon-de mr-2"></i> Deutsch
+      </a>
+      <a href="/guild/locale?lang=en-US" class="dropdown-item <%= locals.locale === 'en-US' ? 'active' : '' %>">
+        <i class="flag-icon flag-icon-us mr-2"></i> English
+      </a>
+    </div>
+  </li>
+
+  <!-- Fullscreen Toggle -->
+  <li class="nav-item">
+    <a class="nav-link" data-widget="fullscreen" href="#" role="button">
+      <i class="fas fa-expand-arrows-alt"></i>
+    </a>
+  </li>
+
+  <!-- Hook: content_header_actions -->
+  <% if (locals.hooks && hooks.getViewHooks) { %>
+    <% const headerActionHooks = hooks.getViewHooks('content_header_actions'); %>
+    <% if (headerActionHooks && headerActionHooks.length > 0) { %>
+      <% headerActionHooks.forEach(hook => { %>
+        <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
+      <% }); %>
+    <% } %>
+  <% } %>
+
+  <!-- Abmelden -->
+  <li class="nav-item">
+    <a class="nav-link" href="/auth/logout" role="button" title="Abmelden">
+      <i class="fas fa-sign-out-alt"></i>
+    </a>
+  </li>
+</ul>

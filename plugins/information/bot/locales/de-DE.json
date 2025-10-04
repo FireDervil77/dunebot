@@ -1,0 +1,117 @@
+{
+    "TITLE": "Information",
+    "DESCRIPTION": "Information commands",
+
+    "BOT": {
+        "DESCRIPTION": "bot bezogene Befehle",
+        "SUB_INVITE_DESC": "hole dir die Einladung des Bots",
+        "SUB_STATS_DESC": "hole dir die Statistiken des Bots",
+        "SUB_UPTIME_DESC": "hole dir die Uptime des Bots",
+
+        "INVITE_EMBED_TITLE": "Einladung",
+        "INVITE_EMBED_DESC": "Hey! Danke, dass du mich einladen möchtest\nNutze den Button unten, um dorthin zu navigieren, wo du möchtest",
+        "INVITE_BTN_LABEL": "Einladungslink",
+        "INVITE_BTN_SUPPORT": "Support-Server",
+        "INVITE_BTN_DASHBOARD": "Dashboard",
+        "INVITE_DM_SENT": "Überprüfe deine DMs für meine Informationen! :envelope_with_arrow:",
+        "INVITE_DM_FAILED": "Ich kann dir meine Informationen nicht senden! Sind deine DMs geöffnet?",
+
+        "STATS_EMBED_TITLE": "Bot Informationen",
+        "STATS_TOTAL_SHARDS": "Gesamt Shards",
+        "STATS_GUILD_COUNT": "Gesamt Server: {{count}}",
+        "STATS_USER_COUNT": "Gesamt Nutzer: {{count}}",
+        "STATS_CHANNEL_COUNT": "Gesamt Kanäle: {{count}}",
+        "STATS_AVG_PING": "Durchschnittlicher Websocket Ping: {{ping}}ms",
+        "STATS_USAGE_INFO": "Ressourcennutzung",
+        "STATS_CPU_USAGE": "CPU Nutzung",
+        "STATS_RAM_USAGE": "RAM Nutzung",
+        "STATS_VERSION_INFO": "Versionsinformationen",
+        "STATS_NODE_VERSION": "NodeJS",
+        "STATS_DISCORD_VERSION": "DiscordJS",
+        "STATS_UPTIME": "Uptime",
+        "STATS_BTN_INVITE": "Einladen",
+        "STATS_BTN_SUPPORT": "Support-Server",
+        "STATS_BTN_DASHBOARD": "Dashboard",
+
+        "UPTIME": "Ich bin seit {{time}} online"
+    },
+
+    "INFO": {
+        "DESCRIPTION": "zeige verschiedene Informationen an",
+        "SUB_USER_DESC": "hole dir Benutzerinformationen",
+        "SUB_USER_NAME_DESC": "Name des Benutzers",
+        "SUB_CHANNEL_DESC": "hole dir Kanalinformationen",
+        "SUB_CHANNEL_NAME_DESC": "Name des Kanals",
+        "SUB_GUILD_DESC": "hole dir Serverinformationen",
+        "SUB_BOT_DESC": "hole dir Botinformationen",
+        "SUB_AVATAR_DESC": "zeige Avatarinformationen an",
+        "SUB_AVATAR_NAME_DESC": "Benutzer, dessen Avatar angezeigt werden soll",
+        "SUB_EMOJI_DESC": "zeige Emoji-Informationen an",
+        "SUB_EMOJI_NAME_DESC": "Name des Emojis",
+
+        "AVATAR_EMBED_TITLE": "Avatar von {{user}}",
+        "AVATAR_EMBED_LINKS": "Links",
+
+        "CHANNEL_EMBED_TITLE": "Kanal Details",
+        "CHANNEL_ID": "ID",
+        "CHANNEL_NAME": "Name",
+        "CHANNEL_TYPE": "Typ",
+        "CHANNEL_CATEGORY": "Kategorie",
+        "CHANNEL_TOPIC": "Thema",
+        "CHANNEL_POSITION": "Position",
+        "CHANNEL_SLOWMODE": "Langsame Mode",
+        "CHANNEL_NSFW": "NSFW",
+        "CHANNEL_OWNER_ID": "Besitzer ID",
+        "CHANNEL_ARCHIVED": "Ist Archiviert?",
+        "CHANNEL_LOCKED": "Ist Gesperrt?",
+        "CHANNEL_BITRATE": "Bitrate",
+        "CHANNEL_USER_LIMIT": "Benutzerlimit",
+        "CHANNEL_FULL": "Ist Voll?",
+
+        "EMOJI_NOT_VALID": "Dies ist kein gültiger Server-Emoji",
+        "EMOJI_EMBED_TITLE": "Emoji Info",
+        "EMOJI_ID": "ID",
+        "EMOJI_NAME": "Name",
+        "EMOJI_ANIMATED": "Animiert",
+
+        "GUILD_ID": "ID",
+        "GUILD_NAME": "Name",
+        "GUILD_OWNER": "Besitzer",
+        "GUILD_REGION": "Region",
+        "GUILD_EMBED_TITLE": "SERVER INFORMATION",
+        "GUILD_MEMBERS": "Server Mitglieder",
+        "GUILD_MEMBERS_VAL": "Mitglieder: {{users}}\nBots: {{bots}}",
+        "GUILD_ONLINE": "Online Stats",
+        "GUILD_ONLINE_VAL": "Mitglieder: {{onlineUsers}}\nBots: {{onlineBots}}",
+        "GUILD_CHANNELS": "Kategorien und Kanäle",
+        "GUILD_CHANNELS_VAL": "Kategorien: {{categories}} | Text: {{textChannels}} | Voice: {{voiceChannels}} | Thread: {{threadChannels}}",
+        "GUILD_ROLES": "Rollen",
+        "GUILD_VERIFICATION": "Verifizierung",
+        "GUILD_BOOSTS": "Server Boosts",
+        "GUILD_CREATED": "Server erstellt",
+
+        "USER_EMBED_TITLE": "Benutzerinformationen für {{user}}",
+        "USER_NAME": "Benutzer-Tag",
+        "USER_ID": "ID",
+        "USER_JOINED": "Server Beigetreten",
+        "USER_CREATED": "Discord Registriert",
+        "USER_ROLES": "Rollen",
+        "USER_AVATAR": "Avatar-URL"
+    },
+
+    "LB": {
+        "DESCRIPTION": "zeige die Rangliste an",
+        "SUB_TYPE_DESC": "Art der anzuzeigenden Rangliste",
+        "NO_USERS": "Keine Benutzer in der Rangliste",
+
+        "INVALID_TYPE": "Ungültiger Ranglistentyp {{type}}.\nGültige Typen sind: {{validTypes}}",
+
+        "STATS_DISABLED": "Ranking ist für diesen Server deaktiviert",
+        "STATS_LB_TITLE": "XP Rangliste",
+
+        "INVITE_DISABLED": "Einladungsverfolgung ist für diesen Server deaktiviert",
+        "INVITE_LB_TITLE": "Einladungs Rangliste",
+
+        "REP_LB_TITLE": "Reputations Rangliste"
+    }
+}

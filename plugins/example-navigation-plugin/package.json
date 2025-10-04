@@ -1,0 +1,13 @@
+{
+  "name": "example-navigation-plugin",
+  "version": "1.0.0",
+  "displayName": "example-navigation-plugin",
+  "description": "example-navigation-plugin.",
+  "author": "FireDervil",
+  "main": "dashboard/index.js",
+  "dashboard": "dashboard/index.js",
+  "repository": "https://github.com/firedervil77/dunebot-plugins",
+  "dependencies": {
+    "dunebot-sdk": "*"
+  }
+}

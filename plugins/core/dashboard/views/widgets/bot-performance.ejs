@@ -1,0 +1,29 @@
+
+<div class="position-relative">
+  <!-- Performance-Gauge -->
+  <canvas id="performanceGauge" style="height: 180px; width: 100%;"></canvas>
+  <div class="position-absolute top-50 start-50 translate-middle text-center">
+    <h3 class="mb-0"><%= stats?.performance?.pingTime || '?' %> ms</h3>
+    <small class="text-muted">Reaktionszeit</small>
+  </div>
+</div>
+<ul class="list-group list-group-flush">
+  <li class="list-group-item d-flex justify-content-between">
+    <span><i class="bi bi-activity me-2"></i>Websocket</span>
+    <strong class="<%= (stats?.performance?.responseTime < 100) ? 'text-success' : ((stats?.performance?.responseTime < 300) ? 'text-warning' : 'text-danger') %>">
+      <%= stats?.performance?.responseTime || '?' %> ms
+    </strong>
+  </li>
+  <li class="list-group-item d-flex justify-content-between">
+    <span><i class="bi bi-clock-history me-2"></i>Uptime</span>
+    <strong><%= stats?.performance?.uptime ? Math.floor(stats.performance.uptime/3600000) + 'h ' + Math.floor((stats.performance.uptime%3600000)/60000) + 'm' : '?' %></strong>
+  </li>
+  <li class="list-group-item d-flex justify-content-between">
+    <span><i class="bi bi-hdd-network me-2"></i>Shard Status</span>
+    <strong class="<%= (stats?.performance?.shardHealth === 0) ? 'text-success' : 'text-warning' %>">
+      <%= (stats?.performance?.shardHealth === 0) ? 'Optimal' : 'Verbindend...' %>
+    </strong>
+  </li>
+</ul>
+</div>
+

@@ -1,0 +1,120 @@
+<div class="content">
+    <div class="container-fluid">
+      <!-- Flash -->
+      <% 
+        const successMsgs = Array.isArray(locals.success) ? locals.success : [];
+        const errorMsgs = Array.isArray(locals.error) ? locals.error : [];
+      %>
+      <% if (successMsgs.length) { %>
+        <div class="alert alert-success"><%= successMsgs.join('<br>') %></div>
+      <% } %>
+      <% if (errorMsgs.length) { %>
+        <div class="alert alert-danger"><%= errorMsgs.join('<br>') %></div>
+      <% } %>
+
+      <!-- Aktivierte Plugins -->
+      <div class="card card-primary">
+          <div class="card-header">
+              <h3 class="card-title"><i class="fas fa-plug mr-2"></i>Aktivierte Plugins</h3>
+          </div>
+          <div class="card-body">
+              <% if (enabledPlugins && enabledPlugins.length) { %>
+                  <div class="row">
+                      <% enabledPlugins.forEach(p => { %>
+                          <div class="col-lg-4 col-md-6 col-sm-12">
+                              <div class="card plugin-card">
+                                  <div class="card-header d-flex align-items-center">
+                                      <img src="<%= p.icon %>" class="img-circle elevation-1 mr-2" style="width:40px;height:40px;" alt="<%= p.displayName %>">
+                                      <div>
+                                          <h5 class="mb-0"><%= p.displayName %></h5>
+                                          <small class="text-muted">v<%= p.version %></small>
+                                      </div>
+                                  </div>
+                                  <div class="card-body">
+                                      <p><%= p.description || 'Keine Beschreibung verfügbar' %></p>
+                                      <p><small class="text-muted">Autor: <%= p.author %></small></p>
+                                  </div>
+                                  <div class="card-footer d-flex">
+                                      <% if (p.name !== 'core') { %>
+                                          <form action="/guild/<%= guildId %>/plugins"
+                                                method="POST" 
+                                                class="guild-ajax-form mr-2"
+                                                data-form-type="plugin">
+                                              <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+                                              <input type="hidden" name="action" value="disable">
+                                              <input type="hidden" name="plugins[]" value="<%= p.name %>">
+                                              <button type="submit" class="btn btn-danger">
+                                                  <i class="fas fa-power-off mr-1"></i> Deaktivieren
+                                              </button>
+                                          </form>
+                                      <% } else { %>
+                                          <span class="badge badge-secondary">Core</span>
+                                      <% } %>
+                                      
+                                      <% if (p.hasSettings && p.settingsUrl) { %>
+                                          <a href="<%= p.settingsUrl %>" class="btn btn-info">
+                                              <i class="fas fa-cog mr-1"></i> Einstellungen
+                                          </a>
+                                      <% } %>
+                                  </div>
+                              </div>
+                          </div>
+                      <% }); %>
+                  </div>
+              <% } else { %>
+                  <div class="alert alert-info mb-0">
+                      <i class="icon fas fa-info-circle"></i> Keine Plugins aktiviert.
+                  </div>
+              <% } %>
+          </div>
+      </div>
+
+      <!-- Verfügbare Plugins -->
+      <div class="card card-secondary">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-box-open mr-2"></i>Verfügbare Plugins</h3>
+        </div>
+        <div class="card-body">
+          <% if (availablePlugins && availablePlugins.length) { %>
+            <div class="row">
+              <% availablePlugins.forEach(p => { %>
+                <div class="col-lg-4 col-md-6 col-sm-12">
+                  <div class="card plugin-card bg-light">
+                    <div class="card-header d-flex align-items-center bg-light">
+                      <img src="<%= p.icon %>" class="img-circle mr-2" style="width:40px;height:40px;opacity:.8" alt="<%= p.displayName %>">
+                      <div>
+                        <h5 class="mb-0"><%= p.displayName %></h5>
+                        <small class="text-muted">v<%= p.version %></small>
+                      </div>
+                    </div>
+                    <div class="card-body">
+                      <p class="text-muted"><%= p.description || 'Keine Beschreibung verfügbar' %></p>
+                      <p><small class="text-muted">Autor: <%= p.author %></small></p>
+                    </div>
+                    <div class="card-footer bg-light">
+                      <form action="/guild/<%= guildId %>/plugins"
+                          method="POST"
+                          class="guild-ajax-form"
+                          data-form-type="plugin">
+                        <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+                        <input type="hidden" name="action" value="enable">
+                        <input type="hidden" name="plugins[]" value="<%= p.name %>">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-power-off mr-1"></i> Aktivieren
+                        </button>
+                    </form>
+                    </div>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          <% } else { %>
+            <div class="alert alert-info mb-0">
+              <i class="icon fas fa-info-circle"></i> Keine weiteren Plugins verfügbar.
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

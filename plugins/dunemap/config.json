@@ -1,0 +1,10 @@
+{
+    "GRID_WIDTH": 9,
+    "GRID_HEIGHT": 9,
+    "TILE_SIZE": 70,
+    "ICON_PATH": "/assets/icons/dunemap/",
+    "USE_SAME_CHANEL": true,
+    "STORM_TIMER_FORMAT": "HH:mm:ss",
+    "STORM_TIMER_DURATION": "5d",
+    "MAP_CHANNEL_ID": null
+}

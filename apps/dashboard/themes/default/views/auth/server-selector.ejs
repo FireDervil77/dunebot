@@ -1,0 +1,179 @@
+<% if (typeof botOnline !== 'undefined' && botOnline === false) { %>
+  <div class="container py-5">
+    <div class="alert alert-warning shadow-sm">
+      <h4 class="alert-heading">
+        <i class="fas fa-power-off me-2"></i>Bot nicht erreichbar
+      </h4>
+      <p class="mb-2">
+        <strong>DuneBot ist aktuell nicht verbunden.</strong><br>
+        Er wird möglicherweise neu gestartet oder befindet sich in Wartung.
+      </p>
+      <ul class="mb-3 small">
+        <li>Bitte warte einen Moment und aktualisiere die Seite.</li>
+        <li>Ohne aktive Bot-Verbindung können keine Server-Daten geladen werden.</li>
+        <li>Deine Anmeldung bleibt (falls aktiv) bestehen.</li>
+      </ul>
+      <div class="d-flex gap-2">
+        <a href="/auth/server-selector" class="btn btn-outline-secondary">
+          <i class="fas fa-sync-alt me-1"></i> Neu versuchen
+        </a>
+        <button id="autoReloadBtn" class="btn btn-outline-primary">
+          <i class="fas fa-redo-alt me-1"></i> Auto-Reload aktivieren
+        </button>
+      </div>
+      <hr>
+      <p class="mb-0 text-muted small">
+        Falls das Problem länger anhält, kontaktiere bitte einen Administrator.
+      </p>
+    </div>
+    <div class="text-center text-muted small">
+      <span id="nextReloadInfo"></span>
+    </div>
+  </div>
+  <script>
+    (function(){
+      let auto = false;
+      let countdown = 15;
+      const btn = document.getElementById('autoReloadBtn');
+      const info = document.getElementById('nextReloadInfo');
+      function updateInfo() {
+        if (!auto) { info.textContent = ''; return; }
+        info.textContent = 'Automatischer Reload in ' + countdown + 's ...';
+      }
+      let interval = null;
+      btn.addEventListener('click', () => {
+        auto = !auto;
+        if (auto) {
+          btn.classList.remove('btn-outline-primary');
+          btn.classList.add('btn-primary');
+          btn.innerHTML = '<i class="fas fa-stop-circle me-1"></i> Auto-Reload stoppen';
+          countdown = 15;
+          updateInfo();
+          interval = setInterval(() => {
+            if (!auto) return;
+            countdown--;
+            if (countdown <= 0) location.reload();
+            updateInfo();
+          }, 1000);
+        } else {
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-outline-primary');
+          btn.innerHTML = '<i class="fas fa-redo-alt me-1"></i> Auto-Reload aktivieren';
+          if (interval) clearInterval(interval);
+          info.textContent = '';
+        }
+      });
+    })();
+  </script>
+<% } else { %>
+
+  <div class="login-box server-selector">
+    <div class="login-logo">
+      <img src="/themes/default/assets/images/DuneBot.png" width="125" height="125" alt="DuneBot">
+      <b>DuneBot</b>
+      <p><span>Wähle deinen Server aus um ihn zu verwalten:</span></p>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+      <% (guilds || []).forEach(guild => { %>
+        <div class="col">
+          <div class="card h-100">
+            <div class="card-body login-card-body text-center">
+              <img src="<%= guild.iconURL %>" alt="<%= guild.name %>" class="guild-icon mb-2" width="100" height="100">
+              <h5 class="card-title"><%= guild.name %></h5>
+              <% if (guild.botInGuild) { %>
+                <div class="guild-status text-success mb-3">
+                  <i class="fas fa-check-circle me-1"></i> Bot in Guild
+                </div>
+                <a href="<%= guild.settingsUrl %>" class="btn btn-primary w-100">Verwalten</a>
+              <% } else { %>
+                <div class="guild-status text-danger mb-3">
+                  <i class="fas fa-exclamation-circle me-1"></i> Bot not in Guild
+                </div>
+                <a href="<%= guild.settingsUrl %>" id="invite-btn-<%= guild.id %>" target="_blank" class="btn btn-outline-primary w-100">
+                  <i class="fas fa-plus-circle me-2"></i> Bot hinzufügen
+                </a>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <% if (!guilds || guilds.length === 0) { %>
+      <div class="alert alert-info text-center mt-5">
+        <i class="fas fa-info-circle me-2"></i> Du hast keine Server, in denen du Besitzer (Owner) bist.
+      </div>
+      <div class="text-center">
+        <a href="https://discord.com/new" target="_blank" class="btn btn-primary mt-3">
+          <i class="fas a-plus-circle me-2"></i> Neuen Discord Server erstellen
+        </a>
+      </div>
+    <% } %>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('[id^="invite-btn-"]').forEach(button => {
+        button.addEventListener('click', function() {
+          const guildId = this.id.replace('invite-btn-','');
+          localStorage.setItem('pendingBotInvite', guildId);
+          localStorage.setItem('inviteTimestamp', Date.now());
+          startPolling(guildId);
+        });
+      });
+      const pendingInvite = localStorage.getItem('pendingBotInvite');
+      const inviteTimestamp = localStorage.getItem('inviteTimestamp');
+      if (pendingInvite && inviteTimestamp && (Date.now() - parseInt(inviteTimestamp)) < 5*60*1000) {
+        startPolling(pendingInvite);
+      } else {
+        localStorage.removeItem('pendingBotInvite');
+        localStorage.removeItem('inviteTimestamp');
+      }
+      function startPolling(guildId) {
+        const statusDiv = document.createElement('div');
+        statusDiv.className='alert alert-info position-fixed top-0 start-50 translate-middle-x mt-3';
+        statusDiv.style.zIndex='1050';
+        statusDiv.innerHTML='<i class="fas fa-spinner fa-spin me-2"></i> Prüfe Bot-Status...';
+        document.body.appendChild(statusDiv);
+        const pollInterval = setInterval(async () => {
+          try {
+            const r = await fetch(`/api/bot-status/${guildId}`);
+            const data = await r.json();
+            if (data.success && data.botInGuild) {
+              statusDiv.className='alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
+              statusDiv.innerHTML='<i class="fas fa-check-circle me-2"></i> Bot erfolgreich hinzugefügt!';
+              clearInterval(pollInterval);
+              updateGuildCard(guildId);
+              localStorage.removeItem('pendingBotInvite');
+              localStorage.removeItem('inviteTimestamp');
+              setTimeout(()=>statusDiv.remove(),3000);
+            }
+          } catch(e){
+            console.error('Bot-Status Fehler:', e);
+            statusDiv.className='alert alert-danger position-fixed top-0 start-50 translate-middle-x mt-3';
+            statusDiv.innerHTML='<i class="fas fa-times-circle me-2"></i> Fehler beim Prüfen';
+            clearInterval(pollInterval);
+          }
+        },3000);
+        setTimeout(()=>{ clearInterval(pollInterval); if (document.body.contains(statusDiv)) statusDiv.remove(); },5*60*1000);
+      }
+      function updateGuildCard(guildId) {
+        const btn = document.querySelector(`#invite-btn-${guildId}`);
+        if (!btn) return;
+        const card = btn.closest('.card');
+        const statusDiv = card.querySelector('.guild-status');
+        if (statusDiv) {
+          statusDiv.className='guild-status text-success mb-3';
+          statusDiv.innerHTML='<i class="fas fa-check-circle me-1"></i> Bot in Guild';
+        }
+        btn.remove();
+        const manageBtn = document.createElement('a');
+        manageBtn.href=`/guild/${guildId}`;
+        manageBtn.className='btn btn-primary w-100';
+        manageBtn.textContent='Verwalten';
+        card.querySelector('.card-body').appendChild(manageBtn);
+      }
+    });
+  </script>
+<% } %>

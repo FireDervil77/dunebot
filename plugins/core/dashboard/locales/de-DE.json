@@ -1,0 +1,27 @@
+{
+    "TITLE": "Core",
+    "DESCRIPTION": "Kern Plugin für die Anwendung",
+
+    "SETTINGS_TITLE": "Einstellungen",
+    "PREFIX_TITLE": "Präfix",
+    "PREFIX_DESC": "Das Präfix für die Bot-Befehle",
+    "LOCALE_TITLE": "Sprache",
+    "LOCALE_DESC": "Die Sprache für den Bot",
+
+    "SERVER_DEFAULTS": "Servereinstellungen",
+    "SUPPORT": "Support-Server",
+    "SUPPORT_DESC": "Discord-Einladungslink für den Support-Server",
+    "SLASH": "Slash-Befehle",
+    "SLASH_DESC": "Aktivieren/deaktivieren von Slash-Befehlen",
+    "CONTEXT": "Kontextmenü",
+    "CONTEXT_DESC": "Aktivieren/deaktivieren von Kontextmenüs",
+
+    "DASH_DEFAULTS": "Dashboard-Einstellungen",
+    "LOGO": "Logo",
+    "LOGO_DESC": "Logo für das Dashboard",
+    "LOGO_URL": "Logo-URL",
+    "LOGO_URL_DESC": "URL zum Logo-Bild",
+
+    "ENABLED": "Aktiviert",
+    "DISABLED": "Deaktiviert"
+}

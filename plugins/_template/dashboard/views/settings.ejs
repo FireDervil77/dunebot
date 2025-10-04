@@ -1,0 +1,140 @@
+<!-- Template Plugin - Einstellungen -->
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-header">
+                <h1>
+                    <i class="fa-solid fa-cog"></i>
+                    Template Plugin Einstellungen
+                </h1>
+                <p class="text-muted">
+                    Konfiguriere das Template-Plugin für deinen Server
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-lg-8">
+            <form method="POST" action="/guild/<%= guild.id %>/template/settings">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fa-solid fa-sliders"></i> Allgemeine Einstellungen</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Feature Toggle -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input 
+                                    class="form-check-input" 
+                                    type="checkbox" 
+                                    id="feature_enabled" 
+                                    name="feature_enabled"
+                                    <%= settings.feature_enabled ? 'checked' : '' %>
+                                >
+                                <label class="form-check-label" for="feature_enabled">
+                                    <strong>Feature aktivieren</strong>
+                                    <p class="text-muted mb-0">Aktiviert das Haupt-Feature des Plugins</p>
+                                </label>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Max Items -->
+                        <div class="mb-3">
+                            <label for="max_items" class="form-label">
+                                <strong>Maximale Anzahl Items</strong>
+                            </label>
+                            <input 
+                                type="number" 
+                                class="form-control" 
+                                id="max_items" 
+                                name="max_items"
+                                value="<%= settings.max_items || 100 %>"
+                                min="1"
+                                max="1000"
+                            >
+                            <div class="form-text">
+                                Legt fest, wie viele Items maximal gespeichert werden können (1-1000)
+                            </div>
+                        </div>
+
+                        <!-- Cooldown -->
+                        <div class="mb-3">
+                            <label for="cooldown_seconds" class="form-label">
+                                <strong>Cooldown (Sekunden)</strong>
+                            </label>
+                            <input 
+                                type="number" 
+                                class="form-control" 
+                                id="cooldown_seconds" 
+                                name="cooldown_seconds"
+                                value="<%= settings.cooldown_seconds || 60 %>"
+                                min="0"
+                                max="3600"
+                            >
+                            <div class="form-text">
+                                Wartezeit zwischen Command-Aufrufen (0-3600 Sekunden)
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-save"></i> Einstellungen speichern
+                        </button>
+                        <a href="/guild/<%= guild.id %>/template" class="btn btn-secondary">
+                            <i class="fa-solid fa-times"></i> Abbrechen
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Info-Sidebar -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fa-solid fa-info-circle"></i> Hilfe</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Über diese Einstellungen</h6>
+                    <p class="text-muted">
+                        Hier kannst du das Verhalten des Template-Plugins für deinen Server anpassen.
+                    </p>
+
+                    <h6 class="mt-3">Feature aktivieren</h6>
+                    <p class="text-muted small">
+                        Aktiviert oder deaktiviert das Haupt-Feature des Plugins. 
+                        Wenn deaktiviert, sind die Commands weiterhin verfügbar, 
+                        aber das Feature wird nicht ausgeführt.
+                    </p>
+
+                    <h6 class="mt-3">Maximale Items</h6>
+                    <p class="text-muted small">
+                        Begrenzt die Anzahl der Items, die pro User gespeichert werden können.
+                        Höhere Werte benötigen mehr Speicher.
+                    </p>
+
+                    <h6 class="mt-3">Cooldown</h6>
+                    <p class="text-muted small">
+                        Verhindert Spam durch Festlegung einer Wartezeit zwischen Command-Aufrufen.
+                        0 Sekunden = kein Cooldown.
+                    </p>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header bg-warning text-dark">
+                    <h5><i class="fa-solid fa-exclamation-triangle"></i> Wichtig</h5>
+                </div>
+                <div class="card-body">
+                    <p class="small mb-0">
+                        Änderungen werden sofort wirksam. Stelle sicher, dass die Einstellungen 
+                        für deinen Server geeignet sind, bevor du speicherst.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

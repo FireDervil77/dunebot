@@ -1,0 +1,71 @@
+<aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+  <div class="sidebar-brand">
+    <a href="/guild/<%= guildId %>" class="brand-link">
+      <img src="/themes/default/assets/images/DuneBot.png" alt="DuneBot" class="brand-image opacity-75 shadow">
+      <span class="brand-text fw-light">DuneBot</span>
+    </a>
+  </div>
+
+  <div class="sidebar-wrapper">
+    <nav class="mt-2">
+        <%
+           const navItems = (guildNav && guildNav.length) ? guildNav : [];
+            %>
+        <% if (navItems.length === 0) { %>
+          <div class="text-muted small px-3 py-2">
+            <i class="bi bi-info-circle me-1"></i> Keine Navigation verfügbar
+          </div>
+          <!-- Debug-Info anzeigen -->
+          <div class="text-muted small px-3 py-2">
+            <small>Debug: guildId=<%= guildId || 'N/A' %>, NavItems=<%= navItems.length %></small>
+          </div>
+        <% } else { %>
+          <ul class="nav nav-pills nav-sidebar flex-column" role="menu" data-accordion="false">
+            <li class="nav-header">Navigation</li>
+            <% 
+              // Erst prüfen, ob es einen exakten Match gibt
+              const hasExactMatch = navItems.some(item => activeMenu === item.url);
+              
+              navItems
+                .sort((a,b) => (a.sort_order || a.order || 0) - (b.sort_order || b.order || 0)) 
+                .forEach(item => { 
+                  // Nur dann als aktiv markieren, wenn:
+                  // 1. Exakter Match ODER
+                  // 2. Kein exakter Match existiert UND die URL mit diesem Item beginnt
+                  const isExactMatch = activeMenu === item.url;
+                  const isParentMatch = !hasExactMatch && activeMenu && activeMenu.startsWith(item.url + '/');
+                  const isActive = isExactMatch || isParentMatch;
+            %>
+              <li class="nav-item <%= isActive ? 'menu-open' : '' %>">
+                <a href="<%= item.url %>" class="nav-link <%= isActive ? 'active' : '' %>">
+                  <i class="nav-icon <%= item.icon || 'fa-solid fa-circle' %>"></i>
+                  <p>
+                    <%= item.title %>
+                    <% if (item.subItems && item.subItems.length > 0) { %>
+                      <i class="bi bi-chevron-right right"></i>
+                    <% } %>
+                  </p>
+                </a>
+                <% if (item.subItems && item.subItems.length > 0) { %>
+                  <ul class="nav nav-treeview">
+                    <% item.subItems
+                        .sort((a,b) => (a.sort_order || a.order || 0) - (b.sort_order || b.order || 0))
+                        .forEach(child => {
+                          const cActive = activeMenu === child.url;
+                    %>
+                      <li class="nav-item">
+                        <a href="<%= child.url %>" class="nav-link <%= cActive ? 'active' : '' %>">
+                          <i class="nav-icon <%= child.icon || 'fa-regular fa-dot-circle' %>"></i>
+                          <p><%= child.title %></p>
+                        </a>
+                      </li>
+                    <% }); %>
+                  </ul>
+                <% } %>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+    </nav>
+  </div>
+</aside>

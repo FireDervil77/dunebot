@@ -1,0 +1,8 @@
+{
+  "name": "superadmin",
+  "version": "1.0.0",
+  "description": "SuperAdmin Panel - Nur für Bot-Owner",
+  "main": "index.js",
+  "author": "FireDervil",
+  "private": true
+}

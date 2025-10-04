@@ -1,0 +1,64 @@
+{
+    "TITLE": "DuneMap",
+    "DESCRIPTION": "Plugin for the DeepDesert map",
+    "ENABLED": "Enable",
+    "DISABLED": "Disable",
+    "ADMIN_RIGHTS" : "You need administrator rights for this command.",
+
+    "PERMISSIONS": {
+        "MANAGE_GUILD_REQUIRED": "You need the **Manage Server** permission for this command!"
+    },
+
+    "CHANNELS": {
+        "CHANNEL_DESCRIPTION" : "Set the channel for the map",
+        "CHANNEL_SET_DSCR" : "Please specify a channel: !dunemap channel #channel",
+        "CHANNEL_SET_ERROR" : "Error setting the channel!",
+        "CHANNEL_SET_SUCCESS": "Map channel set to {channel}!",
+        "TARGET_DESCRIPTION" : "The channel for the map"
+    },
+    "STORM" : {
+        "DESCRIPTION": "Manage the Coriolis storm timer",
+        "SET_DESCRIPTION": "Set the storm timer",
+        "RESET_DESCRIPTION": "Reset the timer",
+        "DAYS_DESCRIPTION": "Days",
+        "HOURS_DESCRIPTION": "Hours",
+        "MINUTES_DESCRIPTION": "Minutes",
+        "TIMER_RESET_MSG": "✅ Timer has been reset!",
+        "COMMANDS_USAGE": "Available commands: set, reset"
+    },
+    "MAP": {
+        "DESCRIPTION": "Deep Desert Map commands",
+        "SHOW_DESCRIPTION": "Display the current map with markers",
+        "SET_DESCRIPTION": "Set a marker on the map",
+        "REMOVE_DESCRIPTION": "Remove a marker from the map",
+        "COORD_DESCRIPTION": "Coordinates (e.g. A1-I9)",
+        "TYPE_DESCRIPTION": "Marker type",
+        "SET_SUCCESS": "✅ Marker set at {coord}!",
+        "REMOVE_SUCCESS": "✅ Marker removed at {coord}!",
+        "INVALID_COORD": "❌ Invalid coordinates! Format: A1-I9",
+        "NO_CHANNEL": "No map channel configured! Please set up first with `/dunemap-setup channel`.",
+        "CHANNEL_NOT_FOUND": "The configured map channel was not found! Please reset with `/dunemap-setup channel`.",
+        "AVAILABLE_COMMANDS": "Available commands: show, set, remove",
+        "ERROR": "❌ An error occurred!",
+        "UPDATED": "✅ Map has been updated!",
+        "USAGE_SET": "Usage: !map set <coord> <type>",
+        "USAGE_REMOVE": "Usage: !map remove <coord>"
+    },
+    "TUTORIAL": {
+        "DESCRIPTION": "Shows a guide for the DuneMap plugin",
+        "INTRO": "Welcome to the DuneMap plugin! This guide shows you how to use the interactive Deep Desert map.",
+        "STEP1_TITLE": "Set up map channel",
+        "STEP1_DESC": "Use `/dunemap-setup channel #channel` to set the channel where the map will be displayed.\n**Required:** Manage Server permission",
+        "STEP2_TITLE": "Place markers",
+        "STEP2_DESC": "Use `/map set <coordinate> <type>` to place markers.\n**Example:** `/map set B3 titan`\n**Available types:** Titan, Spice, Stravidium, Base, Wrack, Aluminium, Basalt, Eisen, Karbon, Höhle, Loch, Kontrollpunkt, Taxi, Test",
+        "STEP3_TITLE": "Use storm timer",
+        "STEP3_DESC": "Set the Coriolis storm timer with `/storm set <days> <hours> <minutes>`.\n**Example:** `/storm set 2 5 30` (2 days, 5 hours, 30 minutes)\n**Required:** Manage Server permission",
+        "STEP4_TITLE": "Display map",
+        "STEP4_DESC": "Use `/map show` to update the map with all markers and the timer, and post it in the configured channel.",
+        "ADMIN_TITLE": "Admin commands",
+        "ADMIN_DESC": "**Reset timer:** `/storm reset`\n**Remove marker:** `/map remove <coordinate>`\n_Note: You can only remove your own markers._",
+        "COMMANDS_TITLE": "Command overview",
+        "COMMANDS_LIST": "🗺️ `/map show` - Display map\n📍 `/map set` - Set marker\n🗑️ `/map remove` - Remove marker\n⏱️ `/storm set` - Set timer\n♻️ `/storm reset` - Reset timer\n⚙️ `/dunemap-setup channel` - Configure channel\n❓ `/tutorial` - Show this help",
+        "FOOTER": "DuneBot Map System • Good luck in the Deep Desert!"
+    }
+}

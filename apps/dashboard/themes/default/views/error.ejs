@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <%
+    const env = locals.environment || process.env.NODE_ENV || 'development';
+    const errObj = typeof error !== 'undefined' ? error : (locals.error || {});
+    const statusCode = (typeof status !== 'undefined' ? status : (errObj.status || errObj.statusCode || 500));
+    const titleText = (errObj.title || errObj.name || 'Fehler');
+    const messageText = (locals.message || errObj.message || 'Es ist ein Fehler aufgetreten.');
+  %>
+  <title><%= statusCode %> - <%= titleText %></title>
+  <link rel="stylesheet" href="/themes/default/assets/css/main.css">
+</head>
+<body class="bg-light">
+  <div class="container py-5">
+    <h1 class="display-4 mb-3"><%= statusCode %> - <%= titleText %></h1>
+    <p class="lead"><%= messageText %></p>
+
+    <% if (env !== 'production' && errObj && errObj.stack) { %>
+      <pre class="mt-4 p-3 bg-white border rounded"><%= errObj.stack %></pre>
+    <% } %>
+
+    <div class="mt-4">
+      <a href="<%= locals.dashboardHomeUrl || '/auth/server-selector' %>" class="btn btn-primary">Zum Dashboard</a>
+      <a href="/" class="btn btn-secondary ml-2">Startseite</a>
+    </div>
+  </div>
+</body>
+</html>

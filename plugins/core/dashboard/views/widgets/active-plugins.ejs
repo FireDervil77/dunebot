@@ -1,0 +1,25 @@
+<!--  Aktivierte Plugins -->
+<% if (locals.enabledPlugins && enabledPlugins.length > 0) { %>
+  <div class="row">
+    <% enabledPlugins.forEach(plugin => { %>
+      <div class="col-md-3 col-lg-2 mb-3">
+        <div class="plugin-card text-center">
+          <div class="plugin-icon mb-2">
+            <i class="bi bi-puzzle fs-3 text-primary"></i>
+          </div>
+          <h5 class="plugin-name mb-1"><%= plugin %></h5>
+          <a href="/guild/<%= guildId %>/plugins/<%= plugin %>" class="btn btn-sm btn-primary">
+            <i class="bi bi-gear-fill me-1"></i> Konfigurieren
+          </a>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+<% } else { %>
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle me-2"></i>
+    Keine Plugins aktiviert oder verfügbar für diesen Server.
+    <a href="/guild/<%= guildId %>/plugins" class="alert-link">Jetzt Plugins aktivieren</a>
+  </div>
+<% } %>
+   

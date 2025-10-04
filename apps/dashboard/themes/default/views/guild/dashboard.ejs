@@ -1,0 +1,78 @@
+<%# 
+  * Server-Dashboard-View
+  * Zeigt die Hauptübersicht für einen Discord-Server an
+  * 
+  * @author FireDervil
+  * @context {Object} guild - Discord Guild-Objekt
+  * @context {Array} widgets - Dashboard-Widgets
+  * @context {Array} enabledPlugins - Aktivierte Plugins für diese Guild
+  * @context {Object} stats - Server-Statistiken
+  %>
+
+<!--begin::App Content-->
+<div class="app-content">
+    <!--begin::Container-->
+    <div class="container-fluid">
+        <!--begin::Row-->
+        <div class="row">
+          
+    <!-- Hook: before_guild_dashboard -->
+    <% if (locals.hooks && hooks.getViewHooks) { %>
+      <% const beforeHooks = hooks.getViewHooks('before_guild_dashboard'); %>
+      <% if (beforeHooks && beforeHooks.length > 0) { %>
+        <% beforeHooks.forEach(hook => { %>
+          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {}, guild, guildId }) %>
+        <% }); %>
+      <% } %>
+    <% } %>
+
+
+     <!-- Dashboard Widgets -->
+        <% if (locals.widgets && widgets.length > 0) { %>
+          <div class="row">
+            <% widgets.forEach(widget => { %>
+              <div class="col-md-<%= widget.size || 12 %>">
+                <div class="card <%= widget.cardClass || '' %>">
+                  <div class="card-header">
+                    <h3 class="card-title"><%= widget.title || 'Widget' %></h3>
+                    <% if (widget.actions && widget.actions.length > 0) { %>
+                      <div class="card-tools">
+                        <% widget.actions.forEach(action => { %>
+                          <button type="button" class="btn btn-tool" data-action="<%= action.id %>"
+                                  <% if (action.attributes) { Object.keys(action.attributes).forEach(attr => { %>
+                                    <%= attr %>="<%= action.attributes[attr] %>"
+                                  <% }); } %>>
+                            <i class="<%= action.icon || 'fas fa-wrench' %>"></i>
+                          </button>
+                        <% }); %>
+                      </div>
+                    <% } %>
+                  </div>
+                  <div class="card-body">
+                    <%- widget.content %>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </div>       
+
+    <!-- Hook: after_guild_dashboard -->
+    <% if (locals.hooks && hooks.getViewHooks) { %>
+      <% const afterHooks = hooks.getViewHooks('after_guild_dashboard'); %>
+      <% if (afterHooks && afterHooks.length > 0) { %>
+        <% afterHooks.forEach(hook => { %>
+          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {}, guild, guildId }) %>
+        <% }); %>
+      <% } %>
+    <% } %>
+
+          
+        </div>
+        <!--end::Row-->
+    </div>
+    <!--end::Container-->
+</div>
+<!--end::App Content-->

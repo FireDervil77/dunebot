@@ -1,0 +1,159 @@
+<%# 
+  * News Editor
+  * Erstellen & Bearbeiten von News
+  %>
+
+<div class="app-content">
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h2><%= news && news._id ? 'News bearbeiten' : 'Neue News erstellen' %></h2>
+            </div>
+            <div class="col-md-6 text-end">
+                <a href="/guild/<%= guildId %>/plugins/superadmin/news" class="btn btn-secondary">
+                    <i class="fa-solid fa-arrow-left me-2"></i>Zurück zur Übersicht
+                </a>
+            </div>
+        </div>
+
+        <!-- News Formular -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST" action="/guild/<%= guildId %>/plugins/superadmin/news/save">
+                            <!-- Verstecktes Feld für ID bei Bearbeitung -->
+                            <% if (news && news._id) { %>
+                                <input type="hidden" name="newsId" value="<%= news._id %>">
+                            <% } %>
+
+                            <!-- Titel -->
+                            <div class="mb-3">
+                                <label for="title" class="form-label">Titel *</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="title" 
+                                       name="title" 
+                                       value="<%= news && news.title ? news.title : '' %>" 
+                                       required>
+                            </div>
+
+                            <!-- Slug -->
+                            <div class="mb-3">
+                                <label for="slug" class="form-label">Slug *</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="slug" 
+                                       name="slug" 
+                                       value="<%= news && news.slug ? news.slug : '' %>" 
+                                       required>
+                                <small class="form-text text-muted">
+                                    URL-freundlicher Name (z.B. "grosse-news-update")
+                                </small>
+                            </div>
+
+                            <!-- Autor -->
+                            <div class="mb-3">
+                                <label for="author" class="form-label">Autor *</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="author" 
+                                       name="author" 
+                                       value="<%= news && news.author ? news.author : (user && user.info && user.info.username ? user.info.username : 'Admin') %>" 
+                                       required>
+                            </div>
+
+                            <!-- Excerpt -->
+                            <div class="mb-3">
+                                <label for="excerpt" class="form-label">Kurzbeschreibung *</label>
+                                <textarea class="form-control" 
+                                          id="excerpt" 
+                                          name="excerpt" 
+                                          rows="3" 
+                                          required><%= news && news.excerpt ? news.excerpt : '' %></textarea>
+                            </div>
+
+                            <!-- News Text -->
+                            <div class="mb-3">
+                                <label for="news_text" class="form-label">Inhalt *</label>
+                                <textarea class="form-control" 
+                                          id="news_text" 
+                                          name="news_text" 
+                                          rows="10" 
+                                          required><%= news && news.news_text ? news.news_text : '' %></textarea>
+                            </div>
+
+                            <!-- Image URL -->
+                            <div class="mb-3">
+                                <label for="image_url" class="form-label">Bild URL</label>
+                                <input type="url" 
+                                       class="form-control" 
+                                       id="image_url" 
+                                       name="image_url" 
+                                       value="<%= news && news.image_url ? news.image_url : '' %>">
+                                <small class="form-text text-muted">
+                                    Optional: URL zu einem Bild für die News
+                                </small>
+                            </div>
+
+                            <!-- Status -->
+                            <div class="mb-3">
+                                <label for="status" class="form-label">Status *</label>
+                                <select class="form-select" id="status" name="status" required>
+                                    <option value="draft" <%= news && news.status === 'draft' ? 'selected' : '' %>>
+                                        Entwurf
+                                    </option>
+                                    <option value="published" <%= news && news.status === 'published' ? 'selected' : '' %>>
+                                        Veröffentlicht
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Datum -->
+                            <div class="mb-3">
+                                <label for="date" class="form-label">Veröffentlichungsdatum *</label>
+                                <input type="datetime-local" 
+                                       class="form-control" 
+                                       id="date" 
+                                       name="date" 
+                                       value="<%= news && news.date ? new Date(news.date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16) %>" 
+                                       required>
+                            </div>
+
+                            <!-- Submit Buttons -->
+                            <div class="d-flex justify-content-between">
+                                <a href="/guild/<%= guildId %>/plugins/superadmin/news" class="btn btn-secondary">
+                                    Abbrechen
+                                </a>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fa-solid fa-save me-2"></i>Speichern
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-generate slug from title
+document.getElementById('title').addEventListener('input', function(e) {
+    const titleInput = e.target;
+    const slugInput = document.getElementById('slug');
+    
+    // Nur auto-generieren wenn slug leer ist
+    if (!slugInput.value) {
+        const slug = titleInput.value
+            .toLowerCase()
+            .replace(/ä/g, 'ae')
+            .replace(/ö/g, 'oe')
+            .replace(/ü/g, 'ue')
+            .replace(/ß/g, 'ss')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        slugInput.value = slug;
+    }
+});
+</script>

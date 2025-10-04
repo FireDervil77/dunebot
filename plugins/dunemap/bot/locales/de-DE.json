@@ -1,0 +1,64 @@
+{
+    "TITLE": "DuneMap",
+    "DESCRIPTION": "Plugin für die Deep Desert Map",
+    "ENABLED": "Aktiviert",
+    "DISABLED": "Deaktiviert",
+    "ADMIN_RIGHTS" : "Du benötigst Administrator-Rechte für diesen Befehl.",
+
+    "PERMISSIONS": {
+        "MANAGE_GUILD_REQUIRED": "Du benötigst die **Server verwalten** Berechtigung für diesen Befehl!"
+    },
+
+    "CHANNELS": {
+        "CHANNEL_DESCRIPTION" : "Setzt den Channel für die Map",
+        "CHANNEL_SET_DSCR" : "Bitte einen Channel angeben: !dunemap channel #channel",
+        "CHANNEL_SET_ERROR" : "Fehler beim Setzen des Channels!",
+        "CHANNEL_SET_SUCCESS": "Map Channel auf {channel} gesetzt!",
+        "TARGET_DESCRIPTION" : "Der Channel für die Map"
+    },
+    "STORM" : {
+        "DESCRIPTION": "Verwaltet den Coriolis-Sturm Timer",
+        "SET_DESCRIPTION": "Setzt den Sturm-Timer",
+        "RESET_DESCRIPTION": "Setzt den Timer zurück",
+        "DAYS_DESCRIPTION": "Tage",
+        "HOURS_DESCRIPTION": "Stunden",
+        "MINUTES_DESCRIPTION": "Minuten",
+        "TIMER_RESET_MSG": "✅ Timer wurde zurückgesetzt!",
+        "COMMANDS_USAGE": "Verfügbare Befehle: set, reset"
+    },
+    "MAP": {
+        "DESCRIPTION": "Deep Desert Map Befehle",
+        "SHOW_DESCRIPTION": "Zeigt die aktuelle Karte mit Markern",
+        "SET_DESCRIPTION": "Setzt einen Marker auf der Karte",
+        "REMOVE_DESCRIPTION": "Entfernt einen Marker von der Karte",
+        "COORD_DESCRIPTION": "Koordinaten (z.B. A1-I9)",
+        "TYPE_DESCRIPTION": "Marker Typ",
+        "SET_SUCCESS": "✅ Marker in {coord} gesetzt!",
+        "REMOVE_SUCCESS": "✅ Marker in {coord} entfernt!",
+        "INVALID_COORD": "❌ Ungültige Koordinaten! Format: A1-I9",
+        "NO_CHANNEL": "Kein Map-Channel konfiguriert! Bitte erst mit `/dunemap-setup channel` einrichten.",
+        "CHANNEL_NOT_FOUND": "Der konfigurierte Map-Channel wurde nicht gefunden! Bitte mit `/dunemap-setup channel` neu setzen.",
+        "AVAILABLE_COMMANDS": "Verfügbare Befehle: show, set, remove",
+        "ERROR": "❌ Ein Fehler ist aufgetreten!",
+        "UPDATED": "✅ Map wurde aktualisiert!",
+        "USAGE_SET": "Benutzung: !map set <coord> <type>",
+        "USAGE_REMOVE": "Benutzung: !map remove <coord>"
+    },
+    "TUTORIAL": {
+        "DESCRIPTION": "Zeigt eine Anleitung für das DuneMap Plugin",
+        "INTRO": "Willkommen beim DuneMap Plugin! Diese Anleitung zeigt dir, wie du die interaktive Deep Desert Map nutzt.",
+        "STEP1_TITLE": "Map-Channel einrichten",
+        "STEP1_DESC": "Verwende `/dunemap-setup channel #kanal` um den Channel festzulegen, in dem die Map angezeigt wird.\n**Benötigt:** Server verwalten Berechtigung",
+        "STEP2_TITLE": "Marker platzieren",
+        "STEP2_DESC": "Mit `/map set <koordinate> <typ>` kannst du Marker setzen.\n**Beispiel:** `/map set B3 titan`\n**Verfügbare Typen:** Titan, Spice, Stravidium, Base, Wrack, Aluminium, Basalt, Eisen, Karbon, Höhle, Loch, Kontrollpunkt, Taxi, Test",
+        "STEP3_TITLE": "Sturm-Timer nutzen",
+        "STEP3_DESC": "Setze den Coriolis-Sturm Timer mit `/storm set <tage> <stunden> <minuten>`.\n**Beispiel:** `/storm set 2 5 30` (2 Tage, 5 Stunden, 30 Minuten)\n**Benötigt:** Server verwalten Berechtigung",
+        "STEP4_TITLE": "Map anzeigen",
+        "STEP4_DESC": "Mit `/map show` wird die Map mit allen Markern und dem Timer aktualisiert und im konfigurierten Channel gepostet.",
+        "ADMIN_TITLE": "Admin-Befehle",
+        "ADMIN_DESC": "**Timer zurücksetzen:** `/storm reset`\n**Marker entfernen:** `/map remove <koordinate>`\n_Hinweis: Du kannst nur deine eigenen Marker entfernen._",
+        "COMMANDS_TITLE": "Befehls-Übersicht",
+        "COMMANDS_LIST": "🗺️ `/map show` - Karte anzeigen\n📍 `/map set` - Marker setzen\n🗑️ `/map remove` - Marker entfernen\n⏱️ `/storm set` - Timer setzen\n♻️ `/storm reset` - Timer zurücksetzen\n⚙️ `/dunemap-setup channel` - Channel konfigurieren\n❓ `/tutorial` - Diese Hilfe anzeigen",
+        "FOOTER": "DuneBot Map System • Viel Erfolg in der Deep Desert!"
+    }
+}

@@ -1,0 +1,14 @@
+{
+    "name": "dunemap",
+    "description": "The Dune DeepDesert Map as Plugin",
+    "version": "0.1.0-beta",
+    "author": "FireDervil",
+    "license": "none",
+    "type":"commonjs",
+    "peerDependencies": {
+        "discord.js": "^14.19.0",
+        "express": "^5.1.0",
+        "dunebot-core": "*",
+        "dunebot-sdk": "*"
+    }
+}

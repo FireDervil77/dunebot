@@ -1,0 +1,160 @@
+<!-- Template Plugin - Hauptseite -->
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-header">
+                <h1>
+                    <i class="fa-solid fa-puzzle-piece"></i>
+                    Template Plugin
+                </h1>
+                <p class="text-muted">
+                    Beispiel-Plugin für DuneBot - Übersichtsseite
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiken -->
+    <div class="row mt-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-primary">
+                    <i class="fa-solid fa-terminal"></i>
+                </div>
+                <div class="stats-content">
+                    <h3><%= stats?.global?.commandsExecuted || 0 %></h3>
+                    <p>Commands ausgeführt</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-danger">
+                    <i class="fa-solid fa-exclamation-triangle"></i>
+                </div>
+                <div class="stats-content">
+                    <h3><%= stats?.global?.errors || 0 %></h3>
+                    <p>Fehler</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-success">
+                    <i class="fa-solid fa-database"></i>
+                </div>
+                <div class="stats-content">
+                    <h3><%= stats?.global?.cacheSize || 0 %></h3>
+                    <p>Cache-Einträge</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon bg-info">
+                    <i class="fa-solid fa-clock"></i>
+                </div>
+                <div class="stats-content">
+                    <h3><%= Math.floor((stats?.global?.uptime || 0) / 1000 / 60) %>m</h3>
+                    <p>Uptime</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guild-Info -->
+    <% if (stats?.guild) { %>
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fa-solid fa-server"></i> Server-Informationen</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-3">Server-Name</dt>
+                        <dd class="col-sm-9"><%= stats.guild.guildName %></dd>
+
+                        <dt class="col-sm-3">Mitglieder</dt>
+                        <dd class="col-sm-9"><%= stats.guild.memberCount %></dd>
+
+                        <dt class="col-sm-3">Feature aktiviert</dt>
+                        <dd class="col-sm-9">
+                            <% if (stats.guild.settings?.feature_enabled) { %>
+                                <span class="badge bg-success">Aktiviert</span>
+                            <% } else { %>
+                                <span class="badge bg-secondary">Deaktiviert</span>
+                            <% } %>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    <% } %>
+
+    <!-- Schnellzugriff -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fa-solid fa-bolt"></i> Schnellzugriff</h5>
+                </div>
+                <div class="card-body">
+                    <div class="btn-group" role="group">
+                        <a href="/guild/<%= guild.id %>/template/settings" class="btn btn-primary">
+                            <i class="fa-solid fa-cog"></i> Einstellungen
+                        </a>
+                        <button type="button" class="btn btn-outline-secondary" onclick="refreshStats()">
+                            <i class="fa-solid fa-refresh"></i> Aktualisieren
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function refreshStats() {
+    location.reload();
+}
+</script>
+
+<style>
+.stats-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.stats-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+}
+
+.stats-content h3 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.stats-content p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 14px;
+}
+</style>

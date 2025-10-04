@@ -1,0 +1,240 @@
+<%# 
+  * System Statistics
+  * Detaillierte Übersicht über Bot-Statistiken
+  %>
+
+<div class="app-content">
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <h2>System Statistiken</h2>
+                <p class="text-muted">Detaillierte Übersicht über den Bot-Status</p>
+            </div>
+        </div>
+
+        <!-- Haupt-Statistiken -->
+        <div class="row mb-4">
+            <!-- Guilds -->
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-primary shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                    Guilds
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                    <%= stats.guilds %>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-server fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users -->
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-success shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                    Benutzer
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                    <%= stats.users %>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-users fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- News -->
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-info shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                    News
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                    <%= stats.news %>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-newspaper fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notifications -->
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-warning shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                    Notifications
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                    <%= stats.notifications %>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-bell fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detaillierte Tabellen -->
+        <div class="row">
+            <!-- Top 10 Guilds -->
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">Neueste Guilds</h6>
+                    </div>
+                    <div class="card-body">
+                        <% if (topGuilds && topGuilds.length > 0) { %>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Beigetreten</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% topGuilds.forEach(guild => { %>
+                                            <tr>
+                                                <td><%= guild.name %></td>
+                                                <td><%= new Date(guild.joined_at).toLocaleDateString('de-DE') %></td>
+                                            </tr>
+                                        <% }); %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <% } else { %>
+                            <p class="text-muted text-center">Keine Guilds vorhanden</p>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Letzte News -->
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-success">Letzte News</h6>
+                    </div>
+                    <div class="card-body">
+                        <% if (recentNews && recentNews.length > 0) { %>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Titel</th>
+                                            <th>Status</th>
+                                            <th>Datum</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% recentNews.forEach(news => { %>
+                                            <tr>
+                                                <td><%= news.title %></td>
+                                                <td>
+                                                    <span class="badge bg-<%= news.status === 'published' ? 'success' : 'warning' %>">
+                                                        <%= news.status %>
+                                                    </span>
+                                                </td>
+                                                <td><%= new Date(news.date).toLocaleDateString('de-DE') %></td>
+                                            </tr>
+                                        <% }); %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <% } else { %>
+                            <p class="text-muted text-center">Keine News vorhanden</p>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plugin Statistiken -->
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card shadow">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-info">Plugin Aktivierungen</h6>
+                    </div>
+                    <div class="card-body">
+                        <% if (pluginStats && pluginStats.length > 0) { %>
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Plugin</th>
+                                            <th>Aktivierungen</th>
+                                            <th>Prozentsatz</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% pluginStats.forEach(plugin => { %>
+                                            <tr>
+                                                <td><%= plugin.name %></td>
+                                                <td><%= plugin.count %></td>
+                                                <td>
+                                                    <div class="progress" style="height: 20px;">
+                                                        <div class="progress-bar" 
+                                                             role="progressbar" 
+                                                             style="width: <%= plugin.percentage %>%;" 
+                                                             aria-valuenow="<%= plugin.percentage %>" 
+                                                             aria-valuemin="0" 
+                                                             aria-valuemax="100">
+                                                            <%= plugin.percentage %>%
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <% }); %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <% } else { %>
+                            <p class="text-muted text-center">Keine Plugin-Statistiken vorhanden</p>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.border-left-primary {
+    border-left: 0.25rem solid #4e73df !important;
+}
+.border-left-success {
+    border-left: 0.25rem solid #1cc88a !important;
+}
+.border-left-info {
+    border-left: 0.25rem solid #36b9cc !important;
+}
+.border-left-warning {
+    border-left: 0.25rem solid #f6c23e !important;
+}
+</style>

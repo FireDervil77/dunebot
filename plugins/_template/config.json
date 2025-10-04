@@ -1,0 +1,28 @@
+{
+  "name": "template",
+  "displayName": "Template Plugin",
+  "description": "Template-Plugin als Basis für neue Plugins",
+  "version": "1.0.0",
+  "author": "DuneBot Team",
+  "icon": "fa-solid fa-puzzle-piece",
+  "category": "utility",
+  "permissions": [],
+  "dependencies": [],
+  "settings": {
+    "example_setting": {
+      "type": "boolean",
+      "default": true,
+      "description": "Eine Beispiel-Einstellung"
+    },
+    "example_text": {
+      "type": "string",
+      "default": "Hallo Welt",
+      "description": "Ein Beispiel-Text"
+    },
+    "example_number": {
+      "type": "number",
+      "default": 42,
+      "description": "Eine Beispiel-Zahl"
+    }
+  }
+}

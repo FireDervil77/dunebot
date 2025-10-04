@@ -1,0 +1,15 @@
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="<%= locals.description || 'A feature rich multipurpose discord bot' %>" />
+<meta name="author" content="<%= tr('LANDING.BOTNAME') %>" />
+<meta name="generator" content="<%= tr('LANDING.BOTNAME') %> LandingPage" />
+
+<% if (locals.title) { %>
+<title><%= locals.title %></title>
+<% } else { %>
+<title><%= tr('LANDING.BOTNAME') %> - Landing</title>
+<% } %>
+
+<link rel="canonical" href="{{ .Permalink }}" />
+

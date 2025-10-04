@@ -1,0 +1,62 @@
+<!-- Erweiterte Server-Analyse -->
+      
+<div class="d-flex justify-content-between mb-2">
+  <div class="text-center">
+    <h4><%= stats?.cacheStats?.members?.total || '0' %></h4>
+    <small class="text-muted">Mitglieder</small>
+  </div>
+  <div class="text-center">
+    <h4><%= stats?.cacheStats?.channels || '0' %></h4>
+    <small class="text-muted">Kanäle</small>
+  </div>
+  <div class="text-center">
+    <h4><%= stats?.cacheStats?.roles || '0' %></h4>
+    <small class="text-muted">Rollen</small>
+  </div>
+</div>
+
+<!-- Cache-Effektivität - Korrigiert -->
+<h6 class="mt-4">Cache-Effektivität</h6>
+<div class="progress" style="height: 20px;">
+  <% 
+  // Sicherer Cache-Ratio-Berechnungsausdruck
+  const cacheRatio = stats && stats.cacheStats && stats.cacheStats.members && stats.cacheStats.members.ratio ? 
+    Math.round(stats.cacheStats.members.ratio * 100) : 0;
+  %>
+  <div class="progress-bar bg-success" role="progressbar" 
+      style="width: <%= cacheRatio %>%;" 
+      aria-valuenow="<%= cacheRatio %>" 
+      aria-valuemin="0" aria-valuemax="100">
+    <%= cacheRatio %>%
+  </div>
+</div>
+<small class="text-muted">Mitglieder im Cache: 
+  <%= stats?.cacheStats?.members?.cached || '0' %>/<%= stats?.cacheStats?.members?.total || '0' %>
+</small>
+
+<!-- Server-Alter -->
+<h6 class="mt-3">Server-Alter</h6>
+<% if (stats?.guild?.createdAt) { 
+    const createdDate = new Date(stats.guild.createdAt);
+    const now = new Date();
+    const diffTime = Math.abs(now - createdDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+%>
+  <p><i class="bi bi-calendar3 me-1"></i> <%= createdDate.toLocaleDateString() %> 
+    <span class="badge bg-secondary ms-2"><%= diffDays %> Tage</span>
+  </p>
+<% } else { %>
+  <p>Keine Daten verfügbar</p>
+<% } %>
+
+<!-- Premium-Status -->
+<% if (stats?.guild?.premiumTier) { %>
+  <h6 class="mt-3">Premium-Status</h6>
+  <div class="d-flex align-items-center">
+    <% for(let i = 0; i < stats.guild.premiumTier; i++) { %>
+      <i class="bi bi-stars text-warning me-1"></i>
+    <% } %>
+    <span class="ms-2">Level <%= stats.guild.premiumTier %></span>
+    <span class="badge bg-primary ms-2"><%= stats.guild.premiumSubscriptionCount || 0 %> Boosts</span>
+  </div>
+<% } %>

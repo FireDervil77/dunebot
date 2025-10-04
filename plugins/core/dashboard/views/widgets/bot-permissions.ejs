@@ -1,0 +1,50 @@
+<% if (stats?.botStats) { %>
+  <div class="d-flex align-items-center mb-3">
+    <% 
+    // Sichere Farbauswahl mit Fallback
+    const roleColor = stats.botStats && stats.botStats.highestRoleColor ? 
+      stats.botStats.highestRoleColor : '#999999';
+    %>
+    <div style="width: 15px; height: 15px; background-color: <%= roleColor %>;" class="rounded-circle me-2"></div>
+    <span><%= stats.botStats.highestRole || 'Keine Rolle' %></span>
+  </div>
+  
+  <ul class="list-group mb-3">
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      Nachrichten senden
+      <span>
+        <% if (stats.botStats.canSendMessages) { %>
+          <i class="bi bi-check-circle-fill text-success"></i>
+        <% } else { %>
+          <i class="bi bi-x-circle-fill text-danger"></i>
+        <% } %>
+      </span>
+    </li>
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      Server verwalten
+      <span>
+        <% if (stats.botStats.canManageServer) { %>
+          <i class="bi bi-check-circle-fill text-success"></i>
+        <% } else { %>
+          <i class="bi bi-x-circle-fill text-danger"></i>
+        <% } %>
+      </span>
+    </li>
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      Rollen verwalten
+      <span>
+        <% if (stats.botStats.canManageRoles) { %>
+          <i class="bi bi-check-circle-fill text-success"></i>
+        <% } else { %>
+          <i class="bi bi-x-circle-fill text-danger"></i>
+        <% } %>
+      </span>
+    </li>
+  </ul>
+  
+  <small class="text-muted">Bot beigetreten am: <%= new Date(stats.botStats.joinedAt).toLocaleDateString() %></small>
+<% } else { %>
+  <div class="alert alert-warning">
+    Keine Bot-Berechtigungsdaten verfügbar
+  </div>
+<% } %> 

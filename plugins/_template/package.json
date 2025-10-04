@@ -1,0 +1,17 @@
+{
+  "name": "dunebot-plugin-template",
+  "version": "1.0.0",
+  "description": "Template Plugin für DuneBot - Basis für neue Plugins",
+  "main": "index.js",
+  "author": "DuneBot Team",
+  "license": "MIT",
+  "keywords": [
+    "dunebot",
+    "discord",
+    "plugin",
+    "template"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

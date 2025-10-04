@@ -1,0 +1,94 @@
+<!-- filepath: /home/firedervil/dunebot_new/apps/dashboard/themes/default/layouts/frontend.ejs -->
+<!doctype html>
+<html lang="<%= locals.lang || 'de' %>" class="<%= locals.theme?.info?.darkMode ? 'dark' : '' %>">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= locals.title ? `${title} - ${locals.dashboardLogo?.name || 'DuneBot'}` : `${locals.dashboardLogo?.name || 'DuneBot'} - Der Discord-Bot für deine Community` %></title>
+    
+    <!-- Cache-Busting für Theme Assets -->
+    <% const cacheBuster = Date.now(); %>
+    
+    <!-- Dashboard Logo Config -->
+    <script>
+      window.DASHBOARD_CONFIG = {
+        logoName: '<%= locals.dashboardLogo?.name || "DuneBot" %>',
+        logoUrl: '<%= locals.dashboardLogo?.url || "/images/logo.png" %>'
+      };
+    </script>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="<%= theme.asset('images/favicon.ico') %>?v=<%= cacheBuster %>" type="image/x-icon">
+    
+    <!-- Theme CSS mit explizitem MIME-Type -->
+    <link rel="stylesheet" href="<%= theme.asset('css/frontend.css') %>?v=<%= cacheBuster %>" type="text/css">
+    <link rel="stylesheet" href="<%= theme.asset('css/adminlte.min.css') %>?v=<%= cacheBuster %>" type="text/css">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SERVING FONTES.EJS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css">
+    <!-- Google Font: Source Sans Pro -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" crossorigin="anonymous"/>  
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="<%= theme.asset('vendor/bootstrap/css/bootstrap.min.css') %>?v=<%= cacheBuster %>" type="text/css">
+    
+    <!-- Hook: frontend_head -->
+    <% if (locals.hooks && hooks.getViewHooks) { %>
+      <% const headHooks = hooks.getViewHooks('frontend_head'); %>
+      <% if (headHooks && headHooks.length > 0) { %>
+        <% headHooks.forEach(hook => { %>
+          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
+        <% }); %>
+      <% } %>
+    <% } %>
+  </head>
+
+  <body class="landing-page">
+    <!-- Navigation -->
+    <%- includePartial('frontend/header_nav', { locals }) %>
+    
+    <!-- Hook: before_frontend_content -->
+    <% if (locals.hooks && hooks.getViewHooks) { %>
+      <% const beforeContentHooks = hooks.getViewHooks('before_frontend_content'); %>
+      <% if (beforeContentHooks && beforeContentHooks.length > 0) { %>
+        <% beforeContentHooks.forEach(hook => { %>
+          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
+        <% }); %>
+      <% } %>
+    <% } %>
+    
+    <!-- Main Content -->
+    <%- body %>
+    
+    <!-- Hook: after_frontend_content -->
+    <% if (locals.hooks && hooks.getViewHooks) { %>
+      <% const afterContentHooks = hooks.getViewHooks('after_frontend_content'); %>
+      <% if (afterContentHooks && afterContentHooks.length > 0) { %>
+        <% afterContentHooks.forEach(hook => { %>
+          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
+        <% }); %>
+      <% } %>
+    <% } %>
+
+    <!-- Footer -->
+    <%- includePartial('frontend/footer', locals) %>
+    
+    <!-- Bootstrap JS (optional lokal) -->
+    <script src="<%= theme.asset('vendor/bootstrap/js/bootstrap.bundle.min.js') %>?v=<%= cacheBuster %>"></script>
+
+        <!-- Footer -->
+    <%- includePartial('frontend/scripts', locals) %>
+    
+    <!-- Hook: frontend_footer_scripts -->
+    <% if (locals.hooks && hooks.getViewHooks) { %>
+      <% const footerScriptHooks = hooks.getViewHooks('frontend_footer_scripts'); %>
+      <% if (footerScriptHooks && footerScriptHooks.length > 0) { %>
+        <% footerScriptHooks.forEach(hook => { %>
+          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
+        <% }); %>
+      <% } %>
+    <% } %>
+  </body>
+</html>
