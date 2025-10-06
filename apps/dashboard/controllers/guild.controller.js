@@ -110,6 +110,9 @@ exports.getDashboard = async (req, res) => {
             );
         }
 
+        // SuperAdmin Configs sind jetzt in res.locals verfügbar (aus guild.middleware)
+        // supportUrl, supportName, dashboardVersion, botVersion
+
         // Template rendern
         res.render("guild/dashboard", {
             title: `Dashboard: ${guild.guild_name}`,
@@ -119,7 +122,7 @@ exports.getDashboard = async (req, res) => {
             guildId,
             stats,
             widgets,
-            guildNav: res.locals.guildNav, // <--- hinzufügen!
+            guildNav: res.locals.guildNav,
             enabledPlugins,
             breadcrumbs,
             // Meta-Daten

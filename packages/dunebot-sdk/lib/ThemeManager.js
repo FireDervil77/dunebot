@@ -406,9 +406,10 @@ class ThemeManager {
                 const template = fs.readFileSync(filePath, 'utf8');
                 
                 // KRITISCH: Spread-Order! appLocals → this (EJS) → data
+                // this enthält bereits res.locals aus renderView (viewData)
                 const renderContext = {
                     ...appLocals,  // Globals (tr, theme, coreConfig)
-                    ...this,       // EJS View Data (user, guild, guildId) - ÜBERSCHREIBT!
+                    ...this,       // EJS View Data (user, guild, guildId, supportUrl, etc.)
                     ...data        // Explicit data
                 };
                 

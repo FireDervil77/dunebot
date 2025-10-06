@@ -591,8 +591,8 @@ class DuneMapPlugin extends DashboardPlugin {
             Logger.info('Deaktiviere DuneMap Plugin und entferne Tabellen...');
             
             // Tabellen in umgekehrter Reihenfolge löschen (wegen Foreign Keys)
-            await dbService.query('DROP TABLE IF EXISTS dunemap_storm_timer');
-            await dbService.query('DROP TABLE IF EXISTS dunemap_markers');
+            //await dbService.query('DROP TABLE IF EXISTS dunemap_storm_timer');
+            //await dbService.query('DROP TABLE IF EXISTS dunemap_markers');
             
             Logger.success('DuneMap Tabellen erfolgreich entfernt');
             return true;
@@ -627,15 +627,13 @@ class DuneMapPlugin extends DashboardPlugin {
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
+        const navigationManager = ServiceManager.get('navigationManager');
         
         try {
             Logger.info(`Deaktiviere DuneMap Plugin für Guild ${guildId}...`);
             
-            // Navigation aus DB entfernen
-            await dbService.query(
-                'DELETE FROM navigation WHERE plugin_name = ? AND guild_id = ?',
-                [this.name, guildId]
-            );
+            // Navigation über NavigationManager entfernen
+            await navigationManager.removeNavigation(this.name, guildId);
             
             // Guild-spezifische Daten aus ALLEN DuneMap-Tabellen löschen
             await dbService.query('DELETE FROM dunemap_storm_timer WHERE guild_id = ?', [guildId]);

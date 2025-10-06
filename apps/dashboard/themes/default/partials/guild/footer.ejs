@@ -24,12 +24,12 @@
       <div class="col-12 col-sm-6">
         <strong>
           <%= tr('DASHBOARD_COMMON.COPYRIGHT') %> &copy; 2024 
-          <a href="https://dunebot.de" class="text-decoration-none">DuneBot</a>.
+          <a href="https://firenetworks.de" class="text-decoration-none">DuneBot</a>.
         </strong>
         <%= tr('DASHBOARD_COMMON.ALL_RIGHTS_RESERVED') %>.
       </div>
       <div class="col-12 col-sm-6 text-end">
-        <b><%= tr('DASHBOARD_COMMON.DASHBOARD_VERSION') %>:</b> <%= locals.dashboard_version %> | <b><%= tr('DASHBOARD_COMMON.BOT_VERSION') %>:</b> <%= locals.bot_version %>
+        <b><%= tr('DASHBOARD_COMMON.DASHBOARD_VERSION') %>:</b> <%= dashboardVersion || '1.0.0' %> | <b><%= tr('DASHBOARD_COMMON.BOT_VERSION') %>:</b> <%= botVersion || '1.0.0' %>
       </div>
     </div>
   </div>

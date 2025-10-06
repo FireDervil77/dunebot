@@ -13,7 +13,12 @@
     <div class="app-wrapper">
 
         <!--begin::Header-->
-          <%- includePartial('guild/header_topbar') %>
+          <%- includePartial('guild/header_topbar', { 
+            supportUrl: typeof supportUrl !== 'undefined' ? supportUrl : '#', 
+            supportName: typeof supportName !== 'undefined' ? supportName : 'Discord Support',
+            dashboardVersion: typeof dashboardVersion !== 'undefined' ? dashboardVersion : '1.0.0',
+            botVersion: typeof botVersion !== 'undefined' ? botVersion : '1.0.0'
+          }) %>
         <!--end::Header-->
 
         <!--begin::Sidebar-->
@@ -64,7 +69,11 @@
             <!--end::App Main-->
 
           <!--begin::Footer-->
-          <%- includePartial('guild/footer') %>
+          <%- includePartial('guild/footer', {
+            dashboardVersion: typeof dashboardVersion !== 'undefined' ? dashboardVersion : '1.0.0',
+            botVersion: typeof botVersion !== 'undefined' ? botVersion : '1.0.0',
+            buyMeCoffeeUrl: typeof buyMeCoffeeUrl !== 'undefined' ? buyMeCoffeeUrl : '#'
+          }) %>
         <!--end::Footer-->
     </div>
     <!--end::App Wrapper-->

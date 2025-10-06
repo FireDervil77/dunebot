@@ -130,7 +130,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
     /**
      * Plugin aktivieren (Global für Dashboard)
      */
-    async enable() {
+    async onEnable() {
         const Logger = ServiceManager.get('Logger');
         Logger.info('[SuperAdmin] Aktiviere Dashboard-Plugin global...');
 
@@ -140,12 +140,6 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         return true;
     }
 
-    /**
-     * Plugin aktivieren (Legacy - ruft enable() auf)
-     */
-    async onEnable() {
-        return await this.enable();
-    }
 
     /**
      * Vollständige Routen für SuperAdmin einrichten
@@ -703,8 +697,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         
         // Prüfe ob es die Control-Guild ist
         if (String(guildId) !== String(controlGuildId)) {
-            Logger.warn(`[SuperAdmin] Versuch, Plugin für Guild ${guildId} zu aktivieren - nur CONTROL_GUILD (${controlGuildId}) erlaubt!`);
-            throw new Error(`SuperAdmin kann nur für die Control-Guild (${controlGuildId}) aktiviert werden!`);
+            Logger.debug(`[SuperAdmin] Guild ${guildId} ist nicht Control-Guild (${controlGuildId}) - überspringe SuperAdmin-Aktivierung`);
+            return; // Silent return statt Error
         }
         
         Logger.debug(`[SuperAdmin] Registriere Navigation für Control-Guild ${guildId}`);
@@ -783,8 +777,14 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         
         try {
             // Entferne SuperAdmin Navigation (removeNavigation, nicht unregisterNavigation!)
-            await navigationManager.removeNavigation('superadmin', guildId);
+            await navigationManager.removeNavigation(this.name, guildId);
             
+            // Configs löschen
+            await dbService.query(
+                'DELETE FROM configs WHERE plugin_name = ? AND guild_id = ?',
+                [this.name, guildId]
+            );
+
             logger.info(`[SuperAdmin] Plugin für Guild ${guildId} deaktiviert`);
         } catch (error) {
             logger.error(`[SuperAdmin] Fehler beim Deaktivieren für Guild ${guildId}:`, error);

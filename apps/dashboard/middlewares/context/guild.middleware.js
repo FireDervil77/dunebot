@@ -88,5 +88,39 @@ try {
 }  
     res.locals.guilds = req.session.user;
     
+    // SuperAdmin Config-Variablen für alle Templates verfügbar machen
+    const guildId = req.params.guildId;
+    
+    try {
+        Logger.debug('[Guild Middleware] Loading SuperAdmin configs for guildId:', guildId);
+        
+        const supportUrl = await dbService.getConfig('superadmin', 'DISCORD_SUPPORT_SERVER_URL', guildId);
+        const supportName = await dbService.getConfig('superadmin', 'DISCORD_SUPPORT_SERVER_NAME', guildId);
+        const dashboardVersion = await dbService.getConfig('superadmin', 'DASHBOARD_VERSION', guildId);
+        const botVersion = await dbService.getConfig('superadmin', 'BOT_VERSION', guildId);
+        const buyMeCoffeeUrl = await dbService.getConfig('superadmin', 'BUYMEACOFFE_URL', guildId);
+        
+        // IMMER setzen, mit Fallback wenn null/undefined
+        res.locals.supportUrl = supportUrl || '#';
+        res.locals.supportName = supportName || 'Discord Support';
+        res.locals.dashboardVersion = dashboardVersion || '1.0.0';
+        res.locals.botVersion = botVersion || '1.0.0';
+        res.locals.buyMeCoffeeUrl = buyMeCoffeeUrl || '#';
+        
+        Logger.debug('[Guild Middleware] SuperAdmin configs loaded:', {
+            supportUrl: res.locals.supportUrl,
+            supportName: res.locals.supportName,
+            hasValues: !!supportUrl
+        });
+    } catch (error) {
+        Logger.warn('[Guild Middleware] Error loading SuperAdmin configs:', error.message);
+        // Fallback-Werte IMMER setzen
+        res.locals.supportUrl = '#';
+        res.locals.supportName = 'Discord Support';
+        res.locals.dashboardVersion = '1.0.0';
+        res.locals.botVersion = '1.0.0';
+        res.locals.buyMeCoffeeUrl = '#';
+    }
+    
     next();
 };

@@ -588,48 +588,50 @@ class PluginManager extends BasePluginManager {
             }
 
             // NEU: Plugin Config NUR mit Guild-ID initialisieren
-            if (plugin.config) {
-                try {
+            // WICHTIG: Config-Speicherung funktioniert AUCH ohne plugin.config Objekt!
+            try {
+                // Falls plugin.config existiert, Guild-ID setzen
+                if (plugin.config) {
                     plugin.config.setGuildId(guildId);
-                    
-                    // Default-Config laden und flach speichern
-                    const configPath = path.join(plugin.baseDir, 'config.json');
-                    if (fs.existsSync(configPath)) {
-                        const defaultConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-                        
-                        // Config flach machen und nur für Guild speichern
-                        const flattenConfig = (obj, prefix = '') => {
-                            return Object.keys(obj).reduce((acc, k) => {
-                                const pre = prefix.length ? `${prefix}.${k}` : k;
-                                if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
-                                    Object.assign(acc, flattenConfig(obj[k], pre));
-                                } else {
-                                    acc[pre] = obj[k];
-                                }
-                                return acc;
-                            }, {});
-                        };
-
-                        const flatConfig = flattenConfig(defaultConfig);
-                        
-                        // WICHTIG: ensureConfig() nutzen statt setConfig()
-                        // Das überschreibt KEINE existierenden User-Configs!
-                        for (const [key, value] of Object.entries(flatConfig)) {
-                            await dbService.ensureConfig(
-                                pluginName,
-                                key,
-                                value,
-                                "shared",
-                                guildId,  // Explizit Guild-ID
-                                false     // nicht global
-                            );
-                        }
-                        
-                        Logger.info(`Config für Plugin ${pluginName} in Guild ${guildId} initialisiert`);
-                    }
-                } catch (configError) {
-                    Logger.error(`Fehler beim Initialisieren der Plugin-Config für ${pluginName} in Guild ${guildId}:`, configError);
                 }
+                
+                // Default-Config laden und flach speichern
+                const configPath = path.join(plugin.baseDir, 'config.json');
+                if (fs.existsSync(configPath)) {
+                    const defaultConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                    
+                    // Config flach machen und nur für Guild speichern
+                    const flattenConfig = (obj, prefix = '') => {
+                        return Object.keys(obj).reduce((acc, k) => {
+                            const pre = prefix.length ? `${prefix}.${k}` : k;
+                            if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
+                                Object.assign(acc, flattenConfig(obj[k], pre));
+                            } else {
+                                acc[pre] = obj[k];
+                            }
+                            return acc;
+                        }, {});
+                    };
+
+                    const flatConfig = flattenConfig(defaultConfig);
+                    
+                    // WICHTIG: ensureConfig() nutzen statt setConfig()
+                    // Das überschreibt KEINE existierenden User-Configs!
+                    for (const [key, value] of Object.entries(flatConfig)) {
+                        await dbService.ensureConfig(
+                            pluginName,
+                            key,
+                            value,
+                            "shared",
+                            guildId,  // Explizit Guild-ID
+                            false     // nicht global
+                        );
+                    }
+                    
+                    Logger.info(`Config für Plugin ${pluginName} in Guild ${guildId} initialisiert`);
+                }
+            } catch (configError) {
+                Logger.error(`Fehler beim Initialisieren der Plugin-Config für ${pluginName} in Guild ${guildId}:`, configError);
             }
 
             // NEU: Aktiviere Plugin in ENABLED_PLUGINS
@@ -695,14 +697,6 @@ class PluginManager extends BasePluginManager {
             // Core Plugin kann niemals deaktiviert werden
             if (pluginName === "core") {
                 const error = new Error("Cannot disable core plugin");
-                await this.hooks.doAction('disable_in_guild_failed', pluginName, guildId, error);
-                throw error;
-            }
-
-            // SuperAdmin Plugin kann in der CONTROL_GUILD nicht deaktiviert werden
-            const controlGuildId = process.env.CONTROL_GUILD_ID;
-            if (pluginName === "superadmin" && controlGuildId && guildId === controlGuildId) {
-                const error = new Error("Cannot disable superadmin plugin in control guild");
                 await this.hooks.doAction('disable_in_guild_failed', pluginName, guildId, error);
                 throw error;
             }
