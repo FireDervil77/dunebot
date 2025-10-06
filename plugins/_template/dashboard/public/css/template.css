@@ -1,0 +1,107 @@
+/**
+ * Template Plugin CSS
+ * Fügen Sie hier Custom-Styles für Ihr Plugin hinzu
+ */
+
+.template-plugin-container {
+    padding: 20px;
+}
+
+.template-stats-box {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.template-stats-box h3 {
+    margin: 0;
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+.template-stats-box p {
+    margin: 0;
+    opacity: 0.9;
+}
+
+.template-card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.template-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+.template-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.template-icon.primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.template-icon.success {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: white;
+}
+
+.template-icon.warning {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.template-activity-item {
+    padding: 12px;
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.2s;
+}
+
+.template-activity-item:last-child {
+    border-bottom: none;
+}
+
+.template-activity-item:hover {
+    background-color: #f8f9fa;
+}
+
+.template-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.template-badge.new {
+    background-color: #28a745;
+    color: white;
+}
+
+.template-badge.updated {
+    background-color: #ffc107;
+    color: #000;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .template-stats-box {
+        margin-bottom: 15px;
+    }
+    
+    .template-stats-box h3 {
+        font-size: 2rem;
+    }
+}

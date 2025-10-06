@@ -1,0 +1,30 @@
+{
+  "enabled": true,
+  "autoLoad": false,
+  "requiredPlugins": [],
+  "optionalPlugins": [],
+  "permissions": {
+    "bot": [
+      "SEND_MESSAGES",
+      "EMBED_LINKS",
+      "READ_MESSAGE_HISTORY"
+    ],
+    "dashboard": [
+      "MANAGE_GUILD"
+    ]
+  },
+  "settings": {
+    "logLevel": "info",
+    "maxEntries": 1000,
+    "autoCleanup": true,
+    "cleanupDays": 30
+  },
+  "features": {
+    "commands": true,
+    "events": true,
+    "dashboard": true,
+    "widgets": true,
+    "navigation": true,
+    "database": true
+  }
+}

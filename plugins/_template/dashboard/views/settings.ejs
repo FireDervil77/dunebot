@@ -1,0 +1,120 @@
+<!-- Template Plugin Einstellungen -->
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fa-solid fa-cog me-2"></i>
+                        <%= tr('template:SETTINGS.TITLE') %>
+                    </h3>
+                </div>
+                <form id="templateSettingsForm">
+                    <div class="card-body">
+                        <!-- Plugin aktiviert -->
+                        <div class="form-group mb-3">
+                            <div class="custom-control custom-switch">
+                                <input type="checkbox" 
+                                       class="custom-control-input" 
+                                       id="enabled" 
+                                       name="enabled"
+                                       <%= config.enabled ? 'checked' : '' %>>
+                                <label class="custom-control-label" for="enabled">
+                                    <%= tr('template:SETTINGS.ENABLED') %>
+                                </label>
+                            </div>
+                            <small class="form-text text-muted">
+                                <%= tr('template:SETTINGS.ENABLED_DESC') %>
+                            </small>
+                        </div>
+                        
+                        <!-- Benachrichtigungs-Kanal -->
+                        <div class="form-group mb-3">
+                            <label for="notificationChannel">
+                                <%= tr('template:SETTINGS.NOTIFICATION_CHANNEL') %>
+                            </label>
+                            <select class="form-control" id="notificationChannel" name="notificationChannel">
+                                <option value="">Kein Kanal ausgewählt</option>
+                                <!-- Kanäle werden dynamisch geladen -->
+                            </select>
+                            <small class="form-text text-muted">
+                                <%= tr('template:SETTINGS.NOTIFICATION_CHANNEL_DESC') %>
+                            </small>
+                        </div>
+                        
+                        <!-- Log-Level -->
+                        <div class="form-group mb-3">
+                            <label for="logLevel">
+                                <%= tr('template:SETTINGS.LOG_LEVEL') %>
+                            </label>
+                            <select class="form-control" id="logLevel" name="logLevel">
+                                <option value="debug" <%= config.logLevel === 'debug' ? 'selected' : '' %>>
+                                    <%= tr('template:SETTINGS.LOG_LEVELS.DEBUG') %>
+                                </option>
+                                <option value="info" <%= config.logLevel === 'info' ? 'selected' : '' %>>
+                                    <%= tr('template:SETTINGS.LOG_LEVELS.INFO') %>
+                                </option>
+                                <option value="warn" <%= config.logLevel === 'warn' ? 'selected' : '' %>>
+                                    <%= tr('template:SETTINGS.LOG_LEVELS.WARN') %>
+                                </option>
+                                <option value="error" <%= config.logLevel === 'error' ? 'selected' : '' %>>
+                                    <%= tr('template:SETTINGS.LOG_LEVELS.ERROR') %>
+                                </option>
+                            </select>
+                            <small class="form-text text-muted">
+                                <%= tr('template:SETTINGS.LOG_LEVEL_DESC') %>
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-save me-1"></i>
+                            <%= tr('template:SETTINGS.SAVE') %>
+                        </button>
+                        <button type="reset" class="btn btn-secondary">
+                            <i class="fa-solid fa-undo me-1"></i>
+                            <%= tr('template:SETTINGS.RESET') %>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript für Formular-Handling -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('templateSettingsForm');
+    
+    // Formular absenden
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        try {
+            const response = await fetch(window.location.pathname, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                toastr.success(result.message || 'Einstellungen gespeichert');
+            } else {
+                toastr.error(result.error || 'Fehler beim Speichern');
+            }
+        } catch (error) {
+            console.error('Fehler:', error);
+            toastr.error('Netzwerkfehler');
+        }
+    });
+});
+</script>

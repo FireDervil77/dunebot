@@ -1,0 +1,10 @@
+<!-- Placeholder für Images -->
+# Images Ordner
+
+Legen Sie hier Ihre Plugin-Bilder ab:
+- Icons
+- Logos  
+- Screenshots
+- Grafiken
+
+Bilder werden über `/assets/plugins/template/images/` verfügbar.

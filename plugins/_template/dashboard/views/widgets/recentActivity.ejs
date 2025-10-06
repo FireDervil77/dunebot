@@ -1,0 +1,40 @@
+<!-- Template Plugin Recent Activity Widget -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fa-solid fa-clock me-2"></i>
+            <%= tr('template:WIDGETS.RECENT_TITLE') %>
+        </h3>
+    </div>
+    <div class="card-body p-0">
+        <% if (activities && activities.length > 0) { %>
+        <ul class="list-group list-group-flush">
+            <% activities.slice(0, 5).forEach(activity => { %>
+            <li class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fa-solid fa-circle-dot text-primary me-2"></i>
+                        <%= activity.description %>
+                    </div>
+                    <small class="text-muted">
+                        <%= new Date(activity.timestamp).toLocaleTimeString() %>
+                    </small>
+                </div>
+            </li>
+            <% }); %>
+        </ul>
+        <% } else { %>
+        <div class="text-center py-4">
+            <i class="fa-solid fa-inbox fa-3x text-muted mb-3"></i>
+            <p class="text-muted"><%= tr('template:RECENT_ACTIVITY.NO_ACTIVITY') %></p>
+        </div>
+        <% } %>
+    </div>
+    <% if (activities && activities.length > 5) { %>
+    <div class="card-footer text-center">
+        <a href="/guild/<%= guildId %>/template" class="btn btn-sm btn-outline-primary">
+            <%= tr('template:RECENT_ACTIVITY.VIEW_ALL') %>
+        </a>
+    </div>
+    <% } %>
+</div>

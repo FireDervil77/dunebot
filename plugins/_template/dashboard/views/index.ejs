@@ -1,0 +1,85 @@
+<!-- Template Plugin Haupt-Dashboard -->
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fa-solid fa-puzzle-piece me-2"></i>
+                        <%= tr('template:PAGE.TITLE') %>
+                    </h3>
+                    <div class="card-tools">
+                        <a href="/guild/<%= guildId %>/template/settings" class="btn btn-sm btn-primary">
+                            <i class="fa-solid fa-cog me-1"></i>
+                            <%= tr('template:SETTINGS.TITLE') %>
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted"><%= tr('template:PAGE.DESCRIPTION') %></p>
+                    
+                    <!-- Statistiken -->
+                    <div class="row mt-4">
+                        <div class="col-md-3">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-info">
+                                    <i class="fa-solid fa-chart-line"></i>
+                                </span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text"><%= tr('template:STATS.TOTAL_USES') %></span>
+                                    <span class="info-box-number"><%= stats.total_uses || 0 %></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-success">
+                                    <i class="fa-solid fa-users"></i>
+                                </span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text"><%= tr('template:STATS.ACTIVE_USERS') %></span>
+                                    <span class="info-box-number"><%= botStats.totalMembers || 0 %></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-warning">
+                                    <i class="fa-solid fa-hashtag"></i>
+                                </span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Kanäle</span>
+                                    <span class="info-box-number"><%= botStats.channels?.total || 0 %></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-danger">
+                                    <i class="fa-solid fa-shield"></i>
+                                </span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Rollen</span>
+                                    <span class="info-box-number"><%= botStats.roles || 0 %></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Beispiel-Inhalt -->
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <div class="callout callout-info">
+                                <h5><i class="icon fa-solid fa-info-circle"></i> Hinweis:</h5>
+                                Dies ist eine Template-View. Ersetzen Sie diesen Inhalt mit Ihren eigenen Daten.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
