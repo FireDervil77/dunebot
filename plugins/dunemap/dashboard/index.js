@@ -509,11 +509,18 @@ class DuneMapPlugin extends DashboardPlugin {
                         }
                         
                         // Marker hinzufügen
-                        await dbService.query(`
+                        const insertResult = await dbService.query(`
                             INSERT INTO dunemap_markers 
                             (guild_id, sector_x, sector_y, marker_type, placed_by, placed_at)
                             VALUES (?, ?, ?, ?, ?, NOW())
                         `, [guildId, sectorX, sectorY, markerType, placedBy || 'Dashboard']);
+                        
+                        // Neuen Marker abrufen für Client-Update
+                        const [newMarker] = await dbService.query(`
+                            SELECT id, guild_id, sector_x, sector_y, marker_type, placed_by, placed_at, updated_at
+                            FROM dunemap_markers
+                            WHERE id = ?
+                        `, [insertResult.insertId]);
                         
                         Logger.info(`[DuneMap] ✅ Marker ${markerType} in ${sectorX}${sectorY} gesetzt`);
                         res.json({ 
@@ -521,7 +528,8 @@ class DuneMapPlugin extends DashboardPlugin {
                             message: t('dunemap:MESSAGES.MARKER_SET', { 
                                 type: markerType, 
                                 sector: `${sectorX}${sectorY}` 
-                            })
+                            }),
+                            marker: newMarker
                         });
                         
                     } else if (action === 'remove') {

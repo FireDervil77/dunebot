@@ -157,7 +157,27 @@
         const result = await response.json();
         if (result.success) {
           showToast('success', result.message || 'Marker hinzugefügt!');
-          setTimeout(() => location.reload(), 500);
+          
+          // Marker zur lokalen Liste hinzufügen (statt Reload)
+          if (result.marker) {
+            markers.push(result.marker);
+            
+            // Grid-Zelle aktualisieren
+            const cell = document.querySelector(`[data-sector-x="${currentSectorX}"][data-sector-y="${currentSectorY}"]`);
+            if (cell) {
+              const img = document.createElement('img');
+              img.src = `/assets/plugins/dunemap/icons/${result.marker.marker_type}.png`;
+              img.alt = result.marker.marker_type;
+              img.style.cssText = 'width: 32px; height: 32px; object-fit: contain;';
+              cell.appendChild(img);
+            }
+            
+            // Editor aktualisieren
+            loadSectorMarkers(currentSectorX, currentSectorY);
+          } else {
+            // Fallback: Reload wenn Server keinen Marker zurückgibt
+            setTimeout(() => location.reload(), 500);
+          }
         } else {
           showToast('danger', result.message || 'Fehler beim Hinzufügen');
         }
@@ -186,7 +206,32 @@
         if (result.success) {
           const successMsg = DATA?.i18n?.success || 'Marker entfernt!';
           showToast('success', result.message || successMsg);
-          setTimeout(() => location.reload(), 500);
+          
+          // Marker aus lokaler Liste entfernen (statt Reload)
+          const markerIndex = markers.findIndex(m => m.id === markerId);
+          if (markerIndex > -1) {
+            const removedMarker = markers[markerIndex];
+            markers.splice(markerIndex, 1);
+            
+            // Grid-Zelle aktualisieren
+            const cell = document.querySelector(`[data-sector-x="${removedMarker.sector_x}"][data-sector-y="${removedMarker.sector_y}"]`);
+            if (cell) {
+              const imgs = cell.querySelectorAll('img');
+              imgs.forEach(img => {
+                if (img.alt === removedMarker.marker_type) {
+                  img.remove();
+                }
+              });
+            }
+            
+            // Editor aktualisieren wenn noch offen
+            if (currentSectorX && currentSectorY) {
+              loadSectorMarkers(currentSectorX, currentSectorY);
+            }
+          } else {
+            // Fallback: Reload
+            setTimeout(() => location.reload(), 500);
+          }
         } else {
           const errorMsg = DATA?.i18n?.error || 'Fehler beim Entfernen';
           showToast('danger', result.message || errorMsg);

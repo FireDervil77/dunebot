@@ -29,6 +29,8 @@
         <!-- Grid-Container (Koordinatensystem wie im Bot: A1 unten links, I9 oben rechts) -->
         <!-- WICHTIG: Keine data-* Attribute - Daten via AssetManager localize -->
         <div id="sectorGrid" 
+             data-guild-id="<%= guildId %>"
+             data-markers='<%- JSON.stringify(markers) %>'
              style="display: grid; grid-template-columns: 40px repeat(9, 1fr); gap: 2px; max-width: 100%;">
           <!-- Grid-Zeilen von oben nach unten (I -> A) -->
           <% const rows = ['I', 'H', 'G', 'F', 'E', 'D', 'C', 'B', 'A']; %>
