@@ -10,7 +10,7 @@
                 <h2>News Verwaltung</h2>
             </div>
             <div class="col-md-6 text-end">
-                <a href="/guild/<%= guildId %>/plugins/superadmin/news/create" class="btn btn-success">
+                <a href="/guild/<%= guildId %>/plugins/superadmin/news/new" class="btn btn-success">
                     <i class="fa-solid fa-plus me-2"></i>Neue News erstellen
                 </a>
             </div>
@@ -48,7 +48,10 @@
                                                    class="btn btn-sm btn-primary">
                                                     <i class="fa-solid fa-edit"></i>
                                                 </a>
-                                                <form method="POST" action="/guild/<%= guildId %>/plugins/superadmin/news/delete/<%= news._id %>" 
+                                                <form method="POST" 
+                                                      action="/guild/<%= guildId %>/plugins/superadmin/news/delete/<%= news._id %>" 
+                                                      class="guild-ajax-form"
+                                                      data-form-type="news-delete"
                                                       style="display:inline;" 
                                                       onsubmit="return confirm('News wirklich löschen?');">
                                                     <button type="submit" class="btn btn-sm btn-danger">

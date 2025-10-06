@@ -1,0 +1,70 @@
+<!-- SuperAdmin Notifications Widget -->
+<form id="notificationForm">
+  <div class="mb-3">
+    <label for="notif_title" class="form-label">Titel</label>
+    <input type="text" class="form-control" id="notif_title" name="title" required>
+  </div>
+  
+  <div class="mb-3">
+    <label for="notif_message" class="form-label">Nachricht</label>
+    <textarea class="form-control" id="notif_message" name="message" rows="3" required></textarea>
+  </div>
+  
+  <div class="mb-3">
+    <label for="notif_type" class="form-label">Typ</label>
+    <select class="form-select" id="notif_type" name="type">
+      <option value="info">Info</option>
+      <option value="warning">Warnung</option>
+      <option value="success">Erfolg</option>
+      <option value="danger">Fehler</option>
+    </select>
+  </div>
+  
+  <div class="mb-3">
+    <label for="notif_target" class="form-label">Ziel</label>
+    <select class="form-select" id="notif_target" name="target" onchange="toggleGuildSelect()">
+      <option value="all">Alle Guilds</option>
+      <option value="specific">Spezifische Guild</option>
+    </select>
+  </div>
+  
+  <div class="mb-3" id="guildSelectDiv" style="display: none;">
+    <label for="notif_guild" class="form-label">Guild auswählen</label>
+    <select class="form-select" id="notif_guild" name="target_guild_id">
+      <% guilds.forEach(guild => { %>
+        <option value="<%= guild.id %>"><%= guild.name %></option>
+      <% }); %>
+    </select>
+  </div>
+  
+  <button type="button" class="btn btn-warning btn-block" onclick="sendNotification()">
+    <i class="fas fa-paper-plane"></i> Notification senden
+  </button>
+</form>
+
+<script>
+function toggleGuildSelect() {
+  const target = document.getElementById('notif_target').value;
+  document.getElementById('guildSelectDiv').style.display = 
+    target === 'specific' ? 'block' : 'none';
+}
+
+async function sendNotification() {
+  const formData = new FormData(document.getElementById('notificationForm'));
+  const data = Object.fromEntries(formData.entries());
+  
+  const response = await fetch(`/api/guild/<%= guildId %>/plugins/superadmin/notifications/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  
+  if (response.ok) {
+    const result = await response.json();
+    alert(`Notification an ${result.count} Guild(s) gesendet!`);
+    document.getElementById('notificationForm').reset();
+  } else {
+    alert('Fehler beim Senden!');
+  }
+}
+</script>

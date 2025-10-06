@@ -318,8 +318,11 @@ class ThemeManager {
             
             plugins.forEach(plugin => {
                 // Überspringe Dateien und versteckte Verzeichnisse
-                if (plugin.startsWith('.') || plugin.startsWith('_')) {
-                    Logger.debug(`Überspringe Plugin: ${plugin} (startet mit . oder _)`);
+                const pluginPath = path.join(pluginsDir, plugin);
+                const stat = fs.statSync(pluginPath);
+                
+                if (!stat.isDirectory() || plugin.startsWith('.') || plugin.startsWith('_')) {
+                    Logger.debug(`Überspringe Plugin: ${plugin} (Datei oder versteckt)`);
                     return;
                 }
                 

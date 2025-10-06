@@ -1,0 +1,331 @@
+<!-- DuneMap Dashboard - Sektor-basierte Karte -->
+
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="alert alert-info">
+      <h5 class="mb-2">
+        <i class="fa-solid fa-map me-2"></i>
+        <%= tr('dunemap:DASHBOARD.WELCOME_TITLE') %>
+      </h5>
+      <p class="mb-0">
+        <%- tr('dunemap:DASHBOARD.WELCOME_TEXT') %>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Statistiken -->
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <i class="fa-solid fa-map-marker-alt text-danger fa-3x mb-2"></i>
+        <h3 class="mb-0"><%= markerCount %></h3>
+        <p class="text-muted mb-0"><%= tr('dunemap:DASHBOARD.STATS.MARKERS_SET') %></p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <i class="fa-solid fa-th text-primary fa-3x mb-2"></i>
+        <h3 class="mb-0">81</h3>
+        <p class="text-muted mb-0"><%= tr('dunemap:DASHBOARD.STATS.AVAILABLE_SECTORS') %></p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <i class="fa-solid fa-gem text-warning fa-3x mb-2"></i>
+        <h3 class="mb-0">14</h3>
+        <p class="text-muted mb-0"><%= tr('dunemap:DASHBOARD.STATS.MARKER_TYPES') %></p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <i class="fa-solid fa-clock text-success fa-3x mb-2"></i>
+        <h3 class="mb-0"><i class="fa-solid fa-infinity"></i></h3>
+        <p class="text-muted mb-0"><%= tr('dunemap:DASHBOARD.STATS.STORM_TIMER_ACTIVE') %></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Schnellzugriff -->
+<div class="row mb-4">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">
+          <i class="fa-solid fa-cog me-2"></i>
+          <%= tr('dunemap:DASHBOARD.PLUGIN_SETTINGS.TITLE') %>
+        </h5>
+      </div>
+      <div class="card-body">
+        <p class="mb-3">
+          <%= tr('dunemap:DASHBOARD.PLUGIN_SETTINGS.DESCRIPTION') %>
+        </p>
+        
+        <h6 class="fw-bold"><%= tr('dunemap:DASHBOARD.PLUGIN_SETTINGS.AVAILABLE_SETTINGS') %></h6>
+        <ul class="mb-3">
+          <li>⏱️ <%= tr('dunemap:DASHBOARD.PLUGIN_SETTINGS.STORM_FORMAT') %></li>
+          <li>🌍 <%= tr('dunemap:DASHBOARD.PLUGIN_SETTINGS.TIMEZONE') %></li>
+          <li>🔄 <%= tr('dunemap:DASHBOARD.PLUGIN_SETTINGS.AUTO_RECALC') %></li>
+          <li>💬 <%= tr('dunemap:DASHBOARD.PLUGIN_SETTINGS.CHANNEL') %></li>
+        </ul>
+        
+        <a href="/guild/<%= guildId %>/plugins/core/settings" class="btn btn-primary w-100">
+          <i class="fa-solid fa-arrow-right me-2"></i>
+          <%= tr('dunemap:DASHBOARD.PLUGIN_SETTINGS.BUTTON') %>
+        </a>
+        <small class="text-muted d-block mt-2">
+          <i class="fa-solid fa-info-circle me-1"></i>
+          <%= tr('dunemap:DASHBOARD.PLUGIN_SETTINGS.INFO') %>
+        </small>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-success text-white">
+        <h5 class="mb-0">
+          <i class="fa-solid fa-terminal me-2"></i>
+          <%= tr('dunemap:DASHBOARD.COMMANDS.TITLE') %>
+        </h5>
+      </div>
+      <div class="card-body">
+        <p class="mb-3">
+          <%= tr('dunemap:DASHBOARD.COMMANDS.DESCRIPTION') %>
+        </p>
+        
+        <h6 class="fw-bold"><%= tr('dunemap:DASHBOARD.COMMANDS.MAP_COMMANDS') %></h6>
+        <ul class="list-unstyled mb-3">
+          <li class="mb-2">
+            <code>/map show</code>
+            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.MAP_SHOW') %></small>
+          </li>
+          <li class="mb-2">
+            <code>/map set A5 titan</code>
+            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.MAP_SET') %></small>
+          </li>
+          <li class="mb-2">
+            <code>/map remove A5</code>
+            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.MAP_REMOVE') %></small>
+          </li>
+        </ul>
+        
+        <h6 class="fw-bold"><%= tr('dunemap:DASHBOARD.COMMANDS.STORM_TIMER') %></h6>
+        <ul class="list-unstyled mb-3">
+          <li class="mb-2">
+            <code>/storm set 05:12:30</code>
+            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.STORM_SET') %></small>
+          </li>
+          <li class="mb-2">
+            <code>/storm reset</code>
+            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.STORM_RESET') %></small>
+          </li>
+        </ul>
+        
+        <h6 class="fw-bold"><%= tr('dunemap:DASHBOARD.COMMANDS.TUTORIAL') %></h6>
+        <ul class="list-unstyled mb-0">
+          <li class="mb-2">
+            <code>/tutorial</code>
+            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.TUTORIAL_DESC') %></small>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Letzte Marker -->
+<% if (recentMarkers && recentMarkers.length > 0) { %>
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i class="fa-solid fa-clock me-2"></i>
+            <%= tr('dunemap:DASHBOARD.RECENT_MARKERS.TITLE') %>
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th><%= tr('dunemap:DASHBOARD.RECENT_MARKERS.SECTOR') %></th>
+                  <th><%= tr('dunemap:DASHBOARD.RECENT_MARKERS.TYPE') %></th>
+                  <th><%= tr('dunemap:DASHBOARD.RECENT_MARKERS.PLACED_BY') %></th>
+                  <th><%= tr('dunemap:DASHBOARD.RECENT_MARKERS.DATE') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% recentMarkers.forEach(marker => { %>
+                  <tr>
+                    <td>
+                      <span class="badge bg-primary fs-6">
+                        <%= marker.sector_x %><%= marker.sector_y %>
+                      </span>
+                    </td>
+                    <td>
+                      <span class="badge bg-secondary"><%= marker.marker_type %></span>
+                    </td>
+                    <td class="text-muted small">
+                      <i class="fa-solid fa-user me-1"></i>
+                      <%= marker.placedByName || marker.placed_by || 'Bot' %>
+                    </td>
+                    <td class="text-muted small">
+                      <%= new Date(marker.placed_at).toLocaleDateString('de-DE', { 
+                        year: 'numeric', 
+                        month: '2-digit', 
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } else { %>
+  <!-- Leerer Zustand -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body text-center py-5">
+          <i class="fa-solid fa-map fa-5x text-muted mb-3 d-block"></i>
+          <h4 class="mb-2"><%= tr('dunemap:DASHBOARD.EMPTY_STATE.TITLE') %></h4>
+          <p class="text-muted mb-4">
+            <%- tr('dunemap:DASHBOARD.EMPTY_STATE.DESCRIPTION') %>
+          </p>
+          <div class="alert alert-info d-inline-block">
+            <h6 class="mb-2"><%= tr('dunemap:DASHBOARD.EMPTY_STATE.EXAMPLES_TITLE') %></h6>
+            <code><%= tr('dunemap:DASHBOARD.EMPTY_STATE.EXAMPLE_1') %></code><br>
+            <code><%= tr('dunemap:DASHBOARD.EMPTY_STATE.EXAMPLE_2') %></code><br>
+            <code><%= tr('dunemap:DASHBOARD.EMPTY_STATE.EXAMPLE_3') %></code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<!-- Marker-Typen Übersicht -->
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header p-0 border-0">
+        <button id="markerTypesToggle"
+          class="btn btn-link text-start w-100 px-3 py-3 d-flex align-items-center justify-content-between"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#markerTypes"
+          aria-expanded="false"
+          aria-controls="markerTypes"
+        >
+          <span class="d-flex align-items-center">
+            <i class="fa-solid fa-list me-2"></i>
+            <span class="fw-semibold"><%= tr('dunemap:DASHBOARD.MARKER_TYPES.TITLE') %></span>
+          </span>
+          <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="collapse" id="markerTypes">
+        <div class="card-body">
+          <% if (typeof markerTypes !== 'undefined' && markerTypes) { %>
+          <div class="row">
+            <!-- Ressourcen -->
+            <div class="col-md-4">
+              <h6 class="fw-bold">🔶 <%= tr('dunemap:DASHBOARD.MARKER_TYPES.RESOURCES') %> (<%= markerTypes.resources?.length || 0 %>):</h6>
+              <ul class="list-unstyled">
+                <% if (markerTypes.resources && markerTypes.resources.length > 0) { %>
+                  <% markerTypes.resources.forEach(type => { %>
+                  <li>
+                    <span class="badge" style="background-color: <%= type.color %>;"><%= type.id %></span> 
+                    - <%= type.name %>
+                  </li>
+                  <% }) %>
+                <% } else { %>
+                  <li class="text-muted"><%= tr('dunemap:DASHBOARD.MARKER_TYPES.NO_RESOURCES') %></li>
+                <% } %>
+              </ul>
+            </div>
+            
+            <!-- Taktisch -->
+            <div class="col-md-4">
+              <h6 class="fw-bold">⚔️ <%= tr('dunemap:DASHBOARD.MARKER_TYPES.TACTICAL') %>:</h6>
+              <ul class="list-unstyled">
+                <% markerTypes.tactical.forEach(type => { %>
+                <li>
+                  <span class="badge" style="background-color: <%= type.color %>;"><%= type.id %></span> 
+                  - <%= type.name %>
+                </li>
+                <% }) %>
+              </ul>
+            </div>
+            
+            <!-- Sonstiges -->
+            <div class="col-md-4">
+              <h6 class="fw-bold">📦 <%= tr('dunemap:DASHBOARD.MARKER_TYPES.OTHER') %>:</h6>
+              <ul class="list-unstyled">
+                <% markerTypes.other.forEach(type => { %>
+                <li>
+                  <span class="badge" style="background-color: <%= type.color %>;"><%= type.id %></span> 
+                  - <%= type.name %>
+                </li>
+                <% }) %>
+              </ul>
+            </div>
+          </div>
+          <% } else { %>
+          <p class="text-muted"><%= tr('dunemap:DASHBOARD.MARKER_TYPES.ERROR') %></p>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+#markerTypesToggle .fa-chevron-down {
+  transition: transform 0.2s ease;
+}
+.rotate-180 {
+  transform: rotate(180deg);
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const collapseElement = document.getElementById('markerTypes');
+  const toggleButton = document.getElementById('markerTypesToggle');
+
+  if (!collapseElement || !toggleButton) {
+    return;
+  }
+
+  const chevronIcon = toggleButton.querySelector('.fa-chevron-down');
+
+  collapseElement.addEventListener('shown.bs.collapse', () => {
+    toggleButton.setAttribute('aria-expanded', 'true');
+    chevronIcon?.classList.add('rotate-180');
+  });
+
+  collapseElement.addEventListener('hidden.bs.collapse', () => {
+    toggleButton.setAttribute('aria-expanded', 'false');
+    chevronIcon?.classList.remove('rotate-180');
+  });
+});
+</script>

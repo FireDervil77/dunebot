@@ -24,6 +24,7 @@ module.exports = async (req, res, next) => {
     const i18n = ServiceManager.get('i18n');
     const themeManager = ServiceManager.get('themeManager');
     const navManager = ServiceManager.get('navigationManager');
+    const assetManager = ServiceManager.get('assetManager');
 
     try {
         // Core Config laden
@@ -38,44 +39,166 @@ module.exports = async (req, res, next) => {
         };
 
         // Setze und normalisiere Locale
-        if (!req.session.locale) {
-            if (!req.session.user) {
-                req.session.locale = coreConfig?.LOCALE?.DEFAULT || "de-DE";
-            } else {
-                const [user] = await dbService.query(
-                    "SELECT locale FROM users WHERE _id = ?",
-                    [req.session.user.info.id]
-                );
-                const dbLocale = user?.locale;
-                req.session.locale = dbLocale || coreConfig?.LOCALE?.DEFAULT || "de-DE";
+        // KORREKTE Priorität: User-Override > Guild-Locale > Session-Locale > Global-Default
+        let finalLocale = coreConfig?.LOCALE?.DEFAULT || "de-DE";
+        let isGuildContext = false;
+        
+        // Guild-ID aus verschiedenen Quellen extrahieren (für Locale-Loading)
+        // WICHTIG: Auch aus req.path extrahieren, da baseMiddleware VOR guildMiddleware läuft!
+        let localeGuildId = res.locals?.guildId || req.params?.guildId || null;
+        
+        // Fallback: Guild-ID aus Pfad extrahieren (/guild/GUILD_ID/...)
+        if (!localeGuildId && req.path.startsWith('/guild/')) {
+            const pathMatch = req.path.match(/^\/guild\/([^\/]+)/);
+            if (pathMatch && pathMatch[1]) {
+                localeGuildId = pathMatch[1];
+                Logger.debug(`[i18n] Guild-ID aus Pfad extrahiert: ${localeGuildId}`);
             }
-            req.session.save((err) => {
-                if (err) Logger.error("Failed to save session", err);
-            });
+        }
+        
+        // 1. Guild-Locale IMMER neu laden (falls Guild-Kontext vorhanden)
+        //    → Guild-Locale hat Priorität über Session-Locale!
+        if (localeGuildId) {
+            isGuildContext = true;
+            try {
+                const [guildLocale] = await dbService.query(
+                    "SELECT config_value FROM configs WHERE plugin_name = 'core' AND config_key = 'LOCALE' AND guild_id = ? AND context = 'shared'",
+                    [localeGuildId]
+                );
+                if (guildLocale?.config_value) {
+                    finalLocale = guildLocale.config_value;
+                    Logger.debug(`[i18n] Guild-Locale für ${localeGuildId}: ${finalLocale}`);
+                } else {
+                    Logger.debug(`[i18n] Keine Guild-Locale gefunden für ${localeGuildId}, nutze Default: ${finalLocale}`);
+                }
+            } catch (err) {
+                Logger.warn('[i18n] Fehler beim Laden der Guild-Locale:', err);
+            }
+        } else if (req.session.locale) {
+            // Wenn kein Guild-Kontext, nutze Session-Locale als Fallback
+            finalLocale = req.session.locale;
+            Logger.debug(`[i18n] Nutze Session-Locale: ${finalLocale}`);
+        }
+        
+        // 2. User-Override prüfen (höchste Priorität!)
+        //    → User kann persönliche Sprache unabhängig von Guild setzen
+        if (req.session.user) {
+            const [user] = await dbService.query(
+                "SELECT locale FROM users WHERE _id = ?",
+                [req.session.user.info.id]
+            );
+            const userLocale = user?.locale;
+            if (userLocale) {
+                finalLocale = userLocale;
+                Logger.debug(`[i18n] User-Override-Locale für ${req.session.user.info.id}: ${finalLocale}`);
+            }
+        }
+        
+        // WICHTIG: Session-Locale NUR außerhalb Guild-Kontext speichern!
+        // Im Guild-Kontext soll Guild-LOCALE bei jedem Request neu geladen werden
+        if (!isGuildContext) {
+            req.session.locale = finalLocale;
+            if (req.session.save) {
+                req.session.save((err) => {
+                    if (err) Logger.error("[i18n] Failed to save session", err);
+                });
+            }
         }
 
         // Normalisiere Sprachcode falls nötig
-        const normalizedLocale = languageCodeMap[req.session.locale] || req.session.locale || "de-DE";
+        const normalizedLocale = languageCodeMap[finalLocale] || finalLocale || "de-DE";
+
+        // WICHTIG: Setze aktuelle Sprache für diesen Request in i18next
+        // Dies ermöglicht dynamischen Sprachwechsel ohne Neustart
+        if (i18n && i18n.i18next) {
+            await i18n.i18next.changeLanguage(normalizedLocale);
+            Logger.debug(`[i18n] Sprache für Request auf ${normalizedLocale} gewechselt`);
+        }
 
         // Extra user methods
         if (req.session.user) {
             req.session.user.info.isOwner = process.env.OWNER_IDS?.split(",")?.includes(req.session.user.info.id);
         }
 
-        // Erstelle eine Übersetzungsfunktion
+        // Erstelle eine Übersetzungsfunktion mit Multi-Namespace-Support
+        // WICHTIG: Nutze i18next direkt statt gecachte Translation-Funktionen!
         req.translate = function(key, options) {
             try {
-                const translationFn = req.app.translations.get(normalizedLocale) || req.app.translations.get('de-DE');
-                if (typeof translationFn === 'function') {
-                    return translationFn(key, options);
+                // Nutze i18next direkt mit aktueller Sprache
+                if (i18n && i18n.i18next) {
+                    const result = i18n.i18next.t(key, { ...options, lng: normalizedLocale });
+                    
+                    // Wenn i18next den Key zurückgibt (nicht gefunden), versuche Fallback
+                    if (result === key) {
+                        return manualLookup(key);
+                    }
+                    return result;
                 }
 
-                // Fallback: Manueller Key-Lookup
-                const translationObj = i18n?.getResourceBundle?.(normalizedLocale, 'translation') || {};
-                return key.split('.').reduce((obj, k) => (obj && obj[k] !== undefined ? obj[k] : key), translationObj);
+                // Fallback zu altem System
+                const translationFn = req.app.translations.get(normalizedLocale) || req.app.translations.get('de-DE');
+                if (typeof translationFn === 'function') {
+                    const result = translationFn(key, options);
+                    if (result === key) {
+                        return manualLookup(key);
+                    }
+                    return result;
+                }
+
+                return manualLookup(key);
             } catch (e) {
                 Logger.error("Translation error:", e);
                 return key; // Fallback auf den Key selbst
+            }
+            
+            /**
+             * Manueller Key-Lookup mit Multi-Namespace-Unterstützung
+             * Sucht zuerst im aktuellen Plugin-Namespace, dann in 'translation'
+             */
+            function manualLookup(searchKey) {
+                // DEBUG: Log zur Fehlersuche
+                const pluginName = req.params?.pluginName || res.locals?.pluginName || null;
+                
+                Logger.debug('[i18n] manualLookup:', {
+                    key: searchKey,
+                    pluginName: pluginName,
+                    'req.params.pluginName': req.params?.pluginName,
+                    'res.locals.pluginName': res.locals?.pluginName,
+                    locale: normalizedLocale
+                });
+                
+                // 1. Versuche Plugin-Namespace (z.B. 'core', 'dunemap')
+                if (pluginName && i18n) {
+                    const pluginBundle = i18n.getResourceBundle?.(normalizedLocale, pluginName) || {};
+                    
+                    Logger.debug('[i18n] Plugin Bundle Keys:', Object.keys(pluginBundle).slice(0, 10));
+                    
+                    const pluginResult = searchKey.split('.').reduce(
+                        (obj, k) => (obj && obj[k] !== undefined ? obj[k] : null), 
+                        pluginBundle
+                    );
+                    if (pluginResult !== null) {
+                        Logger.debug('[i18n] Found in plugin namespace:', pluginResult);
+                        return pluginResult;
+                    }
+                }
+                
+                // 2. Fallback zu 'translation' Namespace (Dashboard-Basis-Übersetzungen)
+                if (i18n) {
+                    const translationObj = i18n.getResourceBundle?.(normalizedLocale, 'translation') || {};
+                    const translationResult = searchKey.split('.').reduce(
+                        (obj, k) => (obj && obj[k] !== undefined ? obj[k] : null), 
+                        translationObj
+                    );
+                    if (translationResult !== null) {
+                        Logger.debug('[i18n] Found in translation namespace:', translationResult);
+                        return translationResult;
+                    }
+                }
+                
+                // 3. Letzter Fallback: Key selbst zurückgeben
+                Logger.warn('[i18n] Translation not found, returning key:', searchKey);
+                return searchKey;
             }
         };
 
@@ -290,6 +413,16 @@ module.exports = async (req, res, next) => {
             // Hook-System für Templates verfügbar machen
             res.locals.hooks = themeManager.hooks || {};
         }
+        
+        // AssetManager für Templates bereitstellen
+        if (assetManager) {
+            res.locals.assetManager = assetManager;
+            
+            // Helper-Funktionen für Templates
+            res.locals.enqueueScript = (handle) => assetManager.enqueueScript(handle);
+            res.locals.enqueueStyle = (handle) => assetManager.enqueueStyle(handle);
+        }
+        
         if (themeManager?.setCurrentLocals) {
             themeManager.setCurrentLocals(res.locals);
             res.on('finish', () => themeManager.clearCurrentLocals?.());

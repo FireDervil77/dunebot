@@ -23,5 +23,81 @@
     "LOGO_URL_DESC": "URL zum Logo-Bild",
 
     "ENABLED": "Aktiviert",
-    "DISABLED": "Deaktiviert"
+    "DISABLED": "Deaktiviert",
+
+    "SETTINGS": {
+        "GENERAL": {
+            "TITLE": "Grundkonfiguration",
+            "PREFIX_LABEL": "Bot-Präfix",
+            "PREFIX_HELP": "Das Präfix für Text-Befehle (z.B. <code>!help</code>, <code>!ping</code>)",
+            "LOCALE_LABEL": "Standard-Sprache",
+            "LOCALE_HELP": "Die Standard-Sprache für Bot-Antworten und Dashboard-Inhalte",
+            "THEME_LABEL": "Dashboard-Theme",
+            "THEME_HELP": "Weitere Themes werden in zukünftigen Updates hinzugefügt",
+            "THEME_DEFAULT": "Standard (Hell)",
+            "THEME_DARK": "Dark Mode (bald verfügbar)",
+            "THEME_NORD": "Nord Theme (bald verfügbar)",
+            "FEATURES_TITLE": "Features",
+            "SLASH_LABEL": "Slash-Commands aktivieren",
+            "SLASH_HELP": "Ermöglicht die Nutzung von Discord Slash-Commands (<code>/help</code> statt <code>!help</code>)",
+            "VERBOSE_LABEL": "Erweiterte Logs",
+            "VERBOSE_HELP": "Protokolliert alle Bot-Aktionen detailliert (für Administratoren empfohlen)",
+            "DEBUG_LABEL": "Debug-Modus",
+            "DEBUG_BADGE": "Für Entwickler",
+            "DEBUG_HELP": "Zeigt erweiterte Fehlerinfos und technische Details (kann die Performance beeinträchtigen)",
+            "RESET_BTN": "Zurücksetzen",
+            "SAVE_BTN": "Einstellungen speichern"
+        },
+        "HELP": {
+            "TITLE": "Hilfe & Tipps",
+            "PREFIX_TITLE": "Bot-Präfix",
+            "PREFIX_TEXT": "Wähle ein eindeutiges Präfix, das nicht mit anderen Bots kollidiert. Beliebte Präfixe: <code>!</code>, <code>?</code>, <code>.</code>",
+            "SLASH_TITLE": "Slash-Commands",
+            "SLASH_TEXT": "Slash-Commands sind die moderne Alternative zu Text-Befehlen. Sie bieten Auto-Vervollständigung und sind benutzerfreundlicher.",
+            "DEBUG_TITLE": "Debug-Modus",
+            "DEBUG_WARNING": "Achtung!",
+            "DEBUG_TEXT": "Der Debug-Modus sollte nur aktiviert werden, wenn du technische Probleme analysierst."
+        },
+        "STATUS": {
+            "TITLE": "Aktuelle Konfiguration",
+            "PREFIX": "Präfix",
+            "LOCALE": "Sprache",
+            "THEME": "Theme",
+            "SLASH": "Slash-Commands",
+            "ACTIVE": "Aktiv",
+            "INACTIVE": "Deaktiviert"
+        }
+    },
+
+    "SETTINGS_OVERVIEW": {
+        "GENERAL_TITLE": "Allgemeine Einstellungen",
+        "GENERAL_SUBTITLE": "Bot-Grundkonfiguration",
+        "GENERAL_DESCRIPTION": "Konfiguriere Bot-Präfix, Standardsprache, Theme und aktiviere/deaktiviere Slash-Commands.",
+        "GENERAL_FEATURES": {
+            "PREFIX": "Bot-Präfix anpassen",
+            "LOCALE": "Sprache festlegen",
+            "THEME": "Theme auswählen",
+            "SLASH": "Slash-Commands verwalten"
+        },
+        "USER_TITLE": "Benutzer-Verwaltung",
+        "USER_SUBTITLE": "Rollen & Permissions",
+        "USER_DESCRIPTION": "Verwalte Berechtigungen, Admin-Rollen und Command-Zugriffe.",
+        "USER_FEATURES": {
+            "ROLES": "Rollen-Berechtigungen",
+            "ADMIN": "Admin-Zugriff",
+            "COMMANDS": "Command-Permissions",
+            "BLACKLIST": "Blacklist verwalten"
+        },
+        "INTEGRATIONS_TITLE": "Integrationen",
+        "INTEGRATIONS_SUBTITLE": "APIs & Webhooks",
+        "INTEGRATIONS_DESCRIPTION": "Konfiguriere externe Dienste, Webhooks und API-Zugriffe.",
+        "INTEGRATIONS_FEATURES": {
+            "WEBHOOKS": "Webhook-URLs",
+            "API_KEYS": "API-Keys",
+            "OAUTH": "OAuth-Verbindungen",
+            "THIRD_PARTY": "Drittanbieter-Dienste"
+        },
+        "COMING_SOON": "Bald verfügbar",
+        "BTN_CONFIGURE": "Konfigurieren"
+    }
 }

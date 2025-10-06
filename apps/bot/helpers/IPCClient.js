@@ -191,40 +191,55 @@ class IPCClient {
      * ruft für jede message den passenden message context auf
      */
     async handleMessage(message) {
-        if (!message?.data?.event) {
-            return;
-        }
-
-        this.logger.debug(`[IPC] Bot empfängt IPC-Event: ${message?.data?.event || "unbekannt"}`);
-        const { event, payload } = message.data;
-        const [pluginName, eventName] = event.split(":");
-
-        if (!pluginName || !eventName) {
-            return message.reply({ success: false, error: "Invalid event format" });
-        }
-
-        if (pluginName === "dashboard") {
-            return this.#handleBaseMessage(eventName, message);
-        }
-
-        const plugin = this.discordClient.pluginManager.getPlugin(pluginName);
-        if (!plugin?.ipcEvents?.has(eventName)) {
-            return message.reply({ success: false, error: "Handler not found" });
-        }
-
         try {
-            const handler = plugin.ipcEvents.get(eventName);
-            const data = await handler(payload, this.discordClient);
-            return message.reply({
-                success: true,
-                data: data,
-            });
+            // DEBUG: Message-Struktur loggen
+            this.logger.debug(`[IPC-DEBUG] handleMessage() aufgerufen, event: ${message?.data?.event}`);
+            
+            if (!message?.data?.event) {
+                this.logger.warn('[IPC-DEBUG] Keine Event-Daten, abgebrochen');
+                return;
+            }
+
+            const { event, payload } = message.data;
+            this.logger.info(`[IPC] Bot empfängt IPC-Event: ${event}`);
+            
+            const [pluginName, eventName] = event.split(":");
+
+            if (!pluginName || !eventName) {
+                this.logger.warn(`[IPC] Ungültiges Event-Format: ${event}`);
+                return message.reply({ success: false, error: "Invalid event format" });
+            }
+
+            if (pluginName === "dashboard") {
+                this.logger.debug(`[IPC] Verarbeite Dashboard-Event: ${eventName}`);
+                return await this.#handleBaseMessage(eventName, message);
+            }
+
+            const plugin = this.discordClient.pluginManager.getPlugin(pluginName);
+            if (!plugin?.ipcEvents?.has(eventName)) {
+                this.logger.warn(`[IPC] Handler nicht gefunden: ${pluginName}:${eventName}`);
+                return message.reply({ success: false, error: "Handler not found" });
+            }
+
+            try {
+                const handler = plugin.ipcEvents.get(eventName);
+                const data = await handler(payload, this.discordClient);
+                return message.reply({
+                    success: true,
+                    data: data,
+                });
+            } catch (error) {
+                this.logger.error(`Error in plugin ${pluginName} IPC handler: ${error.message}`, error);
+                return message.reply({
+                    success: false,
+                    error: error.message,
+                });
+            }
         } catch (error) {
-            this.logger.error(`Error in plugin ${pluginName} IPC handler: ${error.message}`, error);
-            return message.reply({
-                success: false,
-                error: error.message,
-            });
+            this.logger.error(`[IPC] FATAL ERROR in handleMessage():`, error);
+            if (message?.reply) {
+                return message.reply({ success: false, error: error.message });
+            }
         }
     }
 
@@ -276,6 +291,12 @@ class IPCClient {
                 
                 case "GET_GUILD_INFO":
                     return await this.#handleGetGuildInfo(message, payload);
+                    
+                case "GET_GUILD_CHANNELS":
+                    return await this.#handleGetGuildChannels(message, payload);
+                    
+                case "GET_GUILD_MEMBERS":
+                    return await this.#handleGetGuildMembers(message, payload);
                     
                 default:
                     this.logger.warn(`[IPC] Unbekanntes Dashboard-Event: ${eventName}`);
@@ -369,6 +390,176 @@ class IPCClient {
             });
         } catch (error) {
             this.logger.error("[IPC] Fehler beim Abrufen der Guild-Informationen:", error);
+            return message.reply({
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Liefert alle Text-Channels einer Guild für Dropdown-Selects
+     * @param {object} message - Veza-Nachrichtenobjekt
+     * @param {object} payload - Enthält die Guild-ID
+     * @returns {Promise<void>}
+     * @private
+     * @author DuneBot Team
+     */
+    async #handleGetGuildChannels(message, payload) {
+        const { ChannelType } = require('discord.js');
+        
+        try {
+            if (!payload?.guildId) {
+                this.logger.warn('[IPC] GET_GUILD_CHANNELS: Keine guildId im Payload');
+                return message.reply({
+                    success: false,
+                    error: "Guild-ID ist erforderlich"
+                });
+            }
+            
+            const guild = this.discordClient.guilds.cache.get(payload.guildId);
+            if (!guild) {
+                this.logger.warn(`[IPC] GET_GUILD_CHANNELS: Guild ${payload.guildId} nicht gefunden`);
+                return message.reply({
+                    success: false,
+                    error: "Guild nicht gefunden"
+                });
+            }
+
+            // Nur Text-Channels (ChannelType.GuildText = 0)
+            const channels = guild.channels.cache
+                .filter(ch => ch.type === ChannelType.GuildText)
+                .map(ch => ({
+                    id: ch.id,
+                    name: ch.name,
+                    type: ch.type,
+                    parentId: ch.parentId,
+                    parentName: ch.parent?.name || null
+                }))
+                .sort((a, b) => {
+                    // Sortierung: Erst nach Category, dann alphabetisch
+                    if (a.parentName && !b.parentName) return 1;
+                    if (!a.parentName && b.parentName) return -1;
+                    if (a.parentName !== b.parentName) {
+                        return (a.parentName || '').localeCompare(b.parentName || '');
+                    }
+                    return a.name.localeCompare(b.name);
+                });
+
+            this.logger.debug(`[IPC] GET_GUILD_CHANNELS: ${channels.length} Channels für Guild ${payload.guildId}`);
+
+            return message.reply({
+                success: true,
+                channels: channels
+            });
+        } catch (error) {
+            this.logger.error("[IPC] Fehler beim Abrufen der Guild-Channels:", error);
+            return message.reply({
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Liefert Guild-Members für eine bestimmte Guild
+     * Löst User-IDs zu Discord-Usernamen auf
+     * @param {object} message - Veza-Nachrichtenobjekt
+     * @param {object} payload - Enthält guildId und userIds
+     * @returns {Promise<void>}
+     * @private
+     * @author DuneBot Team
+     */
+    async #handleGetGuildMembers(message, payload) {
+        try {
+            if (!payload?.guildId) {
+                this.logger.warn('[IPC] GET_GUILD_MEMBERS: Keine guildId im Payload');
+                return message.reply({
+                    success: false,
+                    error: "Guild-ID ist erforderlich"
+                });
+            }
+            
+            if (!payload?.userIds || !Array.isArray(payload.userIds)) {
+                this.logger.warn('[IPC] GET_GUILD_MEMBERS: userIds fehlt oder ist kein Array');
+                return message.reply({
+                    success: false,
+                    error: "userIds muss ein Array sein"
+                });
+            }
+            
+            const guild = this.discordClient.guilds.cache.get(payload.guildId);
+            if (!guild) {
+                this.logger.warn(`[IPC] GET_GUILD_MEMBERS: Guild ${payload.guildId} nicht gefunden`);
+                return message.reply({
+                    success: false,
+                    error: "Guild nicht gefunden"
+                });
+            }
+
+            const members = {};
+            
+            // Batch-Fetch falls Member nicht im Cache
+            if (guild.members.cache.size < guild.memberCount) {
+                try {
+                    await guild.members.fetch();
+                    this.logger.debug('[IPC] GET_GUILD_MEMBERS: Members aus API gefetcht');
+                } catch (err) {
+                    this.logger.warn('[IPC] Member-Fetch fehlgeschlagen, nutze Cache:', err.message);
+                }
+            }
+            
+            // User-Daten für alle übergebenen IDs abrufen
+            for (const userId of payload.userIds) {
+                try {
+                    const member = guild.members.cache.get(userId);
+                    
+                    if (member) {
+                        members[userId] = {
+                            id: member.id,
+                            username: member.user.username,
+                            discriminator: member.user.discriminator,
+                            displayName: member.displayName,
+                            nickname: member.nickname,
+                            tag: member.user.tag,
+                            avatar: member.user.displayAvatarURL({ dynamic: true }),
+                            joinedAt: member.joinedTimestamp
+                        };
+                    } else {
+                        // Fallback: User nicht in Guild
+                        this.logger.debug(`[IPC] GET_GUILD_MEMBERS: User ${userId} nicht in Guild gefunden`);
+                        members[userId] = {
+                            id: userId,
+                            username: `Unknown User (${userId.slice(0, 8)}...)`,
+                            displayName: 'Unknown',
+                            nickname: null,
+                            tag: 'Unknown#0000',
+                            avatar: null,
+                            joinedAt: null
+                        };
+                    }
+                } catch (err) {
+                    this.logger.warn(`[IPC] Fehler bei User ${userId}:`, err.message);
+                    members[userId] = {
+                        id: userId,
+                        username: `Error (${userId.slice(0, 8)}...)`,
+                        displayName: 'Error',
+                        nickname: null,
+                        tag: 'Error#0000',
+                        avatar: null,
+                        joinedAt: null
+                    };
+                }
+            }
+
+            this.logger.debug(`[IPC] GET_GUILD_MEMBERS: ${Object.keys(members).length}/${payload.userIds.length} Members aufgelöst`);
+
+            return message.reply({
+                success: true,
+                members: members
+            });
+        } catch (error) {
+            this.logger.error("[IPC] Fehler beim Abrufen der Guild-Members:", error);
             return message.reply({
                 success: false,
                 error: error.message

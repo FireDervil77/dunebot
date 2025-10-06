@@ -189,6 +189,78 @@ class DBService extends DBClient {
     }
 
     /**
+     * Stellt sicher, dass eine Config existiert, überschreibt sie aber NICHT falls vorhanden
+     * Perfekt für Default-Configs die nur beim ersten Mal gesetzt werden sollen
+     * @param {string} pluginName Plugin-Name
+     * @param {string} configKey Config-Schlüssel
+     * @param {string|object} defaultValue Standard-Wert (wird nur verwendet wenn Config nicht existiert)
+     * @param {string} [context='shared'] Kontext (shared, bot, dashboard)
+     * @param {string|null} [guildId=null] Guild-ID (null = global)
+     * @param {boolean} [isGlobal=!guildId] Ob es eine globale Config ist
+     * @returns {Promise<boolean>} true wenn neu erstellt, false wenn bereits vorhanden
+     * @author firedervil
+     */
+    async ensureConfig(pluginName, configKey, defaultValue, context = 'shared', guildId = null, isGlobal = null) {
+        const Logger = ServiceManager.get('Logger');
+        
+        // Prüfe ob Config bereits existiert
+        const existing = await this.getConfig(pluginName, configKey, context, guildId);
+        
+        if (existing !== null) {
+            // Config existiert bereits, NICHT überschreiben
+            Logger.debug(`[DBService] Config ${pluginName}.${configKey} existiert bereits, überspringe.`);
+            return false;
+        }
+        
+        // Config existiert nicht, erstelle sie mit Default-Wert
+        let configValue = defaultValue;
+        if (typeof defaultValue === "object") configValue = JSON.stringify(defaultValue);
+        if (isGlobal === null) isGlobal = !guildId;
+        
+        const sql = `
+            INSERT INTO configs (plugin_name, config_key, config_value, context, guild_id, is_global)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `;
+        await this.query(sql, [pluginName, configKey, configValue, context, guildId, isGlobal]);
+        
+        Logger.debug(`[DBService] Config ${pluginName}.${configKey} neu erstellt mit Default-Wert.`);
+        return true;
+    }
+
+    /**
+     * Initialisiert mehrere Configs auf einmal, überschreibt aber KEINE existierenden Werte
+     * Nutzt ensureConfig() für jeden Eintrag
+     * @param {string} pluginName Plugin-Name
+     * @param {Object} defaultConfigs Key-Value-Objekt mit Default-Configs
+     * @param {string} [context='shared'] Kontext
+     * @param {string|null} [guildId=null] Guild-ID (null = global)
+     * @returns {Promise<{created: number, existing: number}>} Statistik über erstellte/vorhandene Configs
+     * @author firedervil
+     */
+    async ensureConfigs(pluginName, defaultConfigs, context = 'shared', guildId = null) {
+        const Logger = ServiceManager.get('Logger');
+        let created = 0;
+        let existing = 0;
+        
+        try {
+            for (const [key, value] of Object.entries(defaultConfigs)) {
+                const isNew = await this.ensureConfig(pluginName, key, value, context, guildId);
+                if (isNew) {
+                    created++;
+                } else {
+                    existing++;
+                }
+            }
+            
+            Logger.info(`[DBService] Plugin ${pluginName}: ${created} Configs neu erstellt, ${existing} bereits vorhanden (nicht überschrieben)`);
+            return { created, existing };
+        } catch (error) {
+            Logger.error(`[DBService] Fehler beim Initialisieren der Configs für ${pluginName}:`, error);
+            throw error;
+        }
+    }
+
+    /**
      * Initialisiert die Plugin-Konfiguration für eine Guild
      * @param {string} guildId Guild-ID
      * @param {object} configObj Standard-Konfiguration aus config.json

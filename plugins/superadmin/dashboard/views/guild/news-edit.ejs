@@ -21,7 +21,10 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-body">
-                        <form method="POST" action="/guild/<%= guildId %>/plugins/superadmin/news/save">
+                        <form method="POST" 
+                              action="/guild/<%= guildId %>/plugins/superadmin/news/save"
+                              class="guild-ajax-form"
+                              data-form-type="news">
                             <!-- Verstecktes Feld für ID bei Bearbeitung -->
                             <% if (news && news._id) { %>
                                 <input type="hidden" name="newsId" value="<%= news._id %>">
@@ -85,14 +88,15 @@
 
                             <!-- Image URL -->
                             <div class="mb-3">
-                                <label for="image_url" class="form-label">Bild URL</label>
-                                <input type="url" 
+                                <label for="image_url" class="form-label">Bild URL / Pfad</label>
+                                <input type="text" 
                                        class="form-control" 
                                        id="image_url" 
                                        name="image_url" 
-                                       value="<%= news && news.image_url ? news.image_url : '' %>">
+                                       value="<%= news && news.image_url ? news.image_url : '' %>"
+                                       placeholder="/images/news/my-image.jpg oder https://example.com/image.jpg">
                                 <small class="form-text text-muted">
-                                    Optional: URL zu einem Bild für die News
+                                    Optional: URL oder relativer Pfad zu einem Bild (z.B. /images/news/bild.jpg)
                                 </small>
                             </div>
 

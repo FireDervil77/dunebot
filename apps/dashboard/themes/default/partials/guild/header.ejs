@@ -26,6 +26,11 @@
 <!-- SERVING FAVICONS -->
 <%- includePartial('guild/stylesheets') %>
 <%- includePartial('guild/analytics') %>
+
+<!-- Plugin Stylesheets (AssetManager) -->
+<% if (locals.assetManager) { %>
+  <%- assetManager.renderStyles() %>
+<% } %>
   
 <!-- Hook: dashboard_head -->
 <% if (locals.hooks && hooks.getViewHooks) { %>

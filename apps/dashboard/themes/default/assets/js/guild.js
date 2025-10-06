@@ -17,8 +17,13 @@ class GuildAjaxHandler {
         }
 
         // Alle AJAX-Formulare im Guild-Bereich abfangen
-        document.querySelectorAll('.guild-ajax-form').forEach(form => {
+        const forms = document.querySelectorAll('.guild-ajax-form');
+        console.log('[GuildAjax] Gefundene Forms:', forms.length);
+        
+        forms.forEach(form => {
+            console.log('[GuildAjax] Registriere Form:', form.dataset.formType);
             form.addEventListener('submit', e => {
+                console.log('[GuildAjax] Form submitted:', form.dataset.formType);
                 e.preventDefault();
                 GuildAjaxHandler.handleForm(form);
             });
@@ -26,15 +31,20 @@ class GuildAjaxHandler {
     }
 
     static async handleForm(form) {
+        console.log('[GuildAjax] handleForm called for:', form.dataset.formType);
         try {
             const formData = new FormData(form);
             const formType = form.dataset.formType || 'default';
 
             // Korrekte URL aus form.action (String!)
             const url = typeof form.action === 'string' ? form.action : form.getAttribute('action');
+            console.log('[GuildAjax] Submitting to:', url, 'Type:', formType);
+            
+            // HTTP-Methode aus Form oder data-method Attribut
+            const method = form.dataset.method || form.method || 'POST';
 
             const response = await fetch(url, {
-                method: form.method || 'POST',
+                method: method.toUpperCase(),
                 headers: {
                     'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
                     'Accept': 'application/json',
@@ -66,6 +76,26 @@ class GuildAjaxHandler {
                 case 'widget':
                     await this.handleWidgetResponse(form, result);
                     break;
+                
+                case 'news':
+                    await this.handleNewsResponse(form, result);
+                    break;
+                
+                case 'news-delete':
+                    await this.handleNewsDeleteResponse(form, result);
+                    break;
+                
+                case 'notification':
+                    await this.handleNotificationResponse(form, result);
+                    break;
+                
+                case 'core-settings':
+                    await this.handleCoreSettingsResponse(form, result);
+                    break;
+                
+                case 'dunemap-settings':
+                    await this.handleDuneMapSettingsResponse(form, result);
+                    break;
                     
                 default:
                     // Generische Behandlung
@@ -80,46 +110,114 @@ class GuildAjaxHandler {
             await this.updateUI(form, result);
 
         } catch (error) {
-            this.showToast('error', 'Netzwerkfehler oder Serverfehler');
+            this.showToast('error', window.i18n?.COMMON?.NETWORK_ERROR || 'Netzwerkfehler oder Serverfehler');
             console.error(error);
         }
     }
 
     static async handlePluginResponse(form, result) {
-        // Remove console.log
         const pluginName = form.querySelector('input[name="plugins[]"]')?.value;
         const action = form.querySelector('input[name="action"]')?.value;
         
         if (result.success) {
-            this.showToast('success', 
-                `Plugin "${pluginName}" wurde erfolgreich ${action === 'enable' ? 'aktiviert' : 'deaktiviert'}`
-            );
+            const message = action === 'enable' 
+                ? (window.i18n?.TOAST_MESSAGES?.PLUGIN_ENABLED || `Plugin "${pluginName}" aktiviert`)
+                : (window.i18n?.TOAST_MESSAGES?.PLUGIN_DISABLED || `Plugin "${pluginName}" deaktiviert`);
+            this.showToast('success', message);
             if (result.requiresReload) {
                 setTimeout(() => window.location.reload(), 1500);
             }
         } else {
             this.showToast('error', 
-                `Fehler beim ${action === 'enable' ? 'Aktivieren' : 'Deaktivieren'} von "${pluginName}": ${result.message}`
+                result.message || (window.i18n?.TOAST_MESSAGES?.PLUGIN_ERROR || 'Fehler bei Plugin-Operation')
             );
         }
     }
 
     static async handleLocaleResponse(form, result) {
         if (result.success) {
-            this.showToast('success', 'Spracheinstellungen wurden aktualisiert');
+            this.showToast('success', window.i18n?.TOAST_MESSAGES?.LOCALE_UPDATED || 'Spracheinstellungen wurden aktualisiert');
             if (result.requiresReload) {
                 setTimeout(() => window.location.reload(), 1500);
             }
         } else {
-            this.showToast('error', `Fehler beim Speichern der Spracheinstellungen: ${result.message}`);
+            this.showToast('error', 
+                result.message || (window.i18n?.TOAST_MESSAGES?.LOCALE_ERROR || 'Fehler beim Speichern der Spracheinstellungen')
+            );
         }
     }
 
     static async handleSettingsResponse(form, result) {
         if (result.success) {
-            this.showToast('success', 'Einstellungen wurden gespeichert');
+            this.showToast('success', window.i18n?.TOAST_MESSAGES?.SETTINGS_SAVED || 'Einstellungen wurden gespeichert');
         } else {
-            this.showToast('error', `Fehler beim Speichern der Einstellungen: ${result.message}`);
+            this.showToast('error', 
+                result.message || (window.i18n?.TOAST_MESSAGES?.SETTINGS_ERROR || 'Fehler beim Speichern der Einstellungen')
+            );
+        }
+    }
+
+    static async handleNewsResponse(form, result) {
+        if (result.success) {
+            this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.NEWS_UPDATED || 'News erfolgreich gespeichert'));
+            // Nach 1 Sekunde zur News-Übersicht weiterleiten
+            setTimeout(() => {
+                const guildId = window.location.pathname.split('/')[2];
+                window.location.href = `/guild/${guildId}/plugins/superadmin/news`;
+            }, 1000);
+        } else {
+            this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.NEWS_ERROR || 'Fehler beim Speichern der News'));
+        }
+    }
+
+    static async handleNewsDeleteResponse(form, result) {
+        if (result.success) {
+            this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.NEWS_DELETED || 'News erfolgreich gelöscht'));
+            // Tabellenzeile entfernen (visuelle Sofort-Aktualisierung)
+            const row = form.closest('tr');
+            if (row) {
+                row.style.opacity = '0';
+                setTimeout(() => row.remove(), 300);
+            }
+        } else {
+            this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.NEWS_ERROR || 'Fehler beim Löschen der News'));
+        }
+    }
+
+    static async handleNotificationResponse(form, result) {
+        if (result.success) {
+            this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.NOTIFICATION_SENT || 'Notification erfolgreich versendet'));
+            // Formular zurücksetzen
+            form.reset();
+        } else {
+            this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.NOTIFICATION_ERROR || 'Fehler beim Versenden der Notification'));
+        }
+    }
+
+    static async handleCoreSettingsResponse(form, result) {
+        if (result.success) {
+            this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.CORE_SETTINGS_SAVED || 'Einstellungen erfolgreich gespeichert'));
+            // Optional: Seite nach 1,5s neu laden um Änderungen sichtbar zu machen
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.CORE_SETTINGS_ERROR || 'Fehler beim Speichern der Einstellungen'));
+        }
+    }
+
+    static async handleDuneMapSettingsResponse(form, result) {
+        console.log('[GuildAjax] handleDuneMapSettingsResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.DUNEMAP_SETTINGS_SAVED || 'DuneMap-Einstellungen gespeichert'));
+            // Seite nach 1,5s neu laden um Änderungen (z.B. Channel-Auswahl) sichtbar zu machen
+            console.log('[GuildAjax] Scheduling page reload in 1.5s...');
+            setTimeout(() => {
+                console.log('[GuildAjax] Reloading page now!');
+                window.location.reload();
+            }, 1500);
+        } else {
+            this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.DUNEMAP_SETTINGS_ERROR || 'Fehler beim Speichern der DuneMap-Einstellungen'));
         }
     }
 

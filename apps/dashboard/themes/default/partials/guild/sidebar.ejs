@@ -23,18 +23,22 @@
           <ul class="nav nav-pills nav-sidebar flex-column" role="menu" data-accordion="false">
             <li class="nav-header">Navigation</li>
             <% 
-              // Erst prüfen, ob es einen exakten Match gibt
+              // Aktiv-Logik: Nur exakte Matches oder direkte Parent-Items
               const hasExactMatch = navItems.some(item => activeMenu === item.url);
               
               navItems
                 .sort((a,b) => (a.sort_order || a.order || 0) - (b.sort_order || b.order || 0)) 
                 .forEach(item => { 
-                  // Nur dann als aktiv markieren, wenn:
-                  // 1. Exakter Match ODER
-                  // 2. Kein exakter Match existiert UND die URL mit diesem Item beginnt
+                  // Aktiv wenn:
+                  // 1. Exakter Match: activeMenu === item.url
+                  // 2. Parent-Match: item hat Kinder UND eines der Kinder ist aktiv
                   const isExactMatch = activeMenu === item.url;
-                  const isParentMatch = !hasExactMatch && activeMenu && activeMenu.startsWith(item.url + '/');
-                  const isActive = isExactMatch || isParentMatch;
+                  
+                  // Prüfe ob ein Kind aktiv ist
+                  const hasActiveChild = item.subItems && item.subItems.length > 0 && 
+                    item.subItems.some(child => activeMenu === child.url);
+                  
+                  const isActive = isExactMatch || hasActiveChild;
             %>
               <li class="nav-item <%= isActive ? 'menu-open' : '' %>">
                 <a href="<%= item.url %>" class="nav-link <%= isActive ? 'active' : '' %>">

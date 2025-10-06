@@ -7,6 +7,7 @@ const NotificationManager = require("./lib/NotificationManager");
 const UpdatesManager = require("./lib/UpdatesManager");
 const { PluginHooks } = require("dunebot-core"); // PluginHooks aus dunebot-core importieren
 const RouterManager = require("./lib/RouterManager");
+const AssetManager = require("./lib/AssetManager");
 const HookSystem = PluginHooks;
 
 module.exports = {
@@ -18,6 +19,7 @@ module.exports = {
     NotificationManager,
     UpdatesManager,
     RouterManager,
+    AssetManager,
     HookSystem, // Exportieren als HookSystem (neuer Name)
     PluginHooks // Auch unter dem alten Namen exportieren für Abwärtskompatibilität
 };

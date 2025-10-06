@@ -92,6 +92,23 @@
 .plugin-card .card-body { flex:1; }
 
 /**
+* CONTENT PADDING (Abstand zwischen Sidebar und Content-Ende)
+* Wichtig: padding auf .app-main statt .app-content, damit es auch für 
+* Views OHNE .app-content-Wrapper funktioniert (z.B. DuneMap-Plugin)
+*/
+.app-main {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+/* Bootstrap .row hat negatives Margin - neutralisieren */
+.app-main > .row,
+.app-content > .row {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/**
 * TOASTS
 */
 .toast {

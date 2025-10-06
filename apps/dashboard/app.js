@@ -7,7 +7,7 @@ require("dotenv").config();
 const PluginManager = require("./helpers/PluginManager");
 const { ServiceManager, I18nManager } = require("dunebot-core");
 const { parseJsonArray } = require("dunebot-sdk/utils");
-const { ThemeManager } = require('dunebot-sdk');
+const { ThemeManager, AssetManager } = require('dunebot-sdk');
 const ShortcodeParser = require("dunebot-sdk/lib/utils/ShortcodeParser");
 const { NotificationManager} = require('dunebot-sdk');
 const { UpdatesManager } = require('dunebot-sdk');
@@ -75,6 +75,10 @@ module.exports = class App {
         this.app.themeManager = new ThemeManager(this.app);
         this.app.themeManager.registerThemeAssets();
         ServiceManager.register("themeManager", this.app.themeManager);
+
+        // Asset-Manager initialisieren (WordPress-like enqueue system)
+        this.app.assetManager = new AssetManager();
+        ServiceManager.register("assetManager", this.app.assetManager);
 
         
         // Plugin-Manager initialisieren
@@ -228,11 +232,18 @@ module.exports = class App {
             // 3. Core-Plugin aktivieren
             await this.app.pluginManager.enablePlugin('core');
             
-            // 3.1 SuperAdmin-Plugin aktivieren (owner-only, control-guild-only)
+            // 3.1 SuperAdmin-Plugin NUR für Control-Guild aktivieren (owner-only)
             if (process.env.CONTROL_GUILD_ID && process.env.OWNER_IDS) {
                 try {
-                    await this.app.pluginManager.enablePlugin('superadmin');
-                    Logger.info('[SuperAdmin] Plugin automatisch geladen (Control Guild konfiguriert)');
+                    const controlGuildId = process.env.CONTROL_GUILD_ID;
+                    
+                    // Erst global enablen (ohne Config)
+                    await this.app.pluginManager.enablePlugin('superadmin', false); // skipConfig = true
+                    
+                    // Dann guild-spezifisch aktivieren mit Config
+                    await this.app.pluginManager.enableInGuild('superadmin', controlGuildId);
+                    
+                    Logger.info(`[SuperAdmin] Plugin für Control Guild ${controlGuildId} aktiviert`);
                 } catch (superAdminError) {
                     Logger.warn('[SuperAdmin] Konnte nicht geladen werden:', superAdminError.message);
                 }
@@ -401,10 +412,10 @@ module.exports = class App {
         const Logger = ServiceManager.get("Logger");
         for (const plugin of this.app.pluginManager.plugins) {
             if (plugin.publicAssets) {
-                const assetsPath = path.join(this.app.pluginManager.pluginsDir, plugin.name, 'public');
+                const assetsPath = path.join(this.app.pluginManager.pluginsDir, plugin.name, 'dashboard', 'public');
                 if (fs.existsSync(assetsPath)) {
                     this.app.use(`/assets/plugins/${plugin.name}`, express.static(assetsPath));
-                    Logger.debug(`Assets für Plugin ${plugin.name} registriert`);
+                    Logger.debug(`Assets für Plugin ${plugin.name} registriert unter /assets/plugins/${plugin.name}`);
                 }
             }
         }

@@ -26,6 +26,7 @@ class I18nManager {
     constructor(app, options = {}) {
         this.app = app;
         this.translations = new Map();
+        this.i18next = i18next; // i18next-Instanz für dynamischen Sprachwechsel exportieren
         this.languagesMeta = require(join(__dirname, "../languages-meta.json"));
         this.availableLanguages = this.languagesMeta.map((lng) => lng.name);
         this.fallbackLng = options.fallbackLng || "de-DE";

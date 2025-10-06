@@ -63,10 +63,16 @@ router.put("/", async (req, res) => {
             Logger.debug(`Settings für Guild ${res.locals.guild.id} aktualisiert`);
         }
 
-        res.sendStatus(200);
+        res.json({ 
+            success: true, 
+            message: needsUpdate ? 'Einstellungen erfolgreich gespeichert' : 'Keine Änderungen vorgenommen' 
+        });
     } catch (error) {
         Logger.error(`Fehler beim Aktualisieren der Settings:`, error);
-        res.sendStatus(500);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Fehler beim Speichern der Einstellungen' 
+        });
     }
 });
 

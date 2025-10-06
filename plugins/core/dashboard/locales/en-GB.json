@@ -23,5 +23,49 @@
     "LOGO_URL_DESC": "URL to the logo image",
 
     "ENABLED": "Enabled",
-    "DISABLED": "Disabled"
+    "DISABLED": "Disabled",
+
+    "SETTINGS": {
+        "GENERAL": {
+            "TITLE": "Basic Configuration",
+            "PREFIX_LABEL": "Bot Prefix",
+            "PREFIX_HELP": "The prefix for text commands (e.g. <code>!help</code>, <code>!ping</code>)",
+            "LOCALE_LABEL": "Default Language",
+            "LOCALE_HELP": "The default language for bot responses and dashboard content",
+            "THEME_LABEL": "Dashboard Theme",
+            "THEME_HELP": "More themes will be added in future updates",
+            "THEME_DEFAULT": "Default (Light)",
+            "THEME_DARK": "Dark Mode (coming soon)",
+            "THEME_NORD": "Nord Theme (coming soon)",
+            "FEATURES_TITLE": "Features",
+            "SLASH_LABEL": "Enable Slash Commands",
+            "SLASH_HELP": "Allows the use of Discord Slash Commands (<code>/help</code> instead of <code>!help</code>)",
+            "VERBOSE_LABEL": "Verbose Logs",
+            "VERBOSE_HELP": "Logs all bot actions in detail (recommended for administrators)",
+            "DEBUG_LABEL": "Debug Mode",
+            "DEBUG_BADGE": "For Developers",
+            "DEBUG_HELP": "Shows advanced error information and technical details (may affect performance)",
+            "RESET_BTN": "Reset",
+            "SAVE_BTN": "Save Settings"
+        },
+        "HELP": {
+            "TITLE": "Help & Tips",
+            "PREFIX_TITLE": "Bot Prefix",
+            "PREFIX_TEXT": "Choose a unique prefix that doesn't conflict with other bots. Popular prefixes: <code>!</code>, <code>?</code>, <code>.</code>",
+            "SLASH_TITLE": "Slash Commands",
+            "SLASH_TEXT": "Slash commands are the modern alternative to text commands. They offer auto-completion and are more user-friendly.",
+            "DEBUG_TITLE": "Debug Mode",
+            "DEBUG_WARNING": "Warning!",
+            "DEBUG_TEXT": "Debug mode should only be enabled when analyzing technical issues."
+        },
+        "STATUS": {
+            "TITLE": "Current Configuration",
+            "PREFIX": "Prefix",
+            "LOCALE": "Language",
+            "THEME": "Theme",
+            "SLASH": "Slash Commands",
+            "ACTIVE": "Active",
+            "INACTIVE": "Disabled"
+        }
+    }
 }

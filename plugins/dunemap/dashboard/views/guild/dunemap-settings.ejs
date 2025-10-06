@@ -1,0 +1,269 @@
+<!-- DuneMap Settings -->
+
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">
+          <i class="fa-solid fa-cog me-2"></i>
+          <%= tr('dunemap:SETTINGS.PAGE_TITLE') %>
+        </h5>
+      </div>
+      <div class="card-body">
+        <form id="dunemap-settings-form"
+          class="guild-ajax-form" 
+          data-form-type="dunemap-settings" 
+          data-method="POST"
+          action="/guild/<%= guildId %>/plugins/dunemap/settings"
+        >
+          
+          <!-- Storm-Timer Format -->
+          <div class="mb-4">
+            <label for="STORM_TIMER_FORMAT" class="form-label fw-bold">
+              <i class="fa-solid fa-clock me-2"></i>
+              <%= tr('dunemap:SETTINGS.STORM_FORMAT.LABEL') %>
+            </label>
+            <select class="form-select" id="STORM_TIMER_FORMAT" name="STORM_TIMER_FORMAT">
+              <option value="HH:mm:ss" <%= settings.STORM_TIMER_FORMAT === 'HH:mm:ss' ? 'selected' : '' %>>
+                <%= tr('dunemap:SETTINGS.STORM_FORMAT.24H') %>
+              </option>
+              <option value="hh:mm:ss A" <%= settings.STORM_TIMER_FORMAT === 'hh:mm:ss A' ? 'selected' : '' %>>
+                <%= tr('dunemap:SETTINGS.STORM_FORMAT.12H') %>
+              </option>
+              <option value="HH:mm" <%= settings.STORM_TIMER_FORMAT === 'HH:mm' ? 'selected' : '' %>>
+                <%= tr('dunemap:SETTINGS.STORM_FORMAT.SHORT') %>
+              </option>
+            </select>
+            <small class="text-muted"><%= tr('dunemap:SETTINGS.STORM_FORMAT.HELP') %></small>
+          </div>
+
+          <!-- Zeitzone -->
+          <div class="mb-4">
+            <label for="STROM_TIMER_TIMEZONE" class="form-label fw-bold">
+              <i class="fa-solid fa-globe me-2"></i>
+              <%= tr('dunemap:SETTINGS.TIMEZONE.LABEL') %>
+            </label>
+            <select class="form-select" id="STROM_TIMER_TIMEZONE" name="STROM_TIMER_TIMEZONE">
+              <option value="Europe/Berlin" <%= settings.STROM_TIMER_TIMEZONE === 'Europe/Berlin' ? 'selected' : '' %>>
+                🇩🇪 Europe/Berlin (MEZ/MESZ)
+              </option>
+              <option value="Europe/London" <%= settings.STROM_TIMER_TIMEZONE === 'Europe/London' ? 'selected' : '' %>>
+                🇬🇧 Europe/London (GMT/BST)
+              </option>
+              <option value="America/New_York" <%= settings.STROM_TIMER_TIMEZONE === 'America/New_York' ? 'selected' : '' %>>
+                🇺🇸 America/New_York (EST/EDT)
+              </option>
+              <option value="America/Los_Angeles" <%= settings.STROM_TIMER_TIMEZONE === 'America/Los_Angeles' ? 'selected' : '' %>>
+                🇺🇸 America/Los_Angeles (PST/PDT)
+              </option>
+              <option value="Asia/Tokyo" <%= settings.STROM_TIMER_TIMEZONE === 'Asia/Tokyo' ? 'selected' : '' %>>
+                🇯🇵 Asia/Tokyo (JST)
+              </option>
+              <option value="Australia/Sydney" <%= settings.STROM_TIMER_TIMEZONE === 'Australia/Sydney' ? 'selected' : '' %>>
+                🇦🇺 Australia/Sydney (AEDT/AEST)
+              </option>
+            </select>
+            <small class="text-muted"><%= tr('dunemap:SETTINGS.TIMEZONE.HELP') %></small>
+          </div>
+
+          <!-- Auto-Neuberechnung -->
+          <div class="mb-4">
+            <div class="form-check form-switch">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                id="STORM_TIME_RECALCULATE_TIME" 
+                name="STORM_TIME_RECALCULATE_TIME"
+                <%= settings.STORM_TIME_RECALCULATE_TIME ? 'checked' : '' %>
+              >
+              <label class="form-check-label fw-bold" for="STORM_TIME_RECALCULATE_TIME">
+                <i class="fa-solid fa-rotate me-2"></i>
+                <%= tr('dunemap:SETTINGS.AUTO_RECALC.LABEL') %>
+              </label>
+            </div>
+            <small class="text-muted d-block mt-1">
+              <%= tr('dunemap:SETTINGS.AUTO_RECALC.HELP') %>
+            </small>
+          </div>
+
+          <!-- Storm-Timer Dauer -->
+          <div class="mb-4">
+            <label for="STROM_TIMER_DURATION" class="form-label fw-bold">
+              <i class="fa-solid fa-hourglass-half me-2"></i>
+              <%= tr('dunemap:SETTINGS.DURATION.LABEL') %>
+            </label>
+            <select class="form-select" id="STROM_TIMER_DURATION" name="STROM_TIMER_DURATION">
+              <option value="5d" <%= settings.STROM_TIMER_DURATION === '5d' ? 'selected' : '' %>>
+                <%= tr('dunemap:SETTINGS.DURATION.5_DAYS') %>
+              </option>
+              <option value="6d" <%= settings.STROM_TIMER_DURATION === '6d' ? 'selected' : '' %>>
+                <%= tr('dunemap:SETTINGS.DURATION.6_DAYS') %>
+              </option>
+              <option value="7d" <%= settings.STROM_TIMER_DURATION === '7d' ? 'selected' : '' %>>
+                <%= tr('dunemap:SETTINGS.DURATION.7_DAYS') %>
+              </option>
+              <option value="3d" <%= settings.STROM_TIMER_DURATION === '3d' ? 'selected' : '' %>>
+                <%= tr('dunemap:SETTINGS.DURATION.3_DAYS') %>
+              </option>
+              <option value="1d" <%= settings.STROM_TIMER_DURATION === '1d' ? 'selected' : '' %>>
+                <%= tr('dunemap:SETTINGS.DURATION.1_DAY') %>
+              </option>
+            </select>
+            <small class="text-muted"><%= tr('dunemap:SETTINGS.DURATION.HELP') %></small>
+          </div>
+
+          <!-- Map Channel ID -->
+          <div class="mb-4">
+            <label for="MAP_CHANNEL_ID" class="form-label fw-bold">
+              <i class="fa-brands fa-discord me-2"></i>
+              <%= tr('dunemap:SETTINGS.CHANNEL.LABEL') %>
+            </label>
+            
+            <% if (guildChannels && guildChannels.length > 0) { %>
+              <!-- Dropdown wenn Channels verfügbar -->
+              <select 
+                class="form-select" 
+                id="MAP_CHANNEL_ID" 
+                name="MAP_CHANNEL_ID"
+              >
+                <option value=""><%= tr('dunemap:SETTINGS.CHANNEL.NO_SELECTION') %></option>
+                <% 
+                  let currentCategory = null;
+                  // Type-safe Vergleich: Settings-Wert als String
+                  const selectedChannelId = String(settings.MAP_CHANNEL_ID || '');
+                  
+                  guildChannels.forEach(channel => { 
+                    // Kategorie-Header wenn neue Category
+                    if (channel.parentName && channel.parentName !== currentCategory) {
+                      currentCategory = channel.parentName;
+                %>
+                  <option disabled>━━━━ <%= currentCategory %> ━━━━</option>
+                <%  } 
+                    // Type-safe Vergleich
+                    const isSelected = selectedChannelId === String(channel.id);
+                %>
+                  <option 
+                    value="<%= channel.id %>" 
+                    <%= isSelected ? 'selected' : '' %>
+                  >
+                    <%= channel.parentName ? '  └─ ' : '' %>#<%= channel.name %>
+                  </option>
+                <% }) %>
+              </select>
+              <small class="text-muted">
+                <%= tr('dunemap:SETTINGS.CHANNEL.HELP') %>
+                <% if (settings.MAP_CHANNEL_ID) { %>
+                  <br><strong><%= tr('dunemap:SETTINGS.CHANNEL.CURRENT') %></strong> 
+                  <% 
+                    const currentChannel = guildChannels.find(ch => String(ch.id) === String(settings.MAP_CHANNEL_ID));
+                  %>
+                  <code>#<%= currentChannel ? currentChannel.name : settings.MAP_CHANNEL_ID %></code>
+                <% } %>
+              </small>
+            <% } else { %>
+              <!-- Fallback: Text-Input wenn IPC fehlschlägt -->
+              <input 
+                type="text" 
+                class="form-control font-monospace" 
+                id="MAP_CHANNEL_ID" 
+                name="MAP_CHANNEL_ID"
+                value="<%= settings.MAP_CHANNEL_ID %>"
+                placeholder="<%= tr('dunemap:SETTINGS.CHANNEL.PLACEHOLDER') %>"
+                pattern="[0-9]{17,20}"
+              >
+              <small class="text-muted text-warning">
+                <i class="fa-solid fa-exclamation-triangle me-1"></i>
+                <%= tr('dunemap:SETTINGS.CHANNEL.ERROR') %>
+              </small>
+            <% } %>
+          </div>
+
+          <!-- Submit-Button -->
+          <div class="d-grid">
+            <button type="submit" class="btn btn-primary btn-lg">
+              <i class="fa-solid fa-save me-2"></i>
+              <%= tr('dunemap:SETTINGS.SAVE_BUTTON') %>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hilfe-Sidebar -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header bg-info text-white">
+        <h6 class="mb-0">
+          <i class="fa-solid fa-info-circle me-2"></i>
+          <%= tr('dunemap:SETTINGS.HELP.TITLE') %>
+        </h6>
+      </div>
+      <div class="card-body">
+        <h6 class="fw-bold">⏱️ <%= tr('dunemap:SETTINGS.HELP.STORM_TITLE') %></h6>
+        <p class="small">
+          <%= tr('dunemap:SETTINGS.HELP.STORM_TEXT') %>
+        </p>
+
+        <h6 class="fw-bold mt-3">🔄 <%= tr('dunemap:SETTINGS.HELP.AUTO_TITLE') %></h6>
+        <p class="small">
+          <%= tr('dunemap:SETTINGS.HELP.AUTO_TEXT') %>
+        </p>
+
+        <h6 class="fw-bold mt-3">💬 <%= tr('dunemap:SETTINGS.HELP.CHANNEL_TITLE') %></h6>
+        <p class="small">
+          <%= tr('dunemap:SETTINGS.HELP.CHANNEL_TEXT') %>
+        </p>
+
+        <h6 class="fw-bold mt-3">🗺️ <%= tr('dunemap:SETTINGS.HELP.SECTORS_TITLE') %></h6>
+        <p class="small">
+          <%- tr('dunemap:SETTINGS.HELP.SECTORS_TEXT') %>
+        </p>
+      </div>
+    </div>
+
+    <!-- Aktuelle Konfiguration -->
+    <div class="card mt-3">
+      <div class="card-header bg-secondary text-white">
+        <h6 class="mb-0">
+          <i class="fa-solid fa-list me-2"></i>
+          <%= tr('dunemap:SETTINGS.CURRENT_CONFIG.TITLE') %>
+        </h6>
+      </div>
+      <div class="card-body">
+        <table class="table table-sm table-borderless mb-0">
+          <tbody>
+            <tr>
+              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.FORMAT') %></td>
+              <td class="small"><code><%= settings.STORM_TIMER_FORMAT %></code></td>
+            </tr>
+            <tr>
+              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.TIMEZONE') %></td>
+              <td class="small"><code><%= settings.STROM_TIMER_TIMEZONE %></code></td>
+            </tr>
+            <tr>
+              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.AUTO_RECALC') %></td>
+              <td class="small">
+                <% if (settings.STORM_TIME_RECALCULATE_TIME) { %>
+                  <span class="badge bg-success"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.ON') %></span>
+                <% } else { %>
+                  <span class="badge bg-secondary"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.OFF') %></span>
+                <% } %>
+              </td>
+            </tr>
+            <tr>
+              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.DURATION') %></td>
+              <td class="small"><code><%= settings.STROM_TIMER_DURATION %></code></td>
+            </tr>
+            <tr>
+              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.CHANNEL') %></td>
+              <td class="small font-monospace" style="font-size: 0.7rem;">
+                <%= settings.MAP_CHANNEL_ID || tr('dunemap:SETTINGS.CURRENT_CONFIG.NOT_SET') %>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

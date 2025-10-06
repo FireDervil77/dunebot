@@ -48,6 +48,7 @@ class DashboardPlugin {
         this.icon = data.icon || 'fa-solid fa-puzzle-piece';
         this.baseDir = data.baseDir;
         this.ownerOnly = data.ownerOnly || false;
+        this.publicAssets = data.publicAssets || false; // Assets aus /public bereitstellen
         
         // Router-Instanzen
         this.guildRouter = data.guildRouter || null;

@@ -75,12 +75,35 @@ class CoreDashboardPlugin extends DashboardPlugin {
             // Haupteinstellungen
             this.guildRouter.get('/settings', async (req, res) => {
                 const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                
+                // Lade aktivierte Plugins für die Guild
+                let enabledPlugins = [];
+                try {
+                    const [config] = await dbService.query(
+                        `SELECT config_value FROM configs 
+                         WHERE plugin_name = 'core' 
+                         AND config_key = 'ENABLED_PLUGINS' 
+                         AND context = 'shared' 
+                         AND guild_id = ?`,
+                        [guildId]
+                    );
+                    
+                    if (config && config.config_value) {
+                        enabledPlugins = typeof config.config_value === 'string' 
+                            ? JSON.parse(config.config_value) 
+                            : config.config_value;
+                    }
+                } catch (err) {
+                    Logger.error('[Core] Fehler beim Laden der enabled Plugins:', err);
+                }
                 
                 // View über ThemeManager rendern lassen
                 await themeManager.renderView(res, 'guild/settings', {
                     title: 'Einstellungen',
                     activeMenu: `/guild/${guildId}/plugins/core/settings`,
                     guildId,
+                    enabledPlugins,
                     plugin: this
                 });
             });
@@ -88,12 +111,118 @@ class CoreDashboardPlugin extends DashboardPlugin {
             // Subnav: Allgemeine Einstellungen
             this.guildRouter.get('/settings/general', async (req, res) => {
                 const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                
+                // WICHTIG: Plugin-Kontext setzen für i18n
+                res.locals.pluginName = 'core';
+                req.params.pluginName = 'core';
+                
+                // Defaults
+                const settings = {
+                    prefix: '!',
+                    locale: 'de-DE',
+                    theme: 'default',
+                    slashCommands: true
+                };
+                
+                try {
+                    // Lade UPPERCASE Settings (Standard im System)
+                    const configs = await dbService.query(`
+                        SELECT config_key, config_value 
+                        FROM configs 
+                        WHERE plugin_name = 'core' 
+                        AND guild_id = ? 
+                        AND context = 'shared'
+                        AND config_key IN ('PREFIX_COMMANDS_PREFIX', 'LOCALE', 'THEME', 'INTERACTIONS_SLASH')
+                    `, [guildId]);
+                    
+                    // Mapping UPPERCASE -> lowercase für View
+                    const keyMap = {
+                        'PREFIX_COMMANDS_PREFIX': 'prefix',
+                        'LOCALE': 'locale',
+                        'THEME': 'theme',
+                        'INTERACTIONS_SLASH': 'slashCommands'
+                    };
+                    
+                    configs.forEach(row => {
+                        const viewKey = keyMap[row.config_key];
+                        if (viewKey) {
+                            let value = row.config_value;
+                            
+                            // Boolean-Werte konvertieren
+                            if (viewKey === 'slashCommands') {
+                                value = value === '1' || value === 1 || value === true;
+                            }
+                            
+                            settings[viewKey] = value;
+                        }
+                    });
+                } catch (err) {
+                    Logger.error('[Core] Fehler beim Laden der Settings:', err);
+                }
+                
+                // Verfügbare Sprachen laden
+                const i18n = ServiceManager.get('i18n');
+                const languagesMeta = i18n.languagesMeta || [];
+                
                 await themeManager.renderView(res, 'guild/settings/general', {
                     title: 'Allgemeine Einstellungen',
                     activeMenu: `/guild/${guildId}/plugins/core/settings/general`,
                     guildId,
+                    settings,
+                    languagesMeta,
                     plugin: this
                 });
+            });
+            
+            // PUT: Allgemeine Einstellungen speichern (vorher POST, jetzt PUT wegen guild.js)
+            this.guildRouter.put('/settings/general', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                const { prefix, locale, theme, slashCommands, verboseLogs, debugMode } = req.body;
+                
+                try {
+                    // WICHTIG: UPPERCASE Keys verwenden (Standard im System!)
+                    const settingsMap = {
+                        'PREFIX_COMMANDS_PREFIX': prefix,
+                        'LOCALE': locale,
+                        'THEME': theme,
+                        'INTERACTIONS_SLASH': slashCommands === 'on' ? 1 : 0
+                    };
+                    
+                    Logger.debug('[Core Settings] Speichere Settings:', settingsMap);
+                    
+                    for (const [configKey, value] of Object.entries(settingsMap)) {
+                        const configValue = typeof value === 'number' ? value.toString() : value;
+                        
+                        Logger.debug(`[Core Settings] UPDATE ${configKey} = ${configValue} für Guild ${guildId}`);
+                        
+                        const result = await dbService.query(`
+                            INSERT INTO configs (plugin_name, config_key, config_value, context, guild_id, is_global)
+                            VALUES ('core', ?, ?, 'shared', ?, 0)
+                            ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)
+                        `, [configKey, configValue, guildId]);
+                        
+                        Logger.debug(`[Core Settings] SQL-Result:`, result);
+                    }
+                    
+                    // WICHTIG: Session-Locale löschen, damit sie beim nächsten Request neu geladen wird!
+                    // Dies ermöglicht sofortige Sprachwechsel ohne Logout
+                    delete req.session.locale;
+                    
+                    Logger.debug('[Core Settings] Session-Locale gelöscht für sofortigen Sprachwechsel');
+                    
+                    res.json({ 
+                        success: true, 
+                        message: 'Einstellungen erfolgreich gespeichert!' 
+                    });
+                } catch (error) {
+                    Logger.error('[Core] Fehler beim Speichern der Settings:', error);
+                    res.status(500).json({ 
+                        success: false, 
+                        message: error.message 
+                    });
+                }
             });
             
             // Subnav: Benutzer-Verwaltung
@@ -283,16 +412,6 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 url: `/guild/${guildId}/plugins`,
                 icon: 'fa-solid fa-puzzle-piece',
                 order: 30,
-                type: navigationManager.menuTypes.MAIN,
-                visible: true,
-                guildId,
-                parent: null
-            },
-            {
-                title: 'Übersetzungen',
-                url: `/guild/${guildId}/locales`,
-                icon: 'fa-solid fa-language',
-                order: 40,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,

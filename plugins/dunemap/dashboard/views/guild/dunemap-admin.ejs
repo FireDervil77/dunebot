@@ -1,0 +1,278 @@
+<!-- DuneMap Admin - Interaktive Sektor-Karte -->
+
+<div class="row mb-3">
+  <div class="col-12">
+    <div class="alert alert-info">
+      <h5 class="mb-2">
+        <i class="fa-solid fa-map-marked-alt me-2"></i>
+        Interaktive Sektor-Karte
+      </h5>
+      <p class="mb-0">
+        Klicke auf einen Sektor (A1-I9) um Marker zu setzen oder zu entfernen.
+        <strong>Maximal 4 Marker pro Sektor!</strong>
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <!-- Karte -->
+  <div class="col-lg-9">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">
+          <i class="fa-solid fa-th me-2"></i>
+          Dune Sektor-Grid (A1 - I9)
+        </h5>
+      </div>
+      <div class="card-body p-2">
+        <!-- Grid-Container (Koordinatensystem wie im Bot: A1 unten links, I9 oben rechts) -->
+        <!-- WICHTIG: Keine data-* Attribute - Daten via AssetManager localize -->
+        <div id="sectorGrid" 
+             style="display: grid; grid-template-columns: 40px repeat(9, 1fr); gap: 2px; max-width: 100%;">
+          <!-- Grid-Zeilen von oben nach unten (I -> A) -->
+          <% const rows = ['I', 'H', 'G', 'F', 'E', 'D', 'C', 'B', 'A']; %>
+          <% rows.forEach((row, rowIndex) => { %>
+            <!-- Zeilen-Label (links) -->
+            <div class="text-center fw-bold bg-secondary text-white p-2" style="font-size: 0.9rem;">
+              <%= row %>
+            </div>
+            
+            <!-- Sektoren dieser Zeile (1-9 von links nach rechts) -->
+            <% for (let col = 1; col <= 9; col++) { %>
+              <% 
+                const sectorId = row + col;
+                const sectorMarkers = markers.filter(m => m.sector_x === row && m.sector_y === col);
+                // PvE-Zone: Reihen A-E, alle Spalten (grüner Rahmen)
+                const isPvE = ['A', 'B', 'C', 'D', 'E'].includes(row);
+                // Trennlinie nach Reihe E (horizontal durch die Mitte)
+                const isLastPvERow = row === 'E';
+              %>
+              <div 
+                class="sector-cell <%= isLastPvERow ? 'pve-border' : '' %>" 
+                data-sector-x="<%= row %>" 
+                data-sector-y="<%= col %>"
+                style="
+                  border: 3px solid <%= isPvE ? '#28a745' : '#dee2e6' %>;
+                  background: <%= isLastPvERow 
+                    ? (sectorMarkers.length > 0 
+                        ? 'linear-gradient(to bottom, #d4edda 0%, #d4edda 50%, #e7f3ff 50%, #e7f3ff 100%)' 
+                        : 'linear-gradient(to bottom, #f0f9f4 0%, #f0f9f4 50%, #fff 50%, #fff 100%)')
+                    : (sectorMarkers.length > 0 ? (isPvE ? '#d4edda' : '#e7f3ff') : (isPvE ? '#f0f9f4' : '#fff')) 
+                  %>;
+                  min-height: 70px;
+                  cursor: pointer;
+                  position: relative;
+                  transition: all 0.2s;
+                "
+              >
+                <!-- Marker-Anzeige mit Icons -->
+                <% if (sectorMarkers.length > 0) { %>
+                  <div class="p-1 d-flex flex-wrap gap-1 justify-content-center align-items-center" style="pointer-events: none;">
+                    <% sectorMarkers.forEach(marker => { %>
+                      <img 
+                        src="/assets/plugins/dunemap/icons/<%= marker.marker_type %>.png" 
+                        alt="<%= marker.marker_type %>"
+                        title="<%= marker.marker_type %>"
+                        style="width: 24px; height: 24px; object-fit: contain; pointer-events: none;"
+                      >
+                    <% }); %>
+                  </div>
+                <% } %>
+                
+                <!-- Sektor-Label (beim Hover) -->
+                <div class="sector-label" style="
+                  position: absolute;
+                  bottom: 2px;
+                  right: 2px;
+                  font-size: 0.7rem;
+                  color: #6c757d;
+                  opacity: 0.5;
+                  font-weight: bold;
+                ">
+                  <%= sectorId %>
+                </div>
+                
+                <!-- PvE-Marker (optional) -->
+                <% if (isPvE && col === 1) { %>
+                  <div style="
+                    position: absolute;
+                    top: 2px;
+                    left: 2px;
+                    font-size: 0.6rem;
+                    color: #28a745;
+                    font-weight: bold;
+                    pointer-events: none;
+                  ">
+                    PvE
+                  </div>
+                <% } %>
+              </div>
+            <% } %>
+          <% }); %>
+          
+          <!-- Footer-Zeile (Zahlen 1-9 unten) -->
+          <div></div>
+          <% for (let col = 1; col <= 9; col++) { %>
+            <div class="text-center fw-bold bg-secondary text-white p-2" style="font-size: 0.9rem;">
+              <%= col %>
+            </div>
+          <% } %>
+        </div>
+        
+        <!-- Legende -->
+        <div class="mt-3 p-2 bg-light border rounded">
+          <small class="fw-bold">Legende:</small>
+          <div class="d-flex gap-3 mt-1">
+            <small>
+              <span style="display: inline-block; width: 12px; height: 12px; background: #28a745; border: 2px solid #28a745;"></span>
+              PvE-Zone (Reihen A-E, alle Spalten)
+            </small>
+            <small>
+              <span style="display: inline-block; width: 12px; height: 12px; background: #dee2e6; border: 2px solid #dee2e6;"></span>
+              PvP-Zone (Reihen F-I, alle Spalten)
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Marker-Editor Sidebar -->
+  <div class="col-lg-3">
+    <div class="card" id="markerEditor" style="display: none;">
+      <div class="card-header bg-success text-white">
+        <h6 class="mb-0">
+          <i class="fa-solid fa-edit me-2"></i>
+          Sektor <span id="currentSector">-</span>
+        </h6>
+      </div>
+      <div class="card-body">
+        <!-- Aktuelle Marker -->
+        <div id="currentMarkers" class="mb-3">
+          <h6 class="fw-bold">Vorhandene Marker:</h6>
+          <div id="markerList" class="mb-2">
+            <p class="text-muted small">Keine Marker</p>
+          </div>
+        </div>
+
+        <!-- Marker hinzufügen -->
+        <div class="mb-3">
+          <h6 class="fw-bold">Marker hinzufügen:</h6>
+          <select class="form-select form-select-sm mb-2" id="markerTypeSelect">
+            <option value="">-- Typ wählen --</option>
+            <optgroup label="Ressourcen">
+              <option value="titan">⚡ Titan</option>
+              <option value="spice">🌶️ Spice</option>
+              <option value="stravidium">� Stravidium</option>
+              <option value="aluminium">🔩 Aluminium</option>
+              <option value="eisen">⚙️ Eisen</option>
+            </optgroup>
+            <optgroup label="Sonstiges">
+              <option value="basalt">🪨 Basalt</option>
+              <option value="karbon">⬛ Karbon</option>
+              <option value="hoele">🕳️ Höhle</option>
+              <option value="hole">🕳️ Loch</option>
+            </optgroup>
+            <optgroup label="Strukturen">
+              <option value="base">🏠 Basis</option>
+              <option value="wrack">💥 Wrack</option>
+              <option value="kontrollpunkt">🎯 Kontrollpunkt</option>
+            </optgroup>
+            <optgroup label="Hilfsmittel">
+              <option value="taxi">🚕 Taxi</option>
+              <option value="test">🧪 Test</option>
+            </optgroup>
+          </select>
+          <!-- Icon-Vorschau -->
+          <div id="iconPreview" class="text-center mb-2" style="display: none;">
+            <img id="previewImg" src="" alt="" style="width: 48px; height: 48px; object-fit: contain;">
+          </div>
+          <button class="btn btn-success btn-sm w-100" id="addMarkerBtn" disabled>
+            <i class="fa-solid fa-plus me-1"></i>
+            Marker hinzufügen
+          </button>
+        </div>
+
+        <button class="btn btn-secondary btn-sm w-100" id="closeEditorBtn">
+          <i class="fa-solid fa-times me-1"></i>
+          Schließen
+        </button>
+      </div>
+    </div>
+
+    <!-- Statistiken -->
+    <div class="card mt-3">
+      <div class="card-header bg-info text-white">
+        <h6 class="mb-0">
+          <i class="fa-solid fa-chart-bar me-2"></i>
+          Statistiken
+        </h6>
+      </div>
+      <div class="card-body">
+        <p class="mb-2 small">
+          <strong>Gesamt-Marker:</strong> <%= markers.length %>
+        </p>
+        <p class="mb-2 small">
+          <strong>Belegte Sektoren:</strong> 
+          <%= [...new Set(markers.map(m => m.sector_x + m.sector_y))].length %>
+        </p>
+        <p class="mb-0 small">
+          <strong>Verfügbar:</strong> 
+          <%= 81 - [...new Set(markers.map(m => m.sector_x + m.sector_y))].length %>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 
+  Assets werden jetzt via AssetManager geladen!
+  Siehe: plugins/dunemap/dashboard/index.js -> _registerAssets()
+  
+  Registrierte Scripts:
+  - dunemap-admin.js (enqueued in /admin route)
+  
+  Rendering erfolgt automatisch im Layout:
+  - CSS in guild/header.ejs via assetManager.renderStyles()
+  - JS in guild.ejs footer via assetManager.renderScripts(true)
+-->
+
+<style>
+.sector-cell {
+  border-radius: 4px;
+}
+
+/* PvE/PvP Trennlinie - horizontal durch die Mitte der E-Reihe */
+.sector-cell.pve-border::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  background: linear-gradient(to bottom, transparent 0%, transparent 50%, rgba(40, 167, 69, 0.15) 50%, rgba(40, 167, 69, 0.15) 100%);
+  border-top: 3px solid #28a745;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Alternative: Einfache horizontale Linie in der Mitte */
+.sector-cell.pve-border::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #28a745;
+  z-index: 10;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.sector-cell:hover .sector-label {
+  opacity: 1 !important;
+  font-weight: bold;
+}
+</style>

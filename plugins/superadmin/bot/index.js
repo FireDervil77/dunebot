@@ -9,16 +9,15 @@ const { BotPlugin } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class SuperAdminBotPlugin extends BotPlugin {
-    constructor(client) {
+    constructor() {
         super({
             name: 'superadmin',
             displayName: 'SuperAdmin',
             description: 'Bot-Owner Management Panel (Dashboard-only)',
             version: '1.0.0',
-            author: 'FireDervil'
+            author: 'FireDervil',
+            baseDir: __dirname
         });
-        
-        this.client = client;
     }
 
     /**
@@ -54,4 +53,5 @@ class SuperAdminBotPlugin extends BotPlugin {
     }
 }
 
-module.exports = SuperAdminBotPlugin;
+// Instanz des Plugins exportieren (nicht die Klasse!)
+module.exports = new SuperAdminBotPlugin();

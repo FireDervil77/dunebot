@@ -5,15 +5,73 @@
 
       <img src="<%= theme.asset('images/hero-bg.png') %>" alt="" data-aos="fade-in">
 
-      <div class="container text-center" data-aos="fade-up" data-aos-delay="100">
-        <div class="row justify-content-center">
-          <div class="col-lg-8">
-            <h2><%= tr('LANDING.HERO') %></h2>
-            <p><%= tr('LANDING.SUBTITLE') %></p>
-            <p><%= tr('LANDING.SUBTITLE2') %></p>
-            <a href="/guild" class="btn-hero btn-get-started"><%= tr('LANDING.BTN_DASHBOARD') %></a> <a href="<%= coreConfig.githubUrl %>" class="btn-hero btn-get-github" target="_blank"><i class="fa-brands fa-github"></i> <%= tr('LANDING.BTN_GITHUB') %></a>
+      <div class="container" data-aos="fade-up" data-aos-delay="100">
+        <!-- Carousel für mehrere Hero-Slides -->
+        <div id="heroCarousel" class="carousel slide carousel-fade" data-ride="carousel" data-interval="5000">
+          
+          <!-- Carousel Indicators (Dots) -->
+          <div class="carousel-indicators">
+            <button type="button" data-target="#heroCarousel" data-slide-to="0" class="active"></button>
+            <button type="button" data-target="#heroCarousel" data-slide-to="1"></button>
+            <button type="button" data-target="#heroCarousel" data-slide-to="2"></button>
           </div>
+
+          <!-- Carousel Slides -->
+          <div class="carousel-inner">
+            
+            <!-- Slide 1: Haupttext (Original) -->
+            <div class="carousel-item active">
+              <div class="text-center">
+                <h2><%= tr('LANDING.HERO') %></h2>
+                <p><%= tr('LANDING.SUBTITLE') %></p>
+                <p><%= tr('LANDING.SUBTITLE2') %></p>
+                <a href="/guild" class="btn-hero btn-get-started"><%= tr('LANDING.BTN_DASHBOARD') %></a> 
+                <a href="<%= coreConfig.githubUrl %>" class="btn-hero btn-get-github" target="_blank">
+                  <i class="fa-brands fa-github"></i> <%= tr('LANDING.BTN_GITHUB') %>
+                </a>
+              </div>
+            </div>
+
+            <!-- Slide 2: Plugin-System -->
+            <div class="carousel-item">
+              <div class="text-center">
+                <h2>Ultraflexibles Plugin-System</h2>
+                <p>Erweitere deinen Bot mit Plugins nach WordPress-Vorbild.</p>
+                <p>Dashboard & Bot-Commands in einem System – vollständig modular!</p>
+                <a href="/guild" class="btn-hero btn-get-started">Plugins entdecken</a> 
+                <a href="<%= coreConfig.githubUrl %>" class="btn-hero btn-get-github" target="_blank">
+                  <i class="fa-brands fa-code"></i> Developer Docs
+                </a>
+              </div>
+            </div>
+
+            <!-- Slide 3: Community Features -->
+            <div class="carousel-item">
+              <div class="text-center">
+                <h2>Perfekt für deine Community</h2>
+                <p>Moderation, Leveling, Custom Commands & mehr.</p>
+                <p>Alles aus einem Dashboard – kein Chaos mit mehreren Bots!</p>
+                <a href="/guild" class="btn-hero btn-get-started">Jetzt starten</a> 
+                <a href="/documentation" class="btn-hero btn-get-github">
+                  <i class="fa-solid fa-book"></i> Dokumentation
+                </a>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Carousel Controls (Arrows) -->
+          <a class="carousel-control-prev" href="#heroCarousel" role="button" data-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Zurück</span>
+          </a>
+          <a class="carousel-control-next" href="#heroCarousel" role="button" data-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Weiter</span>
+          </a>
+
         </div>
+        <!-- /Carousel -->
       </div>
 
     </section><!-- /Hero Section -->

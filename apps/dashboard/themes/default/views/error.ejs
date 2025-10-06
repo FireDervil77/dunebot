@@ -22,8 +22,12 @@
     <% } %>
 
     <div class="mt-4">
-      <a href="<%= locals.dashboardHomeUrl || '/auth/server-selector' %>" class="btn btn-primary">Zum Dashboard</a>
-      <a href="/" class="btn btn-secondary ml-2">Startseite</a>
+      <a href="<%= locals.dashboardHomeUrl || '/auth/server-selector' %>" class="btn btn-primary">
+        <%= locals.tr ? tr('ERROR_PAGE.GO_TO_DASHBOARD') : 'Zum Dashboard' %>
+      </a>
+      <a href="/" class="btn btn-secondary ml-2">
+        <%= locals.tr ? tr('ERROR_PAGE.GO_TO_HOME') : 'Zur Startseite' %>
+      </a>
     </div>
   </div>
 </body>

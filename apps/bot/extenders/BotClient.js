@@ -73,12 +73,7 @@ class BotClient extends Client {
         });
 
         // Initialize translations
-        this.i18n.initialize();
-        
-        // Set dbService for i18n if needed
-        if (process.env.NODE_ENV === "production") {
-            await this.i18n.setDBService(dbService);
-        }
+        await this.i18n.initialize();
 
         this.commandManager.printDebugInfo();
         

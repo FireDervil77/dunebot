@@ -128,8 +128,7 @@
                   <img src="<%= getUserAvatar(currentUser, 256) %>"
                     class="rounded-circle shadow" alt="User Image" />
                   <p>
-                    <%= currentUser.info.username || currentUser.username %> 
-                    <small><%= currentUser.createdAtFormatted || '-' %></small>
+                    <%= currentUser.info.username || currentUser.username %>
                     <% 
                       let createdAt = currentUser.createdAt;
                       let days = '-';
@@ -140,7 +139,7 @@
                         }
                       }
                     %>
-                    <p>Mitglied seit <%= days %> Tagen</p>
+                    <small>Mitglied seit <%= days %> Tagen</small>
                   </p>
                 </li>
                 <li class="user-body">
@@ -149,8 +148,14 @@
                   </div>
                 </li>
                 <li class="user-footer">
-                  <a href="/guild" class="btn btn-danger btn-flat">Guild</a>
-                  <a href="/auth/logout" class="btn btn-info btn-flat float-end"><%= tr('DASHBOARD.LOGOUT') %></a>
+                  <a href="/" class="btn btn-primary btn-xs">
+                    <i class="bi bi-house-door me-1"></i>
+                    Zum Dashboard
+                  </a>
+                  <a href="/auth/logout" class="btn btn-danger btn-flat float-end">
+                    <i class="bi bi-box-arrow-right me-1"></i>
+                    <%= tr('DASHBOARD.LOGOUT') %>
+                  </a>
                 </li>
                 <% } %>
               </ul>

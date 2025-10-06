@@ -65,26 +65,15 @@ class DuneMapBotPlugin extends BotPlugin {
             const defaultConfig = require('../config.json');
             
             // Alle Konfigurationen für diese Guild initialisieren
-            for (const [key, value] of Object.entries(defaultConfig)) {
-                const existingConfig = await this.dbService.getConfig(
-                    'dunemap',
-                    key,
-                    'shared',
-                    guildId
-                );
-                
-                // Nur setzen wenn noch keine Konfiguration existiert
-                if (!existingConfig) {
-                    await this.dbService.setConfig(
-                        'dunemap',
-                        key,
-                        value,
-                        'shared',
-                        guildId,
-                        false  // Nicht global
-                    );
-                }
-            }
+            // ensureConfigs() erstellt nur fehlende Configs, überschreibt KEINE existierenden!
+            const stats = await this.dbService.ensureConfigs(
+                'dunemap',
+                defaultConfig,
+                'shared',
+                guildId
+            );
+            
+            Logger.debug(`DuneMap-Config für Guild ${guildId}: ${stats.created} neu, ${stats.existing} bereits vorhanden`);
 
             // Sicherstellen dass das Plugin in ENABLED_PLUGINS ist
             const coreConfig = await this.dbService.getConfigs(guildId, "core", "shared");

@@ -149,28 +149,43 @@
     },
 
     "ADMIN_PAGE": {
-        "PLUGINS": "Plugin Management",
-        "DESCRIPTION": "Manage installed/enabled plugins.",
-        "LOADING": "Loading plugins...",
-        "VIEW_SOURCE": "View Source",
-        "NO_MATCH": "No plugins found matching the search term",
-        "INSTALL": "Install",
-        "INSTALLING": "Installing",
-        "UNINSTALL": "Uninstall",
-        "UNINSTALLING": "Uninstalling",
-        "INSTALLED": "Installed",
-        "TOTAL": "Total"
+        "PLUGINS": "Plugin-Verwaltung",
+        "DESCRIPTION": "Verwalte installierte/aktivierte Plugins.",
+        "LOADING": "Lade Plugins...",
+        "VIEW_SOURCE": "Quellcode anzeigen",
+        "NO_MATCH": "Keine Plugins gefunden, die den Suchkriterien entsprechen",
+        "INSTALL": "Installieren",
+        "INSTALLING": "Installiert...",
+        "UNINSTALL": "Deinstallieren",
+        "UNINSTALLING": "Deinstalliert...",
+        "INSTALLED": "Installiert",
+        "TOTAL": "Gesamt",
+        "ENABLED_TITLE": "Aktivierte Plugins",
+        "AVAILABLE_TITLE": "Verfügbare Plugins",
+        "NO_ENABLED": "Keine Plugins aktiviert.",
+        "NO_AVAILABLE": "Keine weiteren Plugins verfügbar.",
+        "NO_DESCRIPTION": "Keine Beschreibung verfügbar",
+        "AUTHOR": "Autor",
+        "VERSION": "Version",
+        "CORE_BADGE": "Core",
+        "ENABLE_ACTION": "Aktivieren",
+        "DISABLE_ACTION": "Deaktivieren",
+        "SETTINGS_ACTION": "Einstellungen",
+        "CONFIGURE_ACTION": "Konfigurieren"
     },
 
     "LOCALES_PAGE": {
-        "TITLE": "Localizations",
-        "DESCRIPTION": "Manage localization keys for different plugins and languages.",
-        "APP_SELECT": "Select Application",
-        "PLUGIN_SELECT": "Select Plugin",
-        "LOCALE_SELECT": "Select Language",
-        "FETCH_FAIL": "Failed to fetch localization keys",
-        "UPDATE_SUCCESS": "Bot Localization updated successfully",
-        "UPDATE_ERROR": "Failed to update bot localization"
+        "TITLE": "Lokalisierung",
+        "DESCRIPTION": "Verwalte Übersetzungen für verschiedene Plugins und Sprachen.",
+        "APP_SELECT": "Anwendung auswählen",
+        "PLUGIN_SELECT": "Plugin auswählen",
+        "LOCALE_SELECT": "Sprache auswählen",
+        "FETCH_FAIL": "Fehler beim Laden der Übersetzungsschlüssel",
+        "UPDATE_SUCCESS": "Übersetzungen erfolgreich aktualisiert",
+        "UPDATE_ERROR": "Fehler beim Aktualisieren der Übersetzungen",
+        "LOADING": "Lade Übersetzungen...",
+        "NO_KEYS": "Keine Übersetzungsschlüssel gefunden",
+        "SAVE_BUTTON": "Änderungen speichern"
     },
 
     "EMBED_PREVIEW": {
@@ -197,5 +212,42 @@
         "PREVIEW_PLACEHOLDER": "Embed preview will be shown here"
     },
 
-    "NO_SETTINGS": "This plugin does not have any settings."
+    "NO_SETTINGS": "Dieses Plugin hat keine Einstellungen.",
+
+    "ERROR_PAGE": {
+        "TITLE": "Fehler",
+        "404_TITLE": "Seite nicht gefunden",
+        "404_MESSAGE": "Die angeforderte Seite konnte nicht gefunden werden.",
+        "500_TITLE": "Serverfehler",
+        "500_MESSAGE": "Ein interner Serverfehler ist aufgetreten.",
+        "GENERIC_TITLE": "Ein Fehler ist aufgetreten",
+        "GENERIC_MESSAGE": "Etwas ist schief gelaufen. Bitte versuche es später erneut.",
+        "GO_TO_DASHBOARD": "Zum Dashboard",
+        "GO_TO_HOME": "Zur Startseite",
+        "BACK_BUTTON": "Zurück"
+    },
+
+    "TOAST_MESSAGES": {
+        "PLUGIN_ENABLED": "Plugin erfolgreich aktiviert",
+        "PLUGIN_DISABLED": "Plugin erfolgreich deaktiviert",
+        "PLUGIN_ERROR": "Fehler bei Plugin-Operation",
+        "SETTINGS_SAVED": "Einstellungen erfolgreich gespeichert",
+        "SETTINGS_ERROR": "Fehler beim Speichern der Einstellungen",
+        "LOCALE_UPDATED": "Spracheinstellungen wurden aktualisiert",
+        "LOCALE_ERROR": "Fehler beim Speichern der Spracheinstellungen",
+        "GENERIC_SUCCESS": "Aktion erfolgreich ausgeführt",
+        "GENERIC_ERROR": "Ein Fehler ist aufgetreten",
+        "LOADING_ERROR": "Fehler beim Laden der Daten",
+        "PERMISSION_ERROR": "Keine Berechtigung für diese Aktion",
+        "NEWS_CREATED": "News erfolgreich erstellt",
+        "NEWS_UPDATED": "News erfolgreich aktualisiert",
+        "NEWS_DELETED": "News erfolgreich gelöscht",
+        "NEWS_ERROR": "Fehler bei News-Operation",
+        "NOTIFICATION_SENT": "Benachrichtigung erfolgreich gesendet",
+        "NOTIFICATION_ERROR": "Fehler beim Senden der Benachrichtigung",
+        "CORE_SETTINGS_SAVED": "Core-Einstellungen erfolgreich gespeichert",
+        "CORE_SETTINGS_ERROR": "Fehler beim Speichern der Core-Einstellungen",
+        "DUNEMAP_SETTINGS_SAVED": "DuneMap-Einstellungen erfolgreich gespeichert",
+        "DUNEMAP_SETTINGS_ERROR": "Fehler beim Speichern der DuneMap-Einstellungen"
+    }
 }

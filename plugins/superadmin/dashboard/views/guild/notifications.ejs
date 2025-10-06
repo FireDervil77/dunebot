@@ -17,7 +17,10 @@
             <div class="col-lg-8">
                 <div class="card">
                     <div class="card-body">
-                        <form method="POST" action="/guild/<%= guildId %>/plugins/superadmin/notifications/send">
+                        <form method="POST" 
+                              action="/guild/<%= guildId %>/plugins/superadmin/notifications/send"
+                              class="guild-ajax-form"
+                              data-form-type="notification">
                             <!-- Notification Typ -->
                             <div class="mb-3">
                                 <label for="type" class="form-label">Typ *</label>

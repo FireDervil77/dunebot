@@ -1,3 +1,146 @@
 {
+  "DASHBOARD": {
+    "WELCOME_TITLE": "Willkommen bei DuneMap!",
+    "WELCOME_TEXT": "Verwalte deine Sektor-Marker (A1-I9), setze Ressourcen-Positionen und teile sie mit deinem Server. Nutze <code>/map set [Sektor] [Typ]</code> um Marker zu setzen!",
     
+    "STATS": {
+      "MARKERS_SET": "Marker gesetzt",
+      "AVAILABLE_SECTORS": "Verfügbare Sektoren",
+      "MARKER_TYPES": "Marker-Typen",
+      "STORM_TIMER_ACTIVE": "Storm-Timer aktiv"
+    },
+    
+    "PLUGIN_SETTINGS": {
+      "TITLE": "Plugin-Einstellungen",
+      "DESCRIPTION": "Konfiguriere DuneMap nach deinen Wünschen: Storm-Timer, Zeitzone, Map-Channel und mehr.",
+      "AVAILABLE_SETTINGS": "Verfügbare Einstellungen:",
+      "STORM_FORMAT": "Storm-Timer Format & Dauer",
+      "TIMEZONE": "Zeitzone für Berechnungen",
+      "AUTO_RECALC": "Automatische Timer-Neuberechnung",
+      "CHANNEL": "Discord Map-Channel ID",
+      "BUTTON": "Zu den Einstellungen",
+      "INFO": "Einstellungen findest du in der Bot-Konfiguration unter \"DuneMap\""
+    },
+    
+    "COMMANDS": {
+      "TITLE": "Verfügbare Commands",
+      "DESCRIPTION": "Nutze diese Discord-Commands um mit der Karte zu interagieren:",
+      "MAP_COMMANDS": "Map-Commands:",
+      "MAP_SHOW": "Alle Marker des Servers anzeigen",
+      "MAP_SET": "Marker in Sektor A5 vom Typ \"titan\" setzen",
+      "MAP_REMOVE": "Marker aus Sektor A5 entfernen (Admin)",
+      "STORM_TIMER": "Storm-Timer:",
+      "STORM_SET": "Timer setzen (Format: DD:HH:MM, Admin)",
+      "STORM_RESET": "Timer zurücksetzen (Admin)",
+      "TUTORIAL": "Tutorial:",
+      "TUTORIAL_DESC": "Anleitung für DuneMap anzeigen"
+    },
+    
+    "RECENT_MARKERS": {
+      "TITLE": "Zuletzt gesetzte Marker",
+      "SECTOR": "Sektor",
+      "TYPE": "Typ",
+      "PLACED_BY": "Gesetzt von",
+      "DATE": "Datum"
+    },
+    
+    "EMPTY_STATE": {
+      "TITLE": "Noch keine Marker vorhanden",
+      "DESCRIPTION": "Nutze <code>/map set [Sektor] [Typ]</code> um deinen ersten Marker zu setzen!",
+      "EXAMPLES_TITLE": "Beispiele:",
+      "EXAMPLE_1": "/map set A1 titan",
+      "EXAMPLE_2": "/map set B5 spice",
+      "EXAMPLE_3": "/map set C3 base"
+    },
+    
+    "MARKER_TYPES": {
+      "TITLE": "Verfügbare Marker-Typen",
+      "RESOURCES": "Ressourcen",
+      "TACTICAL": "Taktisch",
+      "OTHER": "Sonstiges",
+      "ERROR": "Marker-Typen konnten nicht geladen werden.",
+      "NO_RESOURCES": "Keine Ressourcen-Marker definiert"
+    }
+  },
+  
+  "SETTINGS": {
+    "PAGE_TITLE": "DuneMap Einstellungen",
+    
+    "STORM_FORMAT": {
+      "LABEL": "Storm-Timer Format",
+      "HELP": "Format für die Anzeige des Storm-Timers",
+      "24H": "24h Format (23:45:30)",
+      "12H": "12h Format (11:45:30 PM)",
+      "SHORT": "Nur Stunden:Minuten (23:45)"
+    },
+    
+    "TIMEZONE": {
+      "LABEL": "Zeitzone",
+      "HELP": "Zeitzone für Storm-Timer Berechnungen"
+    },
+    
+    "AUTO_RECALC": {
+      "LABEL": "Automatische Neuberechnung",
+      "HELP": "Nach Ablauf wird der Timer automatisch auf die Standarddauer zurückgesetzt"
+    },
+    
+    "DURATION": {
+      "LABEL": "Storm-Timer Dauer",
+      "HELP": "Standarddauer bis zum nächsten Storm",
+      "5_DAYS": "5 Tage",
+      "6_DAYS": "6 Tage",
+      "7_DAYS": "7 Tage",
+      "3_DAYS": "3 Tage (Test)",
+      "1_DAY": "1 Tag (Test)"
+    },
+    
+    "CHANNEL": {
+      "LABEL": "Map-Channel",
+      "NO_SELECTION": "-- Kein Channel ausgewählt --",
+      "HELP": "Channel, in dem die Karte angezeigt wird und Commands funktionieren.",
+      "CURRENT": "Aktuell:",
+      "ERROR": "Channel-Liste konnte nicht geladen werden. Bitte Channel-ID manuell eingeben.",
+      "PLACEHOLDER": "z.B. 1234567890123456789"
+    },
+    
+    "SAVE_BUTTON": "Einstellungen speichern",
+    
+    "HELP": {
+      "TITLE": "Hilfe & Tipps",
+      "STORM_TITLE": "Storm-Timer",
+      "STORM_TEXT": "Der Storm-Timer zeigt an, wann der nächste Sturm kommt. Die Zeitzone bestimmt, wie die Zeit berechnet wird.",
+      "AUTO_TITLE": "Auto-Neuberechnung",
+      "AUTO_TEXT": "Aktiviere dies, damit der Timer nach Ablauf automatisch auf die eingestellte Dauer zurückgesetzt wird.",
+      "CHANNEL_TITLE": "Map-Channel",
+      "CHANNEL_TEXT": "Der Channel, in dem die Marker-Commands funktionieren. Stelle sicher, dass der Bot Schreibrechte hat!",
+      "SECTORS_TITLE": "Dune-Sektoren",
+      "SECTORS_TEXT": "Die Karte verwendet das Sektor-System (A1-I9). Marker werden mit <code>/marker add A5 titan</code> gesetzt."
+    },
+    
+    "CURRENT_CONFIG": {
+      "TITLE": "Aktuelle Konfiguration",
+      "FORMAT": "Format:",
+      "TIMEZONE": "Zeitzone:",
+      "AUTO_RECALC": "Auto-Neuberechnung:",
+      "DURATION": "Dauer:",
+      "CHANNEL": "Channel:",
+      "ON": "An",
+      "OFF": "Aus",
+      "NOT_SET": "Nicht gesetzt"
+    }
+  },
+  
+  "MESSAGES": {
+    "ERROR_LOADING_DASHBOARD": "Fehler beim Laden der DuneMap-Übersicht",
+    "SETTINGS_SAVED": "DuneMap-Einstellungen erfolgreich gespeichert!",
+    "ERROR_LOADING_MAP": "Fehler beim Laden der Sektor-Karte",
+    "MISSING_PARAMS": "Fehlende Parameter: sectorX, sectorY, markerType erforderlich",
+    "MAX_MARKERS": "Maximal 4 Marker pro Sektor erlaubt!",
+    "MARKER_SET": "Marker {{type}} in {{sector}} gesetzt!",
+    "MARKER_REMOVED": "Marker entfernt!",
+    "MARKER_TYPE_REMOVED": "Marker {{type}} entfernt!",
+    "MISSING_REMOVE_PARAMS": "Fehlende Parameter: markerId ODER (sectorX, sectorY, markerType) erforderlich",
+    "INVALID_ACTION": "Ungültige Aktion (nur add/remove)",
+    "ERROR_MARKER_OPERATION": "Fehler bei der Marker-Operation"
+  }
 }

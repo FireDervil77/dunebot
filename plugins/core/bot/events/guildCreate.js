@@ -1,5 +1,4 @@
 const { ServiceManager } = require("dunebot-core");
-const { NavigationManager } = require("dunebot-sdk");
 const path = require("path");
 const fs = require("fs");
 
@@ -47,13 +46,12 @@ module.exports = async (guild) => {
         const existingConfig = await dbService.getConfigs(guild.id, "core", "shared");
         
         if (!existingConfig || !existingConfig.ENABLED_PLUGINS) {
-            Logger.info(`📝 Neue Guild - initialisiere Config und Navigation für ${guild.id}`);
+            Logger.info(`📝 Neue Guild - initialisiere Config für ${guild.id}`);
             
             // 4. Guild-spezifische Konfiguration initialisieren
             await initGuildConfigs(guild.id, defaultConfig);
             
-            // 5. Standard-Navigation für Guild erstellen
-            await registerGuildNavigation(guild.id);
+            // 5. Navigation wird beim ersten Dashboard-Zugriff registriert (onGuildEnable)
         } else {
             Logger.info(`✅ Guild ${guild.id} war bereits konfiguriert (Re-Join)`);
         }
@@ -82,96 +80,6 @@ module.exports = async (guild) => {
     }
 };
 
-/**
- * Registriert die Standard-Navigation für eine Guild nach WordPress-Muster
- * @param {Object} dbService - DBService-Instance
- * @param {string} guildId - Discord Guild ID
- * @param {Object} plugin - Core-Plugin-Instance
- */
-async function registerGuildNavigation(guildId) {
-
-    const Logger = ServiceManager.get("Logger");
-
-    try {
-        
-        const navManager = new NavigationManager();
-        
-        // 1. Hauptmenüpunkte
-        const mainMenuItems = [
-            {
-                title: "Dashboard",
-                url: `/guild/${guildId}`,
-                icon: "fa-gauge-high",
-                order: 10
-            },
-            {
-                title: "Plugins",
-                url: `/guild/${guildId}/plugins`,
-                icon: "fa-puzzle-piece",
-                order: 20
-            },
-            {
-                title: "Befehle",
-                url: `/guild/${guildId}/commands`,
-                icon: "fa-terminal",
-                order: 30
-            },
-            {
-                title: "Einstellungen",
-                url: `/guild/${guildId}/settings`,
-                icon: "fa-cog",
-                order: 80
-            }
-        ];
-        
-        // 2. Untermenüs für Einstellungen
-        const settingsSubmenus = [
-            {
-                title: "Allgemein",
-                url: `/Guild/${guildId}/settings/general`,
-                icon: "fa-sliders",
-                parent: `/guild/${guildId}/settings`,
-                order: 10
-            },
-            {
-                title: "Sprache",
-                url: `/guild/${guildId}/settings/language`,
-                icon: "fa-language",
-                parent: `/guild/${guildId}/settings`,
-                order: 20
-            }
-        ];
-        
-        // 3. Dashboard-Widgets
-        const dashboardWidgets = [
-            {
-                title: "Server-Übersicht",
-                url: "core-server-overview",
-                type: "widget",
-                icon: "fa-server",
-                order: 10
-            },
-            {
-                title: "Aktivität",
-                url: "core-activity",
-                type: "widget",
-                icon: "fa-chart-line",
-                order: 20
-            }
-        ];
-        
-        // Alle Menüpunkte zusammenfassen
-        const allNavItems = [...mainMenuItems, ...settingsSubmenus, ...dashboardWidgets];
-        
-        // Navigation registrieren
-        await navManager.registerNavigation("core", guildId, allNavItems);
-        
-        Logger.info(`Standard-Navigation für Guild ${guildId} erfolgreich registriert`);
-    } catch (error) {
-        Logger.error(`Fehler beim Erstellen der Navigation für Guild ${guildId}:`, error);
-    }
-}
-
 async function initGuildConfigs(guildId, configObj) {
     const Logger = ServiceManager.get("Logger");
     const dbService = ServiceManager.get("dbService");
@@ -198,29 +106,25 @@ async function initGuildConfigs(guildId, configObj) {
         // Konfiguration flach machen
         const flatConfig = flattenConfig(configObj);
 
-        // Alle Config-Einträge setzen
-        for (const [key, value] of Object.entries(flatConfig)) {
-            await dbService.setConfig(
-                "core",
-                key,
-                value,
-                "shared",
-                guildId,
-                false
-            );
-        }
+        // ensureConfigs() statt setConfig() - überschreibt KEINE existierenden Configs!
+        const stats = await dbService.ensureConfigs(
+            "core",
+            flatConfig,
+            "shared",
+            guildId
+        );
 
-        // ENABLED_PLUGINS separat setzen (Array wird als JSON gespeichert)
-        await dbService.setConfig(
+        // ENABLED_PLUGINS separat sicherstellen (Array wird als JSON gespeichert)
+        await dbService.ensureConfig(
             "core",
             "ENABLED_PLUGINS", 
-            JSON.stringify(['core']),
+            ['core'], // Als Array, wird intern zu JSON
             "shared",
             guildId,
             false
         );
 
-        Logger.info(`Guild-Konfiguration für ${guildId} initialisiert`);
+        Logger.info(`Guild-Konfiguration für ${guildId}: ${stats.created} neu erstellt, ${stats.existing} bereits vorhanden`);
     } catch (error) {
         Logger.error(`Fehler beim Initialisieren der Guild-Konfiguration für ${guildId}:`, error);
         throw error;

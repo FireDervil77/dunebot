@@ -166,15 +166,14 @@ exports.callback = async (req, res) => {
                 VALUES 
                     (?, ?, ?, ?, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
-                    locale = VALUES(locale),
                     logged_in = VALUES(logged_in),
                     tokens = VALUES(tokens),
                     updated_at = NOW()
             `, [
                 userData.id,                                      // _id
-                userData.locale || req.session.locale || 'de',   // locale
-                true,                                            // logged_in
-                JSON.stringify(userTokens)                       // tokens
+                null,                                             // locale (NULL = nutze Guild-LOCALE)
+                true,                                             // logged_in
+                JSON.stringify(userTokens)                        // tokens
             ]);
 
             Logger.debug("Benutzerdaten in DB gespeichert");

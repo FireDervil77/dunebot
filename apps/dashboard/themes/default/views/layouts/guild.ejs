@@ -7,7 +7,7 @@
 <head>
     <%- includePartial('guild/header') %>
 </head>
-<body class="fixed-footer layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary">
+<body class="layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary">
     
     <!--begin::App Wrapper-->
     <div class="app-wrapper">
@@ -81,6 +81,38 @@
 
 <script src="/themes/default/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script src="/themes/default/assets/js/adminlte.min.js"></script>
+
+<!-- i18n Übersetzungen für Client-Side JavaScript -->
+<script>
+window.i18n = {
+    TOAST_MESSAGES: {
+        PLUGIN_ENABLED: "<%= tr('TOAST_MESSAGES.PLUGIN_ENABLED') %>",
+        PLUGIN_DISABLED: "<%= tr('TOAST_MESSAGES.PLUGIN_DISABLED') %>",
+        PLUGIN_ERROR: "<%= tr('TOAST_MESSAGES.PLUGIN_ERROR') %>",
+        SETTINGS_SAVED: "<%= tr('TOAST_MESSAGES.SETTINGS_SAVED') %>",
+        SETTINGS_ERROR: "<%= tr('TOAST_MESSAGES.SETTINGS_ERROR') %>",
+        LOCALE_UPDATED: "<%= tr('TOAST_MESSAGES.LOCALE_UPDATED') %>",
+        LOCALE_ERROR: "<%= tr('TOAST_MESSAGES.LOCALE_ERROR') %>",
+        GENERIC_SUCCESS: "<%= tr('TOAST_MESSAGES.GENERIC_SUCCESS') %>",
+        GENERIC_ERROR: "<%= tr('TOAST_MESSAGES.GENERIC_ERROR') %>",
+        LOADING_ERROR: "<%= tr('TOAST_MESSAGES.LOADING_ERROR') %>",
+        NEWS_CREATED: "<%= tr('TOAST_MESSAGES.NEWS_CREATED') %>",
+        NEWS_UPDATED: "<%= tr('TOAST_MESSAGES.NEWS_UPDATED') %>",
+        NEWS_DELETED: "<%= tr('TOAST_MESSAGES.NEWS_DELETED') %>",
+        NEWS_ERROR: "<%= tr('TOAST_MESSAGES.NEWS_ERROR') %>",
+        NOTIFICATION_SENT: "<%= tr('TOAST_MESSAGES.NOTIFICATION_SENT') %>",
+        NOTIFICATION_ERROR: "<%= tr('TOAST_MESSAGES.NOTIFICATION_ERROR') %>",
+        CORE_SETTINGS_SAVED: "<%= tr('TOAST_MESSAGES.CORE_SETTINGS_SAVED') %>",
+        CORE_SETTINGS_ERROR: "<%= tr('TOAST_MESSAGES.CORE_SETTINGS_ERROR') %>",
+        DUNEMAP_SETTINGS_SAVED: "<%= tr('TOAST_MESSAGES.DUNEMAP_SETTINGS_SAVED') %>",
+        DUNEMAP_SETTINGS_ERROR: "<%= tr('TOAST_MESSAGES.DUNEMAP_SETTINGS_ERROR') %>"
+    },
+    COMMON: {
+        NETWORK_ERROR: "Netzwerkfehler oder Serverfehler"
+    }
+};
+</script>
+
 <script src="/themes/default/assets/js/guild.js"></script>
 <script src="/themes/default/assets/js/guild-switcher.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" crossorigin="anonymous"></script>
@@ -154,5 +186,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<!-- Plugin Scripts (AssetManager - Footer) -->
+<% if (locals.assetManager) { %>
+  <%- assetManager.renderScripts(true) %>
+<% } %>
+
 </body>
 </html>

@@ -612,9 +612,10 @@ class PluginManager extends BasePluginManager {
 
                         const flatConfig = flattenConfig(defaultConfig);
                         
-                        // Jede Config nur für die Guild speichern
+                        // WICHTIG: ensureConfig() nutzen statt setConfig()
+                        // Das überschreibt KEINE existierenden User-Configs!
                         for (const [key, value] of Object.entries(flatConfig)) {
-                            await dbService.setConfig(
+                            await dbService.ensureConfig(
                                 pluginName,
                                 key,
                                 value,

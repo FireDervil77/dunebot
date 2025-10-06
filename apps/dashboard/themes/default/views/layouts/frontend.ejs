@@ -6,9 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= locals.title ? `${title} - ${locals.dashboardLogo?.name || 'DuneBot'}` : `${locals.dashboardLogo?.name || 'DuneBot'} - Der Discord-Bot für deine Community` %></title>
     
-    <!-- Cache-Busting für Theme Assets -->
-    <% const cacheBuster = Date.now(); %>
-    
     <!-- Dashboard Logo Config -->
     <script>
       window.DASHBOARD_CONFIG = {
@@ -17,22 +14,11 @@
       };
     </script>
     
-    <!-- Favicon -->
-    <link rel="icon" href="<%= theme.asset('images/favicon.ico') %>?v=<%= cacheBuster %>" type="image/x-icon">
+    <!-- Meta & SEO -->
+    <%- includePartial('frontend/header', locals) %>
     
-    <!-- Theme CSS mit explizitem MIME-Type -->
-    <link rel="stylesheet" href="<%= theme.asset('css/frontend.css') %>?v=<%= cacheBuster %>" type="text/css">
-    <link rel="stylesheet" href="<%= theme.asset('css/adminlte.min.css') %>?v=<%= cacheBuster %>" type="text/css">
-
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- SERVING FONTES.EJS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css">
-    <!-- Google Font: Source Sans Pro -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" crossorigin="anonymous"/>  
-    <!-- Bootstrap -->
-    <link rel="stylesheet" href="<%= theme.asset('vendor/bootstrap/css/bootstrap.min.css') %>?v=<%= cacheBuster %>" type="text/css">
+    <!-- Stylesheets (Fonts, Icons, Vendor CSS, Theme CSS) -->
+    <%- includePartial('frontend/stylesheets', locals) %>
     
     <!-- Hook: frontend_head -->
     <% if (locals.hooks && hooks.getViewHooks) { %>
@@ -75,10 +61,7 @@
     <!-- Footer -->
     <%- includePartial('frontend/footer', locals) %>
     
-    <!-- Bootstrap JS (optional lokal) -->
-    <script src="<%= theme.asset('vendor/bootstrap/js/bootstrap.bundle.min.js') %>?v=<%= cacheBuster %>"></script>
-
-        <!-- Footer -->
+    <!-- Scripts (jQuery + Bootstrap + Vendor) -->
     <%- includePartial('frontend/scripts', locals) %>
     
     <!-- Hook: frontend_footer_scripts -->
