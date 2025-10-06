@@ -120,12 +120,10 @@ module.exports = class App {
             const isProduction = process.env.NODE_ENV === 'production';
             this.app.set('view cache', isProduction);
             
-            // FORCE: Alle EJS-Caches beim Start leeren (wichtig bei Template-Änderungen in Development)
-            if (!isProduction) {
-                const ejs = require('ejs');
-                ejs.clearCache();
-                Logger.debug('EJS-Cache deaktiviert (Development Mode)');
-            } 
+            // FORCE: Alle EJS-Caches beim Start IMMER leeren (wichtig bei Template-Änderungen)
+            const ejs = require('ejs');
+            ejs.clearCache();
+            Logger.debug(`EJS-Cache beim Start geleert (${isProduction ? 'Production' : 'Development'} Mode)`); 
 
             // Router mit RouterManager registrieren
             this.routerManager

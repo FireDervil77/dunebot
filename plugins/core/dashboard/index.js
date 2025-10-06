@@ -365,7 +365,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                   guild: options.guild,
                   stats: options.stats,
                   guildId: options.guildId,
-                  enabledPlugins: options.enabledPlugins,
+                  enabledPlugins: options.enabledPlugins.filter(p => p !== 'superadmin'),
                   plugin: 'core'
               })
             });
