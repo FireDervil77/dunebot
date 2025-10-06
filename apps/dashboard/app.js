@@ -230,40 +230,9 @@ module.exports = class App {
             // 3. Core-Plugin aktivieren
             await this.app.pluginManager.enablePlugin('core');
             
-            // 3.1 SuperAdmin-Plugin automatisch für Control-Guild aktivieren
-            if (process.env.CONTROL_GUILD_ID) {
-                try {
-                    const controlGuildId = process.env.CONTROL_GUILD_ID;
-                    
-                    Logger.info(`[SuperAdmin] Aktiviere für Control Guild ${controlGuildId}...`);
-                    
-                    // Plugin global aktivieren
-                    await this.app.pluginManager.enablePlugin('superadmin');
-                    
-                    // Guild-spezifisch aktivieren (falls noch nicht)
-                    const settings = await this.app.dbService.getConfigs(controlGuildId, "core", "shared");
-                    let enabledPlugins;
-                    try {
-                        enabledPlugins = typeof settings.ENABLED_PLUGINS === 'string'
-                            ? JSON.parse(settings.ENABLED_PLUGINS)
-                            : (Array.isArray(settings.ENABLED_PLUGINS) ? settings.ENABLED_PLUGINS : ['core']);
-                    } catch (e) {
-                        enabledPlugins = ['core'];
-                    }
-                    
-                    // Wenn superadmin noch nicht in der Guild aktiviert ist, aktivieren
-                    if (!enabledPlugins.includes('superadmin')) {
-                        await this.app.pluginManager.enableInGuild('superadmin', controlGuildId);
-                        Logger.success(`[SuperAdmin] Plugin für Control Guild ${controlGuildId} aktiviert`);
-                    } else {
-                        Logger.info(`[SuperAdmin] Plugin bereits für Control Guild ${controlGuildId} aktiviert`);
-                    }
-                } catch (superAdminError) {
-                    Logger.warn('[SuperAdmin] Konnte nicht geladen werden:', superAdminError.message);
-                }
-            }
-            
             // 4. Andere Plugins basierend auf der Konfiguration aktivieren
+            // HINWEIS: SuperAdmin wird NICHT mehr automatisch aktiviert!
+            // Es muss manuell über die Plugin-Verwaltung aktiviert werden.
             const config = await this.loadConfig();
             let enabledPlugins = config.ENABLED_PLUGINS || ['core'];
             

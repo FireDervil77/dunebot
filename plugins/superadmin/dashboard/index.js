@@ -128,19 +128,23 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
     }
 
     /**
-     * Plugin aktivieren
+     * Plugin aktivieren (Global für Dashboard)
      */
-    async onEnable() {
+    async enable() {
         const Logger = ServiceManager.get('Logger');
-        Logger.info('[SuperAdmin] Aktiviere Dashboard-Plugin...');
+        Logger.info('[SuperAdmin] Aktiviere Dashboard-Plugin global...');
 
         this._setupRoutes();
-        // KOMPROMISS: Widgets NICHT im Haupt-Dashboard anzeigen
-        // Stattdessen nur auf /plugins/superadmin Seite
-        // this._registerWidgets(); 
         
-        Logger.success('[SuperAdmin] Dashboard-Plugin aktiviert (nur Routen, keine Dashboard-Widgets)');
+        Logger.success('[SuperAdmin] Dashboard-Plugin global aktiviert (Routen registriert)');
         return true;
+    }
+
+    /**
+     * Plugin aktivieren (Legacy - ruft enable() auf)
+     */
+    async onEnable() {
+        return await this.enable();
     }
 
     /**
@@ -755,6 +759,19 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
         await navigationManager.registerNavigation(this.name, guildId, navItems);
         Logger.debug(`[SuperAdmin] Navigation + Routen für Control-Guild ${guildId} aktiviert`);
+    }
+
+    /**
+     * Plugin deaktivieren (Global für Dashboard)
+     */
+    async disable() {
+        const Logger = ServiceManager.get('Logger');
+        Logger.info('[SuperAdmin] Deaktiviere Dashboard-Plugin global...');
+        
+        // Routen werden automatisch durch PluginManager entfernt
+        
+        Logger.success('[SuperAdmin] Dashboard-Plugin global deaktiviert');
+        return true;
     }
 
     /**
