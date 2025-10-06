@@ -232,18 +232,34 @@ module.exports = class App {
             // 3. Core-Plugin aktivieren
             await this.app.pluginManager.enablePlugin('core');
             
-            // 3.1 SuperAdmin-Plugin NUR für Control-Guild aktivieren (owner-only)
-            if (process.env.CONTROL_GUILD_ID && process.env.OWNER_IDS) {
+            // 3.1 SuperAdmin-Plugin automatisch für Control-Guild aktivieren
+            if (process.env.CONTROL_GUILD_ID) {
                 try {
                     const controlGuildId = process.env.CONTROL_GUILD_ID;
                     
-                    // Erst global enablen (ohne Config)
-                    await this.app.pluginManager.enablePlugin('superadmin', false); // skipConfig = true
+                    Logger.info(`[SuperAdmin] Aktiviere für Control Guild ${controlGuildId}...`);
                     
-                    // Dann guild-spezifisch aktivieren mit Config
-                    await this.app.pluginManager.enableInGuild('superadmin', controlGuildId);
+                    // Plugin global aktivieren
+                    await this.app.pluginManager.enablePlugin('superadmin');
                     
-                    Logger.info(`[SuperAdmin] Plugin für Control Guild ${controlGuildId} aktiviert`);
+                    // Guild-spezifisch aktivieren (falls noch nicht)
+                    const settings = await this.app.dbService.getConfigs(controlGuildId, "core", "shared");
+                    let enabledPlugins;
+                    try {
+                        enabledPlugins = typeof settings.ENABLED_PLUGINS === 'string'
+                            ? JSON.parse(settings.ENABLED_PLUGINS)
+                            : (Array.isArray(settings.ENABLED_PLUGINS) ? settings.ENABLED_PLUGINS : ['core']);
+                    } catch (e) {
+                        enabledPlugins = ['core'];
+                    }
+                    
+                    // Wenn superadmin noch nicht in der Guild aktiviert ist, aktivieren
+                    if (!enabledPlugins.includes('superadmin')) {
+                        await this.app.pluginManager.enableInGuild('superadmin', controlGuildId);
+                        Logger.success(`[SuperAdmin] Plugin für Control Guild ${controlGuildId} aktiviert`);
+                    } else {
+                        Logger.info(`[SuperAdmin] Plugin bereits für Control Guild ${controlGuildId} aktiviert`);
+                    }
                 } catch (superAdminError) {
                     Logger.warn('[SuperAdmin] Konnte nicht geladen werden:', superAdminError.message);
                 }

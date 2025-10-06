@@ -5,11 +5,11 @@
     <div class="alert alert-info">
       <h5 class="mb-2">
         <i class="fa-solid fa-map-marked-alt me-2"></i>
-        Interaktive Sektor-Karte
+        <%= tr('dunemap:ADMIN.TITLE') %>
       </h5>
       <p class="mb-0">
-        Klicke auf einen Sektor (A1-I9) um Marker zu setzen oder zu entfernen.
-        <strong>Maximal 4 Marker pro Sektor!</strong>
+        <%= tr('dunemap:ADMIN.DESCRIPTION') %>
+        <strong><%= tr('dunemap:ADMIN.MAX_MARKERS') %></strong>
       </p>
     </div>
   </div>
@@ -22,7 +22,7 @@
       <div class="card-header bg-primary text-white">
         <h5 class="mb-0">
           <i class="fa-solid fa-th me-2"></i>
-          Dune Sektor-Grid (A1 - I9)
+          <%= tr('dunemap:ADMIN.GRID_TITLE') %>
         </h5>
       </div>
       <div class="card-body p-2">
@@ -122,15 +122,15 @@
         
         <!-- Legende -->
         <div class="mt-3 p-2 bg-light border rounded">
-          <small class="fw-bold">Legende:</small>
+          <small class="fw-bold"><%= tr('dunemap:ADMIN.LEGEND_TITLE') %></small>
           <div class="d-flex gap-3 mt-1">
             <small>
               <span style="display: inline-block; width: 12px; height: 12px; background: #28a745; border: 2px solid #28a745;"></span>
-              PvE-Zone (Reihen A-E, alle Spalten)
+              <%= tr('dunemap:ADMIN.PVE_ZONE') %>
             </small>
             <small>
               <span style="display: inline-block; width: 12px; height: 12px; background: #dee2e6; border: 2px solid #dee2e6;"></span>
-              PvP-Zone (Reihen F-I, alle Spalten)
+              <%= tr('dunemap:ADMIN.PVP_ZONE') %>
             </small>
           </div>
         </div>
@@ -144,44 +144,44 @@
       <div class="card-header bg-success text-white">
         <h6 class="mb-0">
           <i class="fa-solid fa-edit me-2"></i>
-          Sektor <span id="currentSector">-</span>
+          <%= tr('dunemap:ADMIN.EDITOR.TITLE') %> <span id="currentSector">-</span>
         </h6>
       </div>
       <div class="card-body">
         <!-- Aktuelle Marker -->
         <div id="currentMarkers" class="mb-3">
-          <h6 class="fw-bold">Vorhandene Marker:</h6>
+          <h6 class="fw-bold"><%= tr('dunemap:ADMIN.EDITOR.CURRENT_MARKERS') %></h6>
           <div id="markerList" class="mb-2">
-            <p class="text-muted small">Keine Marker</p>
+            <p class="text-muted small"><%= tr('dunemap:ADMIN.EDITOR.NO_MARKERS') %></p>
           </div>
         </div>
 
         <!-- Marker hinzufügen -->
         <div class="mb-3">
-          <h6 class="fw-bold">Marker hinzufügen:</h6>
+          <h6 class="fw-bold"><%= tr('dunemap:ADMIN.EDITOR.ADD_MARKER') %></h6>
           <select class="form-select form-select-sm mb-2" id="markerTypeSelect">
-            <option value="">-- Typ wählen --</option>
-            <optgroup label="Ressourcen">
-              <option value="titan">⚡ Titan</option>
-              <option value="spice">🌶️ Spice</option>
-              <option value="stravidium">� Stravidium</option>
-              <option value="aluminium">🔩 Aluminium</option>
-              <option value="eisen">⚙️ Eisen</option>
+            <option value=""><%= tr('dunemap:ADMIN.EDITOR.SELECT_TYPE') %></option>
+            <optgroup label="<%= tr('dunemap:ADMIN.EDITOR.RESOURCES') %>">
+              <option value="titan">⚡ <%= tr('dunemap:ADMIN.MARKER_TYPES.TITAN') %></option>
+              <option value="spice">🌶️ <%= tr('dunemap:ADMIN.MARKER_TYPES.SPICE') %></option>
+              <option value="stravidium">💎 <%= tr('dunemap:ADMIN.MARKER_TYPES.STRAVIDIUM') %></option>
+              <option value="aluminium">🔩 <%= tr('dunemap:ADMIN.MARKER_TYPES.ALUMINIUM') %></option>
+              <option value="eisen">⚙️ <%= tr('dunemap:ADMIN.MARKER_TYPES.EISEN') %></option>
             </optgroup>
-            <optgroup label="Sonstiges">
-              <option value="basalt">🪨 Basalt</option>
-              <option value="karbon">⬛ Karbon</option>
-              <option value="hoele">🕳️ Höhle</option>
-              <option value="hole">🕳️ Loch</option>
+            <optgroup label="<%= tr('dunemap:ADMIN.EDITOR.OTHER') %>">
+              <option value="basalt">🪨 <%= tr('dunemap:ADMIN.MARKER_TYPES.BASALT') %></option>
+              <option value="karbon">⬛ <%= tr('dunemap:ADMIN.MARKER_TYPES.KARBON') %></option>
+              <option value="hoele">🕳️ <%= tr('dunemap:ADMIN.MARKER_TYPES.HOELE') %></option>
+              <option value="hole">🕳️ <%= tr('dunemap:ADMIN.MARKER_TYPES.HOLE') %></option>
             </optgroup>
-            <optgroup label="Strukturen">
-              <option value="base">🏠 Basis</option>
-              <option value="wrack">💥 Wrack</option>
-              <option value="kontrollpunkt">🎯 Kontrollpunkt</option>
+            <optgroup label="<%= tr('dunemap:ADMIN.EDITOR.STRUCTURES') %>">
+              <option value="base">🏠 <%= tr('dunemap:ADMIN.MARKER_TYPES.BASE') %></option>
+              <option value="wrack">💥 <%= tr('dunemap:ADMIN.MARKER_TYPES.WRACK') %></option>
+              <option value="kontrollpunkt">🎯 <%= tr('dunemap:ADMIN.MARKER_TYPES.KONTROLLPUNKT') %></option>
             </optgroup>
-            <optgroup label="Hilfsmittel">
-              <option value="taxi">🚕 Taxi</option>
-              <option value="test">🧪 Test</option>
+            <optgroup label="<%= tr('dunemap:ADMIN.EDITOR.UTILITIES') %>">
+              <option value="taxi">🚕 <%= tr('dunemap:ADMIN.MARKER_TYPES.TAXI') %></option>
+              <option value="test">🧪 <%= tr('dunemap:ADMIN.MARKER_TYPES.TEST') %></option>
             </optgroup>
           </select>
           <!-- Icon-Vorschau -->
@@ -190,13 +190,13 @@
           </div>
           <button class="btn btn-success btn-sm w-100" id="addMarkerBtn" disabled>
             <i class="fa-solid fa-plus me-1"></i>
-            Marker hinzufügen
+            <%= tr('dunemap:ADMIN.EDITOR.BTN_ADD') %>
           </button>
         </div>
 
         <button class="btn btn-secondary btn-sm w-100" id="closeEditorBtn">
           <i class="fa-solid fa-times me-1"></i>
-          Schließen
+          <%= tr('dunemap:ADMIN.EDITOR.BTN_CLOSE') %>
         </button>
       </div>
     </div>
@@ -206,19 +206,19 @@
       <div class="card-header bg-info text-white">
         <h6 class="mb-0">
           <i class="fa-solid fa-chart-bar me-2"></i>
-          Statistiken
+          <%= tr('dunemap:ADMIN.STATS.TITLE') %>
         </h6>
       </div>
       <div class="card-body">
         <p class="mb-2 small">
-          <strong>Gesamt-Marker:</strong> <%= markers.length %>
+          <strong><%= tr('dunemap:ADMIN.STATS.TOTAL_MARKERS') %></strong> <%= markers.length %>
         </p>
         <p class="mb-2 small">
-          <strong>Belegte Sektoren:</strong> 
+          <strong><%= tr('dunemap:ADMIN.STATS.OCCUPIED_SECTORS') %></strong> 
           <%= [...new Set(markers.map(m => m.sector_x + m.sector_y))].length %>
         </p>
         <p class="mb-0 small">
-          <strong>Verfügbar:</strong> 
+          <strong><%= tr('dunemap:ADMIN.STATS.AVAILABLE') %></strong> 
           <%= 81 - [...new Set(markers.map(m => m.sector_x + m.sector_y))].length %>
         </p>
       </div>

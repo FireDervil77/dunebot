@@ -67,5 +67,119 @@
             "ACTIVE": "Active",
             "INACTIVE": "Disabled"
         }
+    },
+
+    "SETTINGS_OVERVIEW": {
+        "GENERAL_TITLE": "General Settings",
+        "GENERAL_SUBTITLE": "Bot Basic Configuration",
+        "GENERAL_DESCRIPTION": "Configure bot prefix, default language, theme and enable/disable slash commands.",
+        "GENERAL_FEATURES": {
+            "PREFIX": "Customize Bot Prefix",
+            "LOCALE": "Set Language",
+            "THEME": "Select Theme",
+            "SLASH": "Manage Slash Commands"
+        },
+        "USER_TITLE": "User Management",
+        "USER_SUBTITLE": "Roles & Permissions",
+        "USER_DESCRIPTION": "Manage permissions, admin roles and command access.",
+        "USER_FEATURES": {
+            "ROLES": "Role Permissions",
+            "ADMIN": "Admin Access",
+            "COMMANDS": "Command Permissions",
+            "BLACKLIST": "Manage Blacklist"
+        },
+        "INTEGRATIONS_TITLE": "Integrations",
+        "INTEGRATIONS_SUBTITLE": "APIs & Webhooks",
+        "INTEGRATIONS_DESCRIPTION": "Configure external services, webhooks and API access.",
+        "INTEGRATIONS_FEATURES": {
+            "WEBHOOKS": "Webhook URLs",
+            "API_KEYS": "API Keys",
+            "OAUTH": "OAuth Connections",
+            "THIRD_PARTY": "Third-party Services",
+            "DISCORD_LOGS": "Discord Logs",
+            "EXTERNAL_SERVICES": "External Services"
+        },
+        "COMING_SOON": "Coming Soon",
+        "BTN_CONFIGURE": "Configure",
+        "BTN_OPEN": "Open",
+        "PLUGIN_SETTINGS_TITLE": "Plugin Settings",
+        "PLUGIN_SETTINGS_DESC": "Enabled plugins can provide their own settings pages. These appear automatically in the navigation.",
+        "PLUGIN_SETTINGS_TIP": "Tip",
+        "PLUGIN_SETTINGS_TIP_TEXT": "Check the left navigation - plugin-specific settings can be found under the respective plugin name in the submenus.",
+        "SYSTEM_STATUS_TITLE": "System Status",
+        "STATUS_BOT": "Bot Status",
+        "STATUS_BOT_ONLINE": "Online",
+        "STATUS_DATABASE": "Database",
+        "STATUS_DATABASE_CONNECTED": "Connected",
+        "STATUS_PLUGINS": "Plugins",
+        "STATUS_PLUGINS_ACTIVE": "Active",
+        "STATUS_PERFORMANCE": "Performance",
+        "STATUS_PERFORMANCE_STABLE": "Stable"
+    },
+    "USERS": {
+        "TITLE": "User Management",
+        "NOTICE_TITLE": "Notice:",
+        "NOTICE_TEXT": "This page is still under development. User permissions, roles and permissions will be managed here in the future.",
+        "TABLE_USER": "User",
+        "TABLE_ROLE": "Role",
+        "TABLE_JOINED": "Joined",
+        "TABLE_ACTIONS": "Actions",
+        "TABLE_EMPTY": "No user data available",
+        "ROLES_TITLE": "Roles & Permissions",
+        "ROLES_DESC": "Manage Discord roles and their permissions for bot commands.",
+        "BANNED_TITLE": "Banned Users",
+        "BANNED_DESC": "Manage users who have been banned from the bot.",
+        "COMING_SOON": "Coming soon"
+    },
+    "INTEGRATIONS": {
+        "TITLE": "Integrations",
+        "NOTICE_TEXT": "Connect DuneBot with external services and APIs.",
+        "WEBHOOK_TITLE": "Webhooks",
+        "WEBHOOK_SUBTITLE": "Receive external events",
+        "WEBHOOK_DESC": "Configure webhooks to receive external events on your server.",
+        "TWITCH_TITLE": "Twitch",
+        "TWITCH_SUBTITLE": "Stream notifications",
+        "TWITCH_DESC": "Get notified when your streamers go live.",
+        "YOUTUBE_TITLE": "YouTube",
+        "YOUTUBE_SUBTITLE": "Video notifications",
+        "YOUTUBE_DESC": "Notifications for new videos from your favourite YouTubers.",
+        "CUSTOM_API_TITLE": "Custom API",
+        "CUSTOM_API_SUBTITLE": "Custom API integration",
+        "CUSTOM_API_DESC": "Connect the bot to your own API or external services.",
+        "BTN_CONFIGURE": "Configure",
+        "DEV_WARNING": "In Development:",
+        "DEV_WARNING_TEXT": "These features will be available in future updates."
+    },
+    "WIDGETS": {
+        "ACTIVE_PLUGINS": {
+            "BTN_CONFIGURE": "Configure",
+            "NO_PLUGINS": "No plugins activated or available for this server.",
+            "ACTIVATE_NOW": "Activate plugins now"
+        },
+        "SERVER_INFO": {
+            "MEMORY_USAGE": "Memory Usage",
+            "BTN_MANAGE_PLUGINS": "Manage Plugins"
+        },
+        "BOT_PERMISSIONS": {
+            "NO_ROLE": "No Role",
+            "PERM_SEND_MESSAGES": "Send Messages",
+            "PERM_MANAGE_SERVER": "Manage Server",
+            "PERM_MANAGE_ROLES": "Manage Roles",
+            "JOINED_AT": "Bot joined on:",
+            "NO_DATA": "No bot permission data available"
+        },
+        "SERVER_ANALYSIS": {
+            "MEMBERS": "Members",
+            "CHANNELS": "Channels",
+            "ROLES": "Roles",
+            "CACHE_EFFICIENCY": "Cache Efficiency",
+            "CACHED_MEMBERS": "Members in cache:",
+            "SERVER_AGE": "Server Age",
+            "DAYS": "Days",
+            "NO_DATA": "No data available",
+            "PREMIUM_STATUS": "Premium Status",
+            "LEVEL": "Level",
+            "BOOSTS": "Boosts"
+        }
     }
 }

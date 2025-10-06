@@ -3,5 +3,9 @@
   "THEME_ENABLED": true,
   "THEME": "default",
   "THEME_PATH": "./themes/default",
-  "BOT_OWNER_ID": "544578232704565262"
+  "BOT_OWNER_ID": "544578232704565262",
+  "DISCORD_SUPPORT_SERVER": "https://discord.gg/KTXCgH3FdQ",
+  "DISCORD_SUPPORT_SERVER_NAME" : "WeppoNapolis",
+  "DASHBOARD_VERSION" : "1.10.15",
+  "BOT_VERSION" : "1.15.1"
 }

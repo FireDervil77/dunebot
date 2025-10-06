@@ -13,7 +13,7 @@
             %>
         <% if (navItems.length === 0) { %>
           <div class="text-muted small px-3 py-2">
-            <i class="bi bi-info-circle me-1"></i> Keine Navigation verfügbar
+            <i class="bi bi-info-circle me-1"></i> <%= tr('DASHBOARD_COMMON.NO_NAVIGATION') %>
           </div>
           <!-- Debug-Info anzeigen -->
           <div class="text-muted small px-3 py-2">
@@ -21,7 +21,7 @@
           </div>
         <% } else { %>
           <ul class="nav nav-pills nav-sidebar flex-column" role="menu" data-accordion="false">
-            <li class="nav-header">Navigation</li>
+            <li class="nav-header"><%= tr('DASHBOARD_COMMON.NAVIGATION_HEADER') %></li>
             <% 
               // Aktiv-Logik: Nur exakte Matches oder direkte Parent-Items
               const hasExactMatch = navItems.some(item => activeMenu === item.url);

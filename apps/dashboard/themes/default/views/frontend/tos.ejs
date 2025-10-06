@@ -1,73 +1,73 @@
 <section id="tos" class="tos-page section dark-background">
   <div class="tos-container">
-    <h1 class="text-center">📜 Nutzungsbedingungen für DuneBot</h1>
-    <p class="text-center"><strong>Letzte Aktualisierung:</strong> <em>12. Juli 2025</em></p>
-    <p class="text-center"><strong>Geltungsbereich:</strong> Diese Nutzungsbedingungen gelten für den Discord-Bot „DuneBot“ und die Nutzung des Dashboards.</p>
+    <h1 class="text-center">📜 <%= tr('TOS.PAGE_TITLE') %></h1>
+    <p class="text-center"><strong><%= tr('TOS.LAST_UPDATED') %></strong> <em><%= tr('TOS.LAST_UPDATED_DATE') %></em></p>
+    <p class="text-center"><strong><%= tr('TOS.SCOPE') %></strong> <%= tr('TOS.SCOPE_TEXT') %></p>
 
     <div class="tos-section">
-      <div class="section-title text-center">1. Allgemeines</div>
+      <div class="section-title text-center"><%= tr('TOS.SECTION1_TITLE') %></div>
       <p>
-        Mit der Nutzung von DuneBot erklärst du dich mit diesen Bedingungen einverstanden. Wenn du nicht zustimmst, verwende den Bot bitte nicht.
+        <%= tr('TOS.SECTION1_TEXT') %>
       </p>
     </div>
 
     <div class="tos-section">
-      <div class="section-title text-center">2. Nutzungsvoraussetzungen</div>
+      <div class="section-title text-center"><%= tr('TOS.SECTION2_TITLE') %></div>
       <ul class="tos-list">
-        <li>Du musst mindestens 13 Jahre alt sein (gemäß Discord-Richtlinien).</li>
-        <li>Du darfst den Bot nicht für illegale, schädliche oder belästigende Zwecke einsetzen.</li>
-        <li>Der Bot ist ausschließlich für den Gebrauch auf Discord-Servern bestimmt.</li>
+        <li><%= tr('TOS.SECTION2_ITEM1') %></li>
+        <li><%= tr('TOS.SECTION2_ITEM2') %></li>
+        <li><%= tr('TOS.SECTION2_ITEM3') %></li>
       </ul>
     </div>
 
     <div class="tos-section">
-      <div class="section-title text-center">3. Funktionsumfang</div>
+      <div class="section-title text-center"><%= tr('TOS.SECTION3_TITLE') %></div>
       <ul class="tos-list">
-        <li>DuneBot bietet verschiedene Funktionen rund um das Dune-Spiel und Discord.</li>
-        <li>Der Funktionsumfang kann sich jederzeit ändern oder erweitert werden.</li>
+        <li><%= tr('TOS.SECTION3_ITEM1') %></li>
+        <li><%= tr('TOS.SECTION3_ITEM2') %></li>
       </ul>
     </div>
 
     <div class="tos-section">
-      <div class="section-title text-center">4. Haftungsausschluss</div>
+      <div class="section-title text-center"><%= tr('TOS.SECTION4_TITLE') %></div>
       <p>
-        DuneBot wird „wie besehen“ bereitgestellt – ohne Garantie auf Verfügbarkeit, Genauigkeit oder Fehlerfreiheit.<br>
-        Der Entwickler haftet nicht für direkte oder indirekte Schäden durch die Nutzung des Bots.
+        <%= tr('TOS.SECTION4_P1') %><br>
+        <%= tr('TOS.SECTION4_P2') %>
       </p>
     </div>
 
     <div class="tos-section">
-      <div class="section-title text-center">5. Datenschutz</div>
+      <div class="section-title text-center"><%= tr('TOS.SECTION5_TITLE') %></div>
       <p>
-        DuneBot speichert möglicherweise folgende Daten:
+        <%= tr('TOS.SECTION5_INTRO') %>
       </p>
       <ul class="tos-list">
-        <li>Discord-User-IDs (zur Identifikation von Spielern)</li>
-        <li>Kartendaten, Positionseinträge und Zeitstempel</li>
+        <li><%= tr('TOS.SECTION5_ITEM1') %></li>
+        <li><%= tr('TOS.SECTION5_ITEM2') %></li>
       </ul>
       <p>
-        Diese Daten werden nicht an Dritte weitergegeben und nur für die Funktion des Bots verwendet.<br>
-        Hinweis: Für detaillierte Infos siehe unsere <a href="/privacy">Datenschutzerklärung</a>.
+        <%= tr('TOS.SECTION5_P1') %><br>
+        <%= tr('TOS.SECTION5_P2') %> <a href="/privacy"><%= tr('TOS.SECTION5_PRIVACY_LINK') %></a>.
       </p>
     </div>
 
     <div class="tos-section">
-      <div class="section-title text-center">6. Änderungen</div>
+      <div class="section-title text-center"><%= tr('TOS.SECTION6_TITLE') %></div>
       <p>
-        Diese Nutzungsbedingungen können jederzeit geändert werden. Bei wesentlichen Änderungen wird ein Hinweis über Discord oder im Repository veröffentlicht.
+        <%= tr('TOS.SECTION6_TEXT') %>
       </p>
     </div>
 
     <div class="tos-section">
-      <div class="section-title text-center">7. Kontakt</div>
+      <div class="section-title text-center"><%= tr('TOS.SECTION7_TITLE') %></div>
       <p>
-        Für Fragen oder Probleme kontaktiere uns bitte über
-        <a href="mailto:support@dunebot.de" class="text-primary">support@dunebot.de</a>
-        oder im
-        <a href="https://discord.gg/AKZv8rqg9X" class="text-primary" target="_blank">offiziellen Support-Discord</a>.
+        <%= tr('TOS.SECTION7_TEXT') %>
+        <a href="mailto:<%= tr('TOS.SECTION7_EMAIL') %>" class="text-primary"><%= tr('TOS.SECTION7_EMAIL') %></a>
+        <%= tr('TOS.SECTION7_OR') %>
+        <a href="https://discord.gg/AKZv8rqg9X" class="text-primary" target="_blank"><%= tr('TOS.SECTION7_DISCORD') %></a>.
       </p>
       <p class="text-center">
-        <a href="/" class="back-link text-primary"><i class="fas fa-arrow-left"></i> Zurück zur Startseite</a>
+        <a href="/" class="back-link text-primary"><i class="fas fa-arrow-left"></i> <%= tr('TOS.BACK_TO_HOME') %></a>
       </p>
     </div>
   </div>

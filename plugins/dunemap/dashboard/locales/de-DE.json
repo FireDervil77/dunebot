@@ -142,5 +142,49 @@
     "MISSING_REMOVE_PARAMS": "Fehlende Parameter: markerId ODER (sectorX, sectorY, markerType) erforderlich",
     "INVALID_ACTION": "Ungültige Aktion (nur add/remove)",
     "ERROR_MARKER_OPERATION": "Fehler bei der Marker-Operation"
+  },
+  "ADMIN": {
+    "TITLE": "Interaktive Sektor-Karte",
+    "DESCRIPTION": "Klicke auf einen Sektor (A1-I9) um Marker zu setzen oder zu entfernen.",
+    "MAX_MARKERS": "Maximal 4 Marker pro Sektor!",
+    "GRID_TITLE": "Dune Sektor-Grid (A1 - I9)",
+    "LEGEND_TITLE": "Legende:",
+    "PVE_ZONE": "PvE-Zone (Reihen A-E, alle Spalten)",
+    "PVP_ZONE": "PvP-Zone (Reihen F-I, alle Spalten)",
+    "EDITOR": {
+      "TITLE": "Sektor",
+      "CURRENT_MARKERS": "Vorhandene Marker:",
+      "NO_MARKERS": "Keine Marker",
+      "ADD_MARKER": "Marker hinzufügen:",
+      "SELECT_TYPE": "-- Typ wählen --",
+      "RESOURCES": "Ressourcen",
+      "OTHER": "Sonstiges",
+      "STRUCTURES": "Strukturen",
+      "UTILITIES": "Hilfsmittel",
+      "BTN_ADD": "Marker hinzufügen",
+      "BTN_CLOSE": "Schließen"
+    },
+    "STATS": {
+      "TITLE": "Statistiken",
+      "TOTAL_MARKERS": "Gesamt-Marker:",
+      "OCCUPIED_SECTORS": "Belegte Sektoren:",
+      "AVAILABLE": "Verfügbar:"
+    },
+    "MARKER_TYPES": {
+      "TITAN": "Titan",
+      "SPICE": "Spice",
+      "STRAVIDIUM": "Stravidium",
+      "ALUMINIUM": "Aluminium",
+      "EISEN": "Eisen",
+      "BASALT": "Basalt",
+      "KARBON": "Karbon",
+      "HOELE": "Höhle",
+      "HOLE": "Loch",
+      "BASE": "Basis",
+      "WRACK": "Wrack",
+      "KONTROLLPUNKT": "Kontrollpunkt",
+      "TAXI": "Taxi",
+      "TEST": "Test"
+    }
   }
 }

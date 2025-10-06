@@ -2,28 +2,28 @@
   <div class="container py-5">
     <div class="alert alert-warning shadow-sm">
       <h4 class="alert-heading">
-        <i class="fas fa-power-off me-2"></i>Bot nicht erreichbar
+        <i class="fas fa-power-off me-2"></i><%= tr('SELECTOR.BOT_OFFLINE_TITLE') %>
       </h4>
       <p class="mb-2">
-        <strong>DuneBot ist aktuell nicht verbunden.</strong><br>
-        Er wird möglicherweise neu gestartet oder befindet sich in Wartung.
+        <strong><%= tr('SELECTOR.BOT_OFFLINE_DESC') %></strong><br>
+        <%= tr('SELECTOR.BOT_OFFLINE_REASON') %>
       </p>
       <ul class="mb-3 small">
-        <li>Bitte warte einen Moment und aktualisiere die Seite.</li>
-        <li>Ohne aktive Bot-Verbindung können keine Server-Daten geladen werden.</li>
-        <li>Deine Anmeldung bleibt (falls aktiv) bestehen.</li>
+        <li><%= tr('SELECTOR.BOT_OFFLINE_WAIT') %></li>
+        <li><%= tr('SELECTOR.BOT_OFFLINE_NO_DATA') %></li>
+        <li><%= tr('SELECTOR.BOT_OFFLINE_SESSION') %></li>
       </ul>
       <div class="d-flex gap-2">
         <a href="/auth/server-selector" class="btn btn-outline-secondary">
-          <i class="fas fa-sync-alt me-1"></i> Neu versuchen
+          <i class="fas fa-sync-alt me-1"></i> <%= tr('SELECTOR.BOT_OFFLINE_BTN_RETRY') %>
         </a>
         <button id="autoReloadBtn" class="btn btn-outline-primary">
-          <i class="fas fa-redo-alt me-1"></i> Auto-Reload aktivieren
+          <i class="fas fa-redo-alt me-1"></i> <%= tr('SELECTOR.BOT_OFFLINE_BTN_AUTO_ENABLE') %>
         </button>
       </div>
       <hr>
       <p class="mb-0 text-muted small">
-        Falls das Problem länger anhält, kontaktiere bitte einen Administrator.
+        <%= tr('SELECTOR.BOT_OFFLINE_CONTACT') %>
       </p>
     </div>
     <div class="text-center text-muted small">
@@ -36,9 +36,13 @@
       let countdown = 15;
       const btn = document.getElementById('autoReloadBtn');
       const info = document.getElementById('nextReloadInfo');
+      const enableText = '<i class="fas fa-redo-alt me-1"></i> <%= tr("SELECTOR.BOT_OFFLINE_BTN_AUTO_ENABLE") %>';
+      const stopText = '<i class="fas fa-stop-circle me-1"></i> <%= tr("SELECTOR.BOT_OFFLINE_BTN_AUTO_STOP") %>';
+      const reloadTemplate = '<%= tr("SELECTOR.BOT_OFFLINE_RELOAD_IN") %>';
+      
       function updateInfo() {
         if (!auto) { info.textContent = ''; return; }
-        info.textContent = 'Automatischer Reload in ' + countdown + 's ...';
+        info.textContent = reloadTemplate.replace('{seconds}', countdown);
       }
       let interval = null;
       btn.addEventListener('click', () => {
@@ -46,7 +50,7 @@
         if (auto) {
           btn.classList.remove('btn-outline-primary');
           btn.classList.add('btn-primary');
-          btn.innerHTML = '<i class="fas fa-stop-circle me-1"></i> Auto-Reload stoppen';
+          btn.innerHTML = stopText;
           countdown = 15;
           updateInfo();
           interval = setInterval(() => {
@@ -58,7 +62,7 @@
         } else {
           btn.classList.remove('btn-primary');
           btn.classList.add('btn-outline-primary');
-          btn.innerHTML = '<i class="fas fa-redo-alt me-1"></i> Auto-Reload aktivieren';
+          btn.innerHTML = enableText;
           if (interval) clearInterval(interval);
           info.textContent = '';
         }
@@ -71,7 +75,7 @@
     <div class="login-logo">
       <img src="/themes/default/assets/images/DuneBot.png" width="125" height="125" alt="DuneBot">
       <b>DuneBot</b>
-      <p><span>Wähle deinen Server aus um ihn zu verwalten:</span></p>
+      <p><span><%= tr('SELECTOR.PAGE_TITLE') %></span></p>
     </div>
 
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
@@ -83,15 +87,15 @@
               <h5 class="card-title"><%= guild.name %></h5>
               <% if (guild.botInGuild) { %>
                 <div class="guild-status text-success mb-3">
-                  <i class="fas fa-check-circle me-1"></i> Bot in Guild
+                  <i class="fas fa-check-circle me-1"></i> <%= tr('SELECTOR.BOT_IN_GUILD') %>
                 </div>
-                <a href="<%= guild.settingsUrl %>" class="btn btn-primary w-100">Verwalten</a>
+                <a href="<%= guild.settingsUrl %>" class="btn btn-primary w-100"><%= tr('SELECTOR.BTN_MANAGE') %></a>
               <% } else { %>
                 <div class="guild-status text-danger mb-3">
-                  <i class="fas fa-exclamation-circle me-1"></i> Bot not in Guild
+                  <i class="fas fa-exclamation-circle me-1"></i> <%= tr('SELECTOR.BOT_NOT_IN_GUILD') %>
                 </div>
                 <a href="<%= guild.settingsUrl %>" id="invite-btn-<%= guild.id %>" target="_blank" class="btn btn-outline-primary w-100">
-                  <i class="fas fa-plus-circle me-2"></i> Bot hinzufügen
+                  <i class="fas fa-plus-circle me-2"></i> <%= tr('SELECTOR.BTN_INVITE') %>
                 </a>
               <% } %>
             </div>

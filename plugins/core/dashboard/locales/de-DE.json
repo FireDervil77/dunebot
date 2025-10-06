@@ -95,9 +95,91 @@
             "WEBHOOKS": "Webhook-URLs",
             "API_KEYS": "API-Keys",
             "OAUTH": "OAuth-Verbindungen",
-            "THIRD_PARTY": "Drittanbieter-Dienste"
+            "THIRD_PARTY": "Drittanbieter-Dienste",
+            "DISCORD_LOGS": "Discord Logs",
+            "EXTERNAL_SERVICES": "Externe Services"
         },
         "COMING_SOON": "Bald verfügbar",
-        "BTN_CONFIGURE": "Konfigurieren"
+        "BTN_CONFIGURE": "Konfigurieren",
+        "BTN_OPEN": "Öffnen",
+        "PLUGIN_SETTINGS_TITLE": "Plugin-Einstellungen",
+        "PLUGIN_SETTINGS_DESC": "Aktivierte Plugins können eigene Einstellungsseiten bereitstellen. Diese erscheinen automatisch in der Navigation.",
+        "PLUGIN_SETTINGS_TIP": "Tipp",
+        "PLUGIN_SETTINGS_TIP_TEXT": "Schau dir die linke Navigation an - Plugin-spezifische Einstellungen findest du unter dem jeweiligen Plugin-Namen in den Untermenüs.",
+        "SYSTEM_STATUS_TITLE": "System-Status",
+        "STATUS_BOT": "Bot-Status",
+        "STATUS_BOT_ONLINE": "Online",
+        "STATUS_DATABASE": "Datenbank",
+        "STATUS_DATABASE_CONNECTED": "Verbunden",
+        "STATUS_PLUGINS": "Plugins",
+        "STATUS_PLUGINS_ACTIVE": "Aktiv",
+        "STATUS_PERFORMANCE": "Performance",
+        "STATUS_PERFORMANCE_STABLE": "Stabil"
+    },
+    "USERS": {
+        "TITLE": "Benutzer-Verwaltung",
+        "NOTICE_TITLE": "Hinweis:",
+        "NOTICE_TEXT": "Diese Seite befindet sich noch in Entwicklung. Hier werden zukünftig Benutzerrechte, Rollen und Permissions verwaltet.",
+        "TABLE_USER": "Benutzer",
+        "TABLE_ROLE": "Rolle",
+        "TABLE_JOINED": "Beigetreten",
+        "TABLE_ACTIONS": "Aktionen",
+        "TABLE_EMPTY": "Keine Benutzer-Daten verfügbar",
+        "ROLES_TITLE": "Rollen & Berechtigungen",
+        "ROLES_DESC": "Verwalte Discord-Rollen und deren Berechtigungen für Bot-Befehle.",
+        "BANNED_TITLE": "Gesperrte Benutzer",
+        "BANNED_DESC": "Verwalte Benutzer, die vom Bot gesperrt wurden.",
+        "COMING_SOON": "Bald verfügbar"
+    },
+    "INTEGRATIONS": {
+        "TITLE": "Integrationen",
+        "NOTICE_TEXT": "Verbinde DuneBot mit externen Services und APIs.",
+        "WEBHOOK_TITLE": "Webhooks",
+        "WEBHOOK_SUBTITLE": "Empfange externe Events",
+        "WEBHOOK_DESC": "Konfiguriere Webhooks um externe Events in deinem Server zu empfangen.",
+        "TWITCH_TITLE": "Twitch",
+        "TWITCH_SUBTITLE": "Stream-Benachrichtigungen",
+        "TWITCH_DESC": "Erhalte Benachrichtigungen wenn deine Streamer live gehen.",
+        "YOUTUBE_TITLE": "YouTube",
+        "YOUTUBE_SUBTITLE": "Video-Benachrichtigungen",
+        "YOUTUBE_DESC": "Benachrichtigungen bei neuen Videos deiner Lieblings-YouTuber.",
+        "CUSTOM_API_TITLE": "Custom API",
+        "CUSTOM_API_SUBTITLE": "Eigene API-Integration",
+        "CUSTOM_API_DESC": "Verbinde den Bot mit deiner eigenen API oder externen Services.",
+        "BTN_CONFIGURE": "Konfigurieren",
+        "DEV_WARNING": "In Entwicklung:",
+        "DEV_WARNING_TEXT": "Diese Features werden in zukünftigen Updates verfügbar sein."
+    },
+    "WIDGETS": {
+        "ACTIVE_PLUGINS": {
+            "BTN_CONFIGURE": "Konfigurieren",
+            "NO_PLUGINS": "Keine Plugins aktiviert oder verfügbar für diesen Server.",
+            "ACTIVATE_NOW": "Jetzt Plugins aktivieren"
+        },
+        "SERVER_INFO": {
+            "MEMORY_USAGE": "Speichernutzung",
+            "BTN_MANAGE_PLUGINS": "Plugins verwalten"
+        },
+        "BOT_PERMISSIONS": {
+            "NO_ROLE": "Keine Rolle",
+            "PERM_SEND_MESSAGES": "Nachrichten senden",
+            "PERM_MANAGE_SERVER": "Server verwalten",
+            "PERM_MANAGE_ROLES": "Rollen verwalten",
+            "JOINED_AT": "Bot beigetreten am:",
+            "NO_DATA": "Keine Bot-Berechtigungsdaten verfügbar"
+        },
+        "SERVER_ANALYSIS": {
+            "MEMBERS": "Mitglieder",
+            "CHANNELS": "Kanäle",
+            "ROLES": "Rollen",
+            "CACHE_EFFICIENCY": "Cache-Effektivität",
+            "CACHED_MEMBERS": "Mitglieder im Cache:",
+            "SERVER_AGE": "Server-Alter",
+            "DAYS": "Tage",
+            "NO_DATA": "Keine Daten verfügbar",
+            "PREMIUM_STATUS": "Premium-Status",
+            "LEVEL": "Level",
+            "BOOSTS": "Boosts"
+        }
     }
 }

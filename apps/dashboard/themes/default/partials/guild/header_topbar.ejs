@@ -95,6 +95,30 @@
             <% } %>
             <!--end::Guild Switcher-->
            
+            <!--begin::Language Switcher-->
+            <li class="nav-item dropdown">
+              <a class="nav-link" href="#" data-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-translate"></i>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-right">
+                <li class="dropdown-header">
+                  <i class="bi bi-translate me-2"></i><%= tr('LANDING.LANGUAGE_SELECTOR') || 'Sprache' %>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a href="#" class="dropdown-item lang-switch-link <%= locals.locale === 'de-DE' ? 'active' : '' %>" data-lang="de-DE">
+                    🇩🇪 <%= tr('LANDING.LANGUAGE_DE') || 'Deutsch' %>
+                  </a>
+                </li>
+                <li>
+                  <a href="#" class="dropdown-item lang-switch-link <%= locals.locale === 'en-GB' ? 'active' : '' %>" data-lang="en-GB">
+                    🇬🇧 <%= tr('LANDING.LANGUAGE_EN') || 'English' %>
+                  </a>
+                </li>
+              </ul>
+            </li>
+            <!--end::Language Switcher-->
+           
             <!--begin::Fullscreen Toggle-->
             <li class="nav-item">
               <a class="nav-link" href="#" data-lte-toggle="fullscreen">
@@ -139,7 +163,7 @@
                         }
                       }
                     %>
-                    <small>Mitglied seit <%= days %> Tagen</small>
+                    <small><%= tr('DASHBOARD_COMMON.MEMBER_SINCE') %> <%= days %> <%= tr('DASHBOARD_COMMON.DAYS') %></small>
                   </p>
                 </li>
                 <li class="user-body">
@@ -148,11 +172,10 @@
                   </div>
                 </li>
                 <li class="user-footer">
-                  <a href="/" class="btn btn-primary btn-xs">
-                    <i class="bi bi-house-door me-1"></i>
-                    Zum Dashboard
+                  <a href="/" class="btn btn-primary btn-sm">
+                    <i class="bi bi-house-door"></i>
                   </a>
-                  <a href="/auth/logout" class="btn btn-danger btn-flat float-end">
+                  <a href="/auth/logout" class="btn btn-danger btn-sm float-end">
                     <i class="bi bi-box-arrow-right me-1"></i>
                     <%= tr('DASHBOARD.LOGOUT') %>
                   </a>

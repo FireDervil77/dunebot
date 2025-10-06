@@ -17,6 +17,20 @@ router.get("/guilds", apiController.getGuilds);
 router.get("/guilds/:guildId", apiController.getGuildInfo);
 
 /**
+ * Spracheinstellung des Benutzers aktualisieren
+ * @route POST /api/language
+ * @author firedervil
+ */
+router.post('/language', CheckAuth, apiController.updateDashboardLanguage);
+
+/**
+ * Spracheinstellung für Gäste (ohne Authentifizierung)
+ * @route POST /api/language/guest
+ * @author firedervil
+ */
+router.post('/language/guest', apiController.updateGuestLanguage);
+
+/**
  * Bot-Status in Guild prüfen (für automatische Weiterleitung nach Bot-Einladung)
  * @author firedervil
  */

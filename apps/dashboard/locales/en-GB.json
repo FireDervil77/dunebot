@@ -14,6 +14,18 @@
     "ROLE_SELECT": "Select Role",
     
     "LANDING": {
+        "HOME": "Home",
+        "FEATURES": "Features",
+        "NEWS": "News",
+        "SERVICES": "Services",
+        "DASHBOARD": "Dashboard",
+        "BOTNAME": "DuneBot",
+        "GITHUB": "GitHub",
+        "DOCUMENTATION": "Documentation",
+        "PLUGINS": "Plugins",
+        "LANGUAGE_SELECTOR": "Language",
+        "LANGUAGE_DE": "Deutsch",
+        "LANGUAGE_EN": "English",
         "HERO": "The Ultimate Discord Dunebot Platform",
         "SUBTITLE": "Build the perfect Discord experience for your community.",
         "SUBTITLE2": "100% Customizable. Powered by a flexible plugin system.",
@@ -25,7 +37,22 @@
         "BTN_LOGIN": "Login",
         "BTN_REGISTER": "Register",
         "BTN_DASHBOARD": "NOW Test",
-        "BTN_GITHUB": "View on GitHub"
+        "BTN_GITHUB": "View on GitHub",
+
+        "HERO_SLIDE2_TITLE": "Ultra-flexible Plugin System",
+        "HERO_SLIDE2_DESC": "Extend your bot with plugins based on WordPress model.",
+        "HERO_SLIDE2_DESC2": "Dashboard & Bot Commands in one system – completely modular!",
+        "HERO_SLIDE2_BTN1": "Discover Plugins",
+        "HERO_SLIDE2_BTN2": "Developer Docs",
+        
+        "HERO_SLIDE3_TITLE": "Perfect for Your Community",
+        "HERO_SLIDE3_DESC": "Moderation, Leveling, Custom Commands & more.",
+        "HERO_SLIDE3_DESC2": "Everything from one dashboard – no chaos with multiple bots!",
+        "HERO_SLIDE3_BTN1": "Get Started",
+        "HERO_SLIDE3_BTN2": "Documentation",
+        
+        "CAROUSEL_PREV": "Previous",
+        "CAROUSEL_NEXT": "Next"
     },
     "FEATURES": {
         "TITLE": "Why Communities Choose DuneBots",
@@ -41,13 +68,120 @@
         "CARD_FIVE_DESCRIPTION": "Easily scale your community. DuneBot is optimized for large servers and provides reliable performance.",
         "CARD_SIX_TITLE": "Customizable for Every Community",
         "CARD_SIX_DESCRIPTION": "Tailor DuneBot to your needs with a variety of customization options.",
-        "CARD_SEVEN_TITLE": "Hooking System",
-        "CARD_SEVEN_DESCRIPTION": "Erlebe ein neues Hooking System! Im Dashboard und im Bot.",
-        "CARD_EIGHT_TITLE": "Skalierbar & Zuverlässig",
-        "CARD_EIGHT_DESCRIPTION": "Skaliere deine Community mit Leichtigkeit. DuneBot ist für große Server optimiert und bietet eine zuverlässige Leistung.",
-        "CARD_NINE_TITLE": "Anpassbar für Jede Community",
-        "CARD_NINE_DESCRIPTION": "Gestalte DuneBot nach deinen Wünschen mit einer Vielzahl von Anpassungsoptionen.",
+        "CARD_SEVEN_TITLE": "Hook System",
+        "CARD_SEVEN_DESCRIPTION": "Experience a new hooking system! In the dashboard and in the bot.",
+        "CARD_EIGHT_TITLE": "Scalable & Reliable",
+        "CARD_EIGHT_DESCRIPTION": "Scale your community with ease. DuneBot is optimized for large servers and provides reliable performance.",
+        "CARD_NINE_TITLE": "Customizable for Every Community",
+        "CARD_NINE_DESCRIPTION": "Customize DuneBot to your needs with a variety of customization options.",
         "STAR": "Planned Features"
+    },
+
+    "FOOTER": {
+        "TERMS_OF_SERVICE": "Terms of Service",
+        "PRIVACY_POLICY": "Privacy Policy",
+        "USEFUL_LINKS": "Useful Links",
+        "CONTACT": "Contact",
+        "DESCRIPTION": "DuneBot is a Discord Bot platform that allows you to manage and customize your bot with a modern dashboard. With a wide range of plugins that are easy to manage."
+    },
+
+    "PRIVACY": {
+        "PAGE_TITLE": "Privacy Policy for DuneBot",
+        "LAST_UPDATED": "Last Updated:",
+        "LAST_UPDATED_DATE": "July 12, 2025",
+        "SCOPE": "Scope:",
+        "SCOPE_TEXT": "This privacy policy applies to the Discord bot DuneBot and describes what personal data is processed and how it is protected.",
+        
+        "SECTION1_TITLE": "1. Data Controller",
+        "SECTION1_TEXT": "Responsible for data processing within the meaning of data protection laws is:",
+        "SECTION1_DEV": "FireDervil",
+        "SECTION1_ROLE": "as Developer.",
+        "SECTION1_CONTACT": "Contact:",
+        "SECTION1_DISCORD": "Discord Support Server",
+        
+        "SECTION2_TITLE": "2. What Data is Collected?",
+        "SECTION2_INTRO": "DuneBot exclusively processes data necessary for the bot's functionality. This includes:",
+        "SECTION2_ITEM1": "Discord User ID: for unique player identification",
+        "SECTION2_ITEM2": "Username and server name (optional): for display on the Dune map",
+        "SECTION2_ITEM3": "Map positions, markers, command inputs: for game interaction",
+        "SECTION2_ITEM4": "Timestamps: to chronologically assign actions",
+        "SECTION2_NOTE": "No sensitive or personal content such as message content, email addresses, or IP addresses is stored.",
+        
+        "SECTION3_TITLE": "3. How is the Data Used?",
+        "SECTION3_INTRO": "The collected data is used to:",
+        "SECTION3_ITEM1": "Provide features like map storage and display",
+        "SECTION3_ITEM2": "Execute user inputs (e.g., set position)",
+        "SECTION3_ITEM3": "Technically operate the bot (error diagnosis, logs)",
+        "SECTION3_NOTE": "No data is sold, analyzed, or used for advertising purposes.",
+        
+        "SECTION4_TITLE": "4. Where and How Long is Data Stored?",
+        "SECTION4_P1": "Data is stored on a private server or cloud service, secured by common technical measures.",
+        "SECTION4_P2": "Data is only stored as long as it is necessary for the bot's functionality.",
+        "SECTION4_P3": "Upon request, data can be completely deleted (see Section 6).",
+        
+        "SECTION5_TITLE": "5. Data Sharing",
+        "SECTION5_INTRO": "No data is shared with third parties unless:",
+        "SECTION5_ITEM1": "it is legally required,",
+        "SECTION5_ITEM2": "the user has given explicit consent.",
+        
+        "SECTION6_TITLE": "6. Your Rights (under GDPR)",
+        "SECTION6_INTRO": "You have the right at any time to:",
+        "SECTION6_ITEM1": "Access your stored data,",
+        "SECTION6_ITEM2": "Correct or delete your data,",
+        "SECTION6_ITEM3": "Restrict or object to its processing.",
+        "SECTION6_NOTE": "Please contact us using the contact information above or below.",
+        
+        "SECTION7_TITLE": "7. Changes to This Privacy Policy",
+        "SECTION7_TEXT": "We reserve the right to update this privacy policy at any time. Changes will be published on this page.",
+        
+        "SECTION8_TITLE": "8. Contact",
+        "SECTION8_TEXT": "For questions about the privacy policy, please contact:",
+        "SECTION8_DISCORD_LINK": "Discord Support Server",
+        
+        "BACK_TO_HOME": "Back to Home"
+    },
+
+    "TOS": {
+        "PAGE_TITLE": "Terms of Service for DuneBot",
+        "LAST_UPDATED": "Last Updated:",
+        "LAST_UPDATED_DATE": "July 12, 2025",
+        "SCOPE": "Scope:",
+        "SCOPE_TEXT": "These terms of service apply to the Discord bot DuneBot and the use of the dashboard.",
+        
+        "SECTION1_TITLE": "1. General",
+        "SECTION1_TEXT": "By using DuneBot, you agree to these terms. If you do not agree, please do not use the bot.",
+        
+        "SECTION2_TITLE": "2. Requirements for Use",
+        "SECTION2_ITEM1": "You must be at least 13 years old (according to Discord guidelines).",
+        "SECTION2_ITEM2": "You may not use the bot for illegal, harmful, or harassing purposes.",
+        "SECTION2_ITEM3": "The bot is exclusively intended for use on Discord servers.",
+        
+        "SECTION3_TITLE": "3. Scope of Features",
+        "SECTION3_ITEM1": "DuneBot offers various features related to the Dune game and Discord.",
+        "SECTION3_ITEM2": "The scope of features may change or be expanded at any time.",
+        
+        "SECTION4_TITLE": "4. Disclaimer",
+        "SECTION4_P1": "DuneBot is provided as is without guarantee of availability, accuracy, or error-free operation.",
+        "SECTION4_P2": "The developer is not liable for direct or indirect damages resulting from the use of the bot.",
+        
+        "SECTION5_TITLE": "5. Privacy",
+        "SECTION5_INTRO": "DuneBot may store the following data:",
+        "SECTION5_ITEM1": "Discord User IDs (for player identification)",
+        "SECTION5_ITEM2": "Map data, position entries, and timestamps",
+        "SECTION5_P1": "This data is not shared with third parties and is only used for the bot's functionality.",
+        "SECTION5_P2": "Note: For detailed information, see our",
+        "SECTION5_PRIVACY_LINK": "Privacy Policy",
+        
+        "SECTION6_TITLE": "6. Changes",
+        "SECTION6_TEXT": "These terms of service may be changed at any time. Significant changes will be announced via Discord or in the repository.",
+        
+        "SECTION7_TITLE": "7. Contact",
+        "SECTION7_TEXT": "For questions or issues, please contact us via",
+        "SECTION7_EMAIL": "support@dunebot.de",
+        "SECTION7_OR": "or on the",
+        "SECTION7_DISCORD": "official Support Discord",
+        
+        "BACK_TO_HOME": "Back to Home"
     },
     
     "SIDEBAR": {
@@ -103,7 +237,29 @@
 
     "SELECTOR": {
         "BTN_MANAGE": "Manage",
-        "BTN_INVITE": "Invite"
+        "BTN_INVITE": "Add Bot",
+        "PAGE_TITLE": "Select your server to manage:",
+        "BOT_IN_GUILD": "Bot in Guild",
+        "BOT_NOT_IN_GUILD": "Bot not in Guild",
+        
+        "BOT_OFFLINE_TITLE": "Bot Unavailable",
+        "BOT_OFFLINE_DESC": "DuneBot is currently not connected.",
+        "BOT_OFFLINE_REASON": "It may be restarting or under maintenance.",
+        "BOT_OFFLINE_WAIT": "Please wait a moment and refresh the page.",
+        "BOT_OFFLINE_NO_DATA": "Without an active bot connection, no server data can be loaded.",
+        "BOT_OFFLINE_SESSION": "Your login (if active) will remain.",
+        "BOT_OFFLINE_BTN_RETRY": "Try Again",
+        "BOT_OFFLINE_BTN_AUTO_ENABLE": "Enable Auto-Reload",
+        "BOT_OFFLINE_BTN_AUTO_STOP": "Stop Auto-Reload",
+        "BOT_OFFLINE_CONTACT": "If the problem persists, please contact an administrator.",
+        "BOT_OFFLINE_RELOAD_IN": "Automatic reload in {seconds}s ..."
+    },
+
+    "NOT_IMPLEMENTED": {
+        "ICON_TOOLS": "Tools",
+        "TITLE": "This Page is Under Development",
+        "DESCRIPTION": "We are working to provide this feature for you. Please check back later.",
+        "BTN_HOME": "Back to Home"
     },
 
     "HOME": {
@@ -172,5 +328,58 @@
         "PREVIEW_PLACEHOLDER": "Embed preview will be shown here"
     },
 
-    "NO_SETTINGS": "This plugin does not have any settings."
+    "NO_SETTINGS": "This plugin does not have any settings.",
+
+    "ERROR_PAGE": {
+        "TITLE": "Error",
+        "404_TITLE": "Page Not Found",
+        "404_MESSAGE": "The requested page could not be found.",
+        "500_TITLE": "Server Error",
+        "500_MESSAGE": "An internal server error has occurred.",
+        "GENERIC_TITLE": "An Error Occurred",
+        "GENERIC_MESSAGE": "Something went wrong. Please try again later.",
+        "GO_TO_DASHBOARD": "Go to Dashboard",
+        "GO_TO_HOME": "Go to Home",
+        "BACK_BUTTON": "Back"
+    },
+
+    "TOAST_MESSAGES": {
+        "PLUGIN_ENABLED": "Plugin successfully enabled",
+        "PLUGIN_DISABLED": "Plugin successfully disabled",
+        "PLUGIN_ERROR": "Error during plugin operation",
+        "SETTINGS_SAVED": "Settings saved successfully",
+        "SETTINGS_ERROR": "Error saving settings",
+        "LOCALE_UPDATED": "Language settings have been updated",
+        "LOCALE_ERROR": "Error saving language settings",
+        "GENERIC_SUCCESS": "Action completed successfully",
+        "GENERIC_ERROR": "An error occurred",
+        "LOADING_ERROR": "Error loading data",
+        "PERMISSION_ERROR": "No permission for this action",
+        "NEWS_CREATED": "News successfully created",
+        "NEWS_UPDATED": "News successfully updated",
+        "NEWS_DELETED": "News successfully deleted",
+        "NEWS_ERROR": "Error during news operation",
+        "NOTIFICATION_SENT": "Notification sent successfully",
+        "NOTIFICATION_ERROR": "Error sending notification",
+        "CORE_SETTINGS_SAVED": "Core settings saved successfully",
+        "CORE_SETTINGS_ERROR": "Error saving core settings",
+        "DUNEMAP_SETTINGS_SAVED": "DuneMap settings saved successfully",
+        "DUNEMAP_SETTINGS_ERROR": "Error saving DuneMap settings"
+    },
+
+    "DASHBOARD_COMMON": {
+        "MEMBER_SINCE": "Member since",
+        "DAYS": "days",
+        "SERVER": "Server",
+        "COPYRIGHT": "Copyright",
+        "ALL_RIGHTS_RESERVED": "All rights reserved",
+        "DASHBOARD_VERSION": "Dashboard Version",
+        "BOT_VERSION": "Bot Version",
+        "NAVIGATION_HEADER": "Navigation",
+        "NO_NAVIGATION": "No navigation available",
+        "ADMIN_AREA": "Admin Area",
+        "DESCRIPTION_META": "DuneBot is a highly scalable Discord Bot platform in Javascript with a Dashboard.",
+        "WELCOME_SETTINGS": "Welcome to Settings!",
+        "WELCOME_SETTINGS_DESC": "Here you can configure your bot, manage permissions and adjust plugin settings."
+    }
 }

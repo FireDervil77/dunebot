@@ -23,13 +23,13 @@
     <div class="row">
       <div class="col-12 col-sm-6">
         <strong>
-          Copyright &copy; 2024 
+          <%= tr('DASHBOARD_COMMON.COPYRIGHT') %> &copy; 2024 
           <a href="https://dunebot.de" class="text-decoration-none">DuneBot</a>.
         </strong>
-        All rights reserved.
+        <%= tr('DASHBOARD_COMMON.ALL_RIGHTS_RESERVED') %>.
       </div>
       <div class="col-12 col-sm-6 text-end">
-        <b>Dashboard Version:</b> <%= locals.dashboard_version %> | <b>Bot Version:</b> <%= locals.bot_version %>
+        <b><%= tr('DASHBOARD_COMMON.DASHBOARD_VERSION') %>:</b> <%= locals.dashboard_version %> | <b><%= tr('DASHBOARD_COMMON.BOT_VERSION') %>:</b> <%= locals.bot_version %>
       </div>
     </div>
   </div>

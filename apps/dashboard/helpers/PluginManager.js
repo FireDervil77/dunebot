@@ -692,8 +692,17 @@ class PluginManager extends BasePluginManager {
         await this.hooks.doAction('before_disable_in_guild', pluginName, guildId);
 
         try {
+            // Core Plugin kann niemals deaktiviert werden
             if (pluginName === "core") {
                 const error = new Error("Cannot disable core plugin");
+                await this.hooks.doAction('disable_in_guild_failed', pluginName, guildId, error);
+                throw error;
+            }
+
+            // SuperAdmin Plugin kann in der CONTROL_GUILD nicht deaktiviert werden
+            const controlGuildId = process.env.CONTROL_GUILD_ID;
+            if (pluginName === "superadmin" && controlGuildId && guildId === controlGuildId) {
+                const error = new Error("Cannot disable superadmin plugin in control guild");
                 await this.hooks.doAction('disable_in_guild_failed', pluginName, guildId, error);
                 throw error;
             }

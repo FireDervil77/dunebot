@@ -1,6 +1,8 @@
 const express = require("express");
 const { ServiceManager } = require("dunebot-core");
 const frontendController = require("../controllers/frontend.controller");
+const apiController = require("../controllers/api.controller");
+const { getLocalizedNews } = require("../helpers/newsHelper");
 
 // Router erstellen
 const router = express.Router();
@@ -9,30 +11,30 @@ const router = express.Router();
 const getNewsDetails = async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get("themeManager");
 
     try {
-        const news = await dbService.query(`
-            SELECT 
-                _id, title, slug, author, news_text,
-                excerpt, image_url, date, status,
-                created_at, updated_at
-            FROM news 
+        const rawNews = await dbService.query(`
+            SELECT * FROM news 
             WHERE slug = ? AND status = 'published'
         `, [req.params.slug]);
 
-        if (!news?.length) {
+        if (!rawNews?.length) {
             return res.status(404).render('frontend/404');
         }
 
+        // News lokalisieren
+        const userLocale = req.session.locale || res.locals.locale || 'de-DE';
+        const localizedNews = getLocalizedNews(rawNews[0], userLocale);
+
         // Layout setzen
-        const themeManager = ServiceManager.get("themeManager");
         res.locals.layout = themeManager.getLayout('frontend');
         
         res.render('frontend/news-details', {
             news: {
-                ...news[0],
-                date: new Date(news[0].date).toLocaleString(
-                    req.session.locale || 'de-DE',
+                ...localizedNews,
+                formattedDate: new Date(localizedNews.date).toLocaleString(
+                    userLocale,
                     {
                         year: 'numeric',
                         month: 'long', 
@@ -102,5 +104,12 @@ router.get('/', frontendController.getIndex);
 router.get('/news-details/:slug', getNewsDetails);
 router.get('/privacy', frontendController.privacy);
 router.get('/tos', frontendController.tos);
+
+/**
+ * Spracheinstellung für Gäste (ohne Authentifizierung)
+ * @route POST /language/guest
+ * @author firedervil
+ */
+router.post('/language/guest', apiController.updateGuestLanguage);
 
 module.exports = router;

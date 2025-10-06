@@ -690,6 +690,27 @@ async getAllConfigs() {
             ORDER BY sector_x, sector_y
         `, [guildId]);
     }
+
+    /**
+     * Aktualisiert einen User in der Datenbank
+     * @param {string} userId - Discord User ID
+     * @param {object} updates - Objekt mit zu aktualisierenden Feldern (z.B. { locale: 'en-GB' })
+     * @returns {Promise<object>} - Query-Resultat
+     * @author firedervil
+     */
+    async updateUser(userId, updates) {
+        // Erstelle SET-Clause aus dem updates-Objekt
+        const setClause = Object.keys(updates)
+            .map(key => `${key} = ?`)
+            .join(', ');
+        
+        const values = [...Object.values(updates), userId];
+        
+        return await this.query(
+            `UPDATE users SET ${setClause}, updated_at = NOW() WHERE _id = ?`,
+            values
+        );
+    }
 }
 
 module.exports = DBService;

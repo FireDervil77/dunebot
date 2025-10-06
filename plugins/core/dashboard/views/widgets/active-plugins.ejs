@@ -9,7 +9,7 @@
           </div>
           <h5 class="plugin-name mb-1"><%= plugin %></h5>
           <a href="/guild/<%= guildId %>/plugins/<%= plugin %>" class="btn btn-sm btn-primary">
-            <i class="bi bi-gear-fill me-1"></i> Konfigurieren
+            <i class="bi bi-gear-fill me-1"></i> <%= tr('core:WIDGETS.ACTIVE_PLUGINS.BTN_CONFIGURE') %>
           </a>
         </div>
       </div>
@@ -18,8 +18,8 @@
 <% } else { %>
   <div class="alert alert-info">
     <i class="bi bi-info-circle me-2"></i>
-    Keine Plugins aktiviert oder verfügbar für diesen Server.
-    <a href="/guild/<%= guildId %>/plugins" class="alert-link">Jetzt Plugins aktivieren</a>
+    <%= tr('core:WIDGETS.ACTIVE_PLUGINS.NO_PLUGINS') %>
+    <a href="/guild/<%= guildId %>/plugins" class="alert-link"><%= tr('core:WIDGETS.ACTIVE_PLUGINS.ACTIVATE_NOW') %></a>
   </div>
 <% } %>
    

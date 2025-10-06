@@ -22,6 +22,17 @@
             </ul>
           </li>
           <li><a href="/guild"><%= tr('LANDING.DASHBOARD') %></a></li>
+          <li class="dropdown language-switcher">
+            <a href="#"><span><i class="bi bi-translate"></i> <%= tr('LANDING.LANGUAGE_SELECTOR') %></span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+            <ul>
+              <li><a href="#" data-lang="de-DE" class="lang-switch-link <%= locals.locale === 'de-DE' ? 'active' : '' %>">
+                🇩🇪 <%= tr('LANDING.LANGUAGE_DE') %>
+              </a></li>
+              <li><a href="#" data-lang="en-GB" class="lang-switch-link <%= locals.locale === 'en-GB' ? 'active' : '' %>">
+                🇬🇧 <%= tr('LANDING.LANGUAGE_EN') %>
+              </a></li>
+            </ul>
+          </li>
         </ul>
         <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
       </nav>

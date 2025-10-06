@@ -15,8 +15,8 @@
   <div class="col-12">
     <div class="alert alert-info">
       <i class="fa-solid fa-circle-info me-2"></i>
-      <strong>Willkommen bei den Einstellungen!</strong> 
-      Hier kannst du deinen Bot konfigurieren, Berechtigungen verwalten und Plugin-Einstellungen anpassen.
+      <strong><%= tr('DASHBOARD_COMMON.WELCOME_SETTINGS') %></strong> 
+      <%= tr('DASHBOARD_COMMON.WELCOME_SETTINGS_DESC') %>
     </div>
   </div>
 </div>
@@ -106,14 +106,14 @@
         </p>
         
         <ul class="list-unstyled small mb-3">
-          <li><i class="fa-solid fa-check text-success me-2"></i>Webhook-URLs</li>
-          <li><i class="fa-solid fa-check text-success me-2"></i>API-Keys</li>
-          <li><i class="fa-solid fa-check text-success me-2"></i>Discord Logs</li>
-          <li><i class="fa-solid fa-check text-success me-2"></i>Externe Services</li>
+          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.WEBHOOKS') %></li>
+          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.API_KEYS') %></li>
+          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.DISCORD_LOGS') %></li>
+          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.EXTERNAL_SERVICES') %></li>
         </ul>
         
         <a href="/guild/<%= guildId %>/plugins/core/settings/integrations" class="btn btn-warning btn-sm w-100">
-          <i class="fa-solid fa-arrow-right me-2"></i>Öffnen
+          <i class="fa-solid fa-arrow-right me-2"></i><%= tr('core:SETTINGS_OVERVIEW.BTN_OPEN') %>
         </a>
       </div>
     </div>
@@ -126,17 +126,17 @@
     <div class="card">
       <div class="card-header bg-light">
         <h5 class="mb-0">
-          <i class="fa-solid fa-puzzle-piece me-2"></i>Plugin-Einstellungen
+          <i class="fa-solid fa-puzzle-piece me-2"></i><%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_TITLE') %>
         </h5>
       </div>
       <div class="card-body">
         <p class="text-muted mb-3">
-          Aktivierte Plugins können eigene Einstellungsseiten bereitstellen. Diese erscheinen automatisch in der Navigation.
+          <%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_DESC') %>
         </p>
         
         <div class="alert alert-secondary mb-0">
           <i class="fa-solid fa-lightbulb me-2"></i>
-          <strong>Tipp:</strong> Schau dir die linke Navigation an - Plugin-spezifische Einstellungen findest du unter dem jeweiligen Plugin-Namen in den Untermenüs.
+          <strong><%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_TIP') %>:</strong> <%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_TIP_TEXT') %>
         </div>
       </div>
     </div>
@@ -149,7 +149,7 @@
     <div class="card">
       <div class="card-header bg-light">
         <h5 class="mb-0">
-          <i class="fa-solid fa-server me-2"></i>System-Status
+          <i class="fa-solid fa-server me-2"></i><%= tr('core:SETTINGS_OVERVIEW.SYSTEM_STATUS_TITLE') %>
         </h5>
       </div>
       <div class="card-body">
@@ -157,28 +157,28 @@
           <div class="col-md-3">
             <div class="border-end">
               <i class="fa-solid fa-circle-check text-success fs-2 mb-2"></i>
-              <h6 class="text-muted small mb-0">Bot-Status</h6>
-              <p class="fw-bold mb-0">Online</p>
+              <h6 class="text-muted small mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_BOT') %></h6>
+              <p class="fw-bold mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_BOT_ONLINE') %></p>
             </div>
           </div>
           <div class="col-md-3">
             <div class="border-end">
               <i class="fa-solid fa-database text-primary fs-2 mb-2"></i>
-              <h6 class="text-muted small mb-0">Datenbank</h6>
-              <p class="fw-bold mb-0">Verbunden</p>
+              <h6 class="text-muted small mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_DATABASE') %></h6>
+              <p class="fw-bold mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_DATABASE_CONNECTED') %></p>
             </div>
           </div>
           <div class="col-md-3">
             <div class="border-end">
               <i class="fa-solid fa-puzzle-piece text-info fs-2 mb-2"></i>
-              <h6 class="text-muted small mb-0">Plugins</h6>
-              <p class="fw-bold mb-0"><%= enabledPlugins?.length || 0 %> Aktiv</p>
+              <h6 class="text-muted small mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_PLUGINS') %></h6>
+              <p class="fw-bold mb-0"><%= enabledPlugins?.length || 0 %> <%= tr('core:SETTINGS_OVERVIEW.STATUS_PLUGINS_ACTIVE') %></p>
             </div>
           </div>
           <div class="col-md-3">
             <i class="fa-solid fa-bolt text-warning fs-2 mb-2"></i>
-            <h6 class="text-muted small mb-0">Performance</h6>
-            <p class="fw-bold mb-0">Stabil</p>
+            <h6 class="text-muted small mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_PERFORMANCE') %></h6>
+            <p class="fw-bold mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_PERFORMANCE_STABLE') %></p>
           </div>
         </div>
       </div>

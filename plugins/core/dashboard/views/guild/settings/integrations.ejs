@@ -3,14 +3,14 @@
   <div class="card-header">
     <h3 class="card-title">
       <i class="fa-solid fa-plug me-2"></i>
-      Integrationen
+      <%= tr('core:INTEGRATIONS.TITLE') %>
     </h3>
   </div>
   <div class="card-body">
     
     <div class="alert alert-info mb-4">
       <i class="fa-solid fa-info-circle me-2"></i>
-      <strong>Hinweis:</strong> Verbinde DuneBot mit externen Services und APIs.
+      <strong><%= tr('core:USERS.NOTICE_TITLE') %></strong> <%= tr('core:INTEGRATIONS.NOTICE_TEXT') %>
     </div>
 
     <!-- Verfügbare Integrationen -->
@@ -25,19 +25,19 @@
                 <i class="fa-solid fa-webhook fa-2x text-primary"></i>
               </div>
               <div class="flex-grow-1 ms-3">
-                <h5 class="card-title mb-0">Webhooks</h5>
-                <small class="text-muted">Empfange externe Events</small>
+                <h5 class="card-title mb-0"><%= tr('core:INTEGRATIONS.WEBHOOK_TITLE') %></h5>
+                <small class="text-muted"><%= tr('core:INTEGRATIONS.WEBHOOK_SUBTITLE') %></small>
               </div>
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="webhookEnabled" disabled>
               </div>
             </div>
             <p class="card-text text-muted small">
-              Konfiguriere Webhooks um externe Events in deinem Server zu empfangen.
+              <%= tr('core:INTEGRATIONS.WEBHOOK_DESC') %>
             </p>
             <button class="btn btn-sm btn-outline-secondary" disabled>
               <i class="fa-solid fa-gear me-1"></i>
-              Konfigurieren
+              <%= tr('core:INTEGRATIONS.BTN_CONFIGURE') %>
             </button>
           </div>
         </div>
@@ -52,19 +52,19 @@
                 <i class="fa-brands fa-twitch fa-2x" style="color: #9146FF;"></i>
               </div>
               <div class="flex-grow-1 ms-3">
-                <h5 class="card-title mb-0">Twitch</h5>
-                <small class="text-muted">Stream-Benachrichtigungen</small>
+                <h5 class="card-title mb-0"><%= tr('core:INTEGRATIONS.TWITCH_TITLE') %></h5>
+                <small class="text-muted"><%= tr('core:INTEGRATIONS.TWITCH_SUBTITLE') %></small>
               </div>
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="twitchEnabled" disabled>
               </div>
             </div>
             <p class="card-text text-muted small">
-              Erhalte Benachrichtigungen wenn deine Streamer live gehen.
+              <%= tr('core:INTEGRATIONS.TWITCH_DESC') %>
             </p>
             <button class="btn btn-sm btn-outline-secondary" disabled>
               <i class="fa-solid fa-gear me-1"></i>
-              Konfigurieren
+              <%= tr('core:INTEGRATIONS.BTN_CONFIGURE') %>
             </button>
           </div>
         </div>
@@ -79,19 +79,19 @@
                 <i class="fa-brands fa-youtube fa-2x text-danger"></i>
               </div>
               <div class="flex-grow-1 ms-3">
-                <h5 class="card-title mb-0">YouTube</h5>
-                <small class="text-muted">Video-Benachrichtigungen</small>
+                <h5 class="card-title mb-0"><%= tr('core:INTEGRATIONS.YOUTUBE_TITLE') %></h5>
+                <small class="text-muted"><%= tr('core:INTEGRATIONS.YOUTUBE_SUBTITLE') %></small>
               </div>
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="youtubeEnabled" disabled>
               </div>
             </div>
             <p class="card-text text-muted small">
-              Benachrichtigungen bei neuen Videos deiner Lieblings-YouTuber.
+              <%= tr('core:INTEGRATIONS.YOUTUBE_DESC') %>
             </p>
             <button class="btn btn-sm btn-outline-secondary" disabled>
               <i class="fa-solid fa-gear me-1"></i>
-              Konfigurieren
+              <%= tr('core:INTEGRATIONS.BTN_CONFIGURE') %>
             </button>
           </div>
         </div>
@@ -106,19 +106,19 @@
                 <i class="fa-solid fa-code fa-2x text-success"></i>
               </div>
               <div class="flex-grow-1 ms-3">
-                <h5 class="card-title mb-0">Custom API</h5>
-                <small class="text-muted">Eigene API-Integration</small>
+                <h5 class="card-title mb-0"><%= tr('core:INTEGRATIONS.CUSTOM_API_TITLE') %></h5>
+                <small class="text-muted"><%= tr('core:INTEGRATIONS.CUSTOM_API_SUBTITLE') %></small>
               </div>
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="customApiEnabled" disabled>
               </div>
             </div>
             <p class="card-text text-muted small">
-              Verbinde den Bot mit deiner eigenen API oder externen Services.
+              <%= tr('core:INTEGRATIONS.CUSTOM_API_DESC') %>
             </p>
             <button class="btn btn-sm btn-outline-secondary" disabled>
               <i class="fa-solid fa-gear me-1"></i>
-              Konfigurieren
+              <%= tr('core:INTEGRATIONS.BTN_CONFIGURE') %>
             </button>
           </div>
         </div>
@@ -129,7 +129,7 @@
     <!-- Info Box -->
     <div class="alert alert-warning mt-4">
       <i class="fa-solid fa-triangle-exclamation me-2"></i>
-      <strong>In Entwicklung:</strong> Diese Features werden in zukünftigen Updates verfügbar sein.
+      <strong><%= tr('core:INTEGRATIONS.DEV_WARNING') %></strong> <%= tr('core:INTEGRATIONS.DEV_WARNING_TEXT') %>
     </div>
 
   </div>

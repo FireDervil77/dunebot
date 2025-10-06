@@ -3,15 +3,14 @@
   <div class="card-header">
     <h3 class="card-title">
       <i class="fa-solid fa-users me-2"></i>
-      Benutzer-Verwaltung
+      <%= tr('core:USERS.TITLE') %>
     </h3>
   </div>
   <div class="card-body">
     
     <div class="alert alert-info">
       <i class="fa-solid fa-info-circle me-2"></i>
-      <strong>Hinweis:</strong> Diese Seite befindet sich noch in Entwicklung. 
-      Hier werden zukünftig Benutzerrechte, Rollen und Permissions verwaltet.
+      <strong><%= tr('core:USERS.NOTICE_TITLE') %></strong> <%= tr('core:USERS.NOTICE_TEXT') %>
     </div>
 
     <!-- Benutzer-Tabelle (Platzhalter) -->
@@ -19,17 +18,17 @@
       <table class="table table-hover">
         <thead>
           <tr>
-            <th><i class="fa-solid fa-user me-1"></i> Benutzer</th>
-            <th><i class="fa-solid fa-shield me-1"></i> Rolle</th>
-            <th><i class="fa-solid fa-calendar me-1"></i> Beigetreten</th>
-            <th><i class="fa-solid fa-gear me-1"></i> Aktionen</th>
+            <th><i class="fa-solid fa-user me-1"></i> <%= tr('core:USERS.TABLE_USER') %></th>
+            <th><i class="fa-solid fa-shield me-1"></i> <%= tr('core:USERS.TABLE_ROLE') %></th>
+            <th><i class="fa-solid fa-calendar me-1"></i> <%= tr('core:USERS.TABLE_JOINED') %></th>
+            <th><i class="fa-solid fa-gear me-1"></i> <%= tr('core:USERS.TABLE_ACTIONS') %></th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td colspan="4" class="text-center text-muted py-4">
               <i class="fa-solid fa-users fa-3x mb-3 d-block opacity-25"></i>
-              Keine Benutzer-Daten verfügbar
+              <%= tr('core:USERS.TABLE_EMPTY') %>
             </td>
           </tr>
         </tbody>
@@ -43,14 +42,14 @@
           <div class="card-body">
             <h5 class="card-title">
               <i class="fa-solid fa-user-shield me-2"></i>
-              Rollen & Berechtigungen
+              <%= tr('core:USERS.ROLES_TITLE') %>
             </h5>
             <p class="card-text text-muted">
-              Verwalte Discord-Rollen und deren Berechtigungen für Bot-Befehle.
+              <%= tr('core:USERS.ROLES_DESC') %>
             </p>
             <button class="btn btn-secondary btn-sm" disabled>
               <i class="fa-solid fa-lock me-1"></i>
-              Bald verfügbar
+              <%= tr('core:USERS.COMING_SOON') %>
             </button>
           </div>
         </div>
@@ -61,14 +60,14 @@
           <div class="card-body">
             <h5 class="card-title">
               <i class="fa-solid fa-ban me-2"></i>
-              Gesperrte Benutzer
+              <%= tr('core:USERS.BANNED_TITLE') %>
             </h5>
             <p class="card-text text-muted">
-              Verwalte Benutzer, die vom Bot gesperrt wurden.
+              <%= tr('core:USERS.BANNED_DESC') %>
             </p>
             <button class="btn btn-secondary btn-sm" disabled>
               <i class="fa-solid fa-lock me-1"></i>
-              Bald verfügbar
+              <%= tr('core:USERS.COMING_SOON') %>
             </button>
           </div>
         </div>

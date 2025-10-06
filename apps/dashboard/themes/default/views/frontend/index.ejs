@@ -35,12 +35,12 @@
             <!-- Slide 2: Plugin-System -->
             <div class="carousel-item">
               <div class="text-center">
-                <h2>Ultraflexibles Plugin-System</h2>
-                <p>Erweitere deinen Bot mit Plugins nach WordPress-Vorbild.</p>
-                <p>Dashboard & Bot-Commands in einem System – vollständig modular!</p>
-                <a href="/guild" class="btn-hero btn-get-started">Plugins entdecken</a> 
+                <h2><%= tr('LANDING.HERO_SLIDE2_TITLE') %></h2>
+                <p><%= tr('LANDING.HERO_SLIDE2_DESC') %></p>
+                <p><%= tr('LANDING.HERO_SLIDE2_DESC2') %></p>
+                <a href="/guild" class="btn-hero btn-get-started"><%= tr('LANDING.HERO_SLIDE2_BTN1') %></a> 
                 <a href="<%= coreConfig.githubUrl %>" class="btn-hero btn-get-github" target="_blank">
-                  <i class="fa-brands fa-code"></i> Developer Docs
+                  <i class="fa-brands fa-code"></i> <%= tr('LANDING.HERO_SLIDE2_BTN2') %>
                 </a>
               </div>
             </div>
@@ -48,12 +48,12 @@
             <!-- Slide 3: Community Features -->
             <div class="carousel-item">
               <div class="text-center">
-                <h2>Perfekt für deine Community</h2>
-                <p>Moderation, Leveling, Custom Commands & mehr.</p>
-                <p>Alles aus einem Dashboard – kein Chaos mit mehreren Bots!</p>
-                <a href="/guild" class="btn-hero btn-get-started">Jetzt starten</a> 
+                <h2><%= tr('LANDING.HERO_SLIDE3_TITLE') %></h2>
+                <p><%= tr('LANDING.HERO_SLIDE3_DESC') %></p>
+                <p><%= tr('LANDING.HERO_SLIDE3_DESC2') %></p>
+                <a href="/guild" class="btn-hero btn-get-started"><%= tr('LANDING.HERO_SLIDE3_BTN1') %></a> 
                 <a href="/documentation" class="btn-hero btn-get-github">
-                  <i class="fa-solid fa-book"></i> Dokumentation
+                  <i class="fa-solid fa-book"></i> <%= tr('LANDING.HERO_SLIDE3_BTN2') %>
                 </a>
               </div>
             </div>
@@ -63,11 +63,11 @@
           <!-- Carousel Controls (Arrows) -->
           <a class="carousel-control-prev" href="#heroCarousel" role="button" data-slide="prev">
             <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-            <span class="visually-hidden">Zurück</span>
+            <span class="visually-hidden"><%= tr('LANDING.CAROUSEL_PREV') %></span>
           </a>
           <a class="carousel-control-next" href="#heroCarousel" role="button" data-slide="next">
             <span class="carousel-control-next-icon" aria-hidden="true"></span>
-            <span class="visually-hidden">Weiter</span>
+            <span class="visually-hidden"><%= tr('LANDING.CAROUSEL_NEXT') %></span>
           </a>
 
         </div>
@@ -197,7 +197,7 @@
             <div class="news-meta d-flex align-items-center">
               <div class="d-flex align-items-center">
                 <i class="bi bi-calendar me-1"></i>
-                <span><%= news.date %></span>
+                <span><%= news.formattedDate %></span>
               </div>
               <div class="d-flex align-items-center ms-3">
                 <i class="bi bi-person me-1"></i>

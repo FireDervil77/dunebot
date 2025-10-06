@@ -11,6 +11,7 @@ const fs = require('fs');
 
 const { DashboardPlugin } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
+const { getLocalizedNews, getLocalizedNewsList, prepareNewsForDB } = require('../../../apps/dashboard/helpers/newsHelper');
 
 class SuperAdminDashboardPlugin extends DashboardPlugin {
     constructor(app) {
@@ -193,17 +194,29 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             this.guildRouter.get('/news/edit/:id', async (req, res) => {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
+                const userLocale = req.session.locale || res.locals.locale || 'de-DE';
 
-                const [news] = await dbService.query(`
+                const rawNews = await dbService.query(`
                     SELECT * FROM news WHERE _id = ?
                 `, [req.params.id]);
 
-                if (!news) {
+                if (!rawNews || rawNews.length === 0) {
                     return res.status(404).render('error', {
                         message: 'News-Eintrag nicht gefunden',
                         error: { status: 404 }
                     });
                 }
+
+                // News mit allen Übersetzungen für das Edit-Formular bereitstellen
+                const news = rawNews[0];
+                
+                // Parse JSON-Felder für das Formular
+                news.title_de = JSON.parse(news.title_translations)['de-DE'] || '';
+                news.title_en = JSON.parse(news.title_translations)['en-GB'] || '';
+                news.content_de = JSON.parse(news.content_translations)['de-DE'] || '';
+                news.content_en = JSON.parse(news.content_translations)['en-GB'] || '';
+                news.excerpt_de = JSON.parse(news.excerpt_translations)['de-DE'] || '';
+                news.excerpt_en = JSON.parse(news.excerpt_translations)['en-GB'] || '';
 
                 await themeManager.renderView(res, 'guild/news-edit', {
                     title: 'News bearbeiten',
@@ -218,13 +231,22 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             this.guildRouter.get('/news', async (req, res) => {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
+                const userLocale = req.session.locale || res.locals.locale || 'de-DE';
 
-                const newsList = await dbService.query(`
-                    SELECT _id, title, slug, author, excerpt, 
-                           status, date, created_at, updated_at
-                    FROM news 
+                const rawNewsList = await dbService.query(`
+                    SELECT * FROM news 
                     ORDER BY date DESC
                 `);
+
+                // News lokalisieren für die Liste
+                const newsList = getLocalizedNewsList(rawNewsList, userLocale).map(news => ({
+                    ...news,
+                    formattedDate: new Date(news.date).toLocaleString(userLocale, {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    })
+                }));
 
                 await themeManager.renderView(res, 'guild/news', {
                     title: 'News Verwaltung',
@@ -236,28 +258,86 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             });
 
             // News speichern (POST)
+            // News speichern (POST) - Multi-Language Support
             this.guildRouter.post('/news/save', async (req, res) => {
                 const dbService = ServiceManager.get('dbService');
-                const { newsId, title, slug, author, excerpt, news_text, image_url, status, date } = req.body;
+                const Logger = ServiceManager.get('Logger');
+                const {
+                    newsId,
+                    title_de, title_en,
+                    excerpt_de, excerpt_en,
+                    content_de, content_en,
+                    slug, author, image_url, status, date
+                } = req.body;
 
                 try {
+                    // Übersetzungen als JSON vorbereiten
+                    const translations = {
+                        title: {
+                            'de-DE': title_de || '',
+                            'en-GB': title_en || ''
+                        },
+                        content: {
+                            'de-DE': content_de || '',
+                            'en-GB': content_en || ''
+                        },
+                        excerpt: {
+                            'de-DE': excerpt_de || '',
+                            'en-GB': excerpt_en || ''
+                        }
+                    };
+
+                    // Metadata
+                    const metadata = {
+                        slug,
+                        author,
+                        image_url,
+                        status,
+                        date
+                    };
+
+                    // prepareNewsForDB nutzen
+                    const newsData = prepareNewsForDB(translations, metadata);
+
                     if (newsId) {
                         // Update existierender News-Eintrag
                         await dbService.query(`
                             UPDATE news 
-                            SET title = ?, slug = ?, author = ?, excerpt = ?,
-                                news_text = ?, image_url = ?, status = ?, date = ?,
-                                updated_at = NOW()
+                            SET title_translations = ?,
+                                content_translations = ?,
+                                excerpt_translations = ?,
+                                slug = ?, author = ?, image_url = ?, 
+                                status = ?, date = ?, updated_at = NOW()
                             WHERE _id = ?
-                        `, [title, slug, author, excerpt, news_text, image_url, status, date, newsId]);
+                        `, [
+                            newsData.title_translations,
+                            newsData.content_translations,
+                            newsData.excerpt_translations,
+                            newsData.slug,
+                            newsData.author,
+                            newsData.image_url,
+                            newsData.status,
+                            newsData.date,
+                            newsId
+                        ]);
                         res.json({ success: true, message: 'News erfolgreich aktualisiert' });
                     } else {
                         // Neuer News-Eintrag
                         await dbService.query(`
                             INSERT INTO news 
-                            (title, slug, author, excerpt, news_text, image_url, status, date, created_at, updated_at)
+                            (title_translations, content_translations, excerpt_translations,
+                             slug, author, image_url, status, date, created_at, updated_at)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-                        `, [title, slug, author, excerpt, news_text, image_url, status, date]);
+                        `, [
+                            newsData.title_translations,
+                            newsData.content_translations,
+                            newsData.excerpt_translations,
+                            newsData.slug,
+                            newsData.author,
+                            newsData.image_url,
+                            newsData.status,
+                            newsData.date
+                        ]);
                         res.json({ success: true, message: 'News erfolgreich erstellt' });
                     }
                 } catch (error) {
@@ -565,7 +645,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             const pluginConfigs = await dbService.query(`
                 SELECT guild_id, config_value 
                 FROM configs 
-                WHERE config_key = 'ENABLED_PLUGINS' AND scope = 'shared' AND namespace = 'core'
+                WHERE config_key = 'ENABLED_PLUGINS'
             `);
             
             // Zähle Plugin-Aktivierungen

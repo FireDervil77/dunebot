@@ -3,20 +3,20 @@
 <div class="d-flex justify-content-between mb-2">
   <div class="text-center">
     <h4><%= stats?.cacheStats?.members?.total || '0' %></h4>
-    <small class="text-muted">Mitglieder</small>
+    <small class="text-muted"><%= tr('core:WIDGETS.SERVER_ANALYSIS.MEMBERS') %></small>
   </div>
   <div class="text-center">
     <h4><%= stats?.cacheStats?.channels || '0' %></h4>
-    <small class="text-muted">Kanäle</small>
+    <small class="text-muted"><%= tr('core:WIDGETS.SERVER_ANALYSIS.CHANNELS') %></small>
   </div>
   <div class="text-center">
     <h4><%= stats?.cacheStats?.roles || '0' %></h4>
-    <small class="text-muted">Rollen</small>
+    <small class="text-muted"><%= tr('core:WIDGETS.SERVER_ANALYSIS.ROLES') %></small>
   </div>
 </div>
 
 <!-- Cache-Effektivität - Korrigiert -->
-<h6 class="mt-4">Cache-Effektivität</h6>
+<h6 class="mt-4"><%= tr('core:WIDGETS.SERVER_ANALYSIS.CACHE_EFFICIENCY') %></h6>
 <div class="progress" style="height: 20px;">
   <% 
   // Sicherer Cache-Ratio-Berechnungsausdruck
@@ -30,12 +30,12 @@
     <%= cacheRatio %>%
   </div>
 </div>
-<small class="text-muted">Mitglieder im Cache: 
+<small class="text-muted"><%= tr('core:WIDGETS.SERVER_ANALYSIS.CACHED_MEMBERS') %> 
   <%= stats?.cacheStats?.members?.cached || '0' %>/<%= stats?.cacheStats?.members?.total || '0' %>
 </small>
 
 <!-- Server-Alter -->
-<h6 class="mt-3">Server-Alter</h6>
+<h6 class="mt-3"><%= tr('core:WIDGETS.SERVER_ANALYSIS.SERVER_AGE') %></h6>
 <% if (stats?.guild?.createdAt) { 
     const createdDate = new Date(stats.guild.createdAt);
     const now = new Date();
@@ -43,20 +43,20 @@
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 %>
   <p><i class="bi bi-calendar3 me-1"></i> <%= createdDate.toLocaleDateString() %> 
-    <span class="badge bg-secondary ms-2"><%= diffDays %> Tage</span>
+    <span class="badge bg-secondary ms-2"><%= diffDays %> <%= tr('core:WIDGETS.SERVER_ANALYSIS.DAYS') %></span>
   </p>
 <% } else { %>
-  <p>Keine Daten verfügbar</p>
+  <p><%= tr('core:WIDGETS.SERVER_ANALYSIS.NO_DATA') %></p>
 <% } %>
 
 <!-- Premium-Status -->
 <% if (stats?.guild?.premiumTier) { %>
-  <h6 class="mt-3">Premium-Status</h6>
+  <h6 class="mt-3"><%= tr('core:WIDGETS.SERVER_ANALYSIS.PREMIUM_STATUS') %></h6>
   <div class="d-flex align-items-center">
     <% for(let i = 0; i < stats.guild.premiumTier; i++) { %>
       <i class="bi bi-stars text-warning me-1"></i>
     <% } %>
-    <span class="ms-2">Level <%= stats.guild.premiumTier %></span>
-    <span class="badge bg-primary ms-2"><%= stats.guild.premiumSubscriptionCount || 0 %> Boosts</span>
+    <span class="ms-2"><%= tr('core:WIDGETS.SERVER_ANALYSIS.LEVEL') %> <%= stats.guild.premiumTier %></span>
+    <span class="badge bg-primary ms-2"><%= stats.guild.premiumSubscriptionCount || 0 %> <%= tr('core:WIDGETS.SERVER_ANALYSIS.BOOSTS') %></span>
   </div>
 <% } %>

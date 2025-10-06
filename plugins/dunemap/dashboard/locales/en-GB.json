@@ -1,3 +1,177 @@
 {
+  "DASHBOARD": {
+    "WELCOME_TITLE": "Welcome to DuneMap!",
+    "WELCOME_TEXT": "Manage your sector markers (A1-I9), set resource positions and share them with your server. Use <code>/map set [Sector] [Type]</code> to place markers!",
     
+    "STATS": {
+      "MARKERS_SET": "Markers Placed",
+      "AVAILABLE_SECTORS": "Available Sectors",
+      "MARKER_TYPES": "Marker Types",
+      "STORM_TIMER_ACTIVE": "Storm Timer Active"
+    },
+    
+    "PLUGIN_SETTINGS": {
+      "TITLE": "Plugin Settings",
+      "DESCRIPTION": "Configure DuneMap to your preferences: Storm timer, timezone, map channel and more.",
+      "AVAILABLE_SETTINGS": "Available Settings:",
+      "STORM_FORMAT": "Storm Timer Format & Duration",
+      "TIMEZONE": "Timezone for Calculations",
+      "AUTO_RECALC": "Automatic Timer Recalculation",
+      "CHANNEL": "Discord Map Channel ID",
+      "BUTTON": "Go to Settings",
+      "INFO": "Settings can be found in the bot configuration under \"DuneMap\""
+    },
+    
+    "COMMANDS": {
+      "TITLE": "Available Commands",
+      "DESCRIPTION": "Use these Discord commands to interact with the map:",
+      "MAP_COMMANDS": "Map Commands:",
+      "MAP_SHOW": "Show all server markers",
+      "MAP_SET": "Place marker in sector A5 of type \"titan\"",
+      "MAP_REMOVE": "Remove marker from sector A5 (Admin)",
+      "STORM_TIMER": "Storm Timer:",
+      "STORM_SET": "Set storm timer to 05:12:30",
+      "STORM_RESET": "Reset storm timer",
+      "TUTORIAL": "Tutorial",
+      "TUTORIAL_DESC": "Display interactive tutorial"
+    },
+    
+    "RECENT_MARKERS": {
+      "TITLE": "Recent Markers",
+      "SECTOR": "Sector",
+      "TYPE": "Type",
+      "PLACED_BY": "Placed By",
+      "DATE": "Date"
+    },
+    
+    "EMPTY_STATE": {
+      "TITLE": "No Markers Yet",
+      "DESCRIPTION": "Your server hasn't placed any markers yet. Start by setting markers in Discord with the <code>/map set</code> command!",
+      "EXAMPLES_TITLE": "Examples:",
+      "EXAMPLE_1": "/map set A5 titan",
+      "EXAMPLE_2": "/map set C3 spice",
+      "EXAMPLE_3": "/map set I9 base"
+    },
+    
+    "MARKER_TYPES": {
+      "TITLE": "Available Marker Types",
+      "RESOURCES": "Resources",
+      "NO_RESOURCES": "No resources available",
+      "TACTICAL": "Tactical",
+      "OTHER": "Other",
+      "ERROR": "Marker type data could not be loaded"
+    }
+  },
+  
+  "SETTINGS": {
+    "PAGE_TITLE": "DuneMap Settings",
+    "STORM_FORMAT": {
+      "LABEL": "Storm Timer Format",
+      "24H": "24-Hour Format (HH:mm:ss)",
+      "12H": "12-Hour Format (hh:mm:ss AM/PM)",
+      "SHORT": "Short Format (HH:mm)",
+      "HELP": "Display format for the storm timer in Discord messages"
+    },
+    "TIMEZONE": {
+      "LABEL": "Timezone",
+      "HELP": "Timezone for all time calculations and displays"
+    },
+    "AUTO_RECALC": {
+      "LABEL": "Automatic Timer Recalculation",
+      "HELP": "Automatically recalculates the storm timer after each cycle"
+    },
+    "DURATION": {
+      "LABEL": "Storm Timer Duration",
+      "5_DAYS": "5 Days (Standard)",
+      "6_DAYS": "6 Days",
+      "7_DAYS": "7 Days (1 Week)",
+      "3_DAYS": "3 Days (Accelerated)",
+      "1_DAY": "1 Day (Test)",
+      "HELP": "Duration of a complete storm cycle"
+    },
+    "CHANNEL": {
+      "LABEL": "Map Channel",
+      "NO_SELECTION": "No channel selected",
+      "HELP": "Discord channel where the map is displayed and updated",
+      "CURRENT": "Current:",
+      "PLACEHOLDER": "123456789012345678",
+      "ERROR": "Channel list could not be loaded. Please enter the Channel ID manually."
+    },
+    "SAVE_BUTTON": "Save Settings",
+    "HELP": {
+      "TITLE": "Help",
+      "STORM_TITLE": "Storm Timer",
+      "STORM_TEXT": "The storm timer tracks the Dune storm cycle. It can be displayed in different formats and timezones.",
+      "AUTO_TITLE": "Auto-Recalculation",
+      "AUTO_TEXT": "When enabled, the timer automatically starts a new cycle after the storm ends.",
+      "CHANNEL_TITLE": "Map Channel",
+      "CHANNEL_TEXT": "The channel where the DuneMap is posted and automatically updated with new markers.",
+      "SECTORS_TITLE": "Sectors",
+      "SECTORS_TEXT": "The map consists of 81 sectors (A1-I9). <strong>Rows A-E</strong> are PvE zones, <strong>Rows F-I</strong> are PvP zones."
+    },
+    "CURRENT_CONFIG": {
+      "TITLE": "Current Configuration",
+      "FORMAT": "Format",
+      "TIMEZONE": "Timezone",
+      "AUTO_RECALC": "Auto",
+      "DURATION": "Duration",
+      "CHANNEL": "Channel",
+      "ON": "On",
+      "OFF": "Off",
+      "NOT_SET": "Not set"
+    }
+  },
+  
+  "API": {
+    "MARKER_ADDED": "Marker added!",
+    "MARKER_REMOVED": "Marker removed!",
+    "MARKER_TYPE_REMOVED": "Marker {{type}} removed!",
+    "MISSING_REMOVE_PARAMS": "Missing parameters: markerId OR (sectorX, sectorY, markerType) required",
+    "INVALID_ACTION": "Invalid action (only add/remove allowed)",
+    "ERROR_MARKER_OPERATION": "Error during marker operation"
+  },
+  "ADMIN": {
+    "TITLE": "Interactive Sector Map",
+    "DESCRIPTION": "Click on a sector (A1-I9) to place or remove markers.",
+    "MAX_MARKERS": "Maximum 4 markers per sector!",
+    "GRID_TITLE": "Dune Sector Grid (A1 - I9)",
+    "LEGEND_TITLE": "Legend:",
+    "PVE_ZONE": "PvE Zone (Rows A-E, all columns)",
+    "PVP_ZONE": "PvP Zone (Rows F-I, all columns)",
+    "EDITOR": {
+      "TITLE": "Sector",
+      "CURRENT_MARKERS": "Existing Markers:",
+      "NO_MARKERS": "No markers",
+      "ADD_MARKER": "Add Marker:",
+      "SELECT_TYPE": "-- Select Type --",
+      "RESOURCES": "Resources",
+      "OTHER": "Other",
+      "STRUCTURES": "Structures",
+      "UTILITIES": "Utilities",
+      "BTN_ADD": "Add Marker",
+      "BTN_CLOSE": "Close"
+    },
+    "STATS": {
+      "TITLE": "Statistics",
+      "TOTAL_MARKERS": "Total Markers:",
+      "OCCUPIED_SECTORS": "Occupied Sectors:",
+      "AVAILABLE": "Available:"
+    },
+    "MARKER_TYPES": {
+      "TITAN": "Titan",
+      "SPICE": "Spice",
+      "STRAVIDIUM": "Stravidium",
+      "ALUMINIUM": "Aluminium",
+      "EISEN": "Iron",
+      "BASALT": "Basalt",
+      "KARBON": "Carbon",
+      "HOELE": "Cave",
+      "HOLE": "Hole",
+      "BASE": "Base",
+      "WRACK": "Wreck",
+      "KONTROLLPUNKT": "Control Point",
+      "TAXI": "Taxi",
+      "TEST": "Test"
+    }
+  }
 }

@@ -2,17 +2,17 @@
 <% if (locals.title) { %>
     <title><%= locals.title %></title>
 <% } else { %>
-    <title><%= tr('DASHBOARD.BOTNAME') %> - Admin Area</title>
+    <title><%= tr('DASHBOARD.BOTNAME') %> - <%= tr('DASHBOARD_COMMON.ADMIN_AREA') %></title>
 <% } %>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
 
 <% if (locals.title) { %>
    <meta name="title" content="<%= locals.title %>" />
 <% } else { %>
-    <meta name="title" content="<%= tr('DASHBOARD.BOTNAME') %> - Admin Area" />
+    <meta name="title" content="<%= tr('DASHBOARD.BOTNAME') %> - <%= tr('DASHBOARD_COMMON.ADMIN_AREA') %>" />
 <% } %>
 <meta name="author" content="FireDervil" />
-<meta name="description" content="DuneBot is very scalable Discord Bot Plattform in Javascript with a Dashboard."/>
+<meta name="description" content="<%= tr('DASHBOARD_COMMON.DESCRIPTION_META') %>"/>
 <meta name="keywords" content="TODO:KEYWORDS"/>
 <link rel="canonical" href="{{ .Permalink }}" />
 

@@ -1,0 +1,84 @@
+<script>
+/**
+ * Sprachumschalter für Frontend
+ * Sendet POST-Request an /api/language und lädt Seite neu
+ * @author firedervil
+ */
+(function() {
+    'use strict';
+    
+    // Alle Sprachlink-Buttons finden
+    const langLinks = document.querySelectorAll('.lang-switch-link');
+    
+    langLinks.forEach(link => {
+        link.addEventListener('click', async function(e) {
+            e.preventDefault();
+            
+            const newLang = this.dataset.lang;
+            const currentLang = '<%= locals.locale || "de-DE" %>';
+            
+            // Wenn bereits die aktuelle Sprache, nichts tun
+            if (newLang === currentLang) {
+                return;
+            }
+            
+            try {
+                // Visuelles Feedback
+                const icon = this.querySelector('i') || this;
+                const originalHTML = this.innerHTML;
+                this.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Laden...';
+                
+                // API-Request - Frontend-Route ohne Auth
+                const response = await fetch('/language/guest', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        language_code: newLang
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Sprache wurde erfolgreich geändert - Seite neu laden
+                    window.location.reload();
+                } else {
+                    // Fehler anzeigen
+                    console.error('Sprachumschaltung fehlgeschlagen:', data.error);
+                    this.innerHTML = originalHTML;
+                    alert(data.error || 'Fehler beim Umschalten der Sprache');
+                }
+            } catch (error) {
+                console.error('Fehler beim Sprachumschalten:', error);
+                alert('Fehler beim Umschalten der Sprache. Bitte versuche es erneut.');
+            }
+        });
+    });
+    
+    // CSS für Spin-Animation
+    const style = document.createElement('style');
+    style.textContent = `
+        .lang-switch-link.active {
+            font-weight: bold;
+            color: #007bff !important;
+            background-color: rgba(0, 123, 255, 0.1);
+            pointer-events: none;
+        }
+        .lang-switch-link.active::before {
+            content: "✓ ";
+            color: #28a745;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spin {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+    `;
+    document.head.appendChild(style);
+})();
+</script>

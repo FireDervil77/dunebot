@@ -94,15 +94,14 @@ module.exports = async (req, res, next) => {
             }
         }
         
-        // WICHTIG: Session-Locale NUR außerhalb Guild-Kontext speichern!
-        // Im Guild-Kontext soll Guild-LOCALE bei jedem Request neu geladen werden
-        if (!isGuildContext) {
-            req.session.locale = finalLocale;
-            if (req.session.save) {
-                req.session.save((err) => {
-                    if (err) Logger.error("[i18n] Failed to save session", err);
-                });
-            }
+        // WICHTIG: Session-Locale IMMER aktualisieren, wenn finalLocale ermittelt wurde!
+        // Dies stellt sicher, dass die User-Locale auch im Guild-Kontext verfügbar ist
+        req.session.locale = finalLocale;
+        if (req.session.save && !isGuildContext) {
+            // Session nur außerhalb Guild-Kontext speichern (Performance)
+            req.session.save((err) => {
+                if (err) Logger.error("[i18n] Failed to save session", err);
+            });
         }
 
         // Normalisiere Sprachcode falls nötig
@@ -126,7 +125,9 @@ module.exports = async (req, res, next) => {
             try {
                 // Nutze i18next direkt mit aktueller Sprache
                 if (i18n && i18n.i18next) {
-                    const result = i18n.i18next.t(key, { ...options, lng: normalizedLocale });
+                    // WICHTIG: Hole aktuelle Sprache dynamisch statt gecachte zu verwenden
+                    const currentLang = i18n.i18next.language || normalizedLocale;
+                    const result = i18n.i18next.t(key, { ...options, lng: currentLang });
                     
                     // Wenn i18next den Key zurückgibt (nicht gefunden), versuche Fallback
                     if (result === key) {
@@ -201,6 +202,10 @@ module.exports = async (req, res, next) => {
                 return searchKey;
             }
         };
+        
+        // WICHTIG: Stelle translate-Funktion auch für Templates bereit
+        res.locals.tr = req.translate;
+        res.locals.locale = normalizedLocale;
 
         // =========================================
         // THEME-VARIABLEN SETZEN

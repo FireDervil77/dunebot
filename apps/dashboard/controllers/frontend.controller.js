@@ -6,14 +6,16 @@ const { ServiceManager } = require("dunebot-core");
  * @author firedervil
  */
 
+const { getLocalizedNewsList } = require('../helpers/newsHelper');
+
 /**
- * Landing Page anzeigen
- * @author firedervil
- * @param {import('express').Request} req - Express Request Objekt
- * @param {import('express').Response} res - Express Response Objekt
- * @returns {Promise<void>}
+ * Controller für Frontend-Routen
+ * Verarbeitet Anfragen für die öffentliche Website
+ * 
+ * @author FireDervil
  */
-exports.getIndex = async (req, res) => {
+
+module.exports.getIndex = async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const themeManager = ServiceManager.get('themeManager');
@@ -25,9 +27,13 @@ exports.getIndex = async (req, res) => {
         // News aus der Datenbank laden
         let newsList = [];
         try {
-            newsList = await dbService.query(
-                "SELECT * FROM news ORDER BY created_at DESC LIMIT 6"
+            const rawNews = await dbService.query(
+                "SELECT * FROM news WHERE status = 'published' ORDER BY created_at DESC LIMIT 6"
             );
+            
+            // News lokalisieren basierend auf User-Locale
+            const userLocale = req.session.locale || res.locals.locale || 'de-DE';
+            newsList = getLocalizedNewsList(rawNews, userLocale);
         } catch (err) {
             Logger.error("Fehler beim Laden der News:", err);
         }
@@ -37,7 +43,7 @@ exports.getIndex = async (req, res) => {
             // news ist bereits ein Plain-Objekt!
             return {
                 ...news,
-                date: news.date
+                formattedDate: news.date
                     ? new Date(news.date).toLocaleString(
                         req.session.locale || 'de-DE',
                         {
