@@ -366,6 +366,16 @@ module.exports = class App {
                 // Plugins für diese Guild aktivieren
                 for (const pluginName of enabledPlugins) {
                     if (pluginName === 'core') continue;
+                    
+                    // WICHTIG: Owner-only Plugins (wie superadmin) nur für Control-Guild aktivieren
+                    const pluginInfo = await pluginManager.getPluginInfo(pluginName);
+                    const controlGuildId = process.env.CONTROL_GUILD_ID;
+                    
+                    if (pluginInfo?.requiresOwner && String(guildId) !== String(controlGuildId)) {
+                        Logger.debug(`[PluginManager] Überspringe Owner-only Plugin ${pluginName} für Guild ${guildId} (nicht Control-Guild)`);
+                        continue;
+                    }
+                    
                     if (!activatedPlugins.has(pluginName)) {
                         try {
                             await pluginManager.enablePlugin(pluginName);
