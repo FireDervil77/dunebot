@@ -156,7 +156,7 @@
         
         const result = await response.json();
         if (result.success) {
-          showToast('success', result.message || 'Marker hinzugefügt!');
+          showToast('success', result.message || DATA?.i18n?.markerAdded || 'Marker added!');
           
           // Marker zur lokalen Liste hinzufügen (statt Reload)
           if (result.marker) {
@@ -179,17 +179,17 @@
             setTimeout(() => location.reload(), 500);
           }
         } else {
-          showToast('danger', result.message || 'Fehler beim Hinzufügen');
+          showToast('danger', result.message || DATA?.i18n?.errorAdd || 'Error adding marker');
         }
       } catch (error) {
         console.error('[DuneMap] Fehler:', error);
-        showToast('danger', 'Netzwerkfehler');
+        showToast('danger', DATA?.i18n?.networkError || 'Network error');
       }
     });
     
     // Marker entfernen (global für inline onclick)
     window.removeMarker = async function(markerId) {
-      const confirmMsg = DATA?.i18n?.confirmDelete || 'Marker wirklich entfernen?';
+      const confirmMsg = DATA?.i18n?.confirmDelete || 'Really remove this marker?';
       if (!confirm(confirmMsg)) return;
       
       try {
@@ -204,7 +204,7 @@
         
         const result = await response.json();
         if (result.success) {
-          const successMsg = DATA?.i18n?.success || 'Marker entfernt!';
+          const successMsg = DATA?.i18n?.markerRemoved || 'Marker removed!';
           showToast('success', result.message || successMsg);
           
           // Marker aus lokaler Liste entfernen (statt Reload)
@@ -233,12 +233,12 @@
             setTimeout(() => location.reload(), 500);
           }
         } else {
-          const errorMsg = DATA?.i18n?.error || 'Fehler beim Entfernen';
+          const errorMsg = DATA?.i18n?.errorRemove || 'Error removing marker';
           showToast('danger', result.message || errorMsg);
         }
       } catch (error) {
         console.error('[DuneMap] Fehler:', error);
-        showToast('danger', DATA?.i18n?.error || 'Netzwerkfehler');
+        showToast('danger', DATA?.i18n?.networkError || 'Network error');
       }
     };
     

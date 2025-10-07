@@ -185,6 +185,14 @@
       "KONTROLLPUNKT": "Kontrollpunkt",
       "TAXI": "Taxi",
       "TEST": "Test"
+    },
+    "JS": {
+      "MARKER_ADDED": "Marker hinzugefügt!",
+      "ERROR_ADD": "Fehler beim Hinzufügen",
+      "NETWORK_ERROR": "Netzwerkfehler",
+      "CONFIRM_DELETE": "Marker wirklich entfernen?",
+      "MARKER_REMOVED": "Marker entfernt!",
+      "ERROR_REMOVE": "Fehler beim Entfernen"
     }
   }
 }

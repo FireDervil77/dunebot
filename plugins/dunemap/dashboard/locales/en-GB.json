@@ -172,6 +172,14 @@
       "KONTROLLPUNKT": "Control Point",
       "TAXI": "Taxi",
       "TEST": "Test"
+    },
+    "JS": {
+      "MARKER_ADDED": "Marker added!",
+      "ERROR_ADD": "Error adding marker",
+      "NETWORK_ERROR": "Network error",
+      "CONFIRM_DELETE": "Really remove this marker?",
+      "MARKER_REMOVED": "Marker removed!",
+      "ERROR_REMOVE": "Error removing marker"
     }
   }
 }

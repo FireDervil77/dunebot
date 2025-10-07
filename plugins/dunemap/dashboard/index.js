@@ -419,10 +419,12 @@ class DuneMapPlugin extends DashboardPlugin {
                                 ajaxUrl: `/guild/${guildId}/plugins/dunemap/admin/marker`,
                                 nonce: req.session.csrfToken || '',  // Falls CSRF verwendet wird
                                 i18n: {
-                                    confirmDelete: 'Marker wirklich löschen?',
-                                    maxMarkersReached: 'Maximal 4 Marker pro Sektor!',
-                                    success: 'Erfolgreich gespeichert',
-                                    error: 'Fehler aufgetreten'
+                                    markerAdded: req.t('dunemap:ADMIN.JS.MARKER_ADDED'),
+                                    errorAdd: req.t('dunemap:ADMIN.JS.ERROR_ADD'),
+                                    networkError: req.t('dunemap:ADMIN.JS.NETWORK_ERROR'),
+                                    confirmDelete: req.t('dunemap:ADMIN.JS.CONFIRM_DELETE'),
+                                    markerRemoved: req.t('dunemap:ADMIN.JS.MARKER_REMOVED'),
+                                    errorRemove: req.t('dunemap:ADMIN.JS.ERROR_REMOVE')
                                 }
                             }
                         });
