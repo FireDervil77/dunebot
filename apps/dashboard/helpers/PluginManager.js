@@ -186,22 +186,8 @@ class PluginManager extends BasePluginManager {
             // Core ist immer aktiviert
             if (pluginName === "core") return true;
 
-            // Config aus der neuen Struktur laden
-            const configs = await dbService.getConfigs(guildId, "core", "shared");
-            
-            let enabledPlugins = ["core"]; // Core ist immer aktiviert
-            if (configs?.ENABLED_PLUGINS) {
-                try {
-                    // Parse ENABLED_PLUGINS wenn es ein String ist
-                    enabledPlugins = typeof configs.ENABLED_PLUGINS === 'string' 
-                        ? JSON.parse(configs.ENABLED_PLUGINS)
-                        : configs.ENABLED_PLUGINS;
-                } catch (parseError) {
-                    Logger.warn(`Fehler beim Parsen der aktivierten Plugins für Guild ${guildId}:`, parseError);
-                }
-            }
-
-            return enabledPlugins.includes(pluginName);
+            // NEUE METHODE: guild_plugins Tabelle nutzen
+            return await dbService.isPluginEnabledForGuild(guildId, pluginName);
 
         } catch (error) {
             Logger.error(`Fehler beim Prüfen des Plugin-Status für ${pluginName} in Guild ${guildId}:`, error);
@@ -564,9 +550,10 @@ class PluginManager extends BasePluginManager {
      * Plugin für eine bestimmte Guild aktivieren
      * @param {string} pluginName - Name des zu aktivierenden Plugins
      * @param {string} guildId - ID der Guild
+     * @param {Object} req - Express Request-Objekt (optional, für Audit Trail)
      * @returns {Promise<boolean>} Erfolg der Aktivierung
      */
-    async enableInGuild(pluginName, guildId) {
+    async enableInGuild(pluginName, guildId, req = null) {
         const Logger = ServiceManager.get("Logger");
         const themeManager = ServiceManager.get('themeManager'); 
         const dbService = ServiceManager.get('dbService');
@@ -634,26 +621,12 @@ class PluginManager extends BasePluginManager {
                 Logger.error(`Fehler beim Initialisieren der Plugin-Config für ${pluginName} in Guild ${guildId}:`, configError);
             }
 
-            // NEU: Aktiviere Plugin in ENABLED_PLUGINS
-            const coreConfigs = await dbService.getConfigs(guildId, "core", "shared");
-            let enabledPlugins = [];
-            if (coreConfigs && coreConfigs.ENABLED_PLUGINS) {
-                enabledPlugins = typeof coreConfigs.ENABLED_PLUGINS === "string"
-                    ? JSON.parse(coreConfigs.ENABLED_PLUGINS)
-                    : coreConfigs.ENABLED_PLUGINS;
-            }
+            // NEU: Plugin in guild_plugins Tabelle aktivieren
+            const userId = req?.session?.user?.info?.id || null;
+            const pluginVersion = plugin.version || null;
             
-            if (!enabledPlugins.includes(pluginName)) {
-                enabledPlugins.push(pluginName);
-                await dbService.setConfig(
-                    "core",
-                    "ENABLED_PLUGINS",
-                    JSON.stringify(enabledPlugins),
-                    "shared", 
-                    guildId,
-                    false
-                );
-            }
+            await dbService.enablePluginForGuild(guildId, pluginName, pluginVersion, userId);
+            Logger.debug(`Plugin ${pluginName} (v${pluginVersion}) in guild_plugins für Guild ${guildId} aktiviert (User: ${userId || 'System'})`);
 
             // Plugin-spezifische Guild-Aktivierung aufrufen
             await this.hooks.doAction('before_plugin_guild_enable_method', plugin, guildId);
@@ -684,9 +657,10 @@ class PluginManager extends BasePluginManager {
      * Plugin für eine bestimmte Guild deaktivieren
      * @param {string} pluginName - Name des zu deaktivierenden Plugins
      * @param {string} guildId - ID der Guild
+     * @param {Object} req - Express Request-Objekt (optional, für Audit Trail)
      * @returns {Promise<boolean>} Erfolg der Deaktivierung
      */
-    async disableInGuild(pluginName, guildId) {
+    async disableInGuild(pluginName, guildId, req = null) {
         const Logger = ServiceManager.get("Logger");
         const dbService = ServiceManager.get('dbService');
         const navigationManager = ServiceManager.get('navigationManager');
@@ -759,40 +733,12 @@ class PluginManager extends BasePluginManager {
 
             await this.hooks.doAction('before_update_guild_settings_disable', plugin, guildId);
 
-            // 4. Plugin aus ENABLED_PLUGINS entfernen
-            const settings = await dbService.getConfigs(guildId, "core", "shared");
-            let enabledPlugins;
-            try {
-                enabledPlugins = typeof settings.ENABLED_PLUGINS === 'string'
-                    ? JSON.parse(settings.ENABLED_PLUGINS)
-                    : (Array.isArray(settings.ENABLED_PLUGINS)
-                        ? settings.ENABLED_PLUGINS
-                        : ['core']);
-            } catch (e) {
-                enabledPlugins = ['core'];
-            }
+            // 4. Plugin in guild_plugins Tabelle deaktivieren (NEU!)
+            const userId = req?.session?.user?.info?.id || null;
+            await dbService.disablePluginForGuild(guildId, pluginName, userId);
+            Logger.debug(`Plugin ${pluginName} in guild_plugins für Guild ${guildId} deaktiviert (User: ${userId || 'System'})`);
 
-            if (enabledPlugins.includes(pluginName)) {
-                enabledPlugins = await this.hooks.applyFilter(
-                    'modify_guild_enabled_plugins',
-                    enabledPlugins.filter(p => p !== pluginName),
-                    pluginName,
-                    guildId,
-                    'remove'
-                );
-
-                // Core Config aktualisieren
-                await dbService.setConfig(
-                    "core",
-                    "ENABLED_PLUGINS",
-                    JSON.stringify(enabledPlugins),
-                    "shared",
-                    guildId,
-                    false
-                );
-
-                await this.hooks.doAction('after_update_guild_settings_disable', plugin, guildId, enabledPlugins);
-            }
+            await this.hooks.doAction('after_update_guild_settings_disable', plugin, guildId);
 
             // 5. Navigation entfernen - NEU: Nutze NavigationManager statt ThemeManager
             if (navigationManager) {

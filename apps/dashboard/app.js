@@ -340,28 +340,12 @@ module.exports = class App {
                 activatedPlugins.add(plugin.name);
             });
             
-            // Für jede Guild die aktivierten Plugins aus configs holen und aktivieren
+            // Für jede Guild die aktivierten Plugins aus guild_plugins holen (NEU!)
             for (const guild of allGuilds) {
                 const guildId = guild._id;
-                // Config für aktivierte Plugins holen
-                const enabledPluginsConfig = await dbService.getConfig(
-                    "core",
-                    "ENABLED_PLUGINS",
-                    "shared",
-                    guildId
-                );
-                let enabledPlugins = ['core'];
-                if (enabledPluginsConfig) {
-                    if (typeof enabledPluginsConfig === "string") {
-                        if (enabledPluginsConfig.startsWith("[")) {
-                            enabledPlugins = JSON.parse(enabledPluginsConfig);
-                        } else {
-                            enabledPlugins = enabledPluginsConfig.split(",").map(p => p.trim());
-                        }
-                    } else if (Array.isArray(enabledPluginsConfig)) {
-                        enabledPlugins = enabledPluginsConfig;
-                    }
-                }
+                
+                // NEU: guild_plugins Tabelle nutzen statt configs
+                const enabledPlugins = await dbService.getEnabledPlugins(guildId);
 
                 // Plugins für diese Guild aktivieren
                 for (const pluginName of enabledPlugins) {

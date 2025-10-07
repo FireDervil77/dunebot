@@ -1,0 +1,16 @@
+{
+    "TITLE": "Greetings",
+    "DESCRIPTION": "Manage greeting messages for your server",
+
+    "WELCOME_TITLE": "Welcome Configuration",
+    "WELCOME_PLACEHOLDER": "Welcome to the server {member:name} 🎉",
+
+    "FAREWELL_TITLE": "Farewell Configuration",
+    "FAREWELL_PLACEHOLDER": "Goodbye {member:name} 👋",
+
+    "CHANNEL_TITLE": "Channel",
+    "CHANNEL_DESC": "The channel where the message will be sent",
+
+    "AUTOROLE_TITLE": "Role to assign",
+    "AUTOROLE_DESC": "The role that will be assigned to users when they join the server"
+}

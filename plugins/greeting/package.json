@@ -1,0 +1,33 @@
+{
+  "name": "greeting",
+  "version": "1.0.0",
+  "displayName": "Greeting Plugin",
+  "description": "FireBot Greetings Plugin",
+  "author": "DuneBot Team",
+  "license": "MIT",
+  "main": "index.js",
+  "bot": "bot/index.js",
+  "dashboard": "dashboard/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/firedervil77/dunebot-plugins"
+  },
+  "keywords": [
+    "dunebot",
+    "firebot",
+    "discord",
+    "plugin",
+    "greeting"
+  ],
+  "dependencies": {
+    "dunebot-sdk": "*"
+  },
+  "peerDependencies": {
+    "discord.js": "^14.19.0",
+    "express": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "type": "commonjs"
+}

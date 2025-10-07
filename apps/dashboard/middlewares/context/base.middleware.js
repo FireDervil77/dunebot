@@ -203,6 +203,9 @@ module.exports = async (req, res, next) => {
             }
         };
         
+        // WICHTIG: Alias req.t für Plugin-Kompatibilität (DuneMap u.a. nutzen req.t)
+        req.t = req.translate;
+        
         // WICHTIG: Stelle translate-Funktion auch für Templates bereit
         res.locals.tr = req.translate;
         res.locals.locale = normalizedLocale;

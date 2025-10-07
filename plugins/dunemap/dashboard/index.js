@@ -58,8 +58,9 @@ class DuneMapPlugin extends DashboardPlugin {
             deps: [], // Keine Abhängigkeiten (standalone)
             version: this.version,
             inFooter: true,
-            defer: false,
-            debugSrc: 'js/dunemap-admin.dev.js' // Für SCRIPT_DEBUG=true
+            defer: false
+            // HINWEIS: debugSrc entfernt, da dunemap-admin.dev.js nicht existiert
+            // Die normale dunemap-admin.js wird auch im Debug-Modus verwendet
         });
         
         // CSS ist inline im Template (kein separates File)

@@ -12,6 +12,18 @@
         <div class="alert alert-danger"><%= errorMsgs.join('<br>') %></div>
       <% } %>
 
+      <!-- View Toggle -->
+      <div class="mb-3 text-right">
+          <div class="btn-group btn-group-sm" role="group" aria-label="View Mode">
+              <button type="button" class="btn btn-outline-secondary active" id="cardViewBtn">
+                  <i class="fas fa-th-large"></i> <%= tr('ADMIN_PAGE.CARD_VIEW') || 'Karten' %>
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="tableViewBtn">
+                  <i class="fas fa-table"></i> <%= tr('ADMIN_PAGE.TABLE_VIEW') || 'Tabelle' %>
+              </button>
+          </div>
+      </div>
+
       <!-- Aktivierte Plugins -->
       <div class="card card-primary">
           <div class="card-header">
@@ -19,7 +31,9 @@
           </div>
           <div class="card-body">
               <% if (enabledPlugins && enabledPlugins.length) { %>
-                  <div class="row">
+                  
+                  <!-- Karten-Ansicht (Standard) -->
+                  <div class="row plugin-view-cards">
                       <% enabledPlugins.forEach(p => { %>
                           <div class="col-lg-4 col-md-6 col-sm-12">
                               <div class="card plugin-card">
@@ -61,6 +75,61 @@
                           </div>
                       <% }); %>
                   </div>
+
+                  <!-- Tabellen-Ansicht (versteckt) -->
+                  <div class="plugin-view-table" style="display:none;">
+                      <div class="table-responsive">
+                          <table class="table table-bordered table-hover">
+                              <thead>
+                                  <tr>
+                                      <th style="width:60px;"><%= tr('ADMIN_PAGE.TABLE_ICON') || 'Icon' %></th>
+                                      <th><%= tr('ADMIN_PAGE.TABLE_NAME') || 'Name' %></th>
+                                      <th><%= tr('ADMIN_PAGE.TABLE_VERSION') || 'Version' %></th>
+                                      <th><%= tr('ADMIN_PAGE.TABLE_AUTHOR') || 'Autor' %></th>
+                                      <th><%= tr('ADMIN_PAGE.TABLE_DESCRIPTION') || 'Beschreibung' %></th>
+                                      <th style="width:200px;"><%= tr('ADMIN_PAGE.TABLE_ACTIONS') || 'Aktionen' %></th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  <% enabledPlugins.forEach(p => { %>
+                                      <tr>
+                                          <td class="text-center">
+                                              <img src="<%= p.icon %>" class="img-circle elevation-1" style="width:40px;height:40px;" alt="<%= p.displayName %>">
+                                          </td>
+                                          <td><strong><%= p.displayName %></strong></td>
+                                          <td><span class="badge badge-info">v<%= p.version %></span></td>
+                                          <td><small class="text-muted"><%= p.author %></small></td>
+                                          <td><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
+                                          <td>
+                                              <% if (p.name !== 'core') { %>
+                                                  <form action="/guild/<%= guildId %>/plugins"
+                                                        method="POST" 
+                                                        class="guild-ajax-form d-inline"
+                                                        data-form-type="plugin">
+                                                      <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+                                                      <input type="hidden" name="action" value="disable">
+                                                      <input type="hidden" name="plugins[]" value="<%= p.name %>">
+                                                      <button type="submit" class="btn btn-danger btn-sm">
+                                                          <i class="fas fa-power-off"></i>
+                                                      </button>
+                                                  </form>
+                                              <% } else { %>
+                                                  <span class="badge badge-secondary"><%= tr('ADMIN_PAGE.CORE_BADGE') %></span>
+                                              <% } %>
+                                              
+                                              <% if (p.hasSettings && p.settingsUrl) { %>
+                                                  <a href="<%= p.settingsUrl %>" class="btn btn-info btn-sm ml-1">
+                                                      <i class="fas fa-cog"></i>
+                                                  </a>
+                                              <% } %>
+                                          </td>
+                                      </tr>
+                                  <% }); %>
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+
               <% } else { %>
                   <div class="alert alert-info mb-0">
                       <i class="icon fas fa-info-circle"></i> <%= tr('ADMIN_PAGE.NO_ENABLED') %>
@@ -69,6 +138,9 @@
           </div>
       </div>
 
+      <!-- Abstand zwischen aktivierten und verfügbaren Plugins -->
+      <div style="margin-bottom: 2rem;"></div>
+
       <!-- Verfügbare Plugins -->
       <div class="card card-secondary">
         <div class="card-header">
@@ -76,7 +148,9 @@
         </div>
         <div class="card-body">
           <% if (availablePlugins && availablePlugins.length) { %>
-            <div class="row">
+            
+            <!-- Karten-Ansicht -->
+            <div class="row plugin-view-cards">
               <% availablePlugins.forEach(p => { %>
                 <div class="col-lg-4 col-md-6 col-sm-12">
                   <div class="card plugin-card bg-light">
@@ -108,6 +182,51 @@
                 </div>
               <% }); %>
             </div>
+
+            <!-- Tabellen-Ansicht -->
+            <div class="plugin-view-table" style="display:none;">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width:60px;"><%= tr('ADMIN_PAGE.TABLE_ICON') || 'Icon' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_NAME') || 'Name' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_VERSION') || 'Version' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_AUTHOR') || 'Autor' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_DESCRIPTION') || 'Beschreibung' %></th>
+                                <th style="width:150px;"><%= tr('ADMIN_PAGE.TABLE_ACTIONS') || 'Aktionen' %></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% availablePlugins.forEach(p => { %>
+                                <tr class="bg-light">
+                                    <td class="text-center">
+                                        <img src="<%= p.icon %>" class="img-circle" style="width:40px;height:40px;opacity:.8" alt="<%= p.displayName %>">
+                                    </td>
+                                    <td><strong><%= p.displayName %></strong></td>
+                                    <td><span class="badge badge-secondary">v<%= p.version %></span></td>
+                                    <td><small class="text-muted"><%= p.author %></small></td>
+                                    <td class="text-muted"><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
+                                    <td>
+                                        <form action="/guild/<%= guildId %>/plugins"
+                                            method="POST"
+                                            class="guild-ajax-form d-inline"
+                                            data-form-type="plugin">
+                                            <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+                                            <input type="hidden" name="action" value="enable">
+                                            <input type="hidden" name="plugins[]" value="<%= p.name %>">
+                                            <button type="submit" class="btn btn-success btn-sm">
+                                                <i class="fas fa-power-off mr-1"></i> <%= tr('ADMIN_PAGE.ENABLE_ACTION') %>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
           <% } else { %>
             <div class="alert alert-info mb-0">
               <i class="icon fas fa-info-circle"></i> <%= tr('ADMIN_PAGE.NO_AVAILABLE') %>

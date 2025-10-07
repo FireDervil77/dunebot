@@ -310,7 +310,15 @@
         "ENABLE_ACTION": "Aktivieren",
         "DISABLE_ACTION": "Deaktivieren",
         "SETTINGS_ACTION": "Einstellungen",
-        "CONFIGURE_ACTION": "Konfigurieren"
+        "CONFIGURE_ACTION": "Konfigurieren",
+        "CARD_VIEW": "Karten",
+        "TABLE_VIEW": "Tabelle",
+        "TABLE_ICON": "Icon",
+        "TABLE_NAME": "Name",
+        "TABLE_VERSION": "Version",
+        "TABLE_AUTHOR": "Autor",
+        "TABLE_DESCRIPTION": "Beschreibung",
+        "TABLE_ACTIONS": "Aktionen"
     },
 
     "LOCALES_PAGE": {

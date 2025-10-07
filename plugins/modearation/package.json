@@ -1,0 +1,32 @@
+{
+  "name": "moderation",
+  "version": "1.0.0",
+  "displayName": "Moderation Plugin",
+  "description": "FireBot Moderation-Plugin a Plugin for moderating your discord server",
+  "author": "FireBot Team",
+  "license": "MIT",
+  "main": "index.js",
+  "bot": "bot/index.js",
+  "dashboard": "dashboard/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/firedervil77/dunebot-plugins"
+  },
+  "keywords": [
+    "dunebot",
+    "discord",
+    "plugin",
+    "moderation"
+  ],
+  "dependencies": {
+    "dunebot-sdk": "*"
+  },
+  "peerDependencies": {
+    "discord.js": "^14.19.0",
+    "express": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "type": "commonjs"
+}
