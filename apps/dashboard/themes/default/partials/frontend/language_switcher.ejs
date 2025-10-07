@@ -1,7 +1,7 @@
 <script>
 /**
  * Sprachumschalter für Frontend
- * Sendet POST-Request an /api/language und lädt Seite neu
+ * Sendet POST-Request an /language/guest und lädt Seite neu
  * @author firedervil
  */
 (function() {
@@ -37,6 +37,9 @@
                     body: JSON.stringify({
                         language_code: newLang
                     })
+                }).catch(err => {
+                    console.error('[Language Switcher] Fetch error:', err);
+                    throw err;
                 });
                 
                 const data = await response.json();
