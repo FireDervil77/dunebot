@@ -116,9 +116,8 @@ async function listPlugins({ client, guild }) {
     const dbService = ServiceManager.get("dbService");
     const plugins = client.pluginManager.plugins.filter(p => !p.ownerOnly);
     
-    // NEU: Config über neues System laden
-    const configs = await dbService.getConfigs(guild.id, "core", "shared");
-    const enabled_plugins = configs?.ENABLED_PLUGINS || ["core"];
+    // NEU: Aktivierte Plugins aus guild_plugins laden
+    const enabled_plugins = await dbService.getEnabledPlugins(guild.id);
 
     const embed = EmbedUtils.embed()
         .setAuthor({ name: guild.getT("core:PLUGIN.LIST_EMBED_TITLE") })
@@ -154,9 +153,8 @@ async function pluginInfo({ client, guild }, plugin) {
         .find(p => p.name === plugin);
     if (!p) return guild.getT("core:PLUGIN.NOT_FOUND", { plugin });
 
-    // NEU: Config über neues System laden
-    const configs = await dbService.getConfigs(guild.id, "core", "shared");
-    const enabled_plugins = configs?.ENABLED_PLUGINS || ["core"];
+    // NEU: Aktivierte Plugins aus guild_plugins laden
+    const enabled_plugins = await dbService.getEnabledPlugins(guild.id);
 
     const embed = EmbedUtils.embed()
         .setAuthor({ name: guild.getT("core:PLUGIN.INFO_EMBED_TITLE", { plugin }) })
@@ -182,9 +180,8 @@ async function pluginStatus(arg0) {
     const dbService = ServiceManager.get("dbService");
     const { client, guild } = arg0;
     
-    // NEU: Config über neues System laden
-    const configs = await dbService.getConfigs(guild.id, "core", "shared");
-    const enabled_plugins = configs?.ENABLED_PLUGINS || ["core"];
+    // NEU: Aktivierte Plugins aus guild_plugins laden
+    const enabled_plugins = await dbService.getEnabledPlugins(guild.id);
 
     const options = [];
     for (const p of client.pluginManager.plugins.filter((p) => !p.ownerOnly)) {
@@ -243,18 +240,37 @@ async function pluginStatus(arg0) {
         }
     }
 
-    // NEU: Plugin-Status über Config-System speichern
-    await dbService.setConfig(
-        "core",
-        "ENABLED_PLUGINS",
-        waiter.values,
-        "shared",
-        guild.id,
-        false
-    );
+    // NEU: Plugin-Status über guild_plugins speichern
+    // Alte aktivierte Plugins holen
+    const currentlyEnabled = await dbService.getEnabledPlugins(guild.id);
+    const selectedPlugins = waiter.values; // Array der vom User gewählten Plugins
+    
+    // Plugins die NEU aktiviert werden sollen
+    const toEnable = selectedPlugins.filter(p => !currentlyEnabled.includes(p));
+    // Plugins die deaktiviert werden sollen
+    const toDisable = currentlyEnabled.filter(p => !selectedPlugins.includes(p) && p !== 'core');
+    
+    // Enable neue Plugins
+    for (const pluginName of toEnable) {
+        try {
+            await client.pluginManager.enableInGuild(pluginName, guild.id);
+        } catch (err) {
+            Logger.error(`Fehler beim Aktivieren von ${pluginName}:`, err);
+        }
+    }
+    
+    // Disable alte Plugins (außer core - das darf nie deaktiviert werden!)
+    for (const pluginName of toDisable) {
+        try {
+            await client.pluginManager.disableInGuild(pluginName, guild.id);
+        } catch (err) {
+            Logger.error(`Fehler beim Deaktivieren von ${pluginName}:`, err);
+        }
+    }
 
     await sentMsg.edit({
         content: guild.getT("core:PLUGIN.STATUS_SELECT_SUCCESS"),
         components: []
     });
 }
+

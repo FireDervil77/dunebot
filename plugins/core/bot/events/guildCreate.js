@@ -43,15 +43,23 @@ module.exports = async (guild) => {
         ]);
         
         // 3. Prüfen ob Guild bereits konfiguriert ist
-        const existingConfig = await dbService.getConfigs(guild.id, "core", "shared");
+        // NEU: Prüfen ob Guild bereits Plugins in guild_plugins hat
+        const existingPlugins = await dbService.query(
+            'SELECT COUNT(*) as count FROM guild_plugins WHERE guild_id = ?',
+            [guild.id]
+        );
         
-        if (!existingConfig || !existingConfig.ENABLED_PLUGINS) {
+        if (!existingPlugins || existingPlugins[0].count === 0) {
             Logger.info(`📝 Neue Guild - initialisiere Config für ${guild.id}`);
             
             // 4. Guild-spezifische Konfiguration initialisieren
             await initGuildConfigs(guild.id, defaultConfig);
             
-            // 5. Navigation wird beim ersten Dashboard-Zugriff registriert (onGuildEnable)
+            // 5. Core-Plugin in guild_plugins aktivieren
+            await dbService.enablePluginForGuild(guild.id, 'core', null, null);
+            Logger.info(`Core-Plugin für neue Guild ${guild.id} in guild_plugins aktiviert`);
+            
+            // 6. Navigation wird beim ersten Dashboard-Zugriff registriert (onGuildEnable)
         } else {
             Logger.info(`✅ Guild ${guild.id} war bereits konfiguriert (Re-Join)`);
         }
@@ -114,15 +122,9 @@ async function initGuildConfigs(guildId, configObj) {
             guildId
         );
 
-        // ENABLED_PLUGINS separat sicherstellen (Array wird als JSON gespeichert)
-        await dbService.ensureConfig(
-            "core",
-            "ENABLED_PLUGINS", 
-            ['core'], // Als Array, wird intern zu JSON
-            "shared",
-            guildId,
-            false
-        );
+        // HINWEIS: ENABLED_PLUGINS wird nicht mehr in configs gespeichert!
+        // Plugins werden über guild_plugins Tabelle verwaltet
+        // Core-Plugin wurde bereits in guildCreate-Event via enablePluginForGuild() aktiviert
 
         Logger.info(`Guild-Konfiguration für ${guildId}: ${stats.created} neu erstellt, ${stats.existing} bereits vorhanden`);
     } catch (error) {

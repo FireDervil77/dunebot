@@ -75,27 +75,8 @@ class DuneMapBotPlugin extends BotPlugin {
             
             Logger.debug(`DuneMap-Config für Guild ${guildId}: ${stats.created} neu, ${stats.existing} bereits vorhanden`);
 
-            // Sicherstellen dass das Plugin in ENABLED_PLUGINS ist
-            const coreConfig = await this.dbService.getConfigs(guildId, "core", "shared");
-            let enabledPlugins = coreConfig?.ENABLED_PLUGINS || ["core"];
-            
-            // Wenn es ein String ist, parsen
-            if (typeof enabledPlugins === 'string') {
-                enabledPlugins = JSON.parse(enabledPlugins);
-            }
-            
-            // DuneMap hinzufügen wenn noch nicht drin
-            if (!enabledPlugins.includes("dunemap")) {
-                enabledPlugins.push("dunemap");
-                await this.dbService.setConfig(
-                    "core",
-                    "ENABLED_PLUGINS",
-                    enabledPlugins,
-                    "shared",
-                    guildId,
-                    false
-                );
-            }
+            // HINWEIS: Plugin wird bereits vom PluginManager via enablePluginForGuild() 
+            // in guild_plugins eingetragen - keine manuelle ENABLED_PLUGINS Manipulation mehr nötig!
             
             Logger.debug(`DuneMap-Konfiguration für Guild ${guildId} initialisiert`);
         } catch (err) {
@@ -113,37 +94,17 @@ class DuneMapBotPlugin extends BotPlugin {
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get("Logger");
         Logger.info(`DuneMap-Plugin für Guild ${guildId} wird deaktiviert...`);
-        
+
         try {
-            // Aus ENABLED_PLUGINS entfernen
-            const coreConfig = await this.dbService.getConfigs(guildId, "core", "shared");
-            let enabledPlugins = coreConfig?.ENABLED_PLUGINS || ["core"];
-            
-            // Wenn es ein String ist, parsen
-            if (typeof enabledPlugins === 'string') {
-                enabledPlugins = JSON.parse(enabledPlugins);
-            }
-            
-            // DuneMap entfernen
-            enabledPlugins = enabledPlugins.filter(p => p !== "dunemap");
-            
-            await this.dbService.setConfig(
-                "core",
-                "ENABLED_PLUGINS",
-                enabledPlugins,
-                "shared",
-                guildId,
-                false
-            );
+            // HINWEIS: Plugin wird bereits vom PluginManager via disablePluginForGuild()
+            // in guild_plugins deaktiviert - keine manuelle ENABLED_PLUGINS Manipulation mehr nötig!
             
             Logger.success(`DuneMap-Plugin für Guild ${guildId} deaktiviert`);
         } catch (err) {
             Logger.error(`Fehler beim Deaktivieren des Plugins für Guild ${guildId}:`, err);
             throw err;
         }
-    }
-
-    /**
+    }    /**
          * Registriert hooks für das Dunemap-Plugin
          * 
          * @param {import('dunebot-sdk').HookSystem} hooks - Das Hook-System

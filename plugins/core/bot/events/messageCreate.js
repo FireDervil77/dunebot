@@ -54,8 +54,8 @@ module.exports = async (message, plugin) => {
         const prefixCommandsEnabled = configs?.PREFIX_COMMANDS_ENABLED ?? true;
         if (!prefixCommandsEnabled) return;
 
-        // Aktivierte Plugins aus der neuen Config-Struktur laden
-        const enabledPlugins = configs?.ENABLED_PLUGINS || ["core"];
+        // NEU: Aktivierte Plugins aus guild_plugins laden
+        const enabledPlugins = await dbService.getEnabledPlugins(guild.id);
         
         // Deaktivierte Befehle aus der Config laden
         const disabledPrefix = configs?.DISABLED_PREFIX || [];

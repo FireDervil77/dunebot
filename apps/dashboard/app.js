@@ -230,19 +230,27 @@ module.exports = class App {
             // 3. Core-Plugin aktivieren
             await this.app.pluginManager.enablePlugin('core');
             
-            // 4. Andere Plugins basierend auf der Konfiguration aktivieren
-            // HINWEIS: SuperAdmin wird NICHT mehr automatisch aktiviert!
-            // Es muss manuell über die Plugin-Verwaltung aktiviert werden.
-            const config = await this.loadConfig();
-            let enabledPlugins = config.ENABLED_PLUGINS || ['core'];
+            // 4. Andere Plugins basierend auf guild_plugins aktivieren
+            // Lade alle Plugins die in mindestens einer Guild aktiviert sind
+            const dbService = ServiceManager.get('dbService');
             
-            // Filter anwenden, falls vorhanden
+            const pluginRows = await dbService.query(`
+                SELECT DISTINCT plugin_name 
+                FROM guild_plugins 
+                WHERE is_enabled = 1 AND plugin_name != 'core'
+            `);
+            
+            let enabledPlugins = pluginRows.map(row => row.plugin_name);
+            
+            // Filter-Hook anwenden, falls vorhanden
             if (this.app.pluginManager.hooks) {
                 enabledPlugins = await this.app.pluginManager.hooks.applyFilter(
                     'filter_enabled_plugins',
                     enabledPlugins
                 );
             }
+            
+            Logger.debug(`Aktiviere ${enabledPlugins.length} Plugins global: ${enabledPlugins.join(', ')}`);
             
             // Plugins aktivieren (außer core, das bereits aktiviert wurde)
             for (const pluginName of enabledPlugins) {
@@ -284,6 +292,8 @@ module.exports = class App {
 
     /**
      * Konfiguration aus der Datenbank laden
+     * HINWEIS: ENABLED_PLUGINS wird nicht mehr aus configs geladen!
+     * Plugins werden jetzt über guild_plugins Tabelle verwaltet.
      */
     async loadConfig() {
         const Logger = ServiceManager.get("Logger");
@@ -294,28 +304,30 @@ module.exports = class App {
                 "SELECT config_key, config_value FROM configs WHERE context = ?",
                 ['dashboard']
             );
-            if (!configs || configs.length === 0) {
-                return { ENABLED_PLUGINS: ['core'] };
-            }
             
             const config = {};
             
-            // Default-Werte
-            config.ENABLED_PLUGINS = ['core'];
-            
-            // Gespeicherte Werte laden
-            for (const entry of configs) {
-                try {
-                    config[entry.config_key] = JSON.parse(entry.config_value);
-                } catch (e) {
-                    config[entry.config_key] = entry.config_value;
+            // Gespeicherte Werte laden (außer ENABLED_PLUGINS - das ist obsolet!)
+            if (configs && configs.length > 0) {
+                for (const entry of configs) {
+                    // ENABLED_PLUGINS überspringen - wird über guild_plugins verwaltet
+                    if (entry.config_key === 'ENABLED_PLUGINS') {
+                        Logger.debug('Überspringe veraltete ENABLED_PLUGINS Config');
+                        continue;
+                    }
+                    
+                    try {
+                        config[entry.config_key] = JSON.parse(entry.config_value);
+                    } catch (e) {
+                        config[entry.config_key] = entry.config_value;
+                    }
                 }
             }
             
             return config;
         } catch (error) {
             Logger.error('Fehler beim Laden der Konfiguration:', error);
-            return { ENABLED_PLUGINS: ['core'] };
+            return {};
         }
     }
     

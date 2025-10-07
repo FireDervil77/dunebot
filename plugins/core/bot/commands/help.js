@@ -49,8 +49,8 @@ module.exports = {
         try {
             // Get coreConfig from database
             const coreConfig = await dbService.getConfigs(message.guild.id);
-            // teste die neue jsonParse-Funktion
-            const enabledPlugins = parseJsonArray(coreConfig.ENABLED_PLUGINS, ['core']);
+            // NEU: Aktivierte Plugins aus guild_plugins laden
+            const enabledPlugins = await dbService.getEnabledPlugins(message.guild.id);
             const disabledPrefix = parseJsonArray(coreConfig.disabled_prefix, []);
 
             // !help
@@ -94,7 +94,8 @@ module.exports = {
         try {
             // Get coreConfig from database
             const coreConfig = await dbService.getConfigs(interaction.guild.id);
-            const enabledPlugins = parseJsonArray(coreConfig.ENABLED_PLUGINS, ['core']);
+            // NEU: Aktivierte Plugins aus guild_plugins laden
+            const enabledPlugins = await dbService.getEnabledPlugins(interaction.guild.id);
             const disabledSlash = parseJsonArray(coreConfig.disabled_slash, []);
 
             // !help
@@ -140,7 +141,8 @@ module.exports = {
 async function getHelpMenu({ client, guild }) {
      const dbService = ServiceManager.get("dbService");
      const coreConfig = await dbService.getConfigs(guild.id);
-     const enabledPlugins = parseJsonArray(coreConfig.ENABLED_PLUGINS, ['core']);
+     // NEU: Aktivierte Plugins aus guild_plugins laden
+     const enabledPlugins = await dbService.getEnabledPlugins(guild.id);
 
 
     // Menu Row

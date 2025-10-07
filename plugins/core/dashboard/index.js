@@ -77,23 +77,10 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 
-                // Lade aktivierte Plugins für die Guild
+                // Lade aktivierte Plugins für die Guild aus guild_plugins Tabelle
                 let enabledPlugins = [];
                 try {
-                    const [config] = await dbService.query(
-                        `SELECT config_value FROM configs 
-                         WHERE plugin_name = 'core' 
-                         AND config_key = 'ENABLED_PLUGINS' 
-                         AND context = 'shared' 
-                         AND guild_id = ?`,
-                        [guildId]
-                    );
-                    
-                    if (config && config.config_value) {
-                        enabledPlugins = typeof config.config_value === 'string' 
-                            ? JSON.parse(config.config_value) 
-                            : config.config_value;
-                    }
+                    enabledPlugins = await dbService.getEnabledPlugins(guildId);
                 } catch (err) {
                     Logger.error('[Core] Fehler beim Laden der enabled Plugins:', err);
                 }

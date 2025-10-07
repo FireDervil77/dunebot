@@ -63,13 +63,21 @@ module.exports = async (client) => {
             });
             
             // 2. Prüfen ob Config bereits existiert
-            const existingConfig = await dbService.getConfigs(guild.id, "core", "shared");
+            // NEU: Prüfen ob Guild bereits Plugins in guild_plugins hat
+            const existingPlugins = await dbService.query(
+                'SELECT COUNT(*) as count FROM guild_plugins WHERE guild_id = ?',
+                [guild.id]
+            );
             
-            if (!existingConfig || !existingConfig.ENABLED_PLUGINS) {
+            if (!existingPlugins || existingPlugins[0].count === 0) {
                 Logger.info(`📝 Initialisiere Config für Guild "${guild.name}" (${guild.id})`);
                 
                 // Config initialisieren
                 await initGuildConfigs(guild.id, defaultConfig);
+                
+                // Core-Plugin in guild_plugins aktivieren
+                await dbService.enablePluginForGuild(guild.id, 'core', null, null);
+                Logger.info(`Core-Plugin für Guild ${guild.id} in guild_plugins aktiviert`);
                 
                 // Navigation wird beim ersten Dashboard-Zugriff registriert (onGuildEnable)
             } else {
@@ -164,15 +172,9 @@ async function initGuildConfigs(guildId, configObj) {
             guildId
         );
 
-        // ENABLED_PLUGINS separat sicherstellen (Array wird als JSON gespeichert)
-        await dbService.ensureConfig(
-            "core",
-            "ENABLED_PLUGINS", 
-            ['core'], // Als Array, wird intern zu JSON
-            "shared",
-            guildId,
-            false
-        );
+        // HINWEIS: ENABLED_PLUGINS wird nicht mehr in configs gespeichert!
+        // Plugins werden über guild_plugins Tabelle verwaltet
+        // Core-Plugin wurde bereits im ready-Event via enablePluginForGuild() aktiviert
 
         Logger.debug(`Config für Guild ${guildId}: ${stats.created} neu, ${stats.existing} bereits vorhanden`);
     } catch (error) {
