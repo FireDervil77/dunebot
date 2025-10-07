@@ -456,7 +456,13 @@ module.exports = class App {
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
         this.app.use(expressLayouts);
-        this.app.use(express.static(path.join(__dirname, "/public")));
+        
+        // Theme Assets (JS, CSS, Images, Fonts, Vendor)
+        // Beispiel: /themes/default/assets/js/guild.js
+        this.app.use('/themes', express.static(path.join(__dirname, 'themes')));
+        
+        // Plugin Assets werden dynamisch in registerPluginAssets() registriert
+        // Beispiel: /assets/plugins/dunemap/images/map.png
         
         // Session & Auth
         this.app.use(sessionMiddleware);
