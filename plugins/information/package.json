@@ -2,7 +2,7 @@
     "name": "information",
     "displayName": "Information´s Plugin",
     "description": "FireBot Information´s Plugin - Serves different Informations around Server / Owner / Member.",
-    "version": "0.1.0-beta",
+    "version": "1.0.0",
     "main": "dashboard/index.js",
     "bot": "bot/index.js",
     "dashboard": "dashboard/index.js",
