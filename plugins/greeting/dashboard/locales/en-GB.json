@@ -2,15 +2,75 @@
     "TITLE": "Greetings",
     "DESCRIPTION": "Manage greeting messages for your server",
 
-    "WELCOME_TITLE": "Welcome Configuration",
-    "WELCOME_PLACEHOLDER": "Welcome to the server {member:name} 🎉",
+    "SETTINGS": {
+        "PAGE_TITLE": "Greeting Settings",
+        "PAGE_DESC": "Configure welcome and farewell messages for your guild"
+    },
 
-    "FAREWELL_TITLE": "Farewell Configuration",
-    "FAREWELL_PLACEHOLDER": "Goodbye {member:name} 👋",
+    "TAB_WELCOME": "Welcome",
+    "TAB_FAREWELL": "Farewell",
+    "TAB_AUTOROLE": "Autorole",
+
+    "WELCOME": {
+        "TITLE": "Welcome Messages",
+        "DESC": "Configure welcome messages for new members",
+        "MESSAGE": "Welcome Message"
+    },
+
+    "FAREWELL": {
+        "TITLE": "Farewell Messages",
+        "DESC": "Configure messages for leaving members",
+        "MESSAGE": "Farewell Message"
+    },
+
+    "AUTOROLE": {
+        "TITLE": "Automatic Role",
+        "DESC": "This role will be automatically assigned to new members"
+    },
 
     "CHANNEL_TITLE": "Channel",
-    "CHANNEL_DESC": "The channel where the message will be sent",
+    "CHANNEL_DESC": "Select the channel for messages",
+    "CHANNEL_SELECT": "Select channel...",
 
-    "AUTOROLE_TITLE": "Role to assign",
-    "AUTOROLE_DESC": "The role that will be assigned to users when they join the server"
+    "STATUS": "Status",
+    "STATUS_ENABLED": "Enabled",
+    "STATUS_DISABLED": "Disabled",
+
+    "AUTOROLE_SELECT": "Select Role",
+    "AUTOROLE_NONE": "No automatic role",
+    "AUTOROLE_INFO": "The selected role will be automatically given to all new members upon joining.",
+
+    "PLACEHOLDERS_HINT": "Use placeholders like {member:name}, {member:mention}, {guild:name}",
+
+    "BTN_ENABLE": "Enable",
+    "BTN_DISABLE": "Disable",
+    "BTN_SAVE": "Save",
+    "BTN_SAVING": "Saving...",
+
+    "SAVE_SUCCESS": "Settings saved successfully",
+    "SAVE_ERROR": "Error saving settings",
+    
+    "TOAST": {
+        "ENABLED": "Enabled",
+        "DISABLED": "Disabled",
+        "SAVED": "Successfully saved",
+        "ERROR": "Error saving",
+        "AUTOROLE_REMOVED": "Autorole removed"
+    },
+
+    "OVERVIEW": {
+        "MESSAGES_TITLE": "Current Messages",
+        "AUTOROLES_TITLE": "Automatic Roles"
+    },
+
+    "HELP": {
+        "TITLE": "Help & Tips",
+        "WELCOME_TITLE": "Welcome Messages",
+        "WELCOME_TEXT": "Greet new members with personalized messages.",
+        "FAREWELL_TITLE": "Farewells",
+        "FAREWELL_TEXT": "Say goodbye to leaving members.",
+        "AUTOROLE_TITLE": "Autorole",
+        "AUTOROLE_TEXT": "Automatic role assignment for new members.",
+        "PLACEHOLDERS_TITLE": "Available Placeholders"
+    }
 }

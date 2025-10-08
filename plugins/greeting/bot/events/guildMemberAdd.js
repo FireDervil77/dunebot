@@ -1,10 +1,13 @@
 const { buildGreeting } = require("../utils");
-const db = require("../../db.service");
+const { ServiceManager } = require('dunebot-core');
+
 
 /**
  * @param {import('discord.js').GuildMember} member
  */
 module.exports = async (member) => {
+    const dbService = ServiceManager.get('dbService');
+
     const settings = await db.getSettings(member.guild);
 
     // Autorole

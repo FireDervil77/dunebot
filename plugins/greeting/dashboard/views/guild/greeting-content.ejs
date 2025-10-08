@@ -1,0 +1,210 @@
+<% if (type === 'welcome') { %>
+<!-- Welcome Tab Content -->
+<div class="card">
+  <div class="card-body">
+    <form id="welcomeForm">
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label">
+              <i class="fa-solid fa-hashtag me-1"></i>
+              <%= tr('greeting:CHANNEL_TITLE', 'Kanal') %>
+            </label>
+            <select class="form-select" name="welcome_channel" required>
+              <option value=""><%= tr('greeting:CHANNEL_SELECT', 'Kanal wählen...') %></option>
+              <% if (channels && channels.length > 0) { %>
+                <% channels.forEach(channel => { %>
+                  <option value="<%= channel.id %>" <%= settings.welcome.channel === channel.id ? 'selected' : '' %>>
+                    #<%= channel.name %>
+                  </option>
+                <% }); %>
+              <% } %>
+            </select>
+            <small class="form-text text-muted">
+              <%= tr('greeting:CHANNEL_DESC', 'Wähle den Kanal für Willkommensnachrichten') %>
+            </small>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label">
+              <i class="fa-solid fa-circle-info me-1"></i>
+              <%= tr('greeting:STATUS', 'Status') %>
+            </label>
+            <div>
+              <% if (settings.welcome.content) { %>
+                <!-- Nur anzeigen wenn Message gespeichert ist -->
+                <div class="custom-control custom-switch">
+                  <input type="checkbox" class="custom-control-input" id="welcomeEnabledToggle" 
+                         <%= settings.welcome.enabled ? 'checked' : '' %>
+                         onchange="toggleGreeting('welcome', this.checked)">
+                  <label class="custom-control-label" for="welcomeEnabledToggle">
+                    <span class="badge <%= settings.welcome.enabled ? 'badge-success' : 'badge-secondary' %>">
+                      <%= settings.welcome.enabled ? tr('greeting:STATUS_ENABLED', 'Aktiviert') : tr('greeting:STATUS_DISABLED', 'Deaktiviert') %>
+                    </span>
+                  </label>
+                </div>
+                <small class="form-text text-muted d-block mt-2">
+                  An/Aus schalten ohne die Message zu löschen
+                </small>
+              <% } else { %>
+                <span class="badge badge-secondary badge-lg">
+                  <i class="fa-solid fa-circle me-1"></i>
+                  <%= tr('greeting:STATUS_DISABLED', 'Nicht konfiguriert') %>
+                </span>
+                <small class="form-text text-muted d-block mt-2">
+                  Wird beim Speichern automatisch aktiviert
+                </small>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">
+          <i class="fa-solid fa-message me-1"></i>
+          <%= tr('greeting:WELCOME.MESSAGE', 'Willkommensnachricht') %>
+        </label>
+        <textarea class="form-control" name="welcome_content" rows="4"><%= settings.welcome.content || '' %></textarea>
+        <small class="form-text text-muted">
+          <%= tr('greeting:PLACEHOLDERS_HINT', 'Nutze Platzhalter wie {member:name}, {member:mention}, {guild:name}') %>
+        </small>
+      </div>
+
+      <div class="d-flex justify-content-end">
+        <button type="button" class="btn btn-primary" onclick="updateGreeting('welcome', 'save')">
+          <i class="fa-solid fa-save me-1"></i>
+          <%= tr('greeting:BTN_SAVE', 'Speichern') %>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% } else if (type === 'farewell') { %>
+<!-- Farewell Tab Content -->
+<div class="card">
+  <div class="card-body">
+    <form id="farewellForm">
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label">
+              <i class="fa-solid fa-hashtag me-1"></i>
+              <%= tr('greeting:CHANNEL_TITLE', 'Kanal') %>
+            </label>
+            <select class="form-select" name="farewell_channel" required>
+              <option value=""><%= tr('greeting:CHANNEL_SELECT', 'Kanal wählen...') %></option>
+              <% if (channels && channels.length > 0) { %>
+                <% channels.forEach(channel => { %>
+                  <option value="<%= channel.id %>" <%= settings.farewell.channel === channel.id ? 'selected' : '' %>>
+                    #<%= channel.name %>
+                  </option>
+                <% }); %>
+              <% } %>
+            </select>
+            <small class="form-text text-muted">
+              <%= tr('greeting:CHANNEL_DESC', 'Wähle den Kanal für Verabschiedungen') %>
+            </small>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label">
+              <i class="fa-solid fa-circle-info me-1"></i>
+              <%= tr('greeting:STATUS', 'Status') %>
+            </label>
+            <div>
+              <% if (settings.farewell.content) { %>
+                <!-- Nur anzeigen wenn Message gespeichert ist -->
+                <div class="custom-control custom-switch">
+                  <input type="checkbox" class="custom-control-input" id="farewellEnabledToggle" 
+                         <%= settings.farewell.enabled ? 'checked' : '' %>
+                         onchange="toggleGreeting('farewell', this.checked)">
+                  <label class="custom-control-label" for="farewellEnabledToggle">
+                    <span class="badge <%= settings.farewell.enabled ? 'badge-success' : 'badge-secondary' %>">
+                      <%= settings.farewell.enabled ? tr('greeting:STATUS_ENABLED', 'Aktiviert') : tr('greeting:STATUS_DISABLED', 'Deaktiviert') %>
+                    </span>
+                  </label>
+                </div>
+                <small class="form-text text-muted d-block mt-2">
+                  An/Aus schalten ohne die Message zu löschen
+                </small>
+              <% } else { %>
+                <span class="badge badge-secondary badge-lg">
+                  <i class="fa-solid fa-circle me-1"></i>
+                  <%= tr('greeting:STATUS_DISABLED', 'Nicht konfiguriert') %>
+                </span>
+                <small class="form-text text-muted d-block mt-2">
+                  Wird beim Speichern automatisch aktiviert
+                </small>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">
+          <i class="fa-solid fa-message me-1"></i>
+          <%= tr('greeting:FAREWELL.MESSAGE', 'Verabschiedungsnachricht') %>
+        </label>
+        <textarea class="form-control" name="farewell_content" rows="4"><%= settings.farewell.content || '' %></textarea>
+        <small class="form-text text-muted">
+          <%= tr('greeting:PLACEHOLDERS_HINT', 'Nutze Platzhalter wie {member:name}, {guild:name}') %>
+        </small>
+      </div>
+
+      <div class="d-flex justify-content-end">
+        <button type="button" class="btn btn-primary" onclick="updateGreeting('farewell', 'save')">
+          <i class="fa-solid fa-save me-1"></i>
+          <%= tr('greeting:BTN_SAVE', 'Speichern') %>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% } else if (type === 'autorole') { %>
+<!-- Autorole Tab Content -->
+<div class="card">
+  <div class="card-body">
+    <form id="autoroleForm">
+      <div class="mb-3">
+        <label class="form-label">
+          <i class="fa-solid fa-user-shield me-1"></i>
+          <%= tr('greeting:AUTOROLE_SELECT', 'Rolle auswählen') %>
+        </label>
+        <select class="form-select" name="autorole_id">
+          <option value=""><%= tr('greeting:AUTOROLE_NONE', 'Keine automatische Rolle') %></option>
+          <% if (roles && roles.length > 0) { %>
+            <% roles.forEach(role => { %>
+              <option value="<%= role.id %>" <%= settings.autorole_id === role.id ? 'selected' : '' %>>
+                <%= role.name %>
+              </option>
+            <% }); %>
+          <% } %>
+        </select>
+        <small class="form-text text-muted">
+          <%= tr('greeting:AUTOROLE_DESC', 'Diese Rolle wird neuen Mitgliedern automatisch zugewiesen') %>
+        </small>
+      </div>
+
+      <div class="alert alert-info">
+        <i class="fa-solid fa-info-circle me-2"></i>
+        <%= tr('greeting:AUTOROLE_INFO', 'Die ausgewählte Rolle wird allen neuen Mitgliedern beim Beitritt automatisch gegeben.') %>
+      </div>
+
+      <div class="d-flex justify-content-end">
+        <button type="button" class="btn btn-primary" onclick="updateGreeting('autorole', 'save')">
+          <i class="fa-solid fa-save me-1"></i>
+          <%= tr('greeting:BTN_SAVE', 'Speichern') %>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>

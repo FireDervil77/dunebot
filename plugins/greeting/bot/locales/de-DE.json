@@ -1,0 +1,99 @@
+{
+    "TITLE": "Begrüßungen",
+    "DESCRIPTION": "Verwalte Begrüßungsnachrichten für deinen Server",
+
+    "AUTOROLE": {
+        "DESCRIPTION": "Rolle konfigurieren, die beim Beitritt vergeben wird",
+        "SUB_ADD": "Rolle konfigurieren, die beim Beitritt vergeben wird",
+        "SUB_ADD_ROLE": "die zu vergebende Rolle",
+        "SUB_ADD_ROLE_ID": "die ID der zu vergebenden Rolle",
+        "SUB_REMOVE": "Autorole deaktivieren",
+
+        "MISSING_ROLE": "Bitte gib eine Rolle oder Rollen-ID an",
+        "ROLE_NOT_FOUND": "Keine passende Rolle zu deiner Anfrage gefunden",
+        "EVERYONE_ROLE": "Du kannst `@everyone` nicht als Autorole setzen",
+        "MISSING_PERM": "Ich habe nicht die `ManageRoles` Berechtigung",
+        "ROLE_PERM": "Ich habe nicht die Berechtigung, diese Rolle zu vergeben",
+        "MANAGED_ROLE": "Oops! Diese Rolle wird von einer Integration verwaltet",
+        "ENABLED": "Autorole aktiviert! Benutzer erhalten nun die `{{role}}` Rolle beim Beitritt",
+        "DISABLED": "Autorole wurde deaktiviert"
+    },
+
+    "WELCOME": {
+        "DESCRIPTION": "Konfiguriere die Willkommensnachricht für deinen Server",
+        "SUB_STATUS": "Willkommensnachricht aktivieren oder deaktivieren",
+        "SUB_STATUS_STATUS": "aktivieren oder deaktivieren",
+        "SUB_CHANNEL": "Setze den Kanal für Willkommensnachrichten",
+        "SUB_PREVIEW": "Vorschau der Willkommensnachricht",
+        "SUB_DESC": "Konfiguriere die Beschreibung der Willkommensnachricht",
+        "SUB_THUMBNAIL": "Thumbnail in Willkommensnachricht aktivieren/deaktivieren",
+        "SUB_COLOR": "Setze die Farbe für die Willkommensnachricht",
+        "SUB_IMAGE": "Setze das Bild für die Willkommensnachricht",
+        "SUB_MSG": "Setze die Willkommensnachricht",
+        "SUB_MSG_CHANNEL": "der Kanal für Willkommensnachrichten",
+        "SUB_MSG_DESC": "die Beschreibung für die Willkommensnachricht",
+        "SUB_MSG_THUMBNAIL": "Thumbnail aktivieren/deaktivieren",
+        "SUB_MSG_COLOR": "die Farbe für die Willkommensnachricht",
+        "SUB_MSG_FOOTER": "die Fußzeile für die Willkommensnachricht",
+        "SUB_MSG_IMAGE": "das Bild für die Willkommensnachricht",
+
+        "INVALID_STATUS": "Ungültiger Status. Wert muss `on/off` sein",
+        "INVALID_CONTENT": "Unzureichende Argumente! Bitte gib gültigen Inhalt an",
+        "INVALID_THUMBNAIL": "Ungültiger Status. Wert muss `on/off` sein",
+        "INVALID_COLOR": "Ungültige Farbe. Wert muss ein gültiger Hex-Farbcode sein",
+        "INVALID_IMAGE": "Ungültige Bild-URL. Bitte gib eine gültige Bild-URL an",
+
+        "WELCOME_DISABLED": "Willkommensnachricht ist auf diesem Server nicht aktiviert",
+
+        "CHANNEL_NOT_CONFIG": "Kein Kanal zum Senden der Willkommensnachricht konfiguriert",
+        "PREVIEW_SENT": "Willkommens-Vorschau an {{channel}} gesendet",
+
+        "ENABLED": "Konfiguration gespeichert! Willkommensnachricht ist nun aktiviert",
+        "DISABLED": "Konfiguration gespeichert! Willkommensnachricht ist nun deaktiviert",
+
+        "CHANNEL_NO_PERMS": "Ugh! Ich kann keine Begrüßung in diesem Kanal senden? Ich benötige die `Nachrichten senden` und `Links einbetten` Berechtigungen in {{channel}}",
+        "CHANNEL_SET": "Konfiguration gespeichert! Willkommensnachricht wird an {{channel}} gesendet",
+
+        "CONFIG_UPDATED": "Konfiguration gespeichert! Willkommensnachricht aktualisiert",
+        "CONFIG_SAVED": "Konfiguration gespeichert! Willkommensnachricht ist für {{channel}} konfiguriert"
+    },
+
+    "FAREWELL": {
+        "DESCRIPTION": "Konfiguriere die Verabschiedungsnachricht für deinen Server",
+        "SUB_STATUS": "Verabschiedungsnachricht aktivieren oder deaktivieren",
+        "SUB_STATUS_STATUS": "aktivieren oder deaktivieren",
+        "SUB_CHANNEL": "Setze den Kanal für Verabschiedungsnachrichten",
+        "SUB_PREVIEW": "Vorschau der Verabschiedungsnachricht",
+        "SUB_DESC": "Konfiguriere die Beschreibung der Verabschiedungsnachricht",
+        "SUB_THUMBNAIL": "Thumbnail in Verabschiedungsnachricht aktivieren/deaktivieren",
+        "SUB_COLOR": "Setze die Farbe für die Verabschiedungsnachricht",
+        "SUB_IMAGE": "Setze das Bild für die Verabschiedungsnachricht",
+        "SUB_MSG": "Setze die Verabschiedungsnachricht",
+        "SUB_MSG_CHANNEL": "der Kanal für Verabschiedungsnachrichten",
+        "SUB_MSG_DESC": "die Beschreibung für die Verabschiedungsnachricht",
+        "SUB_MSG_THUMBNAIL": "Thumbnail aktivieren/deaktivieren",
+        "SUB_MSG_COLOR": "die Farbe für die Verabschiedungsnachricht",
+        "SUB_MSG_FOOTER": "die Fußzeile für die Verabschiedungsnachricht",
+        "SUB_MSG_IMAGE": "das Bild für die Verabschiedungsnachricht",
+
+        "INVALID_STATUS": "Ungültiger Status. Wert muss `on/off` sein",
+        "INVALID_CONTENT": "Unzureichende Argumente! Bitte gib gültigen Inhalt an",
+        "INVALID_THUMBNAIL": "Ungültiger Status. Wert muss `on/off` sein",
+        "INVALID_COLOR": "Ungültige Farbe. Wert muss ein gültiger Hex-Farbcode sein",
+        "INVALID_IMAGE": "Ungültige Bild-URL. Bitte gib eine gültige Bild-URL an",
+
+        "FAREWELL_DISABLED": "Verabschiedungsnachricht ist auf diesem Server nicht aktiviert",
+
+        "CHANNEL_NOT_CONFIG": "Kein Kanal zum Senden der Verabschiedungsnachricht konfiguriert",
+        "PREVIEW_SENT": "Verabschiedungs-Vorschau an {{channel}} gesendet",
+
+        "ENABLED": "Konfiguration gespeichert! Verabschiedungsnachricht ist nun aktiviert",
+        "DISABLED": "Konfiguration gespeichert! Verabschiedungsnachricht ist nun deaktiviert",
+
+        "CHANNEL_NO_PERMS": "Ugh! Ich kann keine Verabschiedung in diesem Kanal senden? Ich benötige die `Nachrichten senden` und `Links einbetten` Berechtigungen in {{channel}}",
+        "CHANNEL_SET": "Konfiguration gespeichert! Verabschiedungsnachricht wird an {{channel}} gesendet",
+
+        "CONFIG_UPDATED": "Konfiguration gespeichert! Verabschiedungsnachricht aktualisiert",
+        "CONFIG_SAVED": "Konfiguration gespeichert! Verabschiedungsnachricht ist für {{channel}} konfiguriert"
+    }
+}
