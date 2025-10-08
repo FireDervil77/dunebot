@@ -387,6 +387,13 @@
         "DUNEMAP_SETTINGS_ERROR": "Error saving DuneMap settings"
     },
 
+    "TOAST_NOTIFICATIONS": {
+        "TITLE": "Toast Notifications",
+        "LOADING": "Loading notifications...",
+        "VIEW_ALL": "View All",
+        "NO_CRITICAL": "No critical notifications"
+    },
+
     "DASHBOARD_COMMON": {
         "MEMBER_SINCE": "Member since",
         "DAYS": "days",

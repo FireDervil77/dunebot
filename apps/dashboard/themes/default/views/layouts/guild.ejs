@@ -88,6 +88,15 @@
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.5/dist/chart.umd.min.js" crossorigin="anonymous"></script>
 
+<!-- Toastr - Global Toast Notifications -->
+<script src="https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.js" crossorigin="anonymous"></script>
+
+<!-- Global Toast System -->
+<script src="/themes/default/assets/js/global-toast.js"></script>
+
+<!-- Toast Notification Center -->
+<script src="/themes/default/assets/js/toast-notification-center.js"></script>
+
 <script src="/themes/default/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script src="/themes/default/assets/js/adminlte.min.js"></script>
 
@@ -199,6 +208,14 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Plugin Scripts (AssetManager - Footer) -->
 <% if (locals.assetManager) { %>
   <%- assetManager.renderScripts(true) %>
+<% } %>
+
+<!-- Plugin Partial Scripts (von includePluginPartial extrahiert) -->
+<% if (locals._pluginScripts && locals._pluginScripts.length > 0) { %>
+  <!-- Extrahierte Scripts aus Plugin-Partials (Total: <%= locals._pluginScripts.length %>) -->
+  <% locals._pluginScripts.forEach(function(script) { %>
+    <%- script %>
+  <% }); %>
 <% } %>
 
 <!-- Language Switcher Script -->

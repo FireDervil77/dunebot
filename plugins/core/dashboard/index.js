@@ -35,6 +35,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
       
       // Router initialisieren
       this.guildRouter = express.Router();   // Guild-Bereich (früher dashboard/admin)
+      this.apiRouter = express.Router();     // API-Bereich für AJAX-Calls
 
       // Routen einrichten
       this._setupRoutes();
@@ -72,6 +73,11 @@ class CoreDashboardPlugin extends DashboardPlugin {
       const themeManager = ServiceManager.get('themeManager');
 
         try {
+            // API-Routen für AJAX-Calls
+            const toastLoggerRouter = require('./routes/api/toast-logger');
+            this.apiRouter.use('/toasts', toastLoggerRouter);
+            Logger.debug('[Core] Toast-Logger API-Route registriert');
+
             // Haupteinstellungen
             this.guildRouter.get('/settings', async (req, res) => {
                 const guildId = res.locals.guildId;
@@ -81,8 +87,10 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 let enabledPlugins = [];
                 try {
                     enabledPlugins = await dbService.getEnabledPlugins(guildId);
+                    Logger.debug(`[Core] Aktivierte Plugins für Guild ${guildId}:`, enabledPlugins);
                 } catch (err) {
                     Logger.error('[Core] Fehler beim Laden der enabled Plugins:', err);
+                    enabledPlugins = []; // Sicherstellen dass es ein Array ist
                 }
                 
                 // View über ThemeManager rendern lassen
@@ -90,7 +98,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                     title: 'Einstellungen',
                     activeMenu: `/guild/${guildId}/plugins/core/settings`,
                     guildId,
-                    enabledPlugins,
+                    enabledPlugins: enabledPlugins || [], // Fallback auf leeres Array
                     plugin: this
                 });
             });
@@ -229,6 +237,17 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 await themeManager.renderView(res, 'guild/settings/integrations', {
                     title: 'Integrationen',
                     activeMenu: `/guild/${guildId}/plugins/core/settings/integrations`,
+                    guildId,
+                    plugin: this
+                });
+            });
+
+            // Toast-History Page (für alle User - zeigt nur eigene Toasts)
+            this.guildRouter.get('/toast-history', async (req, res) => {
+                const guildId = res.locals.guildId;
+                await themeManager.renderView(res, 'guild/toast-history', {
+                    title: 'Toast Benachrichtigungen',
+                    activeMenu: `/guild/${guildId}/plugins/core/toast-history`,
                     guildId,
                     plugin: this
                 });

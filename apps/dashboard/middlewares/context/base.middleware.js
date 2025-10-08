@@ -293,6 +293,9 @@ module.exports = async (req, res, next) => {
         res.locals.activeMenu = req.originalUrl;
         res.locals.dashboardHomeUrl = req.session?.user ? '/guild' : '/auth/server-selector';
         
+        // Plugin Scripts Array (für includePluginPartial Script Extraction)
+        res.locals._pluginScripts = [];
+        
         // Meta-Informationen
         res.locals.siteName = process.env.SITE_NAME || 'DuneBot';
         res.locals.dashboard_version = process.env.DASHBOARD_VERSION || '0.1.0-beta';

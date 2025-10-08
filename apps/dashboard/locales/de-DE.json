@@ -398,6 +398,13 @@
         "DUNEMAP_SETTINGS_ERROR": "Fehler beim Speichern der DuneMap-Einstellungen"
     },
 
+    "TOAST_NOTIFICATIONS": {
+        "TITLE": "Toast Benachrichtigungen",
+        "LOADING": "Lade Benachrichtigungen...",
+        "VIEW_ALL": "Alle anzeigen",
+        "NO_CRITICAL": "Keine kritischen Benachrichtigungen"
+    },
+
     "DASHBOARD_COMMON": {
         "MEMBER_SINCE": "Mitglied seit",
         "DAYS": "Tagen",
