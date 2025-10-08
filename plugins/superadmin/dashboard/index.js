@@ -145,6 +145,12 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         try {
             Logger.debug('[SuperAdmin] Starte Route-Setup für guildRouter...');
             
+            // API-Routen (ohne Owner-Check für bestimmte Endpoints)
+            const toastHistoryApi = require('./routes/api/toast-history');
+            this.apiRouter = express.Router();
+            this.apiRouter.use('/toast-history', toastHistoryApi);
+            Logger.debug('[SuperAdmin] Toast-History API registriert');
+            
             // Middleware: Owner-Check für ALLE SuperAdmin-Routen
             this.guildRouter.use(this._checkOwner.bind(this));
 
@@ -430,6 +436,18 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     Logger.error('[SuperAdmin] Fehler bei /stats:', error);
                     res.status(500).render('error', { message: 'Fehler beim Laden der Statistiken', error });
                 }
+            });
+
+            // === TOAST-HISTORY (Monitoring/Debugging) ===
+            this.guildRouter.get('/toast-history', async (req, res) => {
+                const guildId = res.locals.guildId;
+                
+                await themeManager.renderView(res, 'guild/toast-history', {
+                    title: 'Toast-Event History',
+                    activeMenu: `/guild/${guildId}/plugins/superadmin/toast-history`,
+                    guildId,
+                    plugin: this
+                });
             });
 
             Logger.info('[SuperAdmin] Routen eingerichtet für guildRouter');

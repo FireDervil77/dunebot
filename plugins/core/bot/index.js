@@ -46,8 +46,7 @@ class CoreBotPlugin extends BotPlugin {
     async onEnable(client) {
         const Logger = ServiceManager.get("Logger");
         Logger.info('Core-Bot-Plugin wird aktiviert...');
-        
-       
+        // Empty function
         
         Logger.success('Core-Bot-Plugin aktiviert');
     }

@@ -61,16 +61,10 @@ exports.getDashboard = async (req, res) => {
             Logger.error(`Fehler beim Laden der Statistiken für Guild ${guildId}:`, err);
         }
 
-        // Aktivierte Plugins aus der Datenbank laden
+        // Aktivierte Plugins aus guild_plugins Tabelle laden
         let enabledPlugins = [];
         try {
-            const configs = await dbService.getConfigs(guildId, "core", "shared");
-            
-            // JSON-Feld parsen
-            enabledPlugins = configs?.ENABLED_PLUGINS ? 
-                (typeof configs.ENABLED_PLUGINS === 'string' ? 
-                    JSON.parse(configs.ENABLED_PLUGINS) : 
-                    configs.ENABLED_PLUGINS) : ["core"];
+            enabledPlugins = await dbService.getEnabledPlugins(guildId);
         } catch (err) {
             Logger.error(`Fehler beim Laden der aktivierten Plugins für Guild ${guildId}:`, err);
             enabledPlugins = ["core"]; 
@@ -263,16 +257,10 @@ exports.getPlugins = async (req, res) => {
             Logger.warn(`Kein Guild-Name gefunden für Guild ${guildId}`);
         }
 
-        // Aktivierte Plugins laden
+        // Aktivierte Plugins aus guild_plugins Tabelle laden
         let enabledServerPlugins = [];
         try {
-            const pluginConfigs = await dbService.getConfigs(guildId, "core", "shared");
-            
-            if (pluginConfigs?.ENABLED_PLUGINS) {
-                enabledServerPlugins = typeof pluginConfigs.ENABLED_PLUGINS === 'string' 
-                    ? JSON.parse(pluginConfigs.ENABLED_PLUGINS)
-                    : pluginConfigs.ENABLED_PLUGINS;
-            }
+            enabledServerPlugins = await dbService.getEnabledPlugins(guildId);
             
             // Sicherstellen dass core immer aktiviert ist
             if (!enabledServerPlugins.includes('core')) {
