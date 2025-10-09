@@ -111,14 +111,31 @@
 
                             <div class="form-group">
                                 <label for="changes_de"><%= tr('CHANGELOGS.FORM.CHANGES') %> (DE) <span class="text-danger">*</span></label>
-                                <textarea class="form-control" 
+                                <textarea class="form-control font-monospace" 
                                           id="changes_de" 
                                           name="changes_de" 
-                                          rows="10" 
+                                          rows="15" 
                                           required><%= changelog?.changes_de || '' %></textarea>
                                 <small class="form-text text-muted">
-                                    Eine Änderung pro Zeile. Prefix verwenden:<br>
-                                    <code>+ Neue Feature</code> | <code>* Verbesserung</code> | <code>- Entfernt</code> | <code>! Fix</code>
+                                    <strong>Hierarchische Struktur verwenden:</strong><br>
+                                    <code># Hauptgruppe</code> (z.B. "# PLUGINS" oder "# SYSTEM")<br>
+                                    <code>## Untergruppe</code> (z.B. "## DuneMap" oder "## Core")<br>
+                                    <code>! Fix</code> | <code>+ Feature</code> | <code>- Entfernt</code> | <code>* Verbesserung</code><br><br>
+                                    <strong>Beispiel:</strong><br>
+                                    <pre class="bg-light p-2 mb-0" style="font-size: 0.85em;"># PLUGINS
+## DuneMap
+! Fix: Map-Rendering bei großen Datenmengen verbessert
++ Feature: Neue Marker-Typen hinzugefügt
+* Change: Performance-Optimierung
+
+## Core
+! Fix: Memory Leak im Event-Handler behoben
+- Removed: Legacy-API-Support entfernt
+
+# DASHBOARD
+## SuperAdmin
++ Feature: Changelog-Editor mit hierarchischer Struktur
+* Change: UI-Verbesserungen</pre>
                                 </small>
                             </div>
                         </div>
@@ -145,13 +162,30 @@
 
                             <div class="form-group">
                                 <label for="changes_en"><%= tr('CHANGELOGS.FORM.CHANGES') %> (EN) <span class="text-danger">*</span></label>
-                                <textarea class="form-control" 
+                                <textarea class="form-control font-monospace" 
                                           id="changes_en" 
                                           name="changes_en" 
-                                          rows="10"><%= changelog?.changes_en || '' %></textarea>
+                                          rows="15"><%= changelog?.changes_en || '' %></textarea>
                                 <small class="form-text text-muted">
-                                    One change per line. Use prefix:<br>
-                                    <code>+ New Feature</code> | <code>* Improvement</code> | <code>- Removed</code> | <code>! Fix</code>
+                                    <strong>Use hierarchical structure:</strong><br>
+                                    <code># Main Group</code> (e.g. "# PLUGINS" or "# SYSTEM")<br>
+                                    <code>## Sub Group</code> (e.g. "## DuneMap" or "## Core")<br>
+                                    <code>! Fix</code> | <code>+ Feature</code> | <code>- Removed</code> | <code>* Change</code><br><br>
+                                    <strong>Example:</strong><br>
+                                    <pre class="bg-light p-2 mb-0" style="font-size: 0.85em;"># PLUGINS
+## DuneMap
+! Fix: Improved map rendering with large datasets
++ Feature: Added new marker types
+* Change: Performance optimization
+
+## Core
+! Fix: Fixed memory leak in event handler
+- Removed: Removed legacy API support
+
+# DASHBOARD
+## SuperAdmin
++ Feature: Changelog editor with hierarchical structure
+* Change: UI improvements</pre>
                                 </small>
                             </div>
                         </div>
@@ -177,8 +211,190 @@
                     <a href="/guild/<%= guildId %>/plugins/superadmin/changelogs" class="btn btn-secondary">
                         <i class="fas fa-times mr-2"></i><%= tr('CHANGELOGS.FORM.CANCEL') %>
                     </a>
+                    <button type="button" class="btn btn-info float-right" id="previewBtn">
+                        <i class="fas fa-eye mr-2"></i>Vorschau anzeigen
+                    </button>
+                </div>
+            </div>
+
+            <!-- Vorschau-Card (versteckt bis Button geklickt wird) -->
+            <div class="card mt-3" id="previewCard" style="display: none;">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-eye mr-2"></i>Vorschau der hierarchischen Struktur
+                    </h3>
+                    <button type="button" class="btn btn-sm btn-secondary float-right" id="closePreviewBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-toggle="tab" href="#preview-de">Deutsch</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#preview-en">English</a>
+                        </li>
+                    </ul>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="preview-de"></div>
+                        <div class="tab-pane fade" id="preview-en"></div>
+                    </div>
                 </div>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+// Hierarchisches Parsing für Vorschau
+function parseHierarchicalChangelog(changesText) {
+    if (!changesText || typeof changesText !== 'string') return [];
+    
+    const lines = changesText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    const result = [];
+    let currentGroup = null;
+    let currentSubgroup = null;
+
+    const itemTypeMap = {
+        '!': { type: 'fix', icon: 'fa-bug', class: 'text-danger', category: 'Fixes' },
+        '+': { type: 'feature', icon: 'fa-plus', class: 'text-success', category: 'Features' },
+        '-': { type: 'removed', icon: 'fa-minus', class: 'text-warning', category: 'Removed' },
+        '*': { type: 'change', icon: 'fa-edit', class: 'text-info', category: 'Changes' }
+    };
+
+    for (const line of lines) {
+        if (line.startsWith('# ')) {
+            const title = line.substring(2).trim();
+            currentGroup = { type: 'group', title, level: 1, children: [] };
+            result.push(currentGroup);
+            currentSubgroup = null;
+            continue;
+        }
+
+        if (line.startsWith('## ')) {
+            const title = line.substring(3).trim();
+            currentSubgroup = { type: 'subgroup', title, level: 2, items: [] };
+            
+            if (!currentGroup) {
+                currentGroup = { type: 'group', title: 'Änderungen', level: 1, children: [] };
+                result.push(currentGroup);
+            }
+            
+            currentGroup.children.push(currentSubgroup);
+            continue;
+        }
+
+        const firstChar = line.charAt(0);
+        if (itemTypeMap[firstChar]) {
+            const itemMeta = itemTypeMap[firstChar];
+            const text = line.substring(1).trim();
+            const item = {
+                type: itemMeta.type,
+                icon: itemMeta.icon,
+                class: itemMeta.class,
+                category: itemMeta.category,
+                text
+            };
+
+            if (currentSubgroup) {
+                currentSubgroup.items.push(item);
+            } else if (currentGroup) {
+                let generalSubgroup = currentGroup.children.find(sg => sg.title === 'Allgemein');
+                if (!generalSubgroup) {
+                    generalSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, items: [] };
+                    currentGroup.children.push(generalSubgroup);
+                }
+                generalSubgroup.items.push(item);
+                currentSubgroup = generalSubgroup;
+            } else {
+                currentGroup = { type: 'group', title: 'Änderungen', level: 1, children: [] };
+                currentSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, items: [] };
+                currentGroup.children.push(currentSubgroup);
+                result.push(currentGroup);
+                currentSubgroup.items.push(item);
+            }
+        }
+    }
+
+    return result;
+}
+
+// Render Hierarchie als HTML
+function renderHierarchicalHTML(hierarchicalData) {
+    if (!hierarchicalData || hierarchicalData.length === 0) {
+        return '<p class="text-muted"><em>Keine Änderungen dokumentiert</em></p>';
+    }
+
+    let html = '<div class="changelog-hierarchical">';
+    
+    hierarchicalData.forEach(group => {
+        if (group.type === 'group') {
+            html += `<div class="changelog-group mb-4">
+                <h4 class="border-bottom pb-2 mb-3">
+                    <i class="fas fa-layer-group mr-2 text-primary"></i>${group.title}
+                </h4>`;
+            
+            (group.children || []).forEach(subgroup => {
+                if (subgroup.type === 'subgroup') {
+                    html += `<div class="changelog-subgroup mb-3 ml-3">
+                        <h5 class="text-muted mb-2">
+                            <i class="fas fa-folder-open mr-2"></i>${subgroup.title}
+                        </h5>`;
+                    
+                    if (subgroup.items && subgroup.items.length > 0) {
+                        html += '<ul class="list-unstyled ml-4">';
+                        subgroup.items.forEach(item => {
+                            html += `<li class="mb-2">
+                                <i class="fas ${item.icon} ${item.class} mr-2"></i>
+                                <strong class="${item.class}">${item.category}:</strong> ${item.text}
+                            </li>`;
+                        });
+                        html += '</ul>';
+                    } else {
+                        html += '<p class="text-muted ml-4"><em>Keine Änderungen</em></p>';
+                    }
+                    
+                    html += '</div>';
+                }
+            });
+            
+            html += '</div>';
+        }
+    });
+    
+    html += '</div>';
+    return html;
+}
+
+// Event-Listener für Vorschau
+document.addEventListener('DOMContentLoaded', function() {
+    const previewBtn = document.getElementById('previewBtn');
+    const closePreviewBtn = document.getElementById('closePreviewBtn');
+    const previewCard = document.getElementById('previewCard');
+    const changesDe = document.getElementById('changes_de');
+    const changesEn = document.getElementById('changes_en');
+    const previewDe = document.getElementById('preview-de');
+    const previewEn = document.getElementById('preview-en');
+
+    previewBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        // Parse und rendere Deutsch
+        const hierarchyDe = parseHierarchicalChangelog(changesDe.value);
+        previewDe.innerHTML = renderHierarchicalHTML(hierarchyDe);
+        
+        // Parse und rendere English
+        const hierarchyEn = parseHierarchicalChangelog(changesEn.value);
+        previewEn.innerHTML = renderHierarchicalHTML(hierarchyEn);
+        
+        // Zeige Vorschau
+        previewCard.style.display = 'block';
+        previewCard.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    closePreviewBtn.addEventListener('click', function() {
+        previewCard.style.display = 'none';
+    });
+});
+</script>

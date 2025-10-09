@@ -5,6 +5,8 @@ const { DashboardPlugin } = require("dunebot-sdk");
 const { parseJsonArray } = require("dunebot-sdk/utils");
 
 const execa = require("execa");
+const https = require("https");
+const tar = require("tar");
 
 class PluginManager extends BasePluginManager {
     /**
@@ -824,15 +826,22 @@ class PluginManager extends BasePluginManager {
         const semver = require('semver');
         
         try {
-            // plugin.json laden
-            const pluginMeta = this.loadPluginMeta(pluginName);
-            if (!pluginMeta || !pluginMeta.version) {
-                return; // Kein plugin.json = kein Versioning
+            // 1. GitHub Release prüfen (statt lokale plugin.json)
+            const latestRelease = await this.getLatestGitHubRelease(pluginName);
+            
+            if (!latestRelease) {
+                Logger.debug(`[PluginManager] Kein GitHub Release für ${pluginName} gefunden`);
+                return;
             }
             
-            const fileVersion = pluginMeta.version;
+            const githubVersion = this.extractVersionFromTag(latestRelease.tag_name, pluginName);
             
-            // Aktuelle Version aus DB
+            if (!githubVersion) {
+                Logger.warn(`[PluginManager] Ungültiges Release Tag Format: ${latestRelease.tag_name}`);
+                return;
+            }
+            
+            // 2. Aktuelle Version aus DB
             const [versionRow] = await dbService.query(`
                 SELECT current_version, update_status 
                 FROM plugin_versions 
@@ -841,9 +850,9 @@ class PluginManager extends BasePluginManager {
             
             const currentVersion = versionRow?.current_version || '0.0.0';
             
-            // Versions-Vergleich
-            if (semver.gt(fileVersion, currentVersion)) {
-                Logger.warn(`[PluginManager] Update verfügbar: ${pluginName} ${currentVersion} → ${fileVersion}`);
+            // 3. Versions-Vergleich
+            if (semver.gt(githubVersion, currentVersion)) {
+                Logger.warn(`[PluginManager] Update verfügbar: ${pluginName} ${currentVersion} → ${githubVersion}`);
                 
                 // SuperAdmin Config: Grace Period
                 const [graceDaysRow] = await dbService.query(`
@@ -858,27 +867,32 @@ class PluginManager extends BasePluginManager {
                 const updateDeadlineAt = new Date();
                 updateDeadlineAt.setDate(updateDeadlineAt.getDate() + graceDays);
                 
+                // Changelog aus GitHub Release Body extrahieren
+                const changelog = this.parseReleaseChangelog(latestRelease.body || '');
+                
                 // Update-Info in DB speichern
                 await dbService.query(`
                     INSERT INTO plugin_versions 
                         (plugin_name, guild_id, current_version, available_version, 
-                         update_available_at, update_deadline_at, update_status, changelog)
+                         update_available_at, update_deadline_at, update_status, changelog, release_url)
                     VALUES 
-                        (?, ?, ?, ?, ?, ?, 'available', ?)
+                        (?, ?, ?, ?, ?, ?, 'available', ?, ?)
                     ON DUPLICATE KEY UPDATE
                         available_version = VALUES(available_version),
                         update_available_at = VALUES(update_available_at),
                         update_deadline_at = VALUES(update_deadline_at),
                         update_status = 'available',
-                        changelog = VALUES(changelog)
+                        changelog = VALUES(changelog),
+                        release_url = VALUES(release_url)
                 `, [
                     pluginName, 
                     guildId, 
                     currentVersion, 
-                    fileVersion,
+                    githubVersion,
                     updateAvailableAt,
                     updateDeadlineAt,
-                    JSON.stringify(pluginMeta.changelog?.[fileVersion] || [])
+                    JSON.stringify(changelog),
+                    latestRelease.html_url
                 ]);
                 
                 Logger.info(`[PluginManager] Update-Notice erstellt: ${pluginName} (Deadline: ${updateDeadlineAt.toLocaleDateString('de-DE')})`);
@@ -917,10 +931,17 @@ class PluginManager extends BasePluginManager {
             
             Logger.info(`[PluginManager] Starte ${isAutoUpdate ? 'Auto-' : ''}Update: ${pluginName} → v${targetVersion} (Guild: ${guildId})`);
             
-            // Migration ausführen
+            // 1. Download & Installation von GitHub
+            const downloadResult = await this.downloadAndInstallUpdate(pluginName, targetVersion, guildId);
+            
+            if (!downloadResult.success) {
+                throw new Error(downloadResult.error || 'Download fehlgeschlagen');
+            }
+            
+            // 2. Migration ausführen (falls vorhanden)
             await this.runMigration(pluginName, targetVersion, guildId);
             
-            // Status aktualisieren
+            // 3. Status aktualisieren (wird bereits in downloadAndInstallUpdate gemacht, aber sicherstellen)
             await dbService.query(`
                 UPDATE plugin_versions 
                 SET 
@@ -928,7 +949,8 @@ class PluginManager extends BasePluginManager {
                     available_version = NULL,
                     update_status = ?,
                     auto_update_at = ?,
-                    error_log = NULL
+                    error_log = NULL,
+                    updated_at = NOW()
                 WHERE plugin_name = ? AND guild_id = ?
             `, [
                 targetVersion,
@@ -1119,6 +1141,391 @@ class PluginManager extends BasePluginManager {
         const now = new Date();
         const diff = new Date(deadline) - now;
         return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    }
+
+    // ============================================================
+    // GITHUB RELEASE INTEGRATION
+    // ============================================================
+
+    /**
+     * Holt das neueste GitHub Release für ein Plugin
+     * @param {string} pluginName - Name des Plugins
+     * @returns {Promise<Object|null>} GitHub Release Objekt oder null
+     * @author FireDervil
+     */
+    async getLatestGitHubRelease(pluginName) {
+        const Logger = ServiceManager.get('Logger');
+        
+        try {
+            const releases = await this.fetchGitHubReleases();
+            
+            // Finde neueste Version für dieses Plugin
+            // Format: pluginname-vX.Y.Z (z.B. "dunemap-v2.1.0")
+            const pluginReleases = releases.filter(r => 
+                r.tag_name.startsWith(`${pluginName}-v`) && !r.draft && !r.prerelease
+            );
+            
+            if (pluginReleases.length === 0) {
+                return null;
+            }
+            
+            // Sortiere nach Veröffentlichungsdatum (neueste zuerst)
+            pluginReleases.sort((a, b) => 
+                new Date(b.published_at) - new Date(a.published_at)
+            );
+            
+            return pluginReleases[0];
+            
+        } catch (error) {
+            Logger.error(`[PluginManager] Fehler beim Abrufen des GitHub Releases für ${pluginName}:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Holt alle GitHub Releases des Repositories
+     * @returns {Promise<Array>} Array mit GitHub Release Objekten
+     * @author FireDervil
+     */
+    async fetchGitHubReleases() {
+        const Logger = ServiceManager.get('Logger');
+        
+        return new Promise((resolve, reject) => {
+            const options = {
+                hostname: 'api.github.com',
+                path: '/repos/FireDervil77/dunebot/releases',
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'DuneBot-UpdateManager',
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            };
+            
+            // Optional: GitHub Token für höhere Rate Limits
+            const githubToken = process.env.GITHUB_TOKEN;
+            if (githubToken) {
+                options.headers['Authorization'] = `token ${githubToken}`;
+            }
+            
+            https.get(options, (res) => {
+                let data = '';
+                
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                
+                res.on('end', () => {
+                    if (res.statusCode === 200) {
+                        try {
+                            const releases = JSON.parse(data);
+                            resolve(releases);
+                        } catch (error) {
+                            Logger.error('[PluginManager] Fehler beim Parsen der GitHub API Response:', error);
+                            reject(error);
+                        }
+                    } else {
+                        Logger.error(`[PluginManager] GitHub API Error: ${res.statusCode}`);
+                        reject(new Error(`GitHub API returned status ${res.statusCode}`));
+                    }
+                });
+            }).on('error', (error) => {
+                Logger.error('[PluginManager] Fehler beim Abrufen der GitHub Releases:', error);
+                reject(error);
+            });
+        });
+    }
+
+    /**
+     * Extrahiert die Version aus einem GitHub Release Tag
+     * @param {string} tagName - Release Tag (z.B. "dunemap-v2.1.0")
+     * @param {string} pluginName - Name des Plugins
+     * @returns {string|null} Version (z.B. "2.1.0") oder null
+     * @author FireDervil
+     */
+    extractVersionFromTag(tagName, pluginName) {
+        // Format: pluginname-vX.Y.Z
+        const prefix = `${pluginName}-v`;
+        
+        if (!tagName.startsWith(prefix)) {
+            return null;
+        }
+        
+        return tagName.substring(prefix.length);
+    }
+
+    /**
+     * Parst den Changelog aus einem GitHub Release Body
+     * @param {string} releaseBody - Markdown Text des Release
+     * @returns {Array<string>} Array mit Changelog-Einträgen
+     * @author FireDervil
+     */
+    parseReleaseChangelog(releaseBody) {
+        if (!releaseBody) return [];
+        
+        const lines = releaseBody.split('\n');
+        const changelog = [];
+        
+        for (const line of lines) {
+            const trimmed = line.trim();
+            
+            // Erkenne Changelog-Einträge (Listen mit -, *, oder Nummern)
+            if (trimmed.match(/^[-*]\s+/) || trimmed.match(/^\d+\.\s+/)) {
+                // Entferne Markdown-Formatierung
+                const cleanedLine = trimmed
+                    .replace(/^[-*]\s+/, '')
+                    .replace(/^\d+\.\s+/, '')
+                    .trim();
+                    
+                if (cleanedLine) {
+                    changelog.push(cleanedLine);
+                }
+            }
+        }
+        
+        return changelog.length > 0 ? changelog : ['Update verfügbar'];
+    }
+
+    /**
+     * Lädt ein Plugin-Update von GitHub herunter und installiert es
+     * @param {string} pluginName - Name des Plugins
+     * @param {string} version - Zielversion
+     * @param {string} guildId - Guild ID für Guild-spezifische Updates
+     * @returns {Promise<{success: boolean, error?: string}>}
+     * @author FireDervil
+     */
+    async downloadAndInstallUpdate(pluginName, version, guildId) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        try {
+            Logger.info(`[PluginManager] Starte Download: ${pluginName} v${version}`);
+            
+            // 1. Backup des aktuellen Plugins erstellen
+            const backupPath = await this.createPluginBackup(pluginName);
+            Logger.info(`[PluginManager] Backup erstellt: ${backupPath}`);
+            
+            // 2. GitHub Release URL
+            const releaseTag = `${pluginName}-v${version}`;
+            const downloadUrl = `https://github.com/FireDervil77/dunebot/archive/refs/tags/${releaseTag}.tar.gz`;
+            
+            // 3. Download Release
+            const tempDir = path.join(__dirname, '../../../temp');
+            if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+            
+            const tarballPath = path.join(tempDir, `${pluginName}-${version}.tar.gz`);
+            await this.downloadFile(downloadUrl, tarballPath);
+            Logger.info(`[PluginManager] Download abgeschlossen: ${tarballPath}`);
+            
+            // 4. Extrahiere nur Plugin-Ordner
+            const extractDir = path.join(tempDir, `${pluginName}-${version}-extract`);
+            await this.extractPluginFromTarball(tarballPath, extractDir, pluginName);
+            Logger.info(`[PluginManager] Plugin extrahiert: ${extractDir}`);
+            
+            // 5. Installiere neues Plugin
+            const pluginPath = path.join(this.pluginDir, pluginName);
+            await this.replacePluginFiles(extractDir, pluginPath);
+            Logger.info(`[PluginManager] Plugin-Dateien aktualisiert`);
+            
+            // 6. Cleanup
+            fs.rmSync(tarballPath, { force: true });
+            fs.rmSync(extractDir, { recursive: true, force: true });
+            
+            // 7. Version in DB aktualisieren
+            await dbService.query(`
+                UPDATE plugin_versions 
+                SET current_version = ?, 
+                    available_version = NULL,
+                    update_status = 'up-to-date',
+                    updated_at = NOW()
+                WHERE plugin_name = ? AND guild_id = ?
+            `, [version, pluginName, guildId]);
+            
+            Logger.success(`[PluginManager] ${pluginName} erfolgreich auf v${version} aktualisiert`);
+            
+            return { success: true };
+            
+        } catch (error) {
+            Logger.error(`[PluginManager] Fehler beim Plugin-Update:`, error);
+            
+            // Rollback bei Fehler
+            try {
+                await this.rollbackPlugin(pluginName);
+                Logger.info(`[PluginManager] Rollback durchgeführt`);
+            } catch (rollbackError) {
+                Logger.error(`[PluginManager] Rollback fehlgeschlagen:`, rollbackError);
+            }
+            
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Erstellt ein Backup des aktuellen Plugins
+     * @param {string} pluginName - Name des Plugins
+     * @returns {Promise<string>} Pfad zum Backup
+     * @author FireDervil
+     */
+    async createPluginBackup(pluginName) {
+        const backupDir = path.join(__dirname, '../../../backups/plugins');
+        if (!fs.existsSync(backupDir)) {
+            fs.mkdirSync(backupDir, { recursive: true });
+        }
+        
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupPath = path.join(backupDir, `${pluginName}-backup-${timestamp}`);
+        
+        const sourcePath = path.join(this.pluginDir, pluginName);
+        
+        // Kopiere rekursiv
+        await this.copyDirectory(sourcePath, backupPath);
+        
+        return backupPath;
+    }
+
+    /**
+     * Kopiert ein Verzeichnis rekursiv
+     * @param {string} source - Quellverzeichnis
+     * @param {string} destination - Zielverzeichnis
+     * @author FireDervil
+     */
+    async copyDirectory(source, destination) {
+        if (!fs.existsSync(destination)) {
+            fs.mkdirSync(destination, { recursive: true });
+        }
+        
+        const entries = fs.readdirSync(source, { withFileTypes: true });
+        
+        for (const entry of entries) {
+            const sourcePath = path.join(source, entry.name);
+            const destPath = path.join(destination, entry.name);
+            
+            if (entry.isDirectory()) {
+                await this.copyDirectory(sourcePath, destPath);
+            } else {
+                fs.copyFileSync(sourcePath, destPath);
+            }
+        }
+    }
+
+    /**
+     * Lädt eine Datei von einer URL herunter
+     * @param {string} url - Download URL
+     * @param {string} destination - Zielpfad
+     * @returns {Promise<void>}
+     * @author FireDervil
+     */
+    async downloadFile(url, destination) {
+        return new Promise((resolve, reject) => {
+            const file = fs.createWriteStream(destination);
+            
+            https.get(url, (response) => {
+                // Handle Redirects
+                if (response.statusCode === 302 || response.statusCode === 301) {
+                    https.get(response.headers.location, (redirectResponse) => {
+                        redirectResponse.pipe(file);
+                        file.on('finish', () => {
+                            file.close(resolve);
+                        });
+                    }).on('error', reject);
+                } else {
+                    response.pipe(file);
+                    file.on('finish', () => {
+                        file.close(resolve);
+                    });
+                }
+            }).on('error', (err) => {
+                fs.unlink(destination, () => {});
+                reject(err);
+            });
+        });
+    }
+
+    /**
+     * Extrahiert ein Plugin aus einem GitHub Release Tarball
+     * @param {string} tarballPath - Pfad zum Tarball
+     * @param {string} extractDir - Extraktionsverzeichnis
+     * @param {string} pluginName - Name des Plugins
+     * @returns {Promise<void>}
+     * @author FireDervil
+     */
+    async extractPluginFromTarball(tarballPath, extractDir, pluginName) {
+        // Extrahiere vollständiges Tarball
+        await tar.extract({
+            file: tarballPath,
+            cwd: extractDir
+        });
+        
+        // Finde Plugin-Ordner im extrahierten Archiv
+        // GitHub Format: dunebot-pluginname-vX.Y.Z/plugins/pluginname/
+        const extractedContents = fs.readdirSync(extractDir);
+        const rootFolder = extractedContents[0]; // Normalerweise nur ein Ordner
+        
+        const pluginSourcePath = path.join(extractDir, rootFolder, 'plugins', pluginName);
+        
+        if (!fs.existsSync(pluginSourcePath)) {
+            throw new Error(`Plugin ${pluginName} nicht im Release gefunden`);
+        }
+        
+        // Verschiebe Plugin-Ordner an Root von extractDir
+        const tempPluginPath = path.join(extractDir, 'plugin-temp');
+        fs.renameSync(pluginSourcePath, tempPluginPath);
+        
+        // Cleanup
+        fs.rmSync(path.join(extractDir, rootFolder), { recursive: true, force: true });
+        fs.renameSync(tempPluginPath, path.join(extractDir, pluginName));
+    }
+
+    /**
+     * Ersetzt Plugin-Dateien mit neuer Version
+     * @param {string} source - Quellverzeichnis (neue Version)
+     * @param {string} destination - Zielverzeichnis (aktuelles Plugin)
+     * @author FireDervil
+     */
+    async replacePluginFiles(source, destination) {
+        // Entferne altes Plugin (außer Backups)
+        if (fs.existsSync(destination)) {
+            fs.rmSync(destination, { recursive: true, force: true });
+        }
+        
+        // Kopiere neues Plugin
+        const sourcePath = path.join(source, fs.readdirSync(source)[0]);
+        await this.copyDirectory(sourcePath, destination);
+    }
+
+    /**
+     * Rollback zu vorheriger Plugin-Version
+     * @param {string} pluginName - Name des Plugins
+     * @returns {Promise<void>}
+     * @author FireDervil
+     */
+    async rollbackPlugin(pluginName) {
+        const Logger = ServiceManager.get('Logger');
+        const backupDir = path.join(__dirname, '../../../backups/plugins');
+        
+        // Finde neuestes Backup
+        const backups = fs.readdirSync(backupDir)
+            .filter(f => f.startsWith(`${pluginName}-backup-`))
+            .sort()
+            .reverse();
+        
+        if (backups.length === 0) {
+            throw new Error(`Kein Backup für ${pluginName} gefunden`);
+        }
+        
+        const latestBackup = path.join(backupDir, backups[0]);
+        const pluginPath = path.join(this.pluginDir, pluginName);
+        
+        // Entferne fehlerhafte Version
+        if (fs.existsSync(pluginPath)) {
+            fs.rmSync(pluginPath, { recursive: true, force: true });
+        }
+        
+        // Stelle Backup wieder her
+        await this.copyDirectory(latestBackup, pluginPath);
+        
+        Logger.info(`[PluginManager] Rollback erfolgreich: ${pluginName} wiederhergestellt`);
     }
 }
 
