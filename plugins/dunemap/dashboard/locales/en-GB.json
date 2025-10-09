@@ -72,6 +72,15 @@
       "SHORT": "Short Format (HH:mm)",
       "HELP": "Display format for the storm timer in Discord messages"
     },
+    "CORIOLIS_REGION": {
+      "LABEL": "Coriolis Storm Server Region",
+      "HELP": "Select your server region for accurate storm times (resets every Monday)",
+      "NA": "North America",
+      "SA": "South America",
+      "EU": "Europe",
+      "AS": "Asia",
+      "OCE": "Oceania"
+    },
     "TIMEZONE": {
       "LABEL": "Timezone",
       "HELP": "Timezone for all time calculations and displays"
@@ -112,6 +121,7 @@
     "CURRENT_CONFIG": {
       "TITLE": "Current Configuration",
       "FORMAT": "Format",
+      "REGION": "Server Region",
       "TIMEZONE": "Timezone",
       "AUTO_RECALC": "Auto",
       "DURATION": "Duration",
@@ -133,7 +143,7 @@
   "ADMIN": {
     "TITLE": "Interactive Sector Map",
     "DESCRIPTION": "Click on a sector (A1-I9) to place or remove markers.",
-    "MAX_MARKERS": "Maximum 4 markers per sector!",
+    "MAX_MARKERS": "Maximum 6 markers per sector!",
     "GRID_TITLE": "Dune Sector Grid (A1 - I9)",
     "LEGEND_TITLE": "Legend:",
     "PVE_ZONE": "PvE Zone (Rows A-E, all columns)",
@@ -156,6 +166,13 @@
       "TOTAL_MARKERS": "Total Markers:",
       "OCCUPIED_SECTORS": "Occupied Sectors:",
       "AVAILABLE": "Available:"
+    },
+    "STORM": {
+      "TITLE": "Coriolis Storm Timer",
+      "REGION_LABEL": "Server Region",
+      "NEXT_RESET": "Next Reset in:",
+      "TIME_LABEL": "Storm Time",
+      "HELP_TEXT": "Change in DuneMap Settings"
     },
     "MARKER_TYPES": {
       "TITAN": "Titan",

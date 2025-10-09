@@ -170,6 +170,9 @@ module.exports = class App {
             // Plugins laden
             await this.loadPlugins();
             
+            // Plugin-Update-Check starten (im Hintergrund)
+            this.#startPluginUpdateCheck();
+            
             // View-Pfade nach Plugin-Load aktualisieren (damit Plugin-Views gefunden werden)
             if (this.app.themeManager && typeof this.app.themeManager.setupViewEngine === 'function') {
                 this.app.themeManager.setupViewEngine();
@@ -487,8 +490,60 @@ module.exports = class App {
                 message: "404 Not Found. Visit /docs for more information"
             });
         });
-
-        // Allgemeiner Error-Handler - MUSS als LETZTES stehen
+        
+        // Error Middleware (MUSS als letztes registriert werden)
         this.app.use(errorMiddleware);
+    }
+
+    /**
+     * Startet Plugin-Update-Check und Auto-Update Cronjob
+     * @private
+     */
+    #startPluginUpdateCheck() {
+        const Logger = ServiceManager.get("Logger");
+        
+        // Auto-Update Cronjob: Täglich um 03:00 Uhr
+        const DAILY_CHECK_HOUR = 3; // 03:00 Uhr
+        const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 Stunden
+        
+        // Berechne Zeit bis nächsten Check (03:00 Uhr)
+        const now = new Date();
+        const nextCheck = new Date();
+        nextCheck.setHours(DAILY_CHECK_HOUR, 0, 0, 0);
+        
+        if (now > nextCheck) {
+            nextCheck.setDate(nextCheck.getDate() + 1); // Morgen 03:00
+        }
+        
+        const msUntilNextCheck = nextCheck - now;
+        
+        Logger.info(`[Auto-Update] Nächster Check: ${nextCheck.toLocaleString('de-DE')}`);
+        
+        // Erster Check nach Verzögerung
+        setTimeout(async () => {
+            await this.#runAutoUpdateCheck();
+            
+            // Danach täglich wiederholen
+            setInterval(async () => {
+                await this.#runAutoUpdateCheck();
+            }, INTERVAL_MS);
+            
+        }, msUntilNextCheck);
+    }
+
+    /**
+     * Führt Auto-Update-Check durch
+     * @private
+     */
+    async #runAutoUpdateCheck() {
+        const Logger = ServiceManager.get("Logger");
+        
+        try {
+            Logger.info('[Auto-Update] Starte täglichen Plugin-Update-Check...');
+            await this.app.pluginManager.processAutoUpdates();
+            Logger.success('[Auto-Update] Check abgeschlossen');
+        } catch (error) {
+            Logger.error('[Auto-Update] Fehler beim Update-Check:', error);
+        }
     }
 };

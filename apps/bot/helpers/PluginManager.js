@@ -353,9 +353,9 @@ async enablePlugin(pluginName) {
             }
 
             // Plugin laden wenn noch nicht geladen
-            if (!this.plugins.find(p => p.name === pluginName)) {
+            if (!this.isPluginEnabled(pluginName)) {
                 Logger.debug(`Plugin ${pluginName} wird für Guild ${guildId} geladen...`);
-                const result = await this.loadPlugin(pluginName);
+                const result = await this.enablePlugin(pluginName);
                 
                 // Plugin aktivieren
                 if (!result?.success) {
@@ -363,7 +363,7 @@ async enablePlugin(pluginName) {
                 }
             }
 
-            const plugin = this.plugins.find(p => p.name === pluginName);
+            const plugin = this.getPlugin(pluginName);
             if (!plugin) {
                 throw new Error(`Plugin ${pluginName} konnte nicht gefunden werden`);
             }

@@ -122,5 +122,14 @@ try {
         res.locals.buyMeCoffeeUrl = '#';
     }
     
+    // Plugin-Updates Anzahl laden für Badge in Navigation
+    try {
+        const pendingUpdates = await pluginManager.getAvailableUpdates(guildId);
+        res.locals.pendingUpdatesCount = pendingUpdates.length;
+    } catch (error) {
+        Logger.warn('[Guild Middleware] Error loading plugin updates count:', error.message);
+        res.locals.pendingUpdatesCount = 0;
+    }
+    
     next();
 };

@@ -1,4 +1,5 @@
 const { ServiceManager } = require('dunebot-core');
+const { getNextStormTiming } = require('../../shared/coriolisStormConfig');
 const {
     ActionRowBuilder,
     StringSelectMenuBuilder,
@@ -173,24 +174,14 @@ module.exports = {
                 files: [{ attachment: mapBuffer, name: 'map.png' }]
             });
 
-            // Timer aus der Datenbank laden
-            const [timer] = await dbService.query(
-                'SELECT * FROM dunemap_storm_timer WHERE guild_id = ?',
-                [channel.guild.id]
-            );
-
-            let timerText = null;
-            if (timer) {
-                const remaining = (timer.start_time + timer.duration) - Math.floor(Date.now() / 1000);
-                if (remaining > 0) {
-                    const days = Math.floor(remaining / 86400);
-                    const hours = Math.floor((remaining % 86400) / 3600);
-                    const minutes = Math.floor((remaining % 3600) / 60);
-                    timerText = `${days}d ${hours}h ${minutes}m`;
-                } else {
-                    timerText = 'Timer abgelaufen!';
-                }
-            }
+            // NEUES SYSTEM: Automatischer Storm-Timer basierend auf Region
+            const region = await dbService.getConfig('dunemap', 'coriolis_region', 'shared', channel.guild.id) || 'EU';
+            const stormData = getNextStormTiming(region);
+            
+            // Timer-Text formatieren
+            const timerText = `${stormData.daysUntil}d ${stormData.hoursUntil}h ${stormData.minutesUntil}m`;
+            
+            Logger.debug(`[DuneMap] Storm-Timer für Region ${region}: ${timerText}`);
             
             // Sturm-Timer generieren und senden
             const timerBuffer = await mapGen.generateStormTimer(timerText);

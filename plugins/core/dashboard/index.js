@@ -292,6 +292,30 @@ class CoreDashboardPlugin extends DashboardPlugin {
             
           const { guildId, guild, req, res, theme, user, stats, enabledPlugins, custom } = options;
 
+            // Plugin-Updates Widget (WICHTIG: Zuerst laden!)
+            let pendingUpdates = [];
+            try {
+                pendingUpdates = await pluginManager.getAvailableUpdates(guildId);
+            } catch (err) {
+                Logger.error('[Core Plugin] Fehler beim Laden von Plugin-Updates:', err);
+            }
+
+            // Nur anzeigen wenn Updates vorhanden sind
+            if (pendingUpdates.length > 0) {
+                widgets.push({
+                    id: 'plugin-updates',
+                    title: 'Plugin-Updates',
+                    size: 12, // Volle Breite statt 4
+                    icon: 'fas fa-sync-alt',
+                    cardClass: 'card-warning',
+                    content: await themeManager.renderWidgetPartial('plugin-updates', { 
+                        guildId,
+                        pendingUpdates,
+                        plugin: 'core'
+                    })
+                });
+            }
+
             // Server-Information Widget
             widgets.push({
                 id: 'server-info',

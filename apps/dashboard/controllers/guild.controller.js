@@ -410,6 +410,29 @@ exports.getPlugins = async (req, res) => {
             Logger.error(`[Plugins] Fehler beim Durchsuchen des Plugin-Verzeichnisses:`, scanErr);
         }
 
+        // Plugin-Updates laden
+        let pendingUpdates = [];
+        try {
+            pendingUpdates = await pluginManager.getAvailableUpdates(guildId);
+            
+            // Updates mit Plugins mergen
+            const updateMap = new Map(pendingUpdates.map(u => [u.plugin_name, u]));
+            
+            enabledPlugins.forEach(plugin => {
+                if (updateMap.has(plugin.name)) {
+                    plugin.updateInfo = updateMap.get(plugin.name);
+                }
+            });
+            
+            availablePlugins.forEach(plugin => {
+                if (updateMap.has(plugin.name)) {
+                    plugin.updateInfo = updateMap.get(plugin.name);
+                }
+            });
+        } catch (updateErr) {
+            Logger.error(`[Plugins] Fehler beim Laden von Plugin-Updates:`, updateErr);
+        }
+
         // Breadcrumbs
         const breadcrumbs = [
             { title: 'Dashboard', url: `/guild/${guildId}` },
@@ -428,6 +451,7 @@ exports.getPlugins = async (req, res) => {
             guildId,
             enabledPlugins,
             availablePlugins,
+            pendingUpdates,
             breadcrumbs,
             // Flash-Nachrichten für die View bereitstellen (immer als Arrays)
             success: Array.isArray(res.locals.success) ? res.locals.success : [],
@@ -648,6 +672,41 @@ exports.getLocales = async (req, res) => {
         res.status(500).render("error", { 
             message: "Ein Fehler ist aufgetreten.", 
             error 
+        });
+    }
+};
+
+/**
+ * Plugin-Update durchführen
+ * @author firedervil
+ * @param {import('express').Request} req - Express Request Objekt
+ * @param {import('express').Response} res - Express Response Objekt
+ * @returns {Promise<void>}
+ */
+exports.updatePluginVersion = async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const pluginManager = ServiceManager.get('pluginManager');
+
+    try {
+        const { guildId, pluginName } = req.params;
+        
+        Logger.info(`[Plugin Update] Starting update for plugin ${pluginName} in guild ${guildId}`);
+
+        // Update durchführen (isAutoUpdate = false, da manuell)
+        await pluginManager.updatePlugin(pluginName, guildId, false);
+
+        Logger.info(`[Plugin Update] Successfully updated plugin ${pluginName} in guild ${guildId}`);
+
+        res.json({
+            success: true,
+            message: `Plugin ${pluginName} wurde erfolgreich aktualisiert.`
+        });
+
+    } catch (error) {
+        Logger.error(`[Plugin Update] Fehler beim Aktualisieren von Plugin ${req.params.pluginName}:`, error);
+        res.status(500).json({
+            success: false,
+            message: error.message || "Ein Fehler ist beim Update aufgetreten."
         });
     }
 };
