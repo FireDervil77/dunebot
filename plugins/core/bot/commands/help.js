@@ -192,11 +192,12 @@ async function getHelpMenu({ client, guild }) {
                 "I have spend so many hours to build a framework that can handle all the plugins and commands.\n" +
                 "If you have any questions or suggestions, feel free to join my support server.\n\n" +
                 "**Links:**\n" +
-                `**Website:** [Here](${config["WEBSITE"]})\n` +
-                `**GitHub:** [Here](${config["GITHUB"]})\n` +
-                `**Documentation:** [Here](${config["DOCUMENTATION"]})\n` +
-                `**Support Server:** [Join](${config["SUPPORT_SERVER"]})\n` +
-                '**Buy me a coffee:** [Here](https://ko-fi.com/dunebot)\n\n' +
+                `**Website:** [Here](https://www.firenetworks.de)\n` +
+                `**Dune Wiki:** [Here](https://duneawakeningwiki.de/)\n` +
+                `**GitHub:** [Here](later})\n` +
+                `**Documentation:** [Here](not ready jet)\n` +
+                `**Support Server:** [Join](https://discord.gg/AKZv8rqg9X)\n` +
+                '**Buy me a coffee:** [Here](https://buymeacoffee.com/firedervil)\n\n' +
                 `**Invite Me:** [Here](${client.getInvite()})\n`
         );
 
