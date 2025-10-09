@@ -29,6 +29,8 @@
         <!-- Grid-Container (Koordinatensystem wie im Bot: A1 unten links, I9 oben rechts) -->
         <!-- WICHTIG: Keine data-* Attribute - Daten via AssetManager localize -->
         <div id="sectorGrid" 
+             data-guild-id="<%= guildId %>"
+             data-markers='<%- JSON.stringify(markers) %>'
              style="display: grid; grid-template-columns: 40px repeat(9, 1fr); gap: 2px; max-width: 100%;">
           <!-- Grid-Zeilen von oben nach unten (I -> A) -->
           <% const rows = ['I', 'H', 'G', 'F', 'E', 'D', 'C', 'B', 'A']; %>
@@ -159,32 +161,87 @@
         <!-- Marker hinzufügen -->
         <div class="mb-3">
           <h6 class="fw-bold"><%= tr('dunemap:ADMIN.EDITOR.ADD_MARKER') %></h6>
-          <select class="form-select form-select-sm mb-2" id="markerTypeSelect">
-            <option value=""><%= tr('dunemap:ADMIN.EDITOR.SELECT_TYPE') %></option>
-            <optgroup label="<%= tr('dunemap:ADMIN.EDITOR.RESOURCES') %>">
-              <option value="titan">⚡ <%= tr('dunemap:ADMIN.MARKER_TYPES.TITAN') %></option>
-              <option value="spice">🌶️ <%= tr('dunemap:ADMIN.MARKER_TYPES.SPICE') %></option>
-              <option value="stravidium">💎 <%= tr('dunemap:ADMIN.MARKER_TYPES.STRAVIDIUM') %></option>
-              <option value="aluminium">🔩 <%= tr('dunemap:ADMIN.MARKER_TYPES.ALUMINIUM') %></option>
-              <option value="eisen">⚙️ <%= tr('dunemap:ADMIN.MARKER_TYPES.EISEN') %></option>
-            </optgroup>
-            <optgroup label="<%= tr('dunemap:ADMIN.EDITOR.OTHER') %>">
-              <option value="basalt">🪨 <%= tr('dunemap:ADMIN.MARKER_TYPES.BASALT') %></option>
-              <option value="karbon">⬛ <%= tr('dunemap:ADMIN.MARKER_TYPES.KARBON') %></option>
-              <option value="hoele">🕳️ <%= tr('dunemap:ADMIN.MARKER_TYPES.HOELE') %></option>
-              <option value="hole">🕳️ <%= tr('dunemap:ADMIN.MARKER_TYPES.HOLE') %></option>
-            </optgroup>
-            <optgroup label="<%= tr('dunemap:ADMIN.EDITOR.STRUCTURES') %>">
-              <option value="base">🏠 <%= tr('dunemap:ADMIN.MARKER_TYPES.BASE') %></option>
-              <option value="wrack">💥 <%= tr('dunemap:ADMIN.MARKER_TYPES.WRACK') %></option>
-              <option value="kontrollpunkt">🎯 <%= tr('dunemap:ADMIN.MARKER_TYPES.KONTROLLPUNKT') %></option>
-            </optgroup>
-            <optgroup label="<%= tr('dunemap:ADMIN.EDITOR.UTILITIES') %>">
-              <option value="taxi">🚕 <%= tr('dunemap:ADMIN.MARKER_TYPES.TAXI') %></option>
-              <option value="test">🧪 <%= tr('dunemap:ADMIN.MARKER_TYPES.TEST') %></option>
-            </optgroup>
-          </select>
-          <!-- Icon-Vorschau -->
+          
+          <!-- Custom Dropdown mit Icons -->
+          <div class="custom-marker-select mb-2">
+            <input type="hidden" id="markerTypeSelect" value="">
+            <div class="marker-select-display" id="markerSelectDisplay">
+              <span class="placeholder-text"><%= tr('dunemap:ADMIN.EDITOR.SELECT_TYPE') %></span>
+              <i class="fa-solid fa-chevron-down float-end mt-1"></i>
+            </div>
+            <div class="marker-select-dropdown" id="markerSelectDropdown" style="display: none;">
+              
+              <!-- Resources -->
+              <div class="marker-group-label"><%= tr('dunemap:ADMIN.EDITOR.RESOURCES') %></div>
+              <div class="marker-option" data-value="titan">
+                <img src="/assets/plugins/dunemap/icons/titan.png" alt="Titan" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.TITAN') %></span>
+              </div>
+              <div class="marker-option" data-value="spice">
+                <img src="/assets/plugins/dunemap/icons/spice.png" alt="Spice" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.SPICE') %></span>
+              </div>
+              <div class="marker-option" data-value="stravidium">
+                <img src="/assets/plugins/dunemap/icons/stravidium.png" alt="Stravidium" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.STRAVIDIUM') %></span>
+              </div>
+              <div class="marker-option" data-value="aluminium">
+                <img src="/assets/plugins/dunemap/icons/aluminium.png" alt="Aluminium" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.ALUMINIUM') %></span>
+              </div>
+              <div class="marker-option" data-value="eisen">
+                <img src="/assets/plugins/dunemap/icons/eisen.png" alt="Eisen" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.EISEN') %></span>
+              </div>
+              
+              <!-- Other -->
+              <div class="marker-group-label"><%= tr('dunemap:ADMIN.EDITOR.OTHER') %></div>
+              <div class="marker-option" data-value="basalt">
+                <img src="/assets/plugins/dunemap/icons/basalt.png" alt="Basalt" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.BASALT') %></span>
+              </div>
+              <div class="marker-option" data-value="karbon">
+                <img src="/assets/plugins/dunemap/icons/karbon.png" alt="Karbon" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.KARBON') %></span>
+              </div>
+              <div class="marker-option" data-value="hoele">
+                <img src="/assets/plugins/dunemap/icons/hoele.png" alt="Höhle" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.HOELE') %></span>
+              </div>
+              <div class="marker-option" data-value="hole">
+                <img src="/assets/plugins/dunemap/icons/hole.png" alt="Hole" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.HOLE') %></span>
+              </div>
+              
+              <!-- Structures -->
+              <div class="marker-group-label"><%= tr('dunemap:ADMIN.EDITOR.STRUCTURES') %></div>
+              <div class="marker-option" data-value="base">
+                <img src="/assets/plugins/dunemap/icons/base.png" alt="Base" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.BASE') %></span>
+              </div>
+              <div class="marker-option" data-value="wrack">
+                <img src="/assets/plugins/dunemap/icons/wrack.png" alt="Wrack" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.WRACK') %></span>
+              </div>
+              <div class="marker-option" data-value="kontrollpunkt">
+                <img src="/assets/plugins/dunemap/icons/kontrollpunkt.png" alt="Kontrollpunkt" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.KONTROLLPUNKT') %></span>
+              </div>
+              
+              <!-- Utilities -->
+              <div class="marker-group-label"><%= tr('dunemap:ADMIN.EDITOR.UTILITIES') %></div>
+              <div class="marker-option" data-value="taxi">
+                <img src="/assets/plugins/dunemap/icons/taxi.png" alt="Taxi" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.TAXI') %></span>
+              </div>
+              <div class="marker-option" data-value="test">
+                <img src="/assets/plugins/dunemap/icons/test.png" alt="Test" class="marker-icon-sm">
+                <span><%= tr('dunemap:ADMIN.MARKER_TYPES.TEST') %></span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Icon-Vorschau (behalten wir als Backup) -->
           <div id="iconPreview" class="text-center mb-2" style="display: none;">
             <img id="previewImg" src="" alt="" style="width: 48px; height: 48px; object-fit: contain;">
           </div>
@@ -223,6 +280,54 @@
         </p>
       </div>
     </div>
+    
+    <!-- Coriolis Storm Timer -->
+    <div class="card mt-3">
+      <div class="card-header bg-warning text-dark">
+        <h6 class="mb-0">
+          <i class="fa-solid fa-wind me-2"></i>
+          <%= tr('dunemap:ADMIN.STORM.TITLE') %>
+          <span id="storm-active-badge" class="badge bg-danger float-end" style="display: none;">
+            ⚡ AKTIV
+          </span>
+        </h6>
+      </div>
+      <div class="card-body p-3">
+        <div id="stormTimer" class="text-center">
+          <!-- Region Info -->
+          <div class="mb-2">
+            <small class="text-muted d-block mb-1"><%= tr('dunemap:ADMIN.STORM.REGION_LABEL') %></small>
+            <div id="storm-region-name" class="fw-bold" style="font-size: 0.9rem;">
+              🇪🇺 Europe
+            </div>
+          </div>
+          
+          <!-- Countdown -->
+          <div class="mb-2">
+            <strong class="d-block mb-1" style="font-size: 0.75rem;">
+              <%= tr('dunemap:ADMIN.STORM.NEXT_RESET') %>
+            </strong>
+            <div id="countdown" class="badge bg-danger" style="font-size: 1.1rem; font-family: monospace; padding: 0.5rem 1rem;">
+              --d --h --m --s
+            </div>
+          </div>
+          
+          <!-- Storm-Zeit -->
+          <hr class="my-2">
+          <div style="font-size: 0.75rem;" class="text-muted">
+            <i class="fa-solid fa-clock me-1"></i>
+            <%= tr('dunemap:ADMIN.STORM.TIME_LABEL') %>
+            <strong id="storm-time" class="text-dark">19:00 - 05:00</strong>
+          </div>
+          
+          <!-- Hinweis -->
+          <div class="mt-2 p-2 bg-light rounded" style="font-size: 0.7rem;">
+            <i class="fa-solid fa-info-circle me-1"></i>
+            <%= tr('dunemap:ADMIN.STORM.HELP_TEXT') %>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -241,6 +346,88 @@
 <style>
 .sector-cell {
   border-radius: 4px;
+}
+
+/* Custom Marker Select Dropdown */
+.custom-marker-select {
+  position: relative;
+}
+
+.marker-select-display {
+  background: white;
+  border: 1px solid #ced4da;
+  border-radius: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease-in-out;
+}
+
+.marker-select-display:hover {
+  border-color: #86b7fe;
+}
+
+.marker-select-display.active {
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.marker-select-display .placeholder-text {
+  color: #6c757d;
+}
+
+.marker-select-display img {
+  margin-right: 8px;
+}
+
+.marker-select-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ced4da;
+  border-radius: 0.25rem;
+  margin-top: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.marker-group-label {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6c757d;
+  text-transform: uppercase;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.marker-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.15s ease-in-out;
+  font-size: 0.875rem;
+}
+
+.marker-option:hover {
+  background-color: #f8f9fa;
+}
+
+.marker-option.selected {
+  background-color: #e7f1ff;
+  font-weight: 500;
+}
+
+.marker-icon-sm {
+  width: 24px;
+  height: 24px;
+  margin-right: 10px;
+  object-fit: contain;
 }
 
 /* PvE/PvP Trennlinie - horizontal durch die Mitte der E-Reihe */
@@ -276,3 +463,9 @@
   font-weight: bold;
 }
 </style>
+
+<!-- 
+  DuneMap Admin Script wird automatisch via AssetManager geladen!
+  Siehe Kommentar oben: "dunemap-admin.js (enqueued in /admin route)"
+  NICHT manuell einbinden, sonst wird es doppelt geladen!
+-->

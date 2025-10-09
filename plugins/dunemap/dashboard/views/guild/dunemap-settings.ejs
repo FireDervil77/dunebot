@@ -17,99 +17,30 @@
           action="/guild/<%= guildId %>/plugins/dunemap/settings"
         >
           
-          <!-- Storm-Timer Format -->
+          <!-- Coriolis Storm Region -->
           <div class="mb-4">
-            <label for="STORM_TIMER_FORMAT" class="form-label fw-bold">
-              <i class="fa-solid fa-clock me-2"></i>
-              <%= tr('dunemap:SETTINGS.STORM_FORMAT.LABEL') %>
+            <label for="coriolis_region" class="form-label fw-bold">
+              <i class="fa-solid fa-hurricane me-2"></i>
+              <%= tr('dunemap:SETTINGS.CORIOLIS_REGION.LABEL') %>
             </label>
-            <select class="form-select" id="STORM_TIMER_FORMAT" name="STORM_TIMER_FORMAT">
-              <option value="HH:mm:ss" <%= settings.STORM_TIMER_FORMAT === 'HH:mm:ss' ? 'selected' : '' %>>
-                <%= tr('dunemap:SETTINGS.STORM_FORMAT.24H') %>
+            <select class="form-select" id="coriolis_region" name="coriolis_region">
+              <option value="EU" <%= (settings.coriolis_region || 'EU') === 'EU' ? 'selected' : '' %>>
+                🇪🇺 <%= tr('dunemap:SETTINGS.CORIOLIS_REGION.EU') %> (19:00 - 05:00)
               </option>
-              <option value="hh:mm:ss A" <%= settings.STORM_TIMER_FORMAT === 'hh:mm:ss A' ? 'selected' : '' %>>
-                <%= tr('dunemap:SETTINGS.STORM_FORMAT.12H') %>
+              <option value="NA" <%= settings.coriolis_region === 'NA' ? 'selected' : '' %>>
+                🇺🇸 <%= tr('dunemap:SETTINGS.CORIOLIS_REGION.NA') %> (02:00 - 12:00)
               </option>
-              <option value="HH:mm" <%= settings.STORM_TIMER_FORMAT === 'HH:mm' ? 'selected' : '' %>>
-                <%= tr('dunemap:SETTINGS.STORM_FORMAT.SHORT') %>
+              <option value="SA" <%= settings.coriolis_region === 'SA' ? 'selected' : '' %>>
+                🇧🇷 <%= tr('dunemap:SETTINGS.CORIOLIS_REGION.SA') %> (00:00 - 10:00)
+              </option>
+              <option value="AS" <%= settings.coriolis_region === 'AS' ? 'selected' : '' %>>
+                🇨🇳 <%= tr('dunemap:SETTINGS.CORIOLIS_REGION.AS') %> (13:00 - 23:00)
+              </option>
+              <option value="OCE" <%= settings.coriolis_region === 'OCE' ? 'selected' : '' %>>
+                🇦🇺 <%= tr('dunemap:SETTINGS.CORIOLIS_REGION.OCE') %> (11:00 - 21:00)
               </option>
             </select>
-            <small class="text-muted"><%= tr('dunemap:SETTINGS.STORM_FORMAT.HELP') %></small>
-          </div>
-
-          <!-- Zeitzone -->
-          <div class="mb-4">
-            <label for="STROM_TIMER_TIMEZONE" class="form-label fw-bold">
-              <i class="fa-solid fa-globe me-2"></i>
-              <%= tr('dunemap:SETTINGS.TIMEZONE.LABEL') %>
-            </label>
-            <select class="form-select" id="STROM_TIMER_TIMEZONE" name="STROM_TIMER_TIMEZONE">
-              <option value="Europe/Berlin" <%= settings.STROM_TIMER_TIMEZONE === 'Europe/Berlin' ? 'selected' : '' %>>
-                🇩🇪 Europe/Berlin (MEZ/MESZ)
-              </option>
-              <option value="Europe/London" <%= settings.STROM_TIMER_TIMEZONE === 'Europe/London' ? 'selected' : '' %>>
-                🇬🇧 Europe/London (GMT/BST)
-              </option>
-              <option value="America/New_York" <%= settings.STROM_TIMER_TIMEZONE === 'America/New_York' ? 'selected' : '' %>>
-                🇺🇸 America/New_York (EST/EDT)
-              </option>
-              <option value="America/Los_Angeles" <%= settings.STROM_TIMER_TIMEZONE === 'America/Los_Angeles' ? 'selected' : '' %>>
-                🇺🇸 America/Los_Angeles (PST/PDT)
-              </option>
-              <option value="Asia/Tokyo" <%= settings.STROM_TIMER_TIMEZONE === 'Asia/Tokyo' ? 'selected' : '' %>>
-                🇯🇵 Asia/Tokyo (JST)
-              </option>
-              <option value="Australia/Sydney" <%= settings.STROM_TIMER_TIMEZONE === 'Australia/Sydney' ? 'selected' : '' %>>
-                🇦🇺 Australia/Sydney (AEDT/AEST)
-              </option>
-            </select>
-            <small class="text-muted"><%= tr('dunemap:SETTINGS.TIMEZONE.HELP') %></small>
-          </div>
-
-          <!-- Auto-Neuberechnung -->
-          <div class="mb-4">
-            <div class="form-check form-switch">
-              <input 
-                class="form-check-input" 
-                type="checkbox" 
-                id="STORM_TIME_RECALCULATE_TIME" 
-                name="STORM_TIME_RECALCULATE_TIME"
-                <%= settings.STORM_TIME_RECALCULATE_TIME ? 'checked' : '' %>
-              >
-              <label class="form-check-label fw-bold" for="STORM_TIME_RECALCULATE_TIME">
-                <i class="fa-solid fa-rotate me-2"></i>
-                <%= tr('dunemap:SETTINGS.AUTO_RECALC.LABEL') %>
-              </label>
-            </div>
-            <small class="text-muted d-block mt-1">
-              <%= tr('dunemap:SETTINGS.AUTO_RECALC.HELP') %>
-            </small>
-          </div>
-
-          <!-- Storm-Timer Dauer -->
-          <div class="mb-4">
-            <label for="STROM_TIMER_DURATION" class="form-label fw-bold">
-              <i class="fa-solid fa-hourglass-half me-2"></i>
-              <%= tr('dunemap:SETTINGS.DURATION.LABEL') %>
-            </label>
-            <select class="form-select" id="STROM_TIMER_DURATION" name="STROM_TIMER_DURATION">
-              <option value="5d" <%= settings.STROM_TIMER_DURATION === '5d' ? 'selected' : '' %>>
-                <%= tr('dunemap:SETTINGS.DURATION.5_DAYS') %>
-              </option>
-              <option value="6d" <%= settings.STROM_TIMER_DURATION === '6d' ? 'selected' : '' %>>
-                <%= tr('dunemap:SETTINGS.DURATION.6_DAYS') %>
-              </option>
-              <option value="7d" <%= settings.STROM_TIMER_DURATION === '7d' ? 'selected' : '' %>>
-                <%= tr('dunemap:SETTINGS.DURATION.7_DAYS') %>
-              </option>
-              <option value="3d" <%= settings.STROM_TIMER_DURATION === '3d' ? 'selected' : '' %>>
-                <%= tr('dunemap:SETTINGS.DURATION.3_DAYS') %>
-              </option>
-              <option value="1d" <%= settings.STROM_TIMER_DURATION === '1d' ? 'selected' : '' %>>
-                <%= tr('dunemap:SETTINGS.DURATION.1_DAY') %>
-              </option>
-            </select>
-            <small class="text-muted"><%= tr('dunemap:SETTINGS.DURATION.HELP') %></small>
+            <small class="text-muted"><%= tr('dunemap:SETTINGS.CORIOLIS_REGION.HELP') %></small>
           </div>
 
           <!-- Map Channel ID -->
@@ -200,14 +131,9 @@
         </h6>
       </div>
       <div class="card-body">
-        <h6 class="fw-bold">⏱️ <%= tr('dunemap:SETTINGS.HELP.STORM_TITLE') %></h6>
+        <h6 class="fw-bold">🌪️ <%= tr('dunemap:SETTINGS.HELP.STORM_TITLE') %></h6>
         <p class="small">
-          <%= tr('dunemap:SETTINGS.HELP.STORM_TEXT') %>
-        </p>
-
-        <h6 class="fw-bold mt-3">🔄 <%= tr('dunemap:SETTINGS.HELP.AUTO_TITLE') %></h6>
-        <p class="small">
-          <%= tr('dunemap:SETTINGS.HELP.AUTO_TEXT') %>
+          Wähle deine Dune: Awakening Server-Region. Der Storm-Timer wird automatisch basierend auf den offiziellen Zeiten berechnet (wöchentlicher Reset, 10 Stunden Dauer).
         </p>
 
         <h6 class="fw-bold mt-3">💬 <%= tr('dunemap:SETTINGS.HELP.CHANNEL_TITLE') %></h6>
@@ -234,26 +160,13 @@
         <table class="table table-sm table-borderless mb-0">
           <tbody>
             <tr>
-              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.FORMAT') %></td>
-              <td class="small"><code><%= settings.STORM_TIMER_FORMAT %></code></td>
-            </tr>
-            <tr>
-              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.TIMEZONE') %></td>
-              <td class="small"><code><%= settings.STROM_TIMER_TIMEZONE %></code></td>
-            </tr>
-            <tr>
-              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.AUTO_RECALC') %></td>
+              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.REGION') %></td>
               <td class="small">
-                <% if (settings.STORM_TIME_RECALCULATE_TIME) { %>
-                  <span class="badge bg-success"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.ON') %></span>
-                <% } else { %>
-                  <span class="badge bg-secondary"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.OFF') %></span>
-                <% } %>
+                <% const regionFlags = { NA: '🇺🇸', SA: '🇧🇷', EU: '🇪🇺', AS: '🇨🇳', OCE: '🇦🇺' }; %>
+                <% const regionNames = { NA: 'North America', SA: 'South America', EU: 'Europe', AS: 'Asia', OCE: 'Oceania' }; %>
+                <% const currentRegion = settings.coriolis_region || 'EU'; %>
+                <code><%= regionFlags[currentRegion] %> <%= regionNames[currentRegion] %></code>
               </td>
-            </tr>
-            <tr>
-              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.DURATION') %></td>
-              <td class="small"><code><%= settings.STROM_TIMER_DURATION %></code></td>
             </tr>
             <tr>
               <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.CHANNEL') %></td>
@@ -263,7 +176,13 @@
             </tr>
           </tbody>
         </table>
+        <hr class="my-2">
+        <small class="text-muted d-block">
+          <i class="fa-solid fa-info-circle me-1"></i>
+          Storm-Zeiten werden automatisch basierend auf deiner Region berechnet (wöchentlicher Reset, 10h Dauer).
+        </small>
       </div>
     </div>
   </div>
 </div>
+

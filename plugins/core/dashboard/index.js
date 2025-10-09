@@ -35,6 +35,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
       
       // Router initialisieren
       this.guildRouter = express.Router();   // Guild-Bereich (früher dashboard/admin)
+      this.apiRouter = express.Router();     // API-Bereich für AJAX-Calls
 
       // Routen einrichten
       this._setupRoutes();
@@ -72,30 +73,24 @@ class CoreDashboardPlugin extends DashboardPlugin {
       const themeManager = ServiceManager.get('themeManager');
 
         try {
+            // API-Routen für AJAX-Calls
+            const toastLoggerRouter = require('./routes/api/toast-logger');
+            this.apiRouter.use('/toasts', toastLoggerRouter);
+            Logger.debug('[Core] Toast-Logger API-Route registriert');
+
             // Haupteinstellungen
             this.guildRouter.get('/settings', async (req, res) => {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 
-                // Lade aktivierte Plugins für die Guild
+                // Lade aktivierte Plugins für die Guild aus guild_plugins Tabelle
                 let enabledPlugins = [];
                 try {
-                    const [config] = await dbService.query(
-                        `SELECT config_value FROM configs 
-                         WHERE plugin_name = 'core' 
-                         AND config_key = 'ENABLED_PLUGINS' 
-                         AND context = 'shared' 
-                         AND guild_id = ?`,
-                        [guildId]
-                    );
-                    
-                    if (config && config.config_value) {
-                        enabledPlugins = typeof config.config_value === 'string' 
-                            ? JSON.parse(config.config_value) 
-                            : config.config_value;
-                    }
+                    enabledPlugins = await dbService.getEnabledPlugins(guildId);
+                    Logger.debug(`[Core] Aktivierte Plugins für Guild ${guildId}:`, enabledPlugins);
                 } catch (err) {
                     Logger.error('[Core] Fehler beim Laden der enabled Plugins:', err);
+                    enabledPlugins = []; // Sicherstellen dass es ein Array ist
                 }
                 
                 // View über ThemeManager rendern lassen
@@ -103,7 +98,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                     title: 'Einstellungen',
                     activeMenu: `/guild/${guildId}/plugins/core/settings`,
                     guildId,
-                    enabledPlugins,
+                    enabledPlugins: enabledPlugins || [], // Fallback auf leeres Array
                     plugin: this
                 });
             });
@@ -246,6 +241,17 @@ class CoreDashboardPlugin extends DashboardPlugin {
                     plugin: this
                 });
             });
+
+            // Toast-History Page (für alle User - zeigt nur eigene Toasts)
+            this.guildRouter.get('/toast-history', async (req, res) => {
+                const guildId = res.locals.guildId;
+                await themeManager.renderView(res, 'guild/toast-history', {
+                    title: 'Toast Benachrichtigungen',
+                    activeMenu: `/guild/${guildId}/plugins/core/toast-history`,
+                    guildId,
+                    plugin: this
+                });
+            });
             
             Logger.debug('Core Plugin Routen eingerichtet');
         } catch (error) {
@@ -285,6 +291,30 @@ class CoreDashboardPlugin extends DashboardPlugin {
         pluginManager.hooks.addFilter('guild_dashboard_widgets', async (widgets, options) => {
             
           const { guildId, guild, req, res, theme, user, stats, enabledPlugins, custom } = options;
+
+            // Plugin-Updates Widget (WICHTIG: Zuerst laden!)
+            let pendingUpdates = [];
+            try {
+                pendingUpdates = await pluginManager.getAvailableUpdates(guildId);
+            } catch (err) {
+                Logger.error('[Core Plugin] Fehler beim Laden von Plugin-Updates:', err);
+            }
+
+            // Nur anzeigen wenn Updates vorhanden sind
+            if (pendingUpdates.length > 0) {
+                widgets.push({
+                    id: 'plugin-updates',
+                    title: 'Plugin-Updates',
+                    size: 12, // Volle Breite statt 4
+                    icon: 'fas fa-sync-alt',
+                    cardClass: 'card-warning',
+                    content: await themeManager.renderWidgetPartial('plugin-updates', { 
+                        guildId,
+                        pendingUpdates,
+                        plugin: 'core'
+                    })
+                });
+            }
 
             // Server-Information Widget
             widgets.push({
@@ -365,7 +395,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                   guild: options.guild,
                   stats: options.stats,
                   guildId: options.guildId,
-                  enabledPlugins: options.enabledPlugins,
+                  enabledPlugins: options.enabledPlugins.filter(p => p !== 'superadmin'),
                   plugin: 'core'
               })
             });

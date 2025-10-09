@@ -74,6 +74,16 @@
       "SHORT": "Nur Stunden:Minuten (23:45)"
     },
     
+    "CORIOLIS_REGION": {
+      "LABEL": "Coriolis Storm Server-Region",
+      "HELP": "Wähle deine Server-Region für akkurate Storm-Zeiten (Reset jeden Montag)",
+      "NA": "North America",
+      "SA": "South America", 
+      "EU": "Europe",
+      "AS": "Asia",
+      "OCE": "Oceania"
+    },
+    
     "TIMEZONE": {
       "LABEL": "Zeitzone",
       "HELP": "Zeitzone für Storm-Timer Berechnungen"
@@ -120,6 +130,7 @@
     "CURRENT_CONFIG": {
       "TITLE": "Aktuelle Konfiguration",
       "FORMAT": "Format:",
+      "REGION": "Server-Region:",
       "TIMEZONE": "Zeitzone:",
       "AUTO_RECALC": "Auto-Neuberechnung:",
       "DURATION": "Dauer:",
@@ -135,7 +146,7 @@
     "SETTINGS_SAVED": "DuneMap-Einstellungen erfolgreich gespeichert!",
     "ERROR_LOADING_MAP": "Fehler beim Laden der Sektor-Karte",
     "MISSING_PARAMS": "Fehlende Parameter: sectorX, sectorY, markerType erforderlich",
-    "MAX_MARKERS": "Maximal 4 Marker pro Sektor erlaubt!",
+    "MAX_MARKERS": "Maximal 6 Marker pro Sektor erlaubt!",
     "MARKER_SET": "Marker {{type}} in {{sector}} gesetzt!",
     "MARKER_REMOVED": "Marker entfernt!",
     "MARKER_TYPE_REMOVED": "Marker {{type}} entfernt!",
@@ -146,7 +157,7 @@
   "ADMIN": {
     "TITLE": "Interaktive Sektor-Karte",
     "DESCRIPTION": "Klicke auf einen Sektor (A1-I9) um Marker zu setzen oder zu entfernen.",
-    "MAX_MARKERS": "Maximal 4 Marker pro Sektor!",
+    "MAX_MARKERS": "Maximal 6 Marker pro Sektor!",
     "GRID_TITLE": "Dune Sektor-Grid (A1 - I9)",
     "LEGEND_TITLE": "Legende:",
     "PVE_ZONE": "PvE-Zone (Reihen A-E, alle Spalten)",
@@ -170,6 +181,13 @@
       "OCCUPIED_SECTORS": "Belegte Sektoren:",
       "AVAILABLE": "Verfügbar:"
     },
+    "STORM": {
+      "TITLE": "Coriolis Storm Timer",
+      "REGION_LABEL": "Server-Region",
+      "NEXT_RESET": "Nächster Reset in:",
+      "TIME_LABEL": "Storm-Zeit",
+      "HELP_TEXT": "Änderbar in den DuneMap-Einstellungen"
+    },
     "MARKER_TYPES": {
       "TITAN": "Titan",
       "SPICE": "Spice",
@@ -185,6 +203,14 @@
       "KONTROLLPUNKT": "Kontrollpunkt",
       "TAXI": "Taxi",
       "TEST": "Test"
+    },
+    "JS": {
+      "MARKER_ADDED": "Marker hinzugefügt!",
+      "ERROR_ADD": "Fehler beim Hinzufügen",
+      "NETWORK_ERROR": "Netzwerkfehler",
+      "CONFIRM_DELETE": "Marker wirklich entfernen?",
+      "MARKER_REMOVED": "Marker entfernt!",
+      "ERROR_REMOVE": "Fehler beim Entfernen"
     }
   }
 }

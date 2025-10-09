@@ -30,9 +30,17 @@
      <!-- Dashboard Widgets -->
         <% if (locals.widgets && widgets.length > 0) { %>
           <div class="row">
-            <% widgets.forEach(widget => { %>
-              <div class="col-md-<%= widget.size || 12 %>">
-                <div class="card <%= widget.cardClass || '' %>">
+            <% 
+              let currentRowSize = 0;
+              widgets.forEach((widget, index) => { 
+                const widgetSize = widget.size || 12;
+                currentRowSize += widgetSize;
+                
+                // Wenn die aktuelle Row voll ist (>=12), nach diesem Widget einen Spacer einfügen
+                const isRowFull = currentRowSize >= 12;
+            %>
+              <div class="col-md-<%= widgetSize %>">
+                <div class="card <%= widget.cardClass || '' %>" style="min-height: 350px;">
                   <div class="card-header">
                     <h3 class="card-title"><%= widget.title || 'Widget' %></h3>
                     <% if (widget.actions && widget.actions.length > 0) { %>
@@ -53,6 +61,12 @@
                   </div>
                 </div>
               </div>
+              
+              <% if (isRowFull && index < widgets.length - 1) { %>
+                <!-- Spacer nach voller Row -->
+                <div class="w-100" style="height: 1.5rem;"></div>
+                <% currentRowSize = 0; // Reset für nächste Row %>
+              <% } %>
             <% }); %>
           </div>
         <% } %>

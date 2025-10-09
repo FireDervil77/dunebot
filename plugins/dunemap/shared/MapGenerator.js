@@ -14,7 +14,7 @@ class MapGenerator {
                 font: '#321E00'        // Dunkelbraun für Text
             },
             markerSize: 24,            // Größe der Marker Icons
-            maxMarkersPerCell: 4       // Maximale Marker pro Zelle
+            maxMarkersPerCell: 6       // Maximale Marker pro Zelle
         };
 
         // Assets Pfad

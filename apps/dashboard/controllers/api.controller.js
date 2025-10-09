@@ -372,49 +372,52 @@ module.exports.updateDashboardLanguage = async function (req, res) {
  */
 module.exports.updateGuestLanguage = async function (req, res) {
     const Logger = ServiceManager.get('Logger');
-    const lang = req.body.language_code;
-
-    // Prüfen ob die Sprache gültig ist
-    if (!languagesMeta.find((l) => l.name === lang)) {
-        return res.status(400).json({
-            success: false,
-            error: "Ungültige Sprache"
-        });
-    }
-
-    // Wenn keine Änderung notwendig ist
-    if (req.session.locale === lang) {
-        return res.status(200).json({
-            success: true,
-            message: "Sprache ist bereits eingestellt"
-        });
-    }
-
+    const dbService = ServiceManager.get('dbService');
+    
     try {
-        // Update nur in Session (für Gäste)
+        const lang = req.body.language_code;
+        
+        // Validierung
+        if (!lang || (lang !== 'de-DE' && lang !== 'en-GB')) {
+            return res.status(400).json({ success: false, error: 'Invalid language' });
+        }
+        
+        // Session initialisieren falls nicht vorhanden
+        if (!req.session) {
+            req.session = {};
+        }
+        
+        // Locale setzen in Session
         req.session.locale = lang;
         
+        // Wenn User eingeloggt ist, auch in DB speichern
+        if (req.session.user && req.session.user.info && req.session.user.info.id) {
+            try {
+                await dbService.query(
+                    'UPDATE users SET locale = ? WHERE _id = ?',
+                    [lang, req.session.user.info.id]
+                );
+            } catch (dbError) {
+                Logger.warn('Failed to update user locale in DB:', dbError.message);
+            }
+        }
+        
+        // Session speichern
         req.session.save((err) => {
             if (err) {
-                Logger.error("Fehler beim Speichern der Session:", err);
-                return res.status(500).json({
-                    success: false,
-                    error: "Session konnte nicht aktualisiert werden"
-                });
+                Logger.error('Session save error:', err);
+                return res.status(500).json({ success: false, error: 'Session error' });
             }
             
-            // Erfolgreiche Antwort
-            res.status(200).json({
+            return res.status(200).json({
                 success: true,
-                message: "Sprache erfolgreich aktualisiert",
+                message: 'Language updated',
                 locale: lang
             });
         });
+        
     } catch (error) {
-        Logger.error("Fehler beim Aktualisieren der Gast-Sprache:", error);
-        res.status(500).json({
-            success: false,
-            error: "Fehler bei der Sprachaktualisierung"
-        });
+        Logger.error('updateGuestLanguage error:', error);
+        return res.status(500).json({ success: false, error: error.message });
     }
 };

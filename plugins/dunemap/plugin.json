@@ -1,0 +1,44 @@
+{
+  "name": "dunemap",
+  "displayName": "DuneMap",
+  "version": "2.0.0",
+  "previousVersion": "1.0.0",
+  "author": "FireDervil",
+  "description": "Interactive Dune: Awakening map with automatic Coriolis Storm Timer based on official Discord bot data",
+  "minSystemVersion": "0.1.0",
+  
+  "changelog": {
+    "2.0.0": [
+      "🌪️ Automatic Coriolis Storm Timer based on server region selection",
+      "🌍 Full support for 5 official regions: EU, NA, SA, AS, OCE",
+      "⚙️ Simplified settings interface (removed 4 redundant configuration fields)",
+      "🔄 Storm timer now counts to reset time (end of storm) matching official websites",
+      "📊 Integration with official Dune: Awakening Discord bot timing data",
+      "✨ Live countdown display with 1-second updates in Dashboard",
+      "🚀 Bot command /storm shows automatic timer based on guild region",
+      "📍 Region flags and localized time display"
+    ],
+    "1.0.0": [
+      "Initial release with manual storm timer configuration",
+      "Interactive sector map with marker system",
+      "Discord channel integration for map updates"
+    ]
+  },
+  
+  "migrations": {
+    "2.0.0": "migrations/migrate_to_v2.js"
+  },
+  
+  "breaking": {
+    "2.0.0": true
+  },
+  
+  "compatibility": {
+    "bot": true,
+    "dashboard": true
+  },
+  
+  "dependencies": {
+    "core": ">=0.1.0"
+  }
+}

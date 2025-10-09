@@ -1166,6 +1166,7 @@ section,
   box-shadow: 0 5px 25px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  margin-bottom: 30px; /* Abstand zwischen den Cards */
 }
 
 .news-item:hover {
@@ -1452,4 +1453,78 @@ section,
 
 .privacy-section ul {
   margin-left: 1.5rem;
+}
+/*--------------------------------------------------------------
+# Changelogs Section
+--------------------------------------------------------------*/
+.changelogs.section {
+  padding: 60px 0;
+}
+
+.changelog-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 2rem;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.changelog-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.changelog-header h3 {
+  color: var(--contrast-color);
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.changelog-description {
+  color: var(--default-color);
+  opacity: 0.8;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.changelog-type {
+  color: var(--default-color);
+  opacity: 0.7;
+  font-size: 0.875rem;
+  padding-top: 1rem;
+  margin-top: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.changelog-card .badge {
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  letter-spacing: 0.5px;
+}
+
+.changelog-card .btn-outline-light {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: var(--contrast-color);
+}
+
+.changelog-card .btn-outline-light:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .changelog-card {
+    padding: 1.5rem;
+  }
+  
+  .changelog-header h3 {
+    font-size: 1.25rem;
+  }
 }

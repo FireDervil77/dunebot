@@ -9,8 +9,8 @@
                 <i class="bi bi-list"></i>
               </a>
             </li>
-            <li class="nav-item d-none d-md-block"><a href="/guild" class="nav-link"><%= tr('SIDEBAR.HOME') %></a></li>
-            <li class="nav-item d-none d-md-block"><a href="<%= tr('SIDEBAR.SUPPORT_DISCORD_LINK') %>" class="nav-link"><%= tr('SIDEBAR.SUPPORT_DISCORD') %></a></li>
+            <li class="nav-item d-none d-md-block"> <a href="/guild" class="nav-link"><i class="fa-solid fa-home"></i> <%= tr('SIDEBAR.HOME') %></a></li>
+            <li class="nav-item d-none d-md-block"> <a href="<%= supportUrl || '#' %>" class="nav-link"><i class="fab fa-discord"></i> <%= tr('SIDEBAR.SUPPORT_DISCORD') %></a></li>
           </ul>
           <!--end::Start Navbar Links-->
           <!--begin::End Navbar Links-->
@@ -118,6 +118,38 @@
               </ul>
             </li>
             <!--end::Language Switcher-->
+           
+            <!--begin::Toast Notification Center-->
+            <li class="nav-item dropdown" id="toastNotificationCenter">
+              <a class="nav-link" href="#" data-toggle="dropdown" aria-expanded="false" id="toastNotificationBell">
+                <i class="bi bi-bell"></i>
+                <span class="badge badge-danger navbar-badge" id="toastNotificationBadge" style="display: none;">0</span>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-right" style="min-width: 320px; max-height: 400px; overflow-y: auto;" aria-labelledby="toastNotificationBell">
+                <li class="dropdown-header">
+                  <i class="bi bi-bell me-2"></i>
+                  <%= tr('TOAST_NOTIFICATIONS.TITLE') || 'Toast Benachrichtigungen' %>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                
+                <!-- Toast-Liste wird hier dynamisch eingefügt -->
+                <div id="toastNotificationList">
+                  <li class="dropdown-item text-center text-muted py-3">
+                    <i class="bi bi-hourglass-split me-1"></i>
+                    <%= tr('TOAST_NOTIFICATIONS.LOADING') || 'Lade...' %>
+                  </li>
+                </div>
+                
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a href="/guild/<%= currentGuildId %>/plugins/core/toast-history" class="dropdown-item text-center">
+                    <i class="bi bi-list-ul me-2"></i>
+                    <%= tr('TOAST_NOTIFICATIONS.VIEW_ALL') || 'Alle anzeigen' %>
+                  </a>
+                </li>
+              </ul>
+            </li>
+            <!--end::Toast Notification Center-->
            
             <!--begin::Fullscreen Toggle-->
             <li class="nav-item">

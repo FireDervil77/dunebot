@@ -73,8 +73,8 @@ module.exports = async (interaction) => {
             // Settings aus der Datenbank holen
             const settings = await dbService.getConfigs(guild.id);
 
-            // Parse enabled_plugins (ist ein JSON-String)
-            const enabledPlugins = parseJsonArray(settings.ENABLED_PLUGINS);
+            // NEU: Aktivierte Plugins aus guild_plugins laden
+            const enabledPlugins = await dbService.getEnabledPlugins(guild.id);
             const disabledSlash = parseJsonArray(settings.disabled_slash, []);
             
             // check if the plugin is disabled

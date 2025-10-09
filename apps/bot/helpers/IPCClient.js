@@ -295,6 +295,9 @@ class IPCClient {
                 case "GET_GUILD_CHANNELS":
                     return await this.#handleGetGuildChannels(message, payload);
                     
+                case "GET_GUILD_ROLES":
+                    return await this.#handleGetGuildRoles(message, payload);
+                    
                 case "GET_GUILD_MEMBERS":
                     return await this.#handleGetGuildMembers(message, payload);
                     
@@ -454,6 +457,93 @@ class IPCClient {
             });
         } catch (error) {
             this.logger.error("[IPC] Fehler beim Abrufen der Guild-Channels:", error);
+            return message.reply({
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Liefert Rollen einer Guild zurück
+     * Filtert @everyone, managed roles und Rollen höher als Bot
+     * @param {object} message - Veza-Nachrichtenobjekt
+     * @param {object} payload - Enthält die Guild-ID
+     * @returns {Promise<void>}
+     * @private
+     * @author DuneBot Team
+     */
+    async #handleGetGuildRoles(message, payload) {
+        try {
+            if (!payload?.guildId) {
+                this.logger.warn('[IPC] GET_GUILD_ROLES: Keine guildId im Payload');
+                return message.reply({
+                    success: false,
+                    error: "Guild-ID ist erforderlich"
+                });
+            }
+            
+            const guild = this.discordClient.guilds.cache.get(payload.guildId);
+            if (!guild) {
+                this.logger.warn(`[IPC] GET_GUILD_ROLES: Guild ${payload.guildId} nicht gefunden`);
+                return message.reply({
+                    success: false,
+                    error: "Guild nicht gefunden"
+                });
+            }
+
+            // Debug: Alle Rollen ausgeben
+            const allRoles = guild.roles.cache.size;
+            const botMember = guild.members.me;
+            
+            this.logger.info(`[IPC] GET_GUILD_ROLES Debug - Guild: ${guild.name}`);
+            this.logger.info(`[IPC] - Gesamt-Rollen: ${allRoles}`);
+            this.logger.info(`[IPC] - Bot Member: ${botMember ? 'Ja' : 'Nein'}`);
+            if (botMember) {
+                this.logger.info(`[IPC] - Bot höchste Rolle: ${botMember.roles.highest.name} (Position: ${botMember.roles.highest.position})`);
+            }
+
+            // Filtere Rollen: Keine @everyone, keine managed roles, nicht höher als Bot
+            const roles = guild.roles.cache
+                .filter(role => {
+                    // @everyone ausschließen
+                    if (role.id === guild.id) {
+                        this.logger.debug(`[IPC]   ❌ ${role.name} - @everyone`);
+                        return false;
+                    }
+                    
+                    // Managed roles (z.B. Bot-Rollen, Boosts) ausschließen
+                    if (role.managed) {
+                        this.logger.debug(`[IPC]   ❌ ${role.name} - managed`);
+                        return false;
+                    }
+                    
+                    // Rollen höher als Bot ausschließen (gleiche Position ist erlaubt!)
+                    if (botMember && role.position > botMember.roles.highest.position) {
+                        this.logger.debug(`[IPC]   ❌ ${role.name} - Position ${role.position} > Bot ${botMember.roles.highest.position}`);
+                        return false;
+                    }
+                    
+                    this.logger.debug(`[IPC]   ✅ ${role.name} - OK (Position: ${role.position})`);
+                    return true;
+                })
+                .map(role => ({
+                    id: role.id,
+                    name: role.name,
+                    color: role.color,
+                    position: role.position,
+                    hexColor: role.hexColor
+                }))
+                .sort((a, b) => b.position - a.position); // Sortierung: Höchste Position zuerst
+
+            this.logger.debug(`[IPC] GET_GUILD_ROLES: ${roles.length} Rollen für Guild ${payload.guildId}`);
+
+            return message.reply({
+                success: true,
+                roles: roles
+            });
+        } catch (error) {
+            this.logger.error("[IPC] Fehler beim Abrufen der Guild-Rollen:", error);
             return message.reply({
                 success: false,
                 error: error.message

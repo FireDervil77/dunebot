@@ -186,22 +186,8 @@ class PluginManager extends BasePluginManager {
             // Core ist immer aktiviert
             if (pluginName === "core") return true;
 
-            // Config aus der neuen Struktur laden
-            const configs = await dbService.getConfigs(guildId, "core", "shared");
-            
-            let enabledPlugins = ["core"]; // Core ist immer aktiviert
-            if (configs?.ENABLED_PLUGINS) {
-                try {
-                    // Parse ENABLED_PLUGINS wenn es ein String ist
-                    enabledPlugins = typeof configs.ENABLED_PLUGINS === 'string' 
-                        ? JSON.parse(configs.ENABLED_PLUGINS)
-                        : configs.ENABLED_PLUGINS;
-                } catch (parseError) {
-                    Logger.warn(`Fehler beim Parsen der aktivierten Plugins für Guild ${guildId}:`, parseError);
-                }
-            }
-
-            return enabledPlugins.includes(pluginName);
+            // NEUE METHODE: guild_plugins Tabelle nutzen
+            return await dbService.isPluginEnabledForGuild(guildId, pluginName);
 
         } catch (error) {
             Logger.error(`Fehler beim Prüfen des Plugin-Status für ${pluginName} in Guild ${guildId}:`, error);
@@ -564,9 +550,10 @@ class PluginManager extends BasePluginManager {
      * Plugin für eine bestimmte Guild aktivieren
      * @param {string} pluginName - Name des zu aktivierenden Plugins
      * @param {string} guildId - ID der Guild
+     * @param {Object} req - Express Request-Objekt (optional, für Audit Trail)
      * @returns {Promise<boolean>} Erfolg der Aktivierung
      */
-    async enableInGuild(pluginName, guildId) {
+    async enableInGuild(pluginName, guildId, req = null) {
         const Logger = ServiceManager.get("Logger");
         const themeManager = ServiceManager.get('themeManager'); 
         const dbService = ServiceManager.get('dbService');
@@ -588,70 +575,58 @@ class PluginManager extends BasePluginManager {
             }
 
             // NEU: Plugin Config NUR mit Guild-ID initialisieren
-            if (plugin.config) {
-                try {
+            // WICHTIG: Config-Speicherung funktioniert AUCH ohne plugin.config Objekt!
+            try {
+                // Falls plugin.config existiert, Guild-ID setzen
+                if (plugin.config) {
                     plugin.config.setGuildId(guildId);
-                    
-                    // Default-Config laden und flach speichern
-                    const configPath = path.join(plugin.baseDir, 'config.json');
-                    if (fs.existsSync(configPath)) {
-                        const defaultConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-                        
-                        // Config flach machen und nur für Guild speichern
-                        const flattenConfig = (obj, prefix = '') => {
-                            return Object.keys(obj).reduce((acc, k) => {
-                                const pre = prefix.length ? `${prefix}.${k}` : k;
-                                if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
-                                    Object.assign(acc, flattenConfig(obj[k], pre));
-                                } else {
-                                    acc[pre] = obj[k];
-                                }
-                                return acc;
-                            }, {});
-                        };
-
-                        const flatConfig = flattenConfig(defaultConfig);
-                        
-                        // WICHTIG: ensureConfig() nutzen statt setConfig()
-                        // Das überschreibt KEINE existierenden User-Configs!
-                        for (const [key, value] of Object.entries(flatConfig)) {
-                            await dbService.ensureConfig(
-                                pluginName,
-                                key,
-                                value,
-                                "shared",
-                                guildId,  // Explizit Guild-ID
-                                false     // nicht global
-                            );
-                        }
-                        
-                        Logger.info(`Config für Plugin ${pluginName} in Guild ${guildId} initialisiert`);
-                    }
-                } catch (configError) {
-                    Logger.error(`Fehler beim Initialisieren der Plugin-Config für ${pluginName} in Guild ${guildId}:`, configError);
                 }
+                
+                // Default-Config laden und flach speichern
+                const configPath = path.join(plugin.baseDir, 'config.json');
+                if (fs.existsSync(configPath)) {
+                    const defaultConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                    
+                    // Config flach machen und nur für Guild speichern
+                    const flattenConfig = (obj, prefix = '') => {
+                        return Object.keys(obj).reduce((acc, k) => {
+                            const pre = prefix.length ? `${prefix}.${k}` : k;
+                            if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
+                                Object.assign(acc, flattenConfig(obj[k], pre));
+                            } else {
+                                acc[pre] = obj[k];
+                            }
+                            return acc;
+                        }, {});
+                    };
+
+                    const flatConfig = flattenConfig(defaultConfig);
+                    
+                    // WICHTIG: ensureConfig() nutzen statt setConfig()
+                    // Das überschreibt KEINE existierenden User-Configs!
+                    for (const [key, value] of Object.entries(flatConfig)) {
+                        await dbService.ensureConfig(
+                            pluginName,
+                            key,
+                            value,
+                            "shared",
+                            guildId,  // Explizit Guild-ID
+                            false     // nicht global
+                        );
+                    }
+                    
+                    Logger.info(`Config für Plugin ${pluginName} in Guild ${guildId} initialisiert`);
+                }
+            } catch (configError) {
+                Logger.error(`Fehler beim Initialisieren der Plugin-Config für ${pluginName} in Guild ${guildId}:`, configError);
             }
 
-            // NEU: Aktiviere Plugin in ENABLED_PLUGINS
-            const coreConfigs = await dbService.getConfigs(guildId, "core", "shared");
-            let enabledPlugins = [];
-            if (coreConfigs && coreConfigs.ENABLED_PLUGINS) {
-                enabledPlugins = typeof coreConfigs.ENABLED_PLUGINS === "string"
-                    ? JSON.parse(coreConfigs.ENABLED_PLUGINS)
-                    : coreConfigs.ENABLED_PLUGINS;
-            }
+            // NEU: Plugin in guild_plugins Tabelle aktivieren
+            const userId = req?.session?.user?.info?.id || null;
+            const pluginVersion = plugin.version || null;
             
-            if (!enabledPlugins.includes(pluginName)) {
-                enabledPlugins.push(pluginName);
-                await dbService.setConfig(
-                    "core",
-                    "ENABLED_PLUGINS",
-                    JSON.stringify(enabledPlugins),
-                    "shared", 
-                    guildId,
-                    false
-                );
-            }
+            await dbService.enablePluginForGuild(guildId, pluginName, pluginVersion, userId);
+            Logger.debug(`Plugin ${pluginName} (v${pluginVersion}) in guild_plugins für Guild ${guildId} aktiviert (User: ${userId || 'System'})`);
 
             // Plugin-spezifische Guild-Aktivierung aufrufen
             await this.hooks.doAction('before_plugin_guild_enable_method', plugin, guildId);
@@ -682,9 +657,10 @@ class PluginManager extends BasePluginManager {
      * Plugin für eine bestimmte Guild deaktivieren
      * @param {string} pluginName - Name des zu deaktivierenden Plugins
      * @param {string} guildId - ID der Guild
+     * @param {Object} req - Express Request-Objekt (optional, für Audit Trail)
      * @returns {Promise<boolean>} Erfolg der Deaktivierung
      */
-    async disableInGuild(pluginName, guildId) {
+    async disableInGuild(pluginName, guildId, req = null) {
         const Logger = ServiceManager.get("Logger");
         const dbService = ServiceManager.get('dbService');
         const navigationManager = ServiceManager.get('navigationManager');
@@ -695,14 +671,6 @@ class PluginManager extends BasePluginManager {
             // Core Plugin kann niemals deaktiviert werden
             if (pluginName === "core") {
                 const error = new Error("Cannot disable core plugin");
-                await this.hooks.doAction('disable_in_guild_failed', pluginName, guildId, error);
-                throw error;
-            }
-
-            // SuperAdmin Plugin kann in der CONTROL_GUILD nicht deaktiviert werden
-            const controlGuildId = process.env.CONTROL_GUILD_ID;
-            if (pluginName === "superadmin" && controlGuildId && guildId === controlGuildId) {
-                const error = new Error("Cannot disable superadmin plugin in control guild");
                 await this.hooks.doAction('disable_in_guild_failed', pluginName, guildId, error);
                 throw error;
             }
@@ -765,40 +733,12 @@ class PluginManager extends BasePluginManager {
 
             await this.hooks.doAction('before_update_guild_settings_disable', plugin, guildId);
 
-            // 4. Plugin aus ENABLED_PLUGINS entfernen
-            const settings = await dbService.getConfigs(guildId, "core", "shared");
-            let enabledPlugins;
-            try {
-                enabledPlugins = typeof settings.ENABLED_PLUGINS === 'string'
-                    ? JSON.parse(settings.ENABLED_PLUGINS)
-                    : (Array.isArray(settings.ENABLED_PLUGINS)
-                        ? settings.ENABLED_PLUGINS
-                        : ['core']);
-            } catch (e) {
-                enabledPlugins = ['core'];
-            }
+            // 4. Plugin in guild_plugins Tabelle deaktivieren (NEU!)
+            const userId = req?.session?.user?.info?.id || null;
+            await dbService.disablePluginForGuild(guildId, pluginName, userId);
+            Logger.debug(`Plugin ${pluginName} in guild_plugins für Guild ${guildId} deaktiviert (User: ${userId || 'System'})`);
 
-            if (enabledPlugins.includes(pluginName)) {
-                enabledPlugins = await this.hooks.applyFilter(
-                    'modify_guild_enabled_plugins',
-                    enabledPlugins.filter(p => p !== pluginName),
-                    pluginName,
-                    guildId,
-                    'remove'
-                );
-
-                // Core Config aktualisieren
-                await dbService.setConfig(
-                    "core",
-                    "ENABLED_PLUGINS",
-                    JSON.stringify(enabledPlugins),
-                    "shared",
-                    guildId,
-                    false
-                );
-
-                await this.hooks.doAction('after_update_guild_settings_disable', plugin, guildId, enabledPlugins);
-            }
+            await this.hooks.doAction('after_update_guild_settings_disable', plugin, guildId);
 
             // 5. Navigation entfernen - NEU: Nutze NavigationManager statt ThemeManager
             if (navigationManager) {
@@ -818,6 +758,367 @@ class PluginManager extends BasePluginManager {
             Logger.error(`Fehler beim Deaktivieren des Plugins ${pluginName} in Guild ${guildId}:`, error);
             throw error;
         }
+    }
+
+    // ============================================================
+    // PLUGIN UPDATE SYSTEM (WordPress-Style)
+    // ============================================================
+
+    /**
+     * Lädt plugin.json Metadaten
+     * @param {string} pluginName 
+     * @returns {Object|null}
+     */
+    loadPluginMeta(pluginName) {
+        const Logger = ServiceManager.get('Logger');
+        const metaPath = path.join(this.pluginDir, pluginName, 'plugin.json');
+        
+        if (!fs.existsSync(metaPath)) {
+            Logger.debug(`[PluginManager] Kein plugin.json für ${pluginName} gefunden`);
+            return null;
+        }
+        
+        try {
+            const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+            return meta;
+        } catch (error) {
+            Logger.error(`[PluginManager] Fehler beim Laden von plugin.json für ${pluginName}:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Prüft alle aktiven Plugins auf Updates
+     * @param {string} guildId 
+     */
+    async checkAllPluginUpdates(guildId) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        try {
+            // Alle aktivierten Plugins für diese Guild
+            const [plugins] = await dbService.query(`
+                SELECT plugin_name 
+                FROM guild_plugins 
+                WHERE guild_id = ? AND enabled = 1
+            `, [guildId]);
+            
+            Logger.debug(`[PluginManager] Prüfe Updates für ${plugins.length} Plugins in Guild ${guildId}`);
+            
+            for (const { plugin_name } of plugins) {
+                await this.checkPluginUpdate(plugin_name, guildId);
+            }
+        } catch (error) {
+            Logger.error(`[PluginManager] Fehler beim Prüfen von Plugin-Updates:`, error);
+        }
+    }
+
+    /**
+     * Prüft ein einzelnes Plugin auf Update
+     * @param {string} pluginName 
+     * @param {string} guildId 
+     */
+    async checkPluginUpdate(pluginName, guildId) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        const semver = require('semver');
+        
+        try {
+            // plugin.json laden
+            const pluginMeta = this.loadPluginMeta(pluginName);
+            if (!pluginMeta || !pluginMeta.version) {
+                return; // Kein plugin.json = kein Versioning
+            }
+            
+            const fileVersion = pluginMeta.version;
+            
+            // Aktuelle Version aus DB
+            const [versionRow] = await dbService.query(`
+                SELECT current_version, update_status 
+                FROM plugin_versions 
+                WHERE plugin_name = ? AND guild_id = ?
+            `, [pluginName, guildId]);
+            
+            const currentVersion = versionRow?.current_version || '0.0.0';
+            
+            // Versions-Vergleich
+            if (semver.gt(fileVersion, currentVersion)) {
+                Logger.warn(`[PluginManager] Update verfügbar: ${pluginName} ${currentVersion} → ${fileVersion}`);
+                
+                // SuperAdmin Config: Grace Period
+                const [graceDaysRow] = await dbService.query(`
+                    SELECT config_value 
+                    FROM superadmin_config 
+                    WHERE config_key = 'plugin_update_grace_days'
+                `);
+                
+                const graceDays = parseInt(graceDaysRow?.config_value || '5');
+                
+                const updateAvailableAt = new Date();
+                const updateDeadlineAt = new Date();
+                updateDeadlineAt.setDate(updateDeadlineAt.getDate() + graceDays);
+                
+                // Update-Info in DB speichern
+                await dbService.query(`
+                    INSERT INTO plugin_versions 
+                        (plugin_name, guild_id, current_version, available_version, 
+                         update_available_at, update_deadline_at, update_status, changelog)
+                    VALUES 
+                        (?, ?, ?, ?, ?, ?, 'available', ?)
+                    ON DUPLICATE KEY UPDATE
+                        available_version = VALUES(available_version),
+                        update_available_at = VALUES(update_available_at),
+                        update_deadline_at = VALUES(update_deadline_at),
+                        update_status = 'available',
+                        changelog = VALUES(changelog)
+                `, [
+                    pluginName, 
+                    guildId, 
+                    currentVersion, 
+                    fileVersion,
+                    updateAvailableAt,
+                    updateDeadlineAt,
+                    JSON.stringify(pluginMeta.changelog?.[fileVersion] || [])
+                ]);
+                
+                Logger.info(`[PluginManager] Update-Notice erstellt: ${pluginName} (Deadline: ${updateDeadlineAt.toLocaleDateString('de-DE')})`);
+            } else {
+                // Aktuell oder Downgrade
+                Logger.debug(`[PluginManager] ${pluginName} ist aktuell (v${currentVersion})`);
+            }
+        } catch (error) {
+            Logger.error(`[PluginManager] Fehler beim Prüfen von ${pluginName}:`, error);
+        }
+    }
+
+    /**
+     * Führt Plugin-Update durch (manuell oder automatisch)
+     * @param {string} pluginName 
+     * @param {string} guildId 
+     * @param {boolean} isAutoUpdate 
+     * @returns {Promise<{success: boolean, version?: string, error?: string}>}
+     */
+    async updatePlugin(pluginName, guildId, isAutoUpdate = false) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        try {
+            // Update-Info laden
+            const [updateInfo] = await dbService.query(`
+                SELECT * FROM plugin_versions 
+                WHERE plugin_name = ? AND guild_id = ?
+            `, [pluginName, guildId]);
+            
+            if (!updateInfo || !updateInfo.available_version) {
+                throw new Error('Kein Update verfügbar');
+            }
+            
+            const targetVersion = updateInfo.available_version;
+            
+            Logger.info(`[PluginManager] Starte ${isAutoUpdate ? 'Auto-' : ''}Update: ${pluginName} → v${targetVersion} (Guild: ${guildId})`);
+            
+            // Migration ausführen
+            await this.runMigration(pluginName, targetVersion, guildId);
+            
+            // Status aktualisieren
+            await dbService.query(`
+                UPDATE plugin_versions 
+                SET 
+                    current_version = ?,
+                    available_version = NULL,
+                    update_status = ?,
+                    auto_update_at = ?,
+                    error_log = NULL
+                WHERE plugin_name = ? AND guild_id = ?
+            `, [
+                targetVersion,
+                isAutoUpdate ? 'auto-updated' : 'up-to-date',
+                isAutoUpdate ? new Date() : null,
+                pluginName,
+                guildId
+            ]);
+            
+            Logger.success(`[PluginManager] ${pluginName} erfolgreich aktualisiert auf v${targetVersion}`);
+            
+            return { success: true, version: targetVersion };
+            
+        } catch (error) {
+            Logger.error(`[PluginManager] Update fehlgeschlagen:`, error);
+            
+            // Fehler in DB speichern
+            await dbService.query(`
+                UPDATE plugin_versions 
+                SET update_status = 'failed', error_log = ?
+                WHERE plugin_name = ? AND guild_id = ?
+            `, [error.message, pluginName, guildId]);
+            
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Führt Migration-Script aus
+     * @param {string} pluginName 
+     * @param {string} targetVersion 
+     * @param {string} guildId 
+     */
+    async runMigration(pluginName, targetVersion, guildId) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        // plugin.json laden
+        const pluginMeta = this.loadPluginMeta(pluginName);
+        if (!pluginMeta || !pluginMeta.migrations) {
+            Logger.debug(`[PluginManager] Keine Migrations für ${pluginName} definiert`);
+            return;
+        }
+        
+        // Migration-File für diese Version
+        const migrationFile = pluginMeta.migrations[targetVersion];
+        
+        if (!migrationFile) {
+            Logger.debug(`[PluginManager] Keine Migration für ${pluginName} v${targetVersion}`);
+            return;
+        }
+        
+        const migrationPath = path.join(this.pluginDir, pluginName, migrationFile);
+        
+        if (!fs.existsSync(migrationPath)) {
+            throw new Error(`Migration-File nicht gefunden: ${migrationPath}`);
+        }
+        
+        Logger.info(`[PluginManager] Führe Migration aus: ${pluginName} → v${targetVersion}`);
+        
+        // Migration laden und ausführen
+        const migration = require(migrationPath);
+        const result = await migration.up(dbService, guildId);
+        
+        if (!result.success) {
+            throw new Error(`Migration fehlgeschlagen: ${result.error}`);
+        }
+        
+        Logger.success(`[PluginManager] Migration erfolgreich: ${pluginName} v${targetVersion}`);
+    }
+
+    /**
+     * Cronjob: Auto-Update für abgelaufene Deadlines
+     * Wird täglich ausgeführt
+     */
+    async processAutoUpdates() {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        try {
+            // SuperAdmin Config prüfen
+            const [autoUpdateRow] = await dbService.query(`
+                SELECT config_value 
+                FROM superadmin_config 
+                WHERE config_key = 'plugin_auto_update_enabled'
+            `);
+            
+            const autoUpdateEnabled = autoUpdateRow?.config_value === 'true';
+            
+            if (!autoUpdateEnabled) {
+                Logger.debug('[PluginManager] Auto-Update ist global deaktiviert');
+                return;
+            }
+            
+            // Alle abgelaufenen Updates
+            const overdueUpdates = await dbService.query(`
+                SELECT plugin_name, guild_id, available_version
+                FROM plugin_versions
+                WHERE update_status = 'available'
+                AND update_deadline_at <= NOW()
+            `);
+            
+            Logger.info(`[PluginManager] ${overdueUpdates.length} Auto-Updates anstehend`);
+            
+            for (const { plugin_name, guild_id, available_version } of overdueUpdates) {
+                Logger.info(`[PluginManager] Auto-Update: ${plugin_name} für Guild ${guild_id}`);
+                
+                const result = await this.updatePlugin(plugin_name, guild_id, true);
+                
+                if (!result.success) {
+                    // Admin benachrichtigen via IPC
+                    await this.notifyAdminAboutFailedUpdate(guild_id, plugin_name, result.error);
+                }
+            }
+        } catch (error) {
+            Logger.error('[PluginManager] Fehler beim Auto-Update-Prozess:', error);
+        }
+    }
+
+    /**
+     * Benachrichtigt Guild-Owner über fehlgeschlagenes Auto-Update
+     * @param {string} guildId 
+     * @param {string} pluginName 
+     * @param {string} error 
+     */
+    async notifyAdminAboutFailedUpdate(guildId, pluginName, error) {
+        const Logger = ServiceManager.get('Logger');
+        
+        try {
+            const ipcClient = ServiceManager.get('ipcClient');
+            
+            if (!ipcClient) {
+                Logger.warn('[PluginManager] IPC Client nicht verfügbar für Admin-Benachrichtigung');
+                return;
+            }
+            
+            await ipcClient.send('bot:NOTIFY_GUILD_OWNER', {
+                guildId,
+                title: `⚠️ Plugin-Update fehlgeschlagen`,
+                message: `Das automatische Update für **${pluginName}** ist fehlgeschlagen.\n\nFehler: ${error}\n\nBitte manuell über das Dashboard aktualisieren.`,
+                color: 0xFF0000 // RED
+            });
+            
+            Logger.info(`[PluginManager] Admin-Benachrichtigung für Guild ${guildId} gesendet`);
+        } catch (error) {
+            Logger.error('[PluginManager] Fehler beim Senden der Admin-Benachrichtigung:', error);
+        }
+    }
+
+    /**
+     * Lädt alle verfügbaren Plugin-Updates für eine Guild
+     * @param {string} guildId 
+     * @returns {Promise<Array>}
+     */
+    async getAvailableUpdates(guildId) {
+        const dbService = ServiceManager.get('dbService');
+        
+        const updates = await dbService.query(`
+            SELECT 
+                plugin_name,
+                current_version,
+                available_version,
+                update_available_at,
+                update_deadline_at,
+                update_status,
+                changelog
+            FROM plugin_versions
+            WHERE guild_id = ?
+            AND update_status IN ('available', 'failed')
+            ORDER BY update_available_at DESC
+        `, [guildId]);
+        
+        // Changelog JSON parsen
+        return updates.map(update => ({
+            ...update,
+            changelog: JSON.parse(update.changelog || '[]'),
+            daysLeft: this._calculateDaysLeft(update.update_deadline_at)
+        }));
+    }
+
+    /**
+     * Berechnet verbleibende Tage bis Deadline
+     * @param {Date} deadline 
+     * @returns {number}
+     */
+    _calculateDaysLeft(deadline) {
+        if (!deadline) return 0;
+        const now = new Date();
+        const diff = new Date(deadline) - now;
+        return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
     }
 }
 

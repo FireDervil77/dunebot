@@ -61,17 +61,24 @@ class PluginManager extends BasePluginManager {
             // NEU: Core Config initialisieren
             await this.#config.init();
             
-            let enabledPlugins = ["core"];
-            const configs = await this.#config.get('shared');
+            // GLOBALE Plugins aus guild_plugins holen (alle aktivierten Plugins über alle Guilds)
+            // Dies lädt nur Plugins die mindestens in EINER Guild aktiviert sind
+            let enabledPlugins = ["core"]; // Core ist immer aktiviert
             
-            if (configs?.ENABLED_PLUGINS) {
-                try {
-                    enabledPlugins = typeof configs.ENABLED_PLUGINS === 'string' 
-                        ? JSON.parse(configs.ENABLED_PLUGINS) 
-                        : configs.ENABLED_PLUGINS;
-                } catch (e) {
-                    Logger.warn("Fehler beim Parsen der aktivierten Plugins:", e);
-                }
+            try {
+                const rows = await dbService.query(`
+                    SELECT DISTINCT plugin_name 
+                    FROM guild_plugins 
+                    WHERE is_enabled = 1
+                `);
+                
+                const guildPlugins = rows.map(row => row.plugin_name);
+                enabledPlugins = [...new Set([...enabledPlugins, ...guildPlugins])];
+                
+                Logger.debug(`Global aktivierte Plugins aus guild_plugins: ${enabledPlugins.join(', ')}`);
+            } catch (error) {
+                Logger.warn("Fehler beim Laden der aktivierten Plugins aus guild_plugins:", error);
+                Logger.warn("Fallback: Nur Core-Plugin wird geladen");
             }
 
             if (this.#hooks) {
@@ -305,32 +312,14 @@ async enablePlugin(pluginName) {
         await this.client.commandManager.updatePluginStatus(pluginName, true);
 
         // Plugin registrieren
-        this.setPlugin(pluginName, plugin);        if (this.#hooks) {
+        this.setPlugin(pluginName, plugin);        
+        if (this.#hooks) {
             await this.#hooks.doAction('after_plugin_registered', { plugin });
         }
 
-        // Core-Config aktualisieren, wenn es nicht das Core-Plugin ist
-        if (pluginName !== "core") {
-            // Beispiel: Core-Konfiguration in der DB aktualisieren
-            const [config] = await dbService.query(
-                "SELECT * FROM configs WHERE plugin_name = 'core' AND config_key = 'ENABLED_PLUGINS' AND context = 'shared' LIMIT 1"
-            );
-            let enabledPlugins = [];
-            if (config && config.config_value) {
-                try {
-                    enabledPlugins = JSON.parse(config.config_value);
-                } catch (e) {
-                    Logger.warn("Fehler beim Parsen der Core-Konfiguration:", e);
-                }
-            }
-            if (!enabledPlugins.includes(pluginName)) {
-                enabledPlugins.push(pluginName);
-                await dbService.query(
-                    "UPDATE configs SET config_value = ? WHERE plugin_name = 'core' AND config_key = 'ENABLED_PLUGINS' AND context = 'shared'",
-                    [JSON.stringify(enabledPlugins)]
-                );
-            }
-        }
+        // HINWEIS: Globale ENABLED_PLUGINS Config ist obsolet
+        // Plugins werden jetzt per guild_plugins Tabelle pro Guild aktiviert
+        // Die init() Methode lädt alle Plugins die in mind. einer Guild aktiv sind
 
         Logger.success(`Plugin ${pluginName} aktiviert [${plugin.prefixCount} Prefix, ${plugin.slashCount} Slash]`);
         if (this.#hooks) {
@@ -364,9 +353,9 @@ async enablePlugin(pluginName) {
             }
 
             // Plugin laden wenn noch nicht geladen
-            if (!this.plugins.find(p => p.name === pluginName)) {
+            if (!this.isPluginEnabled(pluginName)) {
                 Logger.debug(`Plugin ${pluginName} wird für Guild ${guildId} geladen...`);
-                const result = await this.loadPlugin(pluginName);
+                const result = await this.enablePlugin(pluginName);
                 
                 // Plugin aktivieren
                 if (!result?.success) {
@@ -374,7 +363,7 @@ async enablePlugin(pluginName) {
                 }
             }
 
-            const plugin = this.plugins.find(p => p.name === pluginName);
+            const plugin = this.getPlugin(pluginName);
             if (!plugin) {
                 throw new Error(`Plugin ${pluginName} konnte nicht gefunden werden`);
             }
@@ -424,25 +413,17 @@ async enablePlugin(pluginName) {
                 }
             }
 
-            // ENABLED_PLUGINS aktualisieren
-            const configs = await dbService.getConfigs(guildId, "core", "shared");
-            let enabledPlugins = configs?.ENABLED_PLUGINS || ["core"];
+            // NEU: guild_plugins Tabelle aktualisieren statt ENABLED_PLUGINS JSON
+            const pluginObj = this.getPlugin(pluginName);
+            const pluginVersion = pluginObj?.version || null;
             
-            if (typeof enabledPlugins === 'string') {
-                enabledPlugins = JSON.parse(enabledPlugins);
-            }
-
-            if (!enabledPlugins.includes(pluginName)) {
-                enabledPlugins.push(pluginName);
-                await dbService.setConfig(
-                    "core",
-                    "ENABLED_PLUGINS",
-                    enabledPlugins,
-                    "shared",
-                    guildId,
-                    false
-                );
-            }
+            // User-ID aus Session extrahieren (falls verfügbar, sonst null)
+            // Im Bot-Context haben wir keine Session, daher ist userId immer null
+            const userId = null;
+            
+            await dbService.enablePluginForGuild(guildId, pluginName, pluginVersion, userId);
+            
+            Logger.debug(`Plugin ${pluginName} in guild_plugins für Guild ${guildId} aktiviert`);
 
             // NEU: CommandManager benachrichtigen, um Commands neu zu registrieren
             Logger.debug(`Aktualisiere Commands für Guild ${guildId} nach Plugin-Aktivierung: ${pluginName}`);
@@ -510,213 +491,11 @@ async enablePlugin(pluginName) {
     }
 
     /**
-     * Deaktiviert ein Plugin für eine bestimmte Guild
-     * @param {string} pluginName - Name des Plugins
-     * @param {string} guildId - ID der Guild
-     * @returns {Promise<boolean>} Erfolgsstatus
-     */
-    async disableInGuild(pluginName, guildId) {
-        const Logger = ServiceManager.get("Logger");
-        const dbService = ServiceManager.get("dbService");
-
-        if (this.#hooks) {
-            await this.#hooks.doAction('before_disable_in_guild', { pluginName, guildId });
-        }
-
-        try {
-            const plugin = this.getPlugin(pluginName);
-            if (!plugin) {
-                throw new Error(`Plugin ${pluginName} ist nicht aktiviert.`);
-            }
-
-            // Guild-spezifische Deaktivierung
-            if (plugin.onGuildDisable) {
-                await plugin.onGuildDisable(guildId);
-            }
-
-            // NEU: Config System für Deaktivierung nutzen
-            const coreConfig = new Config('core', dbService);
-            coreConfig.setGuildId(guildId);
-            await coreConfig.init();
-
-            let enabledPlugins = await coreConfig.get('ENABLED_PLUGINS') || [];
-            if (typeof enabledPlugins === 'string') {
-                enabledPlugins = JSON.parse(enabledPlugins);
-            }
-
-            // Plugin aus aktivierten entfernen
-            enabledPlugins = enabledPlugins.filter(p => p !== pluginName);
-            await coreConfig.set('ENABLED_PLUGINS', enabledPlugins);
-
-            // Plugin Config für Guild zurücksetzen
-            if (plugin.config) {
-                try {
-                    plugin.config.setGuildId(guildId);
-                    await plugin.config.reset();
-                } catch (configError) {
-                    Logger.error(`Fehler beim Zurücksetzen der Config für ${pluginName}:`, configError);
-                }
-            }
-
-            Logger.success(`Plugin ${pluginName} erfolgreich für Guild ${guildId} deaktiviert`);
-            
-            if (this.#hooks) {
-                await this.#hooks.doAction('after_disable_in_guild', { plugin, guildId });
-            }
-
-            return true;
-        } catch (error) {
-            Logger.error(`Fehler beim Deaktivieren des Plugins ${pluginName} für Guild ${guildId}:`, error);
-            if (this.#hooks) {
-                await this.#hooks.doAction('disable_in_guild_failed', { pluginName, guildId, error });
-            }
-            return false;
-        }
-    }
-
-    /**
      * Aktiviert ein Plugin für eine bestimmte Guild
      * @param {string} pluginName - Name des Plugins
      * @param {string} guildId - ID der Guild
      * @returns {Promise<boolean>} Erfolgsstatus
      */
-    async enableInGuild(pluginName, guildId) {
-        const Logger = ServiceManager.get("Logger");
-        const dbService = ServiceManager.get("dbService");
-
-        try {
-            // Pre-Hook
-            if (this.#hooks) {
-                await this.#hooks.doAction('before_enable_in_guild', { pluginName, guildId });
-            }
-
-            // Plugin laden wenn noch nicht geladen
-            if (!this.plugins.find(p => p.name === pluginName)) {
-                Logger.debug(`Plugin ${pluginName} wird für Guild ${guildId} geladen...`);
-                const result = await this.enablePlugin(pluginName);
-                
-                if (!result?.success) {
-                    throw new Error(`Plugin ${pluginName} konnte nicht geladen werden`);
-                }
-            }
-
-            const plugin = this.plugins.find(p => p.name === pluginName);
-            if (!plugin) {
-                throw new Error(`Plugin ${pluginName} konnte nicht gefunden werden`);
-            }
-
-            // Plugin Config initialisieren
-            const configPath = path.join(plugin.baseDir, 'config.json');
-            if (fs.existsSync(configPath)) {
-                try {
-                    const defaultConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-                    
-                    // Flache Config-Struktur erstellen
-                    const flattenConfig = (obj, prefix = '') => {
-                        return Object.keys(obj).reduce((acc, k) => {
-                            const pre = prefix ? `${prefix}_${k}` : k;
-                            if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
-                                Object.assign(acc, flattenConfig(obj[k], pre));
-                            } else {
-                                acc[pre] = obj[k];
-                            }
-                            return acc;
-                        }, {});
-                    };
-
-                    // Config speichern
-                    const flatConfig = flattenConfig(defaultConfig);
-                    for (const [key, value] of Object.entries(flatConfig)) {
-                        await dbService.setConfig(
-                            pluginName,
-                            key,
-                            value,
-                            "shared",
-                            guildId,
-                            false
-                        );
-                    }
-                    Logger.info(`Config für Plugin ${pluginName} in Guild ${guildId} initialisiert`);
-                } catch (error) {
-                    Logger.error(`Config-Fehler für ${pluginName}:`, error);
-                }
-            }
-
-            // Navigation Setup
-            if (this.#hooks) {
-                await this.#hooks.doAction('before_register_navigation', { plugin, guildId });
-            }
-
-            // Navigation Items registrieren
-            let navigationItems = [];
-            if (plugin.getGuildNavigationItems) {
-                navigationItems = plugin.getGuildNavigationItems(guildId);
-                if (this.#hooks) {
-                    navigationItems = await this.#hooks.applyFilters(
-                        'filter_navigation_items',
-                        navigationItems,
-                        { plugin, guildId }
-                    );
-                }
-                
-                if (navigationItems.length > 0) {
-                    const navManager = ServiceManager.get('navigationManager');
-                    if (navManager) {
-                        await navManager.registerNavigation(pluginName, guildId, navigationItems);
-                    }
-                }
-            }
-
-            // Plugin aktivieren
-            if (plugin.onGuildEnable) {
-                if (this.#hooks) {
-                    await this.#hooks.doAction('before_guild_specific_enable', { plugin, guildId });
-                }
-                await plugin.onGuildEnable(guildId);
-                if (this.#hooks) {
-                    await this.#hooks.doAction('after_guild_specific_enable', { plugin, guildId });
-                }
-            }
-
-            // ENABLED_PLUGINS aktualisieren
-            const configs = await dbService.getConfigs(guildId, "core", "shared");
-            let enabledPlugins = configs?.ENABLED_PLUGINS || ["core"];
-            
-            if (typeof enabledPlugins === 'string') {
-                enabledPlugins = JSON.parse(enabledPlugins);
-            }
-
-            if (!enabledPlugins.includes(pluginName)) {
-                enabledPlugins.push(pluginName);
-                await dbService.setConfig(
-                    "core",
-                    "ENABLED_PLUGINS",
-                    enabledPlugins,
-                    "shared",
-                    guildId,
-                    false
-                );
-            }
-
-            // NEU: CommandManager benachrichtigen, um Commands neu zu registrieren
-            Logger.debug(`Aktualisiere Commands für Guild ${guildId} nach Plugin-Aktivierung: ${pluginName}`);
-            await this.client.commandManager.updatePluginStatus(pluginName, true, guildId);
-
-            Logger.success(`Plugin ${pluginName} für Guild ${guildId} aktiviert`);
-            
-            if (this.#hooks) {
-                await this.#hooks.doAction('after_enable_in_guild', { plugin, guildId });
-            }
-
-            return true;
-        } catch (error) {
-            Logger.error(`Fehler beim Aktivieren von ${pluginName} für Guild ${guildId}:`, error);
-            if (this.#hooks) {
-                await this.#hooks.doAction('enable_in_guild_failed', { pluginName, guildId, error });
-            }
-            throw error;
-        }
-    }
 
     /**
      * Deaktiviert ein Plugin für eine bestimmte Guild
@@ -748,20 +527,16 @@ async enablePlugin(pluginName) {
                 await this.#hooks.doAction('before_update_guild_settings_disable', { plugin, guildId });
             }
 
-            // NEU: Guild-Plugins aus configs holen und aktualisieren
-            const coreConfigs = await dbService.getConfigs(guildId, "core", "shared");
-            let enabledPlugins = [];
-            if (coreConfigs && coreConfigs.ENABLED_PLUGINS) {
-                enabledPlugins = typeof coreConfigs.ENABLED_PLUGINS === "string"
-                    ? JSON.parse(coreConfigs.ENABLED_PLUGINS)
-                    : coreConfigs.ENABLED_PLUGINS;
-            }
-            // Plugin entfernen
-            enabledPlugins = enabledPlugins.filter(p => p !== pluginName);
-            await dbService.setConfig("core", "ENABLED_PLUGINS", JSON.stringify(enabledPlugins), "shared", guildId, false);
+            // NEU: guild_plugins Tabelle aktualisieren statt ENABLED_PLUGINS JSON
+            // User-ID aus Session extrahieren (im Bot-Context immer null)
+            const userId = null;
+            
+            await dbService.disablePluginForGuild(guildId, pluginName, userId);
+            
+            Logger.debug(`Plugin ${pluginName} in guild_plugins für Guild ${guildId} deaktiviert`);
 
             if (this.#hooks) {
-                await this.#hooks.doAction('after_update_guild_settings_disable', { plugin, guildId, enabledPlugins });
+                await this.#hooks.doAction('after_update_guild_settings_disable', { plugin, guildId });
             }
             
             // NEU: CommandManager benachrichtigen, um Commands neu zu registrieren
@@ -850,18 +625,20 @@ async enablePlugin(pluginName) {
                 }
                 
                 // Guild ist valide - Configs laden
-                const configs = await dbService.getConfigs(guild.id, "core", "shared");
+                // NEU: guild_plugins Tabelle statt configs.ENABLED_PLUGINS
+                const pluginRows = await dbService.query(
+                    "SELECT plugin_name FROM guild_plugins WHERE guild_id = ? AND is_enabled = 1",
+                    [guild.id]
+                );
                 
-                if (configs?.ENABLED_PLUGINS) {
-                    enabled_plugins = typeof configs.ENABLED_PLUGINS === 'string'
-                        ? JSON.parse(configs.ENABLED_PLUGINS)
-                        : configs.ENABLED_PLUGINS;
-                    
-                    // Sicherstellen dass core immer aktiviert ist
-                    if (!enabled_plugins.includes("core")) {
-                        enabled_plugins.push("core");
-                    }
+                enabled_plugins = pluginRows.map(row => row.plugin_name);
+                
+                // Sicherstellen dass core immer aktiviert ist
+                if (!enabled_plugins.includes("core")) {
+                    enabled_plugins.push("core");
                 }
+                
+                Logger.debug(`[PluginManager] Aktivierte Plugins für Guild ${guild.id}: ${enabled_plugins.join(', ')}`);
             }
         } catch (error) {
             Logger.warn(`[PluginManager] Fehler beim Ermitteln aktivierter Plugins für Event ${eventName}:`, error);

@@ -12,6 +12,31 @@
         <div class="alert alert-danger"><%= errorMsgs.join('<br>') %></div>
       <% } %>
 
+      <!-- Plugin-Updates Info (falls vorhanden) -->
+      <% if (pendingUpdates && pendingUpdates.length > 0) { %>
+      <div class="alert alert-warning alert-dismissible fade show mb-3">
+          <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+          </button>
+          <h5><i class="icon fas fa-exclamation-triangle"></i> <%= pendingUpdates.length %> Plugin-Update(s) verfügbar</h5>
+          <p class="mb-0">
+              Es stehen Updates für installierte Plugins bereit. Bitte überprüfen Sie die Details unten und aktualisieren Sie rechtzeitig vor Ablauf der Frist.
+          </p>
+      </div>
+      <% } %>
+
+      <!-- View Toggle -->
+      <div class="mb-3 text-right">
+          <div class="btn-group btn-group-sm" role="group" aria-label="View Mode">
+              <button type="button" class="btn btn-outline-secondary active" id="cardViewBtn">
+                  <i class="fas fa-th-large"></i> <%= tr('ADMIN_PAGE.CARD_VIEW') || 'Karten' %>
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="tableViewBtn">
+                  <i class="fas fa-table"></i> <%= tr('ADMIN_PAGE.TABLE_VIEW') || 'Tabelle' %>
+              </button>
+          </div>
+      </div>
+
       <!-- Aktivierte Plugins -->
       <div class="card card-primary">
           <div class="card-header">
@@ -19,22 +44,69 @@
           </div>
           <div class="card-body">
               <% if (enabledPlugins && enabledPlugins.length) { %>
-                  <div class="row">
+                  
+                  <!-- Karten-Ansicht (Standard) -->
+                  <div class="row plugin-view-cards">
                       <% enabledPlugins.forEach(p => { %>
                           <div class="col-lg-4 col-md-6 col-sm-12">
-                              <div class="card plugin-card">
+                              <div class="card plugin-card <%= p.updateInfo ? 'border-warning' : '' %>">
                                   <div class="card-header d-flex align-items-center">
                                       <img src="<%= p.icon %>" class="img-circle elevation-1 mr-2" style="width:40px;height:40px;" alt="<%= p.displayName %>">
-                                      <div>
-                                          <h5 class="mb-0"><%= p.displayName %></h5>
-                                          <small class="text-muted">v<%= p.version %></small>
+                                      <div class="flex-grow-1">
+                                          <h5 class="mb-0">
+                                              <%= p.displayName %>
+                                              <% if (p.updateInfo) { %>
+                                                  <span class="badge badge-warning badge-sm ml-1">
+                                                      <i class="fas fa-arrow-up"></i> Update
+                                                  </span>
+                                              <% } %>
+                                          </h5>
+                                          <small class="text-muted">
+                                              v<%= p.version %>
+                                              <% if (p.updateInfo) { %>
+                                                  → v<%= p.updateInfo.available_version %>
+                                              <% } %>
+                                          </small>
                                       </div>
                                   </div>
                                   <div class="card-body">
                                       <p><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></p>
                                       <p><small class="text-muted"><%= tr('ADMIN_PAGE.AUTHOR') %>: <%= p.author %></small></p>
+                                      
+                                      <% if (p.updateInfo) { %>
+                                          <div class="alert alert-warning p-2 mb-2">
+                                              <strong><i class="fas fa-clock"></i> Update verfügbar!</strong><br>
+                                              <small>
+                                                  Deadline: <%= new Date(p.updateInfo.update_deadline_at).toLocaleDateString('de-DE') %>
+                                                  (<%= p.updateInfo.daysLeft %> Tag<%= p.updateInfo.daysLeft !== 1 ? 'e' : '' %> verbleibend)
+                                              </small>
+                                              <% if (p.updateInfo.changelog && p.updateInfo.changelog.length > 0) { %>
+                                                  <div class="mt-2">
+                                                      <small><strong>Änderungen:</strong></small>
+                                                      <ul class="mb-0 pl-3" style="font-size:0.85rem;">
+                                                          <% p.updateInfo.changelog.slice(0, 3).forEach(change => { %>
+                                                              <li><%= change %></li>
+                                                          <% }); %>
+                                                          <% if (p.updateInfo.changelog.length > 3) { %>
+                                                              <li><em>... und <%= p.updateInfo.changelog.length - 3 %> weitere</em></li>
+                                                          <% } %>
+                                                      </ul>
+                                                  </div>
+                                              <% } %>
+                                          </div>
+                                      <% } %>
                                   </div>
-                                  <div class="card-footer d-flex">
+                                  <div class="card-footer d-flex flex-wrap gap-2">
+                                      <% if (p.updateInfo) { %>
+                                          <button type="button" 
+                                                  class="btn btn-warning btn-update-plugin mr-2"
+                                                  data-plugin="<%= p.name %>"
+                                                  data-version="<%= p.updateInfo.available_version %>"
+                                                  data-guild="<%= guildId %>">
+                                              <i class="fas fa-sync-alt mr-1"></i> Jetzt aktualisieren
+                                          </button>
+                                      <% } %>
+                                      
                                       <% if (p.name !== 'core') { %>
                                           <form action="/guild/<%= guildId %>/plugins"
                                                 method="POST" 
@@ -61,6 +133,84 @@
                           </div>
                       <% }); %>
                   </div>
+
+                  <!-- Tabellen-Ansicht (versteckt) -->
+                  <div class="plugin-view-table" style="display:none;">
+                      <div class="table-responsive">
+                          <table class="table table-bordered table-hover">
+                              <thead>
+                                  <tr>
+                                      <th style="width:60px;"><%= tr('ADMIN_PAGE.TABLE_ICON') || 'Icon' %></th>
+                                      <th><%= tr('ADMIN_PAGE.TABLE_NAME') || 'Name' %></th>
+                                      <th><%= tr('ADMIN_PAGE.TABLE_VERSION') || 'Version' %></th>
+                                      <th><%= tr('ADMIN_PAGE.TABLE_AUTHOR') || 'Autor' %></th>
+                                      <th><%= tr('ADMIN_PAGE.TABLE_DESCRIPTION') || 'Beschreibung' %></th>
+                                      <th style="width:250px;"><%= tr('ADMIN_PAGE.TABLE_ACTIONS') || 'Aktionen' %></th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  <% enabledPlugins.forEach(p => { %>
+                                      <tr class="<%= p.updateInfo ? 'table-warning' : '' %>">
+                                          <td class="text-center">
+                                              <img src="<%= p.icon %>" class="img-circle elevation-1" style="width:40px;height:40px;" alt="<%= p.displayName %>">
+                                          </td>
+                                          <td>
+                                              <strong><%= p.displayName %></strong>
+                                              <% if (p.updateInfo) { %>
+                                                  <br><span class="badge badge-warning"><i class="fas fa-arrow-up"></i> Update verfügbar</span>
+                                                  <br><small class="text-muted">Deadline: <%= new Date(p.updateInfo.update_deadline_at).toLocaleDateString('de-DE') %> (<%= p.updateInfo.daysLeft %> Tage)</small>
+                                              <% } %>
+                                          </td>
+                                          <td>
+                                              <span class="badge badge-info">v<%= p.version %></span>
+                                              <% if (p.updateInfo) { %>
+                                                  <br><i class="fas fa-arrow-down text-warning"></i>
+                                                  <br><span class="badge badge-warning">v<%= p.updateInfo.available_version %></span>
+                                              <% } %>
+                                          </td>
+                                          <td><small class="text-muted"><%= p.author %></small></td>
+                                          <td><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
+                                          <td>
+                                              <% if (p.updateInfo) { %>
+                                                  <button type="button" 
+                                                          class="btn btn-warning btn-sm btn-update-plugin mb-1"
+                                                          data-plugin="<%= p.name %>"
+                                                          data-version="<%= p.updateInfo.available_version %>"
+                                                          data-guild="<%= guildId %>">
+                                                      <i class="fas fa-sync-alt"></i> Update
+                                                  </button>
+                                                  <br>
+                                              <% } %>
+                                              
+                                              <% if (p.name !== 'core') { %>
+                                                  <form action="/guild/<%= guildId %>/plugins"
+                                                        method="POST" 
+                                                        class="guild-ajax-form d-inline"
+                                                        data-form-type="plugin">
+                                                      <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+                                                      <input type="hidden" name="action" value="disable">
+                                                      <input type="hidden" name="plugins[]" value="<%= p.name %>">
+                                                      <button type="submit" class="btn btn-danger btn-sm">
+                                                          <i class="fas fa-power-off"></i>
+                                                      </button>
+                                                  </form>
+                                              <% } else { %>
+                                                  <span class="badge badge-secondary"><%= tr('ADMIN_PAGE.CORE_BADGE') %></span>
+                                              <% } %>
+                                              
+                                              <% if (p.hasSettings && p.settingsUrl) { %>
+                                                  <a href="<%= p.settingsUrl %>" class="btn btn-info btn-sm ml-1">
+                                                      <i class="fas fa-cog"></i>
+                                                  </a>
+                                              <% } %>
+                                          </td>
+                                      </tr>
+                                  <% }); %>
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+
               <% } else { %>
                   <div class="alert alert-info mb-0">
                       <i class="icon fas fa-info-circle"></i> <%= tr('ADMIN_PAGE.NO_ENABLED') %>
@@ -69,6 +219,9 @@
           </div>
       </div>
 
+      <!-- Abstand zwischen aktivierten und verfügbaren Plugins -->
+      <div style="margin-bottom: 2rem;"></div>
+
       <!-- Verfügbare Plugins -->
       <div class="card card-secondary">
         <div class="card-header">
@@ -76,7 +229,9 @@
         </div>
         <div class="card-body">
           <% if (availablePlugins && availablePlugins.length) { %>
-            <div class="row">
+            
+            <!-- Karten-Ansicht -->
+            <div class="row plugin-view-cards">
               <% availablePlugins.forEach(p => { %>
                 <div class="col-lg-4 col-md-6 col-sm-12">
                   <div class="card plugin-card bg-light">
@@ -108,6 +263,51 @@
                 </div>
               <% }); %>
             </div>
+
+            <!-- Tabellen-Ansicht -->
+            <div class="plugin-view-table" style="display:none;">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width:60px;"><%= tr('ADMIN_PAGE.TABLE_ICON') || 'Icon' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_NAME') || 'Name' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_VERSION') || 'Version' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_AUTHOR') || 'Autor' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_DESCRIPTION') || 'Beschreibung' %></th>
+                                <th style="width:150px;"><%= tr('ADMIN_PAGE.TABLE_ACTIONS') || 'Aktionen' %></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% availablePlugins.forEach(p => { %>
+                                <tr class="bg-light">
+                                    <td class="text-center">
+                                        <img src="<%= p.icon %>" class="img-circle" style="width:40px;height:40px;opacity:.8" alt="<%= p.displayName %>">
+                                    </td>
+                                    <td><strong><%= p.displayName %></strong></td>
+                                    <td><span class="badge badge-secondary">v<%= p.version %></span></td>
+                                    <td><small class="text-muted"><%= p.author %></small></td>
+                                    <td class="text-muted"><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
+                                    <td>
+                                        <form action="/guild/<%= guildId %>/plugins"
+                                            method="POST"
+                                            class="guild-ajax-form d-inline"
+                                            data-form-type="plugin">
+                                            <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+                                            <input type="hidden" name="action" value="enable">
+                                            <input type="hidden" name="plugins[]" value="<%= p.name %>">
+                                            <button type="submit" class="btn btn-success btn-sm">
+                                                <i class="fas fa-power-off mr-1"></i> <%= tr('ADMIN_PAGE.ENABLE_ACTION') %>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
           <% } else { %>
             <div class="alert alert-info mb-0">
               <i class="icon fas fa-info-circle"></i> <%= tr('ADMIN_PAGE.NO_AVAILABLE') %>
@@ -118,3 +318,96 @@
     </div>
   </div>
 </div>
+
+<script>
+$(document).ready(function() {
+    // View Toggle zwischen Karten und Tabelle
+    $('#cardViewBtn').click(function() {
+        $('.plugin-view-cards').show();
+        $('.plugin-view-table').hide();
+        $(this).addClass('active');
+        $('#tableViewBtn').removeClass('active');
+    });
+    
+    $('#tableViewBtn').click(function() {
+        $('.plugin-view-cards').hide();
+        $('.plugin-view-table').show();
+        $(this).addClass('active');
+        $('#cardViewBtn').removeClass('active');
+    });
+
+    // Plugin Update Handler
+    $('.btn-update-plugin').on('click', function(e) {
+        e.preventDefault();
+        
+        const $btn = $(this);
+        const pluginName = $btn.data('plugin');
+        const version = $btn.data('version');
+        const guildId = $btn.data('guild');
+        const csrfToken = $('input[name="_csrf"]').first().val();
+        
+        // Bestätigungsdialog
+        if (!confirm(`Plugin "${pluginName}" auf Version ${version} aktualisieren?\n\nDies kann einige Sekunden dauern und führt möglicherweise Datenbankmigrationen durch.`)) {
+            return;
+        }
+        
+        // Button-Status setzen
+        const originalHtml = $btn.html();
+        $btn.prop('disabled', true);
+        $btn.html('<i class="fas fa-spinner fa-spin"></i> Wird aktualisiert...');
+        
+        // AJAX-Request
+        $.ajax({
+            url: `/guild/${guildId}/plugins/${pluginName}/update`,
+            method: 'POST',
+            headers: {
+                'X-CSRF-Token': csrfToken
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Erfolgs-Nachricht anzeigen
+                    const alertHtml = `
+                        <div class="alert alert-success alert-dismissible fade show">
+                            <button type="button" class="close" data-dismiss="alert">&times;</button>
+                            <i class="icon fas fa-check"></i> ${response.message}
+                        </div>
+                    `;
+                    $('.container-fluid').prepend(alertHtml);
+                    
+                    // Seite nach 1.5 Sekunden neu laden
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    throw new Error(response.message || 'Unbekannter Fehler');
+                }
+            },
+            error: function(xhr) {
+                // Fehler-Behandlung
+                let errorMsg = 'Ein Fehler ist aufgetreten.';
+                
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                } else if (xhr.statusText) {
+                    errorMsg = xhr.statusText;
+                }
+                
+                const alertHtml = `
+                    <div class="alert alert-danger alert-dismissible fade show">
+                        <button type="button" class="close" data-dismiss="alert">&times;</button>
+                        <i class="icon fas fa-exclamation-triangle"></i> Update fehlgeschlagen: ${errorMsg}
+                    </div>
+                `;
+                $('.container-fluid').prepend(alertHtml);
+                
+                // Button wiederherstellen
+                $btn.prop('disabled', false);
+                $btn.html(originalHtml);
+                
+                // Nach oben scrollen
+                $('html, body').animate({ scrollTop: 0 }, 'fast');
+            }
+        });
+    });
+});
+</script>

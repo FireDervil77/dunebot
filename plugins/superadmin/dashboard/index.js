@@ -12,6 +12,8 @@ const fs = require('fs');
 const { DashboardPlugin } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 const { getLocalizedNews, getLocalizedNewsList, prepareNewsForDB } = require('../../../apps/dashboard/helpers/newsHelper');
+const { getLocalizedNotification, getLocalizedNotificationList, prepareNotificationForDB } = require('../../../apps/dashboard/helpers/notificationHelper');
+const { getLocalizedChangelog, getLocalizedChangelogList, prepareChangelogForDB, getTypeBadge, getComponentBadge } = require('../../../apps/dashboard/helpers/changelogHelper');
 
 class SuperAdminDashboardPlugin extends DashboardPlugin {
     constructor(app) {
@@ -83,31 +85,25 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
         // Plugin Statistiken
         try {
-            const pluginConfigs = await dbService.query(`
-                SELECT guild_id, config_value 
-                FROM configs 
-                WHERE config_key = 'ENABLED_PLUGINS' AND context = 'shared' AND plugin_name = 'core'
+            // NEU: Plugin-Statistiken aus guild_plugins Tabelle
+            const pluginStats = await dbService.query(`
+                SELECT plugin_name, COUNT(DISTINCT guild_id) as guild_count
+                FROM guild_plugins 
+                WHERE is_enabled = 1
+                GROUP BY plugin_name
             `);
             
             const pluginCounts = {};
-            let totalGuildsWithPlugins = 0;
-            
-            pluginConfigs.forEach(row => {
-                try {
-                    const enabledPlugins = typeof row.config_value === 'string' 
-                        ? JSON.parse(row.config_value) 
-                        : row.config_value;
-                    
-                    if (Array.isArray(enabledPlugins) && enabledPlugins.length > 0) {
-                        totalGuildsWithPlugins++;
-                        enabledPlugins.forEach(pluginName => {
-                            pluginCounts[pluginName] = (pluginCounts[pluginName] || 0) + 1;
-                        });
-                    }
-                } catch (err) {
-                    // Ignoriere fehlerhafte JSON-Einträge
-                }
+            pluginStats.forEach(row => {
+                pluginCounts[row.plugin_name] = row.guild_count;
             });
+            
+            const totalGuildsWithPlugins = await dbService.query(`
+                SELECT COUNT(DISTINCT guild_id) as count 
+                FROM guild_plugins 
+                WHERE is_enabled = 1
+            `);
+            const totalGuilds = totalGuildsWithPlugins[0]?.count || 0;
             
             stats.pluginStats = Object.entries(pluginCounts)
                 .map(([name, count]) => ({
@@ -128,20 +124,18 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
     }
 
     /**
-     * Plugin aktivieren
+     * Plugin aktivieren (Global für Dashboard)
      */
     async onEnable() {
         const Logger = ServiceManager.get('Logger');
-        Logger.info('[SuperAdmin] Aktiviere Dashboard-Plugin...');
+        Logger.info('[SuperAdmin] Aktiviere Dashboard-Plugin global...');
 
         this._setupRoutes();
-        // KOMPROMISS: Widgets NICHT im Haupt-Dashboard anzeigen
-        // Stattdessen nur auf /plugins/superadmin Seite
-        // this._registerWidgets(); 
         
-        Logger.success('[SuperAdmin] Dashboard-Plugin aktiviert (nur Routen, keine Dashboard-Widgets)');
+        Logger.success('[SuperAdmin] Dashboard-Plugin global aktiviert (Routen registriert)');
         return true;
     }
+
 
     /**
      * Vollständige Routen für SuperAdmin einrichten
@@ -152,6 +146,12 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
         try {
             Logger.debug('[SuperAdmin] Starte Route-Setup für guildRouter...');
+            
+            // API-Routen (ohne Owner-Check für bestimmte Endpoints)
+            const toastHistoryApi = require('./routes/api/toast-history');
+            this.apiRouter = express.Router();
+            this.apiRouter.use('/toast-history', toastHistoryApi);
+            Logger.debug('[SuperAdmin] Toast-History API registriert');
             
             // Middleware: Owner-Check für ALLE SuperAdmin-Routen
             this.guildRouter.use(this._checkOwner.bind(this));
@@ -357,32 +357,48 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 }
             });
 
-            // === NOTIFICATIONS ===
+            // === NOTIFICATIONS (2-sprachig) ===
+            // Notifications-Liste anzeigen (GET)
             this.guildRouter.get('/notifications', async (req, res) => {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
+                const userLocale = req.session.locale || res.locals.locale || 'de-DE';
 
                 try {
                     Logger.debug('[SuperAdmin] /notifications Route aufgerufen');
                     
-                    const guilds = await dbService.query(`SELECT _id as id, guild_name as name FROM guilds ORDER BY guild_name`);
-                    
-                    // Lade letzte 10 Notifications (ohne guild_id - ist global)
-                    const recentNotifications = await dbService.query(`
+                    // Lade alle Notifications (global, ohne guild_id)
+                    const rawNotifications = await dbService.query(`
                         SELECT * 
                         FROM notifications
                         ORDER BY created_at DESC
-                        LIMIT 10
                     `);
                     
-                    Logger.debug(`[SuperAdmin] ${guilds.length} Guilds, ${recentNotifications.length} Notifications geladen`);
+                    // Lokalisiere Notifications für die Anzeige
+                    const notificationsList = getLocalizedNotificationList(rawNotifications, userLocale).map(notif => ({
+                        ...notif,
+                        formattedDate: new Date(notif.created_at).toLocaleString(userLocale, {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })
+                    }));
+                    
+                    Logger.debug(`[SuperAdmin] ${notificationsList.length} Notifications geladen`);
+
+                    // Toast aus Session holen und löschen
+                    const toast = req.session.toast;
+                    delete req.session.toast;
 
                     await themeManager.renderView(res, 'guild/notifications', {
                         title: 'Globale Notifications',
                         activeMenu: `/guild/${guildId}/plugins/superadmin/notifications`,
                         guildId,
-                        guilds,
-                        recentNotifications,
+                        notifications: notificationsList,
+                        currentLocale: userLocale,
+                        toast,
                         plugin: this
                     });
                 } catch (error) {
@@ -391,22 +407,373 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 }
             });
 
-            this.guildRouter.post('/notifications/send', async (req, res) => {
+            // Neue Notification erstellen (GET Form)
+            this.guildRouter.get('/notifications/new', async (req, res) => {
+                const guildId = res.locals.guildId;
+                
+                await themeManager.renderView(res, 'guild/notification-edit', {
+                    title: 'Neue Notification erstellen',
+                    activeMenu: `/guild/${guildId}/plugins/superadmin/notifications`,
+                    guildId,
+                    notification: null, // Neuer Eintrag
+                    plugin: this
+                });
+            });
+
+            // Notification bearbeiten (GET Form)
+            this.guildRouter.get('/notifications/edit/:id', async (req, res) => {
+                const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
-                const { title, message, type, action_url, action_text, expiry } = req.body;
+
+                const rawNotification = await dbService.query(`
+                    SELECT * FROM notifications WHERE id = ?
+                `, [req.params.id]);
+
+                if (!rawNotification || rawNotification.length === 0) {
+                    return res.status(404).render('error', {
+                        message: 'Notification nicht gefunden',
+                        error: { status: 404 }
+                    });
+                }
+
+                // Parse JSON-Felder für das Edit-Formular
+                const notification = rawNotification[0];
+                notification.title_de = JSON.parse(notification.title_translations)['de-DE'] || '';
+                notification.title_en = JSON.parse(notification.title_translations)['en-GB'] || '';
+                notification.message_de = JSON.parse(notification.message_translations)['de-DE'] || '';
+                notification.message_en = JSON.parse(notification.message_translations)['en-GB'] || '';
+                notification.action_text_de = JSON.parse(notification.action_text_translations)['de-DE'] || 'Mehr erfahren';
+                notification.action_text_en = JSON.parse(notification.action_text_translations)['en-GB'] || 'Learn more';
+
+                await themeManager.renderView(res, 'guild/notification-edit', {
+                    title: 'Notification bearbeiten',
+                    activeMenu: `/guild/${guildId}/plugins/superadmin/notifications`,
+                    guildId,
+                    notification,
+                    plugin: this
+                });
+            });
+
+            // Notification speichern (POST) - Multi-Language Support
+            this.guildRouter.post('/notifications/save', async (req, res) => {
+                const guildId = req.body.guildId || res.locals.guildId || req.params.guildId;
+                const dbService = ServiceManager.get('dbService');
+                const {
+                    notificationId,
+                    title_de, title_en,
+                    message_de, message_en,
+                    action_text_de, action_text_en,
+                    type, action_url, expiry, roles
+                } = req.body;
 
                 try {
-                    // Notification ist GLOBAL für alle User
-                    // Kein guild_id nötig, da die Tabelle keine guild_id Spalte hat
-                    await dbService.query(`
-                        INSERT INTO notifications 
-                        (title, message, type, action_url, action_text, expiry, created_at, dismissed)
-                        VALUES (?, ?, ?, ?, ?, ?, NOW(), 0)
-                    `, [title, message, type || 'info', action_url || null, action_text || null, expiry || null]);
+                    // Übersetzungen als JSON vorbereiten
+                    const translations = {
+                        title: {
+                            'de-DE': title_de || '',
+                            'en-GB': title_en || ''
+                        },
+                        message: {
+                            'de-DE': message_de || '',
+                            'en-GB': message_en || ''
+                        },
+                        action_text: {
+                            'de-DE': action_text_de || 'Mehr erfahren',
+                            'en-GB': action_text_en || 'Learn more'
+                        }
+                    };
 
-                    res.json({ success: true, message: 'Globale Notification erfolgreich erstellt' });
+                    // Metadata
+                    const metadata = {
+                        type: type || 'info',
+                        action_url: action_url || null,
+                        expiry: expiry || null,
+                        roles: roles || null,
+                        dismissed: 0
+                    };
+
+                    // prepareNotificationForDB nutzen
+                    const notificationData = prepareNotificationForDB(translations, metadata);
+
+                    if (notificationId) {
+                        // Update existierende Notification
+                        await dbService.query(`
+                            UPDATE notifications 
+                            SET title_translations = ?,
+                                message_translations = ?,
+                                action_text_translations = ?,
+                                type = ?, action_url = ?, expiry = ?, roles = ?,
+                                updated_at = NOW()
+                            WHERE id = ?
+                        `, [
+                            notificationData.title_translations,
+                            notificationData.message_translations,
+                            notificationData.action_text_translations,
+                            notificationData.type,
+                            notificationData.action_url,
+                            notificationData.expiry,
+                            notificationData.roles,
+                            notificationId
+                        ]);
+                        
+                        // Redirect mit Toast-Notification
+                        req.session.toast = {
+                            type: 'success',
+                            message: 'Notification erfolgreich aktualisiert'
+                        };
+                        res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
+                    } else {
+                        // Neue Notification
+                        await dbService.query(`
+                            INSERT INTO notifications 
+                            (title_translations, message_translations, action_text_translations,
+                             type, action_url, expiry, roles, dismissed, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())
+                        `, [
+                            notificationData.title_translations,
+                            notificationData.message_translations,
+                            notificationData.action_text_translations,
+                            notificationData.type,
+                            notificationData.action_url,
+                            notificationData.expiry,
+                            notificationData.roles
+                        ]);
+                        
+                        // Redirect mit Toast-Notification
+                        req.session.toast = {
+                            type: 'success',
+                            message: 'Notification erfolgreich erstellt'
+                        };
+                        res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
+                    }
                 } catch (error) {
-                    Logger.error('Fehler beim Senden der Notification:', error);
+                    Logger.error('Fehler beim Speichern der Notification:', error);
+                    
+                    req.session.toast = {
+                        type: 'danger',
+                        message: 'Fehler beim Speichern: ' + error.message
+                    };
+                    res.redirect(`/guild/${req.params.guildId}/plugins/superadmin/notifications`);
+                }
+            });
+
+            // Notification löschen (POST)
+            this.guildRouter.post('/notifications/delete/:id', async (req, res) => {
+                const dbService = ServiceManager.get('dbService');
+                try {
+                    await dbService.query(`DELETE FROM notifications WHERE id = ?`, [req.params.id]);
+                    res.json({ success: true, message: 'Notification erfolgreich gelöscht' });
+                } catch (error) {
+                    Logger.error('Fehler beim Löschen der Notification:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
+            // === CHANGELOGS (2-sprachig) ===
+            // Changelogs-Liste anzeigen (GET)
+            this.guildRouter.get('/changelogs', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                const userLocale = req.session.locale || res.locals.locale || 'de-DE';
+
+                const rawChangelogs = await dbService.query(`
+                    SELECT * FROM changelogs 
+                    ORDER BY release_date DESC
+                `);
+
+                // Lokalisiere Changelogs für die Liste
+                const changelogsList = getLocalizedChangelogList(rawChangelogs, userLocale).map(changelog => ({
+                    ...changelog,
+                    formattedDate: new Date(changelog.release_date).toLocaleString(userLocale, {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    }),
+                    typeBadge: getTypeBadge(changelog.type),
+                    componentBadge: getComponentBadge(changelog.component)
+                }));
+
+                // Toast aus Session holen und löschen
+                const toast = req.session.toast;
+                delete req.session.toast;
+
+                await themeManager.renderView(res, 'guild/changelogs', {
+                    title: 'Changelogs Verwaltung',
+                    activeMenu: `/guild/${guildId}/plugins/superadmin/changelogs`,
+                    guildId,
+                    changelogs: changelogsList,
+                    currentLocale: userLocale,
+                    toast,
+                    plugin: this
+                });
+            });
+
+            // Neuen Changelog erstellen (GET Form)
+            this.guildRouter.get('/changelogs/new', async (req, res) => {
+                const guildId = res.locals.guildId;
+                
+                await themeManager.renderView(res, 'guild/changelog-edit', {
+                    title: 'Neuen Changelog erstellen',
+                    activeMenu: `/guild/${guildId}/plugins/superadmin/changelogs`,
+                    guildId,
+                    changelog: null, // Neuer Eintrag
+                    plugin: this
+                });
+            });
+
+            // Changelog bearbeiten (GET Form)
+            this.guildRouter.get('/changelogs/edit/:id', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+
+                const rawChangelog = await dbService.query(`
+                    SELECT * FROM changelogs WHERE id = ?
+                `, [req.params.id]);
+
+                if (!rawChangelog || rawChangelog.length === 0) {
+                    return res.status(404).render('error', {
+                        message: 'Changelog nicht gefunden',
+                        error: { status: 404 }
+                    });
+                }
+
+                // Parse JSON-Felder für das Edit-Formular
+                const changelog = rawChangelog[0];
+                changelog.title_de = JSON.parse(changelog.title_translations)['de-DE'] || '';
+                changelog.title_en = JSON.parse(changelog.title_translations)['en-GB'] || '';
+                changelog.description_de = JSON.parse(changelog.description_translations)['de-DE'] || '';
+                changelog.description_en = JSON.parse(changelog.description_translations)['en-GB'] || '';
+                changelog.changes_de = JSON.parse(changelog.changes_translations)['de-DE'] || '';
+                changelog.changes_en = JSON.parse(changelog.changes_translations)['en-GB'] || '';
+
+                await themeManager.renderView(res, 'guild/changelog-edit', {
+                    title: 'Changelog bearbeiten',
+                    activeMenu: `/guild/${guildId}/plugins/superadmin/changelogs`,
+                    guildId,
+                    changelog,
+                    plugin: this
+                });
+            });
+
+            // Changelog speichern (POST) - Multi-Language Support
+            this.guildRouter.post('/changelogs/save', async (req, res) => {
+                const guildId = req.body.guildId || res.locals.guildId || req.params.guildId;
+                const dbService = ServiceManager.get('dbService');
+                const {
+                    changelogId,
+                    title_de, title_en,
+                    description_de, description_en,
+                    changes_de, changes_en,
+                    version, type, component, component_name, is_public, release_date, author_id
+                } = req.body;
+
+                try {
+                    // Übersetzungen als JSON vorbereiten
+                    const translations = {
+                        title: {
+                            'de-DE': title_de || '',
+                            'en-GB': title_en || ''
+                        },
+                        description: {
+                            'de-DE': description_de || '',
+                            'en-GB': description_en || ''
+                        },
+                        changes: {
+                            'de-DE': changes_de || '',
+                            'en-GB': changes_en || ''
+                        }
+                    };
+
+                    // Metadata
+                    const metadata = {
+                        version,
+                        type: type || 'minor',
+                        component: component || 'system',
+                        component_name: component_name || null,
+                        is_public: is_public !== undefined ? is_public : 1,
+                        release_date: release_date || new Date(),
+                        author_id: author_id || req.session.user?.id || '0'
+                    };
+
+                    // prepareChangelogForDB nutzen
+                    const changelogData = prepareChangelogForDB(translations, metadata);
+
+                    if (changelogId) {
+                        // Update existierender Changelog
+                        await dbService.query(`
+                            UPDATE changelogs 
+                            SET title_translations = ?,
+                                description_translations = ?,
+                                changes_translations = ?,
+                                version = ?, type = ?, component = ?, component_name = ?,
+                                is_public = ?, release_date = ?, author_id = ?,
+                                updated_at = NOW()
+                            WHERE id = ?
+                        `, [
+                            changelogData.title_translations,
+                            changelogData.description_translations,
+                            changelogData.changes_translations,
+                            changelogData.version,
+                            changelogData.type,
+                            changelogData.component,
+                            changelogData.component_name,
+                            changelogData.is_public,
+                            changelogData.release_date,
+                            changelogData.author_id,
+                            changelogId
+                        ]);
+                        
+                        req.session.toast = {
+                            type: 'success',
+                            message: 'Changelog erfolgreich aktualisiert'
+                        };
+                        res.redirect(`/guild/${guildId}/plugins/superadmin/changelogs`);
+                    } else {
+                        // Neuer Changelog
+                        await dbService.query(`
+                            INSERT INTO changelogs 
+                            (title_translations, description_translations, changes_translations,
+                             version, type, component, component_name, is_public, release_date, author_id,
+                             created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                        `, [
+                            changelogData.title_translations,
+                            changelogData.description_translations,
+                            changelogData.changes_translations,
+                            changelogData.version,
+                            changelogData.type,
+                            changelogData.component,
+                            changelogData.component_name,
+                            changelogData.is_public,
+                            changelogData.release_date,
+                            changelogData.author_id
+                        ]);
+                        
+                        req.session.toast = {
+                            type: 'success',
+                            message: 'Changelog erfolgreich erstellt'
+                        };
+                        res.redirect(`/guild/${guildId}/plugins/superadmin/changelogs`);
+                    }
+                } catch (error) {
+                    Logger.error('Fehler beim Speichern des Changelogs:', error);
+                    
+                    req.session.toast = {
+                        type: 'danger',
+                        message: 'Fehler beim Speichern: ' + error.message
+                    };
+                    res.redirect(`/guild/${req.params.guildId}/plugins/superadmin/changelogs`);
+                }
+            });
+
+            // Changelog löschen (POST)
+            this.guildRouter.post('/changelogs/delete/:id', async (req, res) => {
+                const dbService = ServiceManager.get('dbService');
+                try {
+                    await dbService.query(`DELETE FROM changelogs WHERE id = ?`, [req.params.id]);
+                    res.json({ success: true, message: 'Changelog erfolgreich gelöscht' });
+                } catch (error) {
+                    Logger.error('Fehler beim Löschen des Changelogs:', error);
                     res.status(500).json({ success: false, message: error.message });
                 }
             });
@@ -438,6 +805,18 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     Logger.error('[SuperAdmin] Fehler bei /stats:', error);
                     res.status(500).render('error', { message: 'Fehler beim Laden der Statistiken', error });
                 }
+            });
+
+            // === TOAST-HISTORY (Monitoring/Debugging) ===
+            this.guildRouter.get('/toast-history', async (req, res) => {
+                const guildId = res.locals.guildId;
+                
+                await themeManager.renderView(res, 'guild/toast-history', {
+                    title: 'Toast-Event History',
+                    activeMenu: `/guild/${guildId}/plugins/superadmin/toast-history`,
+                    guildId,
+                    plugin: this
+                });
             });
 
             Logger.info('[SuperAdmin] Routen eingerichtet für guildRouter');
@@ -641,41 +1020,33 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
         // Plugin Statistiken
         try {
-            // Hole alle ENABLED_PLUGINS aus configs
-            const pluginConfigs = await dbService.query(`
-                SELECT guild_id, config_value 
-                FROM configs 
-                WHERE config_key = 'ENABLED_PLUGINS'
+            // NEU: Plugin-Statistiken aus guild_plugins Tabelle
+            const pluginStats = await dbService.query(`
+                SELECT plugin_name, COUNT(DISTINCT guild_id) as guild_count
+                FROM guild_plugins 
+                WHERE is_enabled = 1
+                GROUP BY plugin_name
             `);
             
-            // Zähle Plugin-Aktivierungen
             const pluginCounts = {};
-            let totalGuildsWithPlugins = 0;
-            
-            pluginConfigs.forEach(row => {
-                try {
-                    const enabledPlugins = typeof row.config_value === 'string' 
-                        ? JSON.parse(row.config_value) 
-                        : row.config_value;
-                    
-                    if (Array.isArray(enabledPlugins) && enabledPlugins.length > 0) {
-                        totalGuildsWithPlugins++;
-                        enabledPlugins.forEach(pluginName => {
-                            pluginCounts[pluginName] = (pluginCounts[pluginName] || 0) + 1;
-                        });
-                    }
-                } catch (err) {
-                    // Ignoriere fehlerhafte JSON-Einträge
-                }
+            pluginStats.forEach(row => {
+                pluginCounts[row.plugin_name] = row.guild_count;
             });
+            
+            const totalGuildsWithPlugins = await dbService.query(`
+                SELECT COUNT(DISTINCT guild_id) as count 
+                FROM guild_plugins 
+                WHERE is_enabled = 1
+            `);
+            const totalGuilds = totalGuildsWithPlugins[0]?.count || 0;
             
             // Konvertiere zu Array mit Prozentsatz
             stats.pluginStats = Object.entries(pluginCounts)
                 .map(([name, count]) => ({
                     name,
                     count,
-                    percentage: totalGuildsWithPlugins > 0 
-                        ? Math.round((count / totalGuildsWithPlugins) * 100) 
+                    percentage: totalGuilds > 0 
+                        ? Math.round((count / totalGuilds) * 100) 
                         : 0
                 }))
                 .sort((a, b) => b.count - a.count); // Sortiere nach Anzahl absteigend
@@ -699,8 +1070,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         
         // Prüfe ob es die Control-Guild ist
         if (String(guildId) !== String(controlGuildId)) {
-            Logger.warn(`[SuperAdmin] Versuch, Plugin für Guild ${guildId} zu aktivieren - nur CONTROL_GUILD (${controlGuildId}) erlaubt!`);
-            throw new Error(`SuperAdmin kann nur für die Control-Guild (${controlGuildId}) aktiviert werden!`);
+            Logger.debug(`[SuperAdmin] Guild ${guildId} ist nicht Control-Guild (${controlGuildId}) - überspringe SuperAdmin-Aktivierung`);
+            return; // Silent return statt Error
         }
         
         Logger.debug(`[SuperAdmin] Registriere Navigation für Control-Guild ${guildId}`);
@@ -734,10 +1105,19 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 visible: true
             },
             {
+                title: 'Changelogs',
+                path: `/guild/${guildId}/plugins/superadmin/changelogs`,
+                icon: 'fa-solid fa-code-commit',
+                order: 93,  // Untermenü-Reihenfolge
+                parent: `/guild/${guildId}/plugins/superadmin`,
+                type: 'main',
+                visible: true
+            },
+            {
                 title: 'Statistiken',
                 path: `/guild/${guildId}/plugins/superadmin/stats`,
                 icon: 'fa-solid fa-chart-line',
-                order: 93,  // Untermenü-Reihenfolge
+                order: 94,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true
@@ -746,7 +1126,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 title: 'Übersetzungen',
                 path: `/guild/${guildId}/locales`,
                 icon: 'fa-solid fa-language',
-                order: 94,  // Untermenü-Reihenfolge
+                order: 95,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true
@@ -758,6 +1138,19 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
     }
 
     /**
+     * Plugin deaktivieren (Global für Dashboard)
+     */
+    async disable() {
+        const Logger = ServiceManager.get('Logger');
+        Logger.info('[SuperAdmin] Deaktiviere Dashboard-Plugin global...');
+        
+        // Routen werden automatisch durch PluginManager entfernt
+        
+        Logger.success('[SuperAdmin] Dashboard-Plugin global deaktiviert');
+        return true;
+    }
+
+    /**
      * Guild-spezifische Deaktivierung
      */
     async onGuildDisable(guildId) {
@@ -766,8 +1159,14 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         
         try {
             // Entferne SuperAdmin Navigation (removeNavigation, nicht unregisterNavigation!)
-            await navigationManager.removeNavigation('superadmin', guildId);
+            await navigationManager.removeNavigation(this.name, guildId);
             
+            // Configs löschen
+            await dbService.query(
+                'DELETE FROM configs WHERE plugin_name = ? AND guild_id = ?',
+                [this.name, guildId]
+            );
+
             logger.info(`[SuperAdmin] Plugin für Guild ${guildId} deaktiviert`);
         } catch (error) {
             logger.error(`[SuperAdmin] Fehler beim Deaktivieren für Guild ${guildId}:`, error);

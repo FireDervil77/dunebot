@@ -66,9 +66,10 @@ class NotificationManager {
     /**
      * Ruft alle aktiven Benachrichtigungen für einen Benutzer ab
      * @param {Object} user Benutzer-Objekt
+     * @param {string} locale Benutzer-Locale (z.B. 'de-DE', 'en-GB')
      * @returns {Promise<Array>} Liste der aktiven Benachrichtigungen
      */
-    async getNotificationsForUser(user) {
+    async getNotificationsForUser(user, locale = 'de-DE') {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
 
@@ -78,8 +79,8 @@ class NotificationManager {
             // 2. Noch nicht dismissed wurden
             // 3. Keine Rollen-Einschränkung haben ODER der Benutzer die Rolle hat
             const notifications = await dbService.query(`
-                SELECT id, title, message, type, expiry, roles, dismissed, 
-                    action_url, action_text, created_at, updated_at
+                SELECT id, title_translations, message_translations, type, expiry, roles, dismissed, 
+                    action_url, action_text_translations, created_at, updated_at
                 FROM notifications 
                 WHERE (expiry IS NULL OR expiry > NOW())
                 AND dismissed = 0
@@ -87,10 +88,26 @@ class NotificationManager {
                 ORDER BY created_at DESC
             `, [JSON.stringify(user?.roles || [])]);
 
-            return notifications.map(n => ({
-                ...n,
-                roles: n.roles ? JSON.parse(n.roles) : null
-            }));
+            // JSON-Spalten parsen und lokalisieren
+            return notifications.map(n => {
+                const titleTrans = JSON.parse(n.title_translations);
+                const messageTrans = JSON.parse(n.message_translations);
+                const actionTextTrans = n.action_text_translations ? JSON.parse(n.action_text_translations) : null;
+                
+                return {
+                    id: n.id,
+                    title: titleTrans[locale] || titleTrans['de-DE'] || '',
+                    message: messageTrans[locale] || messageTrans['de-DE'] || '',
+                    type: n.type,
+                    expiry: n.expiry,
+                    roles: n.roles ? JSON.parse(n.roles) : null,
+                    dismissed: n.dismissed,
+                    action_url: n.action_url,
+                    action_text: actionTextTrans?.[locale] || actionTextTrans?.['de-DE'] || '',
+                    created_at: n.created_at,
+                    updated_at: n.updated_at
+                };
+            });
         } catch (error) {
             Logger.error('Fehler beim Abrufen der Benachrichtigungen:', error);
             return [];

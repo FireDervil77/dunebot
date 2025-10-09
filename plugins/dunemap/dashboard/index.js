@@ -58,8 +58,9 @@ class DuneMapPlugin extends DashboardPlugin {
             deps: [], // Keine Abhängigkeiten (standalone)
             version: this.version,
             inFooter: true,
-            defer: false,
-            debugSrc: 'js/dunemap-admin.dev.js' // Für SCRIPT_DEBUG=true
+            defer: false
+            // HINWEIS: debugSrc entfernt, da dunemap-admin.dev.js nicht existiert
+            // Die normale dunemap-admin.js wird auch im Debug-Modus verwendet
         });
         
         // CSS ist inline im Template (kein separates File)
@@ -300,38 +301,32 @@ class DuneMapPlugin extends DashboardPlugin {
                 };
                 
                 const { 
-                    STORM_TIMER_FORMAT, 
-                    STROM_TIMER_TIMEZONE, 
-                    STORM_TIME_RECALCULATE_TIME, 
-                    STROM_TIMER_DURATION,
-                    MAP_CHANNEL_ID 
+                    MAP_CHANNEL_ID,
+                    coriolis_region  // Einzige Storm-Einstellung
                 } = req.body;
                 
                 try {
                     const settingsToSave = {
-                        STORM_TIMER_FORMAT: STORM_TIMER_FORMAT || 'HH:mm:ss',
-                        STROM_TIMER_TIMEZONE: STROM_TIMER_TIMEZONE || 'Europe/Berlin',
-                        STORM_TIME_RECALCULATE_TIME: STORM_TIME_RECALCULATE_TIME === 'on',
-                        STROM_TIMER_DURATION: STROM_TIMER_DURATION || '6d',
-                        MAP_CHANNEL_ID: MAP_CHANNEL_ID || ''
+                        MAP_CHANNEL_ID: MAP_CHANNEL_ID || '',
+                        coriolis_region: coriolis_region || 'EU'
                     };
                     
-                    // FIX: Nur setzen wenn Wert tatsächlich geändert wurde
-                    // Verhindert Überschreiben mit Defaults beim Dashboard-Restart
+                    // FIX: INSERT ... ON DUPLICATE KEY UPDATE für alle Settings
+                    // Stellt sicher, dass Settings auch angelegt werden wenn sie noch nicht existieren
                     for (const [key, value] of Object.entries(settingsToSave)) {
                         const configValue = typeof value === 'boolean' || typeof value === 'number' 
                             ? JSON.stringify(value) 
                             : value;
                         
-                        // Nur UPDATE, kein INSERT (Settings müssen vom Bot initialisiert sein)
+                        // INSERT mit ON DUPLICATE KEY UPDATE
                         await dbService.query(`
-                            UPDATE configs 
-                            SET config_value = ?
-                            WHERE plugin_name = 'dunemap' 
-                              AND config_key = ? 
-                              AND guild_id = ? 
-                              AND context = 'shared'
-                        `, [configValue, key, guildId]);
+                            INSERT INTO configs 
+                                (plugin_name, config_key, config_value, guild_id, context)
+                            VALUES 
+                                ('dunemap', ?, ?, ?, 'shared')
+                            ON DUPLICATE KEY UPDATE 
+                                config_value = VALUES(config_value)
+                        `, [key, configValue, guildId]);
                     }
                     
                     Logger.info(`[DuneMap] ✅ Settings gespeichert für Guild ${guildId}`);
@@ -381,13 +376,13 @@ class DuneMapPlugin extends DashboardPlugin {
                     
                     Logger.info(`[DuneMap] Gefundene Marker: ${markers.length}`);
                     
-                    // Lade Settings
+                    // Lade Settings (SHARED für coriolis_region!)
                     const settings = await dbService.query(`
                         SELECT config_key, config_value 
                         FROM configs 
                         WHERE plugin_name = 'dunemap' 
                         AND guild_id = ? 
-                        AND context = 'guild'
+                        AND context IN ('guild', 'shared')
                     `, [guildId]);
                     
                     Logger.info(`[DuneMap] Gefundene Settings: ${settings.length}`);
@@ -419,10 +414,12 @@ class DuneMapPlugin extends DashboardPlugin {
                                 ajaxUrl: `/guild/${guildId}/plugins/dunemap/admin/marker`,
                                 nonce: req.session.csrfToken || '',  // Falls CSRF verwendet wird
                                 i18n: {
-                                    confirmDelete: 'Marker wirklich löschen?',
-                                    maxMarkersReached: 'Maximal 4 Marker pro Sektor!',
-                                    success: 'Erfolgreich gespeichert',
-                                    error: 'Fehler aufgetreten'
+                                    markerAdded: req.t('dunemap:ADMIN.JS.MARKER_ADDED'),
+                                    errorAdd: req.t('dunemap:ADMIN.JS.ERROR_ADD'),
+                                    networkError: req.t('dunemap:ADMIN.JS.NETWORK_ERROR'),
+                                    confirmDelete: req.t('dunemap:ADMIN.JS.CONFIRM_DELETE'),
+                                    markerRemoved: req.t('dunemap:ADMIN.JS.MARKER_REMOVED'),
+                                    errorRemove: req.t('dunemap:ADMIN.JS.ERROR_REMOVE')
                                 }
                             }
                         });
@@ -494,14 +491,14 @@ class DuneMapPlugin extends DashboardPlugin {
                             });
                         }
                         
-                        // Prüfe ob bereits 4 Marker in diesem Sektor existieren
+                        // Prüfe ob bereits 6 Marker in diesem Sektor existieren
                         const [count] = await dbService.query(`
                             SELECT COUNT(*) as count 
                             FROM dunemap_markers 
                             WHERE guild_id = ? AND sector_x = ? AND sector_y = ?
                         `, [guildId, sectorX, sectorY]);
                         
-                        if (count.count >= 4) {
+                        if (count.count >= 6) {
                             return res.status(400).json({ 
                                 success: false, 
                                 message: t('dunemap:MESSAGES.MAX_MARKERS')
@@ -509,11 +506,18 @@ class DuneMapPlugin extends DashboardPlugin {
                         }
                         
                         // Marker hinzufügen
-                        await dbService.query(`
+                        const insertResult = await dbService.query(`
                             INSERT INTO dunemap_markers 
                             (guild_id, sector_x, sector_y, marker_type, placed_by, placed_at)
                             VALUES (?, ?, ?, ?, ?, NOW())
                         `, [guildId, sectorX, sectorY, markerType, placedBy || 'Dashboard']);
+                        
+                        // Neuen Marker abrufen für Client-Update
+                        const [newMarker] = await dbService.query(`
+                            SELECT id, guild_id, sector_x, sector_y, marker_type, placed_by, placed_at, updated_at
+                            FROM dunemap_markers
+                            WHERE id = ?
+                        `, [insertResult.insertId]);
                         
                         Logger.info(`[DuneMap] ✅ Marker ${markerType} in ${sectorX}${sectorY} gesetzt`);
                         res.json({ 
@@ -521,7 +525,8 @@ class DuneMapPlugin extends DashboardPlugin {
                             message: t('dunemap:MESSAGES.MARKER_SET', { 
                                 type: markerType, 
                                 sector: `${sectorX}${sectorY}` 
-                            })
+                            }),
+                            marker: newMarker
                         });
                         
                     } else if (action === 'remove') {
@@ -573,6 +578,57 @@ class DuneMapPlugin extends DashboardPlugin {
                 }
             });
             
+            // === API: CORIOLIS STORM TIMER ===
+            this.guildRouter.get('/api/storm-timer', async (req, res) => {
+                const Logger = ServiceManager.get('Logger');
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                const { getNextStormTiming, getRegionConfig } = require('../shared/coriolisStormConfig');
+                
+                try {
+                    // Lade gespeicherte Region aus Config
+                    const regionResult = await dbService.query(`
+                        SELECT config_value 
+                        FROM configs 
+                        WHERE plugin_name = 'dunemap' 
+                        AND config_key = 'coriolis_region' 
+                        AND guild_id = ? 
+                        AND context = 'guild'
+                    `, [guildId]);
+                    
+                    // Default: EU, falls nichts gespeichert
+                    const region = regionResult.length > 0 
+                        ? JSON.parse(regionResult[0].config_value) 
+                        : 'EU';
+                    
+                    Logger.debug(`[DuneMap] Storm-Timer für Region: ${region}`);
+                    
+                    // Berechne nächsten Storm
+                    const stormData = getNextStormTiming(region);
+                    const regionConfig = getRegionConfig(region);
+                    
+                    res.json({
+                        success: true,
+                        region,
+                        regionConfig,
+                        stormData: {
+                            nextStormStart: stormData.nextStormStart.toISOString(),
+                            nextStormEnd: stormData.nextStormEnd.toISOString(),
+                            daysUntil: stormData.daysUntil,
+                            hoursUntil: stormData.hoursUntil,
+                            minutesUntil: stormData.minutesUntil,
+                            isActive: stormData.isActive
+                        }
+                    });
+                } catch (error) {
+                    Logger.error('[DuneMap] Fehler beim Storm-Timer-Abruf:', error);
+                    res.status(500).json({ 
+                        success: false, 
+                        message: error.message 
+                    });
+                }
+            });
+            
             Logger.debug('[DuneMap] Routen eingerichtet');
         } catch (error) {
             Logger.error('[DuneMap] Fehler beim Einrichten der Routen:', error);
@@ -591,8 +647,8 @@ class DuneMapPlugin extends DashboardPlugin {
             Logger.info('Deaktiviere DuneMap Plugin und entferne Tabellen...');
             
             // Tabellen in umgekehrter Reihenfolge löschen (wegen Foreign Keys)
-            await dbService.query('DROP TABLE IF EXISTS dunemap_storm_timer');
-            await dbService.query('DROP TABLE IF EXISTS dunemap_markers');
+            //await dbService.query('DROP TABLE IF EXISTS dunemap_storm_timer');
+            //await dbService.query('DROP TABLE IF EXISTS dunemap_markers');
             
             Logger.success('DuneMap Tabellen erfolgreich entfernt');
             return true;
@@ -627,15 +683,13 @@ class DuneMapPlugin extends DashboardPlugin {
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
+        const navigationManager = ServiceManager.get('navigationManager');
         
         try {
             Logger.info(`Deaktiviere DuneMap Plugin für Guild ${guildId}...`);
             
-            // Navigation aus DB entfernen
-            await dbService.query(
-                'DELETE FROM navigation WHERE plugin_name = ? AND guild_id = ?',
-                [this.name, guildId]
-            );
+            // Navigation über NavigationManager entfernen
+            await navigationManager.removeNavigation(this.name, guildId);
             
             // Guild-spezifische Daten aus ALLEN DuneMap-Tabellen löschen
             await dbService.query('DELETE FROM dunemap_storm_timer WHERE guild_id = ?', [guildId]);

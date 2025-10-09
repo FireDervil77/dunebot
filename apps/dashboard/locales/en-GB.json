@@ -22,6 +22,8 @@
         "BOTNAME": "DuneBot",
         "GITHUB": "GitHub",
         "DOCUMENTATION": "Documentation",
+        "CHANGELOGS": "Changelogs",
+        "CHANGELOGS_TITLE": "Version Updates",
         "PLUGINS": "Plugins",
         "LANGUAGE_SELECTOR": "Language",
         "LANGUAGE_DE": "Deutsch",
@@ -290,7 +292,27 @@
         "UNINSTALL": "Uninstall",
         "UNINSTALLING": "Uninstalling",
         "INSTALLED": "Installed",
-        "TOTAL": "Total"
+        "TOTAL": "Total",
+        "ENABLED_TITLE": "Enabled Plugins",
+        "AVAILABLE_TITLE": "Available Plugins",
+        "NO_ENABLED": "No plugins enabled.",
+        "NO_AVAILABLE": "No additional plugins available.",
+        "NO_DESCRIPTION": "No description available",
+        "AUTHOR": "Author",
+        "VERSION": "Version",
+        "CORE_BADGE": "Core",
+        "ENABLE_ACTION": "Enable",
+        "DISABLE_ACTION": "Disable",
+        "SETTINGS_ACTION": "Settings",
+        "CONFIGURE_ACTION": "Configure",
+        "CARD_VIEW": "Cards",
+        "TABLE_VIEW": "Table",
+        "TABLE_ICON": "Icon",
+        "TABLE_NAME": "Name",
+        "TABLE_VERSION": "Version",
+        "TABLE_AUTHOR": "Author",
+        "TABLE_DESCRIPTION": "Description",
+        "TABLE_ACTIONS": "Actions"
     },
 
     "LOCALES_PAGE": {
@@ -367,6 +389,13 @@
         "DUNEMAP_SETTINGS_ERROR": "Error saving DuneMap settings"
     },
 
+    "TOAST_NOTIFICATIONS": {
+        "TITLE": "Toast Notifications",
+        "LOADING": "Loading notifications...",
+        "VIEW_ALL": "View All",
+        "NO_CRITICAL": "No critical notifications"
+    },
+
     "DASHBOARD_COMMON": {
         "MEMBER_SINCE": "Member since",
         "DAYS": "days",
@@ -381,5 +410,83 @@
         "DESCRIPTION_META": "DuneBot is a highly scalable Discord Bot platform in Javascript with a Dashboard.",
         "WELCOME_SETTINGS": "Welcome to Settings!",
         "WELCOME_SETTINGS_DESC": "Here you can configure your bot, manage permissions and adjust plugin settings."
+    },
+
+    "NOTIFICATIONS": {
+        "TITLE": "Notifications",
+        "ALL_NOTIFICATIONS": "All Notifications",
+        "ADD_NEW": "New Notification",
+        "ADD_FIRST": "Create First Notification",
+        "NO_NOTIFICATIONS": "No notifications available",
+        "NEW_NOTIFICATION": "New Notification",
+        "EDIT_NOTIFICATION": "Edit Notification",
+        "EDIT": "Edit",
+        "DELETE": "Delete",
+        "DETAILS": "Details",
+        "CONFIRM_DELETE": "Do you really want to delete this notification?",
+        "DELETE_ERROR": "Error deleting notification",
+        "TABLE": {
+            "TITLE": "Title",
+            "TYPE": "Type",
+            "EXPIRES": "Expires",
+            "CREATED": "Created",
+            "ACTIONS": "Actions"
+        },
+        "FORM": {
+            "TITLE": "Title",
+            "MESSAGE": "Message",
+            "ACTION_TEXT": "Action Text",
+            "ACTION_TEXT_HELP": "Text for the action button (optional)",
+            "ACTION_URL": "Action URL",
+            "ACTION_URL_HELP": "URL to open on click (optional)",
+            "TYPE": "Type",
+            "EXPIRES_AT": "Expiration Date",
+            "EXPIRES_AT_HELP": "Leave empty for permanent notification",
+            "SAVE": "Save",
+            "CANCEL": "Cancel"
+        }
+    },
+
+    "CHANGELOGS": {
+        "TITLE": "Changelogs",
+        "SUBTITLE": "All version changes at a glance",
+        "ALL_CHANGELOGS": "All Changelogs",
+        "VIEW_ALL": "View All Changelogs",
+        "ADD_NEW": "New Changelog",
+        "ADD_FIRST": "Create First Changelog",
+        "NO_CHANGELOGS": "No changelogs available",
+        "NEW_CHANGELOG": "New Changelog",
+        "EDIT_CHANGELOG": "Edit Changelog",
+        "EDIT": "Edit",
+        "DELETE": "Delete",
+        "DETAILS": "Details",
+        "CONFIRM_DELETE": "Do you really want to delete this changelog?",
+        "DELETE_ERROR": "Error deleting changelog",
+        "VIEW_DETAILS": "View Details",
+        "BACK_TO_CHANGELOGS": "Back to Changelogs",
+        "TABLE": {
+            "VERSION": "Version",
+            "TITLE": "Title",
+            "TYPE": "Type",
+            "RELEASED": "Released",
+            "ACTIONS": "Actions"
+        },
+        "FORM": {
+            "VERSION": "Version",
+            "TITLE": "Title",
+            "DESCRIPTION": "Description",
+            "CHANGES": "Changes",
+            "TYPE": "Type",
+            "RELEASED_AT": "Released At",
+            "SAVE": "Save",
+            "CANCEL": "Cancel"
+        },
+        "CHANGES": {
+            "ADDED": "Added",
+            "IMPROVED": "Improved",
+            "FIXED": "Fixed",
+            "REMOVED": "Removed",
+            "OTHER": "Other"
+        }
     }
 }

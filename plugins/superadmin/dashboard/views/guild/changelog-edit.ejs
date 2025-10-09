@@ -1,0 +1,184 @@
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">
+                    <%= changelog && changelog.id ? tr('CHANGELOGS.EDIT_CHANGELOG') : tr('CHANGELOGS.NEW_CHANGELOG') %>
+                </h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/superadmin">SuperAdmin</a></li>
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/superadmin/changelogs"><%= tr('CHANGELOGS.TITLE') %></a></li>
+                    <li class="breadcrumb-item active"><%= changelog && changelog.id ? tr('CHANGELOGS.EDIT') : tr('CHANGELOGS.NEW') %></li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="content">
+    <div class="container-fluid">
+        <% if (locals.toast) { %>
+            <div class="alert alert-<%= toast.type %> alert-dismissible fade show">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <%= toast.message %>
+            </div>
+        <% } %>
+
+        <form action="/guild/<%= guildId %>/plugins/superadmin/changelogs/save" method="POST">
+            <input type="hidden" name="guildId" value="<%= guildId %>">
+            <% if (changelog && changelog.id) { %>
+                <input type="hidden" name="changelogId" value="<%= changelog.id %>">
+            <% } %>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><%= tr('CHANGELOGS.DETAILS') %></h3>
+                </div>
+                <div class="card-body">
+                    <!-- Version und Type -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="version"><%= tr('CHANGELOGS.FORM.VERSION') %> <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="version" 
+                                       name="version" 
+                                       value="<%= changelog?.version || '' %>"
+                                       placeholder="1.0.0"
+                                       required>
+                                <small class="form-text text-muted">Format: major.minor.patch (z.B. 2.1.0)</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="type"><%= tr('CHANGELOGS.FORM.TYPE') %> <span class="text-danger">*</span></label>
+                                <select class="form-control" id="type" name="type" required>
+                                    <option value="major" <%= changelog?.type === 'major' ? 'selected' : '' %>>
+                                        Major - Große Änderungen
+                                    </option>
+                                    <option value="minor" <%= changelog?.type === 'minor' ? 'selected' : '' %>>
+                                        Minor - Neue Features
+                                    </option>
+                                    <option value="patch" <%= changelog?.type === 'patch' ? 'selected' : '' %>>
+                                        Patch - Bugfixes
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sprach-Tabs -->
+                    <ul class="nav nav-tabs mb-3" id="langTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="de-tab" data-toggle="tab" href="#de-content" role="tab">
+                                <i class="fas fa-flag mr-1"></i> Deutsch
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="en-tab" data-toggle="tab" href="#en-content" role="tab">
+                                <i class="fas fa-flag mr-1"></i> English
+                            </a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="langTabContent">
+                        <!-- Deutsch Tab -->
+                        <div class="tab-pane fade show active" id="de-content" role="tabpanel">
+                            <div class="form-group">
+                                <label for="title_de"><%= tr('CHANGELOGS.FORM.TITLE') %> (DE) <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="title_de" 
+                                       name="title_de" 
+                                       value="<%= changelog?.title_de || '' %>"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="description_de"><%= tr('CHANGELOGS.FORM.DESCRIPTION') %> (DE)</label>
+                                <textarea class="form-control" 
+                                          id="description_de" 
+                                          name="description_de" 
+                                          rows="3"><%= changelog?.description_de || '' %></textarea>
+                                <small class="form-text text-muted">Kurze Zusammenfassung der Version</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="changes_de"><%= tr('CHANGELOGS.FORM.CHANGES') %> (DE) <span class="text-danger">*</span></label>
+                                <textarea class="form-control" 
+                                          id="changes_de" 
+                                          name="changes_de" 
+                                          rows="10" 
+                                          required><%= changelog?.changes_de || '' %></textarea>
+                                <small class="form-text text-muted">
+                                    Eine Änderung pro Zeile. Prefix verwenden:<br>
+                                    <code>+ Neue Feature</code> | <code>* Verbesserung</code> | <code>- Entfernt</code> | <code>! Fix</code>
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- English Tab -->
+                        <div class="tab-pane fade" id="en-content" role="tabpanel">
+                            <div class="form-group">
+                                <label for="title_en"><%= tr('CHANGELOGS.FORM.TITLE') %> (EN) <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="title_en" 
+                                       name="title_en" 
+                                       value="<%= changelog?.title_en || '' %>">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="description_en"><%= tr('CHANGELOGS.FORM.DESCRIPTION') %> (EN)</label>
+                                <textarea class="form-control" 
+                                          id="description_en" 
+                                          name="description_en" 
+                                          rows="3"><%= changelog?.description_en || '' %></textarea>
+                                <small class="form-text text-muted">Short summary of the version</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="changes_en"><%= tr('CHANGELOGS.FORM.CHANGES') %> (EN) <span class="text-danger">*</span></label>
+                                <textarea class="form-control" 
+                                          id="changes_en" 
+                                          name="changes_en" 
+                                          rows="10"><%= changelog?.changes_en || '' %></textarea>
+                                <small class="form-text text-muted">
+                                    One change per line. Use prefix:<br>
+                                    <code>+ New Feature</code> | <code>* Improvement</code> | <code>- Removed</code> | <code>! Fix</code>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="form-group">
+                        <label for="release_date"><%= tr('CHANGELOGS.FORM.RELEASED_AT') %> <span class="text-danger">*</span></label>
+                        <input type="datetime-local" 
+                               class="form-control" 
+                               id="release_date" 
+                               name="release_date" 
+                               value="<%= changelog?.release_date ? new Date(changelog.release_date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16) %>"
+                               required>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save mr-2"></i><%= tr('CHANGELOGS.FORM.SAVE') %>
+                    </button>
+                    <a href="/guild/<%= guildId %>/plugins/superadmin/changelogs" class="btn btn-secondary">
+                        <i class="fas fa-times mr-2"></i><%= tr('CHANGELOGS.FORM.CANCEL') %>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

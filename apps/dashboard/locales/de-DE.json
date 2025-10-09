@@ -22,6 +22,8 @@
         "BOTNAME": "DuneBot",
         "GITHUB": "GitHub",
         "DOCUMENTATION": "Dokumentation",
+        "CHANGELOGS": "Changelogs",
+        "CHANGELOGS_TITLE": "Version Updates",
         "PLUGINS": "Plugins",
         "LANGUAGE_SELECTOR": "Sprache",
         "LANGUAGE_DE": "Deutsch",
@@ -310,7 +312,15 @@
         "ENABLE_ACTION": "Aktivieren",
         "DISABLE_ACTION": "Deaktivieren",
         "SETTINGS_ACTION": "Einstellungen",
-        "CONFIGURE_ACTION": "Konfigurieren"
+        "CONFIGURE_ACTION": "Konfigurieren",
+        "CARD_VIEW": "Karten",
+        "TABLE_VIEW": "Tabelle",
+        "TABLE_ICON": "Icon",
+        "TABLE_NAME": "Name",
+        "TABLE_VERSION": "Version",
+        "TABLE_AUTHOR": "Autor",
+        "TABLE_DESCRIPTION": "Beschreibung",
+        "TABLE_ACTIONS": "Aktionen"
     },
 
     "LOCALES_PAGE": {
@@ -390,6 +400,13 @@
         "DUNEMAP_SETTINGS_ERROR": "Fehler beim Speichern der DuneMap-Einstellungen"
     },
 
+    "TOAST_NOTIFICATIONS": {
+        "TITLE": "Toast Benachrichtigungen",
+        "LOADING": "Lade Benachrichtigungen...",
+        "VIEW_ALL": "Alle anzeigen",
+        "NO_CRITICAL": "Keine kritischen Benachrichtigungen"
+    },
+
     "DASHBOARD_COMMON": {
         "MEMBER_SINCE": "Mitglied seit",
         "DAYS": "Tagen",
@@ -404,5 +421,83 @@
         "DESCRIPTION_META": "DuneBot ist eine hochskalierbare Discord Bot Plattform in Javascript mit einem Dashboard.",
         "WELCOME_SETTINGS": "Willkommen bei den Einstellungen!",
         "WELCOME_SETTINGS_DESC": "Hier kannst du deinen Bot konfigurieren, Berechtigungen verwalten und Plugin-Einstellungen anpassen."
+    },
+
+    "NOTIFICATIONS": {
+        "TITLE": "Benachrichtigungen",
+        "ALL_NOTIFICATIONS": "Alle Benachrichtigungen",
+        "ADD_NEW": "Neue Benachrichtigung",
+        "ADD_FIRST": "Erste Benachrichtigung erstellen",
+        "NO_NOTIFICATIONS": "Keine Benachrichtigungen vorhanden",
+        "NEW_NOTIFICATION": "Neue Benachrichtigung",
+        "EDIT_NOTIFICATION": "Benachrichtigung bearbeiten",
+        "EDIT": "Bearbeiten",
+        "DELETE": "Löschen",
+        "DETAILS": "Details",
+        "CONFIRM_DELETE": "Möchten Sie diese Benachrichtigung wirklich löschen?",
+        "DELETE_ERROR": "Fehler beim Löschen der Benachrichtigung",
+        "TABLE": {
+            "TITLE": "Titel",
+            "TYPE": "Typ",
+            "EXPIRES": "Läuft ab",
+            "CREATED": "Erstellt",
+            "ACTIONS": "Aktionen"
+        },
+        "FORM": {
+            "TITLE": "Titel",
+            "MESSAGE": "Nachricht",
+            "ACTION_TEXT": "Aktionstext",
+            "ACTION_TEXT_HELP": "Text für den Aktionsbutton (optional)",
+            "ACTION_URL": "Aktions-URL",
+            "ACTION_URL_HELP": "URL die beim Klick geöffnet wird (optional)",
+            "TYPE": "Typ",
+            "EXPIRES_AT": "Ablaufdatum",
+            "EXPIRES_AT_HELP": "Leer lassen für unbefristete Benachrichtigung",
+            "SAVE": "Speichern",
+            "CANCEL": "Abbrechen"
+        }
+    },
+
+    "CHANGELOGS": {
+        "TITLE": "Changelogs",
+        "SUBTITLE": "Alle Versionsänderungen im Überblick",
+        "ALL_CHANGELOGS": "Alle Changelogs",
+        "VIEW_ALL": "Alle Changelogs anzeigen",
+        "ADD_NEW": "Neuer Changelog",
+        "ADD_FIRST": "Ersten Changelog erstellen",
+        "NO_CHANGELOGS": "Keine Changelogs vorhanden",
+        "NEW_CHANGELOG": "Neuer Changelog",
+        "EDIT_CHANGELOG": "Changelog bearbeiten",
+        "EDIT": "Bearbeiten",
+        "DELETE": "Löschen",
+        "DETAILS": "Details",
+        "CONFIRM_DELETE": "Möchten Sie diesen Changelog wirklich löschen?",
+        "DELETE_ERROR": "Fehler beim Löschen des Changelogs",
+        "VIEW_DETAILS": "Details ansehen",
+        "BACK_TO_CHANGELOGS": "Zurück zu den Changelogs",
+        "TABLE": {
+            "VERSION": "Version",
+            "TITLE": "Titel",
+            "TYPE": "Typ",
+            "RELEASED": "Veröffentlicht",
+            "ACTIONS": "Aktionen"
+        },
+        "FORM": {
+            "VERSION": "Version",
+            "TITLE": "Titel",
+            "DESCRIPTION": "Beschreibung",
+            "CHANGES": "Änderungen",
+            "TYPE": "Typ",
+            "RELEASED_AT": "Veröffentlicht am",
+            "SAVE": "Speichern",
+            "CANCEL": "Abbrechen"
+        },
+        "CHANGES": {
+            "ADDED": "Neu hinzugefügt",
+            "IMPROVED": "Verbessert",
+            "FIXED": "Behoben",
+            "REMOVED": "Entfernt",
+            "OTHER": "Sonstiges"
+        }
     }
 }

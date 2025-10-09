@@ -1,0 +1,115 @@
+<!-- Changelogs Overview Section -->
+<main id="main">
+  <section class="changelogs section">
+    <div class="container section-title" data-aos="fade-up">
+      <h2><%= tr('CHANGELOGS.TITLE') %></h2>
+      <p><%= tr('CHANGELOGS.SUBTITLE') %></p>
+    </div>
+
+    <div class="container">
+      <% if (changelogs && changelogs.length > 0) { %>
+        <div class="row gy-4">
+          <% changelogs.forEach(changelog => { 
+            const titleTranslations = typeof changelog.title_translations === 'string' 
+              ? JSON.parse(changelog.title_translations) 
+              : changelog.title_translations;
+            const descTranslations = typeof changelog.description_translations === 'string' 
+              ? JSON.parse(changelog.description_translations) 
+              : changelog.description_translations;
+            
+            const title = titleTranslations?.[currentLocale] || titleTranslations?.['de-DE'] || 'Untitled';
+            const description = descTranslations?.[currentLocale] || descTranslations?.['de-DE'] || '';
+            
+            const typeColors = {
+              major: 'danger',
+              minor: 'warning', 
+              patch: 'info'
+            };
+            const badgeColor = typeColors[changelog.type] || 'secondary';
+          %>
+            <div class="col-lg-6" data-aos="fade-up" data-aos-delay="100">
+              <div class="card changelog-card h-100">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-start mb-3">
+                    <span class="badge bg-<%= badgeColor %> fs-5">
+                      v<%= changelog.version %>
+                    </span>
+                    <small class="text-muted">
+                      <i class="bi bi-calendar me-1"></i>
+                      <%= new Date(changelog.release_date).toLocaleDateString(currentLocale) %>
+                    </small>
+                  </div>
+                  
+                  <h3 class="changelog-title">
+                    <a href="/changelogs/<%= changelog.version %>"><%= title %></a>
+                  </h3>
+                  
+                  <% if (description) { %>
+                    <p class="changelog-excerpt text-muted"><%= description %></p>
+                  <% } %>
+                  
+                  <div class="changelog-type">
+                    <% 
+                    const typeIcons = {
+                      major: 'rocket',
+                      minor: 'star',
+                      patch: 'wrench'
+                    };
+                    const icon = typeIcons[changelog.type] || 'code-branch';
+                    %>
+                    <i class="bi bi-<%= icon %> me-1"></i>
+                    <span class="text-capitalize"><%= changelog.type %> Release</span>
+                  </div>
+                  
+                  <a href="/changelogs/<%= changelog.version %>" class="btn btn-outline-primary btn-sm mt-3">
+                    <%= tr('CHANGELOGS.VIEW_DETAILS') %>
+                    <i class="bi bi-arrow-right ms-1"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <div class="text-center py-5" data-aos="fade-up">
+          <i class="bi bi-code-slash display-1 text-muted"></i>
+          <p class="mt-3 text-muted"><%= tr('CHANGELOGS.NO_CHANGELOGS') %></p>
+        </div>
+      <% } %>
+    </div>
+  </section>
+</main>
+
+<style>
+.changelog-card {
+  border: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.changelog-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.changelog-title a {
+  color: var(--heading-color);
+  text-decoration: none;
+}
+
+.changelog-title a:hover {
+  color: var(--accent-color);
+}
+
+.changelog-excerpt {
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+}
+
+.changelog-type {
+  font-size: 0.875rem;
+  color: #6c757d;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e9ecef;
+}
+</style>

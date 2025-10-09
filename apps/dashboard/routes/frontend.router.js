@@ -3,6 +3,7 @@ const { ServiceManager } = require("dunebot-core");
 const frontendController = require("../controllers/frontend.controller");
 const apiController = require("../controllers/api.controller");
 const { getLocalizedNews } = require("../helpers/newsHelper");
+const { getLocalizedChangelog } = require("../helpers/changelogHelper");
 
 // Router erstellen
 const router = express.Router();
@@ -45,6 +46,69 @@ const getNewsDetails = async (req, res) => {
         });
     } catch (err) {
         Logger.error('Fehler beim Laden der News-Details:', err);
+        res.status(500).render('frontend/500');
+    }
+};
+
+// Changelogs Overview Handler
+const getChangelogsList = async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get("themeManager");
+
+    try {
+        const rawChangelogs = await dbService.query(`
+            SELECT * FROM changelogs 
+            WHERE is_public = 1
+            ORDER BY release_date DESC
+        `);
+
+        // Changelogs lokalisieren
+        const userLocale = req.session.locale || res.locals.locale || 'de-DE';
+        const localizedChangelogs = rawChangelogs.map(cl => getLocalizedChangelog(cl, userLocale));
+
+        // Layout setzen
+        res.locals.layout = themeManager.getLayout('frontend');
+        
+        res.render('frontend/changelogs', {
+            changelogs: localizedChangelogs,
+            currentLocale: userLocale
+        });
+    } catch (err) {
+        Logger.error('Fehler beim Laden der Changelogs:', err);
+        res.status(500).render('frontend/500');
+    }
+};
+
+// Changelog-Details Handler
+const getChangelogDetails = async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get("themeManager");
+
+    try {
+        const rawChangelog = await dbService.query(`
+            SELECT * FROM changelogs 
+            WHERE version = ?
+        `, [req.params.version]);
+
+        if (!rawChangelog?.length) {
+            return res.status(404).render('frontend/404');
+        }
+
+        // Changelog lokalisieren
+        const userLocale = req.session.locale || res.locals.locale || 'de-DE';
+        const localizedChangelog = getLocalizedChangelog(rawChangelog[0], userLocale);
+
+        // Layout setzen
+        res.locals.layout = themeManager.getLayout('frontend');
+        
+        res.render('frontend/changelog-details', {
+            changelog: localizedChangelog,
+            currentLocale: userLocale
+        });
+    } catch (err) {
+        Logger.error('Fehler beim Laden der Changelog-Details:', err);
         res.status(500).render('frontend/500');
     }
 };
@@ -102,6 +166,8 @@ const routeConfig = {
 // Routen auf dem Router registrieren
 router.get('/', frontendController.getIndex);
 router.get('/news-details/:slug', getNewsDetails);
+router.get('/changelogs', getChangelogsList);
+router.get('/changelogs/:version', getChangelogDetails);
 router.get('/privacy', frontendController.privacy);
 router.get('/tos', frontendController.tos);
 

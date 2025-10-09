@@ -41,9 +41,9 @@ module.exports = {
               AND sector_x = NEW.sector_x
               AND sector_y = NEW.sector_y;
             
-            IF marker_count >= 4 THEN
+            IF marker_count >= 6 THEN
                 SIGNAL SQLSTATE '45000'
-                SET MESSAGE_TEXT = 'Maximal 4 Marker pro Koordinate erlaubt';
+                SET MESSAGE_TEXT = 'Maximal 6 Marker pro Koordinate erlaubt';
             END IF;
         END;
   `
