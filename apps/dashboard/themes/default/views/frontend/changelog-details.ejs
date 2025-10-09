@@ -47,14 +47,6 @@
 
         <!-- Changes List -->
         <div class="content">
-          <% 
-          // Import hierarchisches Parsing
-          const { parseHierarchicalChangelog } = require('../../../../helpers/changelogHelper');
-          
-          // Parse hierarchische Struktur
-          const hierarchicalData = parseHierarchicalChangelog(changelog.changes);
-          %>
-
           <% if (hierarchicalData && hierarchicalData.length > 0) { %>
             <div class="changelog-hierarchical">
               <% hierarchicalData.forEach((group, groupIndex) => { %>

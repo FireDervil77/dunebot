@@ -3,7 +3,7 @@ const { ServiceManager } = require("dunebot-core");
 const frontendController = require("../controllers/frontend.controller");
 const apiController = require("../controllers/api.controller");
 const { getLocalizedNews } = require("../helpers/newsHelper");
-const { getLocalizedChangelog } = require("../helpers/changelogHelper");
+const { getLocalizedChangelog, parseHierarchicalChangelog } = require("../helpers/changelogHelper");
 
 // Router erstellen
 const router = express.Router();
@@ -100,11 +100,15 @@ const getChangelogDetails = async (req, res) => {
         const userLocale = req.session.locale || res.locals.locale || 'de-DE';
         const localizedChangelog = getLocalizedChangelog(rawChangelog[0], userLocale);
 
+        // Parse hierarchische Struktur aus changes-Text
+        const hierarchicalData = parseHierarchicalChangelog(localizedChangelog.changes);
+
         // Layout setzen
         res.locals.layout = themeManager.getLayout('frontend');
         
         res.render('frontend/changelog-details', {
             changelog: localizedChangelog,
+            hierarchicalData: hierarchicalData,
             currentLocale: userLocale
         });
     } catch (err) {
