@@ -48,102 +48,94 @@
         <!-- Changes List -->
         <div class="content">
           <% 
-          // Parse changes from text (one change per line)
-          const changes = changelog.changes.split('\n').filter(c => c.trim());
+          // Import hierarchisches Parsing
+          const { parseHierarchicalChangelog } = require('../../../../helpers/changelogHelper');
           
-          // Group changes by type based on prefix
-          const groupedChanges = {
-            added: [],
-            improved: [],
-            removed: [],
-            fixed: [],
-            other: []
-          };
-          
-          changes.forEach(change => {
-            const trimmed = change.trim();
-            if (trimmed.startsWith('+')) {
-              groupedChanges.added.push(trimmed.substring(1).trim());
-            } else if (trimmed.startsWith('*')) {
-              groupedChanges.improved.push(trimmed.substring(1).trim());
-            } else if (trimmed.startsWith('-')) {
-              groupedChanges.removed.push(trimmed.substring(1).trim());
-            } else if (trimmed.startsWith('!')) {
-              groupedChanges.fixed.push(trimmed.substring(1).trim());
-            } else {
-              groupedChanges.other.push(trimmed);
-            }
-          });
+          // Parse hierarchische Struktur
+          const hierarchicalData = parseHierarchicalChangelog(changelog.changes);
           %>
 
-          <% if (groupedChanges.added.length > 0) { %>
-            <div class="change-section mb-4">
-              <h3 class="change-title">
-                <i class="bi bi-plus-circle text-success me-2"></i>
-                <%= tr('CHANGELOGS.CHANGES.ADDED') %>
-              </h3>
-              <ul class="change-list">
-                <% groupedChanges.added.forEach(change => { %>
-                  <li><%= change %></li>
-                <% }); %>
-              </ul>
+          <% if (hierarchicalData && hierarchicalData.length > 0) { %>
+            <div class="changelog-hierarchical">
+              <% hierarchicalData.forEach((group, groupIndex) => { %>
+                <% if (group.type === 'group') { %>
+                  <!-- Hauptgruppe (# Header) -->
+                  <div class="change-group mb-5">
+                    <h2 class="group-title mb-4">
+                      <i class="bi bi-folder2-open me-2 text-primary"></i>
+                      <%= group.title %>
+                    </h2>
+                    
+                    <% (group.children || []).forEach((subgroup, subIndex) => { %>
+                      <% if (subgroup.type === 'subgroup') { %>
+                        <!-- Untergruppe (## Sub-Header) -->
+                        <div class="change-subgroup mb-4">
+                          <h3 class="subgroup-title mb-3">
+                            <i class="bi bi-box me-2"></i>
+                            <%= subgroup.title %>
+                          </h3>
+                          
+                          <% if (subgroup.items && subgroup.items.length > 0) { %>
+                            <%
+                            // Gruppiere Items nach Kategorie
+                            const itemsByCategory = {};
+                            subgroup.items.forEach(item => {
+                              const category = item.category || 'Other';
+                              if (!itemsByCategory[category]) {
+                                itemsByCategory[category] = [];
+                              }
+                              itemsByCategory[category].push(item);
+                            });
+                            
+                            // Kategorie-Reihenfolge
+                            const categoryOrder = ['Features', 'Fixes', 'Changes', 'Removed', 'Other'];
+                            const sortedCategories = Object.keys(itemsByCategory).sort((a, b) => {
+                              const indexA = categoryOrder.indexOf(a);
+                              const indexB = categoryOrder.indexOf(b);
+                              return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+                            });
+                            
+                            // Icons und Übersetzungen für Kategorien
+                            const categoryIcons = {
+                              'Features': 'plus-circle text-success',
+                              'Fixes': 'wrench text-warning',
+                              'Changes': 'arrow-up-circle text-primary',
+                              'Removed': 'dash-circle text-danger',
+                              'Other': 'info-circle text-secondary'
+                            };
+                            
+                            const categoryLabels = {
+                              'Features': tr('CHANGELOGS.CHANGES.ADDED'),
+                              'Fixes': tr('CHANGELOGS.CHANGES.FIXED'),
+                              'Changes': tr('CHANGELOGS.CHANGES.IMPROVED'),
+                              'Removed': tr('CHANGELOGS.CHANGES.REMOVED'),
+                              'Other': tr('CHANGELOGS.CHANGES.OTHER')
+                            };
+                            %>
+                            
+                            <% sortedCategories.forEach(category => { %>
+                              <div class="change-section mb-3">
+                                <h4 class="change-title">
+                                  <i class="bi bi-<%= categoryIcons[category] %> me-2"></i>
+                                  <%= categoryLabels[category] %>
+                                </h4>
+                                <ul class="change-list">
+                                  <% itemsByCategory[category].forEach(item => { %>
+                                    <li><%= item.text %></li>
+                                  <% }); %>
+                                </ul>
+                              </div>
+                            <% }); %>
+                          <% } %>
+                        </div>
+                      <% } %>
+                    <% }); %>
+                  </div>
+                <% } %>
+              <% }); %>
             </div>
-          <% } %>
-
-          <% if (groupedChanges.improved.length > 0) { %>
-            <div class="change-section mb-4">
-              <h3 class="change-title">
-                <i class="bi bi-arrow-up-circle text-primary me-2"></i>
-                <%= tr('CHANGELOGS.CHANGES.IMPROVED') %>
-              </h3>
-              <ul class="change-list">
-                <% groupedChanges.improved.forEach(change => { %>
-                  <li><%= change %></li>
-                <% }); %>
-              </ul>
-            </div>
-          <% } %>
-
-          <% if (groupedChanges.fixed.length > 0) { %>
-            <div class="change-section mb-4">
-              <h3 class="change-title">
-                <i class="bi bi-wrench text-warning me-2"></i>
-                <%= tr('CHANGELOGS.CHANGES.FIXED') %>
-              </h3>
-              <ul class="change-list">
-                <% groupedChanges.fixed.forEach(change => { %>
-                  <li><%= change %></li>
-                <% }); %>
-              </ul>
-            </div>
-          <% } %>
-
-          <% if (groupedChanges.removed.length > 0) { %>
-            <div class="change-section mb-4">
-              <h3 class="change-title">
-                <i class="bi bi-dash-circle text-danger me-2"></i>
-                <%= tr('CHANGELOGS.CHANGES.REMOVED') %>
-              </h3>
-              <ul class="change-list">
-                <% groupedChanges.removed.forEach(change => { %>
-                  <li><%= change %></li>
-                <% }); %>
-              </ul>
-            </div>
-          <% } %>
-
-          <% if (groupedChanges.other.length > 0) { %>
-            <div class="change-section mb-4">
-              <h3 class="change-title">
-                <i class="bi bi-info-circle text-secondary me-2"></i>
-                <%= tr('CHANGELOGS.CHANGES.OTHER') %>
-              </h3>
-              <ul class="change-list">
-                <% groupedChanges.other.forEach(change => { %>
-                  <li><%= change %></li>
-                <% }); %>
-              </ul>
-            </div>
+          <% } else { %>
+            <p class="text-muted"><em><%= tr('CHANGELOGS.NO_CHANGES') %></em></p>
           <% } %>
         </div>
 
@@ -169,18 +161,53 @@
   font-size: 0.95rem;
 }
 
-.change-section {
+/* Hierarchische Struktur */
+.changelog-hierarchical {
+  margin-top: 2rem;
+}
+
+.change-group {
+  border-left: 4px solid var(--accent-color);
+  padding-left: 1.5rem;
+}
+
+.group-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 1.5rem;
+}
+
+.change-subgroup {
   background: #f8f9fa;
   padding: 1.5rem;
   border-radius: 8px;
-  border-left: 4px solid var(--accent-color);
+  margin-left: 0.5rem;
+}
+
+.subgroup-title {
+  font-size: 1.35rem;
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 1rem;
+}
+
+.change-section {
+  margin-bottom: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.change-section:last-child {
+  border-bottom: none;
 }
 
 .change-title {
-  font-size: 1.25rem;
-  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
   display: flex;
   align-items: center;
+  font-weight: 500;
 }
 
 .change-list {
@@ -190,9 +217,10 @@
 }
 
 .change-list li {
-  padding: 0.5rem 0;
+  padding: 0.4rem 0;
   padding-left: 2rem;
   position: relative;
+  line-height: 1.6;
 }
 
 .change-list li:before {
@@ -201,5 +229,26 @@
   left: 0.75rem;
   color: var(--accent-color);
   font-weight: bold;
+  font-size: 1.2rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .group-title {
+    font-size: 1.5rem;
+  }
+  
+  .subgroup-title {
+    font-size: 1.2rem;
+  }
+  
+  .change-subgroup {
+    padding: 1rem;
+    margin-left: 0;
+  }
+  
+  .change-group {
+    padding-left: 1rem;
+  }
 }
 </style>
