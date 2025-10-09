@@ -148,6 +148,203 @@ function getComponentBadge(component) {
     return badges[component] || badges.system;
 }
 
+/**
+ * Parst hierarchische Changelog-Struktur mit # Header und ## Sub-Header
+ * 
+ * Format:
+ * # PLUGINS
+ * ## DuneMap
+ * ! Fix: Irgendwas
+ * + Feature: Neues Ding
+ * - Removed: Altes Zeug
+ * * Change: Verbesserung
+ * 
+ * ## Core
+ * ! Fix: Bug behoben
+ * 
+ * @param {string} changesText - Rohtext aus dem Changelog-Editor
+ * @returns {Array} - Strukturiertes Array mit Gruppen und Items
+ * 
+ * Struktur:
+ * [
+ *   {
+ *     type: 'group',
+ *     title: 'PLUGINS',
+ *     level: 1,
+ *     children: [
+ *       {
+ *         type: 'subgroup',
+ *         title: 'DuneMap',
+ *         level: 2,
+ *         items: [
+ *           { type: 'fix', icon: 'fa-bug', text: 'Fix: Irgendwas', category: 'Fixes' },
+ *           { type: 'feature', icon: 'fa-plus', text: 'Feature: Neues Ding', category: 'Features' },
+ *           ...
+ *         ]
+ *       }
+ *     ]
+ *   }
+ * ]
+ */
+function parseHierarchicalChangelog(changesText) {
+    if (!changesText || typeof changesText !== 'string') {
+        return [];
+    }
+
+    const lines = changesText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    const result = [];
+    let currentGroup = null;
+    let currentSubgroup = null;
+
+    // Mapping für Item-Typen
+    const itemTypeMap = {
+        '!': { type: 'fix', icon: 'fa-bug', class: 'danger', category: 'Fixes' },
+        '+': { type: 'feature', icon: 'fa-plus', class: 'success', category: 'Features' },
+        '-': { type: 'removed', icon: 'fa-minus', class: 'warning', category: 'Removed' },
+        '*': { type: 'change', icon: 'fa-edit', class: 'info', category: 'Changes' }
+    };
+
+    for (const line of lines) {
+        // # Header erkennen (Hauptgruppe)
+        if (line.startsWith('# ')) {
+            const title = line.substring(2).trim();
+            currentGroup = {
+                type: 'group',
+                title,
+                level: 1,
+                children: []
+            };
+            result.push(currentGroup);
+            currentSubgroup = null; // Reset subgroup
+            continue;
+        }
+
+        // ## Sub-Header erkennen (Untergruppe)
+        if (line.startsWith('## ')) {
+            const title = line.substring(3).trim();
+            currentSubgroup = {
+                type: 'subgroup',
+                title,
+                level: 2,
+                items: []
+            };
+
+            // Wenn keine Gruppe existiert, erstelle eine "Allgemein"-Gruppe
+            if (!currentGroup) {
+                currentGroup = {
+                    type: 'group',
+                    title: 'Änderungen',
+                    level: 1,
+                    children: []
+                };
+                result.push(currentGroup);
+            }
+
+            currentGroup.children.push(currentSubgroup);
+            continue;
+        }
+
+        // Items erkennen (!, +, -, *)
+        const firstChar = line.charAt(0);
+        if (itemTypeMap[firstChar]) {
+            const itemMeta = itemTypeMap[firstChar];
+            const text = line.substring(1).trim();
+
+            const item = {
+                type: itemMeta.type,
+                icon: itemMeta.icon,
+                class: itemMeta.class,
+                category: itemMeta.category,
+                text
+            };
+
+            // Wenn Subgroup existiert, füge Item zur Subgroup hinzu
+            if (currentSubgroup) {
+                currentSubgroup.items.push(item);
+            }
+            // Wenn nur Group existiert (keine Subgroup), erstelle "Allgemein"-Subgroup
+            else if (currentGroup) {
+                // Prüfe ob "Allgemein"-Subgroup bereits existiert
+                let generalSubgroup = currentGroup.children.find(sg => sg.title === 'Allgemein');
+                if (!generalSubgroup) {
+                    generalSubgroup = {
+                        type: 'subgroup',
+                        title: 'Allgemein',
+                        level: 2,
+                        items: []
+                    };
+                    currentGroup.children.push(generalSubgroup);
+                }
+                generalSubgroup.items.push(item);
+                currentSubgroup = generalSubgroup; // Setze für weitere Items
+            }
+            // Wenn weder Group noch Subgroup existiert, erstelle beides
+            else {
+                currentGroup = {
+                    type: 'group',
+                    title: 'Änderungen',
+                    level: 1,
+                    children: []
+                };
+                currentSubgroup = {
+                    type: 'subgroup',
+                    title: 'Allgemein',
+                    level: 2,
+                    items: []
+                };
+                currentGroup.children.push(currentSubgroup);
+                result.push(currentGroup);
+                currentSubgroup.items.push(item);
+            }
+        }
+        // Zeile ohne erkanntes Format wird ignoriert (kann erweitert werden für plain text)
+    }
+
+    return result;
+}
+
+/**
+ * Konvertiert hierarchische Struktur zurück zu Markdown-Text
+ * (Nützlich für Editor-Vorschau oder Export)
+ * 
+ * @param {Array} hierarchicalData - Strukturierte Daten von parseHierarchicalChangelog()
+ * @returns {string} - Markdown-formatierter Text
+ */
+function hierarchicalChangelogToMarkdown(hierarchicalData) {
+    if (!Array.isArray(hierarchicalData) || hierarchicalData.length === 0) {
+        return '';
+    }
+
+    const lines = [];
+
+    for (const group of hierarchicalData) {
+        if (group.type === 'group') {
+            lines.push(`# ${group.title}`);
+            
+            for (const subgroup of group.children || []) {
+                if (subgroup.type === 'subgroup') {
+                    lines.push(`## ${subgroup.title}`);
+                    
+                    for (const item of subgroup.items || []) {
+                        const prefix = {
+                            fix: '!',
+                            feature: '+',
+                            removed: '-',
+                            change: '*'
+                        }[item.type] || '*';
+                        
+                        lines.push(`${prefix} ${item.text}`);
+                    }
+                    lines.push(''); // Leerzeile nach Subgroup
+                }
+            }
+            lines.push(''); // Leerzeile nach Group
+        }
+    }
+
+    return lines.join('\n').trim();
+}
+
 module.exports = {
     getLocalizedChangelog,
     getLocalizedChangelogList,
@@ -155,5 +352,7 @@ module.exports = {
     getAvailableLocales,
     prepareChangelogForDB,
     getTypeBadge,
-    getComponentBadge
+    getComponentBadge,
+    parseHierarchicalChangelog,
+    hierarchicalChangelogToMarkdown
 };
