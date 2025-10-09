@@ -1,0 +1,179 @@
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">
+                    <%= notification && notification.id ? tr('NOTIFICATIONS.EDIT_NOTIFICATION') : tr('NOTIFICATIONS.NEW_NOTIFICATION') %>
+                </h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/superadmin">SuperAdmin</a></li>
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/superadmin/notifications"><%= tr('NOTIFICATIONS.TITLE') %></a></li>
+                    <li class="breadcrumb-item active"><%= notification && notification.id ? tr('NOTIFICATIONS.EDIT') : tr('NOTIFICATIONS.NEW') %></li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="content">
+    <div class="container-fluid">
+        <% if (locals.toast) { %>
+            <div class="alert alert-<%= toast.type %> alert-dismissible fade show">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <%= toast.message %>
+            </div>
+        <% } %>
+
+        <form action="/guild/<%= guildId %>/plugins/superadmin/notifications/save" method="POST">
+            <input type="hidden" name="guildId" value="<%= guildId %>">
+            <% if (notification && notification.id) { %>
+                <input type="hidden" name="notificationId" value="<%= notification.id %>">
+            <% } %>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><%= tr('NOTIFICATIONS.DETAILS') %></h3>
+                </div>
+                <div class="card-body">
+                    <!-- Sprach-Tabs -->
+                    <ul class="nav nav-tabs mb-3" id="langTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="de-tab" data-toggle="tab" href="#de-content" role="tab">
+                                <i class="fas fa-flag mr-1"></i> Deutsch
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="en-tab" data-toggle="tab" href="#en-content" role="tab">
+                                <i class="fas fa-flag mr-1"></i> English
+                            </a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="langTabContent">
+                        <!-- Deutsch Tab -->
+                        <div class="tab-pane fade show active" id="de-content" role="tabpanel">
+                            <div class="form-group">
+                                <label for="title_de"><%= tr('NOTIFICATIONS.FORM.TITLE') %> (DE) <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="title_de" 
+                                       name="title_de" 
+                                       value="<%= notification?.title_de || '' %>"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="message_de"><%= tr('NOTIFICATIONS.FORM.MESSAGE') %> (DE) <span class="text-danger">*</span></label>
+                                <textarea class="form-control" 
+                                          id="message_de" 
+                                          name="message_de" 
+                                          rows="4" 
+                                          required><%= notification?.message_de || '' %></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="action_text_de"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT') %> (DE)</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="action_text_de" 
+                                       name="action_text_de" 
+                                       value="<%= notification?.action_text_de || '' %>">
+                                <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT_HELP') %></small>
+                            </div>
+                        </div>
+
+                        <!-- English Tab -->
+                        <div class="tab-pane fade" id="en-content" role="tabpanel">
+                            <div class="form-group">
+                                <label for="title_en"><%= tr('NOTIFICATIONS.FORM.TITLE') %> (EN) <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="title_en" 
+                                       name="title_en" 
+                                       value="<%= notification?.title_en || '' %>">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="message_en"><%= tr('NOTIFICATIONS.FORM.MESSAGE') %> (EN) <span class="text-danger">*</span></label>
+                                <textarea class="form-control" 
+                                          id="message_en" 
+                                          name="message_en" 
+                                          rows="4"><%= notification?.message_en || '' %></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="action_text_en"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT') %> (EN)</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="action_text_en" 
+                                       name="action_text_en" 
+                                       value="<%= notification?.action_text_en || '' %>">
+                                <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT_HELP') %></small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Gemeinsame Felder -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="type"><%= tr('NOTIFICATIONS.FORM.TYPE') %> <span class="text-danger">*</span></label>
+                                <select class="form-control" id="type" name="type" required>
+                                    <option value="info" <%= notification?.type === 'info' ? 'selected' : '' %>>
+                                        <i class="fas fa-info-circle"></i> Info
+                                    </option>
+                                    <option value="warning" <%= notification?.type === 'warning' ? 'selected' : '' %>>
+                                        <i class="fas fa-exclamation-triangle"></i> Warning
+                                    </option>
+                                    <option value="error" <%= notification?.type === 'error' ? 'selected' : '' %>>
+                                        <i class="fas fa-exclamation-circle"></i> Error
+                                    </option>
+                                    <option value="success" <%= notification?.type === 'success' ? 'selected' : '' %>>
+                                        <i class="fas fa-check-circle"></i> Success
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="action_url"><%= tr('NOTIFICATIONS.FORM.ACTION_URL') %></label>
+                                <input type="url" 
+                                       class="form-control" 
+                                       id="action_url" 
+                                       name="action_url" 
+                                       value="<%= notification?.action_url || '' %>">
+                                <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.ACTION_URL_HELP') %></small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="expiry"><%= tr('NOTIFICATIONS.FORM.EXPIRES_AT') %></label>
+                        <input type="datetime-local" 
+                               class="form-control" 
+                               id="expiry" 
+                               name="expiry" 
+                               value="<%= notification?.expiry ? new Date(notification.expiry).toISOString().slice(0, 16) : '' %>">
+                        <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.EXPIRES_AT_HELP') %></small>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save mr-2"></i><%= tr('NOTIFICATIONS.FORM.SAVE') %>
+                    </button>
+                    <a href="/guild/<%= guildId %>/plugins/superadmin/notifications" class="btn btn-secondary">
+                        <i class="fas fa-times mr-2"></i><%= tr('NOTIFICATIONS.FORM.CANCEL') %>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

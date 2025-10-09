@@ -2,7 +2,7 @@
   "name": "greeting",
   "displayName": "Greeting Plugin",
   "description": "FireBot Greetings Plugin",
-  "version": "0.1.0-beta",
+  "version": "1.0.0",
   "author": "DuneBot Team",
   "license": "MIT",
   "main": "index.js",

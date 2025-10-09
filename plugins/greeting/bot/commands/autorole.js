@@ -1,5 +1,5 @@
 const { ApplicationCommandOptionType } = require("discord.js");
-const db = require("../../db.service");
+const { ServiceManager } = require('dunebot-core');
 
 /**
  * @type {import('strange-sdk').CommandType}
@@ -46,7 +46,12 @@ module.exports = {
 
     async messageRun({ message, args }) {
         const input = args.join(" ");
-        const settings = await db.getSettings(message.guild);
+        const dbService = ServiceManager.get('dbService');
+        const [rows] = await dbService.query(
+            'SELECT * FROM greeting_settings WHERE guild_id = ?',
+            [message.guild.id]
+        );
+        const settings = rows?.[0] || {};
 
         let response;
 
@@ -66,7 +71,12 @@ module.exports = {
 
     async interactionRun({ interaction }) {
         const sub = interaction.options.getSubcommand();
-        const settings = await db.getSettings(interaction.guild);
+        const dbService = ServiceManager.get('dbService');
+        const [rows] = await dbService.query(
+            'SELECT * FROM greeting_settings WHERE guild_id = ?',
+            [interaction.guild.id]
+        );
+        const settings = rows?.[0] || {};
         let response;
 
         // add
@@ -101,7 +111,7 @@ module.exports = {
 /**
  * @param {import("discord.js").Message | import("discord.js").CommandInteraction} message
  * @param {import("discord.js").Role} role
- * @param {import("@models/Guild")} settings
+ * @param {Object} settings - Greeting settings object from DB
  */
 async function setAutoRole({ guild }, role, settings) {
     if (role) {
@@ -114,10 +124,14 @@ async function setAutoRole({ guild }, role, settings) {
         if (role.managed) return guild.getT("greeting:AUTOROLE.MANAGED_ROLE");
     }
 
-    if (!role) settings.role_id = null;
-    else settings.role_id = role.id;
+    const dbService = ServiceManager.get('dbService');
+    const roleId = role ? role.id : null;
 
-    await settings.save();
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, autorole_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE autorole_id = ?',
+        [guild.id, roleId, roleId]
+    );
+
     return role
         ? guild.getT("greeting:AUTOROLE.ENABLED", { role: role.name })
         : guild.getT("greeting:AUTOROLE.DISABLED");

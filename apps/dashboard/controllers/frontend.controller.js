@@ -24,6 +24,9 @@ module.exports.getIndex = async (req, res) => {
         // Frontend-Layout verwenden
         res.locals.layout = themeManager.getLayout('frontend');
         
+        // User-Locale einmal bestimmen
+        const userLocale = req.session?.locale || res.locals?.locale || 'de-DE';
+        
         // News aus der Datenbank laden
         let newsList = [];
         try {
@@ -32,10 +35,23 @@ module.exports.getIndex = async (req, res) => {
             );
             
             // News lokalisieren basierend auf User-Locale
-            const userLocale = req.session.locale || res.locals.locale || 'de-DE';
             newsList = getLocalizedNewsList(rawNews, userLocale);
         } catch (err) {
             Logger.error("Fehler beim Laden der News:", err);
+        }
+
+        // Changelogs aus der Datenbank laden
+        let changelogsList = [];
+        try {
+            const rawChangelogs = await dbService.query(
+                "SELECT * FROM changelogs WHERE is_public = 1 ORDER BY release_date DESC LIMIT 3"
+            );
+            
+            // Changelogs lokalisieren
+            const { getLocalizedChangelogList } = require('../helpers/changelogHelper');
+            changelogsList = getLocalizedChangelogList(rawChangelogs, userLocale);
+        } catch (err) {
+            Logger.error("Fehler beim Laden der Changelogs:", err);
         }
 
         // Datumsformat lokalisieren
@@ -44,9 +60,7 @@ module.exports.getIndex = async (req, res) => {
             return {
                 ...news,
                 formattedDate: news.date
-                    ? new Date(news.date).toLocaleString(
-                        req.session.locale || 'de-DE',
-                        {
+                    ? new Date(news.date).toLocaleString(userLocale, {
                             year: 'numeric',
                             month: 'long',
                             day: 'numeric',
@@ -57,12 +71,27 @@ module.exports.getIndex = async (req, res) => {
                     : ''
             };
         });
+
+                // Changelogs Datumsformat lokalisieren
+        const localizedChangelogsList = changelogsList.map(changelog => {
+            return {
+                ...changelog,
+                formattedDate: changelog.release_date 
+                    ? new Date(changelog.release_date).toLocaleString(userLocale, {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    })
+                    : ''
+            };
+        });
         
         // Template rendern
         res.render("frontend/index", {
             title: "Willkommen bei DuneBot",
             user: req.session?.user || null,
-            newsList: localizedNewsList
+            newsList: localizedNewsList,
+            changelogsList: localizedChangelogsList
         });
     } catch (error) {
         Logger.error("Fehler beim Rendern der Landing Page:", error);

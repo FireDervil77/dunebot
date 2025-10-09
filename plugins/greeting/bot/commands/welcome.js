@@ -1,7 +1,24 @@
 const { ApplicationCommandOptionType, ChannelType } = require("discord.js");
 const { MiscUtils } = require("dunebot-sdk/utils");
 const { buildGreeting } = require("../utils");
-//const db = require("../../db.service"); replace this by serviceManager.get('dbService');
+const { ServiceManager } = require('dunebot-core');
+
+/**
+ * Parse JSON embed data from database
+ * @param {string|object} embedData 
+ * @returns {object}
+ */
+function parseEmbedData(embedData) {
+    if (!embedData) return {};
+    if (typeof embedData === 'string') {
+        try {
+            return JSON.parse(embedData);
+        } catch (err) {
+            return {};
+        }
+    }
+    return embedData;
+}
 
 /**
  * @type {import('strange-sdk').CommandType}
@@ -138,7 +155,13 @@ module.exports = {
     },
 
     async messageRun({ message, args }) {
-        const settings = await db.getSettings(message.guild);
+        const dbService = ServiceManager.get('dbService');
+        const rows = await dbService.query(
+            'SELECT * FROM greeting_settings WHERE guild_id = ?',
+            [message.guild.id]
+        );
+        const settings = rows?.[0] || {};
+        
         const type = args[0].toLowerCase();
         let response;
 
@@ -201,7 +224,13 @@ module.exports = {
     },
 
     async interactionRun({ interaction }) {
-        const settings = await db.getSettings(interaction.guild);
+        const dbService = ServiceManager.get('dbService');
+        const rows = await dbService.query(
+            'SELECT * FROM greeting_settings WHERE guild_id = ?',
+            [interaction.guild.id]
+        );
+        const settings = rows?.[0] || {};
+        
         const sub = interaction.options.getSubcommand();
 
         let response;
@@ -231,12 +260,23 @@ module.exports = {
 };
 
 async function sendPreview(settings, member, guild) {
-    if (!settings.welcome?.enabled) return guild.getT("greeting:WELCOME.WELCOME_DISABLED");
+    const Logger = ServiceManager.get('Logger');
+    
+    if (!settings || !settings.welcome_enabled) {
+        return guild.getT("greeting:WELCOME.WELCOME_DISABLED");
+    }
 
-    const targetChannel = member.guild.channels.cache.get(settings.welcome.channel);
+    const targetChannel = member.guild.channels.cache.get(settings.welcome_channel);
     if (!targetChannel) return guild.getT("greeting:WELCOME.CHANNEL_NOT_CONFIG");
 
-    const response = await buildGreeting(member, "WELCOME", settings.welcome);
+    const welcomeConfig = {
+        enabled: settings.welcome_enabled,
+        channel: settings.welcome_channel,
+        content: settings.welcome_content,
+        embed: parseEmbedData(settings.welcome_embed)
+    };
+
+    const response = await buildGreeting(member, "WELCOME", welcomeConfig);
     await targetChannel.send(response);
 
     return guild.getT("greeting:WELCOME.PREVIEW_SENT", {
@@ -245,55 +285,101 @@ async function sendPreview(settings, member, guild) {
 }
 
 async function setStatus(settings, status, guild) {
-    const enabled = status.toUpperCase() === "ON" ? true : false;
-    settings.welcome.enabled = enabled;
-    await settings.save();
-    return status
+    const dbService = ServiceManager.get('dbService');
+    const enabled = status.toUpperCase() === "ON";
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, welcome_enabled) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_enabled = ?',
+        [guild.id, enabled, enabled]
+    );
+    
+    return enabled
         ? guild.getT("greeting:WELCOME.ENABLED")
         : guild.getT("greeting:WELCOME.DISABLED");
 }
 
 async function setChannel(settings, channel, guild) {
-    if (!guild.canSendEmbeds(channel)) {
+    if (!guild.members.me.permissionsIn(channel).has(['SendMessages', 'EmbedLinks'])) {
         return guild.getT("greeting:WELCOME.CHANNEL_NO_PERMS", {
             channel: channel.toString(),
         });
     }
-    settings.welcome.channel = channel.id;
-    await settings.save();
+    
+    const dbService = ServiceManager.get('dbService');
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, welcome_channel) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_channel = ?',
+        [guild.id, channel.id, channel.id]
+    );
+    
     return guild.getT("greeting:WELCOME.CHANNEL_SET", {
         channel: channel.toString(),
     });
 }
 
 async function setDescription(settings, desc, guild) {
-    settings.welcome.embed.description = desc;
-    await settings.save();
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.welcome_embed);
+    embedData.description = desc;
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, welcome_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_embed = ?',
+        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
+    );
+    
     return guild.getT("greeting:WELCOME.CONFIG_UPDATED");
 }
 
 async function setThumbnail(settings, status, guild) {
-    settings.welcome.embed.thumbnail = status.toUpperCase() === "ON" ? true : false;
-    await settings.save();
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.welcome_embed);
+    embedData.thumbnail = status.toUpperCase() === "ON";
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, welcome_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_embed = ?',
+        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
+    );
+    
     return guild.getT("greeting:WELCOME.CONFIG_UPDATED");
 }
 
 async function setColor(settings, color, guild) {
     if (!color || !MiscUtils.isHex(color)) return guild.getT("greeting:WELCOME.INVALID_COLOR");
-    settings.welcome.embed.color = color;
-    await settings.save();
+    
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.welcome_embed);
+    embedData.color = color;
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, welcome_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_embed = ?',
+        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
+    );
+    
     return guild.getT("greeting:WELCOME.CONFIG_UPDATED");
 }
 
 async function setFooter(settings, content, guild) {
-    settings.welcome.embed.footer = content;
-    await settings.save();
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.welcome_embed);
+    embedData.footer = { text: content };
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, welcome_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_embed = ?',
+        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
+    );
+    
     return guild.getT("greeting:WELCOME.CONFIG_UPDATED");
 }
 
 async function setImage(settings, url, guild) {
-    settings.welcome.embed.image = url;
-    await settings.save();
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.welcome_embed);
+    embedData.image = url;
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, welcome_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_embed = ?',
+        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
+    );
+    
     return guild.getT("greeting:WELCOME.CONFIG_UPDATED");
 }
 
@@ -301,14 +387,15 @@ async function setMessage(settings, interaction) {
     const channel = interaction.guild.channels.cache.get(
         interaction.options.getChannel("channel").id,
     );
-    const status = interaction.options.getString("status") === "ON" ? true : false;
+    const status = interaction.options.getString("status") === "ON";
     const color = interaction.options.getString("hex-code");
     const footer = interaction.options.getString("footer");
     const url = interaction.options.getString("url");
+    const desc = interaction.options.getString("description");
 
     const { guild } = interaction;
 
-    if (!guild.canSendEmbeds(channel)) {
+    if (!guild.members.me.permissionsIn(channel).has(['SendMessages', 'EmbedLinks'])) {
         return guild.getT("greeting:WELCOME.CHANNEL_NO_PERMS", {
             channel: channel.toString(),
         });
@@ -316,14 +403,24 @@ async function setMessage(settings, interaction) {
 
     if (color && !MiscUtils.isHex(color)) return guild.getT("greeting:WELCOME.INVALID_COLOR");
 
-    settings.welcome.enabled = interaction.options.getChannel("channel").id;
-    settings.welcome.channel = interaction.options.getString("description");
-    settings.welcome.embed.thumbnail = status;
-    if (color) settings.welcome.embed.color = color;
-    if (footer) settings.welcome.embed.footer = footer;
-    if (url) settings.welcome.embed.image = url;
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.welcome_embed);
+    embedData.description = desc;
+    embedData.thumbnail = status;
+    if (color) embedData.color = color;
+    if (footer) embedData.footer = { text: footer };
+    if (url) embedData.image = url;
 
-    await settings.save();
+    await dbService.query(
+        `INSERT INTO greeting_settings (guild_id, welcome_enabled, welcome_channel, welcome_embed) 
+         VALUES (?, TRUE, ?, ?) 
+         ON DUPLICATE KEY UPDATE 
+            welcome_enabled = TRUE,
+            welcome_channel = ?,
+            welcome_embed = ?`,
+        [guild.id, channel.id, JSON.stringify(embedData), channel.id, JSON.stringify(embedData)]
+    );
+
     return guild.getT("greeting:WELCOME.CONFIG_SAVED", {
         channel: channel.toString(),
     });

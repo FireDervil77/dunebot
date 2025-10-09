@@ -769,8 +769,8 @@ class ThemeManager {
         }
     }
     
-    /**
-     * Lädt globale Benachrichtigungen für das Dashboard
+        /**
+     * Lädt globale Benachrichtigungen für den View-Kontext
      * @param {Object} req - Express Request
      * @param {Object} res - Express Response
      */
@@ -781,8 +781,11 @@ class ThemeManager {
         if (!notificationManager) return [];
         
         try {
+            // Benutzer-Locale aus Session oder res.locals ermitteln
+            const userLocale = req.session?.locale || res.locals?.locale || 'de-DE';
+            
             // Benachrichtigungen für den aktuellen Benutzer laden
-            const notifications = await notificationManager.getNotificationsForUser(req.user);
+            const notifications = await notificationManager.getNotificationsForUser(req.user, userLocale);
             
             // In den View-Kontext einfügen
             res.locals.globalNotifications = notifications;

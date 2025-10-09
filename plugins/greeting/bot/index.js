@@ -26,7 +26,7 @@ class GreetingBotPlugin extends BotPlugin {
      */
     constructor() {
         super({
-            name: 'greetings',
+            name: 'greeting',
             displayName: 'Greetings - Plugin',
             description: 'Ein Greetings-Plugin für FireBot',
             version: '1.0.0',

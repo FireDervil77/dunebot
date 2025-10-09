@@ -109,7 +109,7 @@
 }
 
 /**
-* TOASTS
+* TOASTS & ALERTS
 */
 .toast {
     transition: all 0.3s ease-in-out;
@@ -124,4 +124,33 @@
 .toast.show {
     transform: translateY(0);
     opacity: 1;
+}
+
+/* Alert Visibility Improvements */
+.alert {
+    opacity: 1 !important;
+}
+
+.alert-success {
+    background-color: #28a745 !important;
+    border-color: #28a745 !important;
+    color: #ffffff !important;
+}
+
+.alert-danger {
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: #ffffff !important;
+}
+
+.alert-info {
+    background-color: #17a2b8 !important;
+    border-color: #17a2b8 !important;
+    color: #ffffff !important;
+}
+
+.alert-warning {
+    background-color: #ffc107 !important;
+    border-color: #ffc107 !important;
+    color: #212529 !important;
 }

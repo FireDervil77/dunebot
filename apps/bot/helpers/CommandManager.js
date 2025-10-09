@@ -434,14 +434,22 @@ class CommandManager {
 
         const toRegister = [];
 
-        // Get enabled plugins for this guild
+        // Get enabled plugins for this guild - NEU: Aus guild_plugins Tabelle
         let enabledPlugins;
         try {
-            enabledPlugins = typeof configs?.ENABLED_PLUGINS === 'string'
-                ? JSON.parse(configs.ENABLED_PLUGINS)
-                : (configs?.ENABLED_PLUGINS || ['core']);
+            const pluginRows = await dbService.query(
+                "SELECT plugin_name FROM guild_plugins WHERE guild_id = ? AND is_enabled = 1",
+                [guildId]
+            );
+            
+            enabledPlugins = pluginRows.map(row => row.plugin_name);
+            
+            // Sicherstellen dass core immer aktiviert ist
+            if (!enabledPlugins.includes("core")) {
+                enabledPlugins.push("core");
+            }
         } catch (error) {
-            Logger.error(`Fehler beim Parsen der aktivierten Plugins für Guild ${guildId}:`, error);
+            Logger.error(`Fehler beim Laden der aktivierten Plugins für Guild ${guildId}:`, error);
             enabledPlugins = ['core'];
         }
 

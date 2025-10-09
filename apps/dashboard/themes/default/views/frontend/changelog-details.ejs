@@ -1,0 +1,205 @@
+<!-- Changelog Detail Section -->
+<main id="main">
+  <section class="changelog-detail section">
+    <div class="container" data-aos="fade-up">
+      <article class="changelog-article">
+        <!-- Header -->
+        <div class="changelog-header mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <% 
+            const typeColors = {
+              major: 'danger',
+              minor: 'warning',
+              patch: 'info'
+            };
+            const badgeColor = typeColors[changelog.type] || 'secondary';
+            %>
+            <span class="badge bg-<%= badgeColor %> fs-3">
+              v<%= changelog.version %>
+            </span>
+            <small class="text-muted">
+              <i class="bi bi-calendar me-2"></i>
+              <%= new Date(changelog.release_date).toLocaleDateString(currentLocale) %>
+            </small>
+          </div>
+          
+          <div class="title"><h1><%= changelog.title %></h1></div>
+          
+          <% if (changelog.description) { %>
+            <p class="lead text-muted"><%= changelog.description %></p>
+          <% } %>
+          
+          <div class="changelog-meta d-flex align-items-center gap-3 mt-3">
+            <% 
+            const typeIcons = {
+              major: 'rocket',
+              minor: 'star',
+              patch: 'wrench'
+            };
+            const icon = typeIcons[changelog.type] || 'code-branch';
+            %>
+            <div class="d-flex align-items-center">
+              <i class="bi bi-<%= icon %> me-2"></i>
+              <span class="text-capitalize"><%= changelog.type %> Release</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Changes List -->
+        <div class="content">
+          <% 
+          // Parse changes from text (one change per line)
+          const changes = changelog.changes.split('\n').filter(c => c.trim());
+          
+          // Group changes by type based on prefix
+          const groupedChanges = {
+            added: [],
+            improved: [],
+            removed: [],
+            fixed: [],
+            other: []
+          };
+          
+          changes.forEach(change => {
+            const trimmed = change.trim();
+            if (trimmed.startsWith('+')) {
+              groupedChanges.added.push(trimmed.substring(1).trim());
+            } else if (trimmed.startsWith('*')) {
+              groupedChanges.improved.push(trimmed.substring(1).trim());
+            } else if (trimmed.startsWith('-')) {
+              groupedChanges.removed.push(trimmed.substring(1).trim());
+            } else if (trimmed.startsWith('!')) {
+              groupedChanges.fixed.push(trimmed.substring(1).trim());
+            } else {
+              groupedChanges.other.push(trimmed);
+            }
+          });
+          %>
+
+          <% if (groupedChanges.added.length > 0) { %>
+            <div class="change-section mb-4">
+              <h3 class="change-title">
+                <i class="bi bi-plus-circle text-success me-2"></i>
+                <%= tr('CHANGELOGS.CHANGES.ADDED') %>
+              </h3>
+              <ul class="change-list">
+                <% groupedChanges.added.forEach(change => { %>
+                  <li><%= change %></li>
+                <% }); %>
+              </ul>
+            </div>
+          <% } %>
+
+          <% if (groupedChanges.improved.length > 0) { %>
+            <div class="change-section mb-4">
+              <h3 class="change-title">
+                <i class="bi bi-arrow-up-circle text-primary me-2"></i>
+                <%= tr('CHANGELOGS.CHANGES.IMPROVED') %>
+              </h3>
+              <ul class="change-list">
+                <% groupedChanges.improved.forEach(change => { %>
+                  <li><%= change %></li>
+                <% }); %>
+              </ul>
+            </div>
+          <% } %>
+
+          <% if (groupedChanges.fixed.length > 0) { %>
+            <div class="change-section mb-4">
+              <h3 class="change-title">
+                <i class="bi bi-wrench text-warning me-2"></i>
+                <%= tr('CHANGELOGS.CHANGES.FIXED') %>
+              </h3>
+              <ul class="change-list">
+                <% groupedChanges.fixed.forEach(change => { %>
+                  <li><%= change %></li>
+                <% }); %>
+              </ul>
+            </div>
+          <% } %>
+
+          <% if (groupedChanges.removed.length > 0) { %>
+            <div class="change-section mb-4">
+              <h3 class="change-title">
+                <i class="bi bi-dash-circle text-danger me-2"></i>
+                <%= tr('CHANGELOGS.CHANGES.REMOVED') %>
+              </h3>
+              <ul class="change-list">
+                <% groupedChanges.removed.forEach(change => { %>
+                  <li><%= change %></li>
+                <% }); %>
+              </ul>
+            </div>
+          <% } %>
+
+          <% if (groupedChanges.other.length > 0) { %>
+            <div class="change-section mb-4">
+              <h3 class="change-title">
+                <i class="bi bi-info-circle text-secondary me-2"></i>
+                <%= tr('CHANGELOGS.CHANGES.OTHER') %>
+              </h3>
+              <ul class="change-list">
+                <% groupedChanges.other.forEach(change => { %>
+                  <li><%= change %></li>
+                <% }); %>
+              </ul>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="mt-5">
+          <a href="/changelogs" class="btn btn-primary">
+            <i class="bi bi-arrow-left me-2"></i>
+            <%= tr('CHANGELOGS.BACK_TO_CHANGELOGS') %>
+          </a>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<style>
+.changelog-header {
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 1.5rem;
+}
+
+.changelog-meta {
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.change-section {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border-left: 4px solid var(--accent-color);
+}
+
+.change-title {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.change-list {
+  list-style: none;
+  padding-left: 0;
+  margin-bottom: 0;
+}
+
+.change-list li {
+  padding: 0.5rem 0;
+  padding-left: 2rem;
+  position: relative;
+}
+
+.change-list li:before {
+  content: "•";
+  position: absolute;
+  left: 0.75rem;
+  color: var(--accent-color);
+  font-weight: bold;
+}
+</style>

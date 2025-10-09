@@ -218,6 +218,11 @@ document.addEventListener('DOMContentLoaded', function() {
   <% }); %>
 <% } %>
 
+<!-- View Scripts (express-ejs-layouts) -->
+<% if (typeof script !== 'undefined') { %>
+  <%- script %>
+<% } %>
+
 <!-- Language Switcher Script -->
 <%- includePartial('guild/language_switcher', locals) %>
 

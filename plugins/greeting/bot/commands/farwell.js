@@ -1,7 +1,24 @@
 const { ApplicationCommandOptionType, ChannelType } = require("discord.js");
-const { MiscUtils } = require("strange-sdk/utils");
+const { MiscUtils } = require("dunebot-sdk/utils");
 const { buildGreeting } = require("../utils");
-const db = require("../../db.service");
+const { ServiceManager } = require('dunebot-core');
+
+/**
+ * Parse JSON embed data from database
+ * @param {string|object} embedData 
+ * @returns {object}
+ */
+function parseEmbedData(embedData) {
+    if (!embedData) return {};
+    if (typeof embedData === 'string') {
+        try {
+            return JSON.parse(embedData);
+        } catch (err) {
+            return {};
+        }
+    }
+    return embedData;
+}
 
 /**
  * @type {import('strange-sdk').CommandType}
@@ -138,7 +155,13 @@ module.exports = {
     },
 
     async messageRun({ message, args }) {
-        const settings = await db.getSettings(message.guild);
+        const dbService = ServiceManager.get('dbService');
+        const rows = await dbService.query(
+            'SELECT * FROM greeting_settings WHERE guild_id = ?',
+            [message.guild.id]
+        );
+        const settings = rows?.[0] || {};
+        
         const type = args[0].toLowerCase();
         let response;
 
@@ -201,7 +224,13 @@ module.exports = {
     },
 
     async interactionRun({ interaction }) {
-        const settings = await db.getSettings(interaction.guild);
+        const dbService = ServiceManager.get('dbService');
+        const rows = await dbService.query(
+            'SELECT * FROM greeting_settings WHERE guild_id = ?',
+            [interaction.guild.id]
+        );
+        const settings = rows?.[0] || {};
+        
         const sub = interaction.options.getSubcommand();
 
         let response;
@@ -231,12 +260,22 @@ module.exports = {
 };
 
 async function sendPreview(settings, member, guild) {
-    if (!settings.farewell?.enabled) return guild.getT("greeting:FAREWELL.FAREWELL_DISABLED");
+    if (!settings || !settings.farewell_enabled) {
+        return guild.getT("greeting:FAREWELL.FAREWELL_DISABLED");
+    }
 
-    const targetChannel = member.guild.channels.cache.get(settings.farewell.channel);
+    const targetChannel = member.guild.channels.cache.get(settings.farewell_channel);
     if (!targetChannel) return guild.getT("greeting:FAREWELL.CHANNEL_NOT_CONFIG");
 
-    const response = await buildGreeting(member, "FAREWELL", settings.farewell);
+    // Build farewell config object
+    const farewellConfig = {
+        enabled: settings.farewell_enabled,
+        channel: settings.farewell_channel,
+        content: settings.farewell_content,
+        embed: parseEmbedData(settings.farewell_embed)
+    };
+
+    const response = await buildGreeting(member, "FAREWELL", farewellConfig);
     await targetChannel.send(response);
 
     return guild.getT("greeting:FAREWELL.PREVIEW_SENT", {
@@ -245,55 +284,101 @@ async function sendPreview(settings, member, guild) {
 }
 
 async function setStatus(settings, status, guild) {
-    const enabled = status.toUpperCase() === "ON" ? true : false;
-    settings.farewell.enabled = enabled;
-    await settings.save();
-    return status
+    const dbService = ServiceManager.get('dbService');
+    const enabled = status.toUpperCase() === "ON";
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, farewell_enabled) VALUES (?, ?) ON DUPLICATE KEY UPDATE farewell_enabled = ?',
+        [guild.id, enabled, enabled]
+    );
+    
+    return enabled
         ? guild.getT("greeting:FAREWELL.ENABLED")
         : guild.getT("greeting:FAREWELL.DISABLED");
 }
 
 async function setChannel(settings, channel, guild) {
-    if (!guild.canSendEmbeds(channel)) {
+    if (!guild.members.me.permissionsIn(channel).has(['SendMessages', 'EmbedLinks'])) {
         return guild.getT("greeting:FAREWELL.CHANNEL_NO_PERMS", {
             channel: channel.toString(),
         });
     }
-    settings.farewell.channel = channel.id;
-    await settings.save();
+    
+    const dbService = ServiceManager.get('dbService');
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, farewell_channel) VALUES (?, ?) ON DUPLICATE KEY UPDATE farewell_channel = ?',
+        [guild.id, channel.id, channel.id]
+    );
+    
     return guild.getT("greeting:FAREWELL.CHANNEL_SET", {
         channel: channel.toString(),
     });
 }
 
 async function setDescription(settings, desc, guild) {
-    settings.farewell.embed.description = desc;
-    await settings.save();
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.farewell_embed);
+    embedData.description = desc;
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, farewell_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE farewell_embed = ?',
+        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
+    );
+    
     return guild.getT("greeting:FAREWELL.CONFIG_UPDATED");
 }
 
 async function setThumbnail(settings, status, guild) {
-    settings.farewell.embed.thumbnail = status.toUpperCase() === "ON" ? true : false;
-    await settings.save();
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.farewell_embed);
+    embedData.thumbnail = status.toUpperCase() === "ON";
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, farewell_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE farewell_embed = ?',
+        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
+    );
+    
     return guild.getT("greeting:FAREWELL.CONFIG_UPDATED");
 }
 
 async function setColor(settings, color, guild) {
     if (!color || !MiscUtils.isHex(color)) return guild.getT("greeting:FAREWELL.INVALID_COLOR");
-    settings.farewell.embed.color = color;
-    await settings.save();
+    
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.farewell_embed);
+    embedData.color = color;
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, farewell_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE farewell_embed = ?',
+        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
+    );
+    
     return guild.getT("greeting:FAREWELL.CONFIG_UPDATED");
 }
 
 async function setFooter(settings, content, guild) {
-    settings.farewell.embed.footer = content;
-    await settings.save();
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.farewell_embed);
+    embedData.footer = { text: content };
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, farewell_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE farewell_embed = ?',
+        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
+    );
+    
     return guild.getT("greeting:FAREWELL.CONFIG_UPDATED");
 }
 
 async function setImage(settings, url, guild) {
-    settings.farewell.embed.image = url;
-    await settings.save();
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.farewell_embed);
+    embedData.image = url;
+    
+    await dbService.query(
+        'INSERT INTO greeting_settings (guild_id, farewell_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE farewell_embed = ?',
+        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
+    );
+    
     return guild.getT("greeting:FAREWELL.CONFIG_UPDATED");
 }
 
@@ -301,14 +386,15 @@ async function setMessage(settings, interaction) {
     const channel = interaction.guild.channels.cache.get(
         interaction.options.getChannel("channel").id,
     );
-    const status = interaction.options.getString("status") === "ON" ? true : false;
+    const status = interaction.options.getString("status") === "ON";
     const color = interaction.options.getString("hex-code");
     const footer = interaction.options.getString("footer");
     const url = interaction.options.getString("url");
+    const desc = interaction.options.getString("description");
 
     const { guild } = interaction;
 
-    if (!guild.canSendEmbeds(channel)) {
+    if (!guild.members.me.permissionsIn(channel).has(['SendMessages', 'EmbedLinks'])) {
         return guild.getT("greeting:FAREWELL.CHANNEL_NO_PERMS", {
             channel: channel.toString(),
         });
@@ -316,14 +402,24 @@ async function setMessage(settings, interaction) {
 
     if (color && !MiscUtils.isHex(color)) return guild.getT("greeting:FAREWELL.INVALID_COLOR");
 
-    settings.farewell.enabled = interaction.options.getChannel("channel").id;
-    settings.farewell.channel = interaction.options.getString("description");
-    settings.farewell.embed.thumbnail = status;
-    if (color) settings.farewell.embed.color = color;
-    if (footer) settings.farewell.embed.footer = footer;
-    if (url) settings.farewell.embed.image = url;
+    const dbService = ServiceManager.get('dbService');
+    const embedData = parseEmbedData(settings.farewell_embed);
+    embedData.description = desc;
+    embedData.thumbnail = status;
+    if (color) embedData.color = color;
+    if (footer) embedData.footer = { text: footer };
+    if (url) embedData.image = url;
 
-    await settings.save();
+    await dbService.query(
+        `INSERT INTO greeting_settings (guild_id, farewell_enabled, farewell_channel, farewell_embed) 
+         VALUES (?, TRUE, ?, ?) 
+         ON DUPLICATE KEY UPDATE 
+            farewell_enabled = TRUE,
+            farewell_channel = ?,
+            farewell_embed = ?`,
+        [guild.id, channel.id, JSON.stringify(embedData), channel.id, JSON.stringify(embedData)]
+    );
+
     return guild.getT("greeting:FAREWELL.CONFIG_SAVED", {
         channel: channel.toString(),
     });
