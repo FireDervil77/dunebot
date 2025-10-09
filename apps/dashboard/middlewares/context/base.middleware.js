@@ -203,6 +203,9 @@ module.exports = async (req, res, next) => {
             }
         };
         
+        // WICHTIG: Alias req.t für Plugin-Kompatibilität (DuneMap u.a. nutzen req.t)
+        req.t = req.translate;
+        
         // WICHTIG: Stelle translate-Funktion auch für Templates bereit
         res.locals.tr = req.translate;
         res.locals.locale = normalizedLocale;
@@ -289,6 +292,9 @@ module.exports = async (req, res, next) => {
         res.locals.baseUrl = dashboardUrl;
         res.locals.activeMenu = req.originalUrl;
         res.locals.dashboardHomeUrl = req.session?.user ? '/guild' : '/auth/server-selector';
+        
+        // Plugin Scripts Array (für includePluginPartial Script Extraction)
+        res.locals._pluginScripts = [];
         
         // Meta-Informationen
         res.locals.siteName = process.env.SITE_NAME || 'DuneBot';

@@ -1,0 +1,223 @@
+<!-- Welcome Tab Content -->
+<div x-show="activeTab === 'Welcome'" x-cloak>
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">
+        <i class="fa-solid fa-hand-wave me-2"></i>
+        <%= tr('greeting:WELCOME.TITLE', 'Willkommensnachrichten') %>
+      </h5>
+      <p class="text-muted"><%= tr('greeting:WELCOME.DESC', 'Konfiguriere Willkommensnachrichten für neue Mitglieder') %></p>
+      
+      <form id="welcomeForm">
+        <div class="mb-3">
+          <label class="form-label"><%= tr('greeting:CHANNEL_TITLE', 'Kanal') %></label>
+          <select class="form-select" name="welcome_channel">
+            <option value=""><%= tr('greeting:CHANNEL_SELECT', 'Kanal wählen...') %></option>
+            <% if (channels && channels.length > 0) { %>
+              <% channels.forEach(channel => { %>
+                <option value="<%= channel.id %>" <%= settings.welcome.channel === channel.id ? 'selected' : '' %>>
+                  #<%= channel.name %>
+                </option>
+              <% }); %>
+            <% } %>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label"><%= tr('greeting:WELCOME.MESSAGE', 'Willkommensnachricht') %></label>
+          <textarea class="form-control" name="welcome_content" rows="3"><%= settings.welcome.content || '' %></textarea>
+          <small class="form-text text-muted">
+            <%= tr('greeting:PLACEHOLDERS', 'Verfügbar: {member:name}, {member:mention}, {guild:name}, {guild:memberCount}') %>
+          </small>
+        </div>
+
+        <div class="d-flex justify-content-between">
+          <% if (settings.welcome.enabled) { %>
+            <button type="button" class="btn btn-danger" onclick="updateWelcome('disable')">
+              <%= tr('greeting:BTN_DISABLE', 'Deaktivieren') %>
+            </button>
+            <button type="button" class="btn btn-primary" onclick="updateWelcome('update')">
+              <%= tr('greeting:BTN_SAVE', 'Speichern') %>
+            </button>
+          <% } else { %>
+            <button type="button" class="btn btn-success" onclick="updateWelcome('enable')">
+              <%= tr('greeting:BTN_ENABLE', 'Aktivieren') %>
+            </button>
+          <% } %>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Farewell Tab Content -->
+<div x-show="activeTab === 'Farewell'" x-cloak>
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">
+        <i class="fa-solid fa-door-open me-2"></i>
+        <%= tr('greeting:FAREWELL.TITLE', 'Verabschiedungsnachrichten') %>
+      </h5>
+      <p class="text-muted"><%= tr('greeting:FAREWELL.DESC', 'Konfiguriere Nachrichten für austretende Mitglieder') %></p>
+      
+      <form id="farewellForm">
+        <div class="mb-3">
+          <label class="form-label"><%= tr('greeting:CHANNEL_TITLE', 'Kanal') %></label>
+          <select class="form-select" name="farewell_channel">
+            <option value=""><%= tr('greeting:CHANNEL_SELECT', 'Kanal wählen...') %></option>
+            <% if (channels && channels.length > 0) { %>
+              <% channels.forEach(channel => { %>
+                <option value="<%= channel.id %>" <%= settings.farewell.channel === channel.id ? 'selected' : '' %>>
+                  #<%= channel.name %>
+                </option>
+              <% }); %>
+            <% } %>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label"><%= tr('greeting:FAREWELL.MESSAGE', 'Verabschiedungsnachricht') %></label>
+          <textarea class="form-control" name="farewell_content" rows="3"><%= settings.farewell.content || '' %></textarea>
+          <small class="form-text text-muted">
+            <%= tr('greeting:PLACEHOLDERS', 'Verfügbar: {member:name}, {guild:name}, {guild:memberCount}') %>
+          </small>
+        </div>
+
+        <div class="d-flex justify-content-between">
+          <% if (settings.farewell.enabled) { %>
+            <button type="button" class="btn btn-danger" onclick="updateFarewell('disable')">
+              <%= tr('greeting:BTN_DISABLE', 'Deaktivieren') %>
+            </button>
+            <button type="button" class="btn btn-primary" onclick="updateFarewell('update')">
+              <%= tr('greeting:BTN_SAVE', 'Speichern') %>
+            </button>
+          <% } else { %>
+            <button type="button" class="btn btn-success" onclick="updateFarewell('enable')">
+              <%= tr('greeting:BTN_ENABLE', 'Aktivieren') %>
+            </button>
+          <% } %>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Autorole Tab Content -->
+<div x-show="activeTab === 'Autorole'" x-cloak>
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">
+        <i class="fa-solid fa-user-shield me-2"></i>
+        <%= tr('greeting:AUTOROLE.TITLE', 'Automatische Rolle') %>
+      </h5>
+      <p class="text-muted"><%= tr('greeting:AUTOROLE.DESC', 'Weise neuen Mitgliedern automatisch eine Rolle zu') %></p>
+      
+      <form id="autoroleForm">
+        <div class="mb-3">
+          <label class="form-label"><%= tr('greeting:AUTOROLE_SELECT', 'Rolle auswählen') %></label>
+          <select class="form-select" name="autorole_id">
+            <option value=""><%= tr('greeting:AUTOROLE_NONE', 'Keine Rolle') %></option>
+            <% if (roles && roles.length > 0) { %>
+              <% roles.forEach(role => { %>
+                <option value="<%= role.id %>" <%= settings.autorole_id === role.id ? 'selected' : '' %>>
+                  <%= role.name %>
+                </option>
+              <% }); %>
+            <% } %>
+          </select>
+        </div>
+
+        <div class="d-flex justify-content-end">
+          <button type="button" class="btn btn-primary" onclick="updateAutorole()">
+            <%= tr('greeting:BTN_SAVE', 'Speichern') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+async function updateWelcome(action) {
+  const form = document.getElementById('welcomeForm');
+  const formData = new FormData(form);
+  
+  const data = {
+    action: `welcome_${action}`,
+    welcome_channel: formData.get('welcome_channel'),
+    welcome_content: formData.get('welcome_content')
+  };
+  
+  try {
+    const response = await fetch(window.location.href, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    if (response.ok) {
+      window.location.reload();
+    } else {
+      alert('Fehler beim Speichern');
+    }
+  } catch (error) {
+    console.error(error);
+    alert('Fehler beim Speichern');
+  }
+}
+
+async function updateFarewell(action) {
+  const form = document.getElementById('farewellForm');
+  const formData = new FormData(form);
+  
+  const data = {
+    action: `farewell_${action}`,
+    farewell_channel: formData.get('farewell_channel'),
+    farewell_content: formData.get('farewell_content')
+  };
+  
+  try {
+    const response = await fetch(window.location.href, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    if (response.ok) {
+      window.location.reload();
+    } else {
+      alert('Fehler beim Speichern');
+    }
+  } catch (error) {
+    console.error(error);
+    alert('Fehler beim Speichern');
+  }
+}
+
+async function updateAutorole() {
+  const form = document.getElementById('autoroleForm');
+  const formData = new FormData(form);
+  
+  const data = {
+    action: 'autorole',
+    autorole_id: formData.get('autorole_id')
+  };
+  
+  try {
+    const response = await fetch(window.location.href, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    if (response.ok) {
+      window.location.reload();
+    } else {
+      alert('Fehler beim Speichern');
+    }
+  } catch (error) {
+    console.error(error);
+    alert('Fehler beim Speichern');
+  }
+}
+</script>

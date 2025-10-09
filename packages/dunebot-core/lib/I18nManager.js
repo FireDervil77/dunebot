@@ -304,8 +304,12 @@ class I18nManager {
                 }
 
                 const translationFilePath = join(pluginDir, lngFile);
-                const translationData = JSON.parse(readFileSync(translationFilePath, "utf8"));
-                i18next.addResourceBundle(lng, pluginName, translationData);
+                try {
+                    const translationData = JSON.parse(readFileSync(translationFilePath, "utf8"));
+                    i18next.addResourceBundle(lng, pluginName, translationData);
+                } catch (jsonError) {
+                    throw new Error(`JSON parse error in ${translationFilePath}: ${jsonError.message}`);
+                }
             });
 
             await this.loadAndSyncTranslations(pluginName);

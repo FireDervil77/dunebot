@@ -33,6 +33,9 @@ router.get("/:guildId/settings/:section", CheckGuildAccess, (req, res) => {
 router.get("/:guildId/plugins", CheckGuildAccess, guildController.getPlugins);
 router.post("/:guildId/plugins", CheckGuildAccess, guildController.updatePlugins);
 
+// Plugin Update Route
+router.post("/:guildId/plugins/:pluginName/update", CheckGuildAccess, guildController.updatePluginVersion);
+
 // Guild locales
 router.get("/:guildId/locales", CheckGuildAccess, guildController.getLocales);
 

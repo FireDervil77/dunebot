@@ -1,0 +1,194 @@
+<%# 
+  * Toast-History View für alle User
+  * Zeigt Toast-Events des aktuellen Users für Monitoring/Debugging
+  * @author FireDervil
+  %>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-bell me-2"></i>
+                        Meine Toast-Benachrichtigungen
+                    </h3>
+                    <div class="card-tools">
+                        <span class="badge badge-info" id="totalCount">0 Events</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Info-Text -->
+                    <div class="alert alert-info mb-3">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Hier siehst du deine letzten <strong>Fehler- und Warn-Meldungen</strong>. 
+                        Diese werden automatisch beim Auftreten gespeichert und helfen beim Debugging.
+                    </div>
+
+                    <!-- Filter -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <select class="form-control" id="filterType">
+                                <option value="">Alle Typen</option>
+                                <option value="error">Fehler</option>
+                                <option value="warning">Warnungen</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" class="form-control" id="filterUrl" placeholder="URL filtern...">
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary btn-block" id="reloadToastsBtn">
+                                <i class="fas fa-sync me-1"></i> Neu laden
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Toast-Liste -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Zeitstempel</th>
+                                    <th>Typ</th>
+                                    <th>Nachricht</th>
+                                    <th>Seite</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="toastTableBody">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>
+                                        Lade Benachrichtigungen...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * Lädt Toast-History vom Server (nur eigene Toasts)
+ */
+async function loadToastHistory() {
+    try {
+        // Core-API nutzt Session-Storage - zeigt nur eigene Toasts
+        const response = await fetch('/api/core/toasts/history');
+        const data = await response.json();
+        
+        if (data.success) {
+            let toasts = data.toasts || [];
+            
+            // Client-seitiges Filtern
+            const filterType = document.getElementById('filterType')?.value;
+            const filterUrl = document.getElementById('filterUrl')?.value.toLowerCase();
+            
+            if (filterType) {
+                toasts = toasts.filter(t => t.type === filterType);
+            }
+            
+            if (filterUrl) {
+                toasts = toasts.filter(t => t.url && t.url.toLowerCase().includes(filterUrl));
+            }
+            
+            renderToastTable(toasts);
+            document.getElementById('totalCount').textContent = `${toasts.length} Events`;
+        } else {
+            showError('Fehler beim Laden der Benachrichtigungen');
+        }
+    } catch (error) {
+        console.error('Fehler beim Laden:', error);
+        showError('Fehler beim Laden: ' + error.message);
+    }
+}
+
+/**
+ * Rendert Toast-Tabelle (vereinfacht für User-View)
+ */
+function renderToastTable(toasts) {
+    const tbody = document.getElementById('toastTableBody');
+    
+    if (!toasts || toasts.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-muted py-4">
+                    <i class="bi bi-check-circle text-success me-2" style="font-size: 2rem;"></i>
+                    <div class="mt-2">Keine Fehler oder Warnungen gefunden</div>
+                    <small class="text-muted">Kritische Benachrichtigungen werden hier angezeigt</small>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = toasts.map(toast => {
+        const typeBadge = toast.type === 'error' ? 'danger' : 'warning';
+        const typeIcon = toast.type === 'error' 
+            ? '<i class="bi bi-x-circle-fill"></i>' 
+            : '<i class="bi bi-exclamation-triangle-fill"></i>';
+        
+        const timestamp = new Date(toast.timestamp).toLocaleString('de-DE', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        // URL vereinfachen (nur Pfad ohne Domain)
+        const urlPath = toast.url ? toast.url.replace(/^https?:\/\/[^/]+/, '') : '-';
+        
+        // Metadata kompakt darstellen
+        let metadataHtml = '<small class="text-muted">-</small>';
+        if (toast.metadata && Object.keys(toast.metadata).length > 0) {
+            const metaKeys = Object.keys(toast.metadata);
+            metadataHtml = `
+                <button class="btn btn-sm btn-outline-secondary" 
+                        onclick='showMetadata(${JSON.stringify(toast.metadata).replace(/'/g, "\\'")})'
+                        title="Details anzeigen">
+                    <i class="bi bi-info-circle"></i> ${metaKeys.length} Details
+                </button>
+            `;
+        }
+        
+        return `
+            <tr>
+                <td><small>${timestamp}</small></td>
+                <td><span class="badge badge-${typeBadge}">${typeIcon} ${toast.type === 'error' ? 'Fehler' : 'Warnung'}</span></td>
+                <td>${toast.message}</td>
+                <td><small><code>${urlPath}</code></small></td>
+                <td>${metadataHtml}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+/**
+ * Zeigt Metadata in Bootstrap Modal (einfache Alert-Version)
+ */
+window.showMetadata = function(metadata) {
+    const formatted = JSON.stringify(metadata, null, 2);
+    alert('Details:\n\n' + formatted);
+};
+
+// Initial Load
+document.addEventListener('DOMContentLoaded', () => {
+    // Button-Handler registrieren
+    const reloadBtn = document.getElementById('reloadToastsBtn');
+    if (reloadBtn) {
+        reloadBtn.addEventListener('click', loadToastHistory);
+    }
+    
+    // Initial laden
+    loadToastHistory();
+    
+    // Auto-Refresh alle 30 Sekunden
+    setInterval(loadToastHistory, 30000);
+});
+</script>

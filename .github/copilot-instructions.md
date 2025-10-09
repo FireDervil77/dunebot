@@ -8,6 +8,8 @@ DuneBot ist ein modulares Discord-Bot-System mit einem WordPress-ähnlichen Plug
 - **Theme-System**: Anpassbare UI-Themes für das Dashboard
 - **Hook-System**: WordPress-ähnliche Hooks für Plugin-Interaktion
 - **MySQL-Datenbank**: Nativer SQL-Client (keine ORM)
+- **DASHBOARD**: Nutzte Adminlte & Bootstrap (nichts anderes nutzten!)
+- **Frontend**: Nutzte LUMIA THEME (Bootstrap)
 
 ## CORE ARCHITECTURE PRINCIPLES
 

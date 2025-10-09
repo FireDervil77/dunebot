@@ -170,6 +170,9 @@ module.exports = class App {
             // Plugins laden
             await this.loadPlugins();
             
+            // Plugin-Update-Check starten (im Hintergrund)
+            this.#startPluginUpdateCheck();
+            
             // View-Pfade nach Plugin-Load aktualisieren (damit Plugin-Views gefunden werden)
             if (this.app.themeManager && typeof this.app.themeManager.setupViewEngine === 'function') {
                 this.app.themeManager.setupViewEngine();
@@ -230,19 +233,27 @@ module.exports = class App {
             // 3. Core-Plugin aktivieren
             await this.app.pluginManager.enablePlugin('core');
             
-            // 4. Andere Plugins basierend auf der Konfiguration aktivieren
-            // HINWEIS: SuperAdmin wird NICHT mehr automatisch aktiviert!
-            // Es muss manuell über die Plugin-Verwaltung aktiviert werden.
-            const config = await this.loadConfig();
-            let enabledPlugins = config.ENABLED_PLUGINS || ['core'];
+            // 4. Andere Plugins basierend auf guild_plugins aktivieren
+            // Lade alle Plugins die in mindestens einer Guild aktiviert sind
+            const dbService = ServiceManager.get('dbService');
             
-            // Filter anwenden, falls vorhanden
+            const pluginRows = await dbService.query(`
+                SELECT DISTINCT plugin_name 
+                FROM guild_plugins 
+                WHERE is_enabled = 1 AND plugin_name != 'core'
+            `);
+            
+            let enabledPlugins = pluginRows.map(row => row.plugin_name);
+            
+            // Filter-Hook anwenden, falls vorhanden
             if (this.app.pluginManager.hooks) {
                 enabledPlugins = await this.app.pluginManager.hooks.applyFilter(
                     'filter_enabled_plugins',
                     enabledPlugins
                 );
             }
+            
+            Logger.debug(`Aktiviere ${enabledPlugins.length} Plugins global: ${enabledPlugins.join(', ')}`);
             
             // Plugins aktivieren (außer core, das bereits aktiviert wurde)
             for (const pluginName of enabledPlugins) {
@@ -284,6 +295,8 @@ module.exports = class App {
 
     /**
      * Konfiguration aus der Datenbank laden
+     * HINWEIS: ENABLED_PLUGINS wird nicht mehr aus configs geladen!
+     * Plugins werden jetzt über guild_plugins Tabelle verwaltet.
      */
     async loadConfig() {
         const Logger = ServiceManager.get("Logger");
@@ -294,28 +307,30 @@ module.exports = class App {
                 "SELECT config_key, config_value FROM configs WHERE context = ?",
                 ['dashboard']
             );
-            if (!configs || configs.length === 0) {
-                return { ENABLED_PLUGINS: ['core'] };
-            }
             
             const config = {};
             
-            // Default-Werte
-            config.ENABLED_PLUGINS = ['core'];
-            
-            // Gespeicherte Werte laden
-            for (const entry of configs) {
-                try {
-                    config[entry.config_key] = JSON.parse(entry.config_value);
-                } catch (e) {
-                    config[entry.config_key] = entry.config_value;
+            // Gespeicherte Werte laden (außer ENABLED_PLUGINS - das ist obsolet!)
+            if (configs && configs.length > 0) {
+                for (const entry of configs) {
+                    // ENABLED_PLUGINS überspringen - wird über guild_plugins verwaltet
+                    if (entry.config_key === 'ENABLED_PLUGINS') {
+                        Logger.debug('Überspringe veraltete ENABLED_PLUGINS Config');
+                        continue;
+                    }
+                    
+                    try {
+                        config[entry.config_key] = JSON.parse(entry.config_value);
+                    } catch (e) {
+                        config[entry.config_key] = entry.config_value;
+                    }
                 }
             }
             
             return config;
         } catch (error) {
             Logger.error('Fehler beim Laden der Konfiguration:', error);
-            return { ENABLED_PLUGINS: ['core'] };
+            return {};
         }
     }
     
@@ -340,28 +355,12 @@ module.exports = class App {
                 activatedPlugins.add(plugin.name);
             });
             
-            // Für jede Guild die aktivierten Plugins aus configs holen und aktivieren
+            // Für jede Guild die aktivierten Plugins aus guild_plugins holen (NEU!)
             for (const guild of allGuilds) {
                 const guildId = guild._id;
-                // Config für aktivierte Plugins holen
-                const enabledPluginsConfig = await dbService.getConfig(
-                    "core",
-                    "ENABLED_PLUGINS",
-                    "shared",
-                    guildId
-                );
-                let enabledPlugins = ['core'];
-                if (enabledPluginsConfig) {
-                    if (typeof enabledPluginsConfig === "string") {
-                        if (enabledPluginsConfig.startsWith("[")) {
-                            enabledPlugins = JSON.parse(enabledPluginsConfig);
-                        } else {
-                            enabledPlugins = enabledPluginsConfig.split(",").map(p => p.trim());
-                        }
-                    } else if (Array.isArray(enabledPluginsConfig)) {
-                        enabledPlugins = enabledPluginsConfig;
-                    }
-                }
+                
+                // NEU: guild_plugins Tabelle nutzen statt configs
+                const enabledPlugins = await dbService.getEnabledPlugins(guildId);
 
                 // Plugins für diese Guild aktivieren
                 for (const pluginName of enabledPlugins) {
@@ -460,7 +459,13 @@ module.exports = class App {
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
         this.app.use(expressLayouts);
-        this.app.use(express.static(path.join(__dirname, "/public")));
+        
+        // Theme Assets (JS, CSS, Images, Fonts, Vendor)
+        // Beispiel: /themes/default/assets/js/guild.js
+        this.app.use('/themes', express.static(path.join(__dirname, 'themes')));
+        
+        // Plugin Assets werden dynamisch in registerPluginAssets() registriert
+        // Beispiel: /assets/plugins/dunemap/images/map.png
         
         // Session & Auth
         this.app.use(sessionMiddleware);
@@ -485,8 +490,60 @@ module.exports = class App {
                 message: "404 Not Found. Visit /docs for more information"
             });
         });
-
-        // Allgemeiner Error-Handler - MUSS als LETZTES stehen
+        
+        // Error Middleware (MUSS als letztes registriert werden)
         this.app.use(errorMiddleware);
+    }
+
+    /**
+     * Startet Plugin-Update-Check und Auto-Update Cronjob
+     * @private
+     */
+    #startPluginUpdateCheck() {
+        const Logger = ServiceManager.get("Logger");
+        
+        // Auto-Update Cronjob: Täglich um 03:00 Uhr
+        const DAILY_CHECK_HOUR = 3; // 03:00 Uhr
+        const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 Stunden
+        
+        // Berechne Zeit bis nächsten Check (03:00 Uhr)
+        const now = new Date();
+        const nextCheck = new Date();
+        nextCheck.setHours(DAILY_CHECK_HOUR, 0, 0, 0);
+        
+        if (now > nextCheck) {
+            nextCheck.setDate(nextCheck.getDate() + 1); // Morgen 03:00
+        }
+        
+        const msUntilNextCheck = nextCheck - now;
+        
+        Logger.info(`[Auto-Update] Nächster Check: ${nextCheck.toLocaleString('de-DE')}`);
+        
+        // Erster Check nach Verzögerung
+        setTimeout(async () => {
+            await this.#runAutoUpdateCheck();
+            
+            // Danach täglich wiederholen
+            setInterval(async () => {
+                await this.#runAutoUpdateCheck();
+            }, INTERVAL_MS);
+            
+        }, msUntilNextCheck);
+    }
+
+    /**
+     * Führt Auto-Update-Check durch
+     * @private
+     */
+    async #runAutoUpdateCheck() {
+        const Logger = ServiceManager.get("Logger");
+        
+        try {
+            Logger.info('[Auto-Update] Starte täglichen Plugin-Update-Check...');
+            await this.app.pluginManager.processAutoUpdates();
+            Logger.success('[Auto-Update] Check abgeschlossen');
+        } catch (error) {
+            Logger.error('[Auto-Update] Fehler beim Update-Check:', error);
+        }
     }
 };

@@ -1,0 +1,76 @@
+{
+    "TITLE": "Begrüßungen",
+    "DESCRIPTION": "Verwalte Begrüßungsnachrichten für deinen Server",
+
+    "SETTINGS": {
+        "PAGE_TITLE": "Greeting Einstellungen",
+        "PAGE_DESC": "Konfiguriere Willkommens- und Verabschiedungsnachrichten für deine Guild"
+    },
+
+    "TAB_WELCOME": "Willkommen",
+    "TAB_FAREWELL": "Verabschiedung",
+    "TAB_AUTOROLE": "Autorole",
+
+    "WELCOME": {
+        "TITLE": "Willkommensnachrichten",
+        "DESC": "Konfiguriere Willkommensnachrichten für neue Mitglieder",
+        "MESSAGE": "Willkommensnachricht"
+    },
+
+    "FAREWELL": {
+        "TITLE": "Verabschiedungsnachrichten",
+        "DESC": "Konfiguriere Nachrichten für austretende Mitglieder",
+        "MESSAGE": "Verabschiedungsnachricht"
+    },
+
+    "AUTOROLE": {
+        "TITLE": "Automatische Rolle",
+        "DESC": "Diese Rolle wird neuen Mitgliedern automatisch zugewiesen"
+    },
+
+    "CHANNEL_TITLE": "Kanal",
+    "CHANNEL_DESC": "Wähle den Kanal für die Nachrichten",
+    "CHANNEL_SELECT": "Kanal wählen...",
+
+    "STATUS": "Status",
+    "STATUS_ENABLED": "Aktiviert",
+    "STATUS_DISABLED": "Deaktiviert",
+
+    "AUTOROLE_SELECT": "Rolle auswählen",
+    "AUTOROLE_NONE": "Keine automatische Rolle",
+    "AUTOROLE_INFO": "Die ausgewählte Rolle wird allen neuen Mitgliedern beim Beitritt automatisch gegeben.",
+
+    "PLACEHOLDERS_HINT": "Nutze Platzhalter wie {member:name}, {member:mention}, {guild:name}",
+
+    "BTN_ENABLE": "Aktivieren",
+    "BTN_DISABLE": "Deaktivieren",
+    "BTN_SAVE": "Speichern",
+    "BTN_SAVING": "Speichert...",
+
+    "SAVE_SUCCESS": "Einstellungen erfolgreich gespeichert",
+    "SAVE_ERROR": "Fehler beim Speichern der Einstellungen",
+    
+    "TOAST": {
+        "ENABLED": "Aktiviert",
+        "DISABLED": "Deaktiviert",
+        "SAVED": "Erfolgreich gespeichert",
+        "ERROR": "Fehler beim Speichern",
+        "AUTOROLE_REMOVED": "Autorole entfernt"
+    },
+
+    "OVERVIEW": {
+        "MESSAGES_TITLE": "Aktuelle Nachrichten",
+        "AUTOROLES_TITLE": "Automatische Rollen"
+    },
+
+    "HELP": {
+        "TITLE": "Hilfe & Tipps",
+        "WELCOME_TITLE": "Willkommensnachrichten",
+        "WELCOME_TEXT": "Begrüße neue Mitglieder mit personalisierten Nachrichten.",
+        "FAREWELL_TITLE": "Verabschiedungen",
+        "FAREWELL_TEXT": "Verabschiede austretende Mitglieder.",
+        "AUTOROLE_TITLE": "Autorole",
+        "AUTOROLE_TEXT": "Automatische Rollenzuweisung für neue Mitglieder.",
+        "PLACEHOLDERS_TITLE": "Verfügbare Platzhalter"
+    }
+}

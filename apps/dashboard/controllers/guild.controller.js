@@ -61,16 +61,10 @@ exports.getDashboard = async (req, res) => {
             Logger.error(`Fehler beim Laden der Statistiken für Guild ${guildId}:`, err);
         }
 
-        // Aktivierte Plugins aus der Datenbank laden
+        // Aktivierte Plugins aus guild_plugins Tabelle laden
         let enabledPlugins = [];
         try {
-            const configs = await dbService.getConfigs(guildId, "core", "shared");
-            
-            // JSON-Feld parsen
-            enabledPlugins = configs?.ENABLED_PLUGINS ? 
-                (typeof configs.ENABLED_PLUGINS === 'string' ? 
-                    JSON.parse(configs.ENABLED_PLUGINS) : 
-                    configs.ENABLED_PLUGINS) : ["core"];
+            enabledPlugins = await dbService.getEnabledPlugins(guildId);
         } catch (err) {
             Logger.error(`Fehler beim Laden der aktivierten Plugins für Guild ${guildId}:`, err);
             enabledPlugins = ["core"]; 
@@ -263,16 +257,10 @@ exports.getPlugins = async (req, res) => {
             Logger.warn(`Kein Guild-Name gefunden für Guild ${guildId}`);
         }
 
-        // Aktivierte Plugins laden
+        // Aktivierte Plugins aus guild_plugins Tabelle laden
         let enabledServerPlugins = [];
         try {
-            const pluginConfigs = await dbService.getConfigs(guildId, "core", "shared");
-            
-            if (pluginConfigs?.ENABLED_PLUGINS) {
-                enabledServerPlugins = typeof pluginConfigs.ENABLED_PLUGINS === 'string' 
-                    ? JSON.parse(pluginConfigs.ENABLED_PLUGINS)
-                    : pluginConfigs.ENABLED_PLUGINS;
-            }
+            enabledServerPlugins = await dbService.getEnabledPlugins(guildId);
             
             // Sicherstellen dass core immer aktiviert ist
             if (!enabledServerPlugins.includes('core')) {
@@ -392,12 +380,57 @@ exports.getPlugins = async (req, res) => {
                     }
                 }
 
-                // Sortieren nach DisplayName
-                enabledPlugins.sort((a, b) => a.displayName.localeCompare(b.displayName));
-                availablePlugins.sort((a, b) => a.displayName.localeCompare(b.displayName));
+                // Sortieren: Core & SuperAdmin immer zuerst, dann alphabetisch
+                const priorityPlugins = ['core', 'superadmin'];
+                enabledPlugins.sort((a, b) => {
+                    const aPriority = priorityPlugins.indexOf(a.name);
+                    const bPriority = priorityPlugins.indexOf(b.name);
+                    
+                    // Beide in Priority-Liste: nach Liste sortieren
+                    if (aPriority !== -1 && bPriority !== -1) return aPriority - bPriority;
+                    // Nur A in Priority: A kommt zuerst
+                    if (aPriority !== -1) return -1;
+                    // Nur B in Priority: B kommt zuerst
+                    if (bPriority !== -1) return 1;
+                    // Beide nicht in Priority: alphabetisch
+                    return a.displayName.localeCompare(b.displayName);
+                });
+                
+                availablePlugins.sort((a, b) => {
+                    const aPriority = priorityPlugins.indexOf(a.name);
+                    const bPriority = priorityPlugins.indexOf(b.name);
+                    
+                    if (aPriority !== -1 && bPriority !== -1) return aPriority - bPriority;
+                    if (aPriority !== -1) return -1;
+                    if (bPriority !== -1) return 1;
+                    return a.displayName.localeCompare(b.displayName);
+                });
             }
         } catch (scanErr) {
             Logger.error(`[Plugins] Fehler beim Durchsuchen des Plugin-Verzeichnisses:`, scanErr);
+        }
+
+        // Plugin-Updates laden
+        let pendingUpdates = [];
+        try {
+            pendingUpdates = await pluginManager.getAvailableUpdates(guildId);
+            
+            // Updates mit Plugins mergen
+            const updateMap = new Map(pendingUpdates.map(u => [u.plugin_name, u]));
+            
+            enabledPlugins.forEach(plugin => {
+                if (updateMap.has(plugin.name)) {
+                    plugin.updateInfo = updateMap.get(plugin.name);
+                }
+            });
+            
+            availablePlugins.forEach(plugin => {
+                if (updateMap.has(plugin.name)) {
+                    plugin.updateInfo = updateMap.get(plugin.name);
+                }
+            });
+        } catch (updateErr) {
+            Logger.error(`[Plugins] Fehler beim Laden von Plugin-Updates:`, updateErr);
         }
 
         // Breadcrumbs
@@ -418,6 +451,7 @@ exports.getPlugins = async (req, res) => {
             guildId,
             enabledPlugins,
             availablePlugins,
+            pendingUpdates,
             breadcrumbs,
             // Flash-Nachrichten für die View bereitstellen (immer als Arrays)
             success: Array.isArray(res.locals.success) ? res.locals.success : [],
@@ -509,7 +543,7 @@ exports.updatePlugins = async (req, res) => {
         if (action === 'enable') {
             for (const plugin of plugins) {
                 try {
-                    await pluginManager.enableInGuild(plugin, guildId);
+                    await pluginManager.enableInGuild(plugin, guildId, req);
                     results.push({
                         plugin,
                         success: true,
@@ -526,7 +560,7 @@ exports.updatePlugins = async (req, res) => {
         } else if (action === 'disable') { // Fix: else if statt if
             for (const plugin of plugins) {
                 try {
-                    await pluginManager.disableInGuild(plugin, guildId);
+                    await pluginManager.disableInGuild(plugin, guildId, req);
                     results.push({
                         plugin,
                         success: true,
@@ -638,6 +672,41 @@ exports.getLocales = async (req, res) => {
         res.status(500).render("error", { 
             message: "Ein Fehler ist aufgetreten.", 
             error 
+        });
+    }
+};
+
+/**
+ * Plugin-Update durchführen
+ * @author firedervil
+ * @param {import('express').Request} req - Express Request Objekt
+ * @param {import('express').Response} res - Express Response Objekt
+ * @returns {Promise<void>}
+ */
+exports.updatePluginVersion = async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const pluginManager = ServiceManager.get('pluginManager');
+
+    try {
+        const { guildId, pluginName } = req.params;
+        
+        Logger.info(`[Plugin Update] Starting update for plugin ${pluginName} in guild ${guildId}`);
+
+        // Update durchführen (isAutoUpdate = false, da manuell)
+        await pluginManager.updatePlugin(pluginName, guildId, false);
+
+        Logger.info(`[Plugin Update] Successfully updated plugin ${pluginName} in guild ${guildId}`);
+
+        res.json({
+            success: true,
+            message: `Plugin ${pluginName} wurde erfolgreich aktualisiert.`
+        });
+
+    } catch (error) {
+        Logger.error(`[Plugin Update] Fehler beim Aktualisieren von Plugin ${req.params.pluginName}:`, error);
+        res.status(500).json({
+            success: false,
+            message: error.message || "Ein Fehler ist beim Update aufgetreten."
         });
     }
 };

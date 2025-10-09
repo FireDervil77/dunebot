@@ -1,0 +1,181 @@
+<%# 
+  * Greeting Plugin JavaScript
+  * Handles AJAX updates for Welcome/Farewell/Autorole settings
+  * 
+  * @author DuneBot Team
+  %>
+
+<script>
+console.log('[Greeting] greeting-scripts.ejs loaded');
+
+/**
+ * Update Greeting Settings via AJAX
+ * 
+ * @param {string} type - welcome, farewell, oder autorole
+ * @param {string} action - enable, disable, oder update
+ */
+async function updateGreeting(type, action) {
+    console.log(`[Greeting] updateGreeting called: type=${type}, action=${action}`);
+    
+    const guildId = window.location.pathname.split('/')[2];
+    console.log(`[Greeting] Guild ID: ${guildId}`);
+    
+    let data = { type, action };
+    
+    // Daten je nach Type sammeln
+    if (type === 'welcome') {
+        const channel = document.querySelector('select[name="welcome_channel"]')?.value;
+        const content = document.querySelector('textarea[name="welcome_content"]')?.value;
+        const embedEnabled = document.querySelector('input[name="welcome_embed_enabled"]')?.checked || false;
+        
+        data.welcome_channel = channel;
+        data.welcome_content = content;
+        data.welcome_embed_enabled = embedEnabled;
+        
+        console.log(`[Greeting] Welcome Data:`, data);
+        
+    } else if (type === 'farewell') {
+        const channel = document.querySelector('select[name="farewell_channel"]')?.value;
+        const content = document.querySelector('textarea[name="farewell_content"]')?.value;
+        const embedEnabled = document.querySelector('input[name="farewell_embed_enabled"]')?.checked || false;
+        
+        data.farewell_channel = channel;
+        data.farewell_content = content;
+        data.farewell_embed_enabled = embedEnabled;
+        
+        console.log(`[Greeting] Farewell Data:`, data);
+        
+    } else if (type === 'autorole') {
+        const selectedRole = document.querySelector('select[name="autorole_id"]')?.value;
+        
+        data.autorole_id = selectedRole || null;
+        
+        console.log(`[Greeting] Autorole Data:`, data);
+    }
+    
+    try {
+        console.log(`[Greeting] Sending PUT to /guild/${guildId}/plugins/greeting/settings`);
+        console.log(`[Greeting] Payload:`, JSON.stringify(data, null, 2));
+        
+        const response = await fetch(`/guild/${guildId}/plugins/greeting/settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        console.log(`[Greeting] Response Status: ${response.status} ${response.statusText}`);
+        
+        const result = await response.json();
+        console.log(`[Greeting] Server Response:`, result);
+        
+        if (result.success) {
+            // Erfolgs-Toast anzeigen (Globales Toast-System)
+            showSuccess(result.message || 'Einstellungen erfolgreich gespeichert');
+            
+            // Optional: Seite neu laden
+            setTimeout(() => {
+                console.log('[Greeting] Reloading page...');
+                location.reload();
+            }, 1000);
+        } else {
+            throw new Error(result.message || 'Fehler beim Speichern');
+        }
+        
+    } catch (error) {
+        console.error('[Greeting] Error updating settings:', error);
+        
+        // Fehler-Toast mit Metadaten für Server-Logging
+        showError('Fehler beim Speichern der Einstellungen: ' + error.message, {
+            metadata: { action: 'updateGreeting', type: type, error: error.toString() }
+        });
+    }
+}
+
+// Funktion global verfügbar machen
+window.updateGreeting = updateGreeting;
+console.log('[Greeting] updateGreeting function registered globally');
+
+/**
+ * Autorole entfernen
+ */
+async function removeAutorole() {
+    if (!confirm('Möchtest du die automatische Rolle wirklich entfernen?')) {
+        return;
+    }
+    
+    const guildId = window.location.pathname.split('/')[2];
+    
+    try {
+        const response = await fetch(`/guild/${guildId}/plugins/greeting/settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                type: 'autorole',
+                action: 'disable',
+                autorole_roles: []
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showSuccess('Autorole entfernt');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            throw new Error(result.message || 'Fehler beim Entfernen');
+        }
+    } catch (error) {
+        console.error('[Greeting] Error removing autorole:', error);
+        showError('Fehler: ' + error.message, {
+            metadata: { action: 'removeAutorole', error: error.toString() }
+        });
+    }
+}
+
+window.removeAutorole = removeAutorole;
+
+/**
+ * Toggle Greeting Enabled/Disabled (in Overview-Card)
+ */
+async function toggleGreeting(type, enabled) {
+    const guildId = window.location.pathname.split('/')[2];
+    const action = enabled ? 'enable' : 'disable';
+    
+    console.log(`[Greeting] Toggling ${type}: ${action}`);
+    
+    try {
+        const response = await fetch(`/guild/${guildId}/plugins/greeting/settings`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                type,
+                action
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showSuccess(enabled ? 'Aktiviert' : 'Deaktiviert');
+            // Kein Reload - Toggle aktualisiert sich selbst
+        } else {
+            throw new Error(result.message || 'Fehler beim Ändern');
+        }
+    } catch (error) {
+        console.error('[Greeting] Toggle error:', error);
+        showError('Fehler: ' + error.message, {
+            metadata: { action: 'toggleGreeting', type: type, enabled: enabled, error: error.toString() }
+        });
+        // Toggle zurücksetzen bei Fehler
+        location.reload();
+    }
+}
+
+window.toggleGreeting = toggleGreeting;
+</script>

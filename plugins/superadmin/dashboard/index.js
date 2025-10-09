@@ -83,31 +83,25 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
         // Plugin Statistiken
         try {
-            const pluginConfigs = await dbService.query(`
-                SELECT guild_id, config_value 
-                FROM configs 
-                WHERE config_key = 'ENABLED_PLUGINS' AND context = 'shared' AND plugin_name = 'core'
+            // NEU: Plugin-Statistiken aus guild_plugins Tabelle
+            const pluginStats = await dbService.query(`
+                SELECT plugin_name, COUNT(DISTINCT guild_id) as guild_count
+                FROM guild_plugins 
+                WHERE is_enabled = 1
+                GROUP BY plugin_name
             `);
             
             const pluginCounts = {};
-            let totalGuildsWithPlugins = 0;
-            
-            pluginConfigs.forEach(row => {
-                try {
-                    const enabledPlugins = typeof row.config_value === 'string' 
-                        ? JSON.parse(row.config_value) 
-                        : row.config_value;
-                    
-                    if (Array.isArray(enabledPlugins) && enabledPlugins.length > 0) {
-                        totalGuildsWithPlugins++;
-                        enabledPlugins.forEach(pluginName => {
-                            pluginCounts[pluginName] = (pluginCounts[pluginName] || 0) + 1;
-                        });
-                    }
-                } catch (err) {
-                    // Ignoriere fehlerhafte JSON-Einträge
-                }
+            pluginStats.forEach(row => {
+                pluginCounts[row.plugin_name] = row.guild_count;
             });
+            
+            const totalGuildsWithPlugins = await dbService.query(`
+                SELECT COUNT(DISTINCT guild_id) as count 
+                FROM guild_plugins 
+                WHERE is_enabled = 1
+            `);
+            const totalGuilds = totalGuildsWithPlugins[0]?.count || 0;
             
             stats.pluginStats = Object.entries(pluginCounts)
                 .map(([name, count]) => ({
@@ -150,6 +144,12 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
         try {
             Logger.debug('[SuperAdmin] Starte Route-Setup für guildRouter...');
+            
+            // API-Routen (ohne Owner-Check für bestimmte Endpoints)
+            const toastHistoryApi = require('./routes/api/toast-history');
+            this.apiRouter = express.Router();
+            this.apiRouter.use('/toast-history', toastHistoryApi);
+            Logger.debug('[SuperAdmin] Toast-History API registriert');
             
             // Middleware: Owner-Check für ALLE SuperAdmin-Routen
             this.guildRouter.use(this._checkOwner.bind(this));
@@ -438,6 +438,18 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 }
             });
 
+            // === TOAST-HISTORY (Monitoring/Debugging) ===
+            this.guildRouter.get('/toast-history', async (req, res) => {
+                const guildId = res.locals.guildId;
+                
+                await themeManager.renderView(res, 'guild/toast-history', {
+                    title: 'Toast-Event History',
+                    activeMenu: `/guild/${guildId}/plugins/superadmin/toast-history`,
+                    guildId,
+                    plugin: this
+                });
+            });
+
             Logger.info('[SuperAdmin] Routen eingerichtet für guildRouter');
             Logger.info(`[SuperAdmin] guildRouter enthält ${this.guildRouter.stack?.length || 0} routes/middleware`);
         } catch (error) {
@@ -639,41 +651,33 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
         // Plugin Statistiken
         try {
-            // Hole alle ENABLED_PLUGINS aus configs
-            const pluginConfigs = await dbService.query(`
-                SELECT guild_id, config_value 
-                FROM configs 
-                WHERE config_key = 'ENABLED_PLUGINS'
+            // NEU: Plugin-Statistiken aus guild_plugins Tabelle
+            const pluginStats = await dbService.query(`
+                SELECT plugin_name, COUNT(DISTINCT guild_id) as guild_count
+                FROM guild_plugins 
+                WHERE is_enabled = 1
+                GROUP BY plugin_name
             `);
             
-            // Zähle Plugin-Aktivierungen
             const pluginCounts = {};
-            let totalGuildsWithPlugins = 0;
-            
-            pluginConfigs.forEach(row => {
-                try {
-                    const enabledPlugins = typeof row.config_value === 'string' 
-                        ? JSON.parse(row.config_value) 
-                        : row.config_value;
-                    
-                    if (Array.isArray(enabledPlugins) && enabledPlugins.length > 0) {
-                        totalGuildsWithPlugins++;
-                        enabledPlugins.forEach(pluginName => {
-                            pluginCounts[pluginName] = (pluginCounts[pluginName] || 0) + 1;
-                        });
-                    }
-                } catch (err) {
-                    // Ignoriere fehlerhafte JSON-Einträge
-                }
+            pluginStats.forEach(row => {
+                pluginCounts[row.plugin_name] = row.guild_count;
             });
+            
+            const totalGuildsWithPlugins = await dbService.query(`
+                SELECT COUNT(DISTINCT guild_id) as count 
+                FROM guild_plugins 
+                WHERE is_enabled = 1
+            `);
+            const totalGuilds = totalGuildsWithPlugins[0]?.count || 0;
             
             // Konvertiere zu Array mit Prozentsatz
             stats.pluginStats = Object.entries(pluginCounts)
                 .map(([name, count]) => ({
                     name,
                     count,
-                    percentage: totalGuildsWithPlugins > 0 
-                        ? Math.round((count / totalGuildsWithPlugins) * 100) 
+                    percentage: totalGuilds > 0 
+                        ? Math.round((count / totalGuilds) * 100) 
                         : 0
                 }))
                 .sort((a, b) => b.count - a.count); // Sortiere nach Anzahl absteigend

@@ -1,8 +1,8 @@
 {
   "name": "core",
   "version": "1.0.0",
-  "displayName": "DuneBot Core-Plugin",
-  "description": "Das Core-Plugin des Dunebots (Muss immer in allen Guilds Aktiviert sein!).",
+  "displayName": "Firebot Core-Plugin",
+  "description": "Das Core-Plugin des FireBots (is in every new guild activiated!).",
   "author": "FireDervil",
   "main": "dashboard/index.js",
   "bot": "bot/index.js",

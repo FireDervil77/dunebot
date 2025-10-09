@@ -55,23 +55,29 @@ class ThemeManager {
             // 2. Basis-Context laden
             const baseContext = await this.getContext();
 
-            // 3. View-spezifische Daten mit Basis-Context und Layout mergen
+            // 3. View-spezifische Daten mit Basis-Context mergen
             const viewData = {
                 ...baseContext,           // Basis-Context (User, Guild, etc.)
-                ...res.locals,            // Express locals
-                ...data,                  // View-spezifische Daten
-                layout: this.getLayout(section)  // Korrektes Layout
+                ...res.locals,            // Express locals (enthält bereits vorhandene Daten)
+                ...data                   // View-spezifische Daten (überschreibt alles)
             };
+
+            // 4. WICHTIG: Layout in res.locals setzen für express-ejs-layouts
+            res.locals.layout = this.getLayout(section);
+            
+            // 5. WICHTIG: Alle View-Daten in res.locals mergen für express-ejs-layouts
+            Object.assign(res.locals, viewData);
 
             Logger.debug('Render Context:', {
                 view,
                 section,
                 hasUser: !!viewData.user,
-                layout: viewData.layout
+                layout: res.locals.layout,
+                hasEnabledPlugins: !!viewData.enabledPlugins
             });
 
-            // 4. View rendern (includePartial hat automatisch Zugriff via EJS-Context)
-            res.render(view, viewData);
+            // 6. View rendern (express-ejs-layouts nutzt jetzt res.locals)
+            res.render(view);
 
         } catch (error) {
             Logger.error('Fehler beim Rendern der View:', error);
@@ -422,6 +428,95 @@ class ThemeManager {
             } catch (error) {
                 Logger.error(`Fehler beim Einbinden des Partials ${filename}:`, error);
                 return `<!-- Fehler beim Laden von ${filename} -->`;
+            }
+        };
+        
+        // ============================================================================
+        // GLOBAL FUNCTION: includePluginPartial (für Plugin-Partials!)
+        // ============================================================================
+        // Lädt Partials aus Plugin-Verzeichnissen
+        // Aufruf im Template: <%- includePluginPartial('pluginname', 'partial/name') %>
+        this.app.locals.includePluginPartial = function(pluginName, filename, data = {}) {
+            try {                    
+                const ejs = require('ejs');
+                const path = require('path');  // WICHTIG: path importieren!
+                const PathConfig = require('./utils/PathConfig').getInstance();
+                
+                // DEBUG
+                Logger.debug(`[includePluginPartial] Plugin: ${pluginName}, Partial: ${filename}`);
+                
+                // Plugin-spezifische Suchpfade
+                const pluginPaths = PathConfig.getPath('plugin', pluginName);
+                
+                // DEBUG: Pfade ausgeben
+                Logger.debug(`[includePluginPartial] pluginPaths:`, pluginPaths);
+                
+                const searchPaths = [
+                    // Dashboard-Partials
+                    path.join(pluginPaths.dashboard, 'views', 'partials', filename + '.ejs'),
+                    path.join(pluginPaths.dashboard, 'partials', filename + '.ejs'),
+                    // Root-Level Partials
+                    path.join(pluginPaths.root, 'partials', filename + '.ejs')
+                ];
+                
+                const filePath = searchPaths.find(p => fs.existsSync(p));
+                if (!filePath) {
+                    Logger.warn(`Plugin-Partial ${pluginName}/${filename} nicht gefunden. Suchpfade:`, searchPaths);
+                    return `<!-- Plugin-Partial ${pluginName}/${filename} nicht gefunden -->`;
+                }
+                
+                Logger.debug(`Plugin-Partial gefunden: ${filePath}`);
+                const template = fs.readFileSync(filePath, 'utf8');
+                
+                // Kontext wie bei includePartial: appLocals → this (EJS) → data
+                const renderContext = {
+                    ...appLocals,  // Globals (tr, theme, coreConfig)
+                    ...this,       // EJS View Data (user, guild, guildId, etc.)
+                    ...data        // Explicit data
+                };
+                
+                // EJS-Cache löschen in Development
+                if (process.env.NODE_ENV !== 'production') {
+                    ejs.clearCache();
+                }
+                
+                // Template rendern
+                let renderedContent = ejs.render(template, renderContext, { cache: false, filename: filePath });
+                
+                // ============================================================================
+                // SCRIPT EXTRACTION: Scripts aus dem gerenderten Content extrahieren
+                // und in res.locals._scripts sammeln (wie express-ejs-layouts es macht)
+                // ============================================================================
+                const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+                const scripts = [];
+                let match;
+                
+                // Alle <script> Tags finden
+                while ((match = scriptRegex.exec(renderedContent)) !== null) {
+                    scripts.push(match[0]); // Komplettes <script>...</script> Tag
+                }
+                
+                if (scripts.length > 0) {
+                    Logger.debug(`[includePluginPartial] ${scripts.length} Script(s) gefunden und extrahiert`);
+                    
+                    // Scripts aus dem Content entfernen
+                    renderedContent = renderedContent.replace(scriptRegex, '');
+                    
+                    // Scripts in renderContext._pluginScripts sammeln (kommt von res.locals!)
+                    // renderContext enthält: appLocals + this (EJS context) + data
+                    // res.locals._pluginScripts wird in base.middleware.js initialisiert
+                    if (Array.isArray(renderContext._pluginScripts)) {
+                        renderContext._pluginScripts.push(...scripts);
+                        Logger.debug(`[includePluginPartial] Scripts zu _pluginScripts hinzugefügt. Total: ${renderContext._pluginScripts.length}`);
+                    } else {
+                        Logger.warn(`[includePluginPartial] renderContext._pluginScripts ist kein Array!`, typeof renderContext._pluginScripts);
+                    }
+                }
+                
+                return renderedContent;
+            } catch (error) {
+                Logger.error(`Fehler beim Einbinden des Plugin-Partials ${pluginName}/${filename}:`, error);
+                return `<!-- Fehler beim Laden von ${pluginName}/${filename}: ${error.message} -->`;
             }
         };
         

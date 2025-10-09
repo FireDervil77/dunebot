@@ -3,7 +3,7 @@ const path = require('path');
 
 /**
  * AssetManager - WordPress-ähnliches Asset-Enqueuing-System
- * Ermöglicht Plugins das Registrieren von CSS/JS mit Abhängigkeiten, Versionen und Debug-Support
+ * Ermöglicht Plugins das Registrieren von CSS/JS mit Abhängigkeiten und Versionen
  * 
  * @author DuneBot Team
  */
@@ -21,9 +21,6 @@ class AssetManager {
         /** @type {Set<string>} Bereits eingereiht für Rendering */
         this.enqueuedStyles = new Set();
         
-        /** @type {boolean} Debug-Modus (lädt .dev.js statt .min.js) */
-        this.debugMode = process.env.NODE_ENV === 'development' || process.env.SCRIPT_DEBUG === 'true';
-        
         this.logger = ServiceManager.get('Logger');
     }
 
@@ -40,7 +37,6 @@ class AssetManager {
      * @param {Object} [options.localize] - JavaScript-Objekt für wp_localize_script
      * @param {boolean} [options.defer=false] - defer-Attribut hinzufügen
      * @param {boolean} [options.async=false] - async-Attribut hinzufügen
-     * @param {string} [options.debugSrc] - Alternative Source für Debug-Modus
      * 
      * @returns {boolean} true bei Erfolg
      * 
@@ -49,8 +45,7 @@ class AssetManager {
      *   plugin: 'dunemap',
      *   deps: ['jquery'],
      *   version: '2.1.0',
-     *   localize: { guildId: '12345', markers: [...] },
-     *   debugSrc: 'js/dunemap-admin.dev.js'
+     *   localize: { guildId: '12345', markers: [...] }
      * });
      * 
      * @author DuneBot Team
@@ -71,7 +66,6 @@ class AssetManager {
             localize: options.localize,
             defer: options.defer || false,
             async: options.async || false,
-            debugSrc: options.debugSrc ? this._resolveAssetPath(options.debugSrc, options.plugin, 'js') : null,
             type: 'script'
         };
 
@@ -200,13 +194,9 @@ class AssetManager {
             // Nur Scripts für die richtige Position (head/footer)
             if (asset.inFooter !== inFooter) continue;
 
-            // Debug-Modus: .dev.js statt .min.js oder debugSrc verwenden
-            let src = asset.src;
-            if (this.debugMode && asset.debugSrc) {
-                src = asset.debugSrc;
-            } else if (this.debugMode) {
-                src = src.replace(/\.min\.js$/, '.dev.js').replace(/\.js$/, '.dev.js');
-            }
+            // Nutze immer die registrierte Source-Datei (keine automatischen Debug-Versionen)
+            // DEV→PROD Workflow läuft über Git, nicht über automatische File-Switches
+            const src = asset.src;
 
             // wp_localize_script-Äquivalent
             if (asset.localize) {
@@ -225,11 +215,6 @@ class AssetManager {
             scripts.push(
                 `<script src="${versionedSrc}"${attrs.length ? ' ' + attrs.join(' ') : ''}></script>`
             );
-
-            // Debug-Kommentar im Development
-            if (this.debugMode) {
-                scripts.push(`<!-- Script: ${handle} (${asset.plugin || 'core'}) -->`);
-            }
         }
 
         return [...localizeScripts, ...scripts].join('\n');
@@ -258,10 +243,6 @@ class AssetManager {
             styles.push(
                 `<link rel="stylesheet" href="${versionedSrc}" media="${asset.media}">`
             );
-
-            if (this.debugMode) {
-                styles.push(`<!-- Style: ${handle} (${asset.plugin || 'core'}) -->`);
-            }
         }
 
         return styles.join('\n');

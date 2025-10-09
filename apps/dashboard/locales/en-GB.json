@@ -290,7 +290,27 @@
         "UNINSTALL": "Uninstall",
         "UNINSTALLING": "Uninstalling",
         "INSTALLED": "Installed",
-        "TOTAL": "Total"
+        "TOTAL": "Total",
+        "ENABLED_TITLE": "Enabled Plugins",
+        "AVAILABLE_TITLE": "Available Plugins",
+        "NO_ENABLED": "No plugins enabled.",
+        "NO_AVAILABLE": "No additional plugins available.",
+        "NO_DESCRIPTION": "No description available",
+        "AUTHOR": "Author",
+        "VERSION": "Version",
+        "CORE_BADGE": "Core",
+        "ENABLE_ACTION": "Enable",
+        "DISABLE_ACTION": "Disable",
+        "SETTINGS_ACTION": "Settings",
+        "CONFIGURE_ACTION": "Configure",
+        "CARD_VIEW": "Cards",
+        "TABLE_VIEW": "Table",
+        "TABLE_ICON": "Icon",
+        "TABLE_NAME": "Name",
+        "TABLE_VERSION": "Version",
+        "TABLE_AUTHOR": "Author",
+        "TABLE_DESCRIPTION": "Description",
+        "TABLE_ACTIONS": "Actions"
     },
 
     "LOCALES_PAGE": {
@@ -365,6 +385,13 @@
         "CORE_SETTINGS_ERROR": "Error saving core settings",
         "DUNEMAP_SETTINGS_SAVED": "DuneMap settings saved successfully",
         "DUNEMAP_SETTINGS_ERROR": "Error saving DuneMap settings"
+    },
+
+    "TOAST_NOTIFICATIONS": {
+        "TITLE": "Toast Notifications",
+        "LOADING": "Loading notifications...",
+        "VIEW_ALL": "View All",
+        "NO_CRITICAL": "No critical notifications"
     },
 
     "DASHBOARD_COMMON": {

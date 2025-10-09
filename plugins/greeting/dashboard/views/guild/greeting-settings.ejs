@@ -1,0 +1,109 @@
+<!-- Greeting Plugin Settings Page - Bootstrap/AdminLTE Version -->
+<div class="container-fluid">
+  <div class="row">
+    <!-- Linke Spalte: Settings Tabs (8 Spalten) -->
+    <div class="col-lg-8">
+      <!-- Card Header -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-hand-wave me-2"></i>
+            <%= tr('greeting:SETTINGS.PAGE_TITLE', 'Greeting Einstellungen') %>
+          </h3>
+          <p class="text-muted mb-0 mt-2">
+            <%= tr('greeting:SETTINGS.PAGE_DESC', 'Konfiguriere Willkommens- und Verabschiedungsnachrichten') %>
+          </p>
+        </div>
+
+        <div class="card-body">
+          <!-- Bootstrap 4 Nav Tabs (AdminLTE kompatibel) -->
+          <ul class="nav nav-tabs" id="greetingTabs" role="tablist">
+            <li class="nav-item">
+              <a class="nav-link active" id="welcome-tab" data-toggle="tab" href="#welcome-pane" role="tab">
+                <i class="fa-solid fa-hand-wave me-2"></i>
+                <%= tr('greeting:TAB_WELCOME', 'Willkommen') %>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="farewell-tab" data-toggle="tab" href="#farewell-pane" role="tab">
+                <i class="fa-solid fa-door-open me-2"></i>
+                <%= tr('greeting:TAB_FAREWELL', 'Verabschiedung') %>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="autorole-tab" data-toggle="tab" href="#autorole-pane" role="tab">
+                <i class="fa-solid fa-user-shield me-2"></i>
+                <%= tr('greeting:TAB_AUTOROLE', 'Autorole') %>
+              </a>
+            </li>
+          </ul>
+
+          <!-- Tab Content -->
+          <div class="tab-content mt-4" id="greetingTabContent">
+            <!-- Welcome Tab -->
+            <div class="tab-pane fade show active" id="welcome-pane" role="tabpanel">
+              <%- include('greeting-content', { type: 'welcome', channels, roles, settings, guildId }) %>
+            </div>
+
+            <!-- Farewell Tab -->
+            <div class="tab-pane fade" id="farewell-pane" role="tabpanel">
+              <%- include('greeting-content', { type: 'farewell', channels, roles, settings, guildId }) %>
+            </div>
+
+            <!-- Autorole Tab -->
+            <div class="tab-pane fade" id="autorole-pane" role="tabpanel">
+              <%- include('greeting-content', { type: 'autorole', channels, roles, settings, guildId }) %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Rechte Spalte: Hilfe & Platzhalter (4 Spalten) -->
+    <div class="col-lg-4">
+      <!-- Help Card -->
+      <div class="card card-outline card-info">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-circle-info me-2"></i>
+            <%= tr('greeting:HELP.TITLE', 'Hilfe & Tipps') %>
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="mb-4">
+            <h6><i class="fa-solid fa-hand-wave text-primary me-2"></i><%= tr('greeting:HELP.WELCOME_TITLE', 'Willkommensnachrichten') %></h6>
+            <p class="text-muted small">
+              <%= tr('greeting:HELP.WELCOME_TEXT', 'Begrüße neue Mitglieder mit personalisierten Nachrichten.') %>
+            </p>
+          </div>
+          <div class="mb-4">
+            <h6><i class="fa-solid fa-door-open text-warning me-2"></i><%= tr('greeting:HELP.FAREWELL_TITLE', 'Verabschiedungen') %></h6>
+            <p class="text-muted small">
+              <%= tr('greeting:HELP.FAREWELL_TEXT', 'Verabschiede austretende Mitglieder.') %>
+            </p>
+          </div>
+          <div class="mb-4">
+            <h6><i class="fa-solid fa-user-shield text-success me-2"></i><%= tr('greeting:HELP.AUTOROLE_TITLE', 'Autorole') %></h6>
+            <p class="text-muted small">
+              <%= tr('greeting:HELP.AUTOROLE_TEXT', 'Automatische Rollenzuweisung für neue Mitglieder.') %>
+            </p>
+          </div>
+          
+          <hr>
+          
+          <h6><i class="fa-solid fa-code me-2"></i><%= tr('greeting:HELP.PLACEHOLDERS_TITLE', 'Verfügbare Platzhalter') %></h6>
+          <ul class="small pl-3">
+            <li><code>{member:name}</code> - Member-Name</li>
+            <li><code>{member:nick}</code> - Member-Nickname</li>
+            <li><code>{member:mention}</code> - Member erwähnen</li>
+            <li><code>{guild:name}</code> - Server-Name</li>
+            <li><code>{guild:memberCount}</code> - Mitgliederzahl</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+<!-- Greeting Plugin Scripts -->
+<%- includePluginPartial('greeting', 'greeting-scripts', locals) %>
+</div>

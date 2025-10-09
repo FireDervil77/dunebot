@@ -45,7 +45,9 @@
                   <i class="nav-icon <%= item.icon || 'fa-solid fa-circle' %>"></i>
                   <p>
                     <%= item.title %>
-                    <% if (item.subItems && item.subItems.length > 0) { %>
+                    <% if (item.url && item.url.includes('/plugins') && locals.pendingUpdatesCount > 0) { %>
+                      <span class="badge badge-warning right"><%= locals.pendingUpdatesCount %></span>
+                    <% } else if (item.subItems && item.subItems.length > 0) { %>
                       <i class="bi bi-chevron-right right"></i>
                     <% } %>
                   </p>

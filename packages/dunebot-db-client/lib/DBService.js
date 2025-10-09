@@ -711,6 +711,121 @@ async getAllConfigs() {
             values
         );
     }
+
+    // =====================================
+    // NEUE PLUGIN MANAGEMENT METHODEN
+    // =====================================
+
+    /**
+     * Aktiviert ein Plugin für eine Guild
+     * @param {string} guildId Guild-ID
+     * @param {string} pluginName Plugin-Name
+     * @param {string} version Plugin-Version (optional)
+     * @param {string} userId User-ID des Aktivierenden (optional)
+     * @returns {Promise<Object>}
+     * @author FireDervil
+     */
+    async enablePluginForGuild(guildId, pluginName, version = null, userId = null) {
+        return await this.query(`
+            INSERT INTO guild_plugins 
+                (guild_id, plugin_name, is_enabled, plugin_version, enabled_at, enabled_by)
+            VALUES (?, ?, 1, ?, NOW(), ?)
+            ON DUPLICATE KEY UPDATE
+                is_enabled = 1,
+                plugin_version = VALUES(plugin_version),
+                enabled_at = NOW(),
+                enabled_by = VALUES(enabled_by),
+                disabled_at = NULL,
+                disabled_by = NULL,
+                updated_at = NOW()
+        `, [guildId, pluginName, version, userId]);
+    }
+
+    /**
+     * Deaktiviert ein Plugin für eine Guild
+     * @param {string} guildId Guild-ID
+     * @param {string} pluginName Plugin-Name
+     * @param {string} userId User-ID des Deaktivierenden (optional)
+     * @returns {Promise<Object>}
+     * @author FireDervil
+     */
+    async disablePluginForGuild(guildId, pluginName, userId = null) {
+        return await this.query(`
+            UPDATE guild_plugins
+            SET is_enabled = 0,
+                disabled_at = NOW(),
+                disabled_by = ?,
+                updated_at = NOW()
+            WHERE guild_id = ? AND plugin_name = ?
+        `, [userId, guildId, pluginName]);
+    }
+
+    /**
+     * Holt alle aktivierten Plugins für eine Guild
+     * @param {string} guildId Guild-ID
+     * @returns {Promise<Array<string>>} Array mit Plugin-Namen
+     * @author FireDervil
+     */
+    async getEnabledPlugins(guildId) {
+        const rows = await this.query(`
+            SELECT plugin_name, plugin_version, enabled_at, enabled_by
+            FROM guild_plugins
+            WHERE guild_id = ? AND is_enabled = 1
+            ORDER BY plugin_name
+        `, [guildId]);
+        
+        return rows.map(row => row.plugin_name);
+    }
+
+    /**
+     * Prüft ob ein Plugin für eine Guild aktiviert ist
+     * @param {string} guildId Guild-ID
+     * @param {string} pluginName Plugin-Name
+     * @returns {Promise<boolean>}
+     * @author FireDervil
+     */
+    async isPluginEnabledForGuild(guildId, pluginName) {
+        const [row] = await this.query(`
+            SELECT is_enabled
+            FROM guild_plugins
+            WHERE guild_id = ? AND plugin_name = ?
+        `, [guildId, pluginName]);
+        
+        return row ? Boolean(row.is_enabled) : false;
+    }
+
+    /**
+     * Aktualisiert die Version eines Plugins
+     * @param {string} guildId Guild-ID
+     * @param {string} pluginName Plugin-Name
+     * @param {string} newVersion Neue Version
+     * @returns {Promise<Object>}
+     * @author FireDervil
+     */
+    async updatePluginVersion(guildId, pluginName, newVersion) {
+        return await this.query(`
+            UPDATE guild_plugins
+            SET plugin_version = ?,
+                updated_at = NOW()
+            WHERE guild_id = ? AND plugin_name = ?
+        `, [newVersion, guildId, pluginName]);
+    }
+
+    /**
+     * Holt detaillierte Plugin-Informationen für eine Guild
+     * @param {string} guildId Guild-ID
+     * @param {string} pluginName Plugin-Name (optional, alle wenn nicht angegeben)
+     * @returns {Promise<Array<Object>>}
+     * @author FireDervil
+     */
+    async getPluginDetails(guildId, pluginName = null) {
+        const query = pluginName
+            ? `SELECT * FROM guild_plugins WHERE guild_id = ? AND plugin_name = ?`
+            : `SELECT * FROM guild_plugins WHERE guild_id = ? ORDER BY plugin_name`;
+        
+        const params = pluginName ? [guildId, pluginName] : [guildId];
+        return await this.query(query, params);
+    }
 }
 
 module.exports = DBService;
