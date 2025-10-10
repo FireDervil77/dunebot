@@ -262,6 +262,16 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             this.guildRouter.post('/news/save', async (req, res) => {
                 const dbService = ServiceManager.get('dbService');
                 const Logger = ServiceManager.get('Logger');
+                
+                // DEBUG: Log request body to see what's being sent
+                Logger.debug('[SuperAdmin] News Save Request Body:', {
+                    newsId: req.body.newsId,
+                    title_de_length: req.body.title_de?.length,
+                    content_de_length: req.body.content_de?.length,
+                    content_en_length: req.body.content_en?.length,
+                    all_keys: Object.keys(req.body)
+                });
+                
                 const {
                     newsId,
                     title_de, title_en,
@@ -271,19 +281,17 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 } = req.body;
 
                 try {
-                    // Übersetzungen als JSON vorbereiten
+                    // Übersetzungen im korrekten Format für prepareNewsForDB vorbereiten
                     const translations = {
-                        title: {
-                            'de-DE': title_de || '',
-                            'en-GB': title_en || ''
+                        'de-DE': {
+                            title: title_de || '',
+                            content: content_de || '',
+                            excerpt: excerpt_de || ''
                         },
-                        content: {
-                            'de-DE': content_de || '',
-                            'en-GB': content_en || ''
-                        },
-                        excerpt: {
-                            'de-DE': excerpt_de || '',
-                            'en-GB': excerpt_en || ''
+                        'en-GB': {
+                            title: title_en || '',
+                            content: content_en || '',
+                            excerpt: excerpt_en || ''
                         }
                     };
 
