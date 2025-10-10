@@ -73,13 +73,33 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
         // Recent News
         try {
-            stats.recentNews = await dbService.query(`
-                SELECT _id, title, author, status, date, created_at
+            const newsResults = await dbService.query(`
+                SELECT _id, title_translations, author, status, date, created_at
                 FROM news 
                 ORDER BY date DESC
                 LIMIT 10
             `);
+            
+            // Parse title_translations JSON und extrahiere deutschen Titel
+            stats.recentNews = newsResults.map(news => {
+                let title = 'Kein Titel';
+                if (news.title_translations) {
+                    try {
+                        const titles = typeof news.title_translations === 'string' 
+                            ? JSON.parse(news.title_translations) 
+                            : news.title_translations;
+                        title = titles['de-DE'] || titles['en-GB'] || 'Kein Titel';
+                    } catch (e) {
+                        Logger.error('[SuperAdmin] Fehler beim Parsen von title_translations:', e);
+                    }
+                }
+                return {
+                    ...news,
+                    title
+                };
+            });
         } catch (err) {
+            Logger.error('[SuperAdmin] Fehler beim Laden der News:', err);
             stats.recentNews = [];
         }
 
@@ -1016,13 +1036,33 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
         // Recent News
         try {
-            stats.recentNews = await dbService.query(`
-                SELECT _id, title, author, status, date, created_at
+            const newsResults = await dbService.query(`
+                SELECT _id, title_translations, author, status, date, created_at
                 FROM news 
                 ORDER BY date DESC
                 LIMIT 10
             `);
+            
+            // Parse title_translations JSON und extrahiere deutschen Titel
+            stats.recentNews = newsResults.map(news => {
+                let title = 'Kein Titel';
+                if (news.title_translations) {
+                    try {
+                        const titles = typeof news.title_translations === 'string' 
+                            ? JSON.parse(news.title_translations) 
+                            : news.title_translations;
+                        title = titles['de-DE'] || titles['en-GB'] || 'Kein Titel';
+                    } catch (e) {
+                        Logger.error('[SuperAdmin] Fehler beim Parsen von title_translations:', e);
+                    }
+                }
+                return {
+                    ...news,
+                    title
+                };
+            });
         } catch (err) {
+            Logger.error('[SuperAdmin] Fehler beim Laden der News:', err);
             stats.recentNews = [];
         }
 
