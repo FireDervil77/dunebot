@@ -665,6 +665,8 @@ class DuneMapPlugin extends DashboardPlugin {
      */
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
         Logger.debug(`Registriere Navigation für dunemap in Guild ${guildId}`);
         await this._registerNavigation(guildId);
 
@@ -673,6 +675,76 @@ class DuneMapPlugin extends DashboardPlugin {
         // TODO: Models wieder aktivieren wenn benötigt
         // await this.registerModel(require('./models/Marker'));
         // await this.registerModel(require('./models/StormTimer'));
+
+        // Standard-Marker für A1-A9 Sektoren erstellen
+        await this._seedDefaultMarkers(guildId);
+    }
+
+    /**
+     * Erstellt Standard-Marker für A1-A9 Sektoren (falls noch nicht vorhanden)
+     * @param {string} guildId - Discord Guild ID
+     */
+    async _seedDefaultMarkers(guildId) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        const fs = require('fs');
+        const path = require('path');
+
+        try {
+            // Lade Seed-Daten
+            const seedPath = path.join(__dirname, '..', 'shared', 'seeds', 'default-markers.json');
+            
+            if (!fs.existsSync(seedPath)) {
+                Logger.debug(`[DuneMap] Seed-Datei nicht gefunden: ${seedPath}`);
+                return;
+            }
+            
+            const seedData = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+            const markers = seedData.markers;
+            
+            Logger.info(`[DuneMap] Erstelle ${markers.length} Standard-Marker für Guild ${guildId}...`);
+            
+            let markersCreated = 0;
+            
+            for (const marker of markers) {
+                // Sektor aufteilen (z.B. "A1" -> sector_x='A', sector_y=1)
+                const sectorX = marker.sector.charAt(0);
+                const sectorY = parseInt(marker.sector.substring(1));
+                
+                // Prüfe ob Marker bereits existiert
+                const existing = await dbService.query(`
+                    SELECT id FROM dunemap_markers 
+                    WHERE guild_id = ? AND sector_x = ? AND sector_y = ? AND marker_type = ?
+                `, [guildId, sectorX, sectorY, marker.type]);
+                
+                if (existing.length === 0) {
+                    // Marker erstellen
+                    await dbService.query(`
+                        INSERT INTO dunemap_markers 
+                        (guild_id, sector_x, sector_y, marker_type, placed_by, is_permanent)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    `, [
+                        guildId,
+                        sectorX,
+                        sectorY,
+                        marker.type,
+                        'Dashboard', // placed_by für automatisch erstellte Marker
+                        marker.is_permanent ? 1 : 0
+                    ]);
+                    
+                    markersCreated++;
+                }
+            }
+            
+            if (markersCreated > 0) {
+                Logger.info(`[DuneMap] ${markersCreated} Standard-Marker für Guild ${guildId} erstellt`);
+            } else {
+                Logger.debug(`[DuneMap] Standard-Marker für Guild ${guildId} bereits vorhanden`);
+            }
+            
+        } catch (error) {
+            Logger.error(`[DuneMap] Fehler beim Erstellen der Standard-Marker für Guild ${guildId}:`, error);
+        }
     }
 
     /**

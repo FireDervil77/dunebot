@@ -1,13 +1,19 @@
 {
   "name": "dunemap",
   "displayName": "DuneMap",
-  "version": "2.0.0",
-  "previousVersion": "1.0.0",
+  "version": "2.0.1",
+  "previousVersion": "2.0.0",
   "author": "FireDervil",
   "description": "Interactive Dune: Awakening map with automatic Coriolis Storm Timer based on official Discord bot data",
   "minSystemVersion": "0.1.0",
   
   "changelog": {
+    "2.0.1": [
+      "🌟 Standard-Marker für A1-A9 Sektoren: Automatisch vorbefüllte Marker beim Plugin-Aktivierung",
+      "🗺️ Permanente Marker für Deep Desert-Sektoren (überstehen Storm-Resets)",
+      "💎 Verschiedene Marker-Kategorien: Spicefelder, Strukturen, Landmarken",
+      "⚡ Automatisches Seeding beim onGuildEnable für neue Installationen"
+    ],
     "2.0.0": [
       "🌪️ Automatic Coriolis Storm Timer based on server region selection",
       "🌍 Full support for 5 official regions: EU, NA, SA, AS, OCE",
@@ -26,6 +32,7 @@
   },
   
   "migrations": {
+    "2.0.1": "migrations/seed_default_markers.js",
     "2.0.0": "migrations/migrate_to_v2.js"
   },
   
