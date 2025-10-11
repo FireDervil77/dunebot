@@ -44,7 +44,7 @@
                 <a href="<%= item.url %>" class="nav-link <%= isActive ? 'active' : '' %>">
                   <i class="nav-icon <%= item.icon || 'fa-solid fa-circle' %>"></i>
                   <p>
-                    <%= item.title %>
+                    <%= tr(item.title, item.title) %>
                     <% if (item.url && item.url.includes('/plugins') && locals.pendingUpdatesCount > 0) { %>
                       <span class="badge badge-warning right"><%= locals.pendingUpdatesCount %></span>
                     <% } else if (item.subItems && item.subItems.length > 0) { %>
@@ -62,7 +62,7 @@
                       <li class="nav-item">
                         <a href="<%= child.url %>" class="nav-link <%= cActive ? 'active' : '' %>">
                           <i class="nav-icon <%= child.icon || 'fa-regular fa-dot-circle' %>"></i>
-                          <p><%= child.title %></p>
+                          <p><%= tr(child.title, child.title) %></p>
                         </a>
                       </li>
                     <% }); %>

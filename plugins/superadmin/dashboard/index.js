@@ -835,6 +835,92 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 }
             });
 
+            // === USER FEEDBACK VERWALTUNG (Bugs & Features) ===
+            this.guildRouter.get('/feedback', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+
+                try {
+                    // Alle Bug Reports und Feature Requests laden
+                    const feedbackList = await dbService.query(`
+                        SELECT * FROM user_feedback
+                        ORDER BY created_at DESC
+                    `);
+                    
+                    await themeManager.renderView(res, 'guild/feedback-management', {
+                        title: 'User Feedback Verwaltung',
+                        activeMenu: `/guild/${guildId}/plugins/superadmin/feedback`,
+                        guildId,
+                        feedbackList: feedbackList || [],
+                        plugin: this
+                    });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Laden des User Feedbacks:', error);
+                    res.status(500).render('error', { message: 'Fehler beim Laden des User Feedbacks', error });
+                }
+            });
+
+            // POST: Feedback Status/Priority ändern
+            this.guildRouter.post('/feedback/:id/update', async (req, res) => {
+                const dbService = ServiceManager.get('dbService');
+                const { status, priority, admin_notes, admin_response } = req.body;
+                
+                try {
+                    const updates = [];
+                    const values = [];
+                    
+                    if (status) {
+                        updates.push('status = ?');
+                        values.push(status);
+                    }
+                    if (priority) {
+                        updates.push('priority = ?');
+                        values.push(priority);
+                    }
+                    if (admin_notes !== undefined) {
+                        updates.push('admin_notes = ?');
+                        values.push(admin_notes);
+                    }
+                    if (admin_response !== undefined) {
+                        updates.push('admin_response = ?');
+                        values.push(admin_response);
+                    }
+                    
+                    // resolved_at setzen wenn Status auf resolved/implemented
+                    if (status === 'resolved' || status === 'implemented') {
+                        updates.push('resolved_at = NOW()');
+                        updates.push('resolved_by = ?');
+                        values.push(req.session.user.info.username || 'Admin');
+                    }
+                    
+                    values.push(req.params.id);
+                    
+                    await dbService.query(`
+                        UPDATE user_feedback 
+                        SET ${updates.join(', ')}
+                        WHERE id = ?
+                    `, values);
+                    
+                    res.json({ success: true, message: 'Feedback erfolgreich aktualisiert' });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Aktualisieren des Feedbacks:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
+            // DELETE: Feedback löschen
+            this.guildRouter.delete('/feedback/:id', async (req, res) => {
+                const dbService = ServiceManager.get('dbService');
+                
+                try {
+                    await dbService.query(`DELETE FROM user_feedback WHERE id = ?`, [req.params.id]);
+                    res.json({ success: true, message: 'Feedback erfolgreich gelöscht' });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Löschen des Feedbacks:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
             // === TOAST-HISTORY (Monitoring/Debugging) ===
             this.guildRouter.get('/toast-history', async (req, res) => {
                 const guildId = res.locals.guildId;
@@ -1127,7 +1213,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         // Navigation registrieren
         const navItems = [
             {
-                title: 'SuperAdmin',
+                title: 'superadmin:NAV.SUPERADMIN',
                 path: `/guild/${guildId}/plugins/superadmin`,
                 icon: 'fa-solid fa-shield-halved',
                 order: 90,  // Ganz am Ende der Navigation (nach Core: 10-40)
@@ -1135,7 +1221,16 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 visible: true
             },
             {
-                title: 'News',
+                title: 'superadmin:NAV.FEEDBACK',
+                path: `/guild/${guildId}/plugins/superadmin/feedback`,
+                icon: 'fa-solid fa-comments',
+                order: 91.5,  // Zwischen Notifications und News
+                parent: `/guild/${guildId}/plugins/superadmin`,
+                type: 'main',
+                visible: true
+            },
+            {
+                title: 'superadmin:NAV.NEWS',
                 path: `/guild/${guildId}/plugins/superadmin/news`,
                 icon: 'fa-solid fa-newspaper',
                 order: 91,  // Untermenü-Reihenfolge
@@ -1144,7 +1239,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 visible: true
             },
             {
-                title: 'Notifications',
+                title: 'superadmin:NAV.NOTIFICATIONS',
                 path: `/guild/${guildId}/plugins/superadmin/notifications`,
                 icon: 'fa-solid fa-bell',
                 order: 92,  // Untermenü-Reihenfolge
@@ -1153,7 +1248,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 visible: true
             },
             {
-                title: 'Changelogs',
+                title: 'superadmin:NAV.CHANGELOGS',
                 path: `/guild/${guildId}/plugins/superadmin/changelogs`,
                 icon: 'fa-solid fa-code-commit',
                 order: 93,  // Untermenü-Reihenfolge
@@ -1162,7 +1257,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 visible: true
             },
             {
-                title: 'Statistiken',
+                title: 'superadmin:NAV.STATISTICS',
                 path: `/guild/${guildId}/plugins/superadmin/stats`,
                 icon: 'fa-solid fa-chart-line',
                 order: 94,  // Untermenü-Reihenfolge
@@ -1171,7 +1266,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 visible: true
             },
             {
-                title: 'Übersetzungen',
+                title: 'superadmin:NAV.TRANSLATIONS',
                 path: `/guild/${guildId}/locales`,
                 icon: 'fa-solid fa-language',
                 order: 95,  // Untermenü-Reihenfolge

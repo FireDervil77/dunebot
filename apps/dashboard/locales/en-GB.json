@@ -4,6 +4,8 @@
     "BTN_ENABLE": "Enable",
     "BTN_DISABLE": "Disable",
     "BTN_CREATE": "Create",
+    "BTN_CANCEL": "Cancel",
+    "BTN_SUBMIT": "Submit",
 
     "SETTINGS_SAVE": "Guild settings saved",
     "SETTINGS_SAVE_ERROR": "Failed to save guild settings",
@@ -222,7 +224,16 @@
         "ADMIN": "Admin",
         "LOGOUT": "Logout",
         "TIP_DARK_MODE": "Toggle Dark Mode",
-        "SR_USER_MENU": "Open User Menu" 
+        "SR_USER_MENU": "Open User Menu",
+        "DASHBOARD": "Dashboard",
+        "SETTINGS": "Settings",
+        "GENERAL": "General",
+        "USERS": "Users",
+        "INTEGRATIONS": "Integrations",
+        "PLUGINS": "Plugins",
+        "LOCALES": "Localisation",
+        "BUG_REPORT": "Bug Report",
+        "FEATURE_REQUEST": "Feature Request"
     },
 
     "BREADCRUMB": {
@@ -488,5 +499,59 @@
             "REMOVED": "Removed",
             "OTHER": "Other"
         }
+    },
+    "BUG_REPORT": {
+        "TITLE": "Bug Report",
+        "CREATE_NEW": "Report Bug",
+        "INFO_TITLE": "System Bug Report",
+        "INFO_TEXT": "This Bug Report System is exclusively for technical issues with the bot system. A separate ticket plugin will be provided for server-specific requests.",
+        "TOTAL_BUGS": "Total Bugs",
+        "OPEN_BUGS": "Open",
+        "IN_PROGRESS": "In Progress",
+        "RESOLVED": "Resolved",
+        "ALL_BUGS": "All Bug Reports",
+        "NO_BUGS": "No bug reports available",
+        "TITLE_COL": "Title",
+        "CATEGORY_COL": "Category",
+        "STATUS_COL": "Status",
+        "PRIORITY_COL": "Priority",
+        "REPORTER_COL": "Reported by",
+        "DATE_COL": "Date",
+        "TITLE_LABEL": "Title",
+        "CATEGORY_LABEL": "Category",
+        "DESCRIPTION_LABEL": "Description",
+        "DESCRIPTION_HINT": "Describe the bug as detailed as possible"
+    },
+    "FEATURE_REQUEST": {
+        "TITLE": "Feature Requests",
+        "CREATE_NEW": "Suggest Feature",
+        "INFO_TITLE": "System Feature Requests",
+        "INFO_TEXT": "This Feature Request System is for improvement suggestions for the bot system. Other guild members can support your suggestions with upvotes. A separate ticket plugin will be provided for server-specific requests.",
+        "TOTAL_FEATURES": "Total Features",
+        "PLANNED": "Planned",
+        "IMPLEMENTED": "Implemented",
+        "ALL_FEATURES": "All Feature Requests",
+        "SORTED_BY_VOTES": "Sorted by Upvotes",
+        "NO_FEATURES": "No feature requests available",
+        "TITLE_LABEL": "Title",
+        "CATEGORY_LABEL": "Category",
+        "DESCRIPTION_LABEL": "Description",
+        "DESCRIPTION_HINT": "Describe the feature as detailed as possible"
+    },
+    "STATUS": {
+        "OPEN": "Open",
+        "IN_PROGRESS": "In Progress",
+        "PLANNED": "Planned",
+        "RESOLVED": "Resolved",
+        "IMPLEMENTED": "Implemented",
+        "CLOSED": "Closed",
+        "REJECTED": "Rejected",
+        "WONTFIX": "Won't Fix"
+    },
+    "PRIORITY": {
+        "LOW": "Low",
+        "MEDIUM": "Medium",
+        "HIGH": "High",
+        "CRITICAL": "Critical"
     }
 }

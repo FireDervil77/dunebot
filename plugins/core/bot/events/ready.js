@@ -95,7 +95,7 @@ module.exports = async (client) => {
         const serverCount = client.guilds.cache.size;
 
         // Status-Text mit Platzhaltern
-        const message = ` Dune with ${memberCount} on ${serverCount}!`;
+        const message = ` Dune on ${serverCount} Server with ${memberCount} Members!`;
 
         client.user.setPresence({
             activities: [{

@@ -1,0 +1,15 @@
+{
+    "NAV": {
+        "SUPERADMIN": "SuperAdmin",
+        "NEWS": "News",
+        "NOTIFICATIONS": "Benachrichtigungen",
+        "FEEDBACK": "User Feedback",
+        "CHANGELOGS": "Changelogs",
+        "STATISTICS": "Statistiken",
+        "TRANSLATIONS": "Übersetzungen"
+    },
+    "FEEDBACK": {
+        "TITLE": "User Feedback Verwaltung"
+    }
+
+}

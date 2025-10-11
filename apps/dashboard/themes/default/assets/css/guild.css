@@ -47,8 +47,16 @@
   border-left: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.app-sidebar .nav-treeview .nav-item {
+  display: block !important;
+  width: 100% !important;
+  float: none !important;
+}
+
 .app-sidebar .nav-treeview .nav-link {
   padding: 0.3rem 0.75rem;
+  display: flex !important;
+  width: 100% !important;
 }
 
 /* Styling für Plugin-Karten */

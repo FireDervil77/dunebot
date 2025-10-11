@@ -257,10 +257,21 @@ exports.getPlugins = async (req, res) => {
             Logger.warn(`Kein Guild-Name gefunden für Guild ${guildId}`);
         }
 
-        // Aktivierte Plugins aus guild_plugins Tabelle laden
+        // Aktivierte Plugins aus guild_plugins Tabelle laden (mit Versionen)
         let enabledServerPlugins = [];
+        let pluginVersionsFromDB = {};
         try {
-            enabledServerPlugins = await dbService.getEnabledPlugins(guildId);
+            const pluginsData = await dbService.query(`
+                SELECT plugin_name, plugin_version 
+                FROM guild_plugins 
+                WHERE guild_id = ? AND is_enabled = 1
+            `, [guildId]);
+            
+            enabledServerPlugins = pluginsData.map(p => p.plugin_name);
+            pluginVersionsFromDB = pluginsData.reduce((acc, p) => {
+                acc[p.plugin_name] = p.plugin_version;
+                return acc;
+            }, {});
             
             // Sicherstellen dass core immer aktiviert ist
             if (!enabledServerPlugins.includes('core')) {
@@ -358,14 +369,21 @@ exports.getPlugins = async (req, res) => {
 
                     const displayName = pkg.displayName || pkg.name || pluginName;
                     const isCore = pluginName === "core";
+                    const isEnabled = enabledServerPlugins.includes(pluginName);
+
+                    // Version aus DB verwenden, falls Plugin aktiviert ist
+                    const version = isEnabled && pluginVersionsFromDB[pluginName] 
+                        ? pluginVersionsFromDB[pluginName] 
+                        : (pkg.version || '1.0.0');
 
                     const plugin = {
                         name: pluginName,
                         displayName,
                         description: pkg.description || '',
-                        version: pkg.version || '1.0.0',
+                        version: version,
+                        packageVersion: pkg.version || '1.0.0', // Original-Version für Vergleich
                         author: (typeof pkg.author === 'string' ? pkg.author : (pkg.author?.name || 'Unbekannt')),
-                        enabled: enabledServerPlugins.includes(pluginName),
+                        enabled: isEnabled,
                         hasSettings,
                         settingsUrl: hasSettings ? `/guild/${guildId}/plugins/${pluginName}/settings` : null,
                         icon,
