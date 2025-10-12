@@ -56,8 +56,8 @@ router.use("/:guildId/plugins/:pluginName", CheckGuildAccess, pluginMiddleware.l
         });
     }
 
-    // Debug-Logging für Plugin-Routen
-    Logger.debug('Plugin-Route aufgerufen:', {
+    // Debug-Logging für Plugin-Routen (sichtbar auf info)
+    Logger.info('Plugin-Route aufgerufen:', {
         plugin: plugin.name,
         path: req.path,
         method: req.method,

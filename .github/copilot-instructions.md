@@ -57,6 +57,129 @@ Plugins haben eine duale Struktur: `plugins/pluginname/{bot/, dashboard/, shared
 - **Service-aware**: ServiceManager.get() für alle Services nutzen
 - **Hook-Integration**: Hooks nutzen statt Code direkt zu ändern 
 - **Plugin-Kontext**: Unterscheiden zwischen Bot- und Dashboard-Context bei Plugin-Entwicklung
+- **NO Alpine.js**: NIEMALS Alpine.js verwenden! Nutze das guild.js AJAX-System für alle Formulare
+
+## FRONTEND ARCHITECTURE (CRITICAL!)
+
+### ❌ DEPRECATED & VERBOTEN: Alpine.js
+**NIEMALS VERWENDEN!** Das Projekt nutzt Alpine.js NICHT mehr!
+
+**Alle Alpine.js-Komponenten wurden entfernt:**
+- ✅ Core Guild Config → Migriert zu guild.js
+- ✅ Locales Editor → Entfernt (nicht mehr benötigt)
+- ✅ Moderation Settings → Migriert zu guild.js
+
+**Das System ist jetzt 100% Alpine.js-frei!**
+
+**Wenn du Alpine.js-Code siehst:**
+1. ❌ **NICHT** kopieren oder als Vorlage nutzen
+2. ✅ Sofort melden - sollte nicht mehr existieren
+3. ✅ guild.js-System verwenden
+
+### ✅ AKTUELLER STANDARD: guild.js AJAX System
+
+**Alle neuen Dashboard-Formulare MÜSSEN dieses System nutzen!**
+
+#### **Template-Pattern:**
+```html
+<form class="guild-ajax-form" 
+      data-form-type="feature-name" 
+      data-method="PUT" 
+      action="/guild/:guildId/plugin"
+      method="POST">
+  
+  <input type="text" name="field_name" value="<%= serverValue %>" required>
+  
+  <select name="select_field">
+    <option value="opt1" <%= condition ? 'selected' : '' %>>Option 1</option>
+    <option value="opt2" <%= !condition ? 'selected' : '' %>>Option 2</option>
+  </select>
+  
+  <input type="checkbox" name="checkbox_field" value="1" <%= checked ? 'checked' : '' %>>
+  
+  <input type="hidden" name="form_identifier" value="true">
+  
+  <button type="submit">Speichern</button>
+</form>
+```
+
+**Wichtig:**
+- `class="guild-ajax-form"` - Registrierung im Handler
+- `data-form-type="..."` - Routing für Response-Handler
+- `data-method="PUT|POST|DELETE"` - HTTP-Methode
+- `name` Attribute auf ALLEN Inputs
+- `value` mit Server-Side-Rendering (EJS)
+- `selected`/`checked` mit EJS-Conditionals
+
+#### **Backend-Pattern:**
+```javascript
+router.put('/', async (req, res) => {
+    try {
+        const body = req.body; // Express body-parser
+        
+        // Validierung
+        if (!body.field_name || typeof body.field_name !== 'string') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Ungültige Eingabedaten' 
+            });
+        }
+        
+        // Verarbeitung
+        await dbService.query('UPDATE table SET field = ? WHERE id = ?', [body.field_name, id]);
+        
+        // Erfolg
+        res.json({ 
+            success: true, 
+            message: 'Erfolgreich gespeichert' 
+        });
+        
+    } catch (error) {
+        Logger.error('Route Error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Serverfehler beim Speichern' 
+        });
+    }
+});
+```
+
+**Wichtig:**
+- Strukturierte JSON-Response mit `success` + `message`
+- Proper HTTP-Status-Codes (400, 500)
+- Fehlerbehandlung mit spezifischen Meldungen
+
+#### **guild.js Handler-Pattern:**
+```javascript
+// In guild.js Switch-Case hinzufügen:
+case 'feature-name':
+    await this.handleFeatureNameResponse(form, result);
+    break;
+
+// Handler-Funktion implementieren:
+static async handleFeatureNameResponse(form, result) {
+    console.log('[GuildAjax] handleFeatureNameResponse called:', result);
+    if (result.success) {
+        this.showToast('success', result.message || 'Erfolgreich gespeichert');
+        // Optional: Seite nach 1,5s neu laden
+        setTimeout(() => window.location.reload(), 1500);
+    } else {
+        this.showToast('error', result.message || 'Fehler beim Speichern');
+    }
+}
+```
+
+**Wichtig:**
+- Handler-Name: `handle[FormType]Response`
+- Console-Logging für Debugging
+- Toast-Benachrichtigungen mit `this.showToast()`
+- Optional: Page-Reload mit Timeout
+
+#### **Migrierte Beispiele:**
+Für Referenz siehe:
+- ✅ `/plugins/moderation/dashboard/views/guild/moderation.ejs`
+- ✅ `/plugins/core/dashboard/views/guild.ejs`
+- ✅ `/plugins/dunemap/dashboard/views/guild/settings.ejs`
 
 ## ENVIRONMENT & CONFIGURATION
 

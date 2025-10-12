@@ -96,6 +96,18 @@ class GuildAjaxHandler {
                 case 'dunemap-settings':
                     await this.handleDuneMapSettingsResponse(form, result);
                     break;
+                
+                case 'moderation-settings':
+                    await this.handleModerationSettingsResponse(form, result);
+                    break;
+                
+                case 'server-config':
+                    await this.handleServerConfigResponse(form, result);
+                    break;
+                
+                case 'dashboard-config':
+                    await this.handleDashboardConfigResponse(form, result);
+                    break;
                     
                 default:
                     // Generische Behandlung
@@ -218,6 +230,45 @@ class GuildAjaxHandler {
             }, 1500);
         } else {
             this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.DUNEMAP_SETTINGS_ERROR || 'Fehler beim Speichern der DuneMap-Einstellungen'));
+        }
+    }
+
+    static async handleModerationSettingsResponse(form, result) {
+        console.log('[GuildAjax] handleModerationSettingsResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.MODERATION_SETTINGS_SAVED || 'Moderation-Einstellungen gespeichert'));
+            // Seite nach 1,5s neu laden um Änderungen sichtbar zu machen
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.MODERATION_SETTINGS_ERROR || 'Fehler beim Speichern der Moderation-Einstellungen'));
+        }
+    }
+
+    static async handleServerConfigResponse(form, result) {
+        console.log('[GuildAjax] handleServerConfigResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Server-Einstellungen erfolgreich gespeichert');
+            // Seite nach 1,5s neu laden um Änderungen sichtbar zu machen
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Speichern der Server-Einstellungen');
+        }
+    }
+
+    static async handleDashboardConfigResponse(form, result) {
+        console.log('[GuildAjax] handleDashboardConfigResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Dashboard-Einstellungen erfolgreich gespeichert');
+            // Seite nach 1,5s neu laden um Änderungen sichtbar zu machen
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Speichern der Dashboard-Einstellungen');
         }
     }
 
