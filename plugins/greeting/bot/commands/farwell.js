@@ -21,7 +21,7 @@ function parseEmbedData(embedData) {
 }
 
 /**
- * @type {import('strange-sdk').CommandType}
+ * @type {import('dunebot-sdk').CommandType}
  */
 module.exports = {
     name: "farewell",
