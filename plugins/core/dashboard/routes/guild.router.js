@@ -14,7 +14,18 @@ router.put("/", async (req, res) => {
     const dbService = ServiceManager.get('dbService');
 
     try {
-        const body = req.body;
+        // Content-Type-Handling: Sowohl JSON als auch Form-Data unterstützen
+        let body;
+        const contentType = req.headers['content-type'] || '';
+        
+        if (contentType.includes('application/json')) {
+            body = req.body;
+        } else if (contentType.includes('application/x-www-form-urlencoded')) {
+            body = req.body;
+        } else {
+            body = req.body;
+        }
+        
         const { config } = res.locals;
 
         // Server Config
@@ -24,7 +35,7 @@ router.put("/", async (req, res) => {
                 (body.locale && typeof body.locale !== "string") ||
                 (body.support_server && typeof body.support_server !== "string")
             ) {
-                return res.status(400);
+                return res.status(400).json({ success: false, message: 'Ungültige Eingabedaten' });
             }
 
             config.PREFIX_COMMANDS_PREFIX = body.prefix;
@@ -48,6 +59,7 @@ router.put("/", async (req, res) => {
             ]);
 
             Logger.debug('Server Config aktualisiert');
+            return res.json({ success: true, message: 'Server-Einstellungen erfolgreich gespeichert' });
         }
 
         // Dashboard Config
@@ -56,7 +68,7 @@ router.put("/", async (req, res) => {
                 (body.logo && typeof body.logo !== "string") ||
                 (body.logo_url && typeof body.logo_url !== "string")
             ) {
-                return res.status(400);
+                return res.status(400).json({ success: false, message: 'Ungültige Eingabedaten' });
             }
 
             config.DASHBOARD_LOGO_NAME = body.logo;
@@ -73,12 +85,13 @@ router.put("/", async (req, res) => {
             ]);
 
             Logger.debug('Dashboard Config aktualisiert');
+            return res.json({ success: true, message: 'Dashboard-Einstellungen erfolgreich gespeichert' });
         }
 
-        res.sendStatus(200);
+        res.status(400).json({ success: false, message: 'Keine gültigen Daten übermittelt' });
     } catch (error) {
         Logger.error('Fehler beim Aktualisieren der Konfiguration:', error);
-        res.sendStatus(500);
+        res.status(500).json({ success: false, message: 'Serverfehler beim Speichern' });
     }
 });
 
