@@ -1264,15 +1264,6 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true
-            },
-            {
-                title: 'superadmin:NAV.TRANSLATIONS',
-                path: `/guild/${guildId}/locales`,
-                icon: 'fa-solid fa-language',
-                order: 95,  // Untermenü-Reihenfolge
-                parent: `/guild/${guildId}/plugins/superadmin`,
-                type: 'main',
-                visible: true
             }
         ];
 
