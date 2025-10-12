@@ -15,5 +15,13 @@
         "repositoryPath": "superadmin",
         "dependencies": [],
         "requiresOwner": true
+    },
+    {
+        "name": "moderation",
+        "version": "1.0.0",
+        "author": "FireBot Team",
+        "repository": "local",
+        "repositoryPath": "moderation",
+        "dependencies": ["core"]
     }
 ]

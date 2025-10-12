@@ -147,7 +147,7 @@ async function getHelpMenu({ client, guild }) {
 
     // Menu Row
     const options = [];
-    for (const plugin of client.pluginManager.plugins.filter((p) => !p.ownerOnly)) {
+    for (const plugin of client.pluginManager.plugins.filter((p) => !p.ownerOnly && p.name !== 'superadmin')) {
         if (!enabledPlugins.includes(plugin.name)) continue;
         options.push({
             label: plugin.name,

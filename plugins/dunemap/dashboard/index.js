@@ -766,7 +766,6 @@ class DuneMapPlugin extends DashboardPlugin {
             // Guild-spezifische Daten aus ALLEN DuneMap-Tabellen löschen
             await dbService.query('DELETE FROM dunemap_storm_timer WHERE guild_id = ?', [guildId]);
             await dbService.query('DELETE FROM dunemap_markers WHERE guild_id = ?', [guildId]);
-            await dbService.query('DELETE FROM dunemap_gps_markers WHERE guild_id = ?', [guildId]);
             
             // Configs löschen
             await dbService.query(
@@ -794,7 +793,7 @@ class DuneMapPlugin extends DashboardPlugin {
         // Haupt-Plugin-Navigation
         const navItems = [
             {
-                title: 'DuneMap',
+                title: 'dunemap:NAV.DUNEMAP',
                 path: `/guild/${guildId}/plugins/dunemap`,
                 icon: 'fa-solid fa-map',
                 order: 50,
@@ -802,7 +801,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 visible: true
             },
             {
-                title: 'Sektor-Karte',
+                title: 'dunemap:NAV.SEKTOR_CARD',
                 path: `/guild/${guildId}/plugins/dunemap/admin`,
                 icon: 'fa-solid fa-map-marked-alt',
                 order: 51,
@@ -812,7 +811,7 @@ class DuneMapPlugin extends DashboardPlugin {
             },
             // Settings als Subnav UNTER CORE-EINSTELLUNGEN!
             {
-                title: 'DuneMap',
+                title: 'dunemap:NAV.DUNEMAP',
                 path: `/guild/${guildId}/plugins/dunemap/settings`,
                 icon: 'fa-solid fa-map',
                 order: 24,  // Nach Core-Settings (21, 22, 23)

@@ -2,7 +2,7 @@
   "name": "dunemap",
   "displayName": "DuneMap",
   "version": "2.0.1",
-  "previousVersion": "2.0.0",
+  "previousVersion": "2.0.1",
   "author": "FireDervil",
   "description": "Interactive Dune: Awakening map with automatic Coriolis Storm Timer based on official Discord bot data",
   "minSystemVersion": "0.1.0",

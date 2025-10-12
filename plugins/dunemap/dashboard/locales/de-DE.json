@@ -63,6 +63,11 @@
     }
   },
   
+  "NAV": {
+    "DUNEMAP": "DuneMap",
+    "SEKTOR_CARD": "Sektor-Karte"
+  },
+
   "SETTINGS": {
     "PAGE_TITLE": "DuneMap Einstellungen",
     

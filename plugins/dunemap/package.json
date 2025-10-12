@@ -2,7 +2,7 @@
     "name": "dunemap",
     "displayName": "DuneMap - Plugin",
     "description": "The Dune DeepDesert Map as Plugin",
-    "version": "1.0.0",
+    "version": "2.0.1",
     "author": "FireDervil",
     "license": "none",
     "type":"commonjs",

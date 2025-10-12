@@ -1,0 +1,254 @@
+<div class="app-content">
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <h2><i class="fa-solid fa-comments me-2"></i><%= tr('superadmin:FEEDBACK.TITLE', 'User Feedback Verwaltung') %></h2>
+                <p class="text-muted">Verwalte Bug Reports und Feature Requests von allen Guilds</p>
+            </div>
+        </div>
+        
+        <!-- Statistik-Karten -->
+        <div class="row mb-3">
+            <div class="col-md-2">
+                <div class="small-box bg-primary">
+                    <div class="inner">
+                        <h3><%= feedbackList.length %></h3>
+                        <p>Gesamt</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fa-solid fa-comments"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="small-box bg-danger">
+                    <div class="inner">
+                        <h3><%= feedbackList.filter(f => f.type === 'bug').length %></h3>
+                        <p>Bugs</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fa-solid fa-bug"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="small-box bg-info">
+                    <div class="inner">
+                        <h3><%= feedbackList.filter(f => f.type === 'feature').length %></h3>
+                        <p>Features</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fa-solid fa-lightbulb"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="small-box bg-warning">
+                    <div class="inner">
+                        <h3><%= feedbackList.filter(f => f.status === 'open').length %></h3>
+                        <p>Offen</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fa-solid fa-folder-open"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="small-box bg-secondary">
+                    <div class="inner">
+                        <h3><%= feedbackList.filter(f => f.status === 'in_progress').length %></h3>
+                        <p>In Arbeit</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fa-solid fa-spinner"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="small-box bg-success">
+                    <div class="inner">
+                        <h3><%= feedbackList.filter(f => f.status === 'resolved' || f.status === 'implemented').length %></h3>
+                        <p>Erledigt</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <ul class="nav nav-tabs mb-3" id="feedbackTabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="all-tab" data-toggle="tab" href="#all">
+                    Alle (<%= feedbackList.length %>)
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="bugs-tab" data-toggle="tab" href="#bugs">
+                    <i class="fa-solid fa-bug me-1"></i>Bugs (<%= feedbackList.filter(f => f.type === 'bug').length %>)
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="features-tab" data-toggle="tab" href="#features">
+                    <i class="fa-solid fa-lightbulb me-1"></i>Features (<%= feedbackList.filter(f => f.type === 'feature').length %>)
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="open-tab" data-toggle="tab" href="#open">
+                    Offen (<%= feedbackList.filter(f => f.status === 'open').length %>)
+                </a>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="feedbackTabContent">
+            <!-- Alle -->
+            <div class="tab-pane fade show active" id="all">
+                <%- include('./partials/feedback-table', { feedback: feedbackList }) %>
+            </div>
+            
+            <!-- Bugs -->
+            <div class="tab-pane fade" id="bugs">
+                <%- include('./partials/feedback-table', { feedback: feedbackList.filter(f => f.type === 'bug') }) %>
+            </div>
+            
+            <!-- Features -->
+            <div class="tab-pane fade" id="features">
+                <%- include('./partials/feedback-table', { feedback: feedbackList.filter(f => f.type === 'feature') }) %>
+            </div>
+            
+            <!-- Offen -->
+            <div class="tab-pane fade" id="open">
+                <%- include('./partials/feedback-table', { feedback: feedbackList.filter(f => f.status === 'open') }) %>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- end::app-content -->
+
+<!-- Modal: Feedback bearbeiten -->
+<div class="modal fade" id="editFeedbackModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Feedback bearbeiten</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <form id="editFeedbackForm">
+                <input type="hidden" name="feedbackId" id="edit-feedbackId">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status" id="edit-status">
+                                <option value="open">Offen</option>
+                                <option value="in_progress">In Bearbeitung</option>
+                                <option value="planned">Geplant</option>
+                                <option value="resolved">Gelöst</option>
+                                <option value="implemented">Umgesetzt</option>
+                                <option value="rejected">Abgelehnt</option>
+                                <option value="closed">Geschlossen</option>
+                                <option value="wontfix">Wird nicht behoben</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Priorität</label>
+                            <select class="form-select" name="priority" id="edit-priority">
+                                <option value="low">Niedrig</option>
+                                <option value="medium">Mittel</option>
+                                <option value="high">Hoch</option>
+                                <option value="critical">Kritisch</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Admin Notizen (intern)</label>
+                        <textarea class="form-control" name="admin_notes" id="edit-admin-notes" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Admin Antwort (für User sichtbar)</label>
+                        <textarea class="form-control" name="admin_response" id="edit-admin-response" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" id="deleteFeedbackBtn">
+                        <i class="fa-solid fa-trash me-1"></i>Löschen
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Feedback bearbeiten
+function editFeedback(id, status, priority, adminNotes, adminResponse) {
+    $('#edit-feedbackId').val(id);
+    $('#edit-status').val(status);
+    $('#edit-priority').val(priority);
+    $('#edit-admin-notes').val(adminNotes || '');
+    $('#edit-admin-response').val(adminResponse || '');
+    $('#editFeedbackModal').modal('show');
+}
+
+// Form Submit
+$('#editFeedbackForm').on('submit', async function(e) {
+    e.preventDefault();
+    const feedbackId = $('#edit-feedbackId').val();
+    const formData = {
+        status: $('#edit-status').val(),
+        priority: $('#edit-priority').val(),
+        admin_notes: $('#edit-admin-notes').val(),
+        admin_response: $('#edit-admin-response').val()
+    };
+    
+    try {
+        const response = await fetch(`${window.location.pathname}/${feedbackId}/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            $('#editFeedbackModal').modal('hide');
+            window.location.reload();
+        } else {
+            alert(result.message);
+        }
+    } catch (error) {
+        alert('Fehler beim Speichern');
+    }
+});
+
+// Feedback löschen
+$('#deleteFeedbackBtn').on('click', async function() {
+    if (!confirm('Feedback wirklich löschen?')) return;
+    
+    const feedbackId = $('#edit-feedbackId').val();
+    
+    try {
+        const response = await fetch(`${window.location.pathname}/${feedbackId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            $('#editFeedbackModal').modal('hide');
+            window.location.reload();
+        } else {
+            alert(result.message);
+        }
+    } catch (error) {
+        alert('Fehler beim Löschen');
+    }
+});
+</script>

@@ -1,0 +1,58 @@
+{
+  "NAV": {
+    "MODERATION": "Moderation"
+  },
+  "SETTINGS": {
+    "PAGE_TITLE": "Moderation Settings",
+    "PAGE_DESC": "Configure moderation, logs and notifications"
+  },
+  "SECTION_BASIC": "Basic Settings",
+  "SECTION_BASIC_DESC": "Basic moderation configuration",
+  
+  "MODLOG_CHANNEL_TITLE": "Modlog Channel",
+  "MODLOG_CHANNEL_DESC": "Channel for moderation logs",
+  "CHANNEL_SELECT": "Select channel",
+  
+  "MAXWARN_LIMIT_TITLE": "Max. Warnings",
+  "MAXWARN_LIMIT_DESC": "Number of warnings before action is taken",
+  
+  "MAXWARN_ACTION_TITLE": "Action on Max. Warnings",
+  "MAXWARN_ACTION_DESC": "Which action should be executed when maximum warnings are reached?",
+  
+  "DEFAULT_REASON_TITLE": "Default Reason",
+  "DEFAULT_REASON_DESC": "This reason will be automatically used for kicks/bans when no specific reason is provided.",
+  "DEFAULT_REASON_PLACEHOLDER": "e.g. Violation of server rules",
+  
+  "SECTION_MODLOG_EVENTS": "Modlog Events",
+  "SECTION_MODLOG_EVENTS_DESC": "Choose which actions should be logged in the modlog channel",
+  
+  "EVENT_WARN": "Warnings",
+  "EVENT_KICK": "Kicks",
+  "EVENT_BAN": "Bans",
+  "EVENT_TIMEOUT": "Timeouts",
+  "EVENT_UNTIMEOUT": "Remove Timeout",
+  "EVENT_SOFTBAN": "Softbans",
+  "EVENT_UNBAN": "Unbans",
+  
+  "SECTION_DM_NOTIFICATIONS": "DM Notifications",
+  "SECTION_DM_NOTIFICATIONS_DESC": "Should the affected user be notified via direct message?",
+  
+  "DM_ON_WARN": "On Warning",
+  "DM_ON_KICK": "On Kick",
+  "DM_ON_BAN": "On Ban",
+  "DM_ON_TIMEOUT": "On Timeout",
+  
+  "HELP": {
+    "TITLE": "Help & Tips",
+    "MODERATION_TITLE": "Moderation",
+    "MODERATION_TEXT": "Manage warnings, kicks, bans and timeouts for your server.",
+    "MODLOG_TITLE": "Modlog Events",
+    "MODLOG_TEXT": "Log all moderation actions in a dedicated channel.",
+    "DM_TITLE": "DM Notifications",
+    "DM_TEXT": "Automatically inform affected users about moderation actions via direct message.",
+    "COMMANDS_TITLE": "Available Commands"
+  },
+  
+  "BTN_SAVE": "Save",
+  "BTN_SAVING": "Saving..."
+}

@@ -34,16 +34,31 @@ const parse = async (content, member, inviterData = {}) => {
     }
     return content
         .replaceAll(/\\n/g, "\n")
+        // Server/Guild Placeholders (beide Formate unterstützen)
         .replaceAll(/{server}/g, member.guild.name)
+        .replaceAll(/{guild\.name}/g, member.guild.name)
+        .replaceAll(/{guild:name}/g, member.guild.name)
         .replaceAll(/{count}/g, member.guild.memberCount)
+        .replaceAll(/{guild\.memberCount}/g, member.guild.memberCount)
+        .replaceAll(/{guild:memberCount}/g, member.guild.memberCount)
+        // Member Placeholders (beide Formate unterstützen)
         .replaceAll(/{member:nick}/g, member.displayName)
+        .replaceAll(/{member\.nick}/g, member.displayName)
         .replaceAll(/{member:name}/g, member.user.username)
+        .replaceAll(/{member\.name}/g, member.user.username)
         .replaceAll(/{member:dis}/g, member.user.discriminator)
+        .replaceAll(/{member\.dis}/g, member.user.discriminator)
         .replaceAll(/{member:tag}/g, member.user.tag)
+        .replaceAll(/{member\.tag}/g, member.user.tag)
         .replaceAll(/{member:mention}/g, member.toString())
+        .replaceAll(/{member\.mention}/g, member.toString())
         .replaceAll(/{member:avatar}/g, member.displayAvatarURL())
+        .replaceAll(/{member\.avatar}/g, member.displayAvatarURL())
+        // Inviter Placeholders (beide Formate unterstützen)
         .replaceAll(/{inviter:name}/g, inviteData.name)
+        .replaceAll(/{inviter\.name}/g, inviteData.name)
         .replaceAll(/{inviter:tag}/g, inviteData.tag)
+        .replaceAll(/{inviter\.tag}/g, inviteData.tag)
         .replaceAll(/{invites}/g, getEffectiveInvites(inviterData.invite_data));
 };
 
@@ -64,7 +79,8 @@ const buildGreeting = async (member, type, config, inviterData) => {
     let hasEmbed = false;
 
     if (config.embed.title) {
-        embed.setTitle(config.embed.title);
+        const parsed = await parse(config.embed.title, member, inviterData);
+        embed.setTitle(parsed);
         hasEmbed = true;
     }
     if (config.embed.description) {
@@ -87,13 +103,14 @@ const buildGreeting = async (member, type, config, inviterData) => {
         }
     }
     if (config.embed.image) {
-        const parsed = await parse(config.embed.image, member);
+        const parsed = await parse(config.embed.image, member, inviterData);
         embed.setImage(parsed);
         hasEmbed = true;
     }
     if (config.embed.author?.name) {
+        const parsedName = await parse(config.embed.author.name, member, inviterData);
         embed.setAuthor({
-            name: config.embed.author.name,
+            name: parsedName,
             iconURL: config.embed.author.iconURL || null,
         });
         hasEmbed = true;
@@ -103,9 +120,11 @@ const buildGreeting = async (member, type, config, inviterData) => {
         Array.isArray(config.embed.fields) &&
         config.embed.fields.length > 0
     ) {
-        config.embed.fields.forEach((field) => {
-            embed.addFields({ name: field.name, value: field.value, inline: field.inline });
-        });
+        for (const field of config.embed.fields) {
+            const parsedName = await parse(field.name, member, inviterData);
+            const parsedValue = await parse(field.value, member, inviterData);
+            embed.addFields({ name: parsedName, value: parsedValue, inline: field.inline });
+        }
         hasEmbed = true;
     }
     if (config.embed.timestamp) {

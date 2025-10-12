@@ -47,9 +47,9 @@
                   
                   <!-- Karten-Ansicht (Standard) -->
                   <div class="row plugin-view-cards">
-                      <% enabledPlugins.forEach(p => { %>
-                          <div class="col-lg-4 col-md-6 col-sm-12">
-                              <div class="card plugin-card <%= p.updateInfo ? 'border-warning' : '' %>">
+                      <% enabledPlugins.forEach((p, index) => { %>
+                          <div class="col-lg-4 col-md-6 col-sm-12 mb-3">
+                              <div class="card plugin-card <%= p.updateInfo ? 'border-warning' : '' %> h-100">
                                   <div class="card-header d-flex align-items-center">
                                       <img src="<%= p.icon %>" class="img-circle elevation-1 mr-2" style="width:40px;height:40px;" alt="<%= p.displayName %>">
                                       <div class="flex-grow-1">
@@ -232,9 +232,9 @@
             
             <!-- Karten-Ansicht -->
             <div class="row plugin-view-cards">
-              <% availablePlugins.forEach(p => { %>
-                <div class="col-lg-4 col-md-6 col-sm-12">
-                  <div class="card plugin-card bg-light">
+              <% availablePlugins.forEach((p, index) => { %>
+                <div class="col-lg-4 col-md-6 col-sm-12 mb-3">
+                  <div class="card plugin-card bg-light h-100">
                     <div class="card-header d-flex align-items-center bg-light">
                       <img src="<%= p.icon %>" class="img-circle mr-2" style="width:40px;height:40px;opacity:.8" alt="<%= p.displayName %>">
                       <div>

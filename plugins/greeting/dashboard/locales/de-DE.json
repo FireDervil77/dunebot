@@ -7,6 +7,10 @@
         "PAGE_DESC": "Konfiguriere Willkommens- und Verabschiedungsnachrichten für deine Guild"
     },
 
+    "NAV": {
+        "GREETING": "Begrüßungen"
+    },
+    
     "TAB_WELCOME": "Willkommen",
     "TAB_FAREWELL": "Verabschiedung",
     "TAB_AUTOROLE": "Autorole",

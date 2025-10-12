@@ -6,7 +6,9 @@
   "BOT_OWNER_ID": "544578232704565262",
   "DISCORD_SUPPORT_SERVER_URL": "https://discord.gg/KTXCgH3FdQ",
   "DISCORD_SUPPORT_SERVER_NAME" : "WeppoNapolis",
-  "BUYMEACOFFE_URL" : "https://buymeacoffee.com/firedervil", 
+  "BUYMEACOFFE_URL" : "https://buymeacoffee.com/firedervil",
+  "PLUGIN_AUTO_UPDATE_ENABLED": true,
+  "PLUGIN_UPDATE_GRACE_DAYS": 5,
   "DASHBOARD_VERSION" : "1.10.15",
   "BOT_VERSION" : "1.15.1"
 }
