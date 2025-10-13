@@ -224,3 +224,45 @@
   document.addEventListener('scroll', navmenuScrollspy);
 
 })();
+  /**
+   * Plugin Carousel Initialisierung
+   */
+  function initPluginCarousel() {
+    const pluginsCarousel = document.getElementById('pluginsCarousel');
+    
+    if (!pluginsCarousel) {
+      return; // Kein Carousel auf dieser Seite
+    }
+    
+    if (typeof bootstrap === 'undefined' || typeof bootstrap.Carousel === 'undefined') {
+      console.error('[Plugin Carousel] Bootstrap Carousel ist nicht verfügbar!');
+      return;
+    }
+    
+    console.log('[Plugin Carousel] Initialisiere Carousel...');
+    
+    try {
+      const carousel = new bootstrap.Carousel(pluginsCarousel, {
+        interval: 5000,
+        ride: 'carousel',
+        wrap: true,
+        keyboard: true,
+        pause: 'hover',
+        touch: true
+      });
+      
+      console.log('[Plugin Carousel] Carousel erfolgreich initialisiert!');
+      
+      // Sicherstellen dass Auto-Cycle aktiv ist
+      setTimeout(() => {
+        carousel.cycle();
+        console.log('[Plugin Carousel] Auto-Cycle gestartet!');
+      }, 500);
+      
+    } catch (error) {
+      console.error('[Plugin Carousel] Fehler bei Initialisierung:', error);
+    }
+  }
+  
+  window.addEventListener('load', initPluginCarousel);
+
