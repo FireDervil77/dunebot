@@ -78,6 +78,54 @@ class CoreDashboardPlugin extends DashboardPlugin {
             this.apiRouter.use('/toasts', toastLoggerRouter);
             Logger.debug('[Core] Toast-Logger API-Route registriert');
 
+            // Notification Dismiss API
+            this.apiRouter.post('/dismiss-notification', async (req, res) => {
+                try {
+                    const { notificationId } = req.body;
+                    
+                    // Validierung
+                    if (!notificationId) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: 'Notification-ID erforderlich' 
+                        });
+                    }
+                    
+                    // User muss eingeloggt sein
+                    if (!req.session?.user?.id) {
+                        return res.status(401).json({ 
+                            success: false, 
+                            message: 'Nicht authentifiziert' 
+                        });
+                    }
+                    
+                    const userId = req.session.user.id;
+                    
+                    // Lade aktuelle dismissed IDs
+                    const current = await req.userConfig.get('core', 'DISMISSED_NOTIFICATIONS');
+                    const dismissed = Array.isArray(current) ? current : [];
+                    
+                    // Füge neue ID hinzu (wenn nicht schon vorhanden)
+                    if (!dismissed.includes(parseInt(notificationId))) {
+                        dismissed.push(parseInt(notificationId));
+                        await req.userConfig.set('core', 'DISMISSED_NOTIFICATIONS', dismissed);
+                        Logger.debug(`[Core] User ${userId} dismissed Notification #${notificationId}`);
+                    }
+                    
+                    res.json({ 
+                        success: true,
+                        message: 'Notification erfolgreich ausgeblendet'
+                    });
+                } catch (error) {
+                    Logger.error('[Core] Fehler beim Dismiss der Notification:', error);
+                    res.status(500).json({ 
+                        success: false, 
+                        message: 'Serverfehler beim Ausblenden' 
+                    });
+                }
+            });
+            Logger.debug('[Core] Dismiss-Notification API-Route registriert');
+
             // Haupteinstellungen
             this.guildRouter.get('/settings', async (req, res) => {
                 const guildId = res.locals.guildId;

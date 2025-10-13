@@ -17,6 +17,88 @@
     </div>
 </div>
 
+<script>
+// Delivery Method Toggle
+document.addEventListener('DOMContentLoaded', async function() {
+    const deliveryMethodSelect = document.getElementById('delivery_method');
+    const discordChannelGroup = document.getElementById('discord-channel-group');
+    const targetGuildsSelect = document.getElementById('target_guild_ids');
+    
+    function toggleDiscordChannelField() {
+        const method = deliveryMethodSelect.value;
+        if (method === 'discord_channel' || method === 'all') {
+            discordChannelGroup.style.display = 'block';
+        } else {
+            discordChannelGroup.style.display = 'none';
+        }
+    }
+    
+    deliveryMethodSelect.addEventListener('change', toggleDiscordChannelField);
+    toggleDiscordChannelField(); // Initial check
+    
+    // Lade Bot-Guilds via AJAX (IPC-Call zum Bot)
+    try {
+        const response = await fetch('/guild/<%= guildId %>/plugins/superadmin/api/bot-guilds');
+        const data = await response.json();
+        
+        if (data.success && data.guilds) {
+            // Leere das Select (entferne "Lade Server-Liste...")
+            targetGuildsSelect.innerHTML = '';
+            
+            // Sortiere Guilds alphabetisch
+            const sortedGuilds = data.guilds.sort((a, b) => a.name.localeCompare(b.name));
+            
+            // Befülle Select mit Guilds
+            sortedGuilds.forEach(guild => {
+                const option = document.createElement('option');
+                option.value = guild.id;
+                option.textContent = `${guild.name} (${guild.memberCount} Members)`;
+                
+                // Pre-Select wenn in notification.target_guild_ids
+                <% if (notification?.target_guild_ids) { %>
+                    try {
+                        const targetIds = typeof '<%= notification.target_guild_ids %>' === 'string' 
+                            ? JSON.parse('<%= notification.target_guild_ids %>') 
+                            : [];
+                        if (Array.isArray(targetIds) && targetIds.includes(guild.id)) {
+                            option.selected = true;
+                        }
+                    } catch (e) {
+                        console.warn('Fehler beim Parsen von target_guild_ids:', e);
+                    }
+                <% } %>
+                
+                targetGuildsSelect.appendChild(option);
+            });
+            
+            console.log(`${sortedGuilds.length} Server geladen`);
+        } else {
+            targetGuildsSelect.innerHTML = '<option value="" disabled>Fehler beim Laden der Server</option>';
+            console.error('Fehler beim Laden der Bot-Guilds:', data.error);
+        }
+    } catch (error) {
+        targetGuildsSelect.innerHTML = '<option value="" disabled>Fehler beim Laden der Server</option>';
+        console.error('Fehler beim Laden der Bot-Guilds:', error);
+    }
+});
+
+// Form-Submit: Konvertiere Select2-Array zu JSON-String für Backend
+document.querySelector('form').addEventListener('submit', function(e) {
+    const targetGuildsSelect = document.getElementById('target_guild_ids');
+    const selectedValues = Array.from(targetGuildsSelect.selectedOptions).map(opt => opt.value);
+    
+    // Erstelle Hidden Input mit JSON-String
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.name = 'target_guild_ids';
+    hiddenInput.value = selectedValues.length > 0 ? JSON.stringify(selectedValues) : '';
+    
+    // Entferne Original-Select aus Form-Submission
+    targetGuildsSelect.name = '';
+    this.appendChild(hiddenInput);
+});
+</script>
+
 <div class="content">
     <div class="container-fluid">
         <% if (locals.toast) { %>
@@ -162,6 +244,60 @@
                                name="expiry" 
                                value="<%= notification?.expiry ? new Date(notification.expiry).toISOString().slice(0, 16) : '' %>">
                         <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.EXPIRES_AT_HELP') %></small>
+                    </div>
+
+                    <hr>
+
+                    <!-- Delivery Options -->
+                    <h5 class="mb-3"><i class="fas fa-paper-plane mr-2"></i> Zustellungs-Optionen</h5>
+                    
+                    <div class="form-group">
+                        <label for="delivery_method">Wie soll die Benachrichtigung zugestellt werden? <span class="text-danger">*</span></label>
+                        <select class="form-control" id="delivery_method" name="delivery_method" required>
+                            <option value="dashboard" <%= !notification || notification.delivery_method === 'dashboard' ? 'selected' : '' %>>
+                                📊 Nur im Dashboard anzeigen
+                            </option>
+                            <option value="discord_channel" <%= notification?.delivery_method === 'discord_channel' ? 'selected' : '' %>>
+                                💬 In Discord System-Channel senden
+                            </option>
+                            <option value="discord_dm" <%= notification?.delivery_method === 'discord_dm' ? 'selected' : '' %>>
+                                ✉️  Als DM an Server-Admins senden
+                            </option>
+                            <option value="all" <%= notification?.delivery_method === 'all' ? 'selected' : '' %>>
+                                🚀 Dashboard + Discord (Channel + DM)
+                            </option>
+                        </select>
+                        <small class="form-text text-muted">
+                            Wähle aus, wo die Notification angezeigt werden soll
+                        </small>
+                    </div>
+
+                    <div class="form-group" id="discord-channel-group" style="display: none;">
+                        <label for="discord_channel_id">Discord Channel ID (optional)</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="discord_channel_id" 
+                               name="discord_channel_id" 
+                               value="<%= notification?.discord_channel_id || '' %>"
+                               placeholder="123456789012345678">
+                        <small class="form-text text-muted">
+                            Lass das Feld leer, um den Standard System-Channel zu verwenden
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="target_guild_ids">Ziel-Server (optional)</label>
+                        <select class="form-control" 
+                                id="target_guild_ids" 
+                                name="target_guild_ids" 
+                                multiple
+                                size="8"
+                                style="height: auto;">
+                            <option value="" disabled>Lade Server-Liste...</option>
+                        </select>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-info-circle"></i> Halte <kbd>Strg</kbd> (Windows) oder <kbd>Cmd</kbd> (Mac) gedrückt, um mehrere Server auszuwählen. Leer lassen = an alle Server senden.
+                        </small>
                     </div>
                 </div>
 

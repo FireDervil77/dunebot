@@ -88,8 +88,24 @@ class NotificationManager {
                 ORDER BY created_at DESC
             `, [JSON.stringify(user?.roles || [])]);
 
+            // User-spezifische dismissed IDs laden (falls User eingeloggt)
+            let dismissedIds = [];
+            if (user?.id) {
+                try {
+                    const userDismissed = await dbService.getUserConfig(user.id, 'core', 'DISMISSED_NOTIFICATIONS');
+                    if (Array.isArray(userDismissed)) {
+                        dismissedIds = userDismissed;
+                        Logger.debug(`[NotificationManager] User ${user.id} hat ${dismissedIds.length} dismissed Notifications`);
+                    }
+                } catch (err) {
+                    Logger.warn('[NotificationManager] Fehler beim Laden dismissed IDs:', err);
+                }
+            }
+
             // JSON-Spalten parsen und lokalisieren
-            return notifications.map(n => {
+            return notifications
+                .filter(n => !dismissedIds.includes(n.id)) // Filter dismissed Notifications raus
+                .map(n => {
                 const titleTrans = JSON.parse(n.title_translations);
                 const messageTrans = JSON.parse(n.message_translations);
                 const actionTextTrans = n.action_text_translations ? JSON.parse(n.action_text_translations) : null;

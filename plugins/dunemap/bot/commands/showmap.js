@@ -193,7 +193,7 @@ module.exports = {
             });
 
             // NEUES SYSTEM: Automatischer Storm-Timer basierend auf Region
-            const region = await dbService.getConfig('dunemap', 'coriolis_region', 'shared', channel.guild.id) || 'EU';
+            const region = await dbService.getConfig('dunemap', 'COREOLIS_REGION', 'shared', channel.guild.id) || 'EU';
             const stormData = getNextStormTiming(region);
             
             // Timer-Text formatieren
