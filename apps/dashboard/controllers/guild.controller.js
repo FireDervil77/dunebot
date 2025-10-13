@@ -160,49 +160,17 @@ exports.updateSettings = async (req, res) => {
             });
         }
 
-        // Normalisieren: enabled_plugins erlauben als Array oder JSON-String
-        if (typeof updates.enabled_plugins !== 'undefined') {
-            if (typeof updates.enabled_plugins === 'string') {
-                try {
-                    // Wenn ein JSON-Array-String übermittelt wurde
-                    updates.enabled_plugins = JSON.parse(updates.enabled_plugins);
-                } catch {
-                    // CSV -> Array
-                    updates.enabled_plugins = updates.enabled_plugins
-                        .split(',')
-                        .map(s => s.trim())
-                        .filter(Boolean);
-                }
-            }
-            if (!Array.isArray(updates.enabled_plugins)) {
-                updates.enabled_plugins = ["core"];
-            }
-            // Core darf niemals entfernt werden
-            if (!updates.enabled_plugins.includes("core")) {
-                updates.enabled_plugins.unshift("core");
-            }
-        }
-
-        // Settings in der Datenbank aktualisieren
+        // Settings in der Datenbank aktualisieren via configs Tabelle
         try {
-            // Enabled Plugins als JSON speichern
-            if (updates.enabled_plugins) {
-                updates.enabled_plugins = JSON.stringify(updates.enabled_plugins);
+            // Prefix speichern
+            if (updates.prefix) {
+                await dbService.setConfig('core', 'PREFIX_COMMANDS_PREFIX', updates.prefix, 'shared', guildId);
             }
-
-            await dbService.query(`
-                INSERT INTO settings (_id, prefix, locale, enabled_plugins)
-                VALUES (?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE
-                    prefix = VALUES(prefix),
-                    locale = VALUES(locale),
-                    enabled_plugins = VALUES(enabled_plugins)
-            `, [
-                guildId,
-                updates.prefix || '!',
-                updates.locale || 'de-DE',
-                updates.enabled_plugins || JSON.stringify(['core'])
-            ]);
+            
+            // Locale speichern
+            if (updates.locale) {
+                await dbService.setConfig('core', 'LOCALE', updates.locale, 'shared', guildId);
+            }
         } catch (dbError) {
             Logger.error(`Fehler beim Aktualisieren der Settings für Guild ${guildId}:`, dbError);
             return res.status(500).json({

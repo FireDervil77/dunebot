@@ -302,13 +302,13 @@ class DuneMapPlugin extends DashboardPlugin {
                 
                 const { 
                     MAP_CHANNEL_ID,
-                    coriolis_region  // Einzige Storm-Einstellung
+                    COREOLIS_REGION  // Einzige Storm-Einstellung
                 } = req.body;
                 
                 try {
                     const settingsToSave = {
                         MAP_CHANNEL_ID: MAP_CHANNEL_ID || '',
-                        coriolis_region: coriolis_region || 'EU'
+                        COREOLIS_REGION: COREOLIS_REGION || 'EU'
                     };
                     
                     // FIX: INSERT ... ON DUPLICATE KEY UPDATE für alle Settings
@@ -376,7 +376,7 @@ class DuneMapPlugin extends DashboardPlugin {
                     
                     Logger.info(`[DuneMap] Gefundene Marker: ${markers.length}`);
                     
-                    // Lade Settings (SHARED für coriolis_region!)
+                    // Lade Settings (SHARED für COREOLIS_REGION!)
                     const settings = await dbService.query(`
                         SELECT config_key, config_value 
                         FROM configs 
@@ -591,7 +591,7 @@ class DuneMapPlugin extends DashboardPlugin {
                         SELECT config_value 
                         FROM configs 
                         WHERE plugin_name = 'dunemap' 
-                        AND config_key = 'coriolis_region' 
+                        AND config_key = 'COREOLIS_REGION' 
                         AND guild_id = ? 
                         AND context = 'guild'
                     `, [guildId]);

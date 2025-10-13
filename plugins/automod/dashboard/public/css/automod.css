@@ -1,0 +1,319 @@
+/**
+ * AutoMod Plugin - Tab-System Styling
+ * Sprint 1: Tab-Struktur für bessere UX
+ * Created: 2025-10-13
+ */
+
+/* ==================== TAB NAVIGATION ==================== */
+
+#automodTabs {
+  border-bottom: 2px solid #dee2e6;
+  margin-bottom: 1.5rem;
+}
+
+#automodTabs .nav-link {
+  color: #6c757d;
+  font-weight: 500;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  background: transparent;
+}
+
+#automodTabs .nav-link:hover {
+  color: #495057;
+  background-color: #f8f9fa;
+  border-bottom-color: #adb5bd;
+}
+
+#automodTabs .nav-link.active {
+  color: #0d6efd;
+  background-color: transparent;
+  border-bottom-color: #0d6efd;
+  font-weight: 600;
+}
+
+#automodTabs .nav-link i {
+  margin-right: 0.4rem;
+  font-size: 0.95rem;
+}
+
+/* Badge in Tabs */
+#automodTabs .nav-link .badge {
+  font-size: 0.6rem;
+  padding: 0.2rem 0.4rem;
+  margin-left: 0.4rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+/* ==================== TAB CONTENT ==================== */
+
+.tab-content {
+  padding: 0;
+  min-height: 400px;
+}
+
+.tab-pane {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Tab Section Titles */
+.tab-pane h5 {
+  color: #212529;
+  font-weight: 600;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.tab-pane h5 i {
+  font-size: 1.2rem;
+}
+
+/* ==================== FORM STYLING ==================== */
+
+.tab-pane .form-label {
+  color: #495057;
+  margin-bottom: 0.5rem;
+}
+
+.tab-pane .form-label.fw-bold {
+  color: #212529;
+}
+
+.tab-pane .form-label i {
+  color: #6c757d;
+}
+
+.tab-pane small.text-muted {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Form Switches */
+.tab-pane .form-check-input:checked {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+.tab-pane .form-check-label {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ==================== COMING SOON SECTION ==================== */
+
+#tab-raid .text-center {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 10px;
+  padding: 3rem 1rem;
+}
+
+#tab-raid .fa-shield-virus {
+  opacity: 0.8;
+}
+
+#tab-raid .card.bg-light {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #dee2e6;
+}
+
+#tab-raid .card-body ul li {
+  padding: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+#tab-raid .card-body ul li i.fa-check-circle {
+  font-size: 1.1rem;
+}
+
+/* ==================== SUBMIT BUTTON ==================== */
+
+.guild-ajax-form button[type="submit"] {
+  margin-top: 2rem;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  font-size: 1.05rem;
+  box-shadow: 0 2px 8px rgba(13, 110, 253, 0.2);
+  transition: all 0.2s ease-in-out;
+}
+
+.guild-ajax-form button[type="submit"]:hover {
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+  transform: translateY(-2px);
+}
+
+/* ==================== MULTI-SELECT STYLING ==================== */
+
+select[multiple] {
+  min-height: 200px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+select[multiple] option {
+  padding: 0.5rem 0.75rem;
+}
+
+select[multiple] option:disabled {
+  background-color: #e9ecef;
+  color: #6c757d;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding: 0.4rem 0.75rem;
+}
+
+select[multiple] option:checked {
+  background-color: #0d6efd;
+  color: white;
+}
+
+/* ==================== MOBILE RESPONSIVE ==================== */
+
+@media (max-width: 768px) {
+  /* Tabs als Liste auf Mobile */
+  #automodTabs {
+    flex-direction: column;
+    border-bottom: none;
+  }
+
+  #automodTabs .nav-item {
+    width: 100%;
+  }
+
+  #automodTabs .nav-link {
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 0;
+    padding: 1rem 1.25rem;
+  }
+
+  #automodTabs .nav-link.active {
+    background-color: #e7f1ff;
+    border-left: 4px solid #0d6efd;
+    border-bottom-color: #dee2e6;
+  }
+
+  /* Tab Content */
+  .tab-content {
+    min-height: 300px;
+  }
+
+  /* Coming Soon Section */
+  #tab-raid .text-center {
+    padding: 2rem 0.5rem;
+  }
+
+  #tab-raid .fa-shield-virus {
+    font-size: 3rem !important;
+  }
+
+  /* Submit Button */
+  .guild-ajax-form button[type="submit"] {
+    font-size: 1rem;
+    padding: 0.65rem 1.25rem;
+  }
+}
+
+@media (max-width: 576px) {
+  /* Smaller Icons on Mobile */
+  #automodTabs .nav-link i {
+    margin-right: 0.3rem;
+    font-size: 0.9rem;
+  }
+
+  /* Smaller Badge */
+  #automodTabs .nav-link .badge {
+    font-size: 0.55rem;
+    padding: 0.15rem 0.3rem;
+  }
+
+  /* Form Labels */
+  .tab-pane .form-label {
+    font-size: 0.95rem;
+  }
+
+  /* Multi-Select */
+  select[multiple] {
+    min-height: 150px;
+    font-size: 0.85rem;
+  }
+}
+
+/* ==================== ACCESSIBILITY ==================== */
+
+#automodTabs .nav-link:focus {
+  outline: 2px solid #0d6efd;
+  outline-offset: 2px;
+}
+
+.form-check-input:focus {
+  border-color: #86b7fe;
+  outline: 0;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* ==================== DARK MODE SUPPORT (Optional) ==================== */
+
+@media (prefers-color-scheme: dark) {
+  #automodTabs {
+    border-bottom-color: #495057;
+  }
+
+  #automodTabs .nav-link {
+    color: #adb5bd;
+  }
+
+  #automodTabs .nav-link:hover {
+    color: #dee2e6;
+    background-color: #343a40;
+    border-bottom-color: #6c757d;
+  }
+
+  #automodTabs .nav-link.active {
+    color: #0d6efd;
+    border-bottom-color: #0d6efd;
+  }
+
+  .tab-pane h5 {
+    color: #f8f9fa;
+    border-bottom-color: #495057;
+  }
+
+  #tab-raid .text-center {
+    background: linear-gradient(135deg, #212529 0%, #343a40 100%);
+  }
+}
+
+/* ==================== PRINT STYLES ==================== */
+
+@media print {
+  #automodTabs {
+    display: none;
+  }
+
+  .tab-pane {
+    display: block !important;
+    opacity: 1 !important;
+  }
+
+  .guild-ajax-form button[type="submit"] {
+    display: none;
+  }
+}

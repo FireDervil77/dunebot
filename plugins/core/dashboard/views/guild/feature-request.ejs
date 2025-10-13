@@ -2,7 +2,7 @@
     <div class="container-fluid">
         <div class="row mb-2">
             <div class="col-sm-6">
-                <h1 class="m-0"><%= tr('FEATURE_REQUEST.TITLE', 'Feature Requests') %></h1>
+                <h1 class="m-0"><%= tr('FEATURE_REQUEST.TITLE') %></h1>
             </div>
             <div class="col-sm-6">
                 <button class="btn btn-primary float-right" data-toggle="modal" data-target="#createFeatureModal">
@@ -21,8 +21,8 @@
             <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
-            <h5><i class="fa-solid fa-info-circle me-2"></i><%= tr('FEATURE_REQUEST.INFO_TITLE', 'System Feature Requests') %></h5>
-            <p class="mb-0"><%= tr('FEATURE_REQUEST.INFO_TEXT', 'Dieses Feature Request System ist für Verbesserungsvorschläge am Bot-System gedacht. Andere Guild-Mitglieder können deine Vorschläge mit Upvotes unterstützen. Für Server-spezifische Anfragen wird ein separates Ticket-Plugin bereitgestellt.') %></p>
+            <h5><i class="fa-solid fa-info-circle me-2"></i><%= tr('FEATURE_REQUEST.INFO_TITLE') %></h5>
+            <p class="mb-0"><%= tr('FEATURE_REQUEST.INFO_TEXT') %></p>
         </div>
         
         <!-- Statistik-Karten -->
@@ -31,10 +31,10 @@
                 <div class="small-box bg-primary">
                     <div class="inner">
                         <h3><%= features.length %></h3>
-                        <p><%= tr('FEATURE_REQUEST.TOTAL_FEATURES', 'Features gesamt') %></p>
+                        <p><%= tr('FEATURE_REQUEST.TOTAL_FEATURES') %></p>
                     </div>
                     <div class="icon">
-                        <i class="fa-solid fa-lightbulb"></i>
+                        <i class="fas fa-lightbulb"></i>
                     </div>
                 </div>
             </div>
@@ -42,10 +42,10 @@
                 <div class="small-box bg-info">
                     <div class="inner">
                         <h3><%= features.filter(f => f.status === 'planned').length %></h3>
-                        <p><%= tr('FEATURE_REQUEST.PLANNED', 'Geplant') %></p>
+                        <p><%= tr('FEATURE_REQUEST.PLANNED') %></p>
                     </div>
                     <div class="icon">
-                        <i class="fa-solid fa-calendar-check"></i>
+                        <i class="fas fa-calendar-check"></i>
                     </div>
                 </div>
             </div>
@@ -53,10 +53,10 @@
                 <div class="small-box bg-success">
                     <div class="inner">
                         <h3><%= features.filter(f => f.status === 'implemented').length %></h3>
-                        <p><%= tr('FEATURE_REQUEST.IMPLEMENTED', 'Umgesetzt') %></p>
+                        <p><%= tr('FEATURE_REQUEST.IMPLEMENTED') %></p>
                     </div>
                     <div class="icon">
-                        <i class="fa-solid fa-check-circle"></i>
+                        <i class="fas fa-check-circle"></i>
                     </div>
                 </div>
             </div>
@@ -79,7 +79,7 @@
                 <% } else { %>
                     <div class="list-group list-group-flush">
                         <% features.forEach(feature => { %>
-                            <div class="list-group-item">
+                            <div class="list-group-item <%= feature.admin_response ? 'border-info' : '' %>">
                                 <div class="row align-items-center">
                                     <!-- Upvote Button -->
                                     <div class="col-auto text-center">
@@ -87,7 +87,7 @@
                                             class="btn btn-outline-primary upvote-btn" 
                                             data-feature-id="<%= feature.id %>"
                                             style="min-width: 60px;">
-                                            <i class="fa-solid fa-arrow-up"></i>
+                                            <i class="fas fa-arrow-up"></i>
                                             <br>
                                             <strong><%= feature.upvotes %></strong>
                                         </button>
@@ -130,10 +130,25 @@
                                             </span>
                                             
                                             <small class="text-muted ms-auto">
-                                                <i class="fa-solid fa-user me-1"></i><%= feature.user_tag || feature.user_id || 'Unbekannt' %>
-                                                <i class="fa-solid fa-calendar ms-2 me-1"></i><%= new Date(feature.created_at).toLocaleDateString('de-DE') %>
+                                                <i class="fas fa-user me-1"></i><%= feature.user_tag || feature.user_id || 'Unbekannt' %>
+                                                <i class="fas fa-calendar ms-2 me-1"></i><%= new Date(feature.created_at).toLocaleDateString('de-DE') %>
                                             </small>
                                         </div>
+                                        
+                                        <!-- Admin Response -->
+                                        <% if (feature.admin_response) { %>
+                                            <div class="alert alert-info mt-3 mb-0">
+                                                <h6 class="alert-heading">
+                                                    <i class="fas fa-reply me-2"></i><strong>Admin-Antwort</strong>
+                                                    <% if (feature.resolved_at) { %>
+                                                        <small class="text-muted float-end">
+                                                            <%= new Date(feature.resolved_at).toLocaleString('de-DE') %>
+                                                        </small>
+                                                    <% } %>
+                                                </h6>
+                                                <p class="mb-0"><%= feature.admin_response %></p>
+                                            </div>
+                                        <% } %>
                                     </div>
                                 </div>
                             </div>

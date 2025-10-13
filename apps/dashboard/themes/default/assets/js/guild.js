@@ -97,6 +97,10 @@ class GuildAjaxHandler {
                     await this.handleDuneMapSettingsResponse(form, result);
                     break;
                 
+                case 'automod-settings':
+                    await this.handleAutoModSettingsResponse(form, result);
+                    break;
+                
                 case 'moderation-settings':
                     await this.handleModerationSettingsResponse(form, result);
                     break;
@@ -230,6 +234,21 @@ class GuildAjaxHandler {
             }, 1500);
         } else {
             this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.DUNEMAP_SETTINGS_ERROR || 'Fehler beim Speichern der DuneMap-Einstellungen'));
+        }
+    }
+
+    static async handleAutoModSettingsResponse(form, result) {
+        console.log('[GuildAjax] handleAutoModSettingsResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.AUTOMOD_SETTINGS_SAVED || 'AutoMod-Einstellungen gespeichert'));
+            // Seite nach 1,5s neu laden um Änderungen sichtbar zu machen
+            console.log('[GuildAjax] Scheduling page reload in 1.5s...');
+            setTimeout(() => {
+                console.log('[GuildAjax] Reloading page now!');
+                window.location.reload();
+            }, 1500);
+        } else {
+            this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.AUTOMOD_SETTINGS_ERROR || 'Fehler beim Speichern der AutoMod-Einstellungen'));
         }
     }
 

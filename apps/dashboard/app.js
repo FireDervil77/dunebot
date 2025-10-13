@@ -19,6 +19,7 @@ const { RouterManager } = require('dunebot-sdk');
 const expressLayouts = require("express-ejs-layouts");
 const sessionMiddleware = require("./middlewares/session.middleware");
 const baseMiddleware = require("./middlewares/context/base.middleware");
+const userConfigMiddleware = require("./middlewares/context/user-config.middleware");
 const { CheckAuth, CheckAdmin } = require("./middlewares/auth.middleware");
 const errorMiddleware = require("./middlewares/error.middleware");
 const authMiddleware = require("./middlewares/auth.middleware");
@@ -474,6 +475,7 @@ module.exports = class App {
         this.app.use(hookMiddleware);
         this.app.use(guildMiddleware);
         this.app.use(baseMiddleware);
+        this.app.use(userConfigMiddleware); // User-Config nach baseMiddleware (braucht req.session.user)
     }
 
 

@@ -169,11 +169,16 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             
             // API-Routen (ohne Owner-Check für bestimmte Endpoints)
             const toastHistoryApi = require('./routes/api/toast-history');
+            const botGuildsApi = require('./routes/api/bot-guilds');
             this.apiRouter = express.Router();
             this.apiRouter.use('/toast-history', toastHistoryApi);
-            Logger.debug('[SuperAdmin] Toast-History API registriert');
+            Logger.debug('[SuperAdmin] API-Routen registriert (toast-history)');
             
-            // Middleware: Owner-Check für ALLE SuperAdmin-Routen
+            // Guild-spezifische API-Routen (VOR dem Owner-Check!)
+            this.guildRouter.use('/api/bot-guilds', botGuildsApi);
+            Logger.debug('[SuperAdmin] Guild API-Routen registriert (bot-guilds)');
+            
+            // Middleware: Owner-Check für ALLE SuperAdmin-Routen (nach API-Routen!)
             this.guildRouter.use(this._checkOwner.bind(this));
 
             // === HAUPTSEITE (Dashboard-Übersicht) ===
@@ -491,7 +496,11 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     title_de, title_en,
                     message_de, message_en,
                     action_text_de, action_text_en,
-                    type, action_url, expiry, roles
+                    type, action_url, expiry, roles,
+                    // NEU: Delivery-Optionen
+                    delivery_method,
+                    target_guild_ids,
+                    discord_channel_id
                 } = req.body;
 
                 try {
@@ -517,7 +526,11 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                         action_url: action_url || null,
                         expiry: expiry || null,
                         roles: roles || null,
-                        dismissed: 0
+                        dismissed: 0,
+                        // NEU: Delivery-Optionen
+                        delivery_method: delivery_method || 'dashboard',
+                        target_guild_ids: target_guild_ids || null, // JSON-String vom Frontend
+                        discord_channel_id: discord_channel_id || null
                     };
 
                     // prepareNotificationForDB nutzen
@@ -531,6 +544,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                                 message_translations = ?,
                                 action_text_translations = ?,
                                 type = ?, action_url = ?, expiry = ?, roles = ?,
+                                delivery_method = ?, target_guild_ids = ?, discord_channel_id = ?,
                                 updated_at = NOW()
                             WHERE id = ?
                         `, [
@@ -541,6 +555,9 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             notificationData.action_url,
                             notificationData.expiry,
                             notificationData.roles,
+                            metadata.delivery_method,
+                            metadata.target_guild_ids,
+                            metadata.discord_channel_id,
                             notificationId
                         ]);
                         
@@ -552,11 +569,13 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                         res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
                     } else {
                         // Neue Notification
-                        await dbService.query(`
+                        const [result] = await dbService.query(`
                             INSERT INTO notifications 
                             (title_translations, message_translations, action_text_translations,
-                             type, action_url, expiry, roles, dismissed, created_at, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())
+                             type, action_url, expiry, roles, dismissed,
+                             delivery_method, target_guild_ids, discord_channel_id,
+                             created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NOW(), NOW())
                         `, [
                             notificationData.title_translations,
                             notificationData.message_translations,
@@ -564,8 +583,42 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             notificationData.type,
                             notificationData.action_url,
                             notificationData.expiry,
-                            notificationData.roles
+                            notificationData.roles,
+                            metadata.delivery_method,
+                            metadata.target_guild_ids,
+                            metadata.discord_channel_id
                         ]);
+                        
+                        // NEU: Wenn Discord-Delivery aktiviert, IPC-Call an Bot
+                        if (metadata.delivery_method !== 'dashboard') {
+                            const notificationForBot = {
+                                id: result.insertId,
+                                title_translations: notificationData.title_translations,
+                                message_translations: notificationData.message_translations,
+                                action_text_translations: notificationData.action_text_translations,
+                                type: notificationData.type,
+                                action_url: notificationData.action_url,
+                                delivery_method: metadata.delivery_method,
+                                target_guild_ids: metadata.target_guild_ids,
+                                discord_channel_id: metadata.discord_channel_id
+                            };
+                            
+                            // IPC-Call: Bot soll Notification senden
+                            const ipcServer = ServiceManager.get('ipcServer');
+                            try {
+                                Logger.debug('[SuperAdmin] Sende Notification an Bot via IPC:', notificationForBot);
+                                await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', notificationForBot, true);
+                                Logger.debug('[SuperAdmin] Notification erfolgreich an Bot gesendet');
+                            } catch (ipcError) {
+                                Logger.error('[SuperAdmin] Fehler beim Senden der Notification an Bot:', ipcError);
+                                // Notification wurde gespeichert, aber Discord-Versand fehlgeschlagen
+                                req.session.toast = {
+                                    type: 'warning',
+                                    message: 'Notification gespeichert, aber Discord-Versand fehlgeschlagen: ' + ipcError.message
+                                };
+                                return res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
+                            }
+                        }
                         
                         // Redirect mit Toast-Notification
                         req.session.toast = {

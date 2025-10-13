@@ -34,7 +34,7 @@
                         <p><%= tr('BUG_REPORT.TOTAL_BUGS', 'Bugs gesamt') %></p>
                     </div>
                     <div class="icon">
-                        <i class="fa-solid fa-bug"></i>
+                        <i class="fas fa-bug"></i>
                     </div>
                 </div>
             </div>
@@ -45,7 +45,7 @@
                         <p><%= tr('BUG_REPORT.OPEN_BUGS', 'Offen') %></p>
                     </div>
                     <div class="icon">
-                        <i class="fa-solid fa-folder-open"></i>
+                        <i class="fas fa-folder-open"></i>
                     </div>
                 </div>
             </div>
@@ -56,7 +56,7 @@
                         <p><%= tr('BUG_REPORT.IN_PROGRESS', 'In Bearbeitung') %></p>
                     </div>
                     <div class="icon">
-                        <i class="fa-solid fa-spinner"></i>
+                        <i class="fas fa-spinner"></i>
                     </div>
                 </div>
             </div>
@@ -67,7 +67,7 @@
                         <p><%= tr('BUG_REPORT.RESOLVED', 'Gelöst') %></p>
                     </div>
                     <div class="icon">
-                        <i class="fa-solid fa-check"></i>
+                        <i class="fas fa-check"></i>
                     </div>
                 </div>
             </div>
@@ -98,12 +98,23 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <% bugs.forEach(bug => { %>
-                                <tr>
+                            <% bugs.forEach((bug, index) => { %>
+                                <tr class="<%= bug.admin_response ? 'table-active' : '' %>">
                                     <td><%= bug.id %></td>
                                     <td>
                                         <strong><%= bug.title %></strong>
                                         <br><small class="text-muted"><%= bug.description.substring(0, 100) %>...</small>
+                                        <% if (bug.admin_response) { %>
+                                            <br>
+                                            <button 
+                                                class="btn btn-sm btn-outline-info mt-1" 
+                                                type="button" 
+                                                data-toggle="collapse" 
+                                                data-target="#adminResponse<%= bug.id %>" 
+                                                aria-expanded="false">
+                                                <i class="fas fa-comment-dots me-1"></i>Admin-Antwort anzeigen
+                                            </button>
+                                        <% } %>
                                     </td>
                                     <td><span class="badge bg-secondary"><%= bug.category || 'Allgemein' %></span></td>
                                     <td>
@@ -136,6 +147,23 @@
                                     <td><%= bug.user_tag || bug.user_id || 'Unbekannt' %></td>
                                     <td><%= new Date(bug.created_at).toLocaleDateString('de-DE') %></td>
                                 </tr>
+                                <% if (bug.admin_response) { %>
+                                    <tr class="collapse" id="adminResponse<%= bug.id %>">
+                                        <td colspan="7" class="bg-light">
+                                            <div class="alert alert-info mb-0">
+                                                <h6 class="alert-heading">
+                                                    <i class="fas fa-reply me-2"></i><strong>Admin-Antwort</strong>
+                                                    <% if (bug.resolved_at) { %>
+                                                        <small class="text-muted float-end">
+                                                            <%= new Date(bug.resolved_at).toLocaleString('de-DE') %>
+                                                        </small>
+                                                    <% } %>
+                                                </h6>
+                                                <p class="mb-0"><%= bug.admin_response %></p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <% } %>
                             <% }); %>
                         </tbody>
                     </table>
