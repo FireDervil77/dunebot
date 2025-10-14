@@ -401,13 +401,35 @@ module.exports = class App {
         const Logger = ServiceManager.get("Logger");
         for (const plugin of this.app.pluginManager.plugins) {
             if (plugin.publicAssets) {
-                const assetsPath = path.join(this.app.pluginManager.pluginsDir, plugin.name, 'dashboard', 'public');
-                if (fs.existsSync(assetsPath)) {
-                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(assetsPath));
-                    Logger.debug(`Assets für Plugin ${plugin.name} registriert unter /assets/plugins/${plugin.name}`);
+                // NEUE LOGIK: Mount direkt auf Plugin-Root (ohne public-Verwirrung)
+                const pluginRootPath = path.join(this.app.pluginManager.pluginsDir, plugin.name);
+                
+                // 1. Dashboard-spezifische Assets (falls vorhanden)
+                const dashboardAssetsPath = path.join(pluginRootPath, 'dashboard', 'public');
+                if (fs.existsSync(dashboardAssetsPath)) {
+                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(dashboardAssetsPath));
+                    Logger.debug(`Dashboard-Assets für Plugin ${plugin.name} registriert`);
+                }
+                
+                // 2. Plugin-Root Assets (neue Hierarchie: /assets, /icons, etc.)
+                const rootAssetsPath = path.join(pluginRootPath, 'assets');
+                if (fs.existsSync(rootAssetsPath)) {
+                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(rootAssetsPath));
+                    Logger.debug(`Root-Assets für Plugin ${plugin.name} registriert unter /assets/plugins/${plugin.name}`);
+                }
+                
+                // 3. Backward-Compatibility: /public im Plugin-Root
+                const legacyPublicPath = path.join(pluginRootPath, 'public');
+                if (fs.existsSync(legacyPublicPath)) {
+                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(legacyPublicPath));
+                    Logger.debug(`Legacy-Public-Assets für Plugin ${plugin.name} registriert`);
                 }
             }
         }
+        
+        Logger.debug('Plugin-Asset-Registrierung abgeschlossen');
+        // Beispiel: /assets/plugins/dunemap/icons/map.png
+        // wird aus plugins/dunemap/assets/icons/map.png bereitgestellt
     }
 
     /**

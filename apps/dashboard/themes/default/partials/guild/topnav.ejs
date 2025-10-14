@@ -46,7 +46,7 @@
   <li class="nav-item dropdown">
     <a class="nav-link" data-toggle="dropdown" href="#">
       <i class="far fa-bell"></i>
-      <span class="badge badge-warning navbar-badge"><%= locals.notifications?.length || 0 %></span>
+      <span class="badge badge-warning navbar-badge" id="notification-badge" style="<%= (locals.notifications?.length || 0) === 0 ? 'display: none;' : '' %>"><%= locals.notifications?.length || 0 %></span>
     </a>
     <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
       <span class="dropdown-item dropdown-header"><%= locals.notifications?.length || 0 %> Benachrichtigungen</span>
@@ -54,13 +54,35 @@
       
       <% if (locals.notifications && notifications.length > 0) { %>
         <% notifications.slice(0, 5).forEach(notification => { %>
-          <a href="<%= notification.url || '#' %>" class="dropdown-item">
-            <i class="<%= notification.icon || 'fas fa-envelope' %> mr-2"></i> <%= notification.text.substring(0, 40) %><%= notification.text.length > 40 ? '...' : '' %>
-            <span class="float-right text-muted text-sm"><%= notification.time %></span>
-          </a>
+          <div class="dropdown-item d-flex justify-content-between align-items-center notification-item" data-notification-id="<%= notification.id %>">
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-start">
+                <i class="fas fa-<%= notification.type === 'error' ? 'exclamation-circle text-danger' : notification.type === 'warning' ? 'exclamation-triangle text-warning' : notification.type === 'success' ? 'check-circle text-success' : 'info-circle text-info' %> mr-2 mt-1"></i>
+                <div>
+                  <strong><%= notification.title %></strong>
+                  <br>
+                  <small class="text-muted"><%= notification.message.substring(0, 60) %><%= notification.message.length > 60 ? '...' : '' %></small>
+                  <% if (notification.action_url) { %>
+                    <br>
+                    <a href="<%= notification.action_url %>" class="btn btn-sm btn-outline-primary mt-1">
+                      <%= notification.action_text || 'Mehr erfahren' %>
+                    </a>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-link text-muted dismiss-notification" data-id="<%= notification.id %>" title="Schließen">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
           <div class="dropdown-divider"></div>
         <% }); %>
-        <a href="/guild/notifications" class="dropdown-item dropdown-footer">Alle Benachrichtigungen anzeigen</a>
+        <% if (notifications.length > 5) { %>
+          <span class="dropdown-item text-muted text-center">
+            <small>+ <%= notifications.length - 5 %> weitere Benachrichtigungen</small>
+          </span>
+          <div class="dropdown-divider"></div>
+        <% } %>
       <% } else { %>
         <span class="dropdown-item">Keine Benachrichtigungen</span>
         <div class="dropdown-divider"></div>
@@ -107,3 +129,73 @@
     </a>
   </li>
 </ul>
+
+<script>
+// Notification Dismiss Handler
+document.addEventListener('DOMContentLoaded', function() {
+  // Event Delegation für Dismiss-Buttons
+  document.addEventListener('click', async function(e) {
+    const dismissBtn = e.target.closest('.dismiss-notification');
+    if (!dismissBtn) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const notificationId = dismissBtn.getAttribute('data-id');
+    const notificationItem = dismissBtn.closest('.notification-item');
+    
+    if (!notificationId) return;
+    
+    try {
+      const response = await fetch(`/api/notifications/dismiss/${notificationId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Fade out Animation
+        notificationItem.style.transition = 'opacity 0.3s';
+        notificationItem.style.opacity = '0';
+        
+        setTimeout(() => {
+          // Entferne Item und Divider
+          const nextDivider = notificationItem.nextElementSibling;
+          notificationItem.remove();
+          if (nextDivider && nextDivider.classList.contains('dropdown-divider')) {
+            nextDivider.remove();
+          }
+          
+          // Update Badge
+          const badge = document.getElementById('notification-badge');
+          if (badge) {
+            const currentCount = parseInt(badge.textContent) || 0;
+            const newCount = Math.max(0, currentCount - 1);
+            badge.textContent = newCount;
+            if (newCount === 0) {
+              badge.style.display = 'none';
+            }
+          }
+          
+          // Wenn keine Notifications mehr: Zeige "Keine Benachrichtigungen"
+          const dropdown = document.querySelector('.dropdown-menu-lg .dropdown-divider').parentElement;
+          const items = dropdown.querySelectorAll('.notification-item');
+          if (items.length === 0) {
+            const noNotifItem = document.createElement('span');
+            noNotifItem.className = 'dropdown-item';
+            noNotifItem.textContent = 'Keine Benachrichtigungen';
+            dropdown.querySelector('.dropdown-divider').insertAdjacentElement('afterend', noNotifItem);
+          }
+        }, 300);
+      } else {
+        console.error('Fehler beim Dismissing:', result.message);
+      }
+    } catch (error) {
+      console.error('Fehler beim Dismissing:', error);
+    }
+  });
+});
+</script>

@@ -52,28 +52,67 @@ router.use("/:pluginName", pluginMiddleware.loadPlugin, (req, res, next) => {
 });
 
 /**
- * Markiert eine Benachrichtigung als gelesen
+ * Markiert eine Benachrichtigung als gelesen für den aktuellen User
  * @route POST /api/notifications/dismiss/:id
  */
-router.post('/dismiss/:id', async (req, res) => {
+router.post('/notifications/dismiss/:id', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const notificationManager = ServiceManager.get('notificationManager');
+    
+    // ERWEITERES DEBUG LOGGING
+    Logger.info('🔍 [DEBUG] Notification Dismiss Request:');
+    Logger.info(`   - Notification ID: ${req.params.id}`);
+    Logger.info(`   - Session existiert: ${!!req.session}`);
+    Logger.info(`   - Session User: ${JSON.stringify(req.session?.user?.info || 'KEINE')}`);
+    Logger.info(`   - req.user: ${JSON.stringify(req.user?.info || 'KEINE')}`);
+    Logger.info(`   - Headers: ${JSON.stringify(req.headers.authorization || 'KEINE AUTH HEADER')}`);
+    
     try {
         if (!notificationManager) {
+            Logger.error('❌ NotificationManager nicht verfügbar!');
             return res.status(501).json({ success: false, message: 'Benachrichtigungssystem nicht verfügbar' });
         }
+
+        // User-ID aus Session holen
+        const userId = req.session?.user?.info?.id || req.user?.info?.id;
+        Logger.info(`🎯 [DEBUG] Extrahierte User-ID: ${userId}`);
         
-        const success = await notificationManager.dismissNotification(req.params.id);
+        if (!userId) {
+            Logger.error('❌ Keine User-ID gefunden in Session!');
+            return res.status(401).json({ success: false, message: 'Nicht authentifiziert' });
+        }
+        
+        Logger.info(`📤 [DEBUG] Rufe notificationManager.dismissNotification(${req.params.id}, ${userId}) auf...`);
+        const success = await notificationManager.dismissNotification(req.params.id, userId);
+        Logger.info(`📥 [DEBUG] NotificationManager Ergebnis: ${success}`);
         
         if (success) {
+            Logger.success(`✅ Notification ${req.params.id} erfolgreich dismissed für User ${userId}`);
             return res.json({ success: true });
         } else {
-            return res.status(404).json({ success: false, message: 'Benachrichtigung nicht gefunden' });
+            Logger.error(`❌ NotificationManager dismiss fehlgeschlagen für Notification ${req.params.id}, User ${userId}`);
+            return res.status(500).json({ success: false, message: 'Fehler beim Dismissing' });
         }
     } catch (error) {
-        Logger.error('Fehler beim Markieren der Benachrichtigung als gelesen:', error);
+        Logger.error('💥 [DEBUG] Fehler beim Markieren der Benachrichtigung als gelesen:', error);
         return res.status(500).json({ success: false, message: 'Interner Serverfehler' });
     }
+});
+
+/**
+ * TEST-Route um API-Erreichbarkeit zu prüfen
+ * @route GET /api/test
+ */
+router.get('/test', (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    Logger.info('🧪 [TEST] API Test-Route aufgerufen');
+    res.json({ 
+        success: true, 
+        message: 'API ist erreichbar',
+        timestamp: new Date().toISOString(),
+        session: !!req.session,
+        user: req.session?.user?.info?.id || 'NICHT EINGELOGGT'
+    });
 });
 
 module.exports = router;

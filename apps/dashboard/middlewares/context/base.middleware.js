@@ -442,6 +442,10 @@ module.exports = async (req, res, next) => {
       
         if (themeManager) {
             await themeManager.loadGlobalNotifications(req, res);
+            // Map globalNotifications zu notifications für Template-Kompatibilität
+            if (res.locals.globalNotifications && Array.isArray(res.locals.globalNotifications)) {
+                res.locals.notifications = res.locals.globalNotifications;
+            }
         }
 
         
