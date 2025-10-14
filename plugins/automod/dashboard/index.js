@@ -1,4 +1,4 @@
-const { DashboardPlugin } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 const path = require('path');
@@ -9,7 +9,7 @@ class AutoModPlugin extends DashboardPlugin {
             name: 'automod',
             displayName: 'AutoMod Plugin',
             description: 'Das AutoMod Plugin',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireBot Team',
             icon: 'fa-solid fa-map',
             baseDir: __dirname,

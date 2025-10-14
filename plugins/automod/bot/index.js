@@ -1,4 +1,4 @@
-const { BotPlugin } = require('dunebot-sdk');
+const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class AutoModBotPlugin extends BotPlugin {
@@ -7,7 +7,7 @@ class AutoModBotPlugin extends BotPlugin {
             name: 'automod',
             displayName: 'AutoMod',
             description: 'Automatisierte Moderation für Dune the Awakening',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireBot Team',
             icon: 'fa-solid fa-map',
             baseDir: __dirname,

@@ -474,7 +474,7 @@ class CommandManager {
                         plugin.name,
                     );
 
-                    // Plugin muss in ENABLED_PLUGINS sein (force wird nur für Cooldown verwendet)
+                    // Plugin muss in enabledPlugins sein (force wird nur für Cooldown verwendet)
                     const isGuildEnabled = enabledPlugins.includes(plugin.name);
 
                     return isGloballyEnabled && isGuildEnabled;
@@ -518,7 +518,7 @@ class CommandManager {
                         plugin.name,
                     );
 
-                    // Plugin muss in ENABLED_PLUGINS sein (force wird nur für Cooldown verwendet)
+                    // Plugin muss in enabledPlugins sein (force wird nur für Cooldown verwendet)
                     const isGuildEnabled = enabledPlugins.includes(plugin.name);
 
                     return isGloballyEnabled && isGuildEnabled;
@@ -686,10 +686,22 @@ class CommandManager {
                     return;
                 }
 
-                // Prüfen ob das Plugin aktiviert ist
-                const enabledPlugins = typeof guildConfigs?.ENABLED_PLUGINS === 'string'
-                    ? JSON.parse(guildConfigs.ENABLED_PLUGINS)
-                    : (guildConfigs?.ENABLED_PLUGINS || ['core']);
+                // Prüfen ob das Plugin aktiviert ist (aus guild_plugins Tabelle)
+                let enabledPlugins = ['core'];
+                try {
+                    const pluginRows = await dbService.query(
+                        "SELECT plugin_name FROM guild_plugins WHERE guild_id = ? AND is_enabled = 1",
+                        [interaction.guild.id]
+                    );
+                    enabledPlugins = pluginRows.map(row => row.plugin_name);
+                    
+                    // Sicherstellen dass core immer aktiviert ist
+                    if (!enabledPlugins.includes("core")) {
+                        enabledPlugins.push("core");
+                    }
+                } catch (error) {
+                    Logger.error(`Fehler beim Laden der aktivierten Plugins für Guild ${interaction.guild.id}:`, error);
+                }
 
                 if (!enabledPlugins.includes(command.plugin?.name)) {
                     Logger.debug(`Plugin ${command.plugin?.name} ist für Guild ${interaction.guild.id} nicht aktiviert`);
@@ -817,10 +829,22 @@ class CommandManager {
                 const command = this.prefixCommands.get(commandName);
                 if (!command) return;
 
-                // Prüfen ob das Plugin für diese Guild aktiviert ist
-                const enabledPlugins = typeof guildConfigs?.ENABLED_PLUGINS === 'string' 
-                    ? JSON.parse(guildConfigs.ENABLED_PLUGINS) 
-                    : (guildConfigs?.ENABLED_PLUGINS || ['core']);
+                // Prüfen ob das Plugin für diese Guild aktiviert ist (aus guild_plugins Tabelle)
+                let enabledPlugins = ['core'];
+                try {
+                    const pluginRows = await dbService.query(
+                        "SELECT plugin_name FROM guild_plugins WHERE guild_id = ? AND is_enabled = 1",
+                        [message.guild.id]
+                    );
+                    enabledPlugins = pluginRows.map(row => row.plugin_name);
+                    
+                    // Sicherstellen dass core immer aktiviert ist
+                    if (!enabledPlugins.includes("core")) {
+                        enabledPlugins.push("core");
+                    }
+                } catch (error) {
+                    Logger.error(`Fehler beim Laden der aktivierten Plugins für Guild ${message.guild.id}:`, error);
+                }
 
                 if (!enabledPlugins.includes(command.plugin?.name)) {
                     Logger.debug(`Plugin ${command.plugin?.name} ist für Guild ${message.guild.id} nicht aktiviert`);

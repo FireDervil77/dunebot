@@ -304,22 +304,17 @@ module.exports = class App {
         const dbService = ServiceManager.get('dbService')
 
         try {
+            // Core-Plugin Config laden (shared scope, keine Guild-ID)
             const configs = await dbService.query(
-                "SELECT config_key, config_value FROM configs WHERE context = ?",
-                ['dashboard']
+                "SELECT config_key, config_value FROM configs WHERE plugin_name = ?  AND context = ? AND guild_id IS NULL",
+                ['core', 'shared']
             );
             
             const config = {};
             
-            // Gespeicherte Werte laden (außer ENABLED_PLUGINS - das ist obsolet!)
+            // Gespeicherte Werte laden
             if (configs && configs.length > 0) {
                 for (const entry of configs) {
-                    // ENABLED_PLUGINS überspringen - wird über guild_plugins verwaltet
-                    if (entry.config_key === 'ENABLED_PLUGINS') {
-                        Logger.debug('Überspringe veraltete ENABLED_PLUGINS Config');
-                        continue;
-                    }
-                    
                     try {
                         config[entry.config_key] = JSON.parse(entry.config_value);
                     } catch (e) {
@@ -328,6 +323,7 @@ module.exports = class App {
                 }
             }
             
+            Logger.debug(`Dashboard-Config geladen: ${Object.keys(config).length} Einträge`);
             return config;
         } catch (error) {
             Logger.error('Fehler beim Laden der Konfiguration:', error);

@@ -1,10 +1,14 @@
-const { BotPlugin } = require('dunebot-sdk');
+const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class DuneMapBotPlugin extends BotPlugin {
     constructor() {
         super({
             name: 'dunemap',
+            displayName: 'DuneMap',
+            description: 'DuneMap Plugin für Discord-Integration',
+            version: VersionHelper.getVersionFromContext(__dirname),
+            author: 'FireBot Team',
             displayName: 'DuneMap',
             description: 'Interaktive Karte für Dune the Waakening',
             version: '1.0.0',

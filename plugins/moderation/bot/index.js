@@ -1,10 +1,14 @@
-const { BotPlugin } = require('dunebot-sdk');
+const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class ModerationBotPlugin extends BotPlugin {
     constructor() {
         super({
             name: 'moderation',
+            displayName: 'Moderation',
+            description: 'Erweiterte Moderationsfunktionen für Discord',
+            version: VersionHelper.getVersionFromContext(__dirname),
+            author: 'FireBot Team',
             displayName: 'Moderation',
             description: 'Moderation-Tools für FireBot',
             version: '1.0.0',

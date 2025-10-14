@@ -1,7 +1,7 @@
 const path = require('path');
 const express = require('express');
 
-const { DashboardPlugin } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 const { uptime } = require('process');
 
@@ -12,7 +12,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
             name: 'core',
             displayName: 'Kern-Plugin',
             description: 'Grundlegende Funktionen für DuneBot',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'DuneBot Team',
             icon: 'fa-solid fa-cog',
             baseDir: __dirname

@@ -1,4 +1,4 @@
-const { DashboardPlugin } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 const path = require('path');
 
@@ -8,7 +8,7 @@ class ModerationPlugin extends DashboardPlugin {
             name: 'moderation',
             displayName: 'Moderation Plugin',
             description: 'Das Moderation Plugin für FireBot',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireBot Team',
             icon: 'fa-solid fa-shield-halved',
             baseDir: __dirname,

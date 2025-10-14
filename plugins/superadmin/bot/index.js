@@ -5,7 +5,7 @@
  * @author FireDervil
  */
 
-const { BotPlugin } = require('dunebot-sdk');
+const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class SuperAdminBotPlugin extends BotPlugin {
@@ -14,7 +14,7 @@ class SuperAdminBotPlugin extends BotPlugin {
             name: 'superadmin',
             displayName: 'SuperAdmin',
             description: 'Bot-Owner Management Panel (Dashboard-only)',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireDervil',
             baseDir: __dirname
         });

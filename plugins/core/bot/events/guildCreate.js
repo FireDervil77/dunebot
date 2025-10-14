@@ -55,9 +55,18 @@ module.exports = async (guild) => {
             // 4. Guild-spezifische Konfiguration initialisieren
             await initGuildConfigs(guild.id, defaultConfig);
             
-            // 5. Core-Plugin in guild_plugins aktivieren
-            await dbService.enablePluginForGuild(guild.id, 'core', null, null);
-            Logger.info(`Core-Plugin für neue Guild ${guild.id} in guild_plugins aktiviert`);
+            // 5. Core-Plugin über PluginManager aktivieren (triggert onGuildEnable!)
+            const pluginManager = guild.client.pluginManager;
+            if (pluginManager) {
+                Logger.info(`Aktiviere Core-Plugin für neue Guild ${guild.id} via PluginManager...`);
+                await pluginManager.enableInGuild('core', guild.id);
+                Logger.success(`Core-Plugin für Guild ${guild.id} vollständig initialisiert`);
+            } else {
+                Logger.error(`PluginManager nicht verfügbar für Guild ${guild.id}!`);
+                // Fallback: Nur DB-Eintrag erstellen
+                await dbService.enablePluginForGuild(guild.id, 'core', null, null);
+                Logger.warn(`Core-Plugin für Guild ${guild.id} nur in DB aktiviert (ohne Initialisierung)`);
+            }
             
             // 6. Navigation wird beim ersten Dashboard-Zugriff registriert (onGuildEnable)
         } else {

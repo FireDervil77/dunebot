@@ -6,7 +6,7 @@
  */
 const path = require('path');
 const fs = require('fs');
-const { BotPlugin } = require('dunebot-sdk');
+const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 /**
@@ -25,7 +25,7 @@ class CoreBotPlugin extends BotPlugin {
             name: 'core',
             displayName: 'Kern-Plugin',
             description: 'Grundlegende Funktionen für den DuneBot',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'DuneBot Team',
             icon: 'fa-solid fa-cog',
             baseDir: __dirname,

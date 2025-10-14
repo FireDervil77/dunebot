@@ -115,34 +115,26 @@ ServiceManager.register("bootHooks", bootHooks);
                     // Für jede Guild die aktivierten Plugins laden
                     for (const guild of client.guilds.cache.values()) {
                         try {
-                            const corePlugin = client.pluginManager.getPlugin("core");
-                            if (corePlugin && corePlugin.dbService) {
-                                const coreConfig = await corePlugin.dbService.getConfigs(guild.id, "core", "shared");
-                                
-                                let enabledPlugins = ["core"]; 
-                                if (coreConfig?.ENABLED_PLUGINS) {
-                                    try {
-                                        enabledPlugins = typeof coreConfig.ENABLED_PLUGINS === 'string'
-                                            ? JSON.parse(coreConfig.ENABLED_PLUGINS)
-                                            : coreConfig.ENABLED_PLUGINS;
-                                    } catch (e) {
-                                        Logger.warn(`Fehler beim Parsen der aktivierten Plugins für Guild ${guild.id}:`, e);
-                                    }
-                                }
-
-                                // Für jedes aktivierte Plugin
-                                for (const pluginName of enabledPlugins) {
-                                    if (pluginName === 'core') continue;
-                                    
-                                    try {
-                                        await client.pluginManager.enableInGuild(pluginName, guild.id);
-                                    } catch (err) {
-                                        Logger.error(`Fehler beim Aktivieren von Plugin ${pluginName} für Guild ${guild.id}:`, err);
-                                    }
-                                }
-                                
-                                Logger.info(`Guild ${guild.id}: Found ${enabledPlugins.length} enabled plugins: ${enabledPlugins.join(', ')}`);
+                            // NEU: Aktivierte Plugins aus guild_plugins Tabelle laden
+                            const enabledPlugins = await dbService.getEnabledPlugins(guild.id);
+                            
+                            if (!enabledPlugins || enabledPlugins.length === 0) {
+                                Logger.warn(`Guild ${guild.id} hat keine aktivierten Plugins in guild_plugins Tabelle!`);
+                                continue;
                             }
+
+                            // Für jedes aktivierte Plugin (außer core, das ist bereits geladen)
+                            for (const pluginName of enabledPlugins) {
+                                if (pluginName === 'core') continue;
+                                
+                                try {
+                                    await client.pluginManager.enableInGuild(pluginName, guild.id);
+                                } catch (err) {
+                                    Logger.error(`Fehler beim Aktivieren von Plugin ${pluginName} für Guild ${guild.id}:`, err);
+                                }
+                            }
+                            
+                            Logger.info(`Guild ${guild.id} (${guild.name}): ${enabledPlugins.length} plugins aktiviert: ${enabledPlugins.join(', ')}`);
                         } catch (guildError) {
                             Logger.error(`Fehler beim Laden der Guild-spezifischen Plugins für Guild ${guild.id}:`, guildError);
                         }

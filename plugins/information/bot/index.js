@@ -5,7 +5,7 @@
  * @author DuneBot Team
  */
 const path = require('path');
-const { BotPlugin } = require('dunebot-sdk');
+const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 const { models } = require('dunebot-db-client');
 
@@ -25,7 +25,7 @@ class InfoBotPlugin extends BotPlugin {
             name: 'information',
             displayName: 'Information-Plugin',
             description: 'Stellt verschiedene Informationen rund um den Server / Owner / Member bereit.',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'DuneBot Team',
             icon: 'fa-solid fa-cog',
             baseDir: __dirname,

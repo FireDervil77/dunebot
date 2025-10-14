@@ -1,4 +1,4 @@
-const { DashboardPlugin } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 const path = require('path');
@@ -9,7 +9,7 @@ class DuneMapPlugin extends DashboardPlugin {
             name: 'dunemap',
             displayName: 'DuneMap Plugin',
             description: 'Das lägendäre dunemap plugin',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'DuneBot Team',
             icon: 'fa-solid fa-map',
             baseDir: __dirname,
