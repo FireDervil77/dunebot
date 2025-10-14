@@ -1,0 +1,142 @@
+{
+  "description": "Feste Marker-Verteilung für A1-A9 Sektoren - basierend auf aktuellen Spiel-Daten",
+  "author": "DuneBot Team",
+  "version": "2.0.1",
+  "markers": [
+    {
+      "sector": "A1",
+      "name": "Wrack Alpha",
+      "type": "wrack",
+      "coordinates": { "x": 150, "y": 150 },
+      "description": "Permanentes Wrack in A1",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A2",
+      "name": "Wrack Beta",
+      "type": "wrack",
+      "coordinates": { "x": 150, "y": 150 },
+      "description": "Permanentes Wrack in A2",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A2",
+      "name": "Test Marker A2",
+      "type": "test",
+      "coordinates": { "x": 200, "y": 200 },
+      "description": "Test-Marker in A2",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A3",
+      "name": "Test Marker A3",
+      "type": "test",
+      "coordinates": { "x": 150, "y": 150 },
+      "description": "Test-Marker in A3",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A3",
+      "name": "Wrack Gamma",
+      "type": "wrack",
+      "coordinates": { "x": 200, "y": 200 },
+      "description": "Permanentes Wrack in A3",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A4",
+      "name": "Test Marker A4",
+      "type": "test",
+      "coordinates": { "x": 150, "y": 150 },
+      "description": "Test-Marker in A4",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A4",
+      "name": "Wrack Delta",
+      "type": "wrack",
+      "coordinates": { "x": 200, "y": 200 },
+      "description": "Permanentes Wrack in A4",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A5",
+      "name": "Wrack Epsilon",
+      "type": "wrack",
+      "coordinates": { "x": 150, "y": 150 },
+      "description": "Permanentes Wrack in A5",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A5",
+      "name": "Test Marker A5",
+      "type": "test",
+      "coordinates": { "x": 200, "y": 200 },
+      "description": "Test-Marker in A5",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A5",
+      "name": "Taxi Station A5",
+      "type": "taxi",
+      "coordinates": { "x": 250, "y": 250 },
+      "description": "Schnellreise-Station in A5",
+      "is_permanent": true,
+      "rarity": "uncommon"
+    },
+    {
+      "sector": "A7",
+      "name": "Wrack Zeta",
+      "type": "wrack",
+      "coordinates": { "x": 150, "y": 150 },
+      "description": "Permanentes Wrack in A7",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A8",
+      "name": "Taxi Station A8",
+      "type": "taxi",
+      "coordinates": { "x": 150, "y": 150 },
+      "description": "Schnellreise-Station in A8",
+      "is_permanent": true,
+      "rarity": "uncommon"
+    },
+    {
+      "sector": "A8",
+      "name": "Test Marker A8",
+      "type": "test",
+      "coordinates": { "x": 200, "y": 200 },
+      "description": "Test-Marker in A8",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A9",
+      "name": "Test Marker A9",
+      "type": "test",
+      "coordinates": { "x": 150, "y": 150 },
+      "description": "Test-Marker in A9",
+      "is_permanent": true,
+      "rarity": "common"
+    },
+    {
+      "sector": "A9",
+      "name": "Wrack Eta",
+      "type": "wrack",
+      "coordinates": { "x": 200, "y": 200 },
+      "description": "Permanentes Wrack in A9",
+      "is_permanent": true,
+      "rarity": "common"
+    }
+  ]
+}

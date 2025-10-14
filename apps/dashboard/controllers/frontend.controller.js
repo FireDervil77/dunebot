@@ -86,12 +86,55 @@ module.exports.getIndex = async (req, res) => {
             };
         });
         
+        // Plugins aus Registry und package.json laden
+        let pluginsList = [];
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const pluginsDir = path.join(__dirname, '../../../plugins');
+            
+            // Nur öffentliche Plugins (nicht superadmin)
+            const pluginFolders = fs.readdirSync(pluginsDir)
+                .filter(folder => {
+                    const pluginPath = path.join(pluginsDir, folder);
+                    return fs.statSync(pluginPath).isDirectory() && 
+                           fs.existsSync(path.join(pluginPath, 'package.json')) &&
+                           folder !== 'superadmin'; // Superadmin ausschließen
+                });
+            
+            pluginsList = pluginFolders.map(folder => {
+                try {
+                    // fs.readFileSync + JSON.parse statt require() (Pfad-Problem)
+                    const packagePath = path.join(pluginsDir, folder, 'package.json');
+                    const packageData = fs.readFileSync(packagePath, 'utf8');
+                    const packageJson = JSON.parse(packageData);
+                    
+                    return {
+                        name: packageJson.name || folder,
+                        displayName: packageJson.displayName || packageJson.name || folder,
+                        description: packageJson.description || 'Keine Beschreibung verfügbar',
+                        version: packageJson.version || '1.0.0',
+                        author: packageJson.author || 'FireDervil',
+                        icon: this._getPluginIcon(folder) // Icon basierend auf Plugin-Name
+                    };
+                } catch (err) {
+                    Logger.warn(`Konnte package.json für Plugin ${folder} nicht laden:`, err);
+                    return null;
+                }
+            }).filter(Boolean); // null-Werte entfernen
+            
+            Logger.debug(`Plugins für Carousel geladen: ${pluginsList.length}`);
+        } catch (err) {
+            Logger.error("Fehler beim Laden der Plugins:", err);
+        }
+        
         // Template rendern
         res.render("frontend/index", {
             title: "Willkommen bei DuneBot",
             user: req.session?.user || null,
             newsList: localizedNewsList,
-            changelogsList: localizedChangelogsList
+            changelogsList: localizedChangelogsList,
+            pluginsList: pluginsList
         });
     } catch (error) {
         Logger.error("Fehler beim Rendern der Landing Page:", error);
@@ -207,6 +250,29 @@ exports.tos = async (req, res) => {
 };
 
 // Helper-Funktionen
+
+/**
+ * Helper-Funktion: Plugin-Icon basierend auf Plugin-Namen zuweisen
+ * @private
+ * @param {string} pluginName - Name des Plugins
+ * @returns {string} FontAwesome Icon-Klasse
+ */
+module.exports._getPluginIcon = function(pluginName) {
+    const iconMap = {
+        'core': 'fa-solid fa-gear',
+        'automod': 'fa-solid fa-shield-halved',
+        'moderation': 'fa-solid fa-gavel',
+        'dunemap': 'fa-solid fa-map',
+        'greeting': 'fa-solid fa-hand-wave',
+        'information': 'fa-solid fa-circle-info',
+        'ticket': 'fa-solid fa-ticket',
+        'economy': 'fa-solid fa-coins',
+        'giveaway': 'fa-solid fa-gift',
+        'statistik': 'fa-solid fa-chart-line'
+    };
+    
+    return iconMap[pluginName] || 'fa-solid fa-puzzle-piece';
+};
 
 /**
  * News aus der Datenbank laden und lokalisieren

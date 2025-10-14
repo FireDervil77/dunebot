@@ -167,16 +167,25 @@ module.exports.dashboard = async (req, res, next) => {
         plugin.name.charAt(0).toUpperCase() +
         plugin.name.slice(1) +
         " | " +
-        res.locals.coreConfig["DASHBOARD_LOGO_NAME"];
+        (coreSettings.DASHBOARD_LOGO_NAME || "DuneBot");
 
     res.locals.locale = req.session.locale;
     res.locals.tr = req.translate;
     res.locals.coreSettings = coreSettings;
+    res.locals.coreConfig = coreSettings;
     res.locals.user = req.session.user.info;
     res.locals.plugins = pluginManager.plugins;
-    res.locals.enabledPlugins = pluginManager.plugins.filter((p) =>
-        coreSettings.ENABLED_PLUGINS.includes(p.name)
+    
+    // Lade enabled Plugins aus guild_plugins Tabelle
+    const enabledPluginsRows = await dbService.query(
+        "SELECT plugin_name FROM guild_plugins WHERE guild_id = ? AND is_enabled = 1",
+        [req.params.guildId]
     );
+    const enabledPluginNames = enabledPluginsRows.map(row => row.plugin_name);
+    res.locals.enabledPlugins = pluginManager.plugins.filter((p) =>
+        enabledPluginNames.includes(p.name)
+    );
+    
     res.locals.plugin = plugin;
     res.locals.pluginCmds = pluginCmds;
     res.locals.config = pluginConfig;

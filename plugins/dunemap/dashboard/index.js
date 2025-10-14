@@ -1,4 +1,4 @@
-const { DashboardPlugin } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 const path = require('path');
@@ -9,7 +9,7 @@ class DuneMapPlugin extends DashboardPlugin {
             name: 'dunemap',
             displayName: 'DuneMap Plugin',
             description: 'Das lägendäre dunemap plugin',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'DuneBot Team',
             icon: 'fa-solid fa-map',
             baseDir: __dirname,
@@ -302,13 +302,13 @@ class DuneMapPlugin extends DashboardPlugin {
                 
                 const { 
                     MAP_CHANNEL_ID,
-                    coriolis_region  // Einzige Storm-Einstellung
+                    COREOLIS_REGION  // Einzige Storm-Einstellung
                 } = req.body;
                 
                 try {
                     const settingsToSave = {
                         MAP_CHANNEL_ID: MAP_CHANNEL_ID || '',
-                        coriolis_region: coriolis_region || 'EU'
+                        COREOLIS_REGION: COREOLIS_REGION || 'EU'
                     };
                     
                     // FIX: INSERT ... ON DUPLICATE KEY UPDATE für alle Settings
@@ -376,7 +376,7 @@ class DuneMapPlugin extends DashboardPlugin {
                     
                     Logger.info(`[DuneMap] Gefundene Marker: ${markers.length}`);
                     
-                    // Lade Settings (SHARED für coriolis_region!)
+                    // Lade Settings (SHARED für COREOLIS_REGION!)
                     const settings = await dbService.query(`
                         SELECT config_key, config_value 
                         FROM configs 
@@ -591,7 +591,7 @@ class DuneMapPlugin extends DashboardPlugin {
                         SELECT config_value 
                         FROM configs 
                         WHERE plugin_name = 'dunemap' 
-                        AND config_key = 'coriolis_region' 
+                        AND config_key = 'COREOLIS_REGION' 
                         AND guild_id = ? 
                         AND context = 'guild'
                     `, [guildId]);
@@ -665,6 +665,8 @@ class DuneMapPlugin extends DashboardPlugin {
      */
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
         Logger.debug(`Registriere Navigation für dunemap in Guild ${guildId}`);
         await this._registerNavigation(guildId);
 
@@ -673,6 +675,76 @@ class DuneMapPlugin extends DashboardPlugin {
         // TODO: Models wieder aktivieren wenn benötigt
         // await this.registerModel(require('./models/Marker'));
         // await this.registerModel(require('./models/StormTimer'));
+
+        // Standard-Marker für A1-A9 Sektoren erstellen
+        await this._seedDefaultMarkers(guildId);
+    }
+
+    /**
+     * Erstellt Standard-Marker für A1-A9 Sektoren (falls noch nicht vorhanden)
+     * @param {string} guildId - Discord Guild ID
+     */
+    async _seedDefaultMarkers(guildId) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        const fs = require('fs');
+        const path = require('path');
+
+        try {
+            // Lade Seed-Daten
+            const seedPath = path.join(__dirname, '..', 'shared', 'seeds', 'default-markers.json');
+            
+            if (!fs.existsSync(seedPath)) {
+                Logger.debug(`[DuneMap] Seed-Datei nicht gefunden: ${seedPath}`);
+                return;
+            }
+            
+            const seedData = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+            const markers = seedData.markers;
+            
+            Logger.info(`[DuneMap] Erstelle ${markers.length} Standard-Marker für Guild ${guildId}...`);
+            
+            let markersCreated = 0;
+            
+            for (const marker of markers) {
+                // Sektor aufteilen (z.B. "A1" -> sector_x='A', sector_y=1)
+                const sectorX = marker.sector.charAt(0);
+                const sectorY = parseInt(marker.sector.substring(1));
+                
+                // Prüfe ob Marker bereits existiert
+                const existing = await dbService.query(`
+                    SELECT id FROM dunemap_markers 
+                    WHERE guild_id = ? AND sector_x = ? AND sector_y = ? AND marker_type = ?
+                `, [guildId, sectorX, sectorY, marker.type]);
+                
+                if (existing.length === 0) {
+                    // Marker erstellen
+                    await dbService.query(`
+                        INSERT INTO dunemap_markers 
+                        (guild_id, sector_x, sector_y, marker_type, placed_by, is_permanent)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    `, [
+                        guildId,
+                        sectorX,
+                        sectorY,
+                        marker.type,
+                        'Dashboard', // placed_by für automatisch erstellte Marker
+                        marker.is_permanent ? 1 : 0
+                    ]);
+                    
+                    markersCreated++;
+                }
+            }
+            
+            if (markersCreated > 0) {
+                Logger.info(`[DuneMap] ${markersCreated} Standard-Marker für Guild ${guildId} erstellt`);
+            } else {
+                Logger.debug(`[DuneMap] Standard-Marker für Guild ${guildId} bereits vorhanden`);
+            }
+            
+        } catch (error) {
+            Logger.error(`[DuneMap] Fehler beim Erstellen der Standard-Marker für Guild ${guildId}:`, error);
+        }
     }
 
     /**
@@ -694,7 +766,6 @@ class DuneMapPlugin extends DashboardPlugin {
             // Guild-spezifische Daten aus ALLEN DuneMap-Tabellen löschen
             await dbService.query('DELETE FROM dunemap_storm_timer WHERE guild_id = ?', [guildId]);
             await dbService.query('DELETE FROM dunemap_markers WHERE guild_id = ?', [guildId]);
-            await dbService.query('DELETE FROM dunemap_gps_markers WHERE guild_id = ?', [guildId]);
             
             // Configs löschen
             await dbService.query(
@@ -722,7 +793,7 @@ class DuneMapPlugin extends DashboardPlugin {
         // Haupt-Plugin-Navigation
         const navItems = [
             {
-                title: 'DuneMap',
+                title: 'dunemap:NAV.DUNEMAP',
                 path: `/guild/${guildId}/plugins/dunemap`,
                 icon: 'fa-solid fa-map',
                 order: 50,
@@ -730,7 +801,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 visible: true
             },
             {
-                title: 'Sektor-Karte',
+                title: 'dunemap:NAV.SEKTOR_CARD',
                 path: `/guild/${guildId}/plugins/dunemap/admin`,
                 icon: 'fa-solid fa-map-marked-alt',
                 order: 51,
@@ -740,7 +811,7 @@ class DuneMapPlugin extends DashboardPlugin {
             },
             // Settings als Subnav UNTER CORE-EINSTELLUNGEN!
             {
-                title: 'DuneMap',
+                title: 'dunemap:NAV.DUNEMAP',
                 path: `/guild/${guildId}/plugins/dunemap/settings`,
                 icon: 'fa-solid fa-map',
                 order: 24,  // Nach Core-Settings (21, 22, 23)

@@ -226,5 +226,45 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Language Switcher Script -->
 <%- includePartial('guild/language_switcher', locals) %>
 
+<!-- Notification Dismiss Handler -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Event-Handler für alle Notification Close-Buttons
+    document.querySelectorAll('.alert-dismissible[data-notification-id] .close').forEach(function(closeBtn) {
+        closeBtn.addEventListener('click', async function(e) {
+            const alertElement = this.closest('.alert[data-notification-id]');
+            const notificationId = alertElement.getAttribute('data-notification-id');
+            
+            if (!notificationId) {
+                console.warn('[Notifications] Keine Notification-ID gefunden');
+                return;
+            }
+            
+            try {
+                // API-Call zum Speichern des Dismiss-Status
+                const response = await fetch('/api/core/dismiss-notification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ notificationId: parseInt(notificationId) })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    console.error('[Notifications] Fehler beim Dismiss:', data.message);
+                }
+                
+                console.log('[Notifications] Notification #' + notificationId + ' dismissed');
+            } catch (error) {
+                console.error('[Notifications] Fehler beim Dismiss-API-Call:', error);
+                // Alert wird trotzdem geschlossen (Bootstrap-Standard-Verhalten)
+            }
+        });
+    });
+});
+</script>
+
 </body>
 </html>

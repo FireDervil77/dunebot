@@ -9,7 +9,7 @@ const path = require('path');
 const express = require('express');
 const fs = require('fs');
 
-const { DashboardPlugin } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 const { getLocalizedNews, getLocalizedNewsList, prepareNewsForDB } = require('../../../apps/dashboard/helpers/newsHelper');
 const { getLocalizedNotification, getLocalizedNotificationList, prepareNotificationForDB } = require('../../../apps/dashboard/helpers/notificationHelper');
@@ -21,7 +21,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             name: 'superadmin',
             displayName: 'SuperAdmin Panel',
             description: 'Globale Verwaltung - Nur für Bot-Owner',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'DuneBot Team',
             icon: 'fa-solid fa-shield-halved',
             baseDir: __dirname,
@@ -73,13 +73,33 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
         // Recent News
         try {
-            stats.recentNews = await dbService.query(`
-                SELECT _id, title, author, status, date, created_at
+            const newsResults = await dbService.query(`
+                SELECT _id, title_translations, author, status, date, created_at
                 FROM news 
                 ORDER BY date DESC
                 LIMIT 10
             `);
+            
+            // Parse title_translations JSON und extrahiere deutschen Titel
+            stats.recentNews = newsResults.map(news => {
+                let title = 'Kein Titel';
+                if (news.title_translations) {
+                    try {
+                        const titles = typeof news.title_translations === 'string' 
+                            ? JSON.parse(news.title_translations) 
+                            : news.title_translations;
+                        title = titles['de-DE'] || titles['en-GB'] || 'Kein Titel';
+                    } catch (e) {
+                        Logger.error('[SuperAdmin] Fehler beim Parsen von title_translations:', e);
+                    }
+                }
+                return {
+                    ...news,
+                    title
+                };
+            });
         } catch (err) {
+            Logger.error('[SuperAdmin] Fehler beim Laden der News:', err);
             stats.recentNews = [];
         }
 
@@ -149,11 +169,16 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             
             // API-Routen (ohne Owner-Check für bestimmte Endpoints)
             const toastHistoryApi = require('./routes/api/toast-history');
+            const botGuildsApi = require('./routes/api/bot-guilds');
             this.apiRouter = express.Router();
             this.apiRouter.use('/toast-history', toastHistoryApi);
-            Logger.debug('[SuperAdmin] Toast-History API registriert');
+            Logger.debug('[SuperAdmin] API-Routen registriert (toast-history)');
             
-            // Middleware: Owner-Check für ALLE SuperAdmin-Routen
+            // Guild-spezifische API-Routen (VOR dem Owner-Check!)
+            this.guildRouter.use('/api/bot-guilds', botGuildsApi);
+            Logger.debug('[SuperAdmin] Guild API-Routen registriert (bot-guilds)');
+            
+            // Middleware: Owner-Check für ALLE SuperAdmin-Routen (nach API-Routen!)
             this.guildRouter.use(this._checkOwner.bind(this));
 
             // === HAUPTSEITE (Dashboard-Übersicht) ===
@@ -262,6 +287,16 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             this.guildRouter.post('/news/save', async (req, res) => {
                 const dbService = ServiceManager.get('dbService');
                 const Logger = ServiceManager.get('Logger');
+                
+                // DEBUG: Log request body to see what's being sent
+                Logger.debug('[SuperAdmin] News Save Request Body:', {
+                    newsId: req.body.newsId,
+                    title_de_length: req.body.title_de?.length,
+                    content_de_length: req.body.content_de?.length,
+                    content_en_length: req.body.content_en?.length,
+                    all_keys: Object.keys(req.body)
+                });
+                
                 const {
                     newsId,
                     title_de, title_en,
@@ -271,19 +306,17 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 } = req.body;
 
                 try {
-                    // Übersetzungen als JSON vorbereiten
+                    // Übersetzungen im korrekten Format für prepareNewsForDB vorbereiten
                     const translations = {
-                        title: {
-                            'de-DE': title_de || '',
-                            'en-GB': title_en || ''
+                        'de-DE': {
+                            title: title_de || '',
+                            content: content_de || '',
+                            excerpt: excerpt_de || ''
                         },
-                        content: {
-                            'de-DE': content_de || '',
-                            'en-GB': content_en || ''
-                        },
-                        excerpt: {
-                            'de-DE': excerpt_de || '',
-                            'en-GB': excerpt_en || ''
+                        'en-GB': {
+                            title: title_en || '',
+                            content: content_en || '',
+                            excerpt: excerpt_en || ''
                         }
                     };
 
@@ -463,7 +496,11 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     title_de, title_en,
                     message_de, message_en,
                     action_text_de, action_text_en,
-                    type, action_url, expiry, roles
+                    type, action_url, expiry, roles,
+                    // NEU: Delivery-Optionen
+                    delivery_method,
+                    target_guild_ids,
+                    discord_channel_id
                 } = req.body;
 
                 try {
@@ -489,7 +526,11 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                         action_url: action_url || null,
                         expiry: expiry || null,
                         roles: roles || null,
-                        dismissed: 0
+                        dismissed: 0,
+                        // NEU: Delivery-Optionen
+                        delivery_method: delivery_method || 'dashboard',
+                        target_guild_ids: target_guild_ids || null, // JSON-String vom Frontend
+                        discord_channel_id: discord_channel_id || null
                     };
 
                     // prepareNotificationForDB nutzen
@@ -503,6 +544,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                                 message_translations = ?,
                                 action_text_translations = ?,
                                 type = ?, action_url = ?, expiry = ?, roles = ?,
+                                delivery_method = ?, target_guild_ids = ?, discord_channel_id = ?,
                                 updated_at = NOW()
                             WHERE id = ?
                         `, [
@@ -513,6 +555,9 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             notificationData.action_url,
                             notificationData.expiry,
                             notificationData.roles,
+                            metadata.delivery_method,
+                            metadata.target_guild_ids,
+                            metadata.discord_channel_id,
                             notificationId
                         ]);
                         
@@ -524,11 +569,13 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                         res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
                     } else {
                         // Neue Notification
-                        await dbService.query(`
+                        const [result] = await dbService.query(`
                             INSERT INTO notifications 
                             (title_translations, message_translations, action_text_translations,
-                             type, action_url, expiry, roles, dismissed, created_at, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())
+                             type, action_url, expiry, roles, dismissed,
+                             delivery_method, target_guild_ids, discord_channel_id,
+                             created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NOW(), NOW())
                         `, [
                             notificationData.title_translations,
                             notificationData.message_translations,
@@ -536,8 +583,42 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             notificationData.type,
                             notificationData.action_url,
                             notificationData.expiry,
-                            notificationData.roles
+                            notificationData.roles,
+                            metadata.delivery_method,
+                            metadata.target_guild_ids,
+                            metadata.discord_channel_id
                         ]);
+                        
+                        // NEU: Wenn Discord-Delivery aktiviert, IPC-Call an Bot
+                        if (metadata.delivery_method !== 'dashboard') {
+                            const notificationForBot = {
+                                id: result.insertId,
+                                title_translations: notificationData.title_translations,
+                                message_translations: notificationData.message_translations,
+                                action_text_translations: notificationData.action_text_translations,
+                                type: notificationData.type,
+                                action_url: notificationData.action_url,
+                                delivery_method: metadata.delivery_method,
+                                target_guild_ids: metadata.target_guild_ids,
+                                discord_channel_id: metadata.discord_channel_id
+                            };
+                            
+                            // IPC-Call: Bot soll Notification senden
+                            const ipcServer = ServiceManager.get('ipcServer');
+                            try {
+                                Logger.debug('[SuperAdmin] Sende Notification an Bot via IPC:', notificationForBot);
+                                await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', notificationForBot, true);
+                                Logger.debug('[SuperAdmin] Notification erfolgreich an Bot gesendet');
+                            } catch (ipcError) {
+                                Logger.error('[SuperAdmin] Fehler beim Senden der Notification an Bot:', ipcError);
+                                // Notification wurde gespeichert, aber Discord-Versand fehlgeschlagen
+                                req.session.toast = {
+                                    type: 'warning',
+                                    message: 'Notification gespeichert, aber Discord-Versand fehlgeschlagen: ' + ipcError.message
+                                };
+                                return res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
+                            }
+                        }
                         
                         // Redirect mit Toast-Notification
                         req.session.toast = {
@@ -807,6 +888,92 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 }
             });
 
+            // === USER FEEDBACK VERWALTUNG (Bugs & Features) ===
+            this.guildRouter.get('/feedback', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+
+                try {
+                    // Alle Bug Reports und Feature Requests laden
+                    const feedbackList = await dbService.query(`
+                        SELECT * FROM user_feedback
+                        ORDER BY created_at DESC
+                    `);
+                    
+                    await themeManager.renderView(res, 'guild/feedback-management', {
+                        title: 'User Feedback Verwaltung',
+                        activeMenu: `/guild/${guildId}/plugins/superadmin/feedback`,
+                        guildId,
+                        feedbackList: feedbackList || [],
+                        plugin: this
+                    });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Laden des User Feedbacks:', error);
+                    res.status(500).render('error', { message: 'Fehler beim Laden des User Feedbacks', error });
+                }
+            });
+
+            // POST: Feedback Status/Priority ändern
+            this.guildRouter.post('/feedback/:id/update', async (req, res) => {
+                const dbService = ServiceManager.get('dbService');
+                const { status, priority, admin_notes, admin_response } = req.body;
+                
+                try {
+                    const updates = [];
+                    const values = [];
+                    
+                    if (status) {
+                        updates.push('status = ?');
+                        values.push(status);
+                    }
+                    if (priority) {
+                        updates.push('priority = ?');
+                        values.push(priority);
+                    }
+                    if (admin_notes !== undefined) {
+                        updates.push('admin_notes = ?');
+                        values.push(admin_notes);
+                    }
+                    if (admin_response !== undefined) {
+                        updates.push('admin_response = ?');
+                        values.push(admin_response);
+                    }
+                    
+                    // resolved_at setzen wenn Status auf resolved/implemented
+                    if (status === 'resolved' || status === 'implemented') {
+                        updates.push('resolved_at = NOW()');
+                        updates.push('resolved_by = ?');
+                        values.push(req.session.user.info.username || 'Admin');
+                    }
+                    
+                    values.push(req.params.id);
+                    
+                    await dbService.query(`
+                        UPDATE user_feedback 
+                        SET ${updates.join(', ')}
+                        WHERE id = ?
+                    `, values);
+                    
+                    res.json({ success: true, message: 'Feedback erfolgreich aktualisiert' });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Aktualisieren des Feedbacks:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
+            // DELETE: Feedback löschen
+            this.guildRouter.delete('/feedback/:id', async (req, res) => {
+                const dbService = ServiceManager.get('dbService');
+                
+                try {
+                    await dbService.query(`DELETE FROM user_feedback WHERE id = ?`, [req.params.id]);
+                    res.json({ success: true, message: 'Feedback erfolgreich gelöscht' });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Löschen des Feedbacks:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
             // === TOAST-HISTORY (Monitoring/Debugging) ===
             this.guildRouter.get('/toast-history', async (req, res) => {
                 const guildId = res.locals.guildId;
@@ -1008,13 +1175,33 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
         // Recent News
         try {
-            stats.recentNews = await dbService.query(`
-                SELECT _id, title, author, status, date, created_at
+            const newsResults = await dbService.query(`
+                SELECT _id, title_translations, author, status, date, created_at
                 FROM news 
                 ORDER BY date DESC
                 LIMIT 10
             `);
+            
+            // Parse title_translations JSON und extrahiere deutschen Titel
+            stats.recentNews = newsResults.map(news => {
+                let title = 'Kein Titel';
+                if (news.title_translations) {
+                    try {
+                        const titles = typeof news.title_translations === 'string' 
+                            ? JSON.parse(news.title_translations) 
+                            : news.title_translations;
+                        title = titles['de-DE'] || titles['en-GB'] || 'Kein Titel';
+                    } catch (e) {
+                        Logger.error('[SuperAdmin] Fehler beim Parsen von title_translations:', e);
+                    }
+                }
+                return {
+                    ...news,
+                    title
+                };
+            });
         } catch (err) {
+            Logger.error('[SuperAdmin] Fehler beim Laden der News:', err);
             stats.recentNews = [];
         }
 
@@ -1079,7 +1266,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         // Navigation registrieren
         const navItems = [
             {
-                title: 'SuperAdmin',
+                title: 'superadmin:NAV.SUPERADMIN',
                 path: `/guild/${guildId}/plugins/superadmin`,
                 icon: 'fa-solid fa-shield-halved',
                 order: 90,  // Ganz am Ende der Navigation (nach Core: 10-40)
@@ -1087,7 +1274,16 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 visible: true
             },
             {
-                title: 'News',
+                title: 'superadmin:NAV.FEEDBACK',
+                path: `/guild/${guildId}/plugins/superadmin/feedback`,
+                icon: 'fa-solid fa-comments',
+                order: 91.5,  // Zwischen Notifications und News
+                parent: `/guild/${guildId}/plugins/superadmin`,
+                type: 'main',
+                visible: true
+            },
+            {
+                title: 'superadmin:NAV.NEWS',
                 path: `/guild/${guildId}/plugins/superadmin/news`,
                 icon: 'fa-solid fa-newspaper',
                 order: 91,  // Untermenü-Reihenfolge
@@ -1096,7 +1292,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 visible: true
             },
             {
-                title: 'Notifications',
+                title: 'superadmin:NAV.NOTIFICATIONS',
                 path: `/guild/${guildId}/plugins/superadmin/notifications`,
                 icon: 'fa-solid fa-bell',
                 order: 92,  // Untermenü-Reihenfolge
@@ -1105,7 +1301,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 visible: true
             },
             {
-                title: 'Changelogs',
+                title: 'superadmin:NAV.CHANGELOGS',
                 path: `/guild/${guildId}/plugins/superadmin/changelogs`,
                 icon: 'fa-solid fa-code-commit',
                 order: 93,  // Untermenü-Reihenfolge
@@ -1114,19 +1310,10 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 visible: true
             },
             {
-                title: 'Statistiken',
+                title: 'superadmin:NAV.STATISTICS',
                 path: `/guild/${guildId}/plugins/superadmin/stats`,
                 icon: 'fa-solid fa-chart-line',
                 order: 94,  // Untermenü-Reihenfolge
-                parent: `/guild/${guildId}/plugins/superadmin`,
-                type: 'main',
-                visible: true
-            },
-            {
-                title: 'Übersetzungen',
-                path: `/guild/${guildId}/locales`,
-                icon: 'fa-solid fa-language',
-                order: 95,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true

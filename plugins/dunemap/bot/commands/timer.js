@@ -81,7 +81,7 @@ module.exports = {
 
         try {
             // Lade Region aus DB (Default: EU)
-            const region = await dbService.getConfig('dunemap', 'coriolis_region', 'shared', guild.id) || 'EU';
+            const region = await dbService.getConfig('dunemap', 'COREOLIS_REGION', 'shared', guild.id) || 'EU';
             Logger.debug(`[DuneMap] Storm-Region für Guild ${guild.id}: ${region}`);
 
             // Berechne nächsten Storm

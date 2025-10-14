@@ -10,13 +10,7 @@ module.exports = async (guild, plugin) => {
     Logger.info(`Guild Left: ${guild.name} Members: ${guild.memberCount}`);
 
     // Mark guild as left (MySQL/Sequelize)
-    await dbService.query(`
-        UPDATE guilds 
-        SET 
-            left_at = NOW(),
-            updated_at = NOW()
-        WHERE _id = ?
-    `, [guild.id]);
+    await dbService.query(`UPDATE guilds SET left_at = NOW(), updated_at = NOW() WHERE _id = ?`, [guild.id]);
 
     await dbService.deleteConfig("core", null, "shared", guild.id);
     Logger.info(`Alle Konfigurationen für Guild ${guild.id} wurden entfernt.`);

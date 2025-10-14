@@ -1,0 +1,58 @@
+{
+  "NAV": {
+    "MODERATION": "Moderation"
+  },
+  "SETTINGS": {
+    "PAGE_TITLE": "Moderation Einstellungen",
+    "PAGE_DESC": "Konfiguriere Moderation, Logs und Benachrichtigungen"
+  },
+  "SECTION_BASIC": "Basis-Einstellungen",
+  "SECTION_BASIC_DESC": "Grundlegende Moderations-Konfiguration",
+  
+  "MODLOG_CHANNEL_TITLE": "Modlog-Channel",
+  "MODLOG_CHANNEL_DESC": "Channel für Moderations-Logs",
+  "CHANNEL_SELECT": "Channel auswählen",
+  
+  "MAXWARN_LIMIT_TITLE": "Max. Warnungen",
+  "MAXWARN_LIMIT_DESC": "Anzahl der Warnungen bevor eine Aktion ausgeführt wird",
+  
+  "MAXWARN_ACTION_TITLE": "Aktion bei Max. Warnungen",
+  "MAXWARN_ACTION_DESC": "Welche Aktion soll bei Erreichen der maximalen Warnungen ausgeführt werden?",
+  
+  "DEFAULT_REASON_TITLE": "Standard-Begründung",
+  "DEFAULT_REASON_DESC": "Diese Begründung wird automatisch bei Kicks/Bans verwendet, wenn keine spezifische Begründung angegeben wird.",
+  "DEFAULT_REASON_PLACEHOLDER": "z.B. Verstoß gegen die Server-Regeln",
+  
+  "SECTION_MODLOG_EVENTS": "Modlog Events",
+  "SECTION_MODLOG_EVENTS_DESC": "Wähle welche Aktionen im Modlog-Channel geloggt werden sollen",
+  
+  "EVENT_WARN": "Warnungen",
+  "EVENT_KICK": "Kicks",
+  "EVENT_BAN": "Bans",
+  "EVENT_TIMEOUT": "Timeouts",
+  "EVENT_UNTIMEOUT": "Timeout aufheben",
+  "EVENT_SOFTBAN": "Softbans",
+  "EVENT_UNBAN": "Unbans",
+  
+  "SECTION_DM_NOTIFICATIONS": "DM Benachrichtigungen",
+  "SECTION_DM_NOTIFICATIONS_DESC": "Soll der betroffene User per Direktnachricht informiert werden?",
+  
+  "DM_ON_WARN": "Bei Warnung",
+  "DM_ON_KICK": "Bei Kick",
+  "DM_ON_BAN": "Bei Ban",
+  "DM_ON_TIMEOUT": "Bei Timeout",
+  
+  "HELP": {
+    "TITLE": "Hilfe & Tipps",
+    "MODERATION_TITLE": "Moderation",
+    "MODERATION_TEXT": "Verwalte Warnungen, Kicks, Bans und Timeouts für deinen Server.",
+    "MODLOG_TITLE": "Modlog Events",
+    "MODLOG_TEXT": "Protokolliere alle Moderationsaktionen in einem dedizierten Channel.",
+    "DM_TITLE": "DM Benachrichtigungen",
+    "DM_TEXT": "Informiere betroffene User automatisch über Moderationsaktionen per Direktnachricht.",
+    "COMMANDS_TITLE": "Verfügbare Commands"
+  },
+  
+  "BTN_SAVE": "Speichern",
+  "BTN_SAVING": "Wird gespeichert..."
+}

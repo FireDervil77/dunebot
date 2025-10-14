@@ -1,7 +1,7 @@
 const path = require('path');
 const express = require('express');
 
-const { DashboardPlugin } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 const { uptime } = require('process');
 
@@ -12,7 +12,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
             name: 'core',
             displayName: 'Kern-Plugin',
             description: 'Grundlegende Funktionen für DuneBot',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'DuneBot Team',
             icon: 'fa-solid fa-cog',
             baseDir: __dirname
@@ -77,6 +77,54 @@ class CoreDashboardPlugin extends DashboardPlugin {
             const toastLoggerRouter = require('./routes/api/toast-logger');
             this.apiRouter.use('/toasts', toastLoggerRouter);
             Logger.debug('[Core] Toast-Logger API-Route registriert');
+
+            // Notification Dismiss API
+            this.apiRouter.post('/dismiss-notification', async (req, res) => {
+                try {
+                    const { notificationId } = req.body;
+                    
+                    // Validierung
+                    if (!notificationId) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: 'Notification-ID erforderlich' 
+                        });
+                    }
+                    
+                    // User muss eingeloggt sein
+                    if (!req.session?.user?.id) {
+                        return res.status(401).json({ 
+                            success: false, 
+                            message: 'Nicht authentifiziert' 
+                        });
+                    }
+                    
+                    const userId = req.session.user.id;
+                    
+                    // Lade aktuelle dismissed IDs
+                    const current = await req.userConfig.get('core', 'DISMISSED_NOTIFICATIONS');
+                    const dismissed = Array.isArray(current) ? current : [];
+                    
+                    // Füge neue ID hinzu (wenn nicht schon vorhanden)
+                    if (!dismissed.includes(parseInt(notificationId))) {
+                        dismissed.push(parseInt(notificationId));
+                        await req.userConfig.set('core', 'DISMISSED_NOTIFICATIONS', dismissed);
+                        Logger.debug(`[Core] User ${userId} dismissed Notification #${notificationId}`);
+                    }
+                    
+                    res.json({ 
+                        success: true,
+                        message: 'Notification erfolgreich ausgeblendet'
+                    });
+                } catch (error) {
+                    Logger.error('[Core] Fehler beim Dismiss der Notification:', error);
+                    res.status(500).json({ 
+                        success: false, 
+                        message: 'Serverfehler beim Ausblenden' 
+                    });
+                }
+            });
+            Logger.debug('[Core] Dismiss-Notification API-Route registriert');
 
             // Haupteinstellungen
             this.guildRouter.get('/settings', async (req, res) => {
@@ -252,7 +300,121 @@ class CoreDashboardPlugin extends DashboardPlugin {
                     plugin: this
                 });
             });
+
+            // Bug Report Page
+            this.guildRouter.get('/bug-report', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                
+                // Lade alle Bug Reports für diese Guild
+                const bugs = await dbService.query(`
+                    SELECT * FROM user_feedback
+                    WHERE guild_id = ? AND type = 'bug'
+                    ORDER BY created_at DESC
+                `, [guildId]);
+                
+                await themeManager.renderView(res, 'guild/bug-report', {
+                    title: 'Bug Report',
+                    activeMenu: `/guild/${guildId}/plugins/core/bug-report`,
+                    guildId,
+                    bugs: bugs || [],
+                    plugin: this
+                });
+            });
+
+                        // Feature Request Page
+            this.guildRouter.get('/feature-request', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                
+                // Lade alle Feature Requests für diese Guild
+                const features = await dbService.query(`
+                    SELECT * FROM user_feedback
+                    WHERE guild_id = ? AND type = 'feature'
+                    ORDER BY upvotes DESC, created_at DESC
+                `, [guildId]);
+                
+                await themeManager.renderView(res, 'guild/feature-request', {
+                    title: 'Feature Request',
+                    activeMenu: `/guild/${guildId}/plugins/core/feature-request`,
+                    guildId,
+                    features: features || [],
+                    plugin: this
+                });
+            });
+
+            // POST: Bug Report erstellen
+            this.guildRouter.post('/bug-report', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const userId = req.session.user.info.id;
+                const userTag = req.session.user.info.username || 'Unknown';
+                const dbService = ServiceManager.get('dbService');
+                const { title, description, category } = req.body;
+                
+                try {
+                    await dbService.query(`
+                        INSERT INTO user_feedback (guild_id, user_id, user_tag, type, title, description, category, status)
+                        VALUES (?, ?, ?, 'bug', ?, ?, ?, 'open')
+                    `, [guildId, userId, userTag, title, description, category || null]);
+                    
+                    res.json({ success: true, message: 'Bug Report erfolgreich erstellt!' });
+                } catch (error) {
+                    Logger.error('[Core] Fehler beim Erstellen des Bug Reports:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
+            // POST: Feature Request erstellen
+            this.guildRouter.post('/feature-request', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const userId = req.session.user.info.id;
+                const userTag = req.session.user.info.username || 'Unknown';
+                const dbService = ServiceManager.get('dbService');
+                const { title, description, category } = req.body;
+                
+                try {
+                    await dbService.query(`
+                        INSERT INTO user_feedback (guild_id, user_id, user_tag, type, title, description, category, status)
+                        VALUES (?, ?, ?, 'feature', ?, ?, ?, 'open')
+                    `, [guildId, userId, userTag, title, description, category || null]);
+                    
+                    res.json({ success: true, message: 'Feature Request erfolgreich erstellt!' });
+                } catch (error) {
+                    Logger.error('[Core] Fehler beim Erstellen des Feature Requests:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
+            // POST: Upvote für Feature Request
+            this.guildRouter.post('/feature-request/:id/upvote', async (req, res) => {
+                const feedbackId = req.params.id;
+                const userId = req.session.user.info.id;
+                const dbService = ServiceManager.get('dbService');
+                
+                try {
+                    // Prüfe ob User bereits upvoted hat
+                    const existing = await dbService.query(`
+                        SELECT id FROM user_feedback_votes WHERE feedback_id = ? AND user_id = ?
+                    `, [feedbackId, userId]);
+                    
+                    if (existing && existing.length > 0) {
+                        // Remove upvote
+                        await dbService.query(`DELETE FROM user_feedback_votes WHERE feedback_id = ? AND user_id = ?`, [feedbackId, userId]);
+                        await dbService.query(`UPDATE user_feedback SET upvotes = upvotes - 1 WHERE id = ?`, [feedbackId]);
+                        res.json({ success: true, action: 'removed' });
+                    } else {
+                        // Add upvote
+                        await dbService.query(`INSERT INTO user_feedback_votes (feedback_id, user_id) VALUES (?, ?)`, [feedbackId, userId]);
+                        await dbService.query(`UPDATE user_feedback SET upvotes = upvotes + 1 WHERE id = ?`, [feedbackId]);
+                        res.json({ success: true, action: 'added' });
+                    }
+                } catch (error) {
+                    Logger.error('[Core] Fehler beim Upvote:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
             
+
             Logger.debug('Core Plugin Routen eingerichtet');
         } catch (error) {
             Logger.error('Fehler beim Einrichten der Core Plugin Routen:', error);
@@ -418,7 +580,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
         // Hauptmenüpunkte
         const navItems = [
             {
-                title: 'Dashboard',
+                title: 'NAV.DASHBOARD',
                 url: `/guild/${guildId}`,
                 icon: 'fa-solid fa-gauge-high',
                 order: 10,
@@ -428,7 +590,27 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 parent: null
             },
             {
-                title: 'Einstellungen',
+                title: 'NAV.BUG_REPORT',
+                url: `/guild/${guildId}/plugins/core/bug-report`,
+                icon: 'fa-solid fa-bug',
+                order: 11,
+                type: navigationManager.menuTypes.MAIN,
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}`
+            },
+            {
+                title: 'NAV.FEATURE_REQUEST',
+                url: `/guild/${guildId}/plugins/core/feature-request`,
+                icon: 'fa-solid fa-lightbulb',
+                order: 12,
+                type: navigationManager.menuTypes.MAIN,
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}`
+            },
+            {
+                title: 'NAV.SETTINGS',
                 url: `/guild/${guildId}/plugins/core/settings`,
                 icon: 'fa-solid fa-cog',
                 order: 20,
@@ -438,7 +620,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 parent: null
             },
             {
-                title: 'Plugins',
+                title: 'NAV.PLUGINS',
                 url: `/guild/${guildId}/plugins`,
                 icon: 'fa-solid fa-puzzle-piece',
                 order: 30,
@@ -449,7 +631,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
             },
             // Subnav für Einstellungen
             {
-                title: 'Allgemein',
+                title: 'NAV.GENERAL',
                 url: `/guild/${guildId}/plugins/core/settings/general`,
                 icon: 'fa-solid fa-sliders',
                 order: 21,
@@ -459,7 +641,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 parent: `/guild/${guildId}/plugins/core/settings`
             },
             {
-                title: 'Benutzer',
+                title: 'NAV.USERS',
                 url: `/guild/${guildId}/plugins/core/settings/users`,
                 icon: 'fa-solid fa-users',
                 order: 22,
@@ -469,7 +651,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 parent: `/guild/${guildId}/plugins/core/settings`
             },
             {
-                title: 'Integrationen',
+                title: 'NAV.INTEGRATIONS',
                 url: `/guild/${guildId}/plugins/core/settings/integrations`,
                 icon: 'fa-solid fa-plug',
                 order: 23,
@@ -482,6 +664,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
 
         try {
             await navigationManager.registerNavigation(this.name, guildId, navItems);
+
             Logger.debug('Core-Plugin Navigation (mit Subnav) über NavigationManager registriert');
         } catch (error) {
             Logger.error('Fehler beim Registrieren der Navigation:', error);

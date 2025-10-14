@@ -32,7 +32,8 @@
     
     const grid = document.getElementById('sectorGrid');
     if (!grid) {
-      console.error('[DuneMap] Grid nicht gefunden!');
+      // Kein Fehler loggen, da Script auf allen Seiten geladen wird
+      console.log('[DuneMap] ℹ️ Grid nicht auf dieser Seite (normal für Nicht-Admin-Seiten)');
       return;
     }
     

@@ -507,33 +507,7 @@ class PluginManager extends BasePluginManager {
             // Plugin aus registrierten Plugins entfernen
             this.removePlugin(pluginName);
             
-            // Config aktualisieren
-            if (pluginName !== "core") {
-                const corePlugin = this.getPlugin("core");
-                if (corePlugin) {
-                    const config = await corePlugin.getConfig();
-                    
-                    config.ENABLED_PLUGINS = await this.hooks.applyFilter(
-                        'modify_enabled_plugins',
-                        config.ENABLED_PLUGINS.filter(p => p !== pluginName),
-                        pluginName,
-                        'remove'
-                    );
-                    
-                    // Native MySQL statt Sequelize
-                    await dbService.query(`
-                        INSERT INTO configs (plugin_name, config_key, config_value, context)
-                        VALUES (?, ?, ?, ?)
-                        ON DUPLICATE KEY UPDATE
-                            config_value = VALUES(config_value)
-                    `, [
-                        "core",
-                        "ENABLED_PLUGINS",
-                        JSON.stringify(config.ENABLED_PLUGINS),
-                        "shared"
-                    ]);
-                }
-            }
+            // ENABLED_PLUGINS System ist obsolet - guild_plugins Tabelle nutzt jetzt Plugin-Status
             
             Logger.success(`Disabled plugin: ${pluginName}`);
             

@@ -160,49 +160,17 @@ exports.updateSettings = async (req, res) => {
             });
         }
 
-        // Normalisieren: enabled_plugins erlauben als Array oder JSON-String
-        if (typeof updates.enabled_plugins !== 'undefined') {
-            if (typeof updates.enabled_plugins === 'string') {
-                try {
-                    // Wenn ein JSON-Array-String übermittelt wurde
-                    updates.enabled_plugins = JSON.parse(updates.enabled_plugins);
-                } catch {
-                    // CSV -> Array
-                    updates.enabled_plugins = updates.enabled_plugins
-                        .split(',')
-                        .map(s => s.trim())
-                        .filter(Boolean);
-                }
-            }
-            if (!Array.isArray(updates.enabled_plugins)) {
-                updates.enabled_plugins = ["core"];
-            }
-            // Core darf niemals entfernt werden
-            if (!updates.enabled_plugins.includes("core")) {
-                updates.enabled_plugins.unshift("core");
-            }
-        }
-
-        // Settings in der Datenbank aktualisieren
+        // Settings in der Datenbank aktualisieren via configs Tabelle
         try {
-            // Enabled Plugins als JSON speichern
-            if (updates.enabled_plugins) {
-                updates.enabled_plugins = JSON.stringify(updates.enabled_plugins);
+            // Prefix speichern
+            if (updates.prefix) {
+                await dbService.setConfig('core', 'PREFIX_COMMANDS_PREFIX', updates.prefix, 'shared', guildId);
             }
-
-            await dbService.query(`
-                INSERT INTO settings (_id, prefix, locale, enabled_plugins)
-                VALUES (?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE
-                    prefix = VALUES(prefix),
-                    locale = VALUES(locale),
-                    enabled_plugins = VALUES(enabled_plugins)
-            `, [
-                guildId,
-                updates.prefix || '!',
-                updates.locale || 'de-DE',
-                updates.enabled_plugins || JSON.stringify(['core'])
-            ]);
+            
+            // Locale speichern
+            if (updates.locale) {
+                await dbService.setConfig('core', 'LOCALE', updates.locale, 'shared', guildId);
+            }
         } catch (dbError) {
             Logger.error(`Fehler beim Aktualisieren der Settings für Guild ${guildId}:`, dbError);
             return res.status(500).json({
@@ -257,10 +225,21 @@ exports.getPlugins = async (req, res) => {
             Logger.warn(`Kein Guild-Name gefunden für Guild ${guildId}`);
         }
 
-        // Aktivierte Plugins aus guild_plugins Tabelle laden
+        // Aktivierte Plugins aus guild_plugins Tabelle laden (mit Versionen)
         let enabledServerPlugins = [];
+        let pluginVersionsFromDB = {};
         try {
-            enabledServerPlugins = await dbService.getEnabledPlugins(guildId);
+            const pluginsData = await dbService.query(`
+                SELECT plugin_name, plugin_version 
+                FROM guild_plugins 
+                WHERE guild_id = ? AND is_enabled = 1
+            `, [guildId]);
+            
+            enabledServerPlugins = pluginsData.map(p => p.plugin_name);
+            pluginVersionsFromDB = pluginsData.reduce((acc, p) => {
+                acc[p.plugin_name] = p.plugin_version;
+                return acc;
+            }, {});
             
             // Sicherstellen dass core immer aktiviert ist
             if (!enabledServerPlugins.includes('core')) {
@@ -358,14 +337,21 @@ exports.getPlugins = async (req, res) => {
 
                     const displayName = pkg.displayName || pkg.name || pluginName;
                     const isCore = pluginName === "core";
+                    const isEnabled = enabledServerPlugins.includes(pluginName);
+
+                    // Version aus DB verwenden, falls Plugin aktiviert ist
+                    const version = isEnabled && pluginVersionsFromDB[pluginName] 
+                        ? pluginVersionsFromDB[pluginName] 
+                        : (pkg.version || '1.0.0');
 
                     const plugin = {
                         name: pluginName,
                         displayName,
                         description: pkg.description || '',
-                        version: pkg.version || '1.0.0',
+                        version: version,
+                        packageVersion: pkg.version || '1.0.0', // Original-Version für Vergleich
                         author: (typeof pkg.author === 'string' ? pkg.author : (pkg.author?.name || 'Unbekannt')),
-                        enabled: enabledServerPlugins.includes(pluginName),
+                        enabled: isEnabled,
                         hasSettings,
                         settingsUrl: hasSettings ? `/guild/${guildId}/plugins/${pluginName}/settings` : null,
                         icon,

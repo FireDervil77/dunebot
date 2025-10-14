@@ -2,7 +2,7 @@ const { ApplicationCommandOptionType } = require("discord.js");
 const { ServiceManager } = require('dunebot-core');
 
 /**
- * @type {import('strange-sdk').CommandType}
+ * @type {import('dunebot-sdk').CommandType}
  */
 module.exports = {
     name: "autorole",

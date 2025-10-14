@@ -1,4 +1,4 @@
-const { BotPlugin } = require('dunebot-sdk');
+const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class DuneMapBotPlugin extends BotPlugin {
@@ -6,9 +6,13 @@ class DuneMapBotPlugin extends BotPlugin {
         super({
             name: 'dunemap',
             displayName: 'DuneMap',
-            description: 'Interaktive Karte für Dune-Spiele',
+            description: 'DuneMap Plugin für Discord-Integration',
+            version: VersionHelper.getVersionFromContext(__dirname),
+            author: 'FireBot Team',
+            displayName: 'DuneMap',
+            description: 'Interaktive Karte für Dune the Waakening',
             version: '1.0.0',
-            author: 'DuneBot Team',
+            author: 'FireBot Team',
             icon: 'fa-solid fa-map',
             baseDir: __dirname,
             ownerOnly: false
@@ -28,8 +32,8 @@ class DuneMapBotPlugin extends BotPlugin {
      */
     async onEnable(client) {
         const Logger = ServiceManager.get("Logger");
-        Logger.info('DuneMap-Bot-Plugin wird aktiviert...');
-        Logger.success('DuneMap-Bot-Plugin aktiviert');
+        Logger.info('DuneMap-Plugin wird aktiviert...');
+        Logger.success('DuneMap-Plugin aktiviert');
     }
 
     /**
@@ -37,16 +41,16 @@ class DuneMapBotPlugin extends BotPlugin {
      * 
      * @param {import('discord.js').Client} client - Discord.js Client
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onDisable(client) {
         const Logger = ServiceManager.get("Logger");
-        Logger.info('DuneMap-Bot-Plugin wird deaktiviert...');
+        Logger.info('DuneMap-Plugin wird deaktiviert...');
         
         // Keine Tabellen löschen hier - das macht das Dashboard-Plugin
         // Bot-Plugin kümmert sich nur um Commands/Events cleanup
         
-        Logger.success('DuneMap-Bot-Plugin deaktiviert');
+        Logger.success('DuneMap-Plugin deaktiviert');
     }
         
     /**
@@ -54,7 +58,7 @@ class DuneMapBotPlugin extends BotPlugin {
      * 
      * @param {string} guildId - ID der Discord-Guild
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get("Logger");
@@ -80,7 +84,7 @@ class DuneMapBotPlugin extends BotPlugin {
             
             Logger.debug(`DuneMap-Konfiguration für Guild ${guildId} initialisiert`);
         } catch (err) {
-            Logger.error(`Fehler beim Initialisieren der Guild-Konfiguration für ${guildId}:`, err);
+            Logger.error(`Fehler beim Initialisieren der DuneMap-Konfiguration für ${guildId}:`, err);
         }
     }
 
@@ -89,7 +93,7 @@ class DuneMapBotPlugin extends BotPlugin {
      * 
      * @param {string} guildId - ID der Discord-Guild
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get("Logger");
@@ -101,31 +105,33 @@ class DuneMapBotPlugin extends BotPlugin {
             
             Logger.success(`DuneMap-Plugin für Guild ${guildId} deaktiviert`);
         } catch (err) {
-            Logger.error(`Fehler beim Deaktivieren des Plugins für Guild ${guildId}:`, err);
+            Logger.error(`Fehler beim Deaktivieren des DuneMap-Plugins für Guild ${guildId}:`, err);
             throw err;
         }
-    }    /**
-         * Registriert hooks für das Dunemap-Plugin
-         * 
-         * @param {import('dunebot-sdk').HookSystem} hooks - Das Hook-System
-         * @returns {void}
-         * @author DuneBot Team
-         */
-        registerHooks(hooks) {
-            const Logger = ServiceManager.get("Logger");
-            // Beispiel für einen Filter-Hook
-            hooks.addFilter('modify_command_prefix', (prefix, guildId) => {
-                // Hier könnte der Präfix für bestimmte Guilds geändert werden
-                return prefix;
-            });
-            
-            // Beispiel für einen Action-Hook
-            hooks.addAction('after_command_execution', (commandContext) => {
-                // Hier könnte Logging nach jeder Befehlsausführung durchgeführt werden
-            });
-            
-            Logger.debug('Core-Plugin-Hooks registriert');
-        }
+    }    
+    
+    /**
+     * Registriert hooks für das Dunemap-Plugin
+     * 
+     * @param {import('dunebot-sdk').HookSystem} hooks - Das Hook-System
+     * @returns {void}
+     * @author FireBot Team
+     */
+    registerHooks(hooks) {
+        const Logger = ServiceManager.get("Logger");
+        // Beispiel für einen Filter-Hook
+        hooks.addFilter('modify_command_prefix', (prefix, guildId) => {
+            // Hier könnte der Präfix für bestimmte Guilds geändert werden
+            return prefix;
+        });
+        
+        // Beispiel für einen Action-Hook
+        hooks.addAction('after_command_execution', (commandContext) => {
+            // Hier könnte Logging nach jeder Befehlsausführung durchgeführt werden
+        });
+        
+        Logger.debug('DuneMap-Plugin-Hooks registriert');
+    }
    
 }
 

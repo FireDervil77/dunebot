@@ -47,8 +47,16 @@
   border-left: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.app-sidebar .nav-treeview .nav-item {
+  display: block !important;
+  width: 100% !important;
+  float: none !important;
+}
+
 .app-sidebar .nav-treeview .nav-link {
   padding: 0.3rem 0.75rem;
+  display: flex !important;
+  width: 100% !important;
 }
 
 /* Styling für Plugin-Karten */
@@ -153,4 +161,115 @@
     background-color: #ffc107 !important;
     border-color: #ffc107 !important;
     color: #212529 !important;
+}
+
+/* AdminLTE Small-Box Fix: Icons groß rechts positionieren */
+.small-box {
+    border-radius: 0.25rem;
+    box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
+    display: block;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.small-box > .inner {
+    padding: 10px;
+}
+
+.small-box > .small-box-footer {
+    background-color: rgba(0,0,0,.1);
+    color: rgba(255,255,255,.8);
+    display: block;
+    padding: 3px 0;
+    position: relative;
+    text-align: center;
+    text-decoration: none;
+    z-index: 10;
+}
+
+.small-box > .small-box-footer:hover {
+    background-color: rgba(0,0,0,.15);
+    color: #fff;
+}
+
+.small-box h3 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin: 0 0 10px;
+    padding: 0;
+    white-space: nowrap;
+}
+
+.small-box p {
+    font-size: 1rem;
+}
+
+.small-box p > small {
+    color: #f8f9fa;
+    display: block;
+    font-size: .9rem;
+    margin-top: 5px;
+}
+
+.small-box h3,
+.small-box p {
+    z-index: 5;
+}
+
+.small-box .icon {
+    color: rgba(0,0,0,.35);
+    z-index: 0;
+}
+
+/* Icon-Farbe für farbige Hintergründe - weiß transparent für bessere Sichtbarkeit */
+.small-box.bg-danger .icon,
+.small-box.bg-success .icon,
+.small-box.bg-primary .icon,
+.small-box.bg-info .icon,
+.small-box.bg-warning .icon {
+    color: rgba(255,255,255,.3);
+}
+
+.small-box .icon > i {
+    font-size: 70px;
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    transition: transform .3s linear;
+    font-weight: 400;
+}
+
+.small-box .icon > i.fa,
+.small-box .icon > i.fas,
+.small-box .icon > i.far,
+.small-box .icon > i.fab,
+.small-box .icon > i.fal,
+.small-box .icon > i.fad,
+.small-box .icon > i.fa-solid,
+.small-box .icon > i.fa-regular,
+.small-box .icon > i.fa-brands,
+.small-box .icon > i.svg-inline--fa,
+.small-box .icon > i.ion {
+    font-size: 65px;
+    top: 20px;
+}
+
+.small-box:hover {
+    text-decoration: none;
+}
+
+.small-box:hover .icon > i {
+    transform: scale(1.1);
+}
+
+@media (max-width: 767.98px) {
+    .small-box {
+        text-align: center;
+    }
+    .small-box .icon {
+        display: none;
+    }
+    .small-box p {
+        font-size: 12px;
+    }
 }

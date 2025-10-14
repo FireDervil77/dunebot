@@ -1,0 +1,294 @@
+<!-- Moderation Plugin Settings Page - GuildAjax Version -->
+<div class="container-fluid">
+  <div class="row">
+    <!-- Linke Spalte: Settings Form (8 Spalten) -->
+    <div class="col-lg-8">
+      <form class="guild-ajax-form" 
+            data-form-type="moderation-settings" 
+            action="/guild/<%= guildId %>/plugins/moderation/save"
+            method="POST">
+        
+        <div class="card">
+          
+          <div class="card-header">
+            <h3 class="card-title">
+              <i class="fa-solid fa-shield-halved me-2"></i>
+              <%= tr('moderation:SETTINGS.PAGE_TITLE') %>
+            </h3>
+            <p class="text-muted mb-0 mt-2">
+              <%= tr('moderation:SETTINGS.PAGE_DESC') %>
+            </p>
+          </div>
+
+          <div class="card-body">
+            <!-- Basic Settings Section -->
+            <div class="mb-4">
+              <h5 class="mb-3">
+                <i class="fa-solid fa-cog text-primary me-2"></i>
+                <%= tr("moderation:SECTION_BASIC") %>
+              </h5>
+              <p class="text-muted small mb-3"><%= tr("moderation:SECTION_BASIC_DESC") %></p>
+              
+              <div class="row">
+                <!-- Modlog Channel -->
+                <div class="col-md-4 mb-3">
+                  <label for="log_channel" class="form-label">
+                    <%= tr("moderation:MODLOG_CHANNEL_TITLE") %>
+                  </label>
+                  <select name="log_channel" id="log_channel" class="form-control">
+                    <option value=""><%= tr("moderation:CHANNEL_SELECT") %></option>
+                    <% channels.forEach(ch => { %>
+                    <option value="<%= ch.id %>" <%= settings.modlog_channel === ch.id ? 'selected' : '' %>><%= ch.name %></option>
+                    <% }); %>
+                  </select>
+                  <small class="form-text text-muted">
+                    <%= tr("moderation:MODLOG_CHANNEL_DESC") %>
+                  </small>
+                </div>
+
+                <!-- Max Warnings -->
+                <div class="col-md-4 mb-3">
+                  <label for="maxwarn_count" class="form-label">
+                    <%= tr("moderation:MAXWARN_LIMIT_TITLE") %>
+                  </label>
+                  <input
+                    name="maxwarn_count"
+                    type="number"
+                    min="0"
+                    max="100"
+                    id="maxwarn_count"
+                    class="form-control"
+                    value="<%= settings.max_warn_limit || 5 %>"
+                    required />
+                  <small class="form-text text-muted">
+                    <%= tr("moderation:MAXWARN_LIMIT_DESC") %>
+                  </small>
+                </div>
+
+                <!-- Max Warn Action -->
+                <div class="col-md-4 mb-3">
+                  <label for="maxwarn_action" class="form-label">
+                    <%= tr("moderation:MAXWARN_ACTION_TITLE") %>
+                  </label>
+                  <select name="maxwarn_action" id="maxwarn_action" class="form-control">
+                    <option value="TIMEOUT" <%= settings.max_warn_action === 'TIMEOUT' ? 'selected' : '' %>>TIMEOUT</option>
+                    <option value="KICK" <%= settings.max_warn_action === 'KICK' ? 'selected' : '' %>>KICK</option>
+                    <option value="BAN" <%= settings.max_warn_action === 'BAN' ? 'selected' : '' %>>BAN</option>
+                  </select>
+                  <small class="form-text text-muted">
+                    <%= tr("moderation:MAXWARN_ACTION_DESC") %>
+                  </small>
+                </div>
+              </div>
+
+              <!-- Default Reason Field -->
+              <div class="row mt-3">
+                <div class="col-md-12 mb-3">
+                  <label for="default_reason" class="form-label">
+                    <i class="fa-solid fa-message me-1"></i>
+                    <%= tr("moderation:DEFAULT_REASON_TITLE") %>
+                  </label>
+                  <textarea
+                    name="default_reason"
+                    id="default_reason"
+                    class="form-control"
+                    rows="3"
+                    placeholder="<%= tr('moderation:DEFAULT_REASON_PLACEHOLDER') %>"><%= settings.default_reason || '' %></textarea>
+                  <small class="form-text text-muted">
+                    <%= tr("moderation:DEFAULT_REASON_DESC") %>
+                  </small>
+                </div>
+              </div>
+            </div>
+
+            <hr>
+
+            <!-- Modlog Events Section -->
+            <div class="mb-4">
+              <h5 class="mb-3">
+                <i class="fa-solid fa-list-check text-info me-2"></i>
+                <%= tr("moderation:SECTION_MODLOG_EVENTS") %>
+              </h5>
+              <p class="text-muted small mb-3"><%= tr("moderation:SECTION_MODLOG_EVENTS_DESC") %></p>
+              
+              <%
+                // Parse modlog_events
+                let modlogEvents = [];
+                try {
+                  if (typeof settings.modlog_events === 'string') {
+                    modlogEvents = JSON.parse(settings.modlog_events);
+                  } else if (Array.isArray(settings.modlog_events)) {
+                    modlogEvents = settings.modlog_events;
+                  } else {
+                    modlogEvents = [];
+                  }
+                } catch(e) {
+                  modlogEvents = [];
+                }
+                
+                const events = [
+                  { key: 'WARN', label: 'EVENT_WARN', icon: 'fa-triangle-exclamation' },
+                  { key: 'KICK', label: 'EVENT_KICK', icon: 'fa-right-from-bracket' },
+                  { key: 'BAN', label: 'EVENT_BAN', icon: 'fa-ban' },
+                  { key: 'TIMEOUT', label: 'EVENT_TIMEOUT', icon: 'fa-clock' },
+                  { key: 'UNTIMEOUT', label: 'EVENT_UNTIMEOUT', icon: 'fa-clock-rotate-left' },
+                  { key: 'SOFTBAN', label: 'EVENT_SOFTBAN', icon: 'fa-user-slash' },
+                  { key: 'UNBAN', label: 'EVENT_UNBAN', icon: 'fa-user-check' }
+                ];
+              %>
+              
+              <div class="row">
+                <% events.forEach(event => { %>
+                <div class="col-md-6 col-lg-4 col-xl-3 mb-2">
+                  <div class="custom-control custom-checkbox">
+                    <input
+                      type="checkbox"
+                      class="custom-control-input"
+                      name="modlog_events[]"
+                      value="<%= event.key %>"
+                      id="event_<%= event.key %>"
+                      <%= modlogEvents.includes(event.key) ? 'checked' : '' %>>
+                    <label class="custom-control-label" for="event_<%= event.key %>">
+                      <i class="fa-solid <%= event.icon %> me-1"></i>
+                      <%= tr("moderation:" + event.label) %>
+                    </label>
+                  </div>
+                </div>
+                <% }); %>
+              </div>
+            </div>
+
+            <hr>
+
+            <!-- DM Notifications Section -->
+            <div class="mb-4">
+              <h5 class="mb-3">
+                <i class="fa-solid fa-envelope text-success me-2"></i>
+                <%= tr("moderation:SECTION_DM_NOTIFICATIONS") %>
+              </h5>
+              <p class="text-muted small mb-3"><%= tr("moderation:SECTION_DM_NOTIFICATIONS_DESC") %></p>
+              
+              <div class="row">
+                <div class="col-md-6 col-lg-3 mb-2">
+                  <div class="custom-control custom-switch">
+                    <input
+                      type="checkbox"
+                      class="custom-control-input"
+                      name="dm_on_warn"
+                      value="1"
+                      id="dm_on_warn"
+                      <%= settings.dm_on_warn ? 'checked' : '' %>>
+                    <label class="custom-control-label" for="dm_on_warn">
+                      <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                      <%= tr("moderation:DM_ON_WARN") %>
+                    </label>
+                  </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-3 mb-2">
+                  <div class="custom-control custom-switch">
+                    <input
+                      type="checkbox"
+                      class="custom-control-input"
+                      name="dm_on_kick"
+                      value="1"
+                      id="dm_on_kick"
+                      <%= settings.dm_on_kick ? 'checked' : '' %>>
+                    <label class="custom-control-label" for="dm_on_kick">
+                      <i class="fa-solid fa-right-from-bracket me-1"></i>
+                      <%= tr("moderation:DM_ON_KICK") %>
+                    </label>
+                  </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-3 mb-2">
+                  <div class="custom-control custom-switch">
+                    <input
+                      type="checkbox"
+                      class="custom-control-input"
+                      name="dm_on_ban"
+                      value="1"
+                      id="dm_on_ban"
+                      <%= settings.dm_on_ban ? 'checked' : '' %>>
+                    <label class="custom-control-label" for="dm_on_ban">
+                      <i class="fa-solid fa-ban me-1"></i>
+                      <%= tr("moderation:DM_ON_BAN") %>
+                    </label>
+                  </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-3 mb-2">
+                  <div class="custom-control custom-switch">
+                    <input
+                      type="checkbox"
+                      class="custom-control-input"
+                      name="dm_on_timeout"
+                      value="1"
+                      id="dm_on_timeout"
+                      <%= settings.dm_on_timeout ? 'checked' : '' %>>
+                    <label class="custom-control-label" for="dm_on_timeout">
+                      <i class="fa-solid fa-clock me-1"></i>
+                      <%= tr("moderation:DM_ON_TIMEOUT") %>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="d-flex justify-content-end mt-4">
+              <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-save me-2"></i>
+                <%= tr('moderation:BTN_SAVE') %>
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+    
+    <!-- Rechte Spalte: Hilfe & Informationen (4 Spalten) -->
+    <div class="col-lg-4">
+      <!-- Help Card -->
+      <div class="card card-outline card-info">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-circle-info me-2"></i>
+            <%= tr('moderation:HELP.TITLE') %>
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="mb-4">
+            <h6><i class="fa-solid fa-shield-halved text-primary me-2"></i><%= tr('moderation:HELP.MODERATION_TITLE') %></h6>
+            <p class="text-muted small">
+              <%= tr('moderation:HELP.MODERATION_TEXT') %>
+            </p>
+          </div>
+          <div class="mb-4">
+            <h6><i class="fa-solid fa-list-check text-info me-2"></i><%= tr('moderation:HELP.MODLOG_TITLE') %></h6>
+            <p class="text-muted small">
+              <%= tr('moderation:HELP.MODLOG_TEXT') %>
+            </p>
+          </div>
+          <div class="mb-4">
+            <h6><i class="fa-solid fa-envelope text-success me-2"></i><%= tr('moderation:HELP.DM_TITLE') %></h6>
+            <p class="text-muted small">
+              <%= tr('moderation:HELP.DM_TEXT') %>
+            </p>
+          </div>
+          
+          <hr>
+          
+          <h6><i class="fa-solid fa-terminal me-2"></i><%= tr('moderation:HELP.COMMANDS_TITLE') %></h6>
+          <ul class="small pl-3">
+            <li><code>/warn</code> - User warnen</li>
+            <li><code>/kick</code> - User kicken</li>
+            <li><code>/ban</code> - User bannen</li>
+            <li><code>/timeout</code> - User timen</li>
+            <li><code>/warnings</code> - Warnungen anzeigen</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

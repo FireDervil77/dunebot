@@ -1,0 +1,96 @@
+<div class="card">
+    <div class="card-body p-0">
+        <% if (feedback.length === 0) { %>
+            <div class="text-center py-5">
+                <i class="fa-solid fa-inbox fa-3x text-muted mb-3"></i>
+                <p class="text-muted">Keine Einträge vorhanden</p>
+            </div>
+        <% } else { %>
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Typ</th>
+                        <th>Titel</th>
+                        <th>Guild</th>
+                        <th>User</th>
+                        <th>Status</th>
+                        <th>Priorität</th>
+                        <th>Upvotes</th>
+                        <th>Datum</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% feedback.forEach(item => { %>
+                        <tr>
+                            <td><%= item.id %></td>
+                            <td>
+                                <% if (item.type === 'bug') { %>
+                                    <span class="badge bg-danger"><i class="fa-solid fa-bug me-1"></i>Bug</span>
+                                <% } else { %>
+                                    <span class="badge bg-info"><i class="fa-solid fa-lightbulb me-1"></i>Feature</span>
+                                <% } %>
+                            </td>
+                            <td>
+                                <strong><%= item.title %></strong>
+                                <br><small class="text-muted"><%= item.description.substring(0, 80) %>...</small>
+                            </td>
+                            <td><code><%= item.guild_id %></code></td>
+                            <td>
+                                <%= item.user_tag || item.user_id %>
+                                <br><small class="text-muted"><code><%= item.user_id %></code></small>
+                            </td>
+                            <td>
+                                <% 
+                                const statusClass = {
+                                    open: 'warning',
+                                    in_progress: 'info',
+                                    planned: 'primary',
+                                    resolved: 'success',
+                                    implemented: 'success',
+                                    closed: 'secondary',
+                                    rejected: 'danger',
+                                    wontfix: 'dark'
+                                };
+                                %>
+                                <span class="badge bg-<%= statusClass[item.status] || 'secondary' %>">
+                                    <%= item.status %>
+                                </span>
+                            </td>
+                            <td>
+                                <% 
+                                const priorityClass = {
+                                    low: 'secondary',
+                                    medium: 'primary',
+                                    high: 'warning',
+                                    critical: 'danger'
+                                };
+                                %>
+                                <span class="badge bg-<%= priorityClass[item.priority] || 'secondary' %>">
+                                    <%= item.priority %>
+                                </span>
+                            </td>
+                            <td>
+                                <% if (item.type === 'feature') { %>
+                                    <span class="badge bg-primary"><i class="fa-solid fa-arrow-up"></i> <%= item.upvotes || 0 %></span>
+                                <% } else { %>
+                                    -
+                                <% } %>
+                            </td>
+                            <td><%= new Date(item.created_at).toLocaleDateString('de-DE') %></td>
+                            <td>
+                                <button 
+                                    class="btn btn-sm btn-primary" 
+                                    onclick="editFeedback(<%= item.id %>, '<%= item.status %>', '<%= item.priority %>', `<%= (item.admin_notes || '').replace(/`/g, '\\`') %>`, `<%= (item.admin_response || '').replace(/`/g, '\\`') %>`)"
+                                    title="Bearbeiten">
+                                    <i class="fa-solid fa-edit"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        <% } %>
+    </div>
+</div>

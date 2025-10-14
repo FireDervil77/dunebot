@@ -4,7 +4,7 @@
  * @author DuneBot Team
  */
 const path = require('path');
-const { BotPlugin } = require('dunebot-sdk');
+const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 /**
@@ -29,7 +29,7 @@ class GreetingBotPlugin extends BotPlugin {
             name: 'greeting',
             displayName: 'Greetings - Plugin',
             description: 'Ein Greetings-Plugin für FireBot',
-            version: '1.0.0',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireDervil',
             icon: 'fa-solid fa-puzzle-piece',
             baseDir: __dirname,

@@ -4,6 +4,8 @@
     "BTN_ENABLE": "Aktivieren",
     "BTN_DISABLE": "Deaktivieren",
     "BTN_CREATE": "Erstellen",
+    "BTN_CANCEL": "Abbrechen",
+    "BTN_SUBMIT": "Absenden",
 
     "SETTINGS_SAVE": "Guild Einstellungen gespeichert",
     "SETTINGS_SAVE_ERROR": "Fehler beim speichern der Guild Einstellungen",
@@ -230,7 +232,16 @@
         "ADMIN": "Admin",
         "LOGOUT": "Logout",
         "TIP_DARK_MODE": "Toggle Dark Mode",
-        "SR_USER_MENU": "Open User Menu"   
+        "SR_USER_MENU": "Open User Menu" ,
+        "DASHBOARD": "Dashboard",
+        "SETTINGS": "Einstellungen",
+        "GENERAL": "Allgemein",
+        "USERS": "Benutzer",
+        "INTEGRATIONS": "Integrationen",
+        "PLUGINS": "Plugins",
+        "LOCALES": "Lokalisierung",
+        "BUG_REPORT": "Bug Report",
+        "FEATURE_REQUEST": "Feature Request"
     },
 
     "BREADCRUMB": {
@@ -499,5 +510,59 @@
             "REMOVED": "Entfernt",
             "OTHER": "Sonstiges"
         }
+    },
+    "BUG_REPORT": {
+        "TITLE": "Bug Report",
+        "CREATE_NEW": "Bug melden",
+        "INFO_TITLE": "System Bug Report",
+        "INFO_TEXT": "Dieses Bug Report System ist ausschließlich für das Gesamte System auf firenetworks.de gedacht und unseren Bot. Für Guild-spezifische Anfragen oder Tickets wird ein separates Ticket-Plugin bereitgestellt.",
+        "TOTAL_BUGS": "Bugs gesamt",
+        "OPEN_BUGS": "Offen",
+        "IN_PROGRESS": "In Bearbeitung",
+        "RESOLVED": "Gelöst",
+        "ALL_BUGS": "Alle Bug Reports",
+        "NO_BUGS": "Keine Bug Reports vorhanden",
+        "TITLE_COL": "Titel",
+        "CATEGORY_COL": "Kategorie",
+        "STATUS_COL": "Status",
+        "PRIORITY_COL": "Priorität",
+        "REPORTER_COL": "Gemeldet von",
+        "DATE_COL": "Datum",
+        "TITLE_LABEL": "Titel",
+        "CATEGORY_LABEL": "Kategorie",
+        "DESCRIPTION_LABEL": "Beschreibung",
+        "DESCRIPTION_HINT": "Beschreibe den Bug so detailliert wie möglich"
+    },
+    "FEATURE_REQUEST": {
+        "TITLE": "Feature Requests",
+        "CREATE_NEW": "Feature vorschlagen",
+        "INFO_TITLE": "System Feature Requests",
+        "INFO_TEXT": "Dieses Feature Request System ist für Verbesserungsvorschläge am Bot-System gedacht. Andere Guild-Mitglieder können deine Vorschläge mit Upvotes unterstützen. Für Server-spezifische Anfragen wird ein separates Ticket-Plugin bereitgestellt.",
+        "TOTAL_FEATURES": "Features gesamt",
+        "PLANNED": "Geplant",
+        "IMPLEMENTED": "Umgesetzt",
+        "ALL_FEATURES": "Alle Feature Requests",
+        "SORTED_BY_VOTES": "Sortiert nach Upvotes",
+        "NO_FEATURES": "Keine Feature Requests vorhanden",
+        "TITLE_LABEL": "Titel",
+        "CATEGORY_LABEL": "Kategorie",
+        "DESCRIPTION_LABEL": "Beschreibung",
+        "DESCRIPTION_HINT": "Beschreibe das Feature so detailliert wie möglich"
+    },
+    "STATUS": {
+        "OPEN": "Offen",
+        "IN_PROGRESS": "In Bearbeitung",
+        "PLANNED": "Geplant",
+        "RESOLVED": "Gelöst",
+        "IMPLEMENTED": "Umgesetzt",
+        "CLOSED": "Geschlossen",
+        "REJECTED": "Abgelehnt",
+        "WONTFIX": "Wird nicht behoben"
+    },
+    "PRIORITY": {
+        "LOW": "Niedrig",
+        "MEDIUM": "Mittel",
+        "HIGH": "Hoch",
+        "CRITICAL": "Kritisch"
     }
 }

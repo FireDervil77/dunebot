@@ -1,0 +1,233 @@
+{
+    "TITLE": "Moderation",
+    "DESCRIPTION": "Verwalte die Moderationseinstellungen deines Servers.",
+
+    "NO_MATCH_USER": "Kein Benutzer gefunden, der `{{query}}` entspricht",
+    "INVALID_SUBCOMMAND": "Ungültiger Unterbefehl: `{{sub}}`",
+    "ERROR_OCCURRED": "Bei der Verarbeitung deiner Anfrage ist ein Fehler aufgetreten",
+    "COLLECT_TIMEOUT": "Du hast zu lange gebraucht, um zu antworten. Befehl abgebrochen.",
+
+    "BAN": {
+        "DESCRIPTION": "Bannt das angegebene Mitglied",
+        "USER_DESC": "Das Mitglied, das gebannt werden soll",
+        "REASON_DESC": "Der Grund für den Bann",
+        "SUCCESS": "{{target}} wurde vom Server gebannt!",
+        "BOT_PERM": "Ich habe keine Berechtigung, {{target}} zu bannen",
+        "MEMBER_PERM": "Du hast keine Berechtigung, {{target}} zu bannen",
+        "FAILED": "{{target}} konnte nicht gebannt werden"
+    },
+
+    "KICK": {
+        "DESCRIPTION": "Kickt das angegebene Mitglied",
+        "USER_DESC": "Das Mitglied, das gekickt werden soll",
+        "REASON_DESC": "Der Grund für den Kick",
+        "SUCCESS": "{{target}} wurde vom Server gekickt!",
+        "BOT_PERM": "Ich habe keine Berechtigung, {{target}} zu kicken",
+        "MEMBER_PERM": "Du hast keine Berechtigung, {{target}} zu kicken",
+        "FAILED": "{{target}} konnte nicht gekickt werden"
+    },
+
+    "MAXWARN": {
+        "DESCRIPTION": "Konfiguriere die maximalen Warnungen",
+        "SUB_LIMIT_DESC": "Setze das maximale Warnlimit",
+        "SUB_LIMIT_AMOUNT_DESC": "Die Anzahl der Warnungen, bevor eine Aktion ausgelöst wird",
+        "SUB_ACTION_DESC": "Setze die Aktion bei Erreichen des Limits",
+        "SUB_ACTION_ACTION_DESC": "Die Aktion, die ausgeführt werden soll (TIMEOUT, KICK oder BAN)",
+
+        "INVALID_LIMIT": "Das Limit muss eine Zahl größer als 0 sein",
+        "INVALID_ACTION": "Ungültige Aktion. Verwende TIMEOUT, KICK oder BAN",
+        "LIMIT_SET": "Maximales Warnlimit auf {{limit}} gesetzt",
+        "ACTION_SET": "Warnaktion auf {{action}} gesetzt",
+        "TIMEOUT_PERM": "Ich benötige die Berechtigung 'Mitglieder stummschalten', um Timeouts zu vergeben",
+        "KICK_PERM": "Ich benötige die Berechtigung 'Mitglieder kicken', um Kicks auszuführen",
+        "BAN_PERM": "Ich benötige die Berechtigung 'Mitglieder bannen', um Bans auszuführen"
+    },
+
+    "MODLOG": {
+        "DESCRIPTION": "Aktiviere oder deaktiviere Moderationslogs",
+        "CHANNEL_DESC": "Der Kanal, in den Moderationslogs gesendet werden",
+        "NO_CHANNEL": "Bitte erwähne einen Kanal oder verwende 'off', um Moderationslogs zu deaktivieren",
+        "INVALID_CHANNEL": "Falsche Befehlsverwendung! Bitte erwähne einen Kanal.",
+        "ALREADY_DISABLED": "Moderationslogs sind bereits deaktiviert",
+        "CHANNEL_PERMS": "Ähm! Ich kann keine Logs in diesen Kanal senden? Ich benötige die Berechtigungen `Nachrichten senden` und `Links einbetten` in diesem Kanal",
+        "SUCCESS": "Moderationslogs werden jetzt an {{channel}} gesendet",
+        "DISABLED": "Moderationslogs wurden deaktiviert"
+    },
+
+    "NICK": {
+        "DESCRIPTION": "Nickname-Befehle",
+        "SUB_SET_DESC": "Setzt den Nickname des angegebenen Mitglieds",
+        "SUB_SET_USER": "Das Mitglied, dessen Nickname gesetzt werden soll",
+        "SUB_SET_NAME": "Der neue Nickname",
+        "SUB_RESET_DESC": "Setzt den Nickname des angegebenen Mitglieds zurück",
+        "SUB_RESET_USER": "Das Mitglied, dessen Nickname zurückgesetzt werden soll",
+
+        "MISSING_NICK": "Bitte gib einen Nickname an",
+        "MEMBER_PERM": "Du hast keine Berechtigung, den Nickname von {{user}} zu ändern",
+        "BOT_PERM": "Ich habe keine Berechtigung, den Nickname von {{user}} zu ändern",
+
+        "SET_SUCCESS": "Nickname von {{target}} erfolgreich auf {{nickname}} gesetzt",
+        "SET_FAIL": "Fehler beim Setzen des Nicknames von {{target}}. Hast du einen gültigen Namen angegeben?",
+
+        "RESET_SUCCESS": "Nickname von {{target}} erfolgreich zurückgesetzt",
+        "RESET_FAIL": "Fehler beim Zurücksetzen des Nicknames von {{target}}"
+    },
+
+    "PURGE": {
+        "DESCRIPTION": "Lösch-Befehle",
+        "SUB_ALL_DESC": "Löscht die angegebene Anzahl von Nachrichten",
+        "SUB_ATTACH_DESC": "Löscht die angegebene Anzahl von Nachrichten mit Anhängen",
+        "SUB_BOT_DESC": "Löscht die angegebene Anzahl von Bot-Nachrichten",
+        "SUB_LINK_DESC": "Löscht die angegebene Anzahl von Nachrichten mit Links",
+        "SUB_TOKEN_DESC": "Löscht die angegebene Anzahl von Nachrichten mit dem angegebenen Token",
+        "SUB_TOKEN_TOKEN": "Das zu suchende Token",
+        "SUB_USER_DESC": "Löscht die angegebene Anzahl von Nachrichten eines Benutzers",
+        "SUB_USER_USER": "Der Benutzer, dessen Nachrichten gelöscht werden sollen",
+        "SUB_COMMON_CHANNEL": "Der Kanal, in dem Nachrichten gelöscht werden sollen",
+        "SUB_COMMON_AMOUNT": "Anzahl der zu löschenden Nachrichten (Max 99)",
+
+        "INVALID_AMOUNT": "Die Anzahl der zu löschenden Nachrichten muss zwischen 1 und 99 liegen",
+        "TOO_MANY_MESSAGES": "Die maximale Anzahl an Nachrichten, die ich löschen kann, ist 99",
+
+        "SUCCESS": "{{amount}} Nachrichten in {{channel}} erfolgreich gelöscht",
+        "MEMBER_PERM": "Du hast keine Berechtigung, Nachrichtenverlauf zu lesen & Nachrichten zu verwalten in {{channel}}",
+        "BOT_PERM": "Ich habe keine Berechtigung, Nachrichtenverlauf zu lesen & Nachrichten zu verwalten in {{channel}}",
+        "NO_MESSAGES": "Keine Nachrichten gefunden, die gelöscht werden können",
+        "ERROR": "Fehler aufgetreten! Nachrichten konnten nicht gelöscht werden"
+    },
+
+    "SOFTBAN": {
+        "DESCRIPTION": "Softbannt das angegebene Mitglied. Kickt und löscht Nachrichten",
+        "USER_DESC": "Das Mitglied, das softgebannt werden soll",
+        "REASON_DESC": "Der Grund für den Softban",
+        "SUCCESS": "{{target}} wurde vom Server softgebannt!",
+        "BOT_PERM": "Ich habe keine Berechtigung, {{target}} zu softbannen",
+        "MEMBER_PERM": "Du hast keine Berechtigung, {{target}} zu softbannen",
+        "FAILED": "{{target}} konnte nicht softgebannt werden"
+    },
+
+    "TIMEOUT": {
+        "DESCRIPTION": "Gibt dem angegebenen Mitglied einen Timeout",
+        "USER_DESC": "Das Mitglied, das einen Timeout bekommen soll",
+        "DURATION_DESC": "Die Dauer des Timeouts",
+        "REASON_DESC": "Der Grund für den Timeout",
+        "INVALID_TIME": "Ungültige Zeitangabe. Verwende z.B. 10m, 1h, 1d",
+        "SUCCESS": "{{target}} wurde getimeoutet!",
+        "BOT_PERM": "Ich habe keine Berechtigung, {{target}} einen Timeout zu geben",
+        "MEMBER_PERM": "Du hast keine Berechtigung, {{target}} einen Timeout zu geben",
+        "ALREADY_TIMEOUT": "{{target}} hat bereits einen Timeout",
+        "FAILED": "{{target}} konnte nicht getimeoutet werden"
+    },
+
+    "UNBAN": {
+        "DESCRIPTION": "Entbannt das angegebene Mitglied",
+        "NAME_DESC": "Der Name des Mitglieds, das entbannt werden soll (optional - leer lassen, um alle Bans zu sehen)",
+        "REASON_DESC": "Der Grund für den Entbann",
+        "SELECT_USER": "Wähle einen Benutzer zum Entbannen aus ({{count}} gebannte Benutzer gefunden)",
+        "NO_BANS": "Es gibt keine gebannten Benutzer auf diesem Server",
+        "MENU_PLACEHOLDER": "🔨 Wähle einen Benutzer zum Entbannen",
+        "MENU_CONTENT": "Wähle einen Benutzer aus dem Dropdown-Menü unten",
+        "SUCCESS": "{{target}} wurde erfolgreich entbannt!",
+        "FAILED": "{{target}} konnte nicht entbannt werden"
+    },
+
+    "UNTIMEOUT": {
+        "DESCRIPTION": "Hebt den Timeout des angegebenen Mitglieds auf",
+        "USER_DESC": "Das Mitglied, dessen Timeout aufgehoben werden soll",
+        "REASON_DESC": "Der Grund für die Aufhebung des Timeouts",
+        "SUCCESS": "Timeout von {{target}} wurde aufgehoben!",
+        "BOT_PERM": "Ich habe keine Berechtigung, den Timeout von {{target}} aufzuheben",
+        "MEMBER_PERM": "Du hast keine Berechtigung, den Timeout von {{target}} aufzuheben",
+        "NO_TIMEOUT": "{{target}} hat keinen Timeout",
+        "FAILED": "Timeout von {{target}} konnte nicht aufgehoben werden"
+    },
+
+    "VOICE": {
+        "DESCRIPTION": "Voice-Moderationsbefehle",
+        "SUB_MUTE_DESC": "Stummschalten eines Mitglieds im Voice",
+        "SUB_MUTE_USER": "Das Mitglied, das stummgeschaltet werden soll",
+        "SUB_MUTE_REASON": "Der Grund für die Stummschaltung",
+        "SUB_UNMUTE_DESC": "Aufhebung der Stummschaltung eines Mitglieds im Voice",
+        "SUB_UNMUTE_USER": "Das Mitglied, dessen Stummschaltung aufgehoben werden soll",
+        "SUB_UNMUTE_REASON": "Der Grund für die Aufhebung der Stummschaltung",
+        "SUB_DEAFEN_DESC": "Deafent ein Mitglied in Voice-Kanälen",
+        "SUB_DEAFEN_USER": "Das Mitglied, das gedeafent werden soll",
+        "SUB_DEAFEN_REASON": "Der Grund für das Deafen",
+        "SUB_UNDEAFEN_DESC": "Hebt das Deafen eines Mitglieds in Voice-Kanälen auf",
+        "SUB_UNDEAFEN_USER": "Das Mitglied, dessen Deafen aufgehoben werden soll",
+        "SUB_UNDEAFEN_REASON": "Der Grund für die Aufhebung des Deafens",
+        "SUB_KICK_DESC": "Kickt ein Mitglied aus Voice-Kanälen",
+        "SUB_KICK_USER": "Das Mitglied, das gekickt werden soll",
+        "SUB_KICK_REASON": "Der Grund für den Kick",
+        "SUB_MOVE_DESC": "Verschiebt ein Mitglied in einen anderen Voice-Kanal",
+        "SUB_MOVE_USER": "Das Mitglied, das verschoben werden soll",
+        "SUB_MOVE_CHANNEL": "Der Kanal, in den das Mitglied verschoben werden soll",
+        "SUB_MOVE_REASON": "Der Grund für die Verschiebung",
+
+        "INVALID_CHANNEL_TYPE": "Ungültiger Kanaltyp. Bitte gib einen gültigen Voice-Kanal an",
+
+        "VMUTE_SUCCESS": "Die Voice von {{target}} wurde auf diesem Server stummgeschaltet",
+        "VMUTE_MEMBER_PERM": "Du hast keine Berechtigung, {{target}} im Voice stummzuschalten",
+        "VMUTE_BOT_PERM": "Ich habe keine Berechtigung, {{target}} im Voice stummzuschalten",
+        "VMUTE_NO_VOICE": "{{target}} ist in keinem Voice-Kanal",
+        "VMUTE_ALREADY_MUTED": "{{target}} ist bereits stummgeschaltet",
+        "VMUTE_ERROR": "{{target}} konnte nicht im Voice stummgeschaltet werden",
+
+        "VUNMUTE_SUCCESS": "Die Stummschaltung von {{target}} wurde auf diesem Server aufgehoben",
+        "VUNMUTE_MEMBER_PERM": "Du hast keine Berechtigung, die Stummschaltung von {{target}} im Voice aufzuheben",
+        "VUNMUTE_BOT_PERM": "Ich habe keine Berechtigung, die Stummschaltung von {{target}} im Voice aufzuheben",
+        "VUNMUTE_NO_VOICE": "{{target}} ist in keinem Voice-Kanal",
+        "VUNMUTE_NOT_MUTED": "{{target}} ist nicht im Voice stummgeschaltet",
+        "VUNMUTE_ERROR": "Stummschaltung von {{target}} konnte nicht aufgehoben werden",
+
+        "VDEAFEN_SUCCESS": "{{target}} wurde auf diesem Server gedeafent",
+        "VDEAFEN_MEMBER_PERM": "Du hast keine Berechtigung, {{target}} zu deafen",
+        "VDEAFEN_BOT_PERM": "Ich habe keine Berechtigung, {{target}} zu deafen",
+        "VDEAFEN_NO_VOICE": "{{target}} ist in keinem Voice-Kanal",
+        "VDEAFEN_ALREADY_DEAFENED": "{{target}} ist bereits gedeafent",
+        "VDEAFEN_ERROR": "{{target}} konnte nicht gedeafent werden",
+
+        "VUNDEAFEN_SUCCESS": "Das Deafen von {{target}} wurde auf diesem Server aufgehoben",
+        "VUNDEAFEN_MEMBER_PERM": "Du hast keine Berechtigung, das Deafen von {{target}} aufzuheben",
+        "VUNDEAFEN_BOT_PERM": "Ich habe keine Berechtigung, das Deafen von {{target}} aufzuheben",
+        "VUNDEAFEN_NO_VOICE": "{{target}} ist in keinem Voice-Kanal",
+        "VUNDEAFEN_NOT_DEAFENED": "{{target}} ist nicht gedeafent",
+        "VUNDEAFEN_ERROR": "Deafen von {{target}} konnte nicht aufgehoben werden",
+
+        "VKICK_SUCCESS": "{{target}} wurde aus dem Voice-Kanal gekickt",
+        "VKICK_MEMBER_PERM": "Du hast keine Berechtigung, {{target}} aus dem Voice zu kicken",
+        "VKICK_BOT_PERM": "Ich habe keine Berechtigung, {{target}} aus dem Voice zu kicken",
+        "VKICK_NO_VOICE": "{{target}} ist in keinem Voice-Kanal",
+        "VKICK_ERROR": "{{target}} konnte nicht aus dem Voice gekickt werden",
+
+        "VMOVE_SUCCESS": "{{target}} wurde nach {{channel}} verschoben",
+        "VMOVE_MEMBER_PERM": "Du hast keine Berechtigung, {{target}} zu verschieben",
+        "VMOVE_BOT_PERM": "Ich habe keine Berechtigung, {{target}} zu verschieben",
+        "VMOVE_NO_VOICE": "{{target}} ist in keinem Voice-Kanal",
+        "VMOVE_ERROR": "{{target}} konnte nicht verschoben werden"
+    },
+
+    "WARN": {
+        "DESCRIPTION": "Verwarnt das angegebene Mitglied",
+        "USER_DESC": "Das Mitglied, das verwarnt werden soll",
+        "REASON_DESC": "Der Grund für die Verwarnung",
+        "SUCCESS": "{{target}} wurde verwarnt!",
+        "BOT_PERM": "Ich habe keine Berechtigung, {{target}} zu verwarnen",
+        "MEMBER_PERM": "Du hast keine Berechtigung, {{target}} zu verwarnen",
+        "FAILED": "{{target}} konnte nicht verwarnt werden"
+    },
+
+    "WARNINGS": {
+        "DESCRIPTION": "Zeigt oder löscht Benutzerverwarnungen",
+        "SUB_LIST_DESC": "Zeigt alle Verwarnungen eines Benutzers an",
+        "SUB_LIST_USER": "Der Benutzer, dessen Verwarnungen angezeigt werden sollen",
+        "SUB_CLEAR_DESC": "Löscht alle Verwarnungen eines Benutzers",
+        "SUB_CLEAR_USER": "Der Benutzer, dessen Verwarnungen gelöscht werden sollen",
+
+        "NO_USER": "Kein Benutzer angegeben",
+        "NO_BOTS": "Bots können nicht verwarnt werden",
+        "NO_WARNINGS": "{{target}} hat keine Verwarnungen",
+        "WARNINGS_TITLE": "Verwarnungen für {{target}}",
+        "WARN_CLEAR": "Alle Verwarnungen für {{target}} wurden gelöscht"
+    }
+}

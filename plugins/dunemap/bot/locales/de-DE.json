@@ -51,14 +51,14 @@
         "STEP1_DESC": "Verwende `/dunemap-setup channel #kanal` um den Channel festzulegen, in dem die Map angezeigt wird.\n**Benötigt:** Server verwalten Berechtigung",
         "STEP2_TITLE": "Marker platzieren",
         "STEP2_DESC": "Mit `/map set <koordinate> <typ>` kannst du Marker setzen.\n**Beispiel:** `/map set B3 titan`\n**Verfügbare Typen:** Titan, Spice, Stravidium, Base, Wrack, Aluminium, Basalt, Eisen, Karbon, Höhle, Loch, Kontrollpunkt, Taxi, Test",
-        "STEP3_TITLE": "Sturm-Timer nutzen",
-        "STEP3_DESC": "Setze den Coriolis-Sturm Timer mit `/storm set <tage> <stunden> <minuten>`.\n**Beispiel:** `/storm set 2 5 30` (2 Tage, 5 Stunden, 30 Minuten)\n**Benötigt:** Server verwalten Berechtigung",
+        "STEP3_TITLE": "Automatischer Sturm-Timer",
+        "STEP3_DESC": "Der Coriolis-Sturm Timer wird automatisch basierend auf deiner Server-Region berechnet.\nDu kannst die Region im Dashboard unter DuneMap Einstellungen ändern.\n**Verfügbare Regionen:** EU, NA, SA, AS, OCE",
         "STEP4_TITLE": "Map anzeigen",
-        "STEP4_DESC": "Mit `/map show` wird die Map mit allen Markern und dem Timer aktualisiert und im konfigurierten Channel gepostet.",
+        "STEP4_DESC": "Mit `/map show` wird die Map mit allen Markern und dem automatischen Timer aktualisiert und im konfigurierten Channel gepostet.",
         "ADMIN_TITLE": "Admin-Befehle",
-        "ADMIN_DESC": "**Timer zurücksetzen:** `/storm reset`\n**Marker entfernen:** `/map remove <koordinate>`\n_Hinweis: Du kannst nur deine eigenen Marker entfernen._",
+        "ADMIN_DESC": "**Marker entfernen:** `/map remove <koordinate>`\n_Hinweis: Du kannst nur deine eigenen Marker entfernen. Permanente Marker (A1-A9) können nicht gelöscht werden._",
         "COMMANDS_TITLE": "Befehls-Übersicht",
-        "COMMANDS_LIST": "🗺️ `/map show` - Karte anzeigen\n📍 `/map set` - Marker setzen\n🗑️ `/map remove` - Marker entfernen\n⏱️ `/storm set` - Timer setzen\n♻️ `/storm reset` - Timer zurücksetzen\n⚙️ `/dunemap-setup channel` - Channel konfigurieren\n❓ `/tutorial` - Diese Hilfe anzeigen",
+        "COMMANDS_LIST": "🗺️ `/map show` - Karte anzeigen\n📍 `/map set` - Marker setzen\n🗑️ `/map remove` - Marker entfernen\n⚙️ `/dunemap-setup channel` - Channel konfigurieren\n❓ `/tutorial` - Diese Hilfe anzeigen",
         "FOOTER": "DuneBot Map System • Viel Erfolg in der Deep Desert!"
     }
 }

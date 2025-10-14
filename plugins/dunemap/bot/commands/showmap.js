@@ -159,6 +159,24 @@ module.exports = {
         const Logger = ServiceManager.get('Logger');
 
         try {
+            // Berechtigungen prüfen BEVOR wir die Karte generieren
+            const permissions = channel.permissionsFor(channel.guild.members.me);
+            if (!permissions) {
+                throw new Error('❌ Kann Bot-Berechtigungen nicht abrufen. Bitte stelle sicher, dass der Bot Mitglied des Servers ist.');
+            }
+            
+            if (!permissions.has('ViewChannel')) {
+                throw new Error(`❌ Fehlende Berechtigung: Der Bot kann den Channel <#${channel.id}> nicht sehen. Bitte aktiviere die Berechtigung **"Kanal anzeigen"** für die Bot-Rolle.`);
+            }
+            
+            if (!permissions.has('SendMessages')) {
+                throw new Error(`❌ Fehlende Berechtigung: Der Bot kann keine Nachrichten in <#${channel.id}> senden. Bitte aktiviere die Berechtigung **"Nachrichten senden"** für die Bot-Rolle.`);
+            }
+            
+            if (!permissions.has('AttachFiles')) {
+                throw new Error(`❌ Fehlende Berechtigung: Der Bot kann keine Dateien in <#${channel.id}> anhängen. Bitte aktiviere die Berechtigung **"Dateien anhängen"** für die Bot-Rolle.`);
+            }
+            
             // Marker laden
             const markers = await dbService.query(
                 'SELECT * FROM dunemap_markers WHERE guild_id = ?',
@@ -175,7 +193,7 @@ module.exports = {
             });
 
             // NEUES SYSTEM: Automatischer Storm-Timer basierend auf Region
-            const region = await dbService.getConfig('dunemap', 'coriolis_region', 'shared', channel.guild.id) || 'EU';
+            const region = await dbService.getConfig('dunemap', 'COREOLIS_REGION', 'shared', channel.guild.id) || 'EU';
             const stormData = getNextStormTiming(region);
             
             // Timer-Text formatieren
@@ -196,6 +214,12 @@ module.exports = {
                 files: [{ attachment: legendBuffer, name: 'legend.png' }]
             });
         } catch (error) {
+            // Bessere Fehlerbehandlung für Discord API Fehler
+            if (error.code === 50001) {
+                Logger.error(`[DuneMap] Missing Access in Channel ${channel.id} (${channel.name}) - Guild: ${channel.guild.name}`);
+                throw new Error(`❌ **Fehlende Berechtigung**: Der Bot kann nicht in <#${channel.id}> schreiben.\n\n**Benötigte Berechtigungen:**\n✅ Kanal anzeigen\n✅ Nachrichten senden\n✅ Dateien anhängen\n\nBitte gib dem Bot diese Rechte im Channel oder wähle einen anderen Channel im Dashboard.`);
+            }
+            
             Logger.error('Fehler beim Map Update:', error);
             throw error;
         }
@@ -300,10 +324,20 @@ module.exports = {
 
             switch(subCommand) {
                 case 'show':
-                    await this.updateMap(mapChannel);
-                    return interaction.editReply({
-                        content: getT('dunemap:MAP.UPDATED')
-                    });
+                    try {
+                        await this.updateMap(mapChannel);
+                        return interaction.editReply({
+                            content: getT('dunemap:MAP.UPDATED')
+                        });
+                    } catch (error) {
+                        // Fehlermeldung an User zurückgeben
+                        if (error.message && error.message.startsWith('❌')) {
+                            return interaction.editReply({
+                                content: error.message
+                            });
+                        }
+                        throw error; // Andere Fehler weitergeben
+                    }
 
                 case 'set': {
                     const coord = interaction.options.getString('coord').toUpperCase();
@@ -327,7 +361,18 @@ module.exports = {
                         interaction.user.id
                     ]);
 
-                    await this.updateMap(mapChannel);
+                    try {
+                        await this.updateMap(mapChannel);
+                    } catch (error) {
+                        // Fehlermeldung an User zurückgeben
+                        if (error.message && error.message.startsWith('❌')) {
+                            return interaction.editReply({
+                                content: error.message
+                            });
+                        }
+                        throw error; // Andere Fehler weitergeben
+                    }
+                    
                     return interaction.editReply({
                         content: getT('dunemap:MAP.SET_SUCCESS', { coord })
                     });
@@ -355,7 +400,18 @@ module.exports = {
                         interaction.user.id
                     ]);
 
-                    await this.updateMap(mapChannel);
+                    try {
+                        await this.updateMap(mapChannel);
+                    } catch (error) {
+                        // Fehlermeldung an User zurückgeben
+                        if (error.message && error.message.startsWith('❌')) {
+                            return interaction.editReply({
+                                content: error.message
+                            });
+                        }
+                        throw error; // Andere Fehler weitergeben
+                    }
+                    
                     return interaction.editReply({
                         content: getT('dunemap:MAP.REMOVE_SUCCESS', { coord })
                     });

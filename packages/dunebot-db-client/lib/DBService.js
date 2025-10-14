@@ -826,6 +826,141 @@ async getAllConfigs() {
         const params = pluginName ? [guildId, pluginName] : [guildId];
         return await this.query(query, params);
     }
+
+    // ============================================================
+    // USER CONFIG METHODS
+    // ============================================================
+
+    /**
+     * Holt eine user-spezifische Konfiguration
+     * @param {string} userId Discord User-ID
+     * @param {string} pluginName Plugin-Namespace
+     * @param {string} configKey Config-Schlüssel
+     * @param {string|null} guildId Guild-ID oder null für global
+     * @returns {Promise<any>} Config-Wert (bereits geparst wenn JSON)
+     * @author firedervil
+     */
+    async getUserConfig(userId, pluginName, configKey, guildId = null) {
+        try {
+            const [rows] = await this.query(
+                'SELECT config_value FROM user_configs WHERE user_id = ? AND plugin_name = ? AND config_key = ? AND (guild_id <=> ?)',
+                [userId, pluginName, configKey, guildId]
+            );
+            
+            if (!rows || !rows.config_value) {
+                return null;
+            }
+            
+            // Versuche JSON zu parsen
+            try {
+                if (typeof rows.config_value === 'string' && 
+                    (rows.config_value.startsWith('{') || rows.config_value.startsWith('['))) {
+                    return JSON.parse(rows.config_value);
+                }
+            } catch (parseError) {
+                // Nicht parsebar, gib String zurück
+            }
+            
+            return rows.config_value;
+        } catch (error) {
+            const Logger = ServiceManager.get('Logger');
+            Logger.error(`[DBService] Fehler beim Abrufen von User-Config (${userId}/${pluginName}/${configKey}):`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Setzt eine user-spezifische Konfiguration
+     * @param {string} userId Discord User-ID
+     * @param {string} pluginName Plugin-Namespace
+     * @param {string} configKey Config-Schlüssel
+     * @param {any} configValue Config-Wert (wird automatisch zu JSON wenn Object/Array)
+     * @param {string|null} guildId Guild-ID oder null für global
+     * @returns {Promise<void>}
+     * @author firedervil
+     */
+    async setUserConfig(userId, pluginName, configKey, configValue, guildId = null) {
+        try {
+            // Konvertiere zu JSON wenn Object oder Array
+            let valueToStore = configValue;
+            if (typeof configValue === 'object' && configValue !== null) {
+                valueToStore = JSON.stringify(configValue);
+            }
+            
+            await this.query(
+                `INSERT INTO user_configs (user_id, plugin_name, config_key, config_value, guild_id) 
+                 VALUES (?, ?, ?, ?, ?) 
+                 ON DUPLICATE KEY UPDATE 
+                    config_value = VALUES(config_value),
+                    updated_at = CURRENT_TIMESTAMP`,
+                [userId, pluginName, configKey, valueToStore, guildId]
+            );
+        } catch (error) {
+            const Logger = ServiceManager.get('Logger');
+            Logger.error(`[DBService] Fehler beim Setzen von User-Config (${userId}/${pluginName}/${configKey}):`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Löscht eine user-spezifische Konfiguration
+     * @param {string} userId Discord User-ID
+     * @param {string} pluginName Plugin-Namespace
+     * @param {string} configKey Config-Schlüssel
+     * @param {string|null} guildId Guild-ID oder null für global
+     * @returns {Promise<void>}
+     * @author firedervil
+     */
+    async deleteUserConfig(userId, pluginName, configKey, guildId = null) {
+        try {
+            await this.query(
+                'DELETE FROM user_configs WHERE user_id = ? AND plugin_name = ? AND config_key = ? AND (guild_id <=> ?)',
+                [userId, pluginName, configKey, guildId]
+            );
+        } catch (error) {
+            const Logger = ServiceManager.get('Logger');
+            Logger.error(`[DBService] Fehler beim Löschen von User-Config (${userId}/${pluginName}/${configKey}):`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Holt alle Configs eines Users für ein Plugin
+     * @param {string} userId Discord User-ID
+     * @param {string} pluginName Plugin-Namespace
+     * @param {string|null} guildId Guild-ID oder null für global
+     * @returns {Promise<Object>} Object mit allen Configs (key: value)
+     * @author firedervil
+     */
+    async getUserConfigs(userId, pluginName, guildId = null) {
+        try {
+            const rows = await this.query(
+                'SELECT config_key, config_value FROM user_configs WHERE user_id = ? AND plugin_name = ? AND (guild_id <=> ?)',
+                [userId, pluginName, guildId]
+            );
+            
+            const configs = {};
+            for (const row of rows) {
+                // Versuche JSON zu parsen
+                try {
+                    if (typeof row.config_value === 'string' && 
+                        (row.config_value.startsWith('{') || row.config_value.startsWith('['))) {
+                        configs[row.config_key] = JSON.parse(row.config_value);
+                    } else {
+                        configs[row.config_key] = row.config_value;
+                    }
+                } catch (parseError) {
+                    configs[row.config_key] = row.config_value;
+                }
+            }
+            
+            return configs;
+        } catch (error) {
+            const Logger = ServiceManager.get('Logger');
+            Logger.error(`[DBService] Fehler beim Abrufen von User-Configs (${userId}/${pluginName}):`, error);
+            return {};
+        }
+    }
 }
 
 module.exports = DBService;

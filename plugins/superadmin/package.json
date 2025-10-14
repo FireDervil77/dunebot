@@ -1,7 +1,7 @@
 {
   "name": "superadmin",
   "displayName": "Firebot Superadmin-Plugin",
-  "version": "1.0.0",
+  "version": "6.5.3",
   "description": "SuperAdmin Panel - Nur für Bot-Owner",
   "main": "index.js",
   "author": "FireDervil",

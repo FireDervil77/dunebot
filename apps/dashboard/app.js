@@ -19,6 +19,7 @@ const { RouterManager } = require('dunebot-sdk');
 const expressLayouts = require("express-ejs-layouts");
 const sessionMiddleware = require("./middlewares/session.middleware");
 const baseMiddleware = require("./middlewares/context/base.middleware");
+const userConfigMiddleware = require("./middlewares/context/user-config.middleware");
 const { CheckAuth, CheckAdmin } = require("./middlewares/auth.middleware");
 const errorMiddleware = require("./middlewares/error.middleware");
 const authMiddleware = require("./middlewares/auth.middleware");
@@ -303,22 +304,17 @@ module.exports = class App {
         const dbService = ServiceManager.get('dbService')
 
         try {
+            // Core-Plugin Config laden (shared scope, keine Guild-ID)
             const configs = await dbService.query(
-                "SELECT config_key, config_value FROM configs WHERE context = ?",
-                ['dashboard']
+                "SELECT config_key, config_value FROM configs WHERE plugin_name = ?  AND context = ? AND guild_id IS NULL",
+                ['core', 'shared']
             );
             
             const config = {};
             
-            // Gespeicherte Werte laden (außer ENABLED_PLUGINS - das ist obsolet!)
+            // Gespeicherte Werte laden
             if (configs && configs.length > 0) {
                 for (const entry of configs) {
-                    // ENABLED_PLUGINS überspringen - wird über guild_plugins verwaltet
-                    if (entry.config_key === 'ENABLED_PLUGINS') {
-                        Logger.debug('Überspringe veraltete ENABLED_PLUGINS Config');
-                        continue;
-                    }
-                    
                     try {
                         config[entry.config_key] = JSON.parse(entry.config_value);
                     } catch (e) {
@@ -327,6 +323,7 @@ module.exports = class App {
                 }
             }
             
+            Logger.debug(`Dashboard-Config geladen: ${Object.keys(config).length} Einträge`);
             return config;
         } catch (error) {
             Logger.error('Fehler beim Laden der Konfiguration:', error);
@@ -474,6 +471,7 @@ module.exports = class App {
         this.app.use(hookMiddleware);
         this.app.use(guildMiddleware);
         this.app.use(baseMiddleware);
+        this.app.use(userConfigMiddleware); // User-Config nach baseMiddleware (braucht req.session.user)
     }
 
 

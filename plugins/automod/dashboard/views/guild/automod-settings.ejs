@@ -1,0 +1,606 @@
+<!-- AutoMod Settings -->
+
+<!-- AutoMod Tab-System CSS -->
+<link rel="stylesheet" href="/plugins/automod/css/automod.css">
+
+<!-- Anleitungsbox -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card border-info">
+      <div class="card-header bg-info text-white">
+        <h5 class="mb-0">
+          <%= tr('automod:SETTINGS.GUIDE.TITLE') %>
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <!-- Schritt 1 -->
+          <div class="col-md-6 mb-3">
+            <div class="d-flex align-items-start">
+              <div class="flex-shrink-0">
+                <span class="badge bg-info rounded-circle" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 1rem;">1</span>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <h6 class="mb-1"><%= tr('automod:SETTINGS.GUIDE.STEP1.TITLE') %></h6>
+                <p class="text-muted small mb-0"><%= tr('automod:SETTINGS.GUIDE.STEP1.DESC') %></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Schritt 2 -->
+          <div class="col-md-6 mb-3">
+            <div class="d-flex align-items-start">
+              <div class="flex-shrink-0">
+                <span class="badge bg-info rounded-circle" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 1rem;">2</span>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <h6 class="mb-1"><%= tr('automod:SETTINGS.GUIDE.STEP2.TITLE') %></h6>
+                <p class="text-muted small mb-0"><%= tr('automod:SETTINGS.GUIDE.STEP2.DESC') %></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Schritt 3 -->
+          <div class="col-md-6 mb-3">
+            <div class="d-flex align-items-start">
+              <div class="flex-shrink-0">
+                <span class="badge bg-info rounded-circle" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 1rem;">3</span>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <h6 class="mb-1"><%= tr('automod:SETTINGS.GUIDE.STEP3.TITLE') %></h6>
+                <p class="text-muted small mb-0"><%= tr('automod:SETTINGS.GUIDE.STEP3.DESC') %></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Schritt 4 -->
+          <div class="col-md-6 mb-3">
+            <div class="d-flex align-items-start">
+              <div class="flex-shrink-0">
+                <span class="badge bg-info rounded-circle" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 1rem;">4</span>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <h6 class="mb-1"><%= tr('automod:SETTINGS.GUIDE.STEP4.TITLE') %></h6>
+                <p class="text-muted small mb-0"><%= tr('automod:SETTINGS.GUIDE.STEP4.DESC') %></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tipp -->
+        <div class="alert alert-light border-warning mt-3 mb-0">
+          <div class="d-flex align-items-center">
+            <i class="fa-solid fa-lightbulb text-warning me-3" style="font-size: 1.5rem;"></i>
+            <div>
+              <strong><%= tr('automod:SETTINGS.GUIDE.TIP.TITLE') %>:</strong>
+              <%= tr('automod:SETTINGS.GUIDE.TIP.DESC') %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tab-State JavaScript - Must be at the end after Bootstrap loads -->
+<script>
+(function() {
+    'use strict';
+    
+    // Wait for DOM and Bootstrap to be ready
+    function initTabs() {
+        if (typeof bootstrap === 'undefined') {
+            console.error('[AutoMod Tabs] Bootstrap not loaded yet! Retrying in 100ms...');
+            setTimeout(initTabs, 100);
+            return;
+        }
+        
+        const tabButtons = document.querySelectorAll('#automodTabs button[data-bs-toggle="tab"]');
+        const tabPanes = document.querySelectorAll('#automodTabsContent .tab-pane');
+        const storageKey = 'automod_active_tab_<%= guildId %>';
+        
+        console.log('[AutoMod Tabs] Found', tabButtons.length, 'tab buttons');
+        console.log('[AutoMod Tabs] Found', tabPanes.length, 'tab panes');
+        
+        if (tabButtons.length === 0) {
+            console.error('[AutoMod Tabs] No tab buttons found!');
+            return;
+        }
+        
+        // Funktion zum Wechseln der Tabs
+        function showTab(targetId, clickedButton) {
+            console.log('[AutoMod Tabs] Switching to tab:', targetId);
+            
+            // Alle Tab-Buttons deaktivieren
+            tabButtons.forEach(btn => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-selected', 'false');
+            });
+            
+            // Alle Tab-Panes ausblenden
+            tabPanes.forEach(pane => {
+                pane.classList.remove('show', 'active');
+            });
+            
+            // Angeklickten Button aktivieren
+            if (clickedButton) {
+                clickedButton.classList.add('active');
+                clickedButton.setAttribute('aria-selected', 'true');
+            }
+            
+            // Ziel-Pane anzeigen
+            const targetPane = document.querySelector(targetId);
+            if (targetPane) {
+                targetPane.classList.add('show', 'active');
+                console.log('[AutoMod Tabs] Tab switched successfully to:', targetId);
+            } else {
+                console.error('[AutoMod Tabs] Target pane not found:', targetId);
+            }
+            
+            // In localStorage speichern
+            localStorage.setItem(storageKey, targetId);
+        }
+        
+        // Click-Handler für alle Tabs
+        tabButtons.forEach(tabButton => {
+            const targetId = tabButton.getAttribute('data-bs-target');
+            console.log('[AutoMod Tabs] Attaching handler to:', targetId);
+            
+            tabButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('[AutoMod Tabs] Tab clicked:', targetId);
+                showTab(targetId, tabButton);
+            });
+        });
+        
+        // Letzten aktiven Tab wiederherstellen
+        const lastActiveTab = localStorage.getItem(storageKey);
+        console.log('[AutoMod Tabs] Last active tab from storage:', lastActiveTab);
+        
+        if (lastActiveTab) {
+            const tabButton = document.querySelector(`button[data-bs-target="${lastActiveTab}"]`);
+            if (tabButton) {
+                console.log('[AutoMod Tabs] Restoring tab:', lastActiveTab);
+                showTab(lastActiveTab, tabButton);
+            }
+        }
+        
+        console.log('[AutoMod Tabs] Tab system initialized successfully!');
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTabs);
+    } else {
+        initTabs();
+    }
+})();
+</script>
+<div class="row">
+  <div class="col-lg-10">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">
+          <i class="fa-solid fa-shield-halved me-2"></i>
+          <%= tr('automod:SETTINGS.PAGE_TITLE') %>
+        </h5>
+      </div>
+      <div class="card-body">
+        
+        <!-- Tab Navigation -->
+        <ul class="nav nav-tabs mb-4" id="automodTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-basic-btn" data-bs-toggle="tab" data-bs-target="#tab-basic" type="button" role="tab" aria-controls="tab-basic" aria-selected="true">
+              <i class="fa-solid fa-cog me-1"></i>
+              <%= tr('automod:TABS.BASIC.TITLE') %>
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-content-btn" data-bs-toggle="tab" data-bs-target="#tab-content" type="button" role="tab" aria-controls="tab-content" aria-selected="false">
+              <i class="fa-solid fa-shield-halved me-1"></i>
+              <%= tr('automod:TABS.CONTENT.TITLE') %>
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-limits-btn" data-bs-toggle="tab" data-bs-target="#tab-limits" type="button" role="tab" aria-controls="tab-limits" aria-selected="false">
+              <i class="fa-solid fa-sliders me-1"></i>
+              <%= tr('automod:TABS.LIMITS.TITLE') %>
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-whitelist-btn" data-bs-toggle="tab" data-bs-target="#tab-whitelist" type="button" role="tab" aria-controls="tab-whitelist" aria-selected="false">
+              <i class="fa-solid fa-user-check me-1"></i>
+              <%= tr('automod:TABS.WHITELIST.TITLE') %>
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-raid-btn" data-bs-toggle="tab" data-bs-target="#tab-raid" type="button" role="tab" aria-controls="tab-raid" aria-selected="false">
+              <i class="fa-solid fa-shield-virus me-1"></i>
+              <%= tr('automod:TABS.RAID.TITLE') %>
+              <span class="badge bg-warning text-dark ms-1"><%= tr('automod:TABS.COMING_SOON') %></span>
+            </button>
+          </li>
+        </ul>
+
+        <form 
+          class="guild-ajax-form" 
+          data-form-type="automod-settings" 
+          data-method="PUT"
+          action="/guild/<%= guildId %>/plugins/automod/settings"
+          method="POST"
+        >
+          
+          <!-- Tab Content -->
+          <div class="tab-content" id="automodTabsContent">
+            
+            <!-- ==================== TAB 1: GRUNDEINSTELLUNGEN ==================== -->
+            <div class="tab-pane fade show active" id="tab-basic" role="tabpanel" aria-labelledby="tab-basic-btn">
+              <h5 class="mb-4">
+                <i class="fa-solid fa-cog me-2 text-primary"></i>
+                <%= tr('automod:TABS.BASIC.SUBTITLE') %>
+              </h5>
+
+              <!-- Log Channel -->
+          <div class="mb-4">
+            <label for="log_channel" class="form-label fw-bold">
+              <i class="fa-solid fa-list-ul me-2"></i>
+              <%= tr('automod:SETTINGS.LOG_CHANNEL.LABEL') %>
+            </label>
+            
+            <% if (guildChannels && guildChannels.length > 0) { %>
+              <select class="form-select" id="log_channel" name="log_channel">
+                <option value=""><%= tr('automod:SETTINGS.LOG_CHANNEL.NO_SELECTION') %></option>
+                <% 
+                  let currentCategory = null;
+                  const selectedChannelId = String(settings.log_channel || '');
+                  
+                  guildChannels.forEach(channel => { 
+                    if (channel.parentName && channel.parentName !== currentCategory) {
+                      currentCategory = channel.parentName;
+                %>
+                  <option disabled>━━━━ <%= currentCategory %> ━━━━</option>
+                <%  } 
+                    const isSelected = selectedChannelId === String(channel.id);
+                %>
+                  <option value="<%= channel.id %>" <%= isSelected ? 'selected' : '' %>>
+                    <%= channel.parentName ? '  └─ ' : '' %>#<%= channel.name %>
+                  </option>
+                <% }); %>
+              </select>
+            <% } else { %>
+              <input type="text" class="form-control" id="log_channel" name="log_channel" 
+                     value="<%= settings.log_channel || '' %>" 
+                     placeholder="Channel-ID eingeben">
+            <% } %>
+            <small class="text-muted"><%= tr('automod:SETTINGS.LOG_CHANNEL.HELP') %></small>
+          </div>
+
+          <!-- Max Strikes -->
+          <div class="mb-4">
+            <label for="max_strikes" class="form-label fw-bold">
+              <i class="fa-solid fa-exclamation-triangle me-2"></i>
+              <%= tr('automod:SETTINGS.MAX_STRIKES.LABEL') %>
+            </label>
+            <input type="number" class="form-control" id="max_strikes" name="max_strikes" 
+                   value="<%= settings.max_strikes || 10 %>" min="1" max="100" required>
+            <small class="text-muted"><%= tr('automod:SETTINGS.MAX_STRIKES.HELP') %></small>
+          </div>
+
+          <!-- Action on Max Strikes -->
+          <div class="mb-4">
+            <label for="action" class="form-label fw-bold">
+              <i class="fa-solid fa-gavel me-2"></i>
+              <%= tr('automod:SETTINGS.ACTION.LABEL') %>
+            </label>
+            <select class="form-select" id="action" name="action" required>
+              <option value="TIMEOUT" <%= settings.action === 'TIMEOUT' ? 'selected' : '' %>>
+                ⏱️ <%= tr('automod:SETTINGS.ACTION.TIMEOUT') %> (24h)
+              </option>
+              <option value="KICK" <%= settings.action === 'KICK' ? 'selected' : '' %>>
+                👢 <%= tr('automod:SETTINGS.ACTION.KICK') %>
+              </option>
+              <option value="BAN" <%= settings.action === 'BAN' ? 'selected' : '' %>>
+                🔨 <%= tr('automod:SETTINGS.ACTION.BAN') %>
+              </option>
+            </select>
+            <small class="text-muted"><%= tr('automod:SETTINGS.ACTION.HELP') %></small>
+          </div>
+
+          <!-- Debug Mode -->
+          <div class="mb-4">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="debug_mode" name="debug_mode" 
+                     value="1" <%= settings.debug_mode ? 'checked' : '' %>>
+              <label class="form-check-label fw-bold" for="debug_mode">
+                <i class="fa-solid fa-bug me-2"></i>
+                <%= tr('automod:SETTINGS.DEBUG_MODE.LABEL') %>
+              </label>
+            </div>
+            <small class="text-muted"><%= tr('automod:SETTINGS.DEBUG_MODE.HELP') %></small>
+          </div>
+            </div>
+            <!-- END TAB 1 -->
+
+            <!-- ==================== TAB 2: CONTENT-FILTER ==================== -->
+            <div class="tab-pane fade" id="tab-content" role="tabpanel" aria-labelledby="tab-content-btn">
+              <h5 class="mb-4">
+                <i class="fa-solid fa-shield-halved me-2 text-primary"></i>
+                <%= tr('automod:TABS.CONTENT.SUBTITLE') %>
+              </h5>
+
+          <!-- Anti Ghost Ping -->
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="anti_ghostping" name="anti_ghostping" 
+                     value="1" <%= settings.anti_ghostping ? 'checked' : '' %>>
+              <label class="form-check-label" for="anti_ghostping">
+                👻 <%= tr('automod:SETTINGS.ANTI_GHOSTPING.LABEL') %>
+              </label>
+            </div>
+            <small class="text-muted"><%= tr('automod:SETTINGS.ANTI_GHOSTPING.HELP') %></small>
+          </div>
+
+          <!-- Anti Spam -->
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="anti_spam" name="anti_spam" 
+                     value="1" <%= settings.anti_spam ? 'checked' : '' %>>
+              <label class="form-check-label" for="anti_spam">
+                🚫 <%= tr('automod:SETTINGS.ANTI_SPAM.LABEL') %>
+              </label>
+            </div>
+            <small class="text-muted"><%= tr('automod:SETTINGS.ANTI_SPAM.HELP') %></small>
+          </div>
+
+          <!-- Anti Mass Mention -->
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="anti_massmention" name="anti_massmention" 
+                     value="1" <%= settings.anti_massmention ? 'checked' : '' %>>
+              <label class="form-check-label" for="anti_massmention">
+                @️ <%= tr('automod:SETTINGS.ANTI_MASSMENTION.LABEL') %>
+              </label>
+            </div>
+            <small class="text-muted"><%= tr('automod:SETTINGS.ANTI_MASSMENTION.HELP') %></small>
+          </div>
+
+          <!-- Mass Mention Threshold -->
+          <div class="mb-4 ms-4">
+            <label for="anti_massmention_threshold" class="form-label">
+              <%= tr('automod:SETTINGS.ANTI_MASSMENTION_THRESHOLD.LABEL') %>
+            </label>
+            <input type="number" class="form-control" id="anti_massmention_threshold" 
+                   name="anti_massmention_threshold" 
+                   value="<%= settings.anti_massmention_threshold || 3 %>" 
+                   min="1" max="50">
+            <small class="text-muted"><%= tr('automod:SETTINGS.ANTI_MASSMENTION_THRESHOLD.HELP') %></small>
+          </div>
+
+          <!-- Anti Attachments -->
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="anti_attachments" name="anti_attachments" 
+                     value="1" <%= settings.anti_attachments ? 'checked' : '' %>>
+              <label class="form-check-label" for="anti_attachments">
+                📎 <%= tr('automod:SETTINGS.ANTI_ATTACHMENTS.LABEL') %>
+              </label>
+            </div>
+            <small class="text-muted"><%= tr('automod:SETTINGS.ANTI_ATTACHMENTS.HELP') %></small>
+          </div>
+
+          <!-- Anti Invites -->
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="anti_invites" name="anti_invites" 
+                     value="1" <%= settings.anti_invites ? 'checked' : '' %>>
+              <label class="form-check-label" for="anti_invites">
+                🔗 <%= tr('automod:SETTINGS.ANTI_INVITES.LABEL') %>
+              </label>
+            </div>
+            <small class="text-muted"><%= tr('automod:SETTINGS.ANTI_INVITES.HELP') %></small>
+          </div>
+
+          <!-- Anti Links -->
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="anti_links" name="anti_links" 
+                     value="1" <%= settings.anti_links ? 'checked' : '' %>>
+              <label class="form-check-label" for="anti_links">
+                🌐 <%= tr('automod:SETTINGS.ANTI_LINKS.LABEL') %>
+              </label>
+            </div>
+            <small class="text-muted"><%= tr('automod:SETTINGS.ANTI_LINKS.HELP') %></small>
+          </div>
+            </div>
+            <!-- END TAB 2 -->
+
+            <!-- ==================== TAB 3: LIMITS ==================== -->
+            <div class="tab-pane fade" id="tab-limits" role="tabpanel" aria-labelledby="tab-limits-btn">
+              <h5 class="mb-4">
+                <i class="fa-solid fa-sliders me-2 text-primary"></i>
+                <%= tr('automod:TABS.LIMITS.SUBTITLE') %>
+              </h5>
+
+          <!-- Max Lines -->
+          <div class="mb-4">
+            <label for="max_lines" class="form-label fw-bold">
+              <i class="fa-solid fa-align-left me-2"></i>
+              <%= tr('automod:SETTINGS.MAX_LINES.LABEL') %>
+            </label>
+            <input type="number" class="form-control" id="max_lines" name="max_lines" 
+                   value="<%= settings.max_lines || 0 %>" min="0" max="100">
+            <small class="text-muted"><%= tr('automod:SETTINGS.MAX_LINES.HELP') %></small>
+          </div>
+
+          <!-- Max Mentions -->
+          <div class="mb-4">
+            <label for="max_mentions" class="form-label fw-bold">
+              <i class="fa-solid fa-at me-2"></i>
+              <%= tr('automod:SETTINGS.MAX_MENTIONS.LABEL') %>
+            </label>
+            <input type="number" class="form-control" id="max_mentions" name="max_mentions" 
+                   value="<%= settings.max_mentions || 0 %>" min="0" max="50">
+            <small class="text-muted"><%= tr('automod:SETTINGS.MAX_MENTIONS.HELP') %></small>
+          </div>
+
+          <!-- Max Role Mentions -->
+          <div class="mb-4">
+            <label for="max_role_mentions" class="form-label fw-bold">
+              <i class="fa-solid fa-user-tag me-2"></i>
+              <%= tr('automod:SETTINGS.MAX_ROLE_MENTIONS.LABEL') %>
+            </label>
+            <input type="number" class="form-control" id="max_role_mentions" name="max_role_mentions" 
+                   value="<%= settings.max_role_mentions || 0 %>" min="0" max="50">
+            <small class="text-muted"><%= tr('automod:SETTINGS.MAX_ROLE_MENTIONS.HELP') %></small>
+          </div>
+            </div>
+            <!-- END TAB 3 -->
+
+            <!-- ==================== TAB 4: WHITELISTING ==================== -->
+            <div class="tab-pane fade" id="tab-whitelist" role="tabpanel" aria-labelledby="tab-whitelist-btn">
+              <h5 class="mb-4">
+                <i class="fa-solid fa-user-check me-2 text-primary"></i>
+                <%= tr('automod:TABS.WHITELIST.SUBTITLE') %>
+              </h5>
+
+              <!-- Whitelisted Channels (Existing Feature) -->
+              <div class="mb-4">
+                <label class="form-label fw-bold">
+                  <i class="fa-solid fa-hashtag me-2"></i>
+                  <%= tr('automod:SETTINGS.WHITELISTED_CHANNELS.LABEL') %>
+                </label>
+                
+                <% if (guildChannels && guildChannels.length > 0) { %>
+                  <select class="form-select" id="whitelisted_channels" name="whitelisted_channels" multiple size="8">
+                    <% 
+                      let currentCategory = null;
+                      const whitelistedChannelIds = settings.whitelisted_channels 
+                        ? (Array.isArray(settings.whitelisted_channels) 
+                            ? settings.whitelisted_channels.map(id => String(id))
+                            : JSON.parse(settings.whitelisted_channels || '[]').map(id => String(id)))
+                        : [];
+                      
+                      guildChannels.forEach(channel => { 
+                        if (channel.parentName && channel.parentName !== currentCategory) {
+                          currentCategory = channel.parentName;
+                    %>
+                      <option disabled>━━━━ <%= currentCategory %> ━━━━</option>
+                    <%  } 
+                        const isSelected = whitelistedChannelIds.includes(String(channel.id));
+                    %>
+                      <option value="<%= channel.id %>" <%= isSelected ? 'selected' : '' %>>
+                        <%= channel.parentName ? '  └─ ' : '' %>#<%= channel.name %>
+                      </option>
+                    <% }); %>
+                  </select>
+                  <small class="text-muted">
+                    <i class="fa-solid fa-info-circle me-1"></i>
+                    <%= tr('automod:SETTINGS.WHITELISTED_CHANNELS.HELP') %>
+                  </small>
+                <% } else { %>
+                  <div class="alert alert-warning">
+                    <i class="fa-solid fa-exclamation-triangle me-2"></i>
+                    <%= tr('automod:SETTINGS.WHITELISTED_CHANNELS.NO_CHANNELS') %>
+                  </div>
+                <% } %>
+              </div>
+
+              <!-- Coming Soon: Role Whitelist -->
+              <div class="alert alert-info">
+                <div class="d-flex align-items-center">
+                  <i class="fa-solid fa-user-tag me-3" style="font-size: 2rem;"></i>
+                  <div>
+                    <h6 class="mb-1">
+                      <span class="badge bg-warning text-dark me-2"><%= tr('automod:TABS.COMING_SOON') %></span>
+                      <%= tr('automod:TABS.WHITELIST.ROLE_WHITELIST_TITLE') %>
+                    </h6>
+                    <p class="mb-0 small">
+                      <%= tr('automod:TABS.WHITELIST.ROLE_WHITELIST_DESC') %>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- END TAB 4 -->
+
+            <!-- ==================== TAB 5: RAID-SCHUTZ (COMING SOON) ==================== -->
+            <div class="tab-pane fade" id="tab-raid" role="tabpanel" aria-labelledby="tab-raid-btn">
+              <div class="text-center py-5">
+                <i class="fa-solid fa-shield-virus text-warning mb-3" style="font-size: 4rem;"></i>
+                <h4 class="mb-3">
+                  <span class="badge bg-warning text-dark"><%= tr('automod:TABS.COMING_SOON') %></span>
+                </h4>
+                <h5 class="mb-4"><%= tr('automod:TABS.RAID.SUBTITLE') %></h5>
+                
+                <div class="row justify-content-center">
+                  <div class="col-md-8">
+                    <div class="card bg-light">
+                      <div class="card-body text-start">
+                        <h6 class="mb-3"><i class="fa-solid fa-list-check me-2"></i><%= tr('automod:TABS.RAID.PLANNED_FEATURES') %>:</h6>
+                        <ul class="list-unstyled mb-0">
+                          <li class="mb-2">
+                            <i class="fa-solid fa-check-circle text-success me-2"></i>
+                            <%= tr('automod:TABS.RAID.FEATURE_1') %>
+                          </li>
+                          <li class="mb-2">
+                            <i class="fa-solid fa-check-circle text-success me-2"></i>
+                            <%= tr('automod:TABS.RAID.FEATURE_2') %>
+                          </li>
+                          <li class="mb-2">
+                            <i class="fa-solid fa-check-circle text-success me-2"></i>
+                            <%= tr('automod:TABS.RAID.FEATURE_3') %>
+                          </li>
+                          <li class="mb-0">
+                            <i class="fa-solid fa-check-circle text-success me-2"></i>
+                            <%= tr('automod:TABS.RAID.FEATURE_4') %>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                    <p class="text-muted mt-3 mb-0">
+                      <i class="fa-solid fa-calendar-alt me-2"></i>
+                      <%= tr('automod:TABS.RAID.ETA') %>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- END TAB 5 -->
+
+          </div>
+          <!-- END Tab Content -->
+
+          <!-- Submit Button (Outside Tabs, always visible) -->
+          <div class="d-grid gap-2 mt-4">
+            <button type="submit" class="btn btn-primary btn-lg">
+              <i class="fa-solid fa-save me-2"></i>
+              <%= tr('automod:SETTINGS.SAVE_BUTTON') %>
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar: Info Card -->
+  <div class="col-lg-2">
+    <div class="card">
+      <div class="card-header bg-info text-white">
+        <h6 class="mb-0">
+          <i class="fa-solid fa-info-circle me-2"></i>
+          <%= tr('automod:SETTINGS.INFO.TITLE') %>
+        </h6>
+      </div>
+      <div class="card-body">
+        <p class="small mb-2">
+          <%= tr('automod:SETTINGS.INFO.DESC') %>
+        </p>
+        <hr>
+        <p class="small mb-0">
+          <strong><%= tr('automod:SETTINGS.INFO.VERSION') %>:</strong> 1.0.0
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

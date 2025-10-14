@@ -120,8 +120,8 @@
                                     <tbody>
                                         <% topGuilds.forEach(guild => { %>
                                             <tr>
-                                                <td><%= guild.name %></td>
-                                                <td><%= new Date(guild.joined_at).toLocaleDateString('de-DE') %></td>
+                                                <td><%= guild.guild_name %></td>
+                                                <td><%= new Date(guild.created_at).toLocaleDateString('de-DE') %></td>
                                             </tr>
                                         <% }); %>
                                     </tbody>

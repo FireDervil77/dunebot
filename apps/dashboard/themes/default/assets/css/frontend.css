@@ -1528,3 +1528,269 @@ section,
     font-size: 1.25rem;
   }
 }
+
+/*--------------------------------------------------------------
+# Plugins Carousel Section
+--------------------------------------------------------------*/
+.plugins.section {
+  background: var(--background-color);
+  padding: 80px 0;
+}
+
+.plugins .section-title h2 {
+  color: var(--heading-color);
+  margin-bottom: 20px;
+}
+
+.plugins .section-title p {
+  color: var(--default-color);
+  opacity: 0.8;
+}
+
+/* Carousel Styling */
+#pluginsCarousel {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.plugins .carousel-indicators {
+  margin-bottom: -50px;
+  gap: 8px;
+}
+
+.plugins .carousel-indicators button {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--accent-color);
+  opacity: 0.25;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  margin: 0 4px;
+}
+
+.plugins .carousel-indicators button:hover {
+  opacity: 0.6;
+  transform: scale(1.3);
+}
+
+.plugins .carousel-indicators button.active {
+  opacity: 1;
+  transform: scale(1.4);
+  background-color: var(--accent-color);
+  box-shadow: 0 0 12px rgba(52, 152, 219, 0.6);
+}
+
+/* Plugin Card */
+.plugin-card {
+  background: var(--surface-color);
+  border-radius: 20px;
+  padding: 50px 40px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  transition: all 0.3s ease;
+  min-height: 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.plugin-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 50px rgba(52, 152, 219, 0.15);
+}
+
+.plugin-icon {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, var(--accent-color), #5dade2);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 30px;
+  transition: all 0.3s ease;
+}
+
+.plugin-card:hover .plugin-icon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.plugin-icon i {
+  font-size: 48px;
+  color: #ffffff;
+}
+
+.plugin-content h3 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--heading-color);
+  margin-bottom: 15px;
+}
+
+.plugin-description {
+  font-size: 16px;
+  color: var(--default-color);
+  opacity: 0.8;
+  margin-bottom: 25px;
+  line-height: 1.6;
+}
+
+.plugin-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+}
+
+.plugin-meta .badge {
+  font-size: 14px;
+  padding: 6px 16px;
+  font-weight: 600;
+}
+
+.plugin-meta .text-muted {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Carousel Controls - Subtile Navigation */
+.plugins .carousel-control-prev,
+.plugins .carousel-control-next {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(52, 152, 219, 0.15);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(52, 152, 219, 0.3);
+  opacity: 0.6;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: all 0.3s ease;
+}
+
+.plugins .carousel-control-prev {
+  left: -70px;
+}
+
+.plugins .carousel-control-next {
+  right: -70px;
+}
+
+.plugins .carousel-control-prev:hover,
+.plugins .carousel-control-next:hover {
+  opacity: 1;
+  background: rgba(52, 152, 219, 0.85);
+  border-color: rgba(52, 152, 219, 0.9);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 4px 20px rgba(52, 152, 219, 0.4);
+}
+
+.plugins .carousel-control-prev-icon,
+.plugins .carousel-control-next-icon {
+  width: 20px;
+  height: 20px;
+  background-image: none;
+  position: relative;
+}
+
+/* Custom Chevron Icons mit reinem CSS */
+.plugins .carousel-control-prev-icon::before,
+.plugins .carousel-control-next-icon::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-top: 3px solid #ffffff;
+  border-right: 3px solid #ffffff;
+  top: 50%;
+  left: 50%;
+}
+
+.plugins .carousel-control-prev-icon::before {
+  transform: translate(-30%, -50%) rotate(-135deg);
+}
+
+.plugins .carousel-control-next-icon::before {
+  transform: translate(-70%, -50%) rotate(45deg);
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .plugins .carousel-control-prev {
+    left: 10px;
+    width: 50px;
+    height: 50px;
+  }
+  
+  .plugins .carousel-control-next {
+    right: 10px;
+    width: 50px;
+    height: 50px;
+  }
+  
+  .plugins .carousel-control-prev-icon,
+  .plugins .carousel-control-next-icon {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .plugins .carousel-control-prev-icon::before,
+  .plugins .carousel-control-next-icon::before {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+  }
+  
+  .plugin-card {
+    padding: 40px 30px;
+    min-height: 320px;
+  }
+  
+  .plugin-icon {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .plugin-icon i {
+    font-size: 40px;
+  }
+  
+  .plugin-content h3 {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .plugins .carousel-control-prev,
+  .plugins .carousel-control-next {
+    width: 40px;
+    height: 40px;
+    left: 0;
+    right: 0;
+  }
+  
+  .plugins .carousel-control-prev {
+    left: 10px;
+  }
+  
+  .plugins .carousel-control-next {
+    right: 10px;
+  }
+  
+  .plugin-card {
+    padding: 30px 20px;
+    min-height: 280px;
+  }
+  
+  .plugin-content h3 {
+    font-size: 20px;
+  }
+  
+  .plugin-description {
+    font-size: 14px;
+  }
+}

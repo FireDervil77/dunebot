@@ -141,7 +141,7 @@ class GreetingDashboardPlugin extends DashboardPlugin {
 
         const navItems = [
             {
-                title: 'Greeting',
+                title: 'greeting:NAV.GREETING',
                 path: `/guild/${guildId}/plugins/greeting/settings`,
                 icon: 'fa-solid fa-hands',
                 order: 25,  // Nach Core-Settings und DuneMap

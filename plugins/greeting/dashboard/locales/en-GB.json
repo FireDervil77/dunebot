@@ -7,6 +7,10 @@
         "PAGE_DESC": "Configure welcome and farewell messages for your guild"
     },
 
+    "NAV": {
+        "GREETING": "Begrüßungen"
+    },
+    
     "TAB_WELCOME": "Welcome",
     "TAB_FAREWELL": "Farewell",
     "TAB_AUTOROLE": "Autorole",

@@ -1,0 +1,208 @@
+{
+    "TITLE": "Auto-moderation",
+    "DESCRIPTION": "Automatically moderate your server",
+
+    "NAV": {
+        "AUTOMOD": "AutoMod"
+    },
+
+    "SETTINGS": {
+        "PAGE_TITLE": "AutoMod Settings",
+        
+        "LOG_CHANNEL": {
+            "LABEL": "Log Channel",
+            "NO_SELECTION": "No channel selected",
+            "HELP": "The channel where AutoMod logs will be sent"
+        },
+        
+        "MAX_STRIKES": {
+            "LABEL": "Maximum Strikes",
+            "HELP": "Number of strikes before a user is punished"
+        },
+        
+        "ACTION": {
+            "LABEL": "Action on Max Strikes",
+            "TIMEOUT": "Timeout",
+            "KICK": "Kick",
+            "BAN": "Ban",
+            "HELP": "The action to take when a user reaches the maximum number of strikes"
+        },
+        
+        "DEBUG_MODE": {
+            "LABEL": "Debug Mode",
+            "HELP": "Don't moderate messages from moderators (for testing)"
+        },
+        
+        "ANTI_FEATURES": {
+            "TITLE": "Anti Features"
+        },
+        
+        "ANTI_GHOSTPING": {
+            "LABEL": "Anti Ghost-Ping",
+            "HELP": "Log and moderate ghost pings (deleted mentions)"
+        },
+        
+        "ANTI_SPAM": {
+            "LABEL": "Anti-Spam",
+            "HELP": "Automatically delete spam messages"
+        },
+        
+        "ANTI_MASSMENTION": {
+            "LABEL": "Anti Mass-Mention",
+            "HELP": "Moderate messages with many mentions"
+        },
+        
+        "ANTI_MASSMENTION_THRESHOLD": {
+            "LABEL": "Mass-Mention Threshold",
+            "HELP": "Number of mentions before a message is considered mass-mention"
+        },
+        
+        "ANTI_ATTACHMENTS": {
+            "LABEL": "Anti-Attachments",
+            "HELP": "Automatically delete messages with file attachments"
+        },
+        
+        "ANTI_INVITES": {
+            "LABEL": "Anti-Invites",
+            "HELP": "Automatically delete messages with Discord invites"
+        },
+        
+        "ANTI_LINKS": {
+            "LABEL": "Anti-Links",
+            "HELP": "Automatically delete messages with links"
+        },
+        
+        "LIMITS": {
+            "TITLE": "Limits & Thresholds"
+        },
+        
+        "MAX_LINES": {
+            "LABEL": "Maximum Lines",
+            "HELP": "Delete messages with more lines (0 = disabled)"
+        },
+        
+        "MAX_MENTIONS": {
+            "LABEL": "Maximum User Mentions",
+            "HELP": "Maximum allowed user mentions (0 = unlimited)"
+        },
+        
+        "MAX_ROLE_MENTIONS": {
+            "LABEL": "Maximum Role Mentions",
+            "HELP": "Maximum allowed role mentions (0 = unlimited)"
+        },
+        
+        "WHITELISTED_CHANNELS": {
+            "LABEL": "Whitelisted Channels",
+            "HELP": "Channels where AutoMod is not active (Ctrl+Click for multi-select)",
+            "NO_CHANNELS": "No channels available"
+        },
+        
+        "SAVE_BUTTON": "Save Settings",
+        
+        "INFO": {
+            "TITLE": "Info",
+            "DESC": "AutoMod protects your server from spam, unwanted links and mass mentions.",
+            "VERSION": "Version"
+        },
+
+        "GUIDE": {
+            "TITLE": "💡 Quick Guide",
+            "STEP1": {
+                "TITLE": "1. Setup Log Channel",
+                "DESC": "Select a channel where AutoMod logs should appear"
+            },
+            "STEP2": {
+                "TITLE": "2. Configure Strike System",
+                "DESC": "Set how many strikes a user can receive before being punished"
+            },
+            "STEP3": {
+                "TITLE": "3. Enable Anti Features",
+                "DESC": "Activate desired protection features (Anti-Spam, Anti-Links, etc.)"
+            },
+            "STEP4": {
+                "TITLE": "4. Adjust Limits",
+                "DESC": "Optional: Set limits for line length and mentions"
+            },
+            "TIP": {
+                "TITLE": "💡 Tip",
+                "DESC": "Enable Debug Mode to test settings without affecting moderators"
+            }
+        }
+    },
+
+    "TABS": {
+        "COMING_SOON": "Coming Soon",
+        
+        "BASIC": {
+            "TITLE": "Basic Settings",
+            "SUBTITLE": "Core Configuration"
+        },
+        
+        "CONTENT": {
+            "TITLE": "Content Filter",
+            "SUBTITLE": "Anti Features & Filters"
+        },
+        
+        "LIMITS": {
+            "TITLE": "Limits",
+            "SUBTITLE": "Thresholds & Boundaries"
+        },
+        
+        "WHITELIST": {
+            "TITLE": "Whitelisting",
+            "SUBTITLE": "Exceptions & Exemptions",
+            "ROLE_WHITELIST_TITLE": "Role Whitelist",
+            "ROLE_WHITELIST_DESC": "Coming soon: Exclude specific roles from AutoMod (e.g. Moderators, Trusted Members)"
+        },
+        
+        "RAID": {
+            "TITLE": "Raid Protection",
+            "SUBTITLE": "Raid Protection & Join Spam",
+            "PLANNED_FEATURES": "Planned Features",
+            "FEATURE_1": "Join Spam Detection (X users in Y seconds)",
+            "FEATURE_2": "Account Age Check (Min. 7 days old)",
+            "FEATURE_3": "Lockdown Mode on raid detection",
+            "FEATURE_4": "Automatic Actions (Kick/Ban new users)",
+            "ETA": "Available in approx. 1-2 weeks"
+        }
+    },
+
+    "MESSAGES": {
+        "SETTINGS_SAVED": "AutoMod settings saved successfully",
+        "SETTINGS_ERROR": "Error saving AutoMod settings"
+    },
+
+    "BASIC_TITLE": "Basic Settings",
+    "LOGS_TITLE": "Logs Channel",
+    "LOGS_DESC": "The channel where the bot has to send automod logs",
+    "STRIKES_TITLE": "Max Strikes",
+    "STRIKES_DESC": "The maximum amount of strikes a user can have before being punished",
+    "ACTION_TITLE": "Action",
+    "ACTION_DESC": "The action to take when a user reaches the max amount of strikes",
+    "LOG_EMBED_TITLE": "Log Embed Color",
+    "LOG_EMBED_DESC": "The color of the embeds sent in the logs channel",
+    "DM_EMBED_TITLE": "DM Embed Color",
+    "DM_EMBED_DESC": "The color of the embeds sent in the DMs of the punished user",
+    "WHITELIST_CH_TITLE": "Whitelisted Channels",
+    "WHITELIST_CH_DESC": "The channels where the bot won't moderate",
+
+    "TOGGLE_TITLE": "Quick Automod Toggles",
+    "DEBUG_TITLE": "Debug Mode",
+    "DEBUG_DESC": "Skip moderating messages sent by moderators",
+    "ATTACH_TITLE": "Anti Attachments",
+    "ATTACH_DESC": "Automatically delete messages with attachments",
+    "INVITES_TITLE": "Anti Invites",
+    "INVITES_DESC": "Automatically delete messages with discord invites",
+    "LINKS_TITLE": "Anti Links",
+    "LINKS_DESC": "Automatically delete messages with links",
+    "SPAM_TITLE": "Anti Spam",
+    "SPAM_DESC": "Automatically delete messages that are considered spam",
+    "GHOST_TITLE": "Anti Ghost Ping",
+    "GHOST_DESC": "Log and moderate ghost pings",
+    "MASSMENTION_TITLE": "Anti Mass Mention",
+    "MASSMENTION_DESC": "Automatically moderate messages with mass mentions",
+    "MASSMENTION_THRES_TITLE": "Mass Mention Threshold",
+    "MASSMENTION_THRES_DESC": "The amount of mentions a message must have to be considered a mass mention",
+    "MAXLINES_TITLE": "Max Lines",
+    "MAXLINES_DESC": "Automatically delete messages with more than the specified amount of lines"
+}
