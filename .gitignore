@@ -51,3 +51,4 @@ config/secrets.json
 *.pem
 *.key
 test_*.js
+cookies.txt
