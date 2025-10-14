@@ -170,15 +170,17 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             // API-Routen (ohne Owner-Check für bestimmte Endpoints)
             const toastHistoryApi = require('./routes/api/toast-history');
             const botGuildsApi = require('./routes/api/bot-guilds');
+            const notificationsApi = require('./routes/api/notifications');
             this.apiRouter = express.Router();
             this.apiRouter.use('/toast-history', toastHistoryApi);
             Logger.debug('[SuperAdmin] API-Routen registriert (toast-history)');
             
             // Guild-spezifische API-Routen (VOR dem Owner-Check!)
             this.guildRouter.use('/api/bot-guilds', botGuildsApi);
-            Logger.debug('[SuperAdmin] Guild API-Routen registriert (bot-guilds)');
+            this.guildRouter.use('/api/notifications', notificationsApi);
+            Logger.debug('[SuperAdmin] Guild API-Routen registriert (bot-guilds, notifications)');
             
-            // Middleware: Owner-Check für ALLE SuperAdmin-Routen (nach API-Routen!)
+            // Middleware: Owner-Check für ALLE anderen SuperAdmin-Routen (nach API-Routen!)
             this.guildRouter.use(this._checkOwner.bind(this));
 
             // === HAUPTSEITE (Dashboard-Übersicht) ===

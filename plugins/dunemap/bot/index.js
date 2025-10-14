@@ -32,8 +32,8 @@ class DuneMapBotPlugin extends BotPlugin {
      */
     async onEnable(client) {
         const Logger = ServiceManager.get("Logger");
-        Logger.info('DuneMap-Plugin wird aktiviert...');
-        Logger.success('DuneMap-Plugin aktiviert');
+        Logger.info('[DuneMap]-Plugin wird aktiviert...');
+        Logger.success('[DuneMap]-Plugin aktiviert');
     }
 
     /**
@@ -45,12 +45,12 @@ class DuneMapBotPlugin extends BotPlugin {
      */
     async onDisable(client) {
         const Logger = ServiceManager.get("Logger");
-        Logger.info('DuneMap-Plugin wird deaktiviert...');
+        Logger.info('[DuneMap]-Plugin wird deaktiviert...');
         
         // Keine Tabellen löschen hier - das macht das Dashboard-Plugin
         // Bot-Plugin kümmert sich nur um Commands/Events cleanup
         
-        Logger.success('DuneMap-Plugin deaktiviert');
+        Logger.success('[DuneMap]-Plugin deaktiviert');
     }
         
     /**
@@ -62,7 +62,7 @@ class DuneMapBotPlugin extends BotPlugin {
      */
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get("Logger");
-        Logger.info(`DuneMap-Plugin für Guild ${guildId} aktiviert`);
+        Logger.info(`[DuneMap]-Plugin für Guild ${guildId} aktiviert`);
         
         try {
             // Default Config aus der config.json laden
@@ -77,14 +77,14 @@ class DuneMapBotPlugin extends BotPlugin {
                 guildId
             );
             
-            Logger.debug(`DuneMap-Config für Guild ${guildId}: ${stats.created} neu, ${stats.existing} bereits vorhanden`);
+            Logger.debug(`[DuneMap]-Config für Guild ${guildId}: ${stats.created} neu, ${stats.existing} bereits vorhanden`);
 
             // HINWEIS: Plugin wird bereits vom PluginManager via enablePluginForGuild() 
             // in guild_plugins eingetragen - keine manuelle ENABLED_PLUGINS Manipulation mehr nötig!
             
-            Logger.debug(`DuneMap-Konfiguration für Guild ${guildId} initialisiert`);
+            Logger.debug(`[DuneMap]-Konfiguration für Guild ${guildId} initialisiert`);
         } catch (err) {
-            Logger.error(`Fehler beim Initialisieren der DuneMap-Konfiguration für ${guildId}:`, err);
+            Logger.error(`Fehler beim Initialisieren der [DuneMap]-Konfiguration für ${guildId}:`, err);
         }
     }
 
@@ -97,15 +97,15 @@ class DuneMapBotPlugin extends BotPlugin {
      */
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get("Logger");
-        Logger.info(`DuneMap-Plugin für Guild ${guildId} wird deaktiviert...`);
+        Logger.info(`[DuneMap]-Plugin für Guild ${guildId} wird deaktiviert...`);
 
         try {
             // HINWEIS: Plugin wird bereits vom PluginManager via disablePluginForGuild()
             // in guild_plugins deaktiviert - keine manuelle ENABLED_PLUGINS Manipulation mehr nötig!
             
-            Logger.success(`DuneMap-Plugin für Guild ${guildId} deaktiviert`);
+            Logger.success(`[DuneMap]-Plugin für Guild ${guildId} deaktiviert`);
         } catch (err) {
-            Logger.error(`Fehler beim Deaktivieren des DuneMap-Plugins für Guild ${guildId}:`, err);
+            Logger.error(`Fehler beim Deaktivieren des [DuneMap]-Plugins für Guild ${guildId}:`, err);
             throw err;
         }
     }    
@@ -130,7 +130,7 @@ class DuneMapBotPlugin extends BotPlugin {
             // Hier könnte Logging nach jeder Befehlsausführung durchgeführt werden
         });
         
-        Logger.debug('DuneMap-Plugin-Hooks registriert');
+        Logger.debug('[DuneMap]-Plugin-Hooks registriert');
     }
    
 }
