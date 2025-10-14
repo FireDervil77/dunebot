@@ -1,0 +1,105 @@
+<section class="border-border bg-bg-panel rounded-lg border p-4 shadow-sm">
+  <form
+    x-data="{
+      formData: {
+        xp_message: '<%= settings.xp.message %>',
+        xp_channel: '<%= settings.xp.channel %>',
+        cooldown: '<%= settings.xp.cooldown %>'
+      },
+      saving: false,
+      async submitForm() {
+        try {
+          this.saving = true;
+          const response = await fetch(window.location.href, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.formData)
+          });
+
+          if (response.ok) {
+            Alpine.store('toast').show('<%=tr(`SETTINGS_SAVE`)%>', 'success');
+          } else {
+            throw new Error('Failed to update settings');
+          }
+        } catch (error) {
+          Alpine.store('toast').show('<%=tr(`SETTINGS_SAVE_ERROR`)%>', 'error');
+        } finally {
+          this.saving = false;
+        }
+      }
+    }"
+    @submit.prevent="submitForm">
+    <!-- START: Card Body -->
+    <div class="mb-3">
+      <!-- START: Row 1 (XP Message) -->
+      <div class="mb-3">
+        <div class="mb-2">
+          <label for="xp_message" class="text-text text-sm font-semibold"><%= tr("stats:LVL_MSG_TITLE") %></label>
+          <div class="text-text-muted text-sm font-normal"><%= tr("stats:LVL_MSG_DESC") %></div>
+        </div>
+        <input
+          type="text"
+          x-model="formData.xp_message"
+          id="xp_message"
+          class="focus:border-primary focus:ring-primary border-border bg-bg-interactive text-text block w-full rounded-lg border p-2.5 shadow-sm sm:text-sm"
+          required />
+      </div>
+      <!-- END: Row 1 -->
+
+      <!-- START: Row 2 -->
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+        <!-- START: Column 1 (Channel) -->
+        <div>
+          <div class="mb-2">
+            <label for="xp_channel" class="text-text text-sm font-semibold"><%= tr("stats:LVL_CH_TITLE") %></label>
+            <div class="text-text-muted text-sm font-normal"><%= tr("stats:LVL_CH_DESC") %></div>
+          </div>
+          <select
+            x-model="formData.xp_channel"
+            id="xp_channel"
+            class="focus:ring-primary focus:border-primary border-border bg-bg-interactive text-text block w-full rounded-lg border p-2.5 text-sm">
+            <option value=""><%= tr("CHANNEL_SELECT") %></option>
+            <% channels.map((ch) => { %>
+            <option value="<%= ch.id %>"><%= ch.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <!-- END: Column 1 -->
+
+        <!-- START: Column 2 (Cooldown) -->
+        <div>
+          <div class="mb-2">
+            <label for="cooldown" class="text-text text-sm font-semibold"><%= tr("stats:COOLDOWN_TITLE") %></label>
+            <div class="text-text-muted text-sm font-normal"><%= tr("stats:COOLDOWN_DESC") %></div>
+          </div>
+          <input
+            type="number"
+            min="2"
+            x-model="formData.cooldown"
+            id="cooldown"
+            class="focus:border-primary focus:ring-primary border-border bg-bg-interactive text-text block w-full rounded-lg border p-2.5 shadow-sm sm:text-sm"
+            required />
+        </div>
+        <!-- END: Column 2 -->
+      </div>
+      <!-- END: Row 2 -->
+    </div>
+    <!-- END: Card Body -->
+
+    <!-- START: Card Footer -->
+    <div class="border-border mt-4 flex items-center justify-between border-t pt-3 sm:pt-6">
+      <div></div>
+      <div class="flex-shrink-0">
+        <button
+          type="submit"
+          :disabled="saving"
+          :class="{'opacity-50': saving}"
+          class="bg-primary hover:bg-primary-dark focus:ring-primary inline-flex items-center rounded-lg px-3 py-2 text-center text-sm font-medium text-white focus:outline-none focus:ring-4">
+          <span x-show="!saving"><%= tr('BTN_SAVE') %></span>
+          <span x-show="saving"><%= tr('BTN_SAVING') %></span>
+        </button>
+      </div>
+    </div>
+    <!-- END: Card Footer -->
+  </form>
+</section>

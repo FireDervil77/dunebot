@@ -491,7 +491,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
             // Notification speichern (POST) - Multi-Language Support
             this.guildRouter.post('/notifications/save', async (req, res) => {
-                const guildId = req.body.guildId || res.locals.guildId || req.params.guildId;
+                // Guild-ID aus res.locals (wird von CheckGuildAccess-Middleware gesetzt)
+                const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 const {
                     notificationId,
@@ -563,15 +564,14 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             notificationId
                         ]);
                         
-                        // Redirect mit Toast-Notification
-                        req.session.toast = {
-                            type: 'success',
-                            message: 'Notification erfolgreich aktualisiert'
-                        };
-                        res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
+                        // JSON-Response für AJAX-System
+                        return res.json({ 
+                            success: true, 
+                            message: 'Notification erfolgreich aktualisiert' 
+                        });
                     } else {
                         // Neue Notification
-                        const [result] = await dbService.query(`
+                        const result = await dbService.query(`
                             INSERT INTO notifications 
                             (title_translations, message_translations, action_text_translations,
                              type, action_url, expiry, roles, dismissed,
@@ -614,29 +614,26 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             } catch (ipcError) {
                                 Logger.error('[SuperAdmin] Fehler beim Senden der Notification an Bot:', ipcError);
                                 // Notification wurde gespeichert, aber Discord-Versand fehlgeschlagen
-                                req.session.toast = {
-                                    type: 'warning',
-                                    message: 'Notification gespeichert, aber Discord-Versand fehlgeschlagen: ' + ipcError.message
-                                };
-                                return res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
+                                return res.json({ 
+                                    success: false, 
+                                    message: 'Notification gespeichert, aber Discord-Versand fehlgeschlagen: ' + ipcError.message 
+                                });
                             }
                         }
                         
-                        // Redirect mit Toast-Notification
-                        req.session.toast = {
-                            type: 'success',
-                            message: 'Notification erfolgreich erstellt'
-                        };
-                        res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
+                        // JSON-Response für AJAX-System
+                        return res.json({ 
+                            success: true, 
+                            message: 'Notification erfolgreich erstellt' 
+                        });
                     }
                 } catch (error) {
                     Logger.error('Fehler beim Speichern der Notification:', error);
                     
-                    req.session.toast = {
-                        type: 'danger',
-                        message: 'Fehler beim Speichern: ' + error.message
-                    };
-                    res.redirect(`/guild/${req.params.guildId}/plugins/superadmin/notifications`);
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Fehler beim Speichern: ' + error.message 
+                    });
                 }
             });
 
@@ -1100,12 +1097,22 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
      */
     async _isOwner(user, guildId) {
         const config = this._loadConfig();
-        const ownerId = config.BOT_OWNER_ID;
+        const ownerId = config.BOT_OWNER_ID || process.env.OWNER_IDS?.split(',')[0];
         const controlGuildId = process.env.CONTROL_GUILD_ID;
 
         // Beide Bedingungen müssen erfüllt sein!
         const isOwner = user && String(user.info?.id) === String(ownerId);
         const isControlGuild = String(guildId) === String(controlGuildId);
+
+        console.log('[SuperAdmin Owner Check]', {
+            userId: user?.info?.id,
+            ownerId,
+            guildId,
+            controlGuildId,
+            isOwner,
+            isControlGuild,
+            result: isOwner && isControlGuild
+        });
 
         return isOwner && isControlGuild;
     }

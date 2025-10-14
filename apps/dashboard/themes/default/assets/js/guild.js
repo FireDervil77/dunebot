@@ -89,6 +89,10 @@ class GuildAjaxHandler {
                     await this.handleNotificationResponse(form, result);
                     break;
                 
+                case 'notification-save':
+                    await this.handleNotificationSaveResponse(form, result);
+                    break;
+                
                 case 'core-settings':
                     await this.handleCoreSettingsResponse(form, result);
                     break;
@@ -207,6 +211,24 @@ class GuildAjaxHandler {
             form.reset();
         } else {
             this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.NOTIFICATION_ERROR || 'Fehler beim Versenden der Notification'));
+        }
+    }
+
+    static async handleNotificationSaveResponse(form, result) {
+        console.log('[GuildAjax] handleNotificationSaveResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Notification erfolgreich gespeichert');
+            // Nach 1,5s zur Notifications-Liste redirecten
+            setTimeout(() => {
+                const guildId = form.querySelector('input[name="guildId"]')?.value;
+                if (guildId) {
+                    window.location.href = `/guild/${guildId}/plugins/superadmin/notifications`;
+                } else {
+                    window.location.reload();
+                }
+            }, 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Speichern der Notification');
         }
     }
 
@@ -350,7 +372,7 @@ class GuildAjaxHandler {
             delay: 3000,
             animation: true,
             // Optional: Automatisches Ausblenden deaktivieren
-            // autohide: false
+            autohide: false
         });
         
         bsToast.show();

@@ -3,7 +3,7 @@
   "version": "6.5.1",
   "displayName": "Firebot Core-Plugin",
   "description": "Das Core-Plugin des FireBots (is in every new guild activiated!).",
-  "author": "FireDervil",
+  "author": "FireBot Team",
   "main": "dashboard/index.js",
   "bot": "bot/index.js",
   "dashboard": "dashboard/index.js",

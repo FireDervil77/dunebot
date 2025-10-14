@@ -3,7 +3,7 @@
     "displayName": "DuneMap - Plugin",
     "description": "The Dune DeepDesert Map as Plugin",
     "version": "2.1.3",
-    "author": "FireDervil",
+    "author": "FireBot Team",
     "license": "none",
     "type":"commonjs",
     "peerDependencies": {

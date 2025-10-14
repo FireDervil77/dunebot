@@ -6,7 +6,7 @@
     "main": "dashboard/index.js",
     "bot": "bot/index.js",
     "dashboard": "dashboard/index.js",
-    "author": "FireDervil",
+    "author": "FireBot Team",
     "license": "none",
     "type":"commonjs",
     "dependencies": {
