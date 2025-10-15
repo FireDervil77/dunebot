@@ -273,7 +273,17 @@
         "BOT_OFFLINE_BTN_AUTO_ENABLE": "Auto-Reload aktivieren",
         "BOT_OFFLINE_BTN_AUTO_STOP": "Auto-Reload stoppen",
         "BOT_OFFLINE_CONTACT": "Falls das Problem länger anhält, kontaktiere bitte einen Administrator.",
-        "BOT_OFFLINE_RELOAD_IN": "Automatischer Reload in {seconds}s ..."
+        "BOT_OFFLINE_RELOAD_IN": "Automatischer Reload in {seconds}s ...",
+        
+        "GUILD_UNAVAILABLE_TITLE": "Server nicht verfügbar",
+        "GUILD_UNAVAILABLE_DESC": "Der Bot ist nicht auf diesem Server.",
+        "GUILD_UNAVAILABLE_REASON": "Mögliche Gründe:",
+        "GUILD_UNAVAILABLE_KICKED": "Der Bot wurde vom Server entfernt oder gebannt",
+        "GUILD_UNAVAILABLE_LEFT": "Der Bot hat den Server verlassen",
+        "GUILD_UNAVAILABLE_DELETED": "Der Server wurde gelöscht oder ist nicht mehr erreichbar",
+        "GUILD_UNAVAILABLE_BTN_BACK": "Zurück zur Serverauswahl",
+        "GUILD_UNAVAILABLE_BTN_SUPPORT": "Support kontaktieren",
+        "GUILD_UNAVAILABLE_HINT": "Du kannst den Bot über die Serverauswahl erneut einladen."
     },
 
     "NOT_IMPLEMENTED": {
@@ -564,5 +574,18 @@
         "MEDIUM": "Mittel",
         "HIGH": "Hoch",
         "CRITICAL": "Kritisch"
+    },
+    "PLUGIN_BADGES": {
+        "INFO_TITLE": "Was bedeuten die Badges?",
+        "NEW_TITLE": "Neu veröffentlicht",
+        "NEW_DESC": "Dieses Plugin wurde kürzlich zum Bot hinzugefügt und ist brandneu verfügbar.",
+        "BETA_TITLE": "In Testphase",
+        "BETA_DESC": "Dieses Plugin befindet sich noch in der Entwicklung. Es können Fehler auftreten.",
+        "UPDATED_TITLE": "Kürzlich aktualisiert",
+        "UPDATED_DESC": "Dieses Plugin wurde kürzlich mit neuen Features oder Bugfixes aktualisiert.",
+        "DEPRECATED_TITLE": "Veraltet",
+        "DEPRECATED_DESC": "Dieses Plugin ist veraltet und wird möglicherweise in Zukunft entfernt.",
+        "FEATURED_TITLE": "Featured",
+        "FEATURED_DESC": "Hervorgehobenes Plugin - besonders empfohlen oder beliebt in der Community."
     }
 }

@@ -148,7 +148,19 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
      */
     async onEnable() {
         const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
         Logger.info('[SuperAdmin] Aktiviere Dashboard-Plugin global...');
+
+        // Config aus config.json laden und in DB schreiben
+        try {
+            const config = this._loadConfig();
+            Logger.debug('[SuperAdmin] Lade Config aus config.json:', config);
+            
+            Logger.success('[SuperAdmin] Config erfolgreich in DB synchronisiert');
+        } catch (error) {
+            Logger.error('[SuperAdmin] Fehler beim Laden/Speichern der Config:', error);
+        }
 
         this._setupRoutes();
         
@@ -973,6 +985,87 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 }
             });
 
+            // === PLUGIN BADGE MANAGEMENT ===
+            // GET: Badge-Management Übersicht
+            this.guildRouter.get('/plugin-badges', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                
+                try {
+                    // Alle Badges laden
+                    const badges = await dbService.getAllPluginBadges();
+                    
+                    // Verfügbare Plugins direkt vom Disk auslesen (alle Ordner im plugins-Verzeichnis)
+                    const fs = require('fs');
+                    const pluginsDir = path.join(__dirname, '../..');
+                    const availablePlugins = fs.readdirSync(pluginsDir, { withFileTypes: true })
+                        .filter(dirent => dirent.isDirectory() && dirent.name !== 'node_modules' && !dirent.name.startsWith('.'))
+                        .map(dirent => dirent.name)
+                        .sort();
+                    
+                    await themeManager.renderView(res, 'guild/plugin-badges', {
+                        title: 'Plugin Badge Management',
+                        activeMenu: `/guild/${guildId}/plugins/superadmin/plugin-badges`,
+                        guildId,
+                        badges,
+                        availablePlugins,
+                        plugin: this
+                    });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Laden der Plugin-Badges:', error);
+                    res.status(500).send('Fehler beim Laden der Plugin-Badges');
+                }
+            });
+
+            // POST: Badge setzen
+            this.guildRouter.post('/plugin-badges', async (req, res) => {
+                const dbService = ServiceManager.get('dbService');
+                const { pluginName, badgeStatus, badgeUntil, isFeatured } = req.body;
+                
+                try {
+                    // Validierung
+                    if (!pluginName || !badgeStatus) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: 'Plugin-Name und Badge-Status sind erforderlich' 
+                        });
+                    }
+                    
+                    // Badge setzen
+                    await dbService.setPluginBadge(
+                        pluginName, 
+                        badgeStatus, 
+                        badgeUntil || null, 
+                        isFeatured === '1' || isFeatured === true
+                    );
+                    
+                    res.json({ 
+                        success: true, 
+                        message: `Badge für Plugin "${pluginName}" erfolgreich gesetzt` 
+                    });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Setzen des Plugin-Badges:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
+            // DELETE: Badge entfernen
+            this.guildRouter.delete('/plugin-badges/:pluginName', async (req, res) => {
+                const dbService = ServiceManager.get('dbService');
+                const { pluginName } = req.params;
+                
+                try {
+                    await dbService.removePluginBadge(pluginName);
+                    res.json({ 
+                        success: true, 
+                        message: `Badge für Plugin "${pluginName}" erfolgreich entfernt` 
+                    });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Entfernen des Plugin-Badges:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
             // === TOAST-HISTORY (Monitoring/Debugging) ===
             this.guildRouter.get('/toast-history', async (req, res) => {
                 const guildId = res.locals.guildId;
@@ -1319,10 +1412,19 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 visible: true
             },
             {
+                title: 'superadmin:NAV.PLUGIN_BADGES',
+                path: `/guild/${guildId}/plugins/superadmin/plugin-badges`,
+                icon: 'fa-solid fa-tags',
+                order: 94,  // Untermenü-Reihenfolge
+                parent: `/guild/${guildId}/plugins/superadmin`,
+                type: 'main',
+                visible: true
+            },
+            {
                 title: 'superadmin:NAV.STATISTICS',
                 path: `/guild/${guildId}/plugins/superadmin/stats`,
                 icon: 'fa-solid fa-chart-line',
-                order: 94,  // Untermenü-Reihenfolge
+                order: 95,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true

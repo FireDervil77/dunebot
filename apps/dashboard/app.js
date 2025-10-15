@@ -5,6 +5,8 @@ require("dotenv").config();
 
 // ServiceManager aus SDK holen
 const PluginManager = require("./helpers/PluginManager");
+const SessionManager = require("./helpers/sessionManager");
+const BotHealthMonitor = require("./helpers/botHealthMonitor");
 const { ServiceManager, I18nManager } = require("dunebot-core");
 const { parseJsonArray } = require("dunebot-sdk/utils");
 const { ThemeManager, AssetManager } = require('dunebot-sdk');
@@ -81,6 +83,9 @@ module.exports = class App {
         this.app.assetManager = new AssetManager();
         ServiceManager.register("assetManager", this.app.assetManager);
 
+        // Session-Manager initialisieren
+        this.app.sessionManager = new SessionManager();
+        ServiceManager.register("sessionManager", this.app.sessionManager);
         
         // Plugin-Manager initialisieren
         this.app.pluginManager = new PluginManager(
@@ -134,9 +139,7 @@ module.exports = class App {
                     auth: true,  // Aktiviert CheckAuth Middleware
                     middlewares: [guildMiddleware]  // Zusätzliche Middleware
                 })
-                .register('/api', this.routers.api, { 
-                    auth: true  // Aktiviert CheckAuth Middleware
-                });
+                .register('/api', this.routers.api); // FIXED: Keine automatische Auth - wird in Routes selbst gehandhabt
             
             // Theme initialisieren - übernimmt bereits die View-Engine-Initialisierung
             await this.app.themeManager.initialize(this.config.THEME || 'default');
@@ -184,6 +187,28 @@ module.exports = class App {
             if (this.app.pluginManager && this.app.pluginManager.hooks) {
                 await this.app.pluginManager.hooks.doAction('after_dashboard_initialize', this.app);
             }
+
+            // Session-Cleanup starten (nach erfolgreicher Initialisierung)
+            if (this.app.sessionManager) {
+                this.app.sessionManager.startCleanup(60); // Alle 60 Minuten
+            }
+
+            // Bot Health Monitor starten (nach IPC-Initialisierung)
+            Logger.debug('[INIT] Erstelle BotHealthMonitor-Instanz...');
+            this.app.botHealthMonitor = new BotHealthMonitor();
+            ServiceManager.register("botHealthMonitor", this.app.botHealthMonitor);
+            Logger.debug('[INIT] BotHealthMonitor registriert, starte setTimeout...');
+            
+            // Warte kurz bis IPC vollständig connected ist
+            setTimeout(() => {
+                Logger.debug('[INIT] setTimeout gefeuert! Starte Monitoring...');
+                try {
+                    this.app.botHealthMonitor.startMonitoring(60000); // Alle 60 Sekunden
+                    Logger.success("🏥 Bot Health Monitoring gestartet (60s Intervall)");
+                } catch (error) {
+                    Logger.error('[INIT] Fehler beim Starten des BotHealthMonitors:', error);
+                }
+            }, 3000); // 3s Verzögerung für IPC-Connect
 
             this.#initializeErrorHandling();
             

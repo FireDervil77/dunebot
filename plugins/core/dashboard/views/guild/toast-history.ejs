@@ -1,6 +1,25 @@
 <%# 
   * Toast-History View für alle User
-  * Zeigt Toast-Events des aktuellen Users für Monitoring/Debugging
+  * Zeigt Toast-Events des aktuellenasync function loadToastHistory() {
+    try {
+        const guildId = getCurrentGuildId();
+        const filterType = document.getElementById('filterType')?.value;
+        const filterUrl = document.getElementById('filterUrl')?.value.toLowerCase();
+        
+        // DB-basierte API mit Guild-Context und Server-seitiger Filterung
+        let url = `/api/core/toasts/history?limit=100&guildId=${guildId}`;
+        if (filterType) url += `&type=${filterType}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success) {
+            let toasts = data.toasts || [];
+            
+            // Client-seitiges URL-Filtern (falls gewünscht)
+            if (filterUrl) {
+                toasts = toasts.filter(t => (t.url || '').toLowerCase().includes(filterUrl));
+            }g/Debugging
   * @author FireDervil
   %>
 
@@ -21,8 +40,8 @@
                     <!-- Info-Text -->
                     <div class="alert alert-info mb-3">
                         <i class="bi bi-info-circle me-2"></i>
-                        Hier siehst du deine letzten <strong>Fehler- und Warn-Meldungen</strong>. 
-                        Diese werden automatisch beim Auftreten gespeichert und helfen beim Debugging.
+                        Hier siehst du deine letzten <strong>Toast-Benachrichtigungen</strong>. 
+                        Diese werden automatisch gespeichert und helfen beim Debugging.
                     </div>
 
                     <!-- Filter -->
@@ -30,8 +49,10 @@
                         <div class="col-md-4">
                             <select class="form-control" id="filterType">
                                 <option value="">Alle Typen</option>
-                                <option value="error">Fehler</option>
+                                <option value="success">Erfolg</option>
+                                <option value="info">Info</option>
                                 <option value="warning">Warnungen</option>
+                                <option value="error">Fehler</option>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -78,21 +99,24 @@
  */
 async function loadToastHistory() {
     try {
-        // Core-API nutzt Session-Storage - zeigt nur eigene Toasts
-        const response = await fetch('/api/core/toasts/history');
+        // Query-Parameter zusammenbauen
+        const filterType = document.getElementById('filterType')?.value;
+        const filterUrl = document.getElementById('filterUrl')?.value.toLowerCase();
+        
+        let url = '/api/core/toasts/history?limit=100';
+        
+        // Type-Filter an API übergeben (Server-seitig!)
+        if (filterType) {
+            url += `&type=${filterType}`;
+        }
+        
+        const response = await fetch(url);
         const data = await response.json();
         
         if (data.success) {
             let toasts = data.toasts || [];
             
-            // Client-seitiges Filtern
-            const filterType = document.getElementById('filterType')?.value;
-            const filterUrl = document.getElementById('filterUrl')?.value.toLowerCase();
-            
-            if (filterType) {
-                toasts = toasts.filter(t => t.type === filterType);
-            }
-            
+            // Client-seitiges URL-Filtern
             if (filterUrl) {
                 toasts = toasts.filter(t => t.url && t.url.toLowerCase().includes(filterUrl));
             }
@@ -109,7 +133,7 @@ async function loadToastHistory() {
 }
 
 /**
- * Rendert Toast-Tabelle (vereinfacht für User-View)
+ * Rendert Toast-Tabelle (alle Toast-Typen)
  */
 function renderToastTable(toasts) {
     const tbody = document.getElementById('toastTableBody');
@@ -119,8 +143,8 @@ function renderToastTable(toasts) {
             <tr>
                 <td colspan="5" class="text-center text-muted py-4">
                     <i class="bi bi-check-circle text-success me-2" style="font-size: 2rem;"></i>
-                    <div class="mt-2">Keine Fehler oder Warnungen gefunden</div>
-                    <small class="text-muted">Kritische Benachrichtigungen werden hier angezeigt</small>
+                    <div class="mt-2">Keine Benachrichtigungen gefunden</div>
+                    <small class="text-muted">Toast-Benachrichtigungen werden hier angezeigt</small>
                 </td>
             </tr>
         `;
@@ -128,10 +152,35 @@ function renderToastTable(toasts) {
     }
     
     tbody.innerHTML = toasts.map(toast => {
-        const typeBadge = toast.type === 'error' ? 'danger' : 'warning';
-        const typeIcon = toast.type === 'error' 
-            ? '<i class="bi bi-x-circle-fill"></i>' 
-            : '<i class="bi bi-exclamation-triangle-fill"></i>';
+        // Badge-Styling für alle Typen
+        let typeBadge, typeIcon, typeName;
+        
+        switch(toast.type) {
+            case 'error':
+                typeBadge = 'danger';
+                typeIcon = '<i class="bi bi-x-circle-fill"></i>';
+                typeName = 'Fehler';
+                break;
+            case 'warning':
+                typeBadge = 'warning';
+                typeIcon = '<i class="bi bi-exclamation-triangle-fill"></i>';
+                typeName = 'Warnung';
+                break;
+            case 'success':
+                typeBadge = 'success';
+                typeIcon = '<i class="bi bi-check-circle-fill"></i>';
+                typeName = 'Erfolg';
+                break;
+            case 'info':
+                typeBadge = 'info';
+                typeIcon = '<i class="bi bi-info-circle-fill"></i>';
+                typeName = 'Info';
+                break;
+            default:
+                typeBadge = 'secondary';
+                typeIcon = '<i class="bi bi-question-circle-fill"></i>';
+                typeName = toast.type;
+        }
         
         const timestamp = new Date(toast.timestamp).toLocaleString('de-DE', {
             day: '2-digit',
@@ -144,15 +193,15 @@ function renderToastTable(toasts) {
         // URL vereinfachen (nur Pfad ohne Domain)
         const urlPath = toast.url ? toast.url.replace(/^https?:\/\/[^/]+/, '') : '-';
         
-        // Metadata kompakt darstellen
+        // Metadata NUR bei errors anzeigen
         let metadataHtml = '<small class="text-muted">-</small>';
-        if (toast.metadata && Object.keys(toast.metadata).length > 0) {
+        if (toast.type === 'error' && toast.metadata && Object.keys(toast.metadata).length > 0) {
             const metaKeys = Object.keys(toast.metadata);
             metadataHtml = `
-                <button class="btn btn-sm btn-outline-secondary" 
+                <button class="btn btn-sm btn-outline-danger" 
                         onclick='showMetadata(${JSON.stringify(toast.metadata).replace(/'/g, "\\'")})'
-                        title="Details anzeigen">
-                    <i class="bi bi-info-circle"></i> ${metaKeys.length} Details
+                        title="Fehler-Details anzeigen">
+                    <i class="bi bi-bug"></i> ${metaKeys.length} Details
                 </button>
             `;
         }
@@ -160,7 +209,7 @@ function renderToastTable(toasts) {
         return `
             <tr>
                 <td><small>${timestamp}</small></td>
-                <td><span class="badge badge-${typeBadge}">${typeIcon} ${toast.type === 'error' ? 'Fehler' : 'Warnung'}</span></td>
+                <td><span class="badge badge-${typeBadge}">${typeIcon} ${typeName}</span></td>
                 <td>${toast.message}</td>
                 <td><small><code>${urlPath}</code></small></td>
                 <td>${metadataHtml}</td>
@@ -174,8 +223,31 @@ function renderToastTable(toasts) {
  */
 window.showMetadata = function(metadata) {
     const formatted = JSON.stringify(metadata, null, 2);
-    alert('Details:\n\n' + formatted);
+    alert('Fehler-Details:\n\n' + formatted);
 };
+
+/**
+ * Zeigt Fehler-Nachricht an
+ */
+function showError(message) {
+    const tbody = document.getElementById('toastTableBody');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="5" class="text-center text-danger py-4">
+                <i class="bi bi-exclamation-triangle me-2" style="font-size: 2rem;"></i>
+                <div class="mt-2">${message}</div>
+            </td>
+        </tr>
+    `;
+}
+
+/**
+ * Ermittelt Guild-ID aus aktueller URL
+ */
+function getCurrentGuildId() {
+    const guildMatch = window.location.pathname.match(/\/guild\/(\d+)/);
+    return guildMatch ? guildMatch[1] : null;
+}
 
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
@@ -183,6 +255,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const reloadBtn = document.getElementById('reloadToastsBtn');
     if (reloadBtn) {
         reloadBtn.addEventListener('click', loadToastHistory);
+    }
+    
+    // Filter-Handler registrieren
+    const filterType = document.getElementById('filterType');
+    const filterUrl = document.getElementById('filterUrl');
+    
+    if (filterType) {
+        filterType.addEventListener('change', loadToastHistory);
+    }
+    
+    if (filterUrl) {
+        // Debounce für URL-Filter
+        let urlFilterTimeout;
+        filterUrl.addEventListener('input', () => {
+            clearTimeout(urlFilterTimeout);
+            urlFilterTimeout = setTimeout(loadToastHistory, 500);
+        });
     }
     
     // Initial laden

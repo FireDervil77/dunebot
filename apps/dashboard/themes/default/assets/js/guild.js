@@ -116,6 +116,10 @@ class GuildAjaxHandler {
                 case 'dashboard-config':
                     await this.handleDashboardConfigResponse(form, result);
                     break;
+                
+                case 'plugin-badge-create':
+                    await this.handlePluginBadgeCreateResponse(form, result);
+                    break;
                     
                 default:
                     // Generische Behandlung
@@ -369,14 +373,95 @@ class GuildAjaxHandler {
         
         // Bootstrap 5 Toast mit angepassten Optionen
         const bsToast = new bootstrap.Toast(toast, { 
-            delay: 3000,
+            delay: 2500,  // 2,5 Sekunden Auto-Close
             animation: true,
-            // Optional: Automatisches Ausblenden deaktivieren
-            autohide: false
+            autohide: true  // Auto-Close aktivieren
         });
         
         bsToast.show();
         toast.addEventListener('hidden.bs.toast', () => toast.remove());
+
+        // Automatisches Logging für alle Toasts an zentrale DB
+        this.logToastToAPI(type, message).catch(err => {
+            console.error('[Toast] DB-Logging fehlgeschlagen:', err);
+        });
+
+        // Event für Notification Center (falls vorhanden)
+        if (window.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('toastShown', { 
+                detail: { type, message } 
+            }));
+        }
+    }
+
+    /**
+     * Loggt Toast-Event an zentrale Toast-Logger API
+     * Alle Toasts werden in guild_toast_logs DB-Tabelle gespeichert
+     */
+    static async logToastToAPI(type, message) {
+        try {
+            const response = await fetch('/api/core/toasts/log', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    type,
+                    message,
+                    timestamp: new Date().toISOString(),
+                    url: window.location.href,
+                    guildId: window.currentGuildId || this.getCurrentGuildId(),
+                    userAgent: navigator.userAgent,
+                    metadata: { 
+                        source: 'guild.js',
+                        page: window.location.pathname,
+                        userAgent: navigator.userAgent,
+                        timestamp: Date.now()
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log(`[Toast] ${type.toUpperCase()} geloggt:`, result);
+
+            // Debug-Info falls verfügbar
+            if (result.debug) {
+                console.log('[Toast] Session Debug:', result.debug);
+            }
+
+        } catch (error) {
+            console.warn('[Toast] API Logging Fehler (ignoriert):', error);
+            // Silent fail - Toast wird trotzdem angezeigt, Logging ist optional
+        }
+    }
+
+    /**
+     * Ermittelt Guild-ID aus aktueller URL oder Context
+     */
+    static getCurrentGuildId() {
+        // Aus URL extrahieren (/guild/123456789/...)
+        const guildMatch = window.location.pathname.match(/\/guild\/(\d+)/);
+        if (guildMatch) {
+            return guildMatch[1];
+        }
+
+        // Aus globalem Context
+        if (window.guildId) {
+            return window.guildId;
+        }
+
+        // Aus DOM-Elementen
+        const guildIdElement = document.querySelector('[data-guild-id]');
+        if (guildIdElement) {
+            return guildIdElement.getAttribute('data-guild-id');
+        }
+
+        return null;
     }
 
     static getIconForType(type) {
@@ -396,7 +481,75 @@ class GuildAjaxHandler {
             info: 'Info'
         }[type] || 'Info';
     }
+
+    static async handlePluginBadgeCreateResponse(form, result) {
+        console.log('[GuildAjax] handlePluginBadgeCreateResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Plugin-Badge erfolgreich gesetzt');
+            // Form zurücksetzen
+            form.reset();
+            // Seite nach 1,5s neu laden um Badge in Liste zu sehen
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Setzen des Badges');
+        }
+    }
 }
 
 // Initialisierung nach DOM-Load
-document.addEventListener('DOMContentLoaded', () => GuildAjaxHandler.init());
+document.addEventListener('DOMContentLoaded', () => {
+    GuildAjaxHandler.init();
+    
+    // Plugin-Reload-Buttons registrieren
+    const reloadButtons = document.querySelectorAll('.plugin-reload-btn');
+    console.log('[GuildAjax] Gefundene Reload-Buttons:', reloadButtons.length);
+    
+    reloadButtons.forEach(button => {
+        button.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const pluginName = button.dataset.pluginName;
+            const guildId = button.dataset.guildId;
+            
+            if (!pluginName || !guildId) {
+                console.error('[GuildAjax] Plugin-Name oder Guild-ID fehlt');
+                return;
+            }
+            
+            // Button während Request deaktivieren
+            button.disabled = true;
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+            
+            try {
+                const response = await fetch(`/guild/${guildId}/plugins/core/plugin-reload/${pluginName}`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    GuildAjaxHandler.showToast('success', `Plugin ${pluginName} erfolgreich neu geladen`);
+                    console.log('[GuildAjax] Reload Details:', result.details);
+                } else {
+                    GuildAjaxHandler.showToast('error', result.message || 'Fehler beim Reload');
+                }
+                
+            } catch (error) {
+                console.error('[GuildAjax] Plugin-Reload-Fehler:', error);
+                GuildAjaxHandler.showToast('error', 'Netzwerkfehler beim Plugin-Reload');
+            } finally {
+                // Button wieder aktivieren
+                button.disabled = false;
+                button.innerHTML = originalHTML;
+            }
+        });
+    });
+});

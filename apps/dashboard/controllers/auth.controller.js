@@ -241,17 +241,18 @@ exports.logout = async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get("dbService");
     const pluginManager = ServiceManager.get('pluginManager');
+    const sessionManager = ServiceManager.get('sessionManager');
     const themeManager = ServiceManager.get('themeManager');
 
    try {
+        const userId = req.session?.user?.info?.id;
+        
         // Hook vor dem Logout
         if (pluginManager?.hooks && req.session.user) {
             await pluginManager.hooks.doAction('before_user_logout', req.session.user, req, res);
         }
         
-        if (req.session?.user?.info?.id) {
-            const userId = req.session.user.info.id;
-
+        if (userId) {
             // Transaktion starten
             await dbService.query('START TRANSACTION');
 
@@ -269,9 +270,14 @@ exports.logout = async (req, res) => {
                     [userId]
                 );
 
+                // 3. Alle Sessions des Users zerstören (Session-Cleanup)
+                if (sessionManager) {
+                    await sessionManager.destroyUserSessions(userId);
+                }
+
                 // Transaktion bestätigen
                 await dbService.query('COMMIT');
-                Logger.debug(`Logout erfolgreich: User ${userId} abgemeldet und Guild-Zuweisungen entfernt`);
+                Logger.debug(`Logout erfolgreich: User ${userId} abgemeldet, Guild-Zuweisungen entfernt und Sessions bereinigt`);
 
             } catch (error) {
                 // Bei Fehler Transaktion zurückrollen
@@ -280,7 +286,7 @@ exports.logout = async (req, res) => {
             }
         }
 
-        // Session zerstören
+        // Aktuelle Session zerstören
         req.session.destroy();
         
         // Auth-Layout für Logout-Bestätigung
@@ -365,6 +371,12 @@ exports.getServerSelector = async (req, res) => {
             return res.redirect('/auth/login');
         }
 
+        // Session-Fehlermeldung auslesen (von guild.middleware)
+        const errorMessage = req.session.errorMessage || null;
+        if (errorMessage) {
+            delete req.session.errorMessage; // Nach dem Auslesen löschen
+        }
+
         // BOT ONLINE CHECK
         let botOnline = false;
         try {
@@ -387,6 +399,7 @@ exports.getServerSelector = async (req, res) => {
                 user: req.session.user,
                 guilds: [],
                 botOnline: false,
+                errorMessage: errorMessage,
                 offlineReason: "Der Bot ist derzeit offline oder wird neu gestartet. Ein Zugriff auf Server-Daten ist temporär nicht möglich."
             });
         }
@@ -431,7 +444,8 @@ exports.getServerSelector = async (req, res) => {
             activeMenu: "/auth/server-selector",
             user: req.session.user,
             guilds: guilds.filter(g => g.owner === true),
-            botOnline: true
+            botOnline: true,
+            errorMessage: errorMessage
         });
     } catch (error) {
         Logger.error('Fehler beim Rendern des Server-Selectors:', error);

@@ -122,16 +122,21 @@
 .toast {
     transition: all 0.3s ease-in-out;
     margin-top: 1rem;
-    /* Transparenz ausschalten - vollständig opaker Hintergrund */
-    --bs-toast-bg: #ffffff !important;
+    /* KEIN SCHLEIER - Vollständig opak! */
     opacity: 1 !important;
     background-color: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Bootstrap Toast Variables überschreiben */
+.toast, .toast * {
+    --bs-toast-bg: rgba(255, 255, 255, 1) !important;
+    opacity: 1 !important;
 }
 
 /* Toast-Varianten mit vollständig opaken Hintergründen */
 .toast-success {
-    --bs-toast-bg: #198754 !important;
-    --bs-toast-header-bg: #198754 !important;
     background-color: #198754 !important;
 }
 
@@ -139,12 +144,11 @@
 .toast-success .toast-body {
     background-color: #198754 !important;
     color: #ffffff !important;
+    opacity: 1 !important;
 }
 
 .toast-error,
 .toast-danger {
-    --bs-toast-bg: #dc3545 !important;
-    --bs-toast-header-bg: #dc3545 !important;
     background-color: #dc3545 !important;
 }
 
@@ -154,11 +158,10 @@
 .toast-danger .toast-body {
     background-color: #dc3545 !important;
     color: #ffffff !important;
+    opacity: 1 !important;
 }
 
 .toast-info {
-    --bs-toast-bg: #0dcaf0 !important;
-    --bs-toast-header-bg: #0dcaf0 !important;
     background-color: #0dcaf0 !important;
 }
 
@@ -166,11 +169,10 @@
 .toast-info .toast-body {
     background-color: #0dcaf0 !important;
     color: #000000 !important;
+    opacity: 1 !important;
 }
 
 .toast-warning {
-    --bs-toast-bg: #ffc107 !important;
-    --bs-toast-header-bg: #ffc107 !important;
     background-color: #ffc107 !important;
 }
 
@@ -178,16 +180,17 @@
 .toast-warning .toast-body {
     background-color: #ffc107 !important;
     color: #000000 !important;
+    opacity: 1 !important;
 }
 
 .toast.showing {
     transform: translateY(-100%);
-    opacity: 0;
+    opacity: 0 !important;
 }
 
 .toast.show {
     transform: translateY(0);
-    opacity: 1;
+    opacity: 1 !important;
 }
 
 /* Alert Visibility Improvements */
@@ -395,4 +398,114 @@
   font-size: 0.6rem;
   padding: 0.15rem 0.4rem;
 }
+
+/* Plugin Badge System */
+.plugin-card {
+  position: relative;
+  padding: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+  transition: box-shadow 0.2s;
+}
+
+.plugin-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.plugin-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  letter-spacing: 0.5px;
+  z-index: 2;
+  top: -0.5rem !important;
+  right: -0.5rem !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.plugin-featured-star {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  font-size: 1.2rem;
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.plugin-badge.bg-success {
+  background-color: #198754 !important;
+  color: #ffffff !important;
+}
+
+.plugin-badge.bg-warning {
+  background-color: #ffc107 !important;
+  color: #000000 !important;
+}
+
+.plugin-badge.bg-info {
+  background-color: #0dcaf0 !important;
+  color: #000000 !important;
+}
+
+.plugin-badge.bg-danger {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE - Sidebar Scrolling
+   ============================================ */
+
+@media (max-width: 767.98px) {
+  /* Mobile Sidebar muss scrollbar sein */
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 250px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 1040;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling auf iOS */
+  }
+  
+  /* Navbar-Höhe berücksichtigen */
+  .app-sidebar {
+    top: 57px; /* AdminLTE navbar height */
+  }
+  
+  /* Scrollbar Styling für Mobile Sidebar */
+  .app-sidebar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .app-sidebar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+  }
+  
+  .app-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+  }
+  
+  .app-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Content Padding auf Mobile reduzieren */
+  .app-main {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+@media (max-width: 991.98px) {
+  /* Tablet-Optimierung */
+  .app-sidebar {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 

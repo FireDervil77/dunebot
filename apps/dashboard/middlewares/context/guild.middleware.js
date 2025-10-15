@@ -11,22 +11,77 @@ module.exports = async (req, res, next) => {
     const dbService = ServiceManager.get('dbService');
     const ipcServer = ServiceManager.get('ipcServer');
     const pluginManager = ServiceManager.get('pluginManager');
+    const botHealthMonitor = ServiceManager.get('botHealthMonitor');
 
-
-    if (!req.params.guildId) {
+    // Guild-ID aus req.params ODER aus dem Path extrahieren
+    let guildId = req.params.guildId;
+    
+    // Fallback: Wenn params leer ist, aus dem Path extrahieren
+    if (!guildId) {
+        const pathMatch = req.path.match(/^\/guild\/(\d+)/);
+        if (pathMatch) {
+            guildId = pathMatch[1];
+        }
+    }
+    
+    // Wenn immer noch keine Guild-ID, skip
+    if (!guildId) {
         return next();
     }
 
-    const responses = await ipcServer.broadcast("dashboard:VALIDATE_GUILD", req.params.guildId);
-    if (!responses || !Array.isArray(responses)) {
-        return res.status(500).send("Response in guild.midleware is empty or not an array");
-    }
-    const hasGuild = responses.some((r) => r.success && r.data === true);
-    if (!hasGuild) {
-        return res.status(404).send("Guild not found");
+    Logger.debug(`[Guild Middleware] 🔍 Prüfe Guild ${guildId.slice(0, 8)}...`);
+
+    // 🏥 Bot Health Check - NUR für Bot-Offline-Detection (nicht Guild-spezifisch)
+    if (botHealthMonitor) {
+        const botStatus = botHealthMonitor.getStatus();
+        
+        // Bot offline nach mehreren Fehlversuchen
+        if (!botStatus.isOnline) {
+            Logger.warn(`[Guild Middleware] ❌ Bot offline - Redirect zu /auth/server-selector`);
+            req.session.errorMessage = 'BOT_OFFLINE';
+            return res.redirect('/auth/server-selector');
+        }
+        
+        Logger.debug(`[Guild Middleware] ✅ Bot online (Health-Monitor)`);
+    } else {
+        Logger.warn('[Guild Middleware] ⚠️ BotHealthMonitor nicht verfügbar');
     }
 
-    const guildData = req.session.user.guilds.find((guild) => guild.id === req.params.guildId);   
+    // 🔍 IPC-Validierung: Live-Check ob Bot in Guild ist (authoritative!)
+    try {
+        const responses = await Promise.race([
+            ipcServer.broadcast("dashboard:VALIDATE_GUILD", { guildId }),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('IPC Timeout')), 5000)  // Timeout reduziert auf 5s
+            )
+        ]);
+        
+        if (!responses || !Array.isArray(responses)) {
+            Logger.error('[Guild Middleware] IPC Response ungültig');
+            req.session.errorMessage = 'BOT_OFFLINE';
+            return res.redirect('/auth/server-selector');
+        }
+        
+        const hasGuild = responses.some((r) => r.success && r.data?.valid === true);
+        if (!hasGuild) {
+            Logger.warn(`[Guild Middleware] ❌ Guild ${guildId} nicht verfügbar (IPC) - Redirect`);
+            req.session.errorMessage = 'GUILD_UNAVAILABLE';
+            return res.redirect('/auth/server-selector');
+        }
+        
+        Logger.debug(`[Guild Middleware] ✅ Guild-Validierung erfolgreich (IPC)`);
+    } catch (error) {
+        if (error.message === 'IPC Timeout') {
+            Logger.error('[Guild Middleware] IPC Timeout nach 5s - Bot vermutlich nicht erreichbar');
+            req.session.errorMessage = 'BOT_OFFLINE';
+            return res.redirect('/auth/server-selector');
+        }
+        Logger.error('[Guild Middleware] IPC Error:', error);
+        req.session.errorMessage = 'BOT_OFFLINE';
+        return res.redirect('/auth/server-selector');
+    }
+
+    const guildData = req.session.user.guilds.find((guild) => guild.id === guildId);   
 
     // User-Daten für Templates bereitstellen
     res.locals.user = req.session?.user || null;
@@ -89,7 +144,7 @@ try {
     res.locals.guilds = req.session.user;
     
     // SuperAdmin Config-Variablen für alle Templates verfügbar machen
-    const guildId = req.params.guildId;
+    // (guildId bereits oben deklariert)
     
     try {
         Logger.debug('[Guild Middleware] Loading SuperAdmin configs for guildId:', guildId);
@@ -130,6 +185,9 @@ try {
         Logger.warn('[Guild Middleware] Error loading plugin updates count:', error.message);
         res.locals.pendingUpdatesCount = 0;
     }
+    
+    // SuperAdmin-Status für Templates (für Reload-Button etc.)
+    res.locals.isSuperAdmin = req.session?.user?.isSuperAdmin || false;
     
     next();
 };

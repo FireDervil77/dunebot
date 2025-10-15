@@ -58,6 +58,9 @@ Plugins haben eine duale Struktur: `plugins/pluginname/{bot/, dashboard/, shared
 - **Hook-Integration**: Hooks nutzen statt Code direkt zu ändern 
 - **Plugin-Kontext**: Unterscheiden zwischen Bot- und Dashboard-Context bei Plugin-Entwicklung
 - **NO Alpine.js**: NIEMALS Alpine.js verwenden! Nutze das guild.js AJAX-System für alle Formulare
+- **ONLY WORK IN dunebot_dev**: Arbeite ausschließlich in der `dunebot_dev`-Umgebung. Keine Änderungen in anderen Umgebungen vornehmen.
+- **ASK FOR COMMITS**: Bei größeren Änderungen immer um Commit-Historie bitten, um den Überblick zu behalten.
+- **ONLY COMMIT WITH APROVAL**: Keine Commits ohne vorherige Genehmigung durch den Projektleiter.
 
 ## FRONTEND ARCHITECTURE (CRITICAL!)
 

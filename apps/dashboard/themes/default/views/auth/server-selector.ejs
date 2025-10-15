@@ -1,4 +1,9 @@
-<% if (typeof botOnline !== 'undefined' && botOnline === false) { %>
+<% 
+// Session-Fehlermeldungen aus locals auslesen
+const errorMessage = locals.errorMessage || null;
+%>
+
+<% if (errorMessage === 'BOT_OFFLINE' || (typeof botOnline !== 'undefined' && botOnline === false)) { %>
   <div class="container py-5">
     <div class="alert alert-warning shadow-sm">
       <h4 class="alert-heading">
@@ -69,6 +74,37 @@
       });
     })();
   </script>
+<% } else if (errorMessage === 'GUILD_UNAVAILABLE') { %>
+  <div class="container py-5">
+    <div class="alert alert-danger shadow-sm">
+      <h4 class="alert-heading">
+        <i class="fas fa-ban me-2"></i><%= tr('SELECTOR.GUILD_UNAVAILABLE_TITLE') %>
+      </h4>
+      <p class="mb-2">
+        <strong><%= tr('SELECTOR.GUILD_UNAVAILABLE_DESC') %></strong><br>
+        <%= tr('SELECTOR.GUILD_UNAVAILABLE_REASON') %>
+      </p>
+      <ul class="mb-3 small">
+        <li><%= tr('SELECTOR.GUILD_UNAVAILABLE_KICKED') %></li>
+        <li><%= tr('SELECTOR.GUILD_UNAVAILABLE_LEFT') %></li>
+        <li><%= tr('SELECTOR.GUILD_UNAVAILABLE_DELETED') %></li>
+      </ul>
+      <div class="d-flex gap-2">
+        <a href="/auth/server-selector" class="btn btn-primary">
+          <i class="fas fa-arrow-left me-1"></i> <%= tr('SELECTOR.GUILD_UNAVAILABLE_BTN_BACK') %>
+        </a>
+        <% if (locals.supportUrl && locals.supportUrl !== '#') { %>
+        <a href="<%= locals.supportUrl %>" target="_blank" class="btn btn-outline-secondary">
+          <i class="fab fa-discord me-1"></i> <%= tr('SELECTOR.GUILD_UNAVAILABLE_BTN_SUPPORT') %>
+        </a>
+        <% } %>
+      </div>
+      <hr>
+      <p class="mb-0 text-muted small">
+        <%= tr('SELECTOR.GUILD_UNAVAILABLE_HINT') %>
+      </p>
+    </div>
+  </div>
 <% } else { %>
 
   <div class="login-box server-selector">

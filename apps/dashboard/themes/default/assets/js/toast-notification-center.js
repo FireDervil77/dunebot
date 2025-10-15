@@ -1,6 +1,6 @@
 /**
  * Toast Notification Center
- * Zeigt kritische Toasts (error, warning) in der Navbar-Glocke an
+ * Zeigt ALLE Toast-Benachrichtigungen in der Navbar-Glocke an
  * 
  * @author FireDervil
  */
@@ -17,17 +17,41 @@
      */
     async function loadToastNotifications() {
         try {
-            const response = await fetch('/api/core/toasts/history');
+            const guildId = getCurrentGuildId();
+            // ✅ ALLE Notifications anzeigen (nicht nur critical)
+            const url = `/api/core/toasts/history?criticalOnly=false&limit=${MAX_DISPLAY_TOASTS}${guildId ? `&guildId=${guildId}` : ''}`;
+            
+            const response = await fetch(url);
             const data = await response.json();
 
             if (data.success) {
                 updateNotificationUI(data.toasts || []);
+                
+                // Debug-Info loggen falls verfügbar
+                if (data.debug) {
+                    console.log('[Toast Notifications] Session Debug:', data.debug);
+                }
+                if (data.message) {
+                    console.log('[Toast Notifications] Info:', data.message);
+                }
             } else {
                 console.error('[Toast Notifications] Fehler beim Laden:', data.error);
+                // Bei Fehler leere Liste anzeigen
+                updateNotificationUI([]);
             }
         } catch (error) {
             console.error('[Toast Notifications] Netzwerkfehler:', error);
+            // Bei Netzwerkfehler leere Liste anzeigen
+            updateNotificationUI([]);
         }
+    }
+
+    /**
+     * Ermittelt Guild-ID aus aktueller URL
+     */
+    function getCurrentGuildId() {
+        const guildMatch = window.location.pathname.match(/\/guild\/(\d+)/);
+        return guildMatch ? guildMatch[1] : null;
     }
 
     /**
@@ -42,9 +66,9 @@
             return;
         }
 
-        // Nur kritische Toasts (error, warning)
-        const criticalToasts = toasts.filter(t => t.type === 'error' || t.type === 'warning');
-        const count = criticalToasts.length;
+        // ✅ ALLE Toasts anzeigen (nicht nur critical)
+        const allToasts = toasts;
+        const count = allToasts.length;
 
         // Badge aktualisieren
         if (count > 0) {
@@ -59,21 +83,36 @@
         }
 
         // Liste aktualisieren
-        if (criticalToasts.length === 0) {
+        if (allToasts.length === 0) {
             list.innerHTML = `
                 <li class="dropdown-item text-center text-muted py-3">
                     <i class="bi bi-check-circle me-2"></i>
-                    Keine kritischen Benachrichtigungen
+                    Keine Benachrichtigungen
                 </li>
             `;
         } else {
             // Nur die neuesten X Toasts anzeigen
-            const displayToasts = criticalToasts.slice(0, MAX_DISPLAY_TOASTS);
+            const displayToasts = allToasts.slice(0, MAX_DISPLAY_TOASTS);
             
             list.innerHTML = displayToasts.map(toast => {
-                const icon = toast.type === 'error' 
-                    ? '<i class="bi bi-exclamation-circle-fill text-danger me-2"></i>' 
-                    : '<i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>';
+                // ✅ Icons für alle Toast-Typen
+                let icon;
+                switch(toast.type) {
+                    case 'error':
+                        icon = '<i class="bi bi-exclamation-circle-fill text-danger me-2"></i>';
+                        break;
+                    case 'warning':
+                        icon = '<i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>';
+                        break;
+                    case 'success':
+                        icon = '<i class="bi bi-check-circle-fill text-success me-2"></i>';
+                        break;
+                    case 'info':
+                        icon = '<i class="bi bi-info-circle-fill text-info me-2"></i>';
+                        break;
+                    default:
+                        icon = '<i class="bi bi-bell-fill text-secondary me-2"></i>';
+                }
                 
                 const timeAgo = getTimeAgo(toast.timestamp);
                 const truncatedMessage = toast.message.length > 60 

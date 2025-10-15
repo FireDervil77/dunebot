@@ -291,6 +291,9 @@ class IPCClient {
                     
                 case "UPDATE_PLUGIN":
                     return await this.#handleUpdatePlugin(message, payload);
+                    
+                case "RELOAD_PLUGIN":
+                    return await this.#handleReloadPlugin(message, payload);
                 
                 case "GET_GUILD_INFO":
                     return await this.#handleGetGuildInfo(message, payload);
@@ -303,6 +306,9 @@ class IPCClient {
                     
                 case "GET_GUILD_MEMBERS":
                     return await this.#handleGetGuildMembers(message, payload);
+                    
+                case "BOT_HEALTH_CHECK":
+                    return await this.#handleBotHealthCheck(message);
                     
                 default:
                     this.logger.warn(`[IPC] Unbekanntes Dashboard-Event: ${eventName}`);
@@ -656,6 +662,49 @@ class IPCClient {
             return message.reply({
                 success: false,
                 error: error.message
+            });
+        }
+    }
+
+    /**
+     * Bot Health Check Handler
+     * Gibt Bot-Status und verfügbare Guilds zurück
+     * @param {object} message - Veza-Nachrichtenobjekt
+     * @returns {Promise<void>}
+     * @private
+     */
+    async #handleBotHealthCheck(message) {
+        try {
+            // Alle Guild-IDs sammeln
+            const guildIds = this.discordClient.guilds.cache.map(g => g.id);
+            
+            const healthData = {
+                status: 'online',
+                uptime: Math.floor(process.uptime()),
+                guilds: guildIds,
+                guildCount: guildIds.length,
+                ping: this.discordClient.ws.ping,
+                timestamp: Date.now(),
+                memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) // MB
+            };
+            
+            this.logger.debug(`[IPC Health-Check] ✓ ${healthData.guildCount} Guilds, ${healthData.ping}ms ping`);
+            
+            return message.reply({
+                success: true,
+                ...healthData
+            });
+            
+        } catch (error) {
+            this.logger.error('[IPC Health-Check] Error:', error);
+            
+            return message.reply({ 
+                success: false,
+                status: 'error',
+                guilds: [],
+                guildCount: 0,
+                error: error.message,
+                timestamp: Date.now()
             });
         }
     }
@@ -1673,6 +1722,124 @@ class IPCClient {
             });
         } catch (error) {
             this.logger.error(`[IPC] Fehler bei Plugin-Aktion:`, error);
+            return message.reply({
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Handler für Plugin-Reload ohne Deaktivierung (guild-spezifisch)
+     * Leert den require-Cache und lädt das Bot-Modul neu
+     * 
+     * @param {Object} message - Veza-Message-Objekt
+     * @param {Object} payload - { pluginName, guildId }
+     * @returns {Promise<void>}
+     * @private
+     */
+    async #handleReloadPlugin(message, payload) {
+        const path = require('path');
+        
+        try {
+            const { pluginName, guildId } = payload || {};
+            
+            this.logger.info(`[IPC] Plugin-Reload angefordert: ${pluginName} für Guild ${guildId}`);
+            
+            // Validierung
+            if (!pluginName) {
+                return message.reply({
+                    success: false,
+                    error: 'Plugin-Name fehlt'
+                });
+            }
+            
+            if (!guildId) {
+                return message.reply({
+                    success: false,
+                    error: 'Guild-ID fehlt'
+                });
+            }
+            
+            // Core-Plugin Schutz
+            if (pluginName === 'core') {
+                return message.reply({
+                    success: false,
+                    error: 'Core-Plugin kann nicht neu geladen werden (Sicherheitsgrund)'
+                });
+            }
+            
+            // Prüfen ob Plugin für diese Guild aktiviert ist
+            const pluginManager = this.discordClient.pluginManager;
+            if (!pluginManager) {
+                return message.reply({
+                    success: false,
+                    error: 'PluginManager nicht verfügbar'
+                });
+            }
+            
+            const plugin = pluginManager.getPlugin(pluginName);
+            if (!plugin) {
+                return message.reply({
+                    success: false,
+                    error: `Plugin "${pluginName}" nicht gefunden oder nicht geladen`
+                });
+            }
+            
+            // Plugin-Pfad ermitteln
+            const pluginsDir = path.join(__dirname, '../../..', 'plugins');
+            const pluginPath = path.join(pluginsDir, pluginName);
+            
+            // Require-Cache für das gesamte Plugin leeren
+            const cacheKeys = Object.keys(require.cache).filter(key => 
+                key.startsWith(pluginPath) && !key.includes('node_modules')
+            );
+            
+            this.logger.debug(`[IPC] Lösche ${cacheKeys.length} Bot-Cache-Einträge für ${pluginName}`);
+            
+            cacheKeys.forEach(key => {
+                try {
+                    delete require.cache[key];
+                } catch (err) {
+                    this.logger.warn(`[IPC] Cache-Eintrag konnte nicht gelöscht werden: ${key}`, err.message);
+                }
+            });
+            
+            // Bot-Modul neu laden (ohne onGuildDisable/onGuildEnable zu triggern)
+            const botModulePath = path.join(pluginPath, 'bot', 'index.js');
+            const fs = require('fs');
+            
+            if (!fs.existsSync(botModulePath)) {
+                this.logger.debug(`[IPC] Plugin ${pluginName} hat kein Bot-Modul (nur Dashboard)`);
+                return message.reply({
+                    success: true,
+                    message: `Plugin ${pluginName} hat kein Bot-Modul - nur Dashboard-Cache geleert`,
+                    cacheCleared: cacheKeys.length
+                });
+            }
+            
+            try {
+                // Modul neu laden
+                const freshModule = require(botModulePath);
+                this.logger.success(`[IPC] Bot-Modul für ${pluginName} erfolgreich neu geladen (${cacheKeys.length} Cache-Einträge geleert)`);
+                
+                return message.reply({
+                    success: true,
+                    message: `Plugin ${pluginName} für Guild ${guildId} erfolgreich neu geladen`,
+                    cacheCleared: cacheKeys.length
+                });
+                
+            } catch (loadErr) {
+                this.logger.error(`[IPC] Fehler beim Neu-Laden des Bot-Moduls für ${pluginName}:`, loadErr);
+                return message.reply({
+                    success: false,
+                    error: `Bot-Modul konnte nicht geladen werden: ${loadErr.message}`,
+                    cacheCleared: cacheKeys.length
+                });
+            }
+            
+        } catch (error) {
+            this.logger.error(`[IPC] Kritischer Fehler beim Plugin-Reload:`, error);
             return message.reply({
                 success: false,
                 error: error.message

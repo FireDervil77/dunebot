@@ -131,10 +131,10 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 
-                // Lade aktivierte Plugins für die Guild aus guild_plugins Tabelle
+                // Lade aktivierte Plugins für die Guild aus guild_plugins Tabelle MIT Badge-Info
                 let enabledPlugins = [];
                 try {
-                    enabledPlugins = await dbService.getEnabledPlugins(guildId);
+                    enabledPlugins = await dbService.getEnabledPluginsWithBadges(guildId);
                     Logger.debug(`[Core] Aktivierte Plugins für Guild ${guildId}:`, enabledPlugins);
                 } catch (err) {
                     Logger.error('[Core] Fehler beim Laden der enabled Plugins:', err);
@@ -411,6 +411,114 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 } catch (error) {
                     Logger.error('[Core] Fehler beim Upvote:', error);
                     res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
+            // === PLUGIN RELOAD SYSTEM ===
+            // POST: Plugin für Guild neu laden (ohne Deaktivierung)
+            this.guildRouter.post('/plugin-reload/:pluginName', async (req, res) => {
+                const pluginManager = ServiceManager.get('pluginManager');
+                const ipcServer = ServiceManager.get('ipcServer');
+                const { pluginName } = req.params;
+                const guildId = res.locals.guildId; // Guild-ID aus Middleware
+                
+                try {
+                    Logger.info(`[Core] Plugin-Reload angefordert: ${pluginName} für Guild ${guildId}`);
+                    
+                    // Validierung
+                    if (!pluginName) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: 'Plugin-Name fehlt' 
+                        });
+                    }
+                    
+                    if (!guildId) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: 'Guild-ID fehlt' 
+                        });
+                    }
+                    
+                    // Prüfen ob Plugin für diese Guild aktiviert ist
+                    const dbService = ServiceManager.get('dbService');
+                    const pluginStatus = await dbService.query(
+                        'SELECT is_enabled FROM guild_plugins WHERE guild_id = ? AND plugin_name = ?',
+                        [guildId, pluginName]
+                    );
+                    
+                    if (!pluginStatus || pluginStatus.length === 0 || !pluginStatus[0].is_enabled) {
+                        return res.status(404).json({ 
+                            success: false, 
+                            message: `Plugin "${pluginName}" ist für diese Guild nicht aktiviert` 
+                        });
+                    }
+                    
+                    // Core-Plugin ist erlaubt, aber mit Warnung
+                    if (pluginName === 'core') {
+                        Logger.warn(`[Core] Core-Plugin Reload angefordert für Guild ${guildId} - Vorsicht geboten`);
+                    }
+                    
+                    // DASHBOARD: Require-Cache für das Plugin leeren
+                    const path = require('path');
+                    const pluginPath = path.join(__dirname, '../..', pluginName);
+                    const cacheKeys = Object.keys(require.cache).filter(key => key.startsWith(pluginPath));
+                    
+                    Logger.debug(`[Core] Lösche ${cacheKeys.length} Dashboard-Cache-Einträge für ${pluginName}`);
+                    cacheKeys.forEach(key => {
+                        delete require.cache[key];
+                    });
+                    
+                    // Dashboard-Modul neu laden (ohne onGuildEnable zu triggern)
+                    let dashboardReloaded = false;
+                    try {
+                        const dashboardModulePath = path.join(pluginPath, 'dashboard', 'index.js');
+                        if (require.cache[dashboardModulePath]) {
+                            delete require.cache[dashboardModulePath];
+                        }
+                        require(dashboardModulePath);
+                        dashboardReloaded = true;
+                        Logger.debug(`[Core] Dashboard-Modul für ${pluginName} neu geladen`);
+                    } catch (err) {
+                        Logger.warn(`[Core] Dashboard-Modul konnte nicht neu geladen werden:`, err.message);
+                    }
+                    
+                    // BOT: IPC-Call zum Reload des Bot-Teils (guild-spezifisch)
+                    let botReloaded = false;
+                    try {
+                        const ipcResponse = await ipcServer.broadcastOne('dashboard:RELOAD_PLUGIN', {
+                            pluginName,
+                            guildId
+                        });
+                        
+                        if (!ipcResponse.success) {
+                            Logger.warn(`[Core] Bot-Plugin-Reload fehlgeschlagen:`, ipcResponse.error);
+                        } else {
+                            botReloaded = true;
+                            Logger.debug(`[Core] Bot-Plugin ${pluginName} für Guild ${guildId} erfolgreich neu geladen`);
+                        }
+                    } catch (ipcErr) {
+                        Logger.warn(`[Core] IPC-Reload fehlgeschlagen:`, ipcErr.message);
+                    }
+                    
+                    res.json({ 
+                        success: true, 
+                        message: `Plugin "${pluginName}" wurde für Guild ${guildId} neu geladen.`,
+                        details: {
+                            cacheCleared: cacheKeys.length,
+                            dashboardReloaded,
+                            botReloaded,
+                            pluginName,
+                            guildId
+                        }
+                    });
+                    
+                } catch (error) {
+                    Logger.error(`[Core] Fehler beim Reload von Plugin ${pluginName}:`, error);
+                    res.status(500).json({ 
+                        success: false, 
+                        message: `Fehler beim Reload: ${error.message}` 
+                    });
                 }
             });
             

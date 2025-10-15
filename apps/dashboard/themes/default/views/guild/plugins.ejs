@@ -55,6 +55,30 @@
                                       <div class="flex-grow-1">
                                           <h5 class="mb-0">
                                               <%= p.displayName %>
+                                              <% if (p.badge && p.badge.active) { %>
+                                                  <% 
+                                                    const badgeColorMap = {
+                                                      'new': 'bg-success',
+                                                      'beta': 'bg-warning',
+                                                      'updated': 'bg-info',
+                                                      'deprecated': 'bg-danger'
+                                                    };
+                                                    const badgeColor = badgeColorMap[p.badge.status] || 'bg-secondary';
+                                                    const badgeTextMap = {
+                                                      'new': 'NEU',
+                                                      'beta': 'BETA',
+                                                      'updated': 'UPDATE',
+                                                      'deprecated': 'DEPRECATED'
+                                                    };
+                                                    const badgeText = badgeTextMap[p.badge.status] || p.badge.status.toUpperCase();
+                                                  %>
+                                                  <span class="plugin-badge <%= badgeColor %> text-white">
+                                                      <%= badgeText %>
+                                                  </span>
+                                              <% } %>
+                                              <% if (p.badge && p.badge.featured) { %>
+                                                  <i class="plugin-featured-star fas fa-star text-warning" title="Featured Plugin"></i>
+                                              <% } %>
                                               <% if (p.updateInfo) { %>
                                                   <span class="badge badge-warning badge-sm ml-1">
                                                       <i class="fas fa-arrow-up"></i> Update
@@ -107,6 +131,14 @@
                                           </button>
                                       <% } %>
                                       
+                                      <button type="button" 
+                                              class="btn btn-outline-secondary btn-sm plugin-reload-btn mr-2"
+                                              data-plugin-name="<%= p.name %>"
+                                              data-guild-id="<%= guildId %>"
+                                              title="Plugin Code neu laden">
+                                          <i class="fas fa-redo-alt mr-1"></i> Reload
+                                      </button>
+                                      
                                       <% if (p.name !== 'core') { %>
                                           <form action="/guild/<%= guildId %>/plugins"
                                                 method="POST" 
@@ -156,6 +188,30 @@
                                           </td>
                                           <td>
                                               <strong><%= p.displayName %></strong>
+                                              <% if (p.badge && p.badge.active) { %>
+                                                  <% 
+                                                    const badgeColorMap = {
+                                                      'new': 'bg-success',
+                                                      'beta': 'bg-warning',
+                                                      'updated': 'bg-info',
+                                                      'deprecated': 'bg-danger'
+                                                    };
+                                                    const badgeColor = badgeColorMap[p.badge.status] || 'bg-secondary';
+                                                    const badgeTextMap = {
+                                                      'new': 'NEU',
+                                                      'beta': 'BETA',
+                                                      'updated': 'UPDATED',
+                                                      'deprecated': 'DEPRECATED'
+                                                    };
+                                                    const badgeText = badgeTextMap[p.badge.status] || p.badge.status.toUpperCase();
+                                                  %>
+                                                  <span class="badge <%= badgeColor %> text-white ml-2">
+                                                      <%= badgeText %>
+                                                  </span>
+                                              <% } %>
+                                              <% if (p.badge && p.badge.featured) { %>
+                                                  <i class="fas fa-star text-warning ml-1" title="Featured Plugin"></i>
+                                              <% } %>
                                               <% if (p.updateInfo) { %>
                                                   <br><span class="badge badge-warning"><i class="fas fa-arrow-up"></i> Update verfügbar</span>
                                                   <br><small class="text-muted">Deadline: <%= new Date(p.updateInfo.update_deadline_at).toLocaleDateString('de-DE') %> (<%= p.updateInfo.daysLeft %> Tage)</small>
@@ -181,6 +237,15 @@
                                                   </button>
                                                   <br>
                                               <% } %>
+                                              
+                                              <button type="button" 
+                                                      class="btn btn-outline-secondary btn-sm plugin-reload-btn mb-1"
+                                                      data-plugin-name="<%= p.name %>"
+                                                      data-guild-id="<%= guildId %>"
+                                                      title="Plugin Code neu laden">
+                                                  <i class="fas fa-redo-alt"></i>
+                                              </button>
+                                              <br>
                                               
                                               <% if (p.name !== 'core') { %>
                                                   <form action="/guild/<%= guildId %>/plugins"
@@ -237,8 +302,34 @@
                   <div class="card plugin-card bg-light h-100">
                     <div class="card-header d-flex align-items-center bg-light">
                       <img src="<%= p.icon %>" class="img-circle mr-2" style="width:40px;height:40px;opacity:.8" alt="<%= p.displayName %>">
-                      <div>
-                        <h5 class="mb-0"><%= p.displayName %></h5>
+                      <div class="flex-grow-1">
+                        <h5 class="mb-0">
+                            <%= p.displayName %>
+                            <% if (p.badge && p.badge.active) { %>
+                                <% 
+                                  const badgeColorMap = {
+                                    'new': 'bg-success',
+                                    'beta': 'bg-warning',
+                                    'updated': 'bg-info',
+                                    'deprecated': 'bg-danger'
+                                  };
+                                  const badgeColor = badgeColorMap[p.badge.status] || 'bg-secondary';
+                                  const badgeTextMap = {
+                                    'new': 'NEU',
+                                    'beta': 'BETA',
+                                    'updated': 'UPDATE',
+                                    'deprecated': 'DEPRECATED'
+                                  };
+                                  const badgeText = badgeTextMap[p.badge.status] || p.badge.status.toUpperCase();
+                                %>
+                                <span class="plugin-badge <%= badgeColor %> text-white">
+                                    <%= badgeText %>
+                                </span>
+                            <% } %>
+                            <% if (p.badge && p.badge.featured) { %>
+                                <i class="plugin-featured-star fas fa-star text-warning" title="Featured Plugin"></i>
+                            <% } %>
+                        </h5>
                         <small class="text-muted">v<%= p.version %></small>
                       </div>
                     </div>
@@ -284,7 +375,33 @@
                                     <td class="text-center">
                                         <img src="<%= p.icon %>" class="img-circle" style="width:40px;height:40px;opacity:.8" alt="<%= p.displayName %>">
                                     </td>
-                                    <td><strong><%= p.displayName %></strong></td>
+                                    <td>
+                                        <strong><%= p.displayName %></strong>
+                                        <% if (p.badge && p.badge.active) { %>
+                                            <% 
+                                              const badgeColorMap = {
+                                                'new': 'bg-success',
+                                                'beta': 'bg-warning',
+                                                'updated': 'bg-info',
+                                                'deprecated': 'bg-danger'
+                                              };
+                                              const badgeColor = badgeColorMap[p.badge.status] || 'bg-secondary';
+                                              const badgeTextMap = {
+                                                'new': 'NEU',
+                                                'beta': 'BETA',
+                                                'updated': 'UPDATE',
+                                                'deprecated': 'DEPRECATED'
+                                              };
+                                              const badgeText = badgeTextMap[p.badge.status] || p.badge.status.toUpperCase();
+                                            %>
+                                            <span class="badge <%= badgeColor %> text-white ml-2">
+                                                <%= badgeText %>
+                                            </span>
+                                        <% } %>
+                                        <% if (p.badge && p.badge.featured) { %>
+                                            <i class="fas fa-star text-warning ml-1" title="Featured Plugin"></i>
+                                        <% } %>
+                                    </td>
                                     <td><span class="badge badge-secondary">v<%= p.version %></span></td>
                                     <td><small class="text-muted"><%= p.author %></small></td>
                                     <td class="text-muted"><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
@@ -314,6 +431,58 @@
             </div>
           <% } %>
         </div>
+      </div>
+      
+      <!-- Badge-Erklärung Info-Box -->
+      <div class="card card-info mt-4">
+          <div class="card-header">
+              <h3 class="card-title"><i class="fas fa-question-circle mr-2"></i><%= tr('PLUGIN_BADGES.INFO_TITLE') %></h3>
+          </div>
+          <div class="card-body">
+              <div class="row">
+                  <!-- Badge-Erklärungen -->
+                  <div class="col-md-6 mb-3">
+                      <div class="d-flex align-items-center mb-2">
+                          <span class="badge bg-success mr-2" style="font-size: 0.75rem;">NEU</span>
+                          <strong><%= tr('PLUGIN_BADGES.NEW_TITLE') %></strong>
+                      </div>
+                      <p class="text-muted mb-0 ml-4"><%= tr('PLUGIN_BADGES.NEW_DESC') %></p>
+                  </div>
+                  
+                  <div class="col-md-6 mb-3">
+                      <div class="d-flex align-items-center mb-2">
+                          <span class="badge bg-warning text-dark mr-2" style="font-size: 0.75rem;">BETA</span>
+                          <strong><%= tr('PLUGIN_BADGES.BETA_TITLE') %></strong>
+                      </div>
+                      <p class="text-muted mb-0 ml-4"><%= tr('PLUGIN_BADGES.BETA_DESC') %></p>
+                  </div>
+                  
+                  <div class="col-md-6 mb-3">
+                      <div class="d-flex align-items-center mb-2">
+                          <span class="badge bg-info mr-2" style="font-size: 0.75rem;">UPDATE</span>
+                          <strong><%= tr('dashboard:PLUGIN_BADGES.UPDATED_TITLE') %></strong>
+                      </div>
+                      <p class="text-muted mb-0 ml-4"><%= tr('dashboard:PLUGIN_BADGES.UPDATED_DESC') %></p>
+                  </div>
+                  
+                  <div class="col-md-6 mb-3">
+                      <div class="d-flex align-items-center mb-2">
+                          <span class="badge bg-danger mr-2" style="font-size: 0.75rem;">DEPRECATED</span>
+                          <strong><%= tr('PLUGIN_BADGES.DEPRECATED_TITLE') %></strong>
+                      </div>
+                      <p class="text-muted mb-0 ml-4"><%= tr('PLUGIN_BADGES.DEPRECATED_DESC') %></p>
+                  </div>
+                  
+                  <div class="col-md-12 mb-3">
+                      <div class="d-flex align-items-center mb-2">
+                          <i class="fas fa-star text-warning mr-2" style="font-size: 1.1rem;"></i>
+                          <strong><%= tr('PLUGIN_BADGES.FEATURED_TITLE') %></strong>
+                      </div>
+                      <p class="text-muted mb-0 ml-4"><%= tr('PLUGIN_BADGES.FEATURED_DESC') %></p>
+                  </div>
+              </div>
+              
+          </div>
       </div>
     </div>
   </div>
