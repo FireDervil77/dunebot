@@ -59,15 +59,21 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         const notifications = await dbService.query('SELECT COUNT(*) as count FROM notifications');
         stats.notifications = notifications[0]?.count || 0;
 
-        // Top Guilds nach created_at
+        // Top Guilds nach created_at (neueste zuerst)
         try {
             stats.topGuilds = await dbService.query(`
-                SELECT _id, guild_name, guild_id, created_at
+                SELECT 
+                    _id as guild_id,
+                    guild_name, 
+                    created_at,
+                    is_active_guild
                 FROM guilds 
                 ORDER BY created_at DESC
                 LIMIT 10
             `);
+            Logger.debug(`[SuperAdmin] Loaded ${stats.topGuilds.length} guilds for stats`);
         } catch (err) {
+            Logger.error('[SuperAdmin] Fehler beim Laden der Top Guilds:', err);
             stats.topGuilds = [];
         }
 
