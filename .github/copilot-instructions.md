@@ -62,6 +62,18 @@ Plugins haben eine duale Struktur: `plugins/pluginname/{bot/, dashboard/, shared
 - **ASK FOR COMMITS**: Bei größeren Änderungen immer um Commit-Historie bitten, um den Überblick zu behalten.
 - **ONLY COMMIT WITH APROVAL**: Keine Commits ohne vorherige Genehmigung durch den Projektleiter.
 
+## PLUGINS NOT TO COMMIT (!IMPORTAND)
+- fun
+- economy
+- gameserver
+- masterserver
+- giveaway
+- imageserver
+- masterserver
+- statistik
+- ticket
+- voiceserver
+
 ## FRONTEND ARCHITECTURE (CRITICAL!)
 
 ### ❌ DEPRECATED & VERBOTEN: Alpine.js
