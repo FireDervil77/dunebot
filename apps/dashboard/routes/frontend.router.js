@@ -24,8 +24,8 @@ const getNewsDetails = async (req, res) => {
             return res.status(404).render('frontend/404');
         }
 
-        // News lokalisieren
-        const userLocale = req.session.locale || res.locals.locale || 'de-DE';
+        // News lokalisieren (nutze res.locals.locale statt Session-Zugriff)
+        const userLocale = res.locals.locale || 'de-DE';
         const localizedNews = getLocalizedNews(rawNews[0], userLocale);
 
         // Layout setzen
@@ -63,8 +63,8 @@ const getChangelogsList = async (req, res) => {
             ORDER BY release_date DESC
         `);
 
-        // Changelogs lokalisieren
-        const userLocale = req.session.locale || res.locals.locale || 'de-DE';
+        // Changelogs lokalisieren (nutze res.locals.locale statt Session-Zugriff)
+        const userLocale = res.locals.locale || 'de-DE';
         const localizedChangelogs = rawChangelogs.map(cl => getLocalizedChangelog(cl, userLocale));
 
         // Layout setzen
@@ -96,8 +96,8 @@ const getChangelogDetails = async (req, res) => {
             return res.status(404).render('frontend/404');
         }
 
-        // Changelog lokalisieren
-        const userLocale = req.session.locale || res.locals.locale || 'de-DE';
+        // Changelog lokalisieren (nutze res.locals.locale statt Session-Zugriff)
+        const userLocale = res.locals.locale || 'de-DE';
         const localizedChangelog = getLocalizedChangelog(rawChangelog[0], userLocale);
 
         // Parse hierarchische Struktur aus changes-Text
