@@ -7,6 +7,7 @@
 
 const { ServiceManager } = require('dunebot-core');
 const { PermissionFlagsBits } = require('discord.js');
+const Logger = ServiceManager.get('Logger');
 
 /**
  * Badge-Level zu Discord-Role-Namen Mapping
@@ -28,23 +29,15 @@ const BADGE_COLORS = {
     bronze: 0xCD7F32    // Bronze
 };
 
-module.exports = {
-    name: 'dashboard:SET_SUPPORTER_ROLE',
+module.exports = async function(message, reply) {
+    const dbService = ServiceManager.get('dbService');
+    const { userId, badgeLevel, amount } = message;
     
-    /**
-     * IPC Handler für Supporter-Role-Zuweisung
-     * @param {Client} client - Discord.js Client
-     * @param {object} message - IPC Message mit data: { userId, badgeLevel, amount }
-     * @returns {object} Result mit updated/errors
-     */
-    async execute(client, message) {
-        const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-        const { userId, badgeLevel, amount } = message.data;
-        
-        Logger.info(`[IPC:SetSupporterRole] Processing for user ${userId}, badge: ${badgeLevel || 'none'}`);
-        
-        try {
+    Logger.info(`[IPC:SetSupporterRole] Processing for user ${userId}, badge: ${badgeLevel || 'none'}`);
+    
+    try {
+        // Client aus ServiceManager holen (falls verfügbar) oder aus this
+        const client = this;
         
         // User-Objekt abrufen
         let user;

@@ -6,7 +6,7 @@
  * @author DuneBot Team
  */
 
-const { DashboardPlugin } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class GreetingDashboardPlugin extends DashboardPlugin {
@@ -15,7 +15,7 @@ class GreetingDashboardPlugin extends DashboardPlugin {
             name: 'greeting',
             displayName: 'Greeting Plugin',
             description: 'Willkommens- und Verabschiedungsnachrichten für neue/ausgetretene Member',
-            version: '0.1.0_alpha',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'DuneBot Team',
             icon: 'fa-solid fa-hand-wave',
             baseDir: __dirname,

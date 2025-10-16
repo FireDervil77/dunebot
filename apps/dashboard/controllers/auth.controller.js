@@ -196,6 +196,14 @@ exports.callback = async (req, res) => {
         
         req.session.locale = userData.locale || req.session.locale || "de";
         
+        // DEBUG: Session-Inhalt VOR dem Speichern loggen
+        Logger.debug('[CALLBACK] Session-Inhalt VOR save():', {
+            hasUser: !!req.session.user,
+            hasGuilds: !!req.session.user?.guilds,
+            guildsCount: req.session.user?.guilds?.length || 0,
+            userId: req.session.user?.info?.id
+        });
+        
         // Session speichern und dann weiterleiten
         req.session.save((err) => {
             if (err) {
@@ -207,6 +215,11 @@ exports.callback = async (req, res) => {
             }
             
             Logger.debug("Session gespeichert, leite weiter zu:", redirectURL);
+            Logger.debug('[CALLBACK] Session-Inhalt NACH save():', {
+                hasUser: !!req.session.user,
+                hasGuilds: !!req.session.user?.guilds,
+                guildsCount: req.session.user?.guilds?.length || 0
+            });
             
             // Hook nach erfolgreicher Anmeldung
             if (pluginManager?.hooks) {
@@ -367,7 +380,17 @@ exports.getServerSelector = async (req, res) => {
     try {
         res.locals.layout = themeManager.getLayout('auth');
 
+        // DEBUG: Session-Inhalt loggen
+        Logger.debug('[SERVER-SELECTOR] Session-Check:', {
+            hasSession: !!req.session,
+            hasUser: !!req.session?.user,
+            hasGuilds: !!req.session?.user?.guilds,
+            guildsCount: req.session?.user?.guilds?.length || 0,
+            userId: req.session?.user?.info?.id || 'KEINE USER-ID'
+        });
+
         if (!req.session.user?.guilds) {
+            Logger.warn('[SERVER-SELECTOR] Keine Guilds in Session - Redirect zu /auth/login');
             return res.redirect('/auth/login');
         }
 
