@@ -414,6 +414,137 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 }
             });
 
+            // === DONATION SYSTEM ===
+            // Donation-Seite
+            this.guildRouter.get('/donate', async (req, res) => {
+                try {
+                    const guildId = req.params.guildId;
+                    const dbService = ServiceManager.get('dbService');
+                    const userId = req.session?.user?.info?.id || null;
+                    
+                    // User Badge abrufen (falls vorhanden und eingeloggt)
+                    let badges = [];
+                    if (userId) {
+                        const badgeResult = await dbService.query(
+                            'SELECT * FROM supporter_badges WHERE user_id = ? AND is_active = 1',
+                            [userId]
+                        );
+                        badges = Array.isArray(badgeResult) ? badgeResult : [];
+                    }
+                    
+                    // Community Stats
+                    const statsResult = await dbService.query(`
+                        SELECT 
+                            SUM(CASE WHEN payment_status = 'completed' THEN amount ELSE 0 END) as total_amount,
+                            COUNT(DISTINCT user_id) as supporter_count
+                        FROM donations
+                    `);
+                    const stats = Array.isArray(statsResult) ? statsResult : [];
+                    
+                    await themeManager.renderView(res, 'guild/donate', {
+                        title: 'DuneBot unterstützen',
+                        activeMenu: `/guild/${guildId}/plugins/core/donate`,
+                        guildId,
+                        userBadge: badges[0] || null,
+                        communityStats: stats[0] || { total_amount: 0, supporter_count: 0 },
+                        plugin: this
+                    });
+                } catch (error) {
+                    Logger.error('[Core] Error loading donate page:', error);
+                    res.status(500).render('error', { message: 'Fehler beim Laden der Seite' });
+                }
+            });
+            
+            // Success-Seite
+            this.guildRouter.get('/donate/success', (req, res) => {
+                res.render('guild/donate-success', {
+                    guildId: req.params.guildId,
+                    sessionId: req.query.session_id
+                });
+            });
+            
+            // Cancel-Seite
+            this.guildRouter.get('/donate/cancel', (req, res) => {
+                res.render('guild/donate-cancel', {
+                    guildId: req.params.guildId
+                });
+            });
+            
+            // API Route für Stripe Checkout Session
+            this.apiRouter.use('/create-donation', require('./routes/api/create-donation'));
+            Logger.debug('[Core] Donation Routes registriert');
+
+            // === HALL OF FAME ===
+            // Hall of Fame - Top Donators Leaderboard
+            this.guildRouter.get('/hall-of-fame', async (req, res) => {
+                try {
+                    const guildId = req.params.guildId;
+                    const dbService = ServiceManager.get('dbService');
+                    const userId = req.session?.user?.info?.id || null;
+                    
+                    // Top Donators abrufen (mit Badge-Info und User-Details)
+                    const topDonators = await dbService.query(`
+                        SELECT 
+                            d.user_id,
+                            SUM(CASE WHEN d.payment_status = 'completed' THEN d.amount ELSE 0 END) as total_donated,
+                            COUNT(CASE WHEN d.payment_status = 'completed' THEN 1 END) as donation_count,
+                            MAX(d.created_at) as last_donation,
+                            sb.badge_level,
+                            sb.is_active as has_active_badge,
+                            JSON_UNQUOTE(JSON_EXTRACT(d.metadata, '$.username')) as username
+                        FROM donations d
+                        LEFT JOIN supporter_badges sb ON d.user_id = sb.user_id AND sb.is_active = 1
+                        WHERE d.payment_status = 'completed'
+                        GROUP BY d.user_id
+                        ORDER BY total_donated DESC
+                        LIMIT 50
+                    `);
+                    
+                    // Community Stats
+                    const statsResult = await dbService.query(`
+                        SELECT 
+                            SUM(CASE WHEN payment_status = 'completed' THEN amount ELSE 0 END) as total_amount,
+                            COUNT(DISTINCT user_id) as supporter_count,
+                            COUNT(CASE WHEN payment_status = 'completed' THEN 1 END) as total_donations,
+                            AVG(CASE WHEN payment_status = 'completed' THEN amount END) as avg_donation
+                        FROM donations
+                    `);
+                    const stats = Array.isArray(statsResult) && statsResult.length > 0 
+                        ? statsResult[0] 
+                        : { total_amount: 0, supporter_count: 0, total_donations: 0, avg_donation: 0 };
+                    
+                    // User Badge abrufen (falls eingeloggt)
+                    let userBadge = null;
+                    let userRank = null;
+                    if (userId) {
+                        const badgeResult = await dbService.query(
+                            'SELECT * FROM supporter_badges WHERE user_id = ? AND is_active = 1',
+                            [userId]
+                        );
+                        userBadge = Array.isArray(badgeResult) && badgeResult.length > 0 ? badgeResult[0] : null;
+                        
+                        // User-Rank ermitteln
+                        const rankIndex = topDonators.findIndex(d => d.user_id === userId);
+                        userRank = rankIndex >= 0 ? rankIndex + 1 : null;
+                    }
+                    
+                    await themeManager.renderView(res, 'guild/hall-of-fame', {
+                        title: 'Hall of Fame - Top Supporters',
+                        activeMenu: `/guild/${guildId}/plugins/core/hall-of-fame`,
+                        guildId,
+                        topDonators: topDonators || [],
+                        communityStats: stats,
+                        userBadge,
+                        userRank,
+                        plugin: this
+                    });
+                } catch (error) {
+                    Logger.error('[Core] Error loading hall-of-fame page:', error);
+                    res.status(500).render('error', { message: 'Fehler beim Laden der Hall of Fame' });
+                }
+            });
+            Logger.debug('[Core] Hall of Fame Route registriert');
+
             // === PLUGIN RELOAD SYSTEM ===
             // POST: Plugin für Guild neu laden (ohne Deaktivierung)
             this.guildRouter.post('/plugin-reload/:pluginName', async (req, res) => {
@@ -586,6 +717,9 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 });
             }
 
+            // === SUPPORT DUNEBOT WIDGET ===
+            // Support-Widget für Donations (ans Ende verschieben)
+            
             // Server-Information Widget
             widgets.push({
                 id: 'server-info',
@@ -670,6 +804,46 @@ class CoreDashboardPlugin extends DashboardPlugin {
               })
             });
 
+            // === SUPPORT DUNEBOT WIDGET (am Ende) ===
+            try {
+                const dbService = ServiceManager.get('dbService');
+                const userId = user?.id || null;
+                
+                // User Badge abrufen (nur wenn User eingeloggt)
+                let userBadge = null;
+                if (userId) {
+                    const [badges] = await dbService.query(
+                        'SELECT * FROM supporter_badges WHERE user_id = ? AND badge_visible = 1',
+                        [userId]
+                    );
+                    userBadge = badges[0] || null;
+                }
+                
+                // Community Stats
+                const [donationStats] = await dbService.query(`
+                    SELECT 
+                        SUM(CASE WHEN payment_status = 'completed' THEN amount ELSE 0 END) as total_amount,
+                        COUNT(DISTINCT user_id) as supporter_count
+                    FROM donations
+                `);
+                
+                widgets.push({
+                    id: 'support-dunebot',
+                    title: 'DuneBot unterstützen',
+                    size: 12, // Volle Breite
+                    icon: 'fas fa-heart',
+                    cardClass: 'card-success',
+                    content: await themeManager.renderWidgetPartial('support-dunebot', { 
+                        guildId,
+                        userBadge,
+                        communityStats: donationStats[0] || { total_amount: 0, supporter_count: 0 },
+                        plugin: 'core'
+                    })
+                });
+            } catch (err) {
+                Logger.error('[Core Plugin] Fehler beim Laden des Support-Widgets:', err);
+            }
+
             return widgets;
         });
 
@@ -712,6 +886,26 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 url: `/guild/${guildId}/plugins/core/feature-request`,
                 icon: 'fa-solid fa-lightbulb',
                 order: 12,
+                type: navigationManager.menuTypes.MAIN,
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}`
+            },
+            {
+                title: 'NAV.SUPPORT_DUNEBOT',
+                url: `/guild/${guildId}/plugins/core/donate`,
+                icon: 'fa-solid fa-heart',
+                order: 13,
+                type: navigationManager.menuTypes.MAIN,
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}`
+            },
+            {
+                title: 'NAV.HALL_OF_FAME',
+                url: `/guild/${guildId}/plugins/core/hall-of-fame`,
+                icon: 'fa-solid fa-trophy',
+                order: 14,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,

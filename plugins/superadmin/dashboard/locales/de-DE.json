@@ -7,10 +7,69 @@
         "CHANGELOGS": "Changelogs",
         "PLUGIN_BADGES": "Plugin Badges",
         "STATISTICS": "Statistiken",
-        "TRANSLATIONS": "Übersetzungen"
+        "TRANSLATIONS": "Übersetzungen",
+        "DONATIONS": "Donations"
     },
     "FEEDBACK": {
         "TITLE": "User Feedback Verwaltung"
+    },
+    "DONATIONS": {
+        "TITLE": "Donations Management",
+        "BREADCRUMB": "Donations",
+        "STATS": {
+            "TOTAL_AMOUNT": "Gesamtbetrag",
+            "TOTAL_DONATIONS": "Donations insgesamt",
+            "AVERAGE_DONATION": "Durchschnitt",
+            "UNIQUE_SUPPORTERS": "Einzigartige Supporter"
+        },
+        "TABLE": {
+            "ALL_DONATIONS": "Alle Donations",
+            "MANUAL_DONATION": "Manuelle Donation",
+            "ID": "ID",
+            "USER": "User",
+            "AMOUNT": "Betrag",
+            "STATUS": "Status",
+            "PROVIDER": "Provider",
+            "DATE": "Datum",
+            "ACTIONS": "Aktionen",
+            "NO_DONATIONS": "Keine Donations vorhanden"
+        },
+        "STATUS": {
+            "COMPLETED": "Erfolgreich",
+            "PENDING": "Ausstehend",
+            "REFUNDED": "Erstattet",
+            "EXPIRED": "Abgelaufen"
+        },
+        "PROVIDERS": {
+            "STRIPE": "Stripe",
+            "MANUAL": "Manuell",
+            "BANK_TRANSFER": "Überweisung",
+            "CASH": "Bargeld",
+            "OTHER": "Sonstiges"
+        },
+        "TOP_DONORS": {
+            "TITLE": "Top Donors"
+        },
+        "BADGE_DISTRIBUTION": {
+            "TITLE": "Badge-Verteilung",
+            "PLATINUM": "Platinum",
+            "GOLD": "Gold",
+            "SILVER": "Silver",
+            "BRONZE": "Bronze"
+        },
+        "MODAL": {
+            "CREATE_TITLE": "Manuelle Donation erstellen",
+            "USER_ID": "User ID",
+            "USER_ID_HELP": "Die Discord User-ID des Spenders",
+            "AMOUNT": "Betrag (€)",
+            "PAYMENT_TYPE": "Zahlungsart",
+            "NOTE": "Notiz",
+            "NOTE_PLACEHOLDER": "Zusätzliche Informationen...",
+            "CANCEL": "Abbrechen",
+            "CREATE": "Erstellen"
+        },
+        "ACTIONS": {
+            "REFUND_CONFIRM": "Möchtest du diese Donation wirklich erstatten?\\n\\nDer Supporter-Badge und die Discord-Role werden angepasst."
+        }
     }
-
 }

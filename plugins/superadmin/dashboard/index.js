@@ -11,9 +11,7 @@ const fs = require('fs');
 
 const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
-const { getLocalizedNews, getLocalizedNewsList, prepareNewsForDB } = require('../../../apps/dashboard/helpers/newsHelper');
-const { getLocalizedNotification, getLocalizedNotificationList, prepareNotificationForDB } = require('../../../apps/dashboard/helpers/notificationHelper');
-const { getLocalizedChangelog, getLocalizedChangelogList, prepareChangelogForDB, getTypeBadge, getComponentBadge } = require('../../../apps/dashboard/helpers/changelogHelper');
+const { NewsHelper, ChangelogHelper, NotificationHelper } = require('dunebot-sdk/utils');
 
 class SuperAdminDashboardPlugin extends DashboardPlugin {
     constructor(app) {
@@ -201,6 +199,11 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             // Middleware: Owner-Check für ALLE anderen SuperAdmin-Routen (nach API-Routen!)
             this.guildRouter.use(this._checkOwner.bind(this));
 
+            // === DONATIONS MANAGEMENT ===
+            const donationsRouter = require('./routes/donations');
+            this.guildRouter.use('/donations', donationsRouter);
+            Logger.debug('[SuperAdmin] Donations Management Route registriert');
+
             // === HAUPTSEITE (Dashboard-Übersicht) ===
             this.guildRouter.get('/', async (req, res) => {
                 const guildId = res.locals.guildId;
@@ -284,7 +287,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 `);
 
                 // News lokalisieren für die Liste
-                const newsList = getLocalizedNewsList(rawNewsList, userLocale).map(news => ({
+                const newsList = NewsHelper.getLocalizedNewsList(rawNewsList, userLocale).map(news => ({
                     ...news,
                     formattedDate: new Date(news.date).toLocaleString(userLocale, {
                         year: 'numeric',
@@ -350,7 +353,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     };
 
                     // prepareNewsForDB nutzen
-                    const newsData = prepareNewsForDB(translations, metadata);
+                    const newsData = NewsHelper.prepareNewsForDB(translations, metadata);
 
                     if (newsId) {
                         // Update existierender News-Eintrag
@@ -428,7 +431,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     `);
                     
                     // Lokalisiere Notifications für die Anzeige
-                    const notificationsList = getLocalizedNotificationList(rawNotifications, userLocale).map(notif => ({
+                    const notificationsList = NotificationHelper.getLocalizedNotificationList(rawNotifications, userLocale).map(notif => ({
                         ...notif,
                         formattedDate: new Date(notif.created_at).toLocaleString(userLocale, {
                             year: 'numeric',
@@ -555,7 +558,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     };
 
                     // prepareNotificationForDB nutzen
-                    const notificationData = prepareNotificationForDB(translations, metadata);
+                    const notificationData = NotificationHelper.prepareNotificationForDB(translations, metadata);
 
                     if (notificationId) {
                         // Update existierende Notification
@@ -680,15 +683,15 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 `);
 
                 // Lokalisiere Changelogs für die Liste
-                const changelogsList = getLocalizedChangelogList(rawChangelogs, userLocale).map(changelog => ({
+                const changelogsList = ChangelogHelper.getLocalizedChangelogList(rawChangelogs, userLocale).map(changelog => ({
                     ...changelog,
                     formattedDate: new Date(changelog.release_date).toLocaleString(userLocale, {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'
                     }),
-                    typeBadge: getTypeBadge(changelog.type),
-                    componentBadge: getComponentBadge(changelog.component)
+                    typeBadge: ChangelogHelper.getTypeBadge(changelog.type),
+                    componentBadge: ChangelogHelper.getComponentBadge(changelog.component)
                 }));
 
                 // Toast aus Session holen und löschen
@@ -794,7 +797,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     };
 
                     // prepareChangelogForDB nutzen
-                    const changelogData = prepareChangelogForDB(translations, metadata);
+                    const changelogData = ChangelogHelper.prepareChangelogForDB(translations, metadata);
 
                     if (changelogId) {
                         // Update existierender Changelog
@@ -1431,6 +1434,15 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 path: `/guild/${guildId}/plugins/superadmin/stats`,
                 icon: 'fa-solid fa-chart-line',
                 order: 95,  // Untermenü-Reihenfolge
+                parent: `/guild/${guildId}/plugins/superadmin`,
+                type: 'main',
+                visible: true
+            },
+            {
+                title: 'superadmin:NAV.DONATIONS',
+                path: `/guild/${guildId}/plugins/superadmin/donations`,
+                icon: 'fa-solid fa-heart',
+                order: 96,  // Nach Statistics
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true

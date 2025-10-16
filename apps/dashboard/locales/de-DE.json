@@ -241,7 +241,9 @@
         "PLUGINS": "Plugins",
         "LOCALES": "Lokalisierung",
         "BUG_REPORT": "Bug Report",
-        "FEATURE_REQUEST": "Feature Request"
+        "FEATURE_REQUEST": "Feature Request",
+        "SUPPORT_DUNEBOT": "DuneBot unterstützen",
+        "HALL_OF_FAME": "Hall of Fame"
     },
 
     "BREADCRUMB": {

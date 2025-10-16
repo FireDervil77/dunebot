@@ -122,10 +122,13 @@ function prepareNewsForDB(translations, metadata = {}) {
     };
 }
 
-module.exports = {
+// NewsHelper Objekt für einfachen Import
+const NewsHelper = {
     getLocalizedNews,
     getLocalizedNewsList,
     hasTranslation,
     getAvailableLocales,
     prepareNewsForDB
 };
+
+module.exports = NewsHelper;

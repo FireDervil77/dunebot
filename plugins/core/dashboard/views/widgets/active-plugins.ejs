@@ -31,16 +31,10 @@
             <a href="/guild/<%= guildId %>/plugins/<%= plugin.name %>" class="btn btn-sm btn-primary">
               <i class="bi bi-gear-fill me-1"></i> <%= tr('core:WIDGETS.ACTIVE_PLUGINS.BTN_CONFIGURE') %>
             </a>
-            <% if (locals.isSuperAdmin && plugin.name !== 'core') { %>
-              <button 
-                type="button" 
-                class="btn btn-sm btn-outline-secondary plugin-reload-btn" 
-                data-plugin-name="<%= plugin.name %>"
-                data-guild-id="<%= guildId %>"
-                title="Plugin neu laden (Dev)">
-                <i class="bi bi-arrow-clockwise"></i>
-              </button>
-            <% } %>
+            <%# Reload-Button komplett deaktiviert (auch für Core) %>
+            <%# if (locals.isSuperAdmin) { %>
+            
+            <%# } %>
           </div>
         </div>
       </div>

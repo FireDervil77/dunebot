@@ -7,5 +7,8 @@ module.exports = {
     MiscUtils: require("./MiscUtils"),
     permissions: require("./permissions"),
     parseJsonArray: require("./ParseJsonArray"),
-    ShortcodeParser: require("./ShortcodeParser")
+    ShortcodeParser: require("./ShortcodeParser"),
+    NewsHelper: require("./NewsHelper"),
+    ChangelogHelper: require("./ChangelogHelper"),
+    NotificationHelper: require("./NotificationHelper")
 }

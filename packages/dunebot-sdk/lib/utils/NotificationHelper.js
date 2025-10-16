@@ -114,10 +114,13 @@ function getAvailableLocales(notificationItem) {
     return titleTranslations ? Object.keys(titleTranslations) : [];
 }
 
-module.exports = {
+// NotificationHelper Objekt für einfachen Import
+const NotificationHelper = {
     getLocalizedNotification,
     getLocalizedNotificationList,
     hasTranslation,
     getAvailableLocales,
     prepareNotificationForDB
 };
+
+module.exports = NotificationHelper;

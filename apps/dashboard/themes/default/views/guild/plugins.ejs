@@ -130,14 +130,7 @@
                                               <i class="fas fa-sync-alt mr-1"></i> Jetzt aktualisieren
                                           </button>
                                       <% } %>
-                                      
-                                      <button type="button" 
-                                              class="btn btn-outline-secondary btn-sm plugin-reload-btn mr-2"
-                                              data-plugin-name="<%= p.name %>"
-                                              data-guild-id="<%= guildId %>"
-                                              title="Plugin Code neu laden">
-                                          <i class="fas fa-redo-alt mr-1"></i> Reload
-                                      </button>
+                            
                                       
                                       <% if (p.name !== 'core') { %>
                                           <form action="/guild/<%= guildId %>/plugins"
@@ -236,17 +229,7 @@
                                                       <i class="fas fa-sync-alt"></i> Update
                                                   </button>
                                                   <br>
-                                              <% } %>
-                                              
-                                              <button type="button" 
-                                                      class="btn btn-outline-secondary btn-sm plugin-reload-btn mb-1"
-                                                      data-plugin-name="<%= p.name %>"
-                                                      data-guild-id="<%= guildId %>"
-                                                      title="Plugin Code neu laden">
-                                                  <i class="fas fa-redo-alt"></i>
-                                              </button>
-                                              <br>
-                                              
+                                              <% } %>                                              
                                               <% if (p.name !== 'core') { %>
                                                   <form action="/guild/<%= guildId %>/plugins"
                                                         method="POST" 

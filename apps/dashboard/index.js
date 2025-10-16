@@ -1,5 +1,5 @@
-require("dotenv").config();
 const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 const { Logger } = require("dunebot-sdk/utils");
 const ServiceManager = require("dunebot-core/lib/ServiceManager");
 const PathConfig = require("dunebot-sdk/lib/utils/PathConfig"); // Hier PathConfig importieren

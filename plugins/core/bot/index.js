@@ -46,7 +46,7 @@ class CoreBotPlugin extends BotPlugin {
     async onEnable(client) {
         const Logger = ServiceManager.get("Logger");
         Logger.info('Core-Bot-Plugin wird aktiviert...');
-        // Empty function
+        // IPC Handler werden automatisch aus events/ipc/ geladen
         
         Logger.success('Core-Bot-Plugin aktiviert');
     }

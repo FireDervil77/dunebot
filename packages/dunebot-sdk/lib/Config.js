@@ -95,6 +95,40 @@ class Config {
     }
 
     /**
+     * Lädt die Konfiguration neu aus der Datenbank und löscht den Cache
+     * Nützlich für dynamisches Nachladen von Konfigurationsänderungen
+     * 
+     * @param {string} [context=null] - Spezifischer Kontext oder null für alle
+     * @returns {Promise<Object>} Die neu geladene Konfiguration
+     * @author DuneBot Team
+     */
+    async reload(context = null) {
+        const Logger = ServiceManager.get('Logger');
+        
+        try {
+            // Cache leeren (entweder spezifischer Kontext oder alles)
+            if (context) {
+                delete this.cache[context];
+                Logger.debug(`[Config Reload] Cache cleared for context: ${context}`);
+            } else {
+                this.cache = {};
+                Logger.debug(`[Config Reload] Full cache cleared`);
+            }
+            
+            // Konfiguration neu laden
+            const targetContext = context || this.defaultContext;
+            const config = await this.get(targetContext);
+            
+            Logger.info(`[Config Reload] Configuration reloaded for plugin ${this.pluginName}, context: ${targetContext}`);
+            return config;
+            
+        } catch (error) {
+            Logger.error(`[Config Reload] Failed to reload config for ${this.pluginName}:`, error);
+            throw error;
+        }
+    }
+
+    /**
      * Prüft und aktualisiert das Models
      * @private
      */

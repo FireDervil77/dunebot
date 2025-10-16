@@ -2,8 +2,8 @@ const express = require("express");
 const { ServiceManager } = require("dunebot-core");
 const frontendController = require("../controllers/frontend.controller");
 const apiController = require("../controllers/api.controller");
-const { getLocalizedNews } = require("../helpers/newsHelper");
-const { getLocalizedChangelog, parseHierarchicalChangelog } = require("../helpers/changelogHelper");
+const { NewsHelper } = require("dunebot-sdk/utils");
+const { ChangelogHelper } = require("dunebot-sdk/utils");
 
 // Router erstellen
 const router = express.Router();
@@ -26,7 +26,7 @@ const getNewsDetails = async (req, res) => {
 
         // News lokalisieren (nutze res.locals.locale statt Session-Zugriff)
         const userLocale = res.locals.locale || 'de-DE';
-        const localizedNews = getLocalizedNews(rawNews[0], userLocale);
+        const localizedNews = NewsHelper.getLocalizedNews(rawNews[0], userLocale);
 
         // Layout setzen
         res.locals.layout = themeManager.getLayout('frontend');
@@ -65,7 +65,7 @@ const getChangelogsList = async (req, res) => {
 
         // Changelogs lokalisieren (nutze res.locals.locale statt Session-Zugriff)
         const userLocale = res.locals.locale || 'de-DE';
-        const localizedChangelogs = rawChangelogs.map(cl => getLocalizedChangelog(cl, userLocale));
+        const localizedChangelogs = rawChangelogs.map(cl => ChangelogHelper.getLocalizedChangelog(cl, userLocale));
 
         // Layout setzen
         res.locals.layout = themeManager.getLayout('frontend');
@@ -98,10 +98,10 @@ const getChangelogDetails = async (req, res) => {
 
         // Changelog lokalisieren (nutze res.locals.locale statt Session-Zugriff)
         const userLocale = res.locals.locale || 'de-DE';
-        const localizedChangelog = getLocalizedChangelog(rawChangelog[0], userLocale);
+        const localizedChangelog = ChangelogHelper.getLocalizedChangelog(rawChangelog[0], userLocale);
 
         // Parse hierarchische Struktur aus changes-Text
-        const hierarchicalData = parseHierarchicalChangelog(localizedChangelog.changes);
+        const hierarchicalData = ChangelogHelper.parseHierarchicalChangelog(localizedChangelog.changes);
 
         // Layout setzen
         res.locals.layout = themeManager.getLayout('frontend');

@@ -9,6 +9,8 @@ const VersionHelper = require("./lib/VersionHelper");
 const { PluginHooks } = require("dunebot-core"); // PluginHooks aus dunebot-core importieren
 const RouterManager = require("./lib/RouterManager");
 const AssetManager = require("./lib/AssetManager");
+const BotHealthMonitor = require("./lib/BotHealthMonitor");
+const SessionManager = require("./lib/SessionManager");
 const HookSystem = PluginHooks;
 
 module.exports = {
@@ -22,6 +24,8 @@ module.exports = {
     VersionHelper,
     RouterManager,
     AssetManager,
+    BotHealthMonitor,
+    SessionManager,
     HookSystem, // Exportieren als HookSystem (neuer Name)
     PluginHooks // Auch unter dem alten Namen exportieren für Abwärtskompatibilität
 };

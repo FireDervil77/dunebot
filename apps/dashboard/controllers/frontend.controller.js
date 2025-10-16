@@ -6,7 +6,7 @@ const { ServiceManager } = require("dunebot-core");
  * @author firedervil
  */
 
-const { getLocalizedNewsList } = require('../helpers/newsHelper');
+const { NewsHelper } = require('dunebot-sdk/utils');
 
 /**
  * Controller für Frontend-Routen
@@ -35,7 +35,7 @@ module.exports.getIndex = async (req, res) => {
             );
             
             // News lokalisieren basierend auf User-Locale
-            newsList = getLocalizedNewsList(rawNews, userLocale);
+            newsList = NewsHelper.getLocalizedNewsList(rawNews, userLocale);
         } catch (err) {
             Logger.error("Fehler beim Laden der News:", err);
         }
@@ -48,8 +48,8 @@ module.exports.getIndex = async (req, res) => {
             );
             
             // Changelogs lokalisieren
-            const { getLocalizedChangelogList } = require('../helpers/changelogHelper');
-            changelogsList = getLocalizedChangelogList(rawChangelogs, userLocale);
+            const { ChangelogHelper } = require('dunebot-sdk/utils');
+            changelogsList = ChangelogHelper.getLocalizedChangelogList(rawChangelogs, userLocale);
         } catch (err) {
             Logger.error("Fehler beim Laden der Changelogs:", err);
         }

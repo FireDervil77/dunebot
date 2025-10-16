@@ -11,7 +11,7 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const { ServiceManager } = require('dunebot-core');
-const { prepareNotificationForDB } = require('../../../../../apps/dashboard/helpers/notificationHelper');
+const { NotificationHelper } = require('dunebot-sdk/utils');
 
 /**
  * Config laden
@@ -115,7 +115,7 @@ router.post('/send', async (req, res) => {
         };
 
         // prepareNotificationForDB nutzen
-        const notificationData = prepareNotificationForDB(translations, metadata);
+        const notificationData = NotificationHelper.prepareNotificationForDB(translations, metadata);
 
         // In Datenbank speichern
         const [result] = await dbService.query(`

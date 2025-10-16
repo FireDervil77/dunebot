@@ -345,7 +345,8 @@ function hierarchicalChangelogToMarkdown(hierarchicalData) {
     return lines.join('\n').trim();
 }
 
-module.exports = {
+// ChangelogHelper Objekt für einfachen Import
+const ChangelogHelper = {
     getLocalizedChangelog,
     getLocalizedChangelogList,
     hasTranslation,
@@ -356,3 +357,5 @@ module.exports = {
     parseHierarchicalChangelog,
     hierarchicalChangelogToMarkdown
 };
+
+module.exports = ChangelogHelper;

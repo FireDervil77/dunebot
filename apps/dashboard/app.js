@@ -5,8 +5,7 @@ require("dotenv").config();
 
 // ServiceManager aus SDK holen
 const PluginManager = require("./helpers/PluginManager");
-const SessionManager = require("./helpers/sessionManager");
-const BotHealthMonitor = require("./helpers/botHealthMonitor");
+const { SessionManager, BotHealthMonitor } = require("dunebot-sdk");
 const { ServiceManager, I18nManager } = require("dunebot-core");
 const { parseJsonArray } = require("dunebot-sdk/utils");
 const { ThemeManager, AssetManager } = require('dunebot-sdk');
@@ -500,6 +499,14 @@ module.exports = class App {
      * @private
      */
     #initializeMiddlewares() {
+        // === WICHTIG: Stripe Webhook Route VOR express.json() ===
+        // Webhook benötigt raw body für Signature Verification!
+        this.app.use(
+            '/api/superadmin/webhooks/stripe', 
+            express.raw({ type: 'application/json' }), 
+            require('../../plugins/superadmin/dashboard/routes/api/stripe-webhook')
+        );
+        
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
         this.app.use(expressLayouts);

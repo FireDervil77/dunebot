@@ -109,6 +109,167 @@ class DashboardPlugin {
     }
 
     /**
+     * Reload-Methode für Plugin-Komponenten
+     * Lädt Schemas, Models, Navigation und Config neu ohne Server-Restart
+     * 
+     * @param {Object} options - Reload-Optionen
+     * @param {boolean} [options.schemas=true] - Schemas neu laden
+     * @param {boolean} [options.models=true] - Models neu registrieren
+     * @param {boolean} [options.navigation=true] - Navigation aktualisieren
+     * @param {boolean} [options.config=false] - Config refreshen
+     * @param {string} [options.guildId=null] - Spezifische Guild ID für Navigation
+     * @returns {Promise<Object>} Reload-Status mit Details
+     * @author DuneBot Team
+     */
+    async onReload(options = {}) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        const opts = {
+            schemas: options.schemas !== false,
+            models: options.models !== false,
+            navigation: options.navigation !== false,
+            config: options.config === true,
+            guildId: options.guildId || null
+        };
+        
+        const result = {
+            success: true,
+            schemas: { loaded: 0, failed: 0, files: [] },
+            models: { registered: 0, failed: 0, names: [] },
+            navigation: { updated: false, items: 0 },
+            config: { refreshed: false },
+            errors: []
+        };
+        
+        Logger.info(`[Reload] Starting reload for plugin ${this.name}`, opts);
+        
+        try {
+            // 1. Schemas nachladen
+            if (opts.schemas && dbService) {
+                try {
+                    const schemasDir = path.join(this.baseDir, 'schemas');
+                    if (fs.existsSync(schemasDir)) {
+                        const schemaFiles = fs.readdirSync(schemasDir)
+                            .filter(f => f.endsWith('.sql') || f.endsWith('.js'));
+                        
+                        for (const file of schemaFiles) {
+                            try {
+                                const schemaPath = path.join(schemasDir, file);
+                                
+                                if (file.endsWith('.sql')) {
+                                    const sql = fs.readFileSync(schemaPath, 'utf8');
+                                    await dbService.query(sql);
+                                    result.schemas.loaded++;
+                                    result.schemas.files.push(file);
+                                    Logger.debug(`[Reload] Schema loaded: ${file}`);
+                                } else if (file.endsWith('.js')) {
+                                    delete require.cache[require.resolve(schemaPath)];
+                                    const schema = require(schemaPath);
+                                    if (typeof schema === 'function') {
+                                        await schema(dbService);
+                                    }
+                                    result.schemas.loaded++;
+                                    result.schemas.files.push(file);
+                                    Logger.debug(`[Reload] Schema executed: ${file}`);
+                                }
+                            } catch (error) {
+                                result.schemas.failed++;
+                                result.errors.push(`Schema ${file}: ${error.message}`);
+                                Logger.error(`[Reload] Failed to load schema ${file}:`, error);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    result.errors.push(`Schemas: ${error.message}`);
+                    Logger.error('[Reload] Schema loading failed:', error);
+                }
+            }
+            
+            // 2. Models neu registrieren
+            if (opts.models && dbService) {
+                try {
+                    const modelsDir = path.join(this.baseDir, 'models');
+                    if (fs.existsSync(modelsDir)) {
+                        const modelFiles = fs.readdirSync(modelsDir)
+                            .filter(f => f.endsWith('.js'));
+                        
+                        for (const file of modelFiles) {
+                            try {
+                                const modelPath = path.join(modelsDir, file);
+                                delete require.cache[require.resolve(modelPath)];
+                                const model = require(modelPath);
+                                
+                                if (model && model.name) {
+                                    // Model im DBService registrieren (falls Methode existiert)
+                                    if (typeof dbService.registerModel === 'function') {
+                                        await dbService.registerModel(model.name, model);
+                                        result.models.registered++;
+                                        result.models.names.push(model.name);
+                                        Logger.debug(`[Reload] Model registered: ${model.name}`);
+                                    }
+                                }
+                            } catch (error) {
+                                result.models.failed++;
+                                result.errors.push(`Model ${file}: ${error.message}`);
+                                Logger.error(`[Reload] Failed to register model ${file}:`, error);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    result.errors.push(`Models: ${error.message}`);
+                    Logger.error('[Reload] Model registration failed:', error);
+                }
+            }
+            
+            // 3. Navigation aktualisieren
+            if (opts.navigation && opts.guildId) {
+                try {
+                    const navigationManager = ServiceManager.get('navigationManager');
+                    if (navigationManager) {
+                        // Navigation für Guild neu laden
+                        await navigationManager.reloadPluginNavigation(this.name, opts.guildId);
+                        result.navigation.updated = true;
+                        Logger.debug(`[Reload] Navigation updated for guild ${opts.guildId}`);
+                    }
+                } catch (error) {
+                    result.errors.push(`Navigation: ${error.message}`);
+                    Logger.error('[Reload] Navigation update failed:', error);
+                }
+            }
+            
+            // 4. Config refreshen
+            if (opts.config) {
+                try {
+                    await this.config.reload();
+                    result.config.refreshed = true;
+                    Logger.debug('[Reload] Config refreshed');
+                } catch (error) {
+                    result.errors.push(`Config: ${error.message}`);
+                    Logger.error('[Reload] Config refresh failed:', error);
+                }
+            }
+            
+            result.success = result.errors.length === 0;
+            Logger.info(`[Reload] Completed for plugin ${this.name}:`, {
+                schemas: `${result.schemas.loaded} loaded, ${result.schemas.failed} failed`,
+                models: `${result.models.registered} registered, ${result.models.failed} failed`,
+                navigation: result.navigation.updated ? 'updated' : 'skipped',
+                config: result.config.refreshed ? 'refreshed' : 'skipped',
+                errors: result.errors.length
+            });
+            
+            return result;
+            
+        } catch (error) {
+            Logger.error(`[Reload] Critical error for plugin ${this.name}:`, error);
+            result.success = false;
+            result.errors.push(`Critical: ${error.message}`);
+            return result;
+        }
+    }
+
+    /**
      * Wird aufgerufen, wenn das Plugin in einer Guild aktiviert wird
      * @param {string} guildId - ID der Guild
      */
