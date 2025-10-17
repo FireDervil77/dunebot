@@ -348,10 +348,10 @@ class PluginManager extends BasePluginManager {
         await super.registerPluginTables(plugin, 'dashboard');
         
         try {
-            // Prüfen, ob eine spezielle dashboard/models/ Struktur existiert
-            const dashboardModelsDir = path.join(this.pluginsDir, plugin.name, 'dashboard', 'models');
-            if (fs.existsSync(dashboardModelsDir)) {
-                await this.registerModelsFromDir(plugin, dashboardModelsDir, 'dashboard-models');
+            // SQL-Dateien aus dashboard/sql/ laden
+            const dashboardSqlDir = path.join(this.pluginsDir, plugin.name, 'dashboard', 'sql');
+            if (fs.existsSync(dashboardSqlDir)) {
+                await this.registerModelsFromDir(plugin, dashboardSqlDir, 'dashboard-sql');
             }
             
             // "after_register_tables" Hook aufrufen

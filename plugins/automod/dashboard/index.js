@@ -134,7 +134,7 @@ class AutoModPlugin extends DashboardPlugin {
                 
             } catch (error) {
                 Logger.error('[AutoMod] Fehler beim Laden der Settings:', error);
-                res.status(500).send('Fehler beim Laden der AutoMod-Einstellungen');
+                res.status(500).send('Fehler beim Laden der [AutoMod]-Einstellungen');
             }
         });
 
@@ -161,7 +161,7 @@ class AutoModPlugin extends DashboardPlugin {
             };
             
             try {
-                Logger.info(`[AutoMod] 💾 Settings speichern für Guild ${guildId}`, req.body);
+                Logger.info(`[AutoMod] Settings speichern für Guild ${guildId}`, req.body);
                 
                 // Validierung
                 const {
@@ -218,7 +218,7 @@ class AutoModPlugin extends DashboardPlugin {
                 // Settings speichern
                 await AutoModSettings.updateSettings(guildId, updates);
                 
-                Logger.info(`[AutoMod] ✅ Settings gespeichert für Guild ${guildId}`);
+                Logger.info(`[AutoMod] Settings gespeichert für Guild ${guildId}`);
                 
                 res.json({ 
                     success: true, 
@@ -330,7 +330,7 @@ class AutoModPlugin extends DashboardPlugin {
                 title: 'automod:NAV.AUTOMOD',
                 path: `/guild/${guildId}/plugins/automod/settings`,
                 icon: 'fa-solid fa-shield-halved',
-                order: 25,  // Nach Core-Settings (21-24)
+                order: null,  
                 parent: `/guild/${guildId}/plugins/core/settings`,  // ← Parent ist Core-Settings!
                 type: 'main',
                 visible: true

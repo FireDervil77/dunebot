@@ -644,16 +644,16 @@ class DuneMapPlugin extends DashboardPlugin {
         const dbService = ServiceManager.get('dbService');
         
         try {
-            Logger.info('Deaktiviere DuneMap Plugin und entferne Tabellen...');
+            Logger.info('Deaktiviere [DuneMap] Plugin und entferne Tabellen...');
             
             // Tabellen in umgekehrter Reihenfolge löschen (wegen Foreign Keys)
             //await dbService.query('DROP TABLE IF EXISTS dunemap_storm_timer');
             //await dbService.query('DROP TABLE IF EXISTS dunemap_markers');
             
-            Logger.success('DuneMap Tabellen erfolgreich entfernt');
+            Logger.success('[DuneMap] Tabellen erfolgreich entfernt');
             return true;
         } catch (error) {
-            Logger.error('Fehler beim Entfernen der DuneMap Tabellen:', error);
+            Logger.error('Fehler beim Entfernen der [DuneMap] Tabellen:', error);
             throw error;
         }
     }
@@ -667,11 +667,11 @@ class DuneMapPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
         
-        Logger.debug(`Registriere Navigation für dunemap in Guild ${guildId}`);
+        Logger.debug(`Registriere Navigation für [dunemap] in Guild ${guildId}`);
         await this._registerNavigation(guildId);
 
         // DB Models registrieren
-        Logger.debug(`Registriere Models für dunemap in Guild ${guildId}`);
+        Logger.debug(`Registriere Models für [dunemap] in Guild ${guildId}`);
         // TODO: Models wieder aktivieren wenn benötigt
         // await this.registerModel(require('./models/Marker'));
         // await this.registerModel(require('./models/StormTimer'));
@@ -758,7 +758,7 @@ class DuneMapPlugin extends DashboardPlugin {
         const navigationManager = ServiceManager.get('navigationManager');
         
         try {
-            Logger.info(`Deaktiviere DuneMap Plugin für Guild ${guildId}...`);
+            Logger.info(`Deaktiviere [DuneMap] Plugin für Guild ${guildId}...`);
             
             // Navigation über NavigationManager entfernen
             await navigationManager.removeNavigation(this.name, guildId);
@@ -773,10 +773,10 @@ class DuneMapPlugin extends DashboardPlugin {
                 [this.name, guildId]
             );
             
-            Logger.success(`DuneMap Daten für Guild ${guildId} erfolgreich entfernt (storm_timer, markers, gps_markers, configs)`);
+            Logger.success(`[DuneMap] Daten für Guild ${guildId} erfolgreich entfernt (storm_timer, markers, gps_markers, configs)`);
             return true;
         } catch (error) {
-            Logger.error(`Fehler beim Entfernen der DuneMap Daten für Guild ${guildId}:`, error);
+            Logger.error(`Fehler beim Entfernen der [DuneMap] Daten für Guild ${guildId}:`, error);
             throw error;
         }
     }
@@ -796,7 +796,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 title: 'dunemap:NAV.DUNEMAP',
                 path: `/guild/${guildId}/plugins/dunemap`,
                 icon: 'fa-solid fa-map',
-                order: 50,
+                order: null,
                 type: 'main',
                 visible: true
             },
@@ -804,7 +804,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 title: 'dunemap:NAV.SEKTOR_CARD',
                 path: `/guild/${guildId}/plugins/dunemap/admin`,
                 icon: 'fa-solid fa-map-marked-alt',
-                order: 51,
+                order: 10,
                 parent: `/guild/${guildId}/plugins/dunemap`,
                 type: 'main',
                 visible: true
@@ -814,7 +814,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 title: 'dunemap:NAV.DUNEMAP',
                 path: `/guild/${guildId}/plugins/dunemap/settings`,
                 icon: 'fa-solid fa-map',
-                order: 24,  // Nach Core-Settings (21, 22, 23)
+                order: null,  // Nach Core-Settings (21, 22, 23)
                 parent: `/guild/${guildId}/plugins/core/settings`,  // ← Parent ist Core-Settings!
                 type: 'main',
                 visible: true
@@ -845,8 +845,8 @@ class DuneMapPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const pluginManager = ServiceManager.get('pluginManager');
         const themeManager = ServiceManager.get("themeManager");
-        
-        Logger.debug('Core Plugin Widgets registriert');
+
+        Logger.debug('[DuneMap] Plugin Widgets registriert');
     }
 
     /**

@@ -18,9 +18,9 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         super({
             name: 'superadmin',
             displayName: 'SuperAdmin Panel',
-            description: 'Globale Verwaltung - Nur für Bot-Owner',
+            description: 'Globale Verwaltung - Nur für den Bot-Owner',
             version: VersionHelper.getVersionFromContext(__dirname),
-            author: 'DuneBot Team',
+            author: 'FireBot Team',
             icon: 'fa-solid fa-shield-halved',
             baseDir: __dirname,
             requiresOwner: true
@@ -1380,7 +1380,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 title: 'superadmin:NAV.SUPERADMIN',
                 path: `/guild/${guildId}/plugins/superadmin`,
                 icon: 'fa-solid fa-shield-halved',
-                order: 90,  // Ganz am Ende der Navigation (nach Core: 10-40)
+                order: 999999,  // Ganz am Ende der Navigation (nach Core: 10-40)
                 type: 'main',
                 visible: true
             },
@@ -1388,7 +1388,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 title: 'superadmin:NAV.FEEDBACK',
                 path: `/guild/${guildId}/plugins/superadmin/feedback`,
                 icon: 'fa-solid fa-comments',
-                order: 91.5,  // Zwischen Notifications und News
+                order: null,  // Zwischen Notifications und News
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true
@@ -1397,7 +1397,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 title: 'superadmin:NAV.NEWS',
                 path: `/guild/${guildId}/plugins/superadmin/news`,
                 icon: 'fa-solid fa-newspaper',
-                order: 91,  // Untermenü-Reihenfolge
+                order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true
@@ -1406,7 +1406,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 title: 'superadmin:NAV.NOTIFICATIONS',
                 path: `/guild/${guildId}/plugins/superadmin/notifications`,
                 icon: 'fa-solid fa-bell',
-                order: 92,  // Untermenü-Reihenfolge
+                order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true
@@ -1415,7 +1415,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 title: 'superadmin:NAV.CHANGELOGS',
                 path: `/guild/${guildId}/plugins/superadmin/changelogs`,
                 icon: 'fa-solid fa-code-commit',
-                order: 93,  // Untermenü-Reihenfolge
+                order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true
@@ -1424,7 +1424,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 title: 'superadmin:NAV.PLUGIN_BADGES',
                 path: `/guild/${guildId}/plugins/superadmin/plugin-badges`,
                 icon: 'fa-solid fa-tags',
-                order: 94,  // Untermenü-Reihenfolge
+                order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true
@@ -1433,7 +1433,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 title: 'superadmin:NAV.STATISTICS',
                 path: `/guild/${guildId}/plugins/superadmin/stats`,
                 icon: 'fa-solid fa-chart-line',
-                order: 95,  // Untermenü-Reihenfolge
+                order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true
@@ -1442,7 +1442,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 title: 'superadmin:NAV.DONATIONS',
                 path: `/guild/${guildId}/plugins/superadmin/donations`,
                 icon: 'fa-solid fa-heart',
-                order: 96,  // Nach Statistics
+                order: null,  // Nach Statistics
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true

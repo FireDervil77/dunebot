@@ -205,21 +205,21 @@ class ModerationPlugin extends DashboardPlugin {
             
             Logger.info('[Moderation] Routen eingerichtet für guildRouter');
         } catch (error) {
-            Logger.error('Fehler beim Einrichten der Moderation Plugin Routen:', error);
+            Logger.error('Fehler beim Einrichten der [Moderation] Plugin Routen:', error);
             throw error;
         }
     }
 
     async onDisable() {
         const Logger = ServiceManager.get('Logger');
-        Logger.info('Deaktiviere Moderation Plugin...');
-        Logger.success('Moderation Plugin deaktiviert');
+        Logger.info('Deaktiviere [Moderation] Plugin...');
+        Logger.success('[Moderation] Plugin deaktiviert');
         return true;
     }
     
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get('Logger');
-        Logger.debug(`Registriere Navigation für Moderation in Guild ${guildId}`);
+        Logger.debug(`Registriere Navigation für [Moderation] in Guild ${guildId}`);
         await this._registerNavigation(guildId);
     }
 
@@ -228,12 +228,12 @@ class ModerationPlugin extends DashboardPlugin {
         const dbService = ServiceManager.get('dbService');
         
         try {
-            Logger.info(`Entferne Navigation für Moderation aus Guild ${guildId}`);
+            Logger.info(`Entferne Navigation für [Moderation] aus Guild ${guildId}`);
             await dbService.query("DELETE FROM nav_items WHERE plugin = ? AND guildId = ?", [this.name, guildId]);
-            Logger.success(`Moderation Navigation für Guild ${guildId} entfernt`);
+            Logger.success(`[Moderation] Navigation für Guild ${guildId} entfernt`);
             return true;
         } catch (error) {
-            Logger.error(`Fehler beim Entfernen der Moderation Navigation für Guild ${guildId}:`, error);
+            Logger.error(`Fehler beim Entfernen der [Moderation] Navigation für Guild ${guildId}:`, error);
             throw error;
         }
     }
@@ -246,7 +246,7 @@ class ModerationPlugin extends DashboardPlugin {
             title: 'moderation:NAV.MODERATION',
             path: `/guild/${guildId}/plugins/moderation`,
             icon: 'fa-solid fa-shield-halved',
-            order: 24,
+            order: null,
             parent: `/guild/${guildId}/plugins/core/settings`,
             type: 'main',
             visible: true

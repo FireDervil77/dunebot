@@ -63,3 +63,8 @@ plugins/imageserver/
 plugins/statistik/
 plugins/ticket/
 plugins/voiceserver/
+
+
+#docs and docs folder
+docs/
+docs/*

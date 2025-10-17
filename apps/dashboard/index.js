@@ -21,6 +21,7 @@ PathConfig.init(path.join(__dirname, "..", "..")); // Root-Verzeichnis übergebe
 const { DBService, models } = require("dunebot-db-client");
 const App = require("./app");
 const IPCServer = require("./helpers/IPCServer");
+const IPMServer = require('./helpers/IPMServer');
 
 /**
  * Hauptfunktion zum Starten des Dashboards
@@ -52,6 +53,13 @@ const IPCServer = require("./helpers/IPCServer");
         Logger.success("IPC-Server initialisiert");
         ServiceManager.register("ipcServer", ipcServer);
         
+        // IPM Server initialisieren (WebSocket für Daemons)
+        Logger.info("Starte IPM-Server (WebSocket Port 9340)...");
+        const ipmServer = new IPMServer(parseInt(process.env.IPM_SERVER_PORT || '9340'));
+        await ipmServer.start();
+        Logger.success("IPM-Server gestartet");
+        ServiceManager.register('ipmServer', ipmServer);
+
         // Dashboard-App initialisieren
         Logger.info("Initialisiere Dashboard-App...");
         const app = new App(ipcServer, dbService);
@@ -63,6 +71,21 @@ const IPCServer = require("./helpers/IPCServer");
         // Server starten
         const port = process.env.DASHBOARD_PORT || 3000;
         app.listen(port);
+
+        // Graceful Shutdown
+        process.on('SIGINT', async () => {
+            Logger.info('SIGINT empfangen - fahre Server herunter...');
+            await ipmServer.stop();
+            await dbService.close();
+            process.exit(0);
+        });
+
+        process.on('SIGTERM', async () => {
+            Logger.info('SIGTERM empfangen - fahre Server herunter...');
+            await ipmServer.stop();
+            await dbService.close();
+            process.exit(0);
+        });
         
     } catch (error) {
         Logger.error("Fehler beim Starten des Dashboards:", error);

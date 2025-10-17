@@ -16,12 +16,113 @@ class NavigationManager {
     }
 
     /**
+     * Ermittelt die nächste verfügbare sort_order-Range (1000, 2000, 3000...)
+     * für Hauptnavigations-Punkte ohne parent
+     * @param {string} guildId - ID der Guild
+     * @returns {Promise<number>} - Nächste freie Range (z.B. 3000)
+     * @private
+     */
+    async _getNextMainNavRange(guildId) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        try {
+            // Höchste sort_order für Hauptmenü-Items (parent = NULL) finden
+            const result = await dbService.query(
+                `SELECT MAX(sort_order) as max_order 
+                 FROM nav_items 
+                 WHERE guildId = ? 
+                 AND type = 'main' 
+                 AND (parent IS NULL OR parent = '')`,
+                [guildId]
+            );
+            
+            const maxOrder = result?.[0]?.max_order || 0;
+            
+            // Nächste 1000er-Range berechnen
+            // Beispiel: maxOrder=2300 → nextRange=3000
+            const nextRange = Math.ceil((maxOrder + 1) / 1000) * 1000;
+            
+            // Mindestens 1000 (erste Range)
+            return nextRange < 1000 ? 1000 : nextRange;
+            
+        } catch (error) {
+            Logger.error('Fehler beim Ermitteln der nächsten sort_order-Range:', error);
+            return 1000; // Fallback zur ersten Range
+        }
+    }
+
+    /**
+     * Ermittelt die nächste verfügbare sort_order für Submenü-Punkte (10, 20, 30...)
+     * @param {string} guildId - ID der Guild
+     * @param {string} parentUrl - URL des übergeordneten Menüpunkts
+     * @returns {Promise<number>} - Nächster freier Submenu-Offset (z.B. 30)
+     * @private
+     */
+    async _getNextSubmenuOrder(guildId, parentUrl) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        try {
+            // Höchste sort_order für Submenüs dieses Parents finden
+            const result = await dbService.query(
+                `SELECT MAX(sort_order) as max_order 
+                 FROM nav_items 
+                 WHERE guildId = ? 
+                 AND type = 'main' 
+                 AND parent = ?`,
+                [guildId, parentUrl]
+            );
+            
+            const maxOrder = result?.[0]?.max_order || 0;
+            
+            // Nächste 10er-Stelle berechnen
+            // Beispiel: maxOrder=25 → nextOrder=30
+            //          maxOrder=0  → nextOrder=10
+            const nextOrder = Math.ceil((maxOrder + 1) / 10) * 10;
+            
+            // Mindestens 10 (erster Submenu-Punkt)
+            return nextOrder < 10 ? 10 : nextOrder;
+            
+        } catch (error) {
+            Logger.error(`Fehler beim Ermitteln der nächsten Submenu-Order für parent ${parentUrl}:`, error);
+            return 10; // Fallback zum ersten Submenu-Slot
+        }
+    }
+
+    /**
      * Registriert Navigation für ein Plugin in einer bestimmten Guild
      * @param {string} pluginName - Name des Plugins
      * @param {string} guildId - ID der Guild
      * @param {Array} navItems - Array mit Navigationselementen
      * @returns {Promise<Array>} - Array mit erstellten Navigationselementen
      * @throws {Error} Wenn die Registrierung fehlschlägt
+     * 
+     * Sort-Order-System:
+     * 
+     * HAUPTNAVIGATION (parent=null):
+     * - Feste Ranges: 1000, 2000, 3000...
+     * - Bei order=null → automatisch nächste freie Range
+     * - Bei order >= 1000 → exakte Verwendung
+     * - Bei order < 1000 → als Offset in ermittelter Range (z.B. order=50 in Range 2000 → 2050)
+     * 
+     * SUBMENÜS (parent=/some/url):
+     * - Automatische Offsets: 10, 20, 30...
+     * - Bei order=null → automatisch nächster freier Offset (pro parent)
+     * - Bei order < 1000 → exakte Verwendung (manuelles Override)
+     * - Bei order >= 1000 → exakte Verwendung (für spezielle Fälle)
+     * 
+     * Beispiel:
+     * // Hauptnav
+     * { title: 'Dashboard', order: null }           → 1000 (auto)
+     * { title: 'Masterserver', order: null }        → 2000 (auto)
+     * { title: 'Settings', order: 9000 }            → 9000 (manuell ganz hinten)
+     * 
+     * // Submenüs unter '/guild/:gid/masterserver'
+     * { title: 'Overview', parent: '/...', order: null }  → 10 (auto)
+     * { title: 'Daemons', parent: '/...', order: null }   → 20 (auto)
+     * { title: 'Settings', parent: '/...', order: null }  → 30 (auto)
+     * { title: 'Important!', parent: '/...', order: 5 }   → 5 (manuell ganz vorne)
      */
     async registerNavigation(pluginName, guildId, navItems = []) {
         const Logger = ServiceManager.get('Logger');
@@ -40,35 +141,107 @@ class NavigationManager {
                 return [];
             }
             
-            // Prüfen, ob Navigation bereits existiert
+            // Alle bestehenden Navigations-Items für dieses Plugin in dieser Guild laden
             const existing = await dbService.query(
-                "SELECT * FROM nav_items WHERE plugin = ? AND guildId = ?",
+                "SELECT url, parent, type FROM nav_items WHERE plugin = ? AND guildId = ?",
                 [pluginName, guildId]
             );
             
-            if (existing && existing.length > 0) {
-                Logger.debug(`Navigation für Plugin ${pluginName} in Guild ${guildId} existiert bereits`);
+            // Set für schnelle URL-Lookups erstellen (URL + parent + type als Key)
+            const existingKeys = new Set(
+                existing.map(item => `${item.type}|${item.parent || 'NULL'}|${item.url}`)
+            );
+            
+            // Nur neue Items filtern (die noch nicht existieren)
+            const newItems = navItems.filter(item => {
+                const key = `${item.type || this.menuTypes.MAIN}|${item.parent || 'NULL'}|${item.url || item.path}`;
+                const exists = existingKeys.has(key);
+                
+                if (exists) {
+                    Logger.debug(`[NavigationManager] Überspringe existierendes Item: ${item.title} (${item.url || item.path})`);
+                }
+                
+                return !exists;
+            });
+            
+            if (newItems.length === 0) {
+                Logger.debug(`Alle Navigationselemente für Plugin ${pluginName} in Guild ${guildId} existieren bereits - keine neuen Items`);
                 return existing;
             }
 
             // Neue Navigation anlegen
-            Logger.debug(`Erstelle Navigation für Plugin ${pluginName} in Guild ${guildId}`);
+            Logger.debug(`Erstelle ${newItems.length} neue Navigationselemente für Plugin ${pluginName} in Guild ${guildId}`);
             
-            // Navigation-Items mit erweiterten Eigenschaften erstellen
-            const items = navItems.map(item => ({
-                plugin: pluginName,
-                guildId: guildId,
-                title: item.title || null,
-                url: item.url || item.path || null,
-                icon: item.icon || 'fa-puzzle-piece',
-                sort_order: item.order || 50,
-                parent: item.parent || null,
-                type: item.type || this.menuTypes.MAIN,
-                capability: item.capability || 'manage_guild',
-                target: item.target || '_self',
-                visible: item.visible ?? true,
-                classes: item.classes || '',
-                position: item.position || 'normal'
+            // Nächste freie Range für Hauptnavigation ermitteln (nur einmal)
+            let nextMainNavRange = null;
+            
+            // Cache für Submenu-Orders pro parent (nur einmal pro parent ermitteln)
+            const submenuOrderCache = new Map();
+            
+            // Navigation-Items mit erweiterten Eigenschaften erstellen (nur für neue Items)
+            const items = await Promise.all(newItems.map(async (item) => {
+                let sortOrder;
+                
+                // Nur für Hauptnavigations-Elemente (ohne parent) Auto-Range anwenden
+                const isMainNavItem = !item.parent && item.type === this.menuTypes.MAIN;
+                const isSubmenuItem = item.parent && item.type === this.menuTypes.MAIN;
+                
+                if (item.order === null || item.order === undefined) {
+                    // Kein order angegeben → automatisch ermitteln
+                    if (isMainNavItem) {
+                        // Für Hauptnav: Nächste freie Range ermitteln (lazy loading)
+                        if (nextMainNavRange === null) {
+                            nextMainNavRange = await this._getNextMainNavRange(guildId);
+                            Logger.debug(`[NavigationManager] Ermittelte nächste Hauptnav-Range: ${nextMainNavRange}`);
+                        }
+                        sortOrder = nextMainNavRange;
+                    } else if (isSubmenuItem) {
+                        // Für Submenüs: Nächste freie Order ermitteln (10, 20, 30...)
+                        if (!submenuOrderCache.has(item.parent)) {
+                            const nextOrder = await this._getNextSubmenuOrder(guildId, item.parent);
+                            submenuOrderCache.set(item.parent, nextOrder);
+                            Logger.debug(`[NavigationManager] Ermittelte nächste Submenu-Order für parent '${item.parent}': ${nextOrder}`);
+                        }
+                        sortOrder = submenuOrderCache.get(item.parent);
+                        // Für nächsten Submenu-Punkt in diesem Parent: +10
+                        submenuOrderCache.set(item.parent, sortOrder + 10);
+                    } else {
+                        // Für andere Typen (settings, widget, metabox): Standard-Order
+                        sortOrder = 50;
+                    }
+                } else if (item.order >= 1000) {
+                    // Explizite Range angegeben (≥1000) → direkt verwenden
+                    sortOrder = item.order;
+                } else {
+                    // Kleine Zahl (<1000) → Kontext-abhängig
+                    if (isMainNavItem) {
+                        // Hauptnav: Als Offset in der Range verwenden
+                        if (nextMainNavRange === null) {
+                            nextMainNavRange = await this._getNextMainNavRange(guildId);
+                        }
+                        sortOrder = nextMainNavRange + item.order;
+                        Logger.debug(`[NavigationManager] Offset ${item.order} in Range ${nextMainNavRange} → ${sortOrder}`);
+                    } else {
+                        // Submenüs/andere: Direkt verwenden (explizite Order)
+                        sortOrder = item.order;
+                    }
+                }
+                
+                return {
+                    plugin: pluginName,
+                    guildId: guildId,
+                    title: item.title || null,
+                    url: item.url || item.path || null,
+                    icon: item.icon || 'fa-puzzle-piece',
+                    sort_order: sortOrder,
+                    parent: item.parent || null,
+                    type: item.type || this.menuTypes.MAIN,
+                    capability: item.capability || 'manage_guild',
+                    target: item.target || '_self',
+                    visible: item.visible ?? true,
+                    classes: item.classes || '',
+                    position: item.position || 'normal'
+                };
             }));
 
             // Bulk-Insert mit native MySQL
@@ -94,9 +267,18 @@ class NavigationManager {
                     navItem.classes,
                     navItem.position
                 ]);
+                
+                Logger.debug(`[NavigationManager] Erstellt: ${navItem.title} (sort_order=${navItem.sort_order})`);
             }
-            Logger.success(`${items.length} Navigationselemente für Plugin ${pluginName} in Guild ${guildId} erstellt`);
-            return items;
+            Logger.success(`${items.length} neue Navigationselemente für Plugin ${pluginName} in Guild ${guildId} erstellt`);
+            
+            // Alle Items zurückgeben (existing + new)
+            const allItems = await dbService.query(
+                "SELECT * FROM nav_items WHERE plugin = ? AND guildId = ?",
+                [pluginName, guildId]
+            );
+            
+            return allItems;
         } catch (error) {
             Logger.error(`Fehler beim Erstellen der Navigation für Plugin ${pluginName}:`, error);
             throw error;

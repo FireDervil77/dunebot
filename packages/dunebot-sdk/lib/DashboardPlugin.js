@@ -145,17 +145,17 @@ class DashboardPlugin {
         Logger.info(`[Reload] Starting reload for plugin ${this.name}`, opts);
         
         try {
-            // 1. Schemas nachladen
+            // 1. SQL-Dateien nachladen
             if (opts.schemas && dbService) {
                 try {
-                    const schemasDir = path.join(this.baseDir, 'schemas');
-                    if (fs.existsSync(schemasDir)) {
-                        const schemaFiles = fs.readdirSync(schemasDir)
+                    const sqlDir = path.join(this.baseDir, 'sql');
+                    if (fs.existsSync(sqlDir)) {
+                        const schemaFiles = fs.readdirSync(sqlDir)
                             .filter(f => f.endsWith('.sql') || f.endsWith('.js'));
                         
                         for (const file of schemaFiles) {
                             try {
-                                const schemaPath = path.join(schemasDir, file);
+                                const schemaPath = path.join(sqlDir, file);
                                 
                                 if (file.endsWith('.sql')) {
                                     const sql = fs.readFileSync(schemaPath, 'utf8');

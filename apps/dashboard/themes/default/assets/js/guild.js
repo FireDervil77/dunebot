@@ -120,6 +120,15 @@ class GuildAjaxHandler {
                 case 'plugin-badge-create':
                     await this.handlePluginBadgeCreateResponse(form, result);
                     break;
+                
+                // Masterserver Plugin Handlers
+                case 'daemon-create':
+                    await this.handleDaemonCreateResponse(form, result);
+                    break;
+                
+                case 'token-generate':
+                    await this.handleTokenGenerateResponse(form, result);
+                    break;
                     
                 default:
                     // Generische Behandlung
@@ -233,6 +242,44 @@ class GuildAjaxHandler {
             }, 1500);
         } else {
             this.showToast('error', result.message || 'Fehler beim Speichern der Notification');
+        }
+    }
+
+    // =====================================================
+    // MASTERSERVER PLUGIN HANDLERS
+    // =====================================================
+    
+    static async handleDaemonCreateResponse(form, result) {
+        console.log('[GuildAjax] handleDaemonCreateResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Daemon erfolgreich erstellt!');
+            // Nach 1,5s neu laden um Daemon-Info anzuzeigen
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Erstellen des Daemons');
+        }
+    }
+    
+    static async handleTokenGenerateResponse(form, result) {
+        console.log('[GuildAjax] handleTokenGenerateResponse called:', result);
+        if (result.success) {
+            // Modal mit Token anzeigen (WICHTIG: Nur einmal sichtbar!)
+            const modal = document.getElementById('tokenModal');
+            if (modal) {
+                document.getElementById('modalTokenId').value = result.tokenId;
+                document.getElementById('modalToken').value = result.token;
+                $(modal).modal('show');
+                
+                this.showToast('success', 'Token erfolgreich generiert!');
+            } else {
+                // Fallback: Alert (falls Modal fehlt)
+                alert(`Token generiert!\n\nToken-ID: ${result.tokenId}\n\nToken (WICHTIG - nur einmal sichtbar!):\n${result.token}`);
+            }
+            
+            // Formular zurücksetzen
+            form.reset();
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Generieren des Tokens');
         }
     }
 

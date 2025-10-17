@@ -1,8 +1,14 @@
+---
+applyTo: "**"
+---
+
 # COPILOT EDITS OPERATIONAL GUIDELINES
 
 ## PROJECT OVERVIEW
+
 DuneBot ist ein modulares Discord-Bot-System mit einem WordPress-ähnlichen Plugin-System. Das Projekt besteht aus:
-- **Bot** (Discord.js): Bot-Funktionalität mit Commands und Events  
+
+- **Bot** (Discord.js): Bot-Funktionalität mit Commands und Events
 - **Dashboard** (Express.js): Web-Interface für Guild-Management mit Discord OAuth2
 - **Plugin-System**: Erweiterbare Architektur für beide Seiten (Bot + Dashboard)
 - **Theme-System**: Anpassbare UI-Themes für das Dashboard
@@ -14,35 +20,42 @@ DuneBot ist ein modulares Discord-Bot-System mit einem WordPress-ähnlichen Plug
 ## CORE ARCHITECTURE PRINCIPLES
 
 ### ServiceManager Pattern
+
 Zentraler Service-Registry für alle wichtigen Services. Zugriff via `ServiceManager.get('serviceName')`:
+
 - `Logger` - Logging-System (Pino-basiert)
 - `dbService` - Datenbank-Operationen (nativer MySQL)
-- `pluginManager` - Plugin-Verwaltung (Bot/Dashboard-spezifisch) 
+- `pluginManager` - Plugin-Verwaltung (Bot/Dashboard-spezifisch)
 - `themeManager` - Theme-System (nur Dashboard)
 - `navigationManager` - Navigation-Verwaltung (nur Dashboard)
 - `i18n` - Übersetzungs-System
 - `ipcServer/ipcClient` - Inter-Process-Communication zwischen Bot und Dashboard
 
 ### IPC Communication (Bot ↔ Dashboard)
+
 Bot und Dashboard kommunizieren über Veza-IPC. Definierte IPC-Calls siehe im ursprünglichen Dokument.
 
 ### Plugin Architecture
+
 Plugins haben eine duale Struktur: `plugins/pluginname/{bot/, dashboard/, shared/}`
+
 - `bot/index.js` - Erweitert BotPlugin (Commands, Events)
 - `dashboard/index.js` - Erweitert DashboardPlugin (Routes, Widgets, Navigation)
-- Beide können Hooks registrieren und nutzen 
+- Beide können Hooks registrieren und nutzen
 
 ## CRITICAL STARTUP SEQUENCE & SERVICE INITIALIZATION
 
 ### Bot Startup (`apps/bot/bot.js`)
+
 1. **Logger & ServiceManager** - Core-Services registrieren
-2. **Database** - DBService verbinden, Tabellen erstellen  
+2. **Database** - DBService verbinden, Tabellen erstellen
 3. **BotClient** - Discord-Client initialisieren mit PluginManager
 4. **I18n** - Übersetzungs-System laden
 5. **Plugins** - Core-Plugin und weitere laden
 6. **Discord Login** - Bot mit Discord verbinden
 
-### Dashboard Startup (`apps/dashboard/index.js`) 
+### Dashboard Startup (`apps/dashboard/index.js`)
+
 1. **Logger & PathConfig** - Basis-Services
 2. **Database** - Geteilte DBService-Instanz
 3. **IPC Server** - Kommunikation mit Bot aufbauen
@@ -52,10 +65,11 @@ Plugins haben eine duale Struktur: `plugins/pluginname/{bot/, dashboard/, shared
 **WICHTIG**: Services müssen in dieser Reihenfolge initialisiert werden! Abhängigkeiten beachten.
 
 ## PRIME DIRECTIVE
+
 - **Deutsch first**: Kommentare, Dokumentation und Antworten auf Deutsch
 - **Codebase-first**: Immer nach existierenden Implementierungen suchen, bevor neue erstellt werden
 - **Service-aware**: ServiceManager.get() für alle Services nutzen
-- **Hook-Integration**: Hooks nutzen statt Code direkt zu ändern 
+- **Hook-Integration**: Hooks nutzen statt Code direkt zu ändern
 - **Plugin-Kontext**: Unterscheiden zwischen Bot- und Dashboard-Context bei Plugin-Entwicklung
 - **NO Alpine.js**: NIEMALS Alpine.js verwenden! Nutze das guild.js AJAX-System für alle Formulare
 - **ONLY WORK IN dunebot_dev**: Arbeite ausschließlich in der `dunebot_dev`-Umgebung. Keine Änderungen in anderen Umgebungen vornehmen.
@@ -63,6 +77,7 @@ Plugins haben eine duale Struktur: `plugins/pluginname/{bot/, dashboard/, shared
 - **ONLY COMMIT WITH APROVAL**: Keine Commits ohne vorherige Genehmigung durch den Projektleiter.
 
 ## PLUGINS NOT TO COMMIT (!IMPORTAND)
+
 - fun
 - economy
 - gameserver
@@ -77,9 +92,11 @@ Plugins haben eine duale Struktur: `plugins/pluginname/{bot/, dashboard/, shared
 ## FRONTEND ARCHITECTURE (CRITICAL!)
 
 ### ❌ DEPRECATED & VERBOTEN: Alpine.js
+
 **NIEMALS VERWENDEN!** Das Projekt nutzt Alpine.js NICHT mehr!
 
 **Alle Alpine.js-Komponenten wurden entfernt:**
+
 - ✅ Core Guild Config → Migriert zu guild.js
 - ✅ Locales Editor → Entfernt (nicht mehr benötigt)
 - ✅ Moderation Settings → Migriert zu guild.js
@@ -87,6 +104,7 @@ Plugins haben eine duale Struktur: `plugins/pluginname/{bot/, dashboard/, shared
 **Das System ist jetzt 100% Alpine.js-frei!**
 
 **Wenn du Alpine.js-Code siehst:**
+
 1. ❌ **NICHT** kopieren oder als Vorlage nutzen
 2. ✅ Sofort melden - sollte nicht mehr existieren
 3. ✅ guild.js-System verwenden
@@ -96,29 +114,31 @@ Plugins haben eine duale Struktur: `plugins/pluginname/{bot/, dashboard/, shared
 **Alle neuen Dashboard-Formulare MÜSSEN dieses System nutzen!**
 
 #### **Template-Pattern:**
+
 ```html
-<form class="guild-ajax-form" 
-      data-form-type="feature-name" 
-      data-method="PUT" 
+<form class="guild-ajax-form"
+      data-form-type="feature-name"
+      data-method="PUT"
       action="/guild/:guildId/plugin"
       method="POST">
-  
+
   <input type="text" name="field_name" value="<%= serverValue %>" required>
-  
+
   <select name="select_field">
     <option value="opt1" <%= condition ? 'selected' : '' %>>Option 1</option>
     <option value="opt2" <%= !condition ? 'selected' : '' %>>Option 2</option>
   </select>
-  
+
   <input type="checkbox" name="checkbox_field" value="1" <%= checked ? 'checked' : '' %>>
-  
+
   <input type="hidden" name="form_identifier" value="true">
-  
+
   <button type="submit">Speichern</button>
 </form>
 ```
 
 **Wichtig:**
+
 - `class="guild-ajax-form"` - Registrierung im Handler
 - `data-form-type="..."` - Routing für Response-Handler
 - `data-method="PUT|POST|DELETE"` - HTTP-Methode
@@ -127,44 +147,49 @@ Plugins haben eine duale Struktur: `plugins/pluginname/{bot/, dashboard/, shared
 - `selected`/`checked` mit EJS-Conditionals
 
 #### **Backend-Pattern:**
+
 ```javascript
-router.put('/', async (req, res) => {
-    try {
-        const body = req.body; // Express body-parser
-        
-        // Validierung
-        if (!body.field_name || typeof body.field_name !== 'string') {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Ungültige Eingabedaten' 
-            });
-        }
-        
-        // Verarbeitung
-        await dbService.query('UPDATE table SET field = ? WHERE id = ?', [body.field_name, id]);
-        
-        // Erfolg
-        res.json({ 
-            success: true, 
-            message: 'Erfolgreich gespeichert' 
-        });
-        
-    } catch (error) {
-        Logger.error('Route Error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Serverfehler beim Speichern' 
-        });
+router.put("/", async (req, res) => {
+  try {
+    const body = req.body; // Express body-parser
+
+    // Validierung
+    if (!body.field_name || typeof body.field_name !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Ungültige Eingabedaten",
+      });
     }
+
+    // Verarbeitung
+    await dbService.query("UPDATE table SET field = ? WHERE id = ?", [
+      body.field_name,
+      id,
+    ]);
+
+    // Erfolg
+    res.json({
+      success: true,
+      message: "Erfolgreich gespeichert",
+    });
+  } catch (error) {
+    Logger.error("Route Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Serverfehler beim Speichern",
+    });
+  }
 });
 ```
 
 **Wichtig:**
+
 - Strukturierte JSON-Response mit `success` + `message`
 - Proper HTTP-Status-Codes (400, 500)
 - Fehlerbehandlung mit spezifischen Meldungen
 
 #### **guild.js Handler-Pattern:**
+
 ```javascript
 // In guild.js Switch-Case hinzufügen:
 case 'feature-name':
@@ -185,13 +210,16 @@ static async handleFeatureNameResponse(form, result) {
 ```
 
 **Wichtig:**
+
 - Handler-Name: `handle[FormType]Response`
 - Console-Logging für Debugging
 - Toast-Benachrichtigungen mit `this.showToast()`
 - Optional: Page-Reload mit Timeout
 
 #### **Migrierte Beispiele:**
+
 Für Referenz siehe:
+
 - ✅ `/plugins/moderation/dashboard/views/guild/moderation.ejs`
 - ✅ `/plugins/core/dashboard/views/guild.ejs`
 - ✅ `/plugins/dunemap/dashboard/views/guild/settings.ejs`
@@ -199,26 +227,31 @@ Für Referenz siehe:
 ## ENVIRONMENT & CONFIGURATION
 
 ### Environment Variables Location
+
 **WICHTIG**: Alle Environment-Variablen sind in `apps/dashboard/.env` gespeichert!
+
 - ❌ NICHT in `apps/bot/.env` (existiert nicht)
 - ❌ NICHT im Root `.env` (nur für spezielle Zwecke)
 - ✅ **IMMER**: `apps/dashboard/.env`
 
 ### Database Connection
+
 **MySQL-Credentials** aus `.env` verwenden:
+
 ```javascript
 // Für Node.js Scripts mit mysql2
-require('dotenv').config({ path: './apps/dashboard/.env' });
+require("dotenv").config({ path: "./apps/dashboard/.env" });
 const connection = await mysql.createConnection({
-    host: process.env.MYSQL_HOST,      // NICHT DB_HOST!
-    port: process.env.MYSQL_PORT,      // Standard: 3306
-    user: process.env.MYSQL_USER,      // NICHT DB_USER!
-    password: process.env.MYSQL_PASSWORD,  // NICHT DB_PASSWORD!
-    database: process.env.MYSQL_DATABASE   // NICHT DB_DATABASE!
+  host: process.env.MYSQL_HOST, // NICHT DB_HOST!
+  port: process.env.MYSQL_PORT, // Standard: 3306
+  user: process.env.MYSQL_USER, // NICHT DB_USER!
+  password: process.env.MYSQL_PASSWORD, // NICHT DB_PASSWORD!
+  database: process.env.MYSQL_DATABASE, // NICHT DB_DATABASE!
 });
 ```
 
 **Verfügbare ENV-Variablen** (Auszug):
+
 - **MySQL**: `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`
 - **Discord**: `CLIENT_ID`, `CLIENT_SECRET`, `DISCORD_REDIRECT_URI`, `TOKEN_ENCRYPTION_KEY`
 - **Dashboard**: `DASHBOARD_PORT`, `DASHBOARD_BASE_URL`, `SESSION_SECRET`, `SESSION_COOKIE`
@@ -227,85 +260,74 @@ const connection = await mysql.createConnection({
 - **Debug**: `LOG_LEVEL`, `NODE_ENV`, `DEBUG_HOOKS`, `VEZA_DEBUG`
 
 ### DBService Pattern
+
 Im laufenden Bot/Dashboard-Code **immer DBService** verwenden:
+
 ```javascript
-const dbService = ServiceManager.get('dbService');
-await dbService.query('SELECT * FROM table WHERE id = ?', [id]);
+const dbService = ServiceManager.get("dbService");
+await dbService.query("SELECT * FROM table WHERE id = ?", [id]);
 ```
+
 DBService nutzt intern die MySQL-Credentials aus der `.env` automatisch.
 
 ## LARGE FILE & COMPLEX CHANGE PROTOCOL
 
 ### MANDATORY PLANNING PHASE
-   When working with large files (>300 lines) or complex changes:
-		1. ALWAYS start by creating a detailed plan BEFORE making any edits
-        2. Your plan MUST include:
-            - All functions/sections that need modification
-            - The order in which changes should be applied
-            - Dependencies between changes
-            - Estimated number of separate edits required
-            - How they adjust the function/section
-            - and what functions/sections the new one will replace
-            (in wich form the old one can be removed)
-        3. Format your plan as:
-            Working with: [filename]
-	        Total planned edits: [number]
-        
+
+When working with large files (>300 lines) or complex changes: 1. ALWAYS start by creating a detailed plan BEFORE making any edits 2. Your plan MUST include: - All functions/sections that need modification - The order in which changes should be applied - Dependencies between changes - Estimated number of separate edits required - How they adjust the function/section - and what functions/sections the new one will replace
+(in wich form the old one can be removed) 3. Format your plan as:
+Working with: [filename]
+Total planned edits: [number]
 
 ### RATE LIMIT AVOIDANCE
-	- For very large files, suggest splitting changes across multiple sessions
-	- Prioritize changes that are logically complete units
-	- Always provide clear stopping points
 
-
-
-
-
-
-
+    - For very large files, suggest splitting changes across multiple sessions
+    - Prioritize changes that are logically complete units
+    - Always provide clear stopping points
 
 ## Folder Structure
-	Follow this structured directory layout:
 
-		project-root/
-		├── apps/                   # Main Folder for the 2 apps
-		│   ├── bot/                # Bot app
-        │   │   ├── extenders/      # extending the bot 
-		│   │   ├── helpers/        # helpers are core bot files
-		│   │   └── locales/        # Localisation files
-		│   └── dashboard/          # Dashboard app
+    Follow this structured directory layout:
+
+    	project-root/
+    	├── apps/                   # Main Folder for the 2 apps
+    	│   ├── bot/                # Bot app
+        │   │   ├── extenders/      # extending the bot
+    	│   │   ├── helpers/        # helpers are core bot files
+    	│   │   └── locales/        # Localisation files
+    	│   └── dashboard/          # Dashboard app
         │       ├── controllers/
-		│       ├── helpers/
-		│       ├── locales/
-		│       ├── middleware/
+    	│       ├── helpers/
+    	│       ├── locales/
+    	│       ├── middleware/
         │       │   └── context/
         │       ├── public/
         │       ├── routes/
-		│       └── themes/
+    	│       └── themes/
         │           └── default/
-		│               ├── assets/
-		│               │   ├── css/
-		│               │   ├── js/
-		│               │   ├── images/
-		│               │   └── fonts/
-		│               ├── layouts/
+    	│               ├── assets/
+    	│               │   ├── css/
+    	│               │   ├── js/
+    	│               │   ├── images/
+    	│               │   └── fonts/
+    	│               ├── layouts/
         │               ├── partials/
         │               │   ├── admin/
         │               │   ├── frontend/
         │               │   └── shared/
         │               └── views/
         │                   └── auth/
-		├── logs/                 # Server and application logs
+    	├── logs/                 # Server and application logs
         ├── packages/             # Main package for the 2 system.
         │   ├── dunebot-core/
         │   │   └── lib/
-		│   ├── dunebot-db-client/
+    	│   ├── dunebot-db-client/
         │   │   ├── lib/
-        │   │   └── schemas/        
-		│   └── dunebot-sdk/
+        │   │   └── schemas/
+    	│   └── dunebot-sdk/
         │       └── lib/
-        │          └── utils/        
-		└── plugins/                    # Home for all plugin files
+        │          └── utils/
+    	└── plugins/                    # Home for all plugin files
         │   ├── core/                   # the core plugin. main plugin for the dunebot
         │   │   ├── bot/
         │   │   │   └── commands/
@@ -324,14 +346,14 @@ DBService nutzt intern die MySQL-Credentials aus der `.env` automatisch.
         │   │           └── widgets/
         ├── plugin_abc/                 # all other plugins her, same struccture as core
 
-
 ### IPC CALLS
+
     - DIese IPC CALLS kann der Client an den server senden.
         - dashboard:VALIDATE_GUILD
         - dashboard:GET_BOT_GUILDS
         - dashboard:GET_GUILD_STATS
         - dashboard:GET_CMDS_SUMMARY
-        - dashboard:GET_PLUGIN_CMDS 
+        - dashboard:GET_PLUGIN_CMDS
             mit potenziellen types:
                 - prefix
                 - slash
@@ -346,25 +368,27 @@ DBService nutzt intern die MySQL-Credentials aus der `.env` automatisch.
                 - guildEnable
                 - guildDisable
 
-
 ## Documentation Requirements
-	- Include JSDoc comments for JavaScript.
-	- Document complex functions with clear examples.
-	- Maintain concise Markdown documentation.
-	- Minimum docblock info: `param`, `return`, `throws`, `author`
+
+    - Include JSDoc comments for JavaScript.
+    - Document complex functions with clear examples.
+    - Maintain concise Markdown documentation.
+    - Minimum docblock info: `param`, `return`, `throws`, `author`
 
 ## Database Requirements (MySQL)
-	- Leverage JSON columns, generated columns, strict mode, foreign keys, check constraints, and transactions.
+
+    - Leverage JSON columns, generated columns, strict mode, foreign keys, check constraints, and transactions.
     - always be near wordpress.
 
 ## Security Considerations
-	- Sanitize all user inputs thoroughly.
-	- Parameterize database queries.
-	- Enforce strong Content Security Policies (CSP).
-	- Use CSRF protection where applicable.
-	- Ensure secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`).
-	- Limit privileges and enforce role-based access control.
-	- Implement detailed internal logging and monitoring.
+
+    - Sanitize all user inputs thoroughly.
+    - Parameterize database queries.
+    - Enforce strong Content Security Policies (CSP).
+    - Use CSRF protection where applicable.
+    - Ensure secure cookies (`HttpOnly`, `Secure`, `SameSite=Strict`).
+    - Limit privileges and enforce role-based access control.
+    - Implement detailed internal logging and monitoring.
 
 ## THINK ON USING HOOKS FROM THE system
 
@@ -375,7 +399,7 @@ DBService nutzt intern die MySQL-Credentials aus der `.env` automatisch.
         - content_header_actions: Aktions-Buttons in der Kopfzeile einfügen
         - after_content: Inhalte nach dem Hauptinhalt einfügen
         - dashboard_footer_scripts: Skripts am Ende der Seite einfügen
-    
+
     - PLUGINMANAGER (DASHBOARD) HOOKS:
         - REGISTERING TABLES
             - before_register_tables - Vor der Registrierung von Tabellen
@@ -400,7 +424,7 @@ DBService nutzt intern die MySQL-Credentials aus der `.env` automatisch.
             - modify_enabled_plugins - Filter zum Modifizieren der aktivierten Plugins
             - after_update_config - Nach der Aktualisierung der Konfiguration
             - after_enable_plugin - Nach erfolgreicher Aktivierung
-        
+
         - PLUGIN DISABLE
             - before_disable_plugin - Vor der Deaktivierung eines Plugins
             - before_plugin_disable_method - Vor dem Aufruf der onDisable-Methode
@@ -447,30 +471,46 @@ DBService nutzt intern die MySQL-Credentials aus der `.env` automatisch.
 ## PLUGIN SYSTEM ARCHITECTURE
 
 ### Plugin Structure Example (Core Plugin)
+
 ```javascript
 // plugins/core/index.js - Plugin Entry Point
 module.exports = {
-  bot: require('./bot'),        // Bot-spezifischer Teil
-  dashboard: require('./dashboard')  // Dashboard-spezifischer Teil
+  bot: require("./bot"), // Bot-spezifischer Teil
+  dashboard: require("./dashboard"), // Dashboard-spezifischer Teil
 };
 
 // plugins/core/bot/index.js - Bot Plugin
 class CoreBotPlugin extends BotPlugin {
-  async onEnable(client) { /* Bot-Aktivierung */ }
-  async onGuildEnable(guildId) { /* Guild-spezifische Aktivierung */ }
-  registerHooks(hooks) { /* Hooks registrieren */ }
+  async onEnable(client) {
+    /* Bot-Aktivierung */
+  }
+  async onGuildEnable(guildId) {
+    /* Guild-spezifische Aktivierung */
+  }
+  registerHooks(hooks) {
+    /* Hooks registrieren */
+  }
 }
 
-// plugins/core/dashboard/index.js - Dashboard Plugin  
+// plugins/core/dashboard/index.js - Dashboard Plugin
 class CoreDashboardPlugin extends DashboardPlugin {
-  async enable() { /* Dashboard-Aktivierung */ }
-  _setupRoutes() { /* Express-Routen */ }
-  _registerWidgets() { /* Dashboard-Widgets */ }
-  async onGuildEnable(guildId) { /* Navigation registrieren */ }
+  async enable() {
+    /* Dashboard-Aktivierung */
+  }
+  _setupRoutes() {
+    /* Express-Routen */
+  }
+  _registerWidgets() {
+    /* Dashboard-Widgets */
+  }
+  async onGuildEnable(guildId) {
+    /* Navigation registrieren */
+  }
 }
 ```
 
 ### Plugin Lifecycle Methods
+
 - **Bot**: `onEnable()`, `onDisable()`, `onGuildEnable()`, `onGuildDisable()`
 - **Dashboard**: `enable()`, `disable()`, `onGuildEnable()`, `onGuildDisable()`
 - **Hooks**: `registerHooks()` - WordPress-ähnliche Action/Filter-Hooks
@@ -478,6 +518,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
 - **Database**: Models aus `bot/models/`, `dashboard/models/`, `shared/models/` werden automatisch geladen
 
 ### ThemeManager & Navigation System
+
 - **View Engine**: EJS mit Multi-Path-Lookup (Plugin > Theme > Default)
 - **Layout System**: `res.locals.layout = themeManager.getLayout('guild'|'frontend')`
 - **Navigation**: DB-basiert über `NavigationManager`, dynamische Plugin-Navigation
@@ -485,6 +526,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
 - **Asset Handling**: Theme-Assets über RouterManager automatisch bereitgestellt
 
 ### Database Operations
+
 - **Native MySQL**: Keine ORM, direkte SQL-Queries über DBService
 - **Schema Loading**: `.sql`-Dateien und JS-Module aus Plugin-Verzeichnissen
 - **Migration**: Tabellen werden automatisch bei Plugin-Aktivierung erstellt

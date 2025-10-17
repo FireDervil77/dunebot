@@ -11,9 +11,9 @@ class CoreDashboardPlugin extends DashboardPlugin {
         super({
             name: 'core',
             displayName: 'Kern-Plugin',
-            description: 'Grundlegende Funktionen für DuneBot',
+            description: 'Grundlegende Funktionen für FireBot Dashboard',
             version: VersionHelper.getVersionFromContext(__dirname),
-            author: 'DuneBot Team',
+            author: 'FireBot Team',
             icon: 'fa-solid fa-cog',
             baseDir: __dirname
         });
@@ -31,7 +31,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
    */
   async _startup_core() {
       const Logger = ServiceManager.get('Logger');
-      Logger.info('Aktiviere Core Dashboard-Plugin...');
+      Logger.info('Aktiviere [Core] Dashboard-Plugin...');
       
       // Router initialisieren
       this.guildRouter = express.Router();   // Guild-Bereich (früher dashboard/admin)
@@ -43,7 +43,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
       this._registerWidgets();
       this._registerShortcodes();
       
-      Logger.success('Core Dashboard-Plugin aktiviert');
+      Logger.success('[Core] Dashboard-Plugin aktiviert');
       return true;
     }
 
@@ -52,13 +52,13 @@ class CoreDashboardPlugin extends DashboardPlugin {
      */
     async enable() {
       const Logger = ServiceManager.get('Logger');
-      Logger.info('Aktiviere Core Dashboard-Plugin...');
+      Logger.info('Aktiviere [Core] Dashboard-Plugin...');
 
       this._registerHooks();
       this._registerWidgets();
       this._registerShortcodes();
       
-      Logger.success('Core Dashboard-Plugin aktiviert');
+      Logger.success('[Core] Dashboard-Plugin aktiviert');
       return true;
     }
   
@@ -233,12 +233,12 @@ class CoreDashboardPlugin extends DashboardPlugin {
                         'INTERACTIONS_SLASH': slashCommands === 'on' ? 1 : 0
                     };
                     
-                    Logger.debug('[Core Settings] Speichere Settings:', settingsMap);
+                    Logger.debug('[Core] Speichere Settings:', settingsMap);
                     
                     for (const [configKey, value] of Object.entries(settingsMap)) {
                         const configValue = typeof value === 'number' ? value.toString() : value;
                         
-                        Logger.debug(`[Core Settings] UPDATE ${configKey} = ${configValue} für Guild ${guildId}`);
+                        Logger.debug(`[Core] UPDATE ${configKey} = ${configValue} für Guild ${guildId}`);
                         
                         const result = await dbService.query(`
                             INSERT INTO configs (plugin_name, config_key, config_value, context, guild_id, is_global)
@@ -246,14 +246,14 @@ class CoreDashboardPlugin extends DashboardPlugin {
                             ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)
                         `, [configKey, configValue, guildId]);
                         
-                        Logger.debug(`[Core Settings] SQL-Result:`, result);
+                        Logger.debug(`[Core] SQL-Result:`, result);
                     }
                     
                     // WICHTIG: Session-Locale löschen, damit sie beim nächsten Request neu geladen wird!
                     // Dies ermöglicht sofortige Sprachwechsel ohne Logout
                     delete req.session.locale;
                     
-                    Logger.debug('[Core Settings] Session-Locale gelöscht für sofortigen Sprachwechsel');
+                    Logger.debug('[Core] Session-Locale gelöscht für sofortigen Sprachwechsel');
                     
                     res.json({ 
                         success: true, 
@@ -654,9 +654,9 @@ class CoreDashboardPlugin extends DashboardPlugin {
             });
             
 
-            Logger.debug('Core Plugin Routen eingerichtet');
+            Logger.debug('[Core] Routen eingerichtet');
         } catch (error) {
-            Logger.error('Fehler beim Einrichten der Core Plugin Routen:', error);
+            Logger.error('Fehler beim Einrichten der [Core] Routen:', error);
             throw error;
         }
     }
@@ -698,7 +698,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
             try {
                 pendingUpdates = await pluginManager.getAvailableUpdates(guildId);
             } catch (err) {
-                Logger.error('[Core Plugin] Fehler beim Laden von Plugin-Updates:', err);
+                Logger.error('[Core] Fehler beim Laden von Plugin-Updates:', err);
             }
 
             // Nur anzeigen wenn Updates vorhanden sind
@@ -841,13 +841,13 @@ class CoreDashboardPlugin extends DashboardPlugin {
                     })
                 });
             } catch (err) {
-                Logger.error('[Core Plugin] Fehler beim Laden des Support-Widgets:', err);
+                Logger.error('[Core] Fehler beim Laden des Support-Widgets:', err);
             }
 
             return widgets;
         });
 
-        Logger.debug('Core Plugin Widgets registriert');
+        Logger.debug('[Core] Plugin Widgets registriert');
     }
   
   
@@ -865,7 +865,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 title: 'NAV.DASHBOARD',
                 url: `/guild/${guildId}`,
                 icon: 'fa-solid fa-gauge-high',
-                order: 10,
+                order: 1000,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,
@@ -875,7 +875,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 title: 'NAV.BUG_REPORT',
                 url: `/guild/${guildId}/plugins/core/bug-report`,
                 icon: 'fa-solid fa-bug',
-                order: 11,
+                order: 10,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,
@@ -885,7 +885,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 title: 'NAV.FEATURE_REQUEST',
                 url: `/guild/${guildId}/plugins/core/feature-request`,
                 icon: 'fa-solid fa-lightbulb',
-                order: 12,
+                order: 20,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,
@@ -895,7 +895,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 title: 'NAV.SUPPORT_DUNEBOT',
                 url: `/guild/${guildId}/plugins/core/donate`,
                 icon: 'fa-solid fa-heart',
-                order: 13,
+                order: 30,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,
@@ -905,7 +905,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 title: 'NAV.HALL_OF_FAME',
                 url: `/guild/${guildId}/plugins/core/hall-of-fame`,
                 icon: 'fa-solid fa-trophy',
-                order: 14,
+                order: 40,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,
@@ -915,7 +915,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 title: 'NAV.SETTINGS',
                 url: `/guild/${guildId}/plugins/core/settings`,
                 icon: 'fa-solid fa-cog',
-                order: 20,
+                order: 2000,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,
@@ -925,7 +925,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 title: 'NAV.PLUGINS',
                 url: `/guild/${guildId}/plugins`,
                 icon: 'fa-solid fa-puzzle-piece',
-                order: 30,
+                order: 3000,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,
@@ -936,7 +936,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 title: 'NAV.GENERAL',
                 url: `/guild/${guildId}/plugins/core/settings/general`,
                 icon: 'fa-solid fa-sliders',
-                order: 21,
+                order: 10,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,
@@ -946,7 +946,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 title: 'NAV.USERS',
                 url: `/guild/${guildId}/plugins/core/settings/users`,
                 icon: 'fa-solid fa-users',
-                order: 22,
+                order: 20,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,
@@ -956,7 +956,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 title: 'NAV.INTEGRATIONS',
                 url: `/guild/${guildId}/plugins/core/settings/integrations`,
                 icon: 'fa-solid fa-plug',
-                order: 23,
+                order: 30,
                 type: navigationManager.menuTypes.MAIN,
                 visible: true,
                 guildId,
@@ -967,9 +967,9 @@ class CoreDashboardPlugin extends DashboardPlugin {
         try {
             await navigationManager.registerNavigation(this.name, guildId, navItems);
 
-            Logger.debug('Core-Plugin Navigation (mit Subnav) über NavigationManager registriert');
+            Logger.debug('[Core] Plugin Navigation (mit Subnav) über NavigationManager registriert');
         } catch (error) {
-            Logger.error('Fehler beim Registrieren der Navigation:', error);
+            Logger.error('[Core] Fehler beim Registrieren der Navigation:', error);
         }
     }
   
@@ -997,7 +997,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
         
-        Logger.info(`[Core Plugin] Aktiviere Core-Plugin für Guild ${guildId}`);
+        Logger.info(`[Core] Aktiviere Core-Plugin für Guild ${guildId}`);
         
         try {
             // Prüfen, ob Navigation bereits existiert
@@ -1014,11 +1014,11 @@ class CoreDashboardPlugin extends DashboardPlugin {
                     "DELETE FROM nav_items WHERE plugin = ? AND guildId = ?",
                     ['core', guildId]
                 );
-                Logger.debug(`[Core Plugin] Bestehende Navigation für Guild ${guildId} gelöscht`);
+                Logger.debug(`[Core] Bestehende Navigation für Guild ${guildId} gelöscht`);
             }
             
             // Navigation registrieren
-            Logger.debug(`[Core Plugin] Registriere Navigation für Guild ${guildId}`);
+            Logger.debug(`[Core] Registriere Navigation für Guild ${guildId}`);
             await this._registerNavigation(guildId);
             
             // Verifizieren, dass Navigation erstellt wurde
@@ -1027,9 +1027,9 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 ['core', guildId]
             );
             
-            Logger.info(`[Core Plugin] Navigation für Guild ${guildId} erfolgreich registriert: ${newNav[0]?.count || 0} Einträge`);
+            Logger.info(`[Core] Navigation für Guild ${guildId} erfolgreich registriert: ${newNav[0]?.count || 0} Einträge`);
         } catch (error) {
-            Logger.error(`[Core Plugin] Fehler bei Guild-Aktivierung für ${guildId}:`, error);
+            Logger.error(`[Core] Fehler bei Guild-Aktivierung für ${guildId}:`, error);
             throw error; // Fehler weitergeben für korrekte Fehlerbehandlung
         }
     }

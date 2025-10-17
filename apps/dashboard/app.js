@@ -507,8 +507,63 @@ module.exports = class App {
             require('../../plugins/superadmin/dashboard/routes/api/stripe-webhook')
         );
         
+        // =====================================================
+        // SECURITY MIDDLEWARES (Reihenfolge wichtig!)
+        // =====================================================
+        
+        // 1. Helmet - HTTP Security Headers
+        const helmet = require('helmet');
+        this.app.use(helmet({
+            contentSecurityPolicy: {
+                directives: {
+                    defaultSrc: ["'self'"],
+                    styleSrc: [
+                        "'self'", 
+                        "'unsafe-inline'", 
+                        "https://fonts.googleapis.com", 
+                        "https://cdn.jsdelivr.net",
+                        "https://cdnjs.cloudflare.com" // Font Awesome
+                    ],
+                    scriptSrc: [
+                        "'self'", 
+                        "'unsafe-inline'", 
+                        "'unsafe-eval'", 
+                        "https://cdn.jsdelivr.net",
+                        "https://cdnjs.cloudflare.com" // Font Awesome
+                    ],
+                    fontSrc: [
+                        "'self'", 
+                        "https://fonts.gstatic.com", 
+                        "https://cdn.jsdelivr.net",
+                        "https://cdnjs.cloudflare.com", // Font Awesome
+                        "data:" // Font-Data-URLs
+                    ],
+                    imgSrc: ["'self'", "data:", "https:", "http:"],
+                    connectSrc: ["'self'", "ws:", "wss:"]
+                }
+            },
+            hsts: {
+                maxAge: 31536000,
+                includeSubDomains: true,
+                preload: true
+            }
+        }));
+        
+        // 2. Exploit-Blocker (PHP-Scans, Path-Traversal, SQL-Injection)
+        const exploitBlocker = require('./middlewares/security/exploit-blocker.middleware');
+        this.app.use(exploitBlocker);
+        
+        // 3. Rate Limiting - Allgemeines Limit
+        const { generalLimiter } = require('./middlewares/security/rate-limiter.middleware');
+        this.app.use(generalLimiter);
+        
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
+        
+        // Cookie Parser (für CSRF Double-Submit-Cookie)
+        const cookieParser = require('cookie-parser');
+        this.app.use(cookieParser());
+        
         this.app.use(expressLayouts);
         
         // Theme Assets (JS, CSS, Images, Fonts, Vendor)
@@ -520,6 +575,11 @@ module.exports = class App {
         
         // Session & Auth
         this.app.use(sessionMiddleware);
+        
+        // 4. CSRF Protection (nach Session und Cookie-Parser!)
+        const { csrfMiddleware, csrfProtection } = require('./middlewares/security/csrf-protection.middleware');
+        this.app.use(csrfMiddleware); // Token generieren
+        // csrfProtection wird pro-Route angewendet (siehe unten)
         
         // Rest of the middlewares
         this.app.use(hookMiddleware);
