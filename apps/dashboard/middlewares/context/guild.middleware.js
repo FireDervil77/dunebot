@@ -144,16 +144,17 @@ try {
     res.locals.guilds = req.session.user;
     
     // SuperAdmin Config-Variablen für alle Templates verfügbar machen
-    // (guildId bereits oben deklariert)
+    // WICHTIG: Diese Configs sind GLOBAL (guildId = null), da sie für alle Guilds gelten
     
     try {
-        Logger.debug('[Guild Middleware] Loading SuperAdmin configs for guildId:', guildId);
+        Logger.debug('[Guild Middleware] Loading SuperAdmin global configs');
         
-        const supportUrl = await dbService.getConfig('superadmin', 'DISCORD_SUPPORT_SERVER_URL', guildId);
-        const supportName = await dbService.getConfig('superadmin', 'DISCORD_SUPPORT_SERVER_NAME', guildId);
-        const dashboardVersion = await dbService.getConfig('superadmin', 'DASHBOARD_VERSION', guildId);
-        const botVersion = await dbService.getConfig('superadmin', 'BOT_VERSION', guildId);
-        const buyMeCoffeeUrl = await dbService.getConfig('superadmin', 'BUYMEACOFFE_URL', guildId);
+        // Globale Configs (ohne guildId) - gelten für alle Guilds
+        const supportUrl = await dbService.getConfig('superadmin', 'DISCORD_SUPPORT_SERVER_URL', 'shared', null);
+        const supportName = await dbService.getConfig('superadmin', 'DISCORD_SUPPORT_SERVER_NAME', 'shared', null);
+        const dashboardVersion = await dbService.getConfig('superadmin', 'DASHBOARD_VERSION', 'shared', null);
+        const botVersion = await dbService.getConfig('superadmin', 'BOT_VERSION', 'shared', null);
+        const buyMeCoffeeUrl = await dbService.getConfig('superadmin', 'BUYMEACOFFE_URL', 'shared', null);
         
         // IMMER setzen, mit Fallback wenn null/undefined
         res.locals.supportUrl = supportUrl || '#';
@@ -165,7 +166,9 @@ try {
         Logger.debug('[Guild Middleware] SuperAdmin configs loaded:', {
             supportUrl: res.locals.supportUrl,
             supportName: res.locals.supportName,
-            hasValues: !!supportUrl
+            dashboardVersion: res.locals.dashboardVersion,
+            botVersion: res.locals.botVersion,
+            hasValues: !!(supportUrl || dashboardVersion || botVersion)
         });
     } catch (error) {
         Logger.warn('[Guild Middleware] Error loading SuperAdmin configs:', error.message);

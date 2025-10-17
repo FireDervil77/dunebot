@@ -129,6 +129,10 @@ class GuildAjaxHandler {
                 case 'token-generate':
                     await this.handleTokenGenerateResponse(form, result);
                     break;
+                
+                case 'create-server':
+                    await this.handleCreateServerResponse(form, result);
+                    break;
                     
                 default:
                     // Generische Behandlung
@@ -257,6 +261,19 @@ class GuildAjaxHandler {
             setTimeout(() => window.location.reload(), 1500);
         } else {
             this.showToast('error', result.message || 'Fehler beim Erstellen des Daemons');
+        }
+    }
+    
+    static async handleCreateServerResponse(form, result) {
+        console.log('[GuildAjax] handleCreateServerResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Server erfolgreich erstellt');
+            // Modal schließen
+            $('#createServerModal').modal('hide');
+            // Seite nach 1,5s neu laden
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Erstellen des Servers');
         }
     }
     

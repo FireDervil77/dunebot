@@ -11,10 +11,10 @@ const pluginMiddleware = require("../middlewares/context/plugin.middleware");
 const { CheckAuth } = require("../middlewares/auth.middleware");
 
 
-// Basis-API-Endpunkte
-router.get("/user", apiController.getUserInfo);
-router.get("/guilds", apiController.getGuilds);
-router.get("/guilds/:guildId", apiController.getGuildInfo);
+// Basis-API-Endpunkte (mit Authentication!)
+router.get("/user", CheckAuth, apiController.getUserInfo);
+router.get("/guilds", CheckAuth, apiController.getGuilds);
+router.get("/guilds/:guildId", CheckAuth, apiController.getGuildInfo);
 
 /**
  * Spracheinstellung des Benutzers aktualisieren
@@ -37,36 +37,39 @@ router.post('/language/guest', apiController.updateGuestLanguage);
 router.get('/bot-status/:guildId', CheckAuth, authController.checkBotInGuild);
 
 /**
- * TEST-Route um API-Erreichbarkeit zu prüfen (ohne Auth)
+ * TEST-Route um API-Erreichbarkeit zu prüfen (NUR FÜR DEVELOPMENT!)
  * @route GET /api/test
+ * @security Nur in NODE_ENV=development verfügbar
  */
-router.get('/test', (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    Logger.info('🧪 [TEST] API Test-Route aufgerufen');
-    res.json({ 
-        success: true, 
-        message: 'API ist erreichbar',
-        timestamp: new Date().toISOString(),
-        session: !!req.session,
-        user: req.session?.user?.info?.id || 'NICHT EINGELOGGT'
+if (process.env.NODE_ENV === 'development') {
+    router.get('/test', (req, res) => {
+        const Logger = ServiceManager.get('Logger');
+        Logger.info('🧪 [TEST] API Test-Route aufgerufen');
+        res.json({ 
+            success: true, 
+            message: 'API ist erreichbar (DEV MODE)',
+            timestamp: new Date().toISOString(),
+            session: !!req.session,
+            user: req.session?.user?.info?.id || 'NICHT EINGELOGGT'
+        });
     });
-});
 
-/**
- * Anonymer Session-Test (keine Auth)
- * @route GET /api/session-test
- */
-router.get('/session-test', (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    Logger.info('🧪 [SESSION-TEST] Anonymer Session-Test aufgerufen');
-    res.json({ 
-        success: true, 
-        message: 'Session-Test erfolgreich',
-        sessionExists: !!req.session,
-        sessionId: req.session?.id || 'NO_SESSION',
-        timestamp: new Date().toISOString()
+    /**
+     * Anonymer Session-Test (NUR FÜR DEVELOPMENT!)
+     * @route GET /api/session-test
+     */
+    router.get('/session-test', (req, res) => {
+        const Logger = ServiceManager.get('Logger');
+        Logger.info('🧪 [SESSION-TEST] Anonymer Session-Test aufgerufen');
+        res.json({ 
+            success: true, 
+            message: 'Session-Test erfolgreich (DEV MODE)',
+            sessionExists: !!req.session,
+            sessionId: req.session?.id || 'NO_SESSION',
+            timestamp: new Date().toISOString()
+        });
     });
-});
+}
 
 /**
  * Session-Statistiken (nur für Admins)
@@ -147,9 +150,14 @@ router.post('/sessions/cleanup', CheckAuth, async (req, res) => {
 });
 
 // Plugin-spezifische API-Endpunkte (AM ENDE!)
+// HINWEIS: Plugins MÜSSEN CheckAuth selbst in ihren Routen verwenden!
+// Das Base-API-System schützt nicht automatisch alle Plugin-Endpunkte
 router.use("/:pluginName", pluginMiddleware.loadPlugin, (req, res, next) => {
+    const Logger = ServiceManager.get('Logger');
     const plugin = res.locals.plugin;
+    
     if (!plugin || !plugin.apiRouter) {
+        Logger.warn(`[API Security] Plugin ${req.params.pluginName} nicht gefunden oder keine API`);
         return res.status(404).json({ 
             success: false,
             error: "Plugin nicht gefunden oder keine API verfügbar"
@@ -163,8 +171,9 @@ router.use("/:pluginName", pluginMiddleware.loadPlugin, (req, res, next) => {
 /**
  * Markiert eine Benachrichtigung als gelesen für den aktuellen User
  * @route POST /api/notifications/dismiss/:id
+ * @security Authentifizierung erforderlich
  */
-router.post('/notifications/dismiss/:id', async (req, res) => {
+router.post('/notifications/dismiss/:id', CheckAuth, async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const notificationManager = ServiceManager.get('notificationManager');
     

@@ -539,7 +539,13 @@ module.exports = class App {
                         "data:" // Font-Data-URLs
                     ],
                     imgSrc: ["'self'", "data:", "https:", "http:"],
-                    connectSrc: ["'self'", "ws:", "wss:"]
+                    connectSrc: [
+                        "'self'", 
+                        "ws:", 
+                        "wss:",
+                        "https://cdn.jsdelivr.net", // Source Maps für Chart.js, Toastr, etc.
+                        "https://cdnjs.cloudflare.com" // Source Maps für Font Awesome, etc.
+                    ]
                 }
             },
             hsts: {

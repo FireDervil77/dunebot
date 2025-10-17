@@ -11,12 +11,26 @@
     // Konfiguration
     const REFRESH_INTERVAL = 30000; // 30 Sekunden
     const MAX_DISPLAY_TOASTS = 5;   // Max. Toasts im Dropdown
+    const ERROR_BACKOFF_TIME = 5000; // 5 Sekunden Pause nach Fehler
+
+    // State
+    let lastErrorTime = 0;
+    let consecutiveErrors = 0;
 
     /**
      * Lädt Toast-History vom Server und aktualisiert UI
      */
     async function loadToastNotifications() {
         try {
+            // ✅ Rate Limiting bei wiederholten Fehlern
+            if (consecutiveErrors > 3) {
+                const timeSinceError = Date.now() - lastErrorTime;
+                if (timeSinceError < ERROR_BACKOFF_TIME) {
+                    console.warn('[Toast Notifications] Zu viele Fehler, warte...');
+                    return;
+                }
+            }
+
             const guildId = getCurrentGuildId();
             // ✅ ALLE Notifications anzeigen (nicht nur critical)
             const url = `/api/core/toasts/history?criticalOnly=false&limit=${MAX_DISPLAY_TOASTS}${guildId ? `&guildId=${guildId}` : ''}`;
@@ -27,6 +41,9 @@
             if (data.success) {
                 updateNotificationUI(data.toasts || []);
                 
+                // ✅ Reset Error-Counter bei Erfolg
+                consecutiveErrors = 0;
+                
                 // Debug-Info loggen falls verfügbar
                 if (data.debug) {
                     console.log('[Toast Notifications] Session Debug:', data.debug);
@@ -36,11 +53,15 @@
                 }
             } else {
                 console.error('[Toast Notifications] Fehler beim Laden:', data.error);
+                consecutiveErrors++;
+                lastErrorTime = Date.now();
                 // Bei Fehler leere Liste anzeigen
                 updateNotificationUI([]);
             }
         } catch (error) {
             console.error('[Toast Notifications] Netzwerkfehler:', error);
+            consecutiveErrors++;
+            lastErrorTime = Date.now();
             // Bei Netzwerkfehler leere Liste anzeigen
             updateNotificationUI([]);
         }
@@ -182,18 +203,32 @@ ${toast.metadata ? 'Metadata:\n' + JSON.stringify(toast.metadata, null, 2) : ''}
      * Initialisierung
      */
     document.addEventListener('DOMContentLoaded', function() {
+        // Prevent multiple initializations (wichtig bei SPA-Navigation!)
+        if (window._toastNotificationCenterInitialized) {
+            console.log('[Toast Notifications] Bereits initialisiert, überspringe...');
+            return;
+        }
+        window._toastNotificationCenterInitialized = true;
+
         // Initial laden
         loadToastNotifications();
 
         // Periodisches Aktualisieren
-        setInterval(loadToastNotifications, REFRESH_INTERVAL);
+        const refreshInterval = setInterval(loadToastNotifications, REFRESH_INTERVAL);
 
         // Bei jedem neuen Toast auch sofort aktualisieren
-        if (window.addEventListener) {
-            window.addEventListener('toastShown', function() {
-                setTimeout(loadToastNotifications, 500);
-            });
-        }
+        // ✅ Named function für removeEventListener
+        const handleToastShown = function() {
+            setTimeout(loadToastNotifications, 500);
+        };
+        window.addEventListener('toastShown', handleToastShown);
+
+        // Cleanup bei Page Unload (SPA-Navigation)
+        window.addEventListener('beforeunload', function() {
+            clearInterval(refreshInterval);
+            window.removeEventListener('toastShown', handleToastShown);
+            window._toastNotificationCenterInitialized = false;
+        });
 
         console.log('[Toast Notifications] Notification Center initialisiert');
     });

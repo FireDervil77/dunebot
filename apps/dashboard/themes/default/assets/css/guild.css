@@ -1,6 +1,32 @@
-/* Kompakte Sidebar-Navigation */
+/* Kompakte Sidebar-Navigation mit Scrolling */
 .app-sidebar {
   width: 250px;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling auf iOS */
+  z-index: 1038; /* Unter navbar (1039) aber über content */
+}
+
+/* Scrollbar Styling für Desktop Sidebar */
+.app-sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.app-sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.app-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.app-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .app-sidebar .nav-sidebar {
@@ -370,6 +396,9 @@
 
 /* Notification Dropdown Styling */
 .notification-item {
+  cursor: default;
+  white-space: normal;
+  padding: 0.75rem 1rem;
 }
 
 .notification-item:hover {
@@ -457,40 +486,20 @@
    ============================================ */
 
 @media (max-width: 767.98px) {
-  /* Mobile Sidebar muss scrollbar sein */
+  /* Mobile Sidebar - bereits durch Desktop-Styles definiert */
   .app-sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
     width: 250px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    z-index: 1040;
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling auf iOS */
+    /* overflow und scrolling bereits durch Desktop-Styles aktiv */
   }
   
-  /* Navbar-Höhe berücksichtigen */
+  /* Navbar-Höhe auf Mobile berücksichtigen */
   .app-sidebar {
     top: 57px; /* AdminLTE navbar height */
   }
   
-  /* Scrollbar Styling für Mobile Sidebar */
+  /* Scrollbar schmaler auf Mobile */
   .app-sidebar::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  .app-sidebar::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
-  }
-  
-  .app-sidebar::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 3px;
-  }
-  
-  .app-sidebar::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.3);
+    width: 4px;
   }
   
   /* Content Padding auf Mobile reduzieren */
@@ -501,10 +510,9 @@
 }
 
 @media (max-width: 991.98px) {
-  /* Tablet-Optimierung */
-  .app-sidebar {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+  /* Tablet - Scrollbar etwas schmaler */
+  .app-sidebar::-webkit-scrollbar {
+    width: 6px;
   }
 }
 

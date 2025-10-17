@@ -15,6 +15,7 @@
 
 const WebSocket = require('ws');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const { ServiceManager } = require('dunebot-core');
 
 class IPMServer {
@@ -28,6 +29,10 @@ class IPMServer {
         this.pendingCommands = new Map(); // commandId -> {resolve, reject, timeout}
         this.Logger = null;
         this.dbService = null;
+        
+        // JWT Secret aus ENV (oder generieren falls nicht vorhanden)
+        this.jwtSecret = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
+        this.jwtExpiry = '30d'; // Session-Token gültig für 30 Tage
     }
 
     /**
@@ -140,7 +145,12 @@ class IPMServer {
     }
 
     /**
-     * Daemon-Registrierung (Token-Validierung)
+     * Daemon-Registrierung mit 2-Token-System (Setup-Token + JWT Session-Token)
+     * 
+     * Flow:
+     * 1. Erste Registrierung: Setup-Token (bcrypt) → JWT Session-Token generieren
+     * 2. Reconnect: JWT validieren → Neuen JWT generieren (Token-Rotation)
+     * 
      * @private
      */
     async _handleRegister(ws, payload) {
@@ -151,12 +161,90 @@ class IPMServer {
         }
 
         try {
-            // Token aus DB laden
+            // Prüfen ob Token ein JWT ist (Session-Token)
+            const isJWT = token.startsWith('eyJ'); // JWT startet immer mit "eyJ"
+            
+            // ======================================
+            // FALL 1: JWT Session-Token (Reconnect)
+            // ======================================
+            if (isJWT) {
+                try {
+                    // JWT validieren
+                    const decoded = jwt.verify(token, this.jwtSecret);
+                    
+                    // Prüfen ob daemon_id übereinstimmt
+                    if (decoded.daemon_id !== daemon_id) {
+                        return { success: false, error: 'Token daemon_id mismatch' };
+                    }
+                    
+                    // Daemon aus DB laden
+                    const [daemon] = await this.dbService.query(
+                        'SELECT * FROM daemon_instances WHERE daemon_id = ?',
+                        [daemon_id]
+                    );
+                    
+                    if (!daemon) {
+                        return { success: false, error: 'Daemon not found' };
+                    }
+                    
+                    // Neuen Session-Token generieren (Token-Rotation!)
+                    const newSessionToken = jwt.sign({
+                        daemon_id: daemon.daemon_id,
+                        guild_id: daemon.guild_id,
+                        version: version || daemon.version
+                    }, this.jwtSecret, { expiresIn: this.jwtExpiry });
+                    
+                    // Daemon-Status aktualisieren
+                    await this.dbService.query(
+                        `UPDATE daemon_instances 
+                         SET status = 'online', 
+                             last_heartbeat = NOW(),
+                             version = ?,
+                             session_token = ?,
+                             session_token_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
+                         WHERE daemon_id = ?`,
+                        [version || daemon.version, newSessionToken, daemon_id]
+                    );
+                    
+                    await this._logDaemonEvent(daemon_id, 'reconnected', { version });
+                    
+                    ws.send(JSON.stringify({ 
+                        type: 'registered', 
+                        sessionToken: newSessionToken
+                    }));
+                    
+                    return { 
+                        success: true, 
+                        daemonId: daemon_id, 
+                        sessionId: newSessionToken,
+                        metadata: {
+                            guild_id: daemon.guild_id,
+                            display_name: daemon.display_name,
+                            version: version || daemon.version
+                        }
+                    };
+                    
+                } catch (jwtError) {
+                    // JWT ungültig/abgelaufen
+                    if (jwtError.name === 'TokenExpiredError') {
+                        this.Logger.warn(`[IPMServer] Session token expired for daemon ${daemon_id}`);
+                        return { success: false, error: 'Session token expired - use setup token' };
+                    }
+                    this.Logger.error('[IPMServer] JWT verification failed:', jwtError);
+                    return { success: false, error: 'Invalid session token' };
+                }
+            }
+            
+            // ================================================
+            // FALL 2: Setup-Token (Erste Registrierung)
+            // ================================================
+            
+            // Setup-Token aus DB laden (Guild-basiert)
             const [tokenData] = await this.dbService.query(
-                `SELECT dt.*, di.guild_id, di.display_name, di.config
+                `SELECT dt.*, di.guild_id, di.display_name
                  FROM daemon_tokens dt
-                 JOIN daemon_instances di ON dt.daemon_id = di.daemon_id
-                 WHERE dt.daemon_id = ? AND dt.expires_at > NOW()
+                 JOIN daemon_instances di ON dt.guild_id = di.guild_id
+                 WHERE di.daemon_id = ? AND dt.expires_at > NOW() AND dt.used = 0
                  ORDER BY dt.created_at DESC
                  LIMIT 1`,
                 [daemon_id]
@@ -166,7 +254,7 @@ class IPMServer {
                 return { success: false, error: 'Invalid or expired token' };
             }
 
-            // Token hashen und vergleichen (bcrypt/argon2)
+            // Setup-Token validieren (bcrypt)
             const bcrypt = require('bcrypt');
             const isValid = await bcrypt.compare(token, tokenData.token_hash);
 
@@ -174,33 +262,47 @@ class IPMServer {
                 return { success: false, error: 'Invalid token' };
             }
 
-            // Session-Token generieren
-            const sessionId = crypto.randomBytes(32).toString('hex');
+            // Token als verwendet markieren
+            await this.dbService.query(
+                `UPDATE daemon_tokens 
+                 SET used = 1, 
+                     used_at = NOW(), 
+                     used_by_daemon_id = ?
+                 WHERE id = ?`,
+                [daemon_id, tokenData.id]
+            );
 
-            // Daemon-Status aktualisieren
+            // JWT Session-Token generieren
+            const sessionToken = jwt.sign({
+                daemon_id,
+                guild_id: tokenData.guild_id,
+                version: version || 'unknown'
+            }, this.jwtSecret, { expiresIn: this.jwtExpiry });
+
+            // Daemon-Status aktualisieren mit Session-Token
             await this.dbService.query(
                 `UPDATE daemon_instances 
                  SET status = 'online', 
-                     last_seen = NOW(),
+                     last_heartbeat = NOW(),
                      version = ?,
-                     session_token = ?
+                     session_token = ?,
+                     session_token_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
                  WHERE daemon_id = ?`,
-                [version || 'unknown', sessionId, daemon_id]
+                [version || 'unknown', sessionToken, daemon_id]
             );
 
             // Audit-Log
-            await this._logDaemonEvent(daemon_id, 'connected', { version, sessionId });
+            await this._logDaemonEvent(daemon_id, 'first_registration', { version });
 
             ws.send(JSON.stringify({ 
                 type: 'registered', 
-                sessionId,
-                config: JSON.parse(tokenData.config || '{}')
+                sessionToken
             }));
 
             return { 
                 success: true, 
                 daemonId: daemon_id, 
-                sessionId,
+                sessionId: sessionToken,
                 metadata: {
                     guild_id: tokenData.guild_id,
                     display_name: tokenData.display_name,
@@ -256,9 +358,14 @@ class IPMServer {
 
         conn.lastHeartbeat = Date.now();
 
-        // DB-Update (last_seen)
+        // Hardware-Stats in Connection-Metadata speichern
+        if (payload.hardware) {
+            conn.metadata.hardware = payload.hardware;
+        }
+
+        // DB-Update (last_heartbeat)
         await this.dbService.query(
-            'UPDATE daemon_instances SET last_seen = NOW() WHERE daemon_id = ?',
+            'UPDATE daemon_instances SET last_heartbeat = NOW() WHERE daemon_id = ?',
             [daemonId]
         );
 
@@ -317,11 +424,26 @@ class IPMServer {
     async _handleDaemonLog(daemonId, payload) {
         const { level, message, context } = payload;
 
-        await this.dbService.query(
-            `INSERT INTO daemon_logs (daemon_id, level, message, context, created_at)
-             VALUES (?, ?, ?, ?, NOW())`,
-            [daemonId, level, message, JSON.stringify(context || {})]
-        );
+        try {
+            // Guild-ID für Log-Eintrag holen
+            const [daemon] = await this.dbService.query(
+                'SELECT guild_id FROM daemon_instances WHERE daemon_id = ?',
+                [daemonId]
+            );
+            
+            if (!daemon) return;
+            
+            // Level zu event_type mappen (error → error, rest → status_change)
+            const eventType = level === 'error' ? 'error' : 'status_change';
+
+            await this.dbService.query(
+                `INSERT INTO daemon_logs (guild_id, daemon_id, event_type, action, message, metadata, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [daemon.guild_id, daemonId, eventType, level, message, JSON.stringify(context || {})]
+            );
+        } catch (error) {
+            this.Logger.error('[IPMServer] Failed to log daemon message:', error);
+        }
     }
 
     /**
@@ -329,11 +451,38 @@ class IPMServer {
      * @private
      */
     async _logDaemonEvent(daemonId, event, data) {
-        await this.dbService.query(
-            `INSERT INTO daemon_logs (daemon_id, level, message, context, created_at)
-             VALUES (?, 'info', ?, ?, NOW())`,
-            [daemonId, `Event: ${event}`, JSON.stringify(data || {})]
-        );
+        try {
+            // Guild-ID für Log-Eintrag holen
+            const [daemon] = await this.dbService.query(
+                'SELECT guild_id FROM daemon_instances WHERE daemon_id = ?',
+                [daemonId]
+            );
+            
+            if (!daemon) return;
+            
+            // Event-Typ Mapping (ENUM: register, disconnect, command, error, status_change, heartbeat_lost, reconnect)
+            const eventTypeMap = {
+                'first_registration': 'register',
+                'reconnected': 'reconnect',
+                'connected': 'register'
+            };
+            const eventType = eventTypeMap[event] || 'status_change';
+            
+            await this.dbService.query(
+                `INSERT INTO daemon_logs (guild_id, daemon_id, event_type, action, message, metadata, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [
+                    daemon.guild_id,
+                    daemonId,
+                    eventType,
+                    event, // action: 'first_registration', 'reconnected', 'connected'
+                    `Daemon Event: ${event}`,
+                    JSON.stringify(data || {})
+                ]
+            );
+        } catch (error) {
+            this.Logger.error('[IPMServer] Failed to log daemon event:', error);
+        }
     }
 
     /**
@@ -442,8 +591,19 @@ class IPMServer {
             guildId: conn.metadata.guild_id,
             displayName: conn.metadata.display_name,
             version: conn.metadata.version,
-            lastHeartbeat: conn.lastHeartbeat
+            lastHeartbeat: conn.lastHeartbeat,
+            hardware: conn.metadata.hardware || null
         }));
+    }
+
+    /**
+     * Hardware-Stats eines spezifischen Daemons abrufen
+     * @param {string} daemonId - Daemon ID
+     * @returns {object|null}
+     */
+    getDaemonHardware(daemonId) {
+        const conn = this.connections.get(daemonId);
+        return conn?.metadata?.hardware || null;
     }
 
     /**

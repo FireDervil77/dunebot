@@ -29,6 +29,16 @@ module.exports = async (req, res, next) => {
     try {
         // Core Config laden
         const coreConfig = await pluginManager.getPlugin("core").getConfig();
+        
+        // SuperAdmin globale Configs laden (Versionen, Support-URLs)
+        // WICHTIG: Diese sind GLOBAL (guildId = null) und gelten für alle Guilds
+        const dashboardVersion = await dbService.getConfig('superadmin', 'DASHBOARD_VERSION', 'shared', null);
+        const botVersion = await dbService.getConfig('superadmin', 'BOT_VERSION', 'shared', null);
+        
+        // Versionen zu coreConfig hinzufügen für Frontend-Footer Kompatibilität
+        coreConfig.dashboardVersion = dashboardVersion || '1.0.0';
+        coreConfig.botVersion = botVersion || '1.0.0';
+        
         res.locals.coreConfig = coreConfig;
 
         // Map kurze Sprachcodes auf vollständige Codes
