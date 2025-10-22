@@ -33,7 +33,212 @@ Zentraler Service-Registry für alle wichtigen Services. Zugriff via `ServiceMan
 
 ### IPC Communication (Bot ↔ Dashboard)
 
-Bot und Dashboard kommunizieren über Veza-IPC. Definierte IPC-Calls siehe im ursprünglichen Dokument.
+**Technologie:** Veza-IPC (Node.js Inter-Process Communication)  
+**Zweck:** Kommunikation zwischen Discord Bot und Dashboard
+
+Bot und Dashboard kommunizieren über **Veza-IPC** für Discord-bezogene Operationen:
+- Guild-Daten abrufen
+- Bot-Status überwachen
+- Commands synchronisieren
+- Locale-Management
+- Plugin-Management (Bot-seitig)
+
+**Architektur:**
+```
+┌─────────────┐         Veza-IPC          ┌──────────────┐
+│             │◄──────────────────────────►│              │
+│  Discord    │   (TCP Socket, Node.js)    │  Dashboard   │
+│  Bot        │                            │  (Express)   │
+│             │                            │              │
+└─────────────┘                            └──────────────┘
+     Process 1                                 Process 2
+```
+
+**IPC Server:** `apps/bot/bot.js` (Port konfiguriert in `.env`: `IPC_SERVER_HOST`, `IPC_SERVER_PORT`)  
+**IPC Client:** `apps/dashboard/helpers/IPCClient.js`
+
+**Wichtig:** 
+- ❌ **NICHT** für Gameserver/Daemon-Kommunikation verwenden!
+- ✅ **NUR** für Bot ↔ Dashboard Kommunikation
+- ✅ Nutze `ServiceManager.get('ipcClient')` im Dashboard
+- ✅ Nutze `ServiceManager.get('ipcServer')` im Bot
+
+**Verfügbare IPC-Calls:**
+```javascript
+// Discord/Guild-bezogen
+ipcClient.send('dashboard:VALIDATE_GUILD', { guildId });
+ipcClient.send('dashboard:GET_BOT_GUILDS');
+ipcClient.send('dashboard:GET_GUILD_STATS', { guildId });
+
+// Commands
+ipcClient.send('dashboard:GET_CMDS_SUMMARY', { guildId });
+ipcClient.send('dashboard:GET_PLUGIN_CMDS', { type: 'slash' | 'prefix' });
+
+// Locales
+ipcClient.send('dashboard:GET_LOCALE_BUNDLE', { locale });
+ipcClient.send('dashboard:SET_LOCALE_BUNDLE', { locale, data });
+
+// Plugin-Management (Bot-Plugins!)
+ipcClient.send('dashboard:UPDATE_PLUGIN', { 
+    pluginName, 
+    action: 'enable' | 'disable' | 'guildEnable' | 'guildDisable'
+});
+```
+
+---
+
+### IPM Communication (Daemon ↔ Dashboard)
+
+**Technologie:** WebSocket (Native WebSocket oder ws Library)  
+**Zweck:** Kommunikation zwischen FireBot Daemon (Go) und Dashboard (Node.js)
+
+Daemon und Dashboard kommunizieren über **WebSocket-basiertes IPM (Inter-Process Messaging)** für Gameserver-Management:
+- Rootserver-Status
+- Gameserver-Lifecycle (Start/Stop/Restart)
+- Echtzeit-Logs & Konsole
+- Ressourcen-Monitoring (CPU, RAM, Disk)
+- Installation-Queue-Updates
+
+**Architektur:**
+```
+┌──────────────┐      WebSocket (IPM)      ┌──────────────┐
+│              │◄─────────────────────────►│              │
+│  FireBot     │   (ws://, Binary/JSON)    │  Dashboard   │
+│  Daemon (Go) │                           │  (Express)   │
+│              │                           │              │
+└──────────────┘                           └──────────────┘
+  Externer Server                            Process 2
+  (z.B. VPS/Dedicated)                      
+```
+
+**IPM Server:** `firebot_daemon/internal/websocket/` (Go-Implementierung)  
+**IPM Client:** Dashboard Plugin (z.B. `plugins/masterserver/dashboard/helpers/IPMClient.js`)
+
+**Port-Konfiguration:** 
+- Daemon: `daemon.yaml` → `ipm_server.port` (Standard: 8081)
+- Dashboard: `.env` → `IPM_SERVER_URL=ws://daemon-host:8081`
+
+**Wichtig:** 
+- ❌ **NICHT** IPC (Veza) nennen - das ist für Bot ↔ Dashboard!
+- ✅ **IMMER** IPM, IPMServer, IPMClient oder ipmServer/ipmClient verwenden
+- ✅ **Authentifizierung:** API-Keys aus `rootserver`-Tabelle
+- ✅ **Binary Protocol:** Für Logs/Console kann Binary WebSocket genutzt werden
+
+**IPM Message Pattern:**
+```javascript
+// Client → Daemon (Request)
+{
+    "type": "request",
+    "id": "unique-request-id",
+    "action": "rootserver:status" | "gameserver:start" | "console:send",
+    "payload": {
+        // Action-spezifische Daten
+    }
+}
+
+// Daemon → Client (Response)
+{
+    "type": "response",
+    "id": "unique-request-id", // Matching request ID
+    "success": true | false,
+    "data": { /* Response data */ },
+    "error": "Error message if failed"
+}
+
+// Daemon → Client (Event/Push)
+{
+    "type": "event",
+    "event": "server:status_changed" | "server:crashed" | "console:output",
+    "payload": {
+        "serverId": "abc123",
+        "newStatus": "running",
+        "timestamp": 1634567890
+    }
+}
+```
+
+**Verfügbare IPM-Actions (Beispiele):**
+```javascript
+// RootServer Management
+ipmClient.send('rootserver:list', { guildId });
+ipmClient.send('rootserver:status', { rootserverId });
+ipmClient.send('rootserver:resources', { rootserverId }); // CPU, RAM, Disk
+
+// GameServer Lifecycle
+ipmClient.send('gameserver:start', { serverId });
+ipmClient.send('gameserver:stop', { serverId });
+ipmClient.send('gameserver:restart', { serverId });
+ipmClient.send('gameserver:status', { serverId });
+
+// Console/Logs
+ipmClient.send('console:attach', { serverId }); // Subscribe to output
+ipmClient.send('console:send', { serverId, command: 'say Hello' });
+ipmClient.send('logs:fetch', { serverId, lines: 100 });
+
+// Installation
+ipmClient.send('install:rootserver', { config });
+ipmClient.send('install:gameserver', { rootserverId, gameType, config });
+ipmClient.send('install:status', { installId });
+```
+
+**Event-Handling (Daemon Push-Events):**
+```javascript
+// Im Dashboard IPMClient
+ipmClient.on('event:server:status_changed', (data) => {
+    console.log(`Server ${data.serverId} → ${data.newStatus}`);
+    // Update UI, DB, etc.
+});
+
+ipmClient.on('event:console:output', (data) => {
+    console.log(`[${data.serverId}] ${data.line}`);
+    // Append to console widget
+});
+
+ipmClient.on('event:server:crashed', (data) => {
+    console.error(`Server ${data.serverId} crashed!`);
+    // Send notification, log, restart?
+});
+```
+
+---
+
+### 🔄 Kommunikations-Übersicht (Zusammenfassung)
+
+**IPC vs. IPM - Wann was nutzen?**
+
+| Aspekt | IPC (Bot ↔ Dashboard) | IPM (Daemon ↔ Dashboard) |
+|--------|----------------------|-------------------------|
+| **Technologie** | Veza (TCP, Node.js) | WebSocket (ws Library) |
+| **Zweck** | Discord-Bot-Daten | Gameserver-Management |
+| **Protokoll** | Veza-Messages | JSON WebSocket Messages |
+| **Verbindung** | Lokal (beide Node.js) | Remote (Go ↔ Node.js) |
+| **Auth** | Keine (vertrauenswürdig) | API-Keys (rootserver-Tabelle) |
+| **Beispiel-Use-Cases** | Guild-Liste, Commands, Locales | Server starten, Logs, Monitoring |
+| **Service-Name** | `ipcClient` / `ipcServer` | `ipmClient` / `ipmServer` |
+| **Code-Location** | `apps/bot/`, `apps/dashboard/helpers/` | `firebot_daemon/internal/websocket/`, `plugins/masterserver/dashboard/` |
+
+**Naming Convention:**
+```javascript
+// ✅ RICHTIG
+const ipcClient = ServiceManager.get('ipcClient');  // Bot-Communication
+const ipmClient = require('./helpers/IPMClient');   // Daemon-Communication
+
+ipcClient.send('dashboard:GET_BOT_GUILDS');         // Bot-Daten
+ipmClient.send('gameserver:start', { serverId });   // Gameserver-Action
+
+// ❌ FALSCH
+const ipcClient = new IPCClient();                  // IPC für Daemon (FALSCH!)
+ipmClient.send('dashboard:GET_BOT_GUILDS');         // IPM für Bot (FALSCH!)
+```
+
+**Debugging:**
+```bash
+# IPC (Bot ↔ Dashboard)
+export VEZA_DEBUG=true        # Veza-Debug-Logs aktivieren
+
+# IPM (Daemon ↔ Dashboard)
+export DEBUG_IPM=true         # IPM-Debug-Logs aktivieren (falls implementiert)
+```
 
 ### Plugin Architecture
 

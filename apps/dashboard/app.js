@@ -53,7 +53,8 @@ module.exports = class App {
             frontend: require("./routes/frontend.router"),
             auth: require("./routes/auth.router"),
             guild: require("./routes/guild.router"),
-            api: require("./routes/api.router")
+            api: require("./routes/api.router"),
+            downloads: require("./routes/downloads.router")
         };
 
         // Weitere Manager initialisieren...
@@ -134,6 +135,7 @@ module.exports = class App {
             this.routerManager
                 .register('/', this.routers.frontend)
                 .register('/auth', this.routers.auth)
+                .register('/downloads', this.routers.downloads) // Öffentlich, keine Auth
                 .register('/guild', this.routers.guild, { 
                     auth: true,  // Aktiviert CheckAuth Middleware
                     middlewares: [guildMiddleware]  // Zusätzliche Middleware
@@ -267,6 +269,12 @@ module.exports = class App {
                 FROM guild_plugins 
                 WHERE is_enabled = 1 AND plugin_name != 'core'
             `);
+            
+            // Sicherstellen dass pluginRows ein Array ist
+            if (!Array.isArray(pluginRows)) {
+                Logger.error('[Plugin Load] Query lieferte kein Array:', pluginRows);
+                throw new Error('rows.map is not a function - pluginRows ist kein Array');
+            }
             
             let enabledPlugins = pluginRows.map(row => row.plugin_name);
             
@@ -576,6 +584,7 @@ module.exports = class App {
         // Beispiel: /themes/default/assets/js/guild.js
         this.app.use('/themes', express.static(path.join(__dirname, 'themes')));
         
+
         // Plugin Assets werden dynamisch in registerPluginAssets() registriert
         // Beispiel: /assets/plugins/dunemap/images/map.png
         

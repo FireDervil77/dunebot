@@ -1,0 +1,59 @@
+# DuneBot Daemon - Beispiel-Konfigurationsdatei
+# Diese Datei zeigt alle verfügbaren Optionen
+
+dashboard:
+  # URL zum Dashboard (WICHTIG: Muss erreichbar sein)
+  url: "https://dashboard.example.com"
+  
+  # Authentifizierungs-Token (aus dem Dashboard generieren)
+  token: "YOUR_TOKEN_HERE"
+
+daemon:
+  # Automatische Updates aktivieren (Standard: false)
+  # Wenn true: Daemon lädt bei Start automatisch neue Versionen
+  # Wenn false: Updates nur manuell über Dashboard
+  auto_update: false
+
+server:
+  # Basis-Verzeichnis für alle Gameserver
+  base_directory: "/home/gameserver"
+  
+  # Unterverzeichnis für Server-Installationen
+  servers_subdir: "servers"
+  
+  # Erlaube custom Pfade für einzelne Server (Standard: false)
+  allow_custom_paths: false
+  
+  # Erstelle base_directory automatisch wenn nicht vorhanden
+  auto_create_base: true
+
+paths:
+  # Basis-Verzeichnis (wird für Server-Installationen genutzt)
+  base_dir: "/home/gameserver"
+  
+  # Log-Verzeichnis (GETRENNT von Server-Logs!)
+  # Struktur:
+  #   {log_dir}/daemon.log         - Daemon-Logs
+  #   {base_dir}/servers/{id}/logs - Server-spezifische Logs
+  log_dir: "/home/gameserver/daemon-logs"
+
+logging:
+  # Log-Level: debug, info, warn, error
+  level: "info"
+  
+  # Log-Datei (relativ zu log_dir)
+  file: "daemon.log"
+
+# Beispiel-Struktur nach Installation:
+# /home/gameserver/
+# ├── daemon-logs/
+# │   └── daemon.log
+# ├── servers/
+# │   ├── 420718f0-bb38-4775-bf19-ae300aad1569/
+# │   │   ├── arma3server
+# │   │   ├── config/
+# │   │   └── logs/
+# │   └── server-xyz-123/
+# │       └── ...
+# └── steamcmd/
+#     └── ...

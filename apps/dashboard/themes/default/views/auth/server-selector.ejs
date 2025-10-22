@@ -115,7 +115,11 @@ const errorMessage = locals.errorMessage || null;
     </div>
 
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
-      <% (guilds || []).forEach(guild => { %>
+      <% 
+      console.log('[SERVER-SELECTOR VIEW] Rendering guilds:', guilds?.length || 0);
+      (guilds || []).forEach(guild => { 
+        console.log(`[SERVER-SELECTOR VIEW] Rendering guild: ${guild.name} (${guild.id}) - botInGuild=${guild.botInGuild}, canManage=${guild.canManage}`);
+      %>
         <div class="col">
           <div class="card h-100">
             <div class="card-body login-card-body text-center">

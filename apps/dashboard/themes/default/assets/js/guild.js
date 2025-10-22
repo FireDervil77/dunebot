@@ -97,6 +97,10 @@ class GuildAjaxHandler {
                     await this.handleCoreSettingsResponse(form, result);
                     break;
                 
+                case 'add-staff':
+                    await this.handleAddStaffResponse(form, result);
+                    break;
+                
                 case 'dunemap-settings':
                     await this.handleDuneMapSettingsResponse(form, result);
                     break;
@@ -132,6 +136,19 @@ class GuildAjaxHandler {
                 
                 case 'create-server':
                     await this.handleCreateServerResponse(form, result);
+                    break;
+                
+                case 'update-server':
+                    await this.handleUpdateServerResponse(form, result);
+                    break;
+                
+                // Gameserver Plugin Handlers
+                case 'gameserver-create':
+                    await this.handleGameserverCreateResponse(form, result);
+                    break;
+                
+                case 'gameserver-edit':
+                    await this.handleGameserverEditResponse(form, result);
                     break;
                     
                 default:
@@ -191,6 +208,27 @@ class GuildAjaxHandler {
             this.showToast('error', 
                 result.message || (window.i18n?.TOAST_MESSAGES?.SETTINGS_ERROR || 'Fehler beim Speichern der Einstellungen')
             );
+        }
+    }
+
+    static async handleAddStaffResponse(form, result) {
+        console.log('[GuildAjax] handleAddStaffResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Benutzer erfolgreich hinzugefügt');
+            
+            // Modal schließen
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addStaffModal'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Formular zurücksetzen
+            form.reset();
+            
+            // Seite nach 1,5s neu laden um neue Tabelle zu zeigen
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Hinzufügen des Benutzers');
         }
     }
 
@@ -268,14 +306,103 @@ class GuildAjaxHandler {
         console.log('[GuildAjax] handleCreateServerResponse called:', result);
         if (result.success) {
             this.showToast('success', result.message || 'Server erfolgreich erstellt');
-            // Modal schließen
-            $('#createServerModal').modal('hide');
-            // Seite nach 1,5s neu laden
-            setTimeout(() => window.location.reload(), 1500);
+            
+            // ✅ Redirect zur Server-Liste (kein Modal mehr!)
+            setTimeout(() => {
+                // Extrahiere Guild-ID aus Form-Action oder URL
+                const action = form.getAttribute('action');
+                const match = action.match(/\/guild\/([^/]+)\//);
+                
+                if (match && match[1]) {
+                    const guildId = match[1];
+                    console.log('[GuildAjax] Redirecting to server list for guild:', guildId);
+                    window.location.href = `/guild/${guildId}/plugins/masterserver/servers`;
+                } else {
+                    // Fallback: Aus aktueller URL extrahieren
+                    const urlMatch = window.location.pathname.match(/\/guild\/([^/]+)\//);
+                    if (urlMatch && urlMatch[1]) {
+                        const guildId = urlMatch[1];
+                        console.log('[GuildAjax] Redirecting to server list (from URL) for guild:', guildId);
+                        window.location.href = `/guild/${guildId}/plugins/masterserver/servers`;
+                    } else {
+                        // Letzter Fallback: Seite neu laden
+                        console.warn('[GuildAjax] Could not extract guildId, reloading page');
+                        window.location.reload();
+                    }
+                }
+            }, 1500);
         } else {
             this.showToast('error', result.message || 'Fehler beim Erstellen des Servers');
         }
     }
+    
+    static async handleUpdateServerResponse(form, result) {
+        console.log('[GuildAjax] handleUpdateServerResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Server erfolgreich aktualisiert');
+            
+            // Nach 1,5s zurück zur Server-Übersicht navigieren
+            setTimeout(() => {
+                // Guild-ID aus URL extrahieren
+                const pathParts = window.location.pathname.split('/');
+                const guildIdIndex = pathParts.indexOf('guild') + 1;
+                const guildId = pathParts[guildIdIndex];
+                
+                // Zurück zur Server-Liste
+                window.location.href = `/guild/${guildId}/plugins/masterserver/servers`;
+            }, 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Aktualisieren des Servers');
+        }
+    }
+    
+    /**
+     * Gameserver Creation Handler
+     * Behandelt Response vom Server-Erstellungs-Wizard
+     */
+    static async handleGameserverCreateResponse(form, result) {
+        console.log('[GuildAjax] handleGameserverCreateResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Server erfolgreich erstellt');
+            
+            // Optional: Progress-Anzeige für Installation
+            if (result.serverId) {
+                console.log('[GuildAjax] Neuer Gameserver ID:', result.serverId);
+            }
+            
+            // Nach 2s zur Server-Liste navigieren
+            setTimeout(() => {
+                if (result.redirectUrl) {
+                    window.location.href = result.redirectUrl;
+                } else {
+                    // Fallback: Guild-ID aus URL extrahieren
+                    const pathParts = window.location.pathname.split('/');
+                    const guildIdIndex = pathParts.indexOf('guild') + 1;
+                    const guildId = pathParts[guildIdIndex];
+                    window.location.href = `/guild/${guildId}/plugins/gameserver/servers`;
+                }
+            }, 2000);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Erstellen des Servers');
+        }
+    }
+
+    static async handleGameserverEditResponse(form, result) {
+        console.log('[GuildAjax] handleGameserverEditResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Server erfolgreich aktualisiert');
+            // Nach 1,5s zur Server-Liste zurückkehren
+            setTimeout(() => {
+                const pathParts = window.location.pathname.split('/');
+                const guildIdIndex = pathParts.indexOf('guild') + 1;
+                const guildId = pathParts[guildIdIndex];
+                window.location.href = `/guild/${guildId}/plugins/gameserver/servers`;
+            }, 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Aktualisieren des Servers');
+        }
+    }
+
     
     static async handleTokenGenerateResponse(form, result) {
         console.log('[GuildAjax] handleTokenGenerateResponse called:', result);

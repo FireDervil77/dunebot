@@ -271,12 +271,186 @@ class CoreDashboardPlugin extends DashboardPlugin {
             // Subnav: Benutzer-Verwaltung
             this.guildRouter.get('/settings/users', async (req, res) => {
                 const guildId = res.locals.guildId;
+                
+                // Lade aktuelle Guild Staff Members
+                const dbService = ServiceManager.get('dbService');
+                const ipcServer = ServiceManager.get('ipcServer');
+                let staffMembers = [];
+                
+                try {
+                    const result = await dbService.query(`
+                        SELECT 
+                            gs.user_id,
+                            gs.role,
+                            gs.can_manage_settings,
+                            gs.can_manage_plugins,
+                            gs.can_view_logs,
+                            gs.granted_by,
+                            gs.granted_at,
+                            gs.expires_at,
+                            gs.notes
+                        FROM guild_staff gs
+                        WHERE gs.guild_id = ?
+                        ORDER BY gs.granted_at DESC
+                    `, [guildId]);
+                    
+                    // Handle verschiedene Result-Formate
+                    if (result && result[0]) {
+                        const firstElement = result[0];
+                        if (firstElement.user_id) {
+                            staffMembers = [firstElement];
+                        } else if (typeof firstElement === 'object' && !Array.isArray(firstElement)) {
+                            const numericKeys = Object.keys(firstElement).filter(key => !isNaN(key));
+                            staffMembers = numericKeys.map(key => firstElement[key]);
+                        } else if (Array.isArray(firstElement)) {
+                            staffMembers = firstElement;
+                        }
+                    }
+                    
+                    // User-Daten vom Bot holen für Namen/Avatare
+                    if (staffMembers.length > 0) {
+                        const userIds = staffMembers.map(m => m.user_id);
+                        try {
+                            const userDataResponse = await ipcServer.broadcastOne('dashboard:GET_USERS_DATA', { userIds });
+                            
+                            if (userDataResponse && userDataResponse.users) {
+                                staffMembers = staffMembers.map(member => {
+                                    const userData = userDataResponse.users[member.user_id];
+                                    return {
+                                        ...member,
+                                        username: userData?.username || 'Unbekannt',
+                                        discriminator: userData?.discriminator || '0000',
+                                        avatar: userData?.avatar || null,
+                                        tag: userData ? `${userData.username}#${userData.discriminator}` : member.user_id
+                                    };
+                                });
+                            }
+                        } catch (ipcErr) {
+                            Logger.warn('[Core] Fehler beim Laden von User-Daten via IPC:', ipcErr.message);
+                        }
+                    }
+                } catch (err) {
+                    Logger.error('[Core] Fehler beim Laden von Guild Staff:', err);
+                }
+                
                 await themeManager.renderView(res, 'guild/settings/users', {
                     title: 'Benutzer-Verwaltung',
                     activeMenu: `/guild/${guildId}/plugins/core/settings/users`,
                     guildId,
+                    staffMembers,
                     plugin: this
                 });
+            });
+            
+            // API: Guild Staff Liste laden
+            this.guildRouter.get('/settings/users/staff', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                
+                try {
+                    const result = await dbService.query(`
+                        SELECT 
+                            user_id,
+                            role,
+                            can_manage_settings,
+                            can_manage_plugins,
+                            can_view_logs,
+                            granted_by,
+                            granted_at,
+                            expires_at
+                        FROM guild_staff
+                        WHERE guild_id = ?
+                        ORDER BY granted_at DESC
+                    `, [guildId]);
+                    
+                    let staffMembers = [];
+                    if (result && result[0]) {
+                        const firstElement = result[0];
+                        if (firstElement.user_id) {
+                            staffMembers = [firstElement];
+                        } else if (typeof firstElement === 'object') {
+                            const numericKeys = Object.keys(firstElement).filter(key => !isNaN(key));
+                            staffMembers = numericKeys.map(key => firstElement[key]);
+                        }
+                    }
+                    
+                    res.json({ success: true, staff: staffMembers });
+                } catch (err) {
+                    Logger.error('[Core] Fehler beim Laden von Guild Staff:', err);
+                    res.status(500).json({ success: false, message: 'Fehler beim Laden der Staff-Liste' });
+                }
+            });
+            
+            // API: Guild Staff Member hinzufügen
+            this.guildRouter.post('/settings/users/staff', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                const { user_id, role, can_manage_settings, can_manage_plugins, can_view_logs, expires_at, notes } = req.body;
+                
+                // Validierung
+                if (!user_id || !role) {
+                    return res.status(400).json({ success: false, message: 'User ID und Rolle sind erforderlich' });
+                }
+                
+                const validRoles = ['admin', 'manager', 'moderator', 'viewer'];
+                if (!validRoles.includes(role)) {
+                    return res.status(400).json({ success: false, message: 'Ungültige Rolle' });
+                }
+                
+                try {
+                    // Prüfen ob User schon existiert
+                    const checkResult = await dbService.query(`
+                        SELECT user_id FROM guild_staff WHERE guild_id = ? AND user_id = ?
+                    `, [guildId, user_id]);
+                    
+                    if (checkResult && checkResult[0] && checkResult[0].user_id) {
+                        return res.status(400).json({ success: false, message: 'Dieser Benutzer hat bereits eine Rolle' });
+                    }
+                    
+                    // Neuen Staff Member einfügen
+                    await dbService.query(`
+                        INSERT INTO guild_staff (
+                            guild_id, user_id, role,
+                            can_manage_settings, can_manage_plugins, can_view_logs,
+                            granted_by, granted_at, expires_at, notes
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)
+                    `, [
+                        guildId,
+                        user_id,
+                        role,
+                        can_manage_settings ? 1 : 0,
+                        can_manage_plugins ? 1 : 0,
+                        can_view_logs ? 1 : 0,
+                        req.session.user.info.id,
+                        expires_at || null,
+                        notes || null
+                    ]);
+                    
+                    Logger.info(`[Core] Guild Staff hinzugefügt: ${user_id} als ${role} in Guild ${guildId}`);
+                    res.json({ success: true, message: 'Benutzer erfolgreich hinzugefügt' });
+                } catch (err) {
+                    Logger.error('[Core] Fehler beim Hinzufügen von Guild Staff:', err);
+                    res.status(500).json({ success: false, message: 'Fehler beim Hinzufügen des Benutzers' });
+                }
+            });
+            
+            // API: Guild Staff Member entfernen
+            this.guildRouter.delete('/settings/users/staff/:userId', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const { userId } = req.params;
+                const dbService = ServiceManager.get('dbService');
+                
+                try {
+                    await dbService.query(`
+                        DELETE FROM guild_staff WHERE guild_id = ? AND user_id = ?
+                    `, [guildId, userId]);
+                    
+                    Logger.info(`[Core] Guild Staff entfernt: ${userId} aus Guild ${guildId}`);
+                    res.json({ success: true, message: 'Benutzer erfolgreich entfernt' });
+                } catch (err) {
+                    Logger.error('[Core] Fehler beim Entfernen von Guild Staff:', err);
+                    res.status(500).json({ success: false, message: 'Fehler beim Entfernen des Benutzers' });
+                }
             });
             
             // Subnav: Integrationen

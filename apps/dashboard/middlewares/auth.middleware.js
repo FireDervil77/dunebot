@@ -104,11 +104,33 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
             });
         }
         
-        // Überprüfen, ob der Benutzer Admin-Rechte auf diesem Server hat
-        const hasAccess = (guild.permissions & 0x20) === 0x20 || 
-                         (guild.permissions & 0x8) === 0x8 || 
-                          guild.owner === true || 
-                          req.session.user.admin === true;
+        // Überprüfen Discord-Permissions
+        const isAdmin = (guild.permissions & 0x8) === 0x8;
+        const isManager = (guild.permissions & 0x20) === 0x20;
+        const isOwner = guild.owner === true;
+        const isBotOwner = req.session.user.admin === true;
+        
+        // Custom Permissions aus guild_staff prüfen
+        let hasCustomAccess = false;
+        try {
+            const result = await dbService.query(`
+                SELECT role 
+                FROM guild_staff 
+                WHERE guild_id = ? AND user_id = ? 
+                AND (expires_at IS NULL OR expires_at > NOW())
+            `, [guildId, req.session.user.info.id]);
+            
+            // dbService.query gibt direkt die Row zurück wenn nur 1 Row
+            if (result && result[0]) {
+                const firstElement = result[0];
+                hasCustomAccess = !!(firstElement.role); // Hat irgendeine Rolle = Zugriff
+            }
+        } catch (err) {
+            Logger.warn('[requireGuildAccess] Fehler beim Laden von guild_staff:', err.message);
+        }
+        
+        // Zugriff prüfen: Discord-Permissions ODER Custom DB-Permissions
+        const hasAccess = isAdmin || isManager || isOwner || isBotOwner || hasCustomAccess;
         
         if (!hasAccess) {
             return res.status(403).render("error", {

@@ -26,6 +26,7 @@ class IPMServer {
         this.port = port;
         this.wss = null;
         this.connections = new Map(); // daemon_id -> {ws, lastHeartbeat, sessionId, metadata}
+        this.connectionCounts = new Map(); // daemon_id -> connection_count (für Limit-Tracking)
         this.pendingCommands = new Map(); // commandId -> {resolve, reject, timeout}
         this.Logger = null;
         this.dbService = null;
@@ -33,6 +34,9 @@ class IPMServer {
         // JWT Secret aus ENV (oder generieren falls nicht vorhanden)
         this.jwtSecret = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
         this.jwtExpiry = '30d'; // Session-Token gültig für 30 Tage
+        
+        // ✅ SECURITY: Connection-Limits
+        this.maxConnectionsPerDaemon = 3; // Max 3 parallele Verbindungen pro Daemon
     }
 
     /**
@@ -98,17 +102,45 @@ class IPMServer {
                 
                 // Registrierung (erste Nachricht)
                 if (message.type === 'register' && !authenticated) {
-                    const result = await this._handleRegister(ws, message.payload);
+                    const result = await this._handleRegister(ws, message.payload, clientIp);
                     if (result.success) {
                         daemonId = result.daemonId;
                         authenticated = true;
+                        
+                        // ✅ SECURITY: Connection-Limit prüfen
+                        const currentConnections = this.connectionCounts.get(daemonId) || 0;
+                        if (currentConnections >= this.maxConnectionsPerDaemon) {
+                            this.Logger.warn(`[IPMServer Security] Daemon ${daemonId} hat zu viele Verbindungen: ${currentConnections}/${this.maxConnectionsPerDaemon}`);
+                            ws.send(JSON.stringify({ 
+                                type: 'error', 
+                                error: `Zu viele Verbindungen (max: ${this.maxConnectionsPerDaemon})` 
+                            }));
+                            ws.close(4429, 'Too many connections');
+                            return;
+                        }
+                        
+                        // Connection registrieren
                         this.connections.set(daemonId, {
                             ws,
                             lastHeartbeat: Date.now(),
                             sessionId: result.sessionId,
                             metadata: result.metadata
                         });
-                        this.Logger.info(`[IPMServer] Daemon ${daemonId} registriert (Guild: ${result.metadata.guild_id})`);
+                        
+                        // Connection-Count erhöhen
+                        this.connectionCounts.set(daemonId, currentConnections + 1);
+                        
+                        this.Logger.info(`[IPMServer] Daemon ${daemonId} registriert (Guild: ${result.metadata.guild_id}, Connections: ${currentConnections + 1}/${this.maxConnectionsPerDaemon})`);
+                        
+                        // ✅ RE-TRIGGER: Gameserver mit Status 'installing' erneut senden (NACH Connection-Registrierung!)
+                        if (result.isReconnect) {
+                            // Asynchron im Hintergrund ausführen, um Registration nicht zu blockieren
+                            setImmediate(() => {
+                                this._retriggerPendingInstallations(daemonId).catch(err => {
+                                    this.Logger.error(`[IPMServer] Re-trigger Fehler für Daemon ${daemonId}:`, err);
+                                });
+                            });
+                        }
                     } else {
                         ws.send(JSON.stringify({ type: 'error', error: result.error }));
                         ws.close(4001, result.error);
@@ -135,7 +167,13 @@ class IPMServer {
         ws.on('close', () => {
             if (daemonId) {
                 this.connections.delete(daemonId);
-                this.Logger.info(`[IPMServer] Daemon ${daemonId} disconnected`);
+                
+                // ✅ SECURITY: Connection-Count verringern
+                const currentConnections = this.connectionCounts.get(daemonId) || 0;
+                const newCount = Math.max(0, currentConnections - 1);
+                this.connectionCounts.set(daemonId, newCount);
+                
+                this.Logger.info(`[IPMServer] Daemon ${daemonId} disconnected (Connections: ${newCount}/${this.maxConnectionsPerDaemon})`);
             }
         });
 
@@ -151,14 +189,21 @@ class IPMServer {
      * 1. Erste Registrierung: Setup-Token (bcrypt) → JWT Session-Token generieren
      * 2. Reconnect: JWT validieren → Neuen JWT generieren (Token-Rotation)
      * 
+     * @param {WebSocket} ws - WebSocket Connection
+     * @param {object} payload - Register-Payload
+     * @param {string} clientIp - Client IP-Adresse
      * @private
      */
-    async _handleRegister(ws, payload) {
-        const { token, daemon_id, version } = payload;
+    async _handleRegister(ws, payload, clientIp) {
+        const { token, daemon_id, version, hardware } = payload; // ✅ Hardware-Info extrahieren
 
         if (!token || !daemon_id) {
             return { success: false, error: 'Missing token or daemon_id' };
         }
+        
+        // ✅ SECURITY: IP-Logging für Audit
+        this.Logger.info(`[IPMServer] Registrierungsversuch von Daemon ${daemon_id} (IP: ${clientIp})`);
+
 
         try {
             // Prüfen ob Token ein JWT ist (Session-Token)
@@ -208,19 +253,30 @@ class IPMServer {
                     
                     await this._logDaemonEvent(daemon_id, 'reconnected', { version });
                     
+                    // Server-Registry laden (alle Server die zu diesem Daemon gehören)
+                    const servers = await this.dbService.query(
+                        `SELECT server_id, server_name, ram_limit_gb, disk_limit_gb, custom_path
+                         FROM daemon_servers 
+                         WHERE daemon_id = ?`,
+                        [daemon_id]
+                    );
+                    
                     ws.send(JSON.stringify({ 
                         type: 'registered', 
-                        sessionToken: newSessionToken
+                        sessionToken: newSessionToken,
+                        serverRegistry: servers // ✅ Server-Registry mitschicken
                     }));
                     
                     return { 
                         success: true, 
                         daemonId: daemon_id, 
                         sessionId: newSessionToken,
+                        isReconnect: true, // ✅ Flag für Re-Trigger
                         metadata: {
                             guild_id: daemon.guild_id,
                             display_name: daemon.display_name,
-                            version: version || daemon.version
+                            version: version || daemon.version,
+                            hardware: hardware || null // ✅ Hardware-Info für Connection
                         }
                     };
                     
@@ -294,9 +350,18 @@ class IPMServer {
             // Audit-Log
             await this._logDaemonEvent(daemon_id, 'first_registration', { version });
 
+            // Server-Registry laden (alle Server die zu diesem Daemon gehören)
+            const servers = await this.dbService.query(
+                `SELECT server_id, server_name, ram_limit_gb, disk_limit_gb, custom_path
+                 FROM daemon_servers 
+                 WHERE daemon_id = ?`,
+                [daemon_id]
+            );
+
             ws.send(JSON.stringify({ 
                 type: 'registered', 
-                sessionToken
+                sessionToken,
+                serverRegistry: servers // ✅ Server-Registry mitschicken
             }));
 
             return { 
@@ -306,7 +371,8 @@ class IPMServer {
                 metadata: {
                     guild_id: tokenData.guild_id,
                     display_name: tokenData.display_name,
-                    version
+                    version,
+                    hardware: hardware || null // ✅ Hardware-Info für Connection
                 }
             };
 
@@ -323,7 +389,10 @@ class IPMServer {
     async _routeMessage(daemonId, message) {
         const { type, payload, id } = message;
 
-        switch (type) {
+        // ✅ Case-insensitive Type-Matching (Go-Daemon sendet UPPERCASE)
+        const normalizedType = type?.toLowerCase();
+
+        switch (normalizedType) {
             case 'heartbeat':
                 await this._handleHeartbeat(daemonId, payload);
                 break;
@@ -331,6 +400,13 @@ class IPMServer {
             case 'response':
                 // Antwort auf Command (Command-ID in payload.commandId)
                 this._resolveCommand(payload.commandId, payload);
+                break;
+
+            case 'command_response':
+                // ✅ Alternative Response-Format vom Go-Daemon
+                // Go-Daemon sendet: { type: "command_response", id: "...", payload: {...} }
+                // payload enthält: { success: bool, error: string, ... }
+                this._resolveCommand(id, payload);
                 break;
 
             case 'event':
@@ -361,6 +437,26 @@ class IPMServer {
         // Hardware-Stats in Connection-Metadata speichern
         if (payload.hardware) {
             conn.metadata.hardware = payload.hardware;
+            
+            // ✅ Hardware-Stats auch in daemon_servers speichern (für alle Virtual Server dieses Daemons)
+            const DaemonServer = require('../../../plugins/masterserver/dashboard/models/DaemonServer');
+            
+            // Alle Server dieses Daemons abrufen
+            const servers = await this.dbService.query(
+                'SELECT server_id FROM daemon_servers WHERE daemon_id = ?',
+                [daemonId]
+            );
+            
+            // Für jeden Server Hardware-Stats updaten
+            for (const server of servers) {
+                await DaemonServer.updateHardwareStats(server.server_id, payload.hardware);
+            }
+        }
+
+        // Update-Info in Connection-Metadata speichern
+        if (payload.updateInfo) {
+            conn.metadata.updateInfo = payload.updateInfo;
+            this.Logger.debug(`[IPMServer] Update-Info: ${payload.updateInfo.currentVersion} → ${payload.updateInfo.latestVersion} (Available: ${payload.updateInfo.available})`);
         }
 
         // DB-Update (last_heartbeat)
@@ -393,7 +489,12 @@ class IPMServer {
                      current_players = ?,
                      last_heartbeat = NOW()
                  WHERE daemon_id = ? AND server_id = ?`,
-                [server.status, server.players, daemonId, server.server_id]
+                [
+                    server.status || 'unknown', 
+                    server.players ?? null,  // undefined → null für MySQL
+                    daemonId, 
+                    server.server_id
+                ]
             );
         }
     }
@@ -407,7 +508,10 @@ class IPMServer {
 
         this.Logger.debug(`[IPMServer] Event from Daemon ${daemonId}: ${event}`, data);
 
-        // Event an IPC-Server weiterleiten (Bot benachrichtigen)
+        // ✅ Dashboard-Events DIREKT verarbeiten (ohne IPC zum Bot)
+        await this._processDashboardEvent(daemonId, event, data);
+
+        // Event an IPC-Server weiterleiten (Bot benachrichtigen) - TODO: Später implementieren
         const ipcServer = ServiceManager.get('ipcServer');
         if (ipcServer) {
             ipcServer.broadcast('daemon:event', { daemonId, event, data });
@@ -415,6 +519,64 @@ class IPMServer {
 
         // Event in DB loggen
         await this._logDaemonEvent(daemonId, event, data);
+    }
+
+    /**
+     * Dashboard-Events direkt verarbeiten
+     * @private
+     */
+    async _processDashboardEvent(daemonId, event, data) {
+        switch (event) {
+            case 'gameserver.install_complete':
+                await this._handleGameserverInstallComplete(daemonId, data);
+                break;
+
+            case 'gameserver.install_failed':
+                await this._handleGameserverInstallFailed(daemonId, data);
+                break;
+
+            // Weitere Events hier hinzufügen...
+        }
+    }
+
+    /**
+     * Gameserver Installation abgeschlossen
+     * @private
+     */
+    async _handleGameserverInstallComplete(daemonId, data) {
+        const { server_id } = data;
+        
+        this.Logger.info(`[IPMServer] Gameserver ${server_id} Installation abgeschlossen`);
+
+        // ✅ Server-Status in DB auf 'offline' setzen (Installation fertig)
+        await this.dbService.query(
+            `UPDATE gameservers 
+             SET status = 'offline', 
+                 updated_at = NOW() 
+             WHERE id = ?`,
+            [server_id]
+        );
+
+        this.Logger.success(`[IPMServer] Gameserver ${server_id} Status → offline`);
+    }
+
+    /**
+     * Gameserver Installation fehlgeschlagen
+     * @private
+     */
+    async _handleGameserverInstallFailed(daemonId, data) {
+        const { server_id, error } = data;
+        
+        this.Logger.error(`[IPMServer] Gameserver ${server_id} Installation fehlgeschlagen: ${error}`);
+
+        // ✅ Server-Status auf 'error' setzen
+        await this.dbService.query(
+            `UPDATE gameservers 
+             SET status = 'error', 
+                 updated_at = NOW() 
+             WHERE id = ?`,
+            [server_id]
+        );
     }
 
     /**
@@ -437,9 +599,9 @@ class IPMServer {
             const eventType = level === 'error' ? 'error' : 'status_change';
 
             await this.dbService.query(
-                `INSERT INTO daemon_logs (guild_id, daemon_id, event_type, action, message, metadata, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-                [daemon.guild_id, daemonId, eventType, level, message, JSON.stringify(context || {})]
+                `INSERT INTO daemon_logs (guild_id, daemon_id, event_type, level, action, message, metadata, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+                [daemon.guild_id, daemonId, eventType, level, level, message, JSON.stringify(context || {})]
             );
         } catch (error) {
             this.Logger.error('[IPMServer] Failed to log daemon message:', error);
@@ -468,13 +630,20 @@ class IPMServer {
             };
             const eventType = eventTypeMap[event] || 'status_change';
             
+            // Level basierend auf Event-Typ bestimmen
+            let level = 'info'; // Default
+            if (eventType === 'error') level = 'error';
+            else if (eventType === 'disconnect' || eventType === 'heartbeat_lost') level = 'warn';
+            else if (eventType === 'register' || eventType === 'reconnect') level = 'info';
+            
             await this.dbService.query(
-                `INSERT INTO daemon_logs (guild_id, daemon_id, event_type, action, message, metadata, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                `INSERT INTO daemon_logs (guild_id, daemon_id, event_type, level, action, message, metadata, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
                 [
                     daemon.guild_id,
                     daemonId,
                     eventType,
+                    level,
                     event, // action: 'first_registration', 'reconnected', 'connected'
                     `Daemon Event: ${event}`,
                     JSON.stringify(data || {})
@@ -491,14 +660,33 @@ class IPMServer {
      * @param {string} daemonId - Daemon ID
      * @param {string} command - Command-Name (z.B. 'server.start', 'server.stop')
      * @param {object} payload - Command-Daten
-     * @param {number} timeout - Timeout in ms (Standard: 30s)
+     * @param {number} timeout - Timeout in ms (wird automatisch basierend auf Command gesetzt)
      * @returns {Promise<object>} Command-Response
      */
-    async sendCommand(daemonId, command, payload = {}, timeout = 30000) {
+    async sendCommand(daemonId, command, payload = {}, timeout = null) {
+        // NOTE: Keine Payload-Validierung für Daemon-Commands!
+        // IPMServer kommuniziert direkt mit Go-Daemon (firebot_daemon), NICHT mit Bot
+        // WebSocket-Validator ist nur für Bot-Commands gedacht
+        
         const conn = this.connections.get(daemonId);
         
         if (!conn) {
             throw new Error(`Daemon ${daemonId} not connected`);
+        }
+
+        // Intelligente Timeout-Auswahl basierend auf Command
+        if (timeout === null) {
+            // Commands mit SteamCMD-Installation brauchen VIEL mehr Zeit
+            const longRunningCommands = [
+                'gameserver.install',   // 2-5 Minuten (SteamCMD Download)
+                'virtual.create'        // 1-3 Minuten (inkl. SteamCMD Installation)
+            ];
+            
+            timeout = longRunningCommands.includes(command) 
+                ? 300000  // 5 Minuten für SteamCMD-Operations
+                : 60000;  // 60s für normale Commands
+            
+            this.Logger.debug(`[IPMServer] Auto-Timeout für ${command}: ${timeout}ms`);
         }
 
         const commandId = crypto.randomBytes(16).toString('hex');
@@ -550,7 +738,8 @@ class IPMServer {
         this.pendingCommands.delete(commandId);
 
         if (response.success) {
-            pending.resolve(response.data);
+            // ✅ Go-Daemon sendet payload direkt, nicht verschachtelt in .data
+            pending.resolve(response);
         } else {
             pending.reject(new Error(response.error || 'Command failed'));
         }
@@ -637,6 +826,148 @@ class IPMServer {
 
         this.Logger.debug(`[IPMServer] Broadcast to Guild ${guildId}: ${event} (${sent} daemons)`);
         return sent;
+    }
+
+    /**
+     * Re-trigger Gameserver-Installationen die auf 'installing' hängen
+     * Wird bei Daemon-Reconnect aufgerufen
+     * 
+     * @param {string} daemonId - Daemon ID
+     * @private
+     */
+    async _retriggerPendingInstallations(daemonId) {
+        try {
+            this.Logger.info(`[IPMServer] Prüfe hängende Installationen für Daemon ${daemonId}...`);
+
+            // Alle Virtual Server für diesen Daemon laden
+            const virtualServers = await this.dbService.query(
+                `SELECT server_id FROM daemon_servers WHERE daemon_id = ?`,
+                [daemonId]
+            );
+
+            if (!virtualServers || virtualServers.length === 0) {
+                this.Logger.debug(`[IPMServer] Keine Virtual Server für Daemon ${daemonId}`);
+                return;
+            }
+
+            const virtualServerIds = virtualServers.map(v => v.server_id);
+
+            // Gameserver mit Status 'installing' für diese Virtual Server
+            // IN (?)-Platzhalter für jedes Array-Element erstellen
+            const placeholders = virtualServerIds.map(() => '?').join(',');
+            const pendingServers = await this.dbService.query(
+                `SELECT 
+                    gs.id as server_id,
+                    gs.daemon_server_id,
+                    gs.addon_marketplace_id,
+                    gs.name,
+                    gs.ports,
+                    gs.env_variables,
+                    gs.launch_params as startup_command,
+                    gs.frozen_game_data,
+                    am.slug as addon_slug,
+                    am.name as addon_name
+                 FROM gameservers gs
+                 LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
+                 WHERE gs.daemon_server_id IN (${placeholders})
+                 AND gs.status = 'installing'`,
+                virtualServerIds
+            );
+
+            if (!pendingServers || pendingServers.length === 0) {
+                this.Logger.info(`[IPMServer] Keine hängenden Installationen für Daemon ${daemonId}`);
+                return;
+            }
+
+            this.Logger.success(`[IPMServer] ${pendingServers.length} hängende Installation(en) gefunden, sende erneut...`);
+
+            // Jede Installation erneut senden
+            for (const server of pendingServers) {
+                try {
+                    // frozen_game_data parsen
+                    let gameData = {};
+                    try {
+                        gameData = typeof server.frozen_game_data === 'string'
+                            ? JSON.parse(server.frozen_game_data)
+                            : (server.frozen_game_data || {});
+                    } catch (e) {
+                        this.Logger.warn(`[IPMServer] frozen_game_data parse error für Server ${server.server_id}:`, e);
+                        this.Logger.warn(`[IPMServer] frozen_game_data raw:`, server.frozen_game_data);
+                    }
+
+                    // Validierung: frozen_game_data muss existieren
+                    if (!gameData || Object.keys(gameData).length === 0) {
+                        this.Logger.error(`[IPMServer] Server ${server.server_id} hat keine frozen_game_data - überspringe Re-trigger`);
+                        
+                        await this.dbService.query(
+                            'UPDATE gameservers SET status = ?, error_message = ? WHERE id = ?',
+                            ['error', 'Keine frozen_game_data vorhanden - Installation kann nicht fortgesetzt werden', server.server_id]
+                        );
+                        continue;
+                    }
+
+                    // Ports parsen
+                    let ports = {};
+                    try {
+                        ports = typeof server.ports === 'string'
+                            ? JSON.parse(server.ports)
+                            : server.ports;
+                    } catch (e) {
+                        this.Logger.warn(`[IPMServer] ports parse error für Server ${server.server_id}`);
+                    }
+
+                    // ENV Variables parsen
+                    let envVariables = {};
+                    try {
+                        envVariables = typeof server.env_variables === 'string'
+                            ? JSON.parse(server.env_variables)
+                            : server.env_variables;
+                    } catch (e) {
+                        this.Logger.warn(`[IPMServer] env_variables parse error für Server ${server.server_id}`);
+                    }
+
+                    // Install-Command mit 60s Timeout senden
+                    this.Logger.info(`[IPMServer] Re-trigger Installation: ${server.name} (ID: ${server.server_id})`);
+
+                    const response = await this.sendCommand(daemonId, 'gameserver.install', {
+                        server_id: server.server_id,
+                        daemon_server_id: server.daemon_server_id,
+                        addon_slug: server.addon_slug,
+                        addon_name: server.addon_name,
+                        template_name: null, // Template-Name nicht in DB gespeichert
+                        steam_app_id: gameData.install?.steamcmd?.app_id,
+                        startup_command: server.startup_command,
+                        ports,
+                        env_variables: envVariables,
+                        install_path: `/gameservers/${server.addon_slug}-${server.server_id}`
+                    }, 60000);
+
+                    if (response.success) {
+                        this.Logger.success(`[IPMServer] Installation erneut gestartet: ${server.name}`);
+                    } else {
+                        this.Logger.error(`[IPMServer] Re-trigger fehlgeschlagen für ${server.name}:`, response.error);
+                        
+                        // Status auf 'error' setzen
+                        await this.dbService.query(
+                            'UPDATE gameservers SET status = ?, error_message = ? WHERE id = ?',
+                            ['error', response.error || 'Re-trigger failed', server.server_id]
+                        );
+                    }
+
+                } catch (serverError) {
+                    this.Logger.error(`[IPMServer] Fehler beim Re-trigger für Server ${server.server_id}:`, serverError);
+                    
+                    // Status auf 'error' setzen
+                    await this.dbService.query(
+                        'UPDATE gameservers SET status = ?, error_message = ? WHERE id = ?',
+                        ['error', serverError.message || 'Re-trigger error', server.server_id]
+                    );
+                }
+            }
+
+        } catch (error) {
+            this.Logger.error('[IPMServer] Fehler beim Re-trigger von Installationen:', error);
+        }
     }
 }
 

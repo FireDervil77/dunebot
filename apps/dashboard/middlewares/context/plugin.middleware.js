@@ -181,10 +181,17 @@ module.exports.dashboard = async (req, res, next) => {
         "SELECT plugin_name FROM guild_plugins WHERE guild_id = ? AND is_enabled = 1",
         [req.params.guildId]
     );
-    const enabledPluginNames = enabledPluginsRows.map(row => row.plugin_name);
-    res.locals.enabledPlugins = pluginManager.plugins.filter((p) =>
-        enabledPluginNames.includes(p.name)
-    );
+    
+    // Validierung: enabledPluginsRows muss ein Array sein
+    if (!Array.isArray(enabledPluginsRows)) {
+        Logger.error('[Plugin Middleware] Query lieferte kein Array:', enabledPluginsRows);
+        res.locals.enabledPlugins = [];
+    } else {
+        const enabledPluginNames = enabledPluginsRows.map(row => row.plugin_name);
+        res.locals.enabledPlugins = pluginManager.plugins.filter((p) =>
+            enabledPluginNames.includes(p.name)
+        );
+    }
     
     res.locals.plugin = plugin;
     res.locals.pluginCmds = pluginCmds;

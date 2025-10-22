@@ -64,16 +64,9 @@ class RouterManager {
             // Route registrieren
             this.app.use(path, ...chain, router);
             
-            // Navigation registrieren wenn vorhanden
-            if (navigation && this.app.navigationManager) {
-                this.app.navigationManager.addItem(
-                    navigation.section,
-                    {
-                        ...navigation.item,
-                        path
-                    }
-                );
-            }
+            // HINWEIS: Navigation wird NICHT hier registriert!
+            // Plugins registrieren Navigation in onGuildEnable() via navigationManager.registerNavigation()
+            // Die addItem() Methode existiert nicht und wird auch nicht benötigt
 
             this.Logger.debug(`Route registriert: ${path}`);
             return this;
@@ -96,11 +89,7 @@ class RouterManager {
                     plugin.guildRouter,
                     { 
                         auth: true,
-                        plugin,
-                        navigation: {
-                            section: 'guild',
-                            item: plugin.navigationItems?.guild
-                        }
+                        plugin
                     }
                 );
             }

@@ -18,6 +18,10 @@ class NavigationManager {
     /**
      * Ermittelt die nächste verfügbare sort_order-Range (1000, 2000, 3000...)
      * für Hauptnavigations-Punkte ohne parent
+     * 
+     * WICHTIG: Ignoriert Ranges >= 9000 (reserviert für Superadmin)
+     * Neue Plugins werden immer VOR dem Superadmin-Bereich eingefügt!
+     * 
      * @param {string} guildId - ID der Guild
      * @returns {Promise<number>} - Nächste freie Range (z.B. 3000)
      * @private
@@ -28,12 +32,14 @@ class NavigationManager {
         
         try {
             // Höchste sort_order für Hauptmenü-Items (parent = NULL) finden
+            // ABER: Ignoriere alles >= 9000 (Superadmin-Bereich)
             const result = await dbService.query(
                 `SELECT MAX(sort_order) as max_order 
                  FROM nav_items 
                  WHERE guildId = ? 
                  AND type = 'main' 
-                 AND (parent IS NULL OR parent = '')`,
+                 AND (parent IS NULL OR parent = '')
+                 AND sort_order < 9000`,
                 [guildId]
             );
             
@@ -41,10 +47,21 @@ class NavigationManager {
             
             // Nächste 1000er-Range berechnen
             // Beispiel: maxOrder=2300 → nextRange=3000
-            const nextRange = Math.ceil((maxOrder + 1) / 1000) * 1000;
+            let nextRange = Math.ceil((maxOrder + 1) / 1000) * 1000;
             
             // Mindestens 1000 (erste Range)
-            return nextRange < 1000 ? 1000 : nextRange;
+            if (nextRange < 1000) nextRange = 1000;
+            
+            // === SAFETY CHECK ===
+            // Falls die Berechnung trotzdem >= 9000 ergibt (sollte nicht passieren)
+            // → Nutze 8000 als "Notfall-Range" vor dem Superadmin
+            if (nextRange >= 90000) {
+                Logger.warn(`[NavigationManager] Berechnete Range ${nextRange} >= 9000 - nutze Fallback 8000`);
+                nextRange = 8000;
+            }
+            
+            Logger.debug(`[NavigationManager] Nächste freie Range (< 9000): ${nextRange}`);
+            return nextRange;
             
         } catch (error) {
             Logger.error('Fehler beim Ermitteln der nächsten sort_order-Range:', error);
@@ -106,6 +123,10 @@ class NavigationManager {
      * - Bei order >= 1000 → exakte Verwendung
      * - Bei order < 1000 → als Offset in ermittelter Range (z.B. order=50 in Range 2000 → 2050)
      * 
+     * RESERVIERTE RANGES:
+     * - 9000-9999: Reserviert für Superadmin-Plugin (immer ganz hinten in der Navigation)
+     * - Andere Plugins dürfen diese Range NICHT nutzen!
+     * 
      * SUBMENÜS (parent=/some/url):
      * - Automatische Offsets: 10, 20, 30...
      * - Bei order=null → automatisch nächster freier Offset (pro parent)
@@ -116,7 +137,7 @@ class NavigationManager {
      * // Hauptnav
      * { title: 'Dashboard', order: null }           → 1000 (auto)
      * { title: 'Masterserver', order: null }        → 2000 (auto)
-     * { title: 'Settings', order: 9000 }            → 9000 (manuell ganz hinten)
+     * { title: 'Settings', order: 9000 }            → 9000 (nur Superadmin!)
      * 
      * // Submenüs unter '/guild/:gid/masterserver'
      * { title: 'Overview', parent: '/...', order: null }  → 10 (auto)
@@ -185,6 +206,15 @@ class NavigationManager {
                 // Nur für Hauptnavigations-Elemente (ohne parent) Auto-Range anwenden
                 const isMainNavItem = !item.parent && item.type === this.menuTypes.MAIN;
                 const isSubmenuItem = item.parent && item.type === this.menuTypes.MAIN;
+                
+                // === RESERVED RANGE CHECK (90000-99999 für Superadmin) ===
+                if (item.order !== null && item.order !== undefined && 
+                    item.order >= 90000 && item.order < 100000 && 
+                    pluginName !== 'superadmin') {
+                    Logger.error(`[NavigationManager] Plugin '${pluginName}' versucht reservierte Range 90000-99999 zu nutzen!`);
+                    Logger.error(`[NavigationManager] Diese Range ist für das Superadmin-Plugin reserviert!`);
+                    throw new Error(`Reserved navigation order range 90000-99999 (Superadmin only). Plugin: ${pluginName}, Item: ${item.title}`);
+                }
                 
                 if (item.order === null || item.order === undefined) {
                     // Kein order angegeben → automatisch ermitteln

@@ -64,6 +64,12 @@ plugins/statistik/
 plugins/ticket/
 plugins/voiceserver/
 
+# Daemon Binaries (separat laden)
+apps/dashboard/downloads/daemon/binaries/
+downloads/binarys/
+*.exe
+firebot-daemon
+firebot-daemon-*
 
 #docs and docs folder
 docs/

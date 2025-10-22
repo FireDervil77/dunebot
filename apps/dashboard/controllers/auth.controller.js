@@ -429,6 +429,58 @@ exports.getServerSelector = async (req, res) => {
 
         // Normaler Flow (Bot online)
         const userGuilds = req.session.user.guilds;
+        const userId = req.session.user.info.id;
+
+        Logger.debug(`[SERVER-SELECTOR] Lade Custom Permissions für User-ID: ${userId}`);
+
+        // Custom Permissions aus DB laden (guild_staff)
+        const dbService = ServiceManager.get('dbService');
+        let customPermissions = [];
+        try {
+            const result = await dbService.query(`
+                SELECT 
+                    guild_id,
+                    role,
+                    can_manage_settings,
+                    can_manage_plugins,
+                    can_view_logs
+                FROM guild_staff
+                WHERE user_id = ?
+                AND (expires_at IS NULL OR expires_at > NOW())
+            `, [userId]);
+            
+            // dbService.query gibt direkt die Row zurück wenn nur 1 Row!
+            // Bei 1 Row: result = [{guild_id: "...", role: "..."}, fields]
+            // Bei mehreren Rows: result = [{0: row1, 1: row2}, fields]
+            if (result && result[0]) {
+                const firstElement = result[0];
+                
+                // Check ob es direkt eine Row ist (hat guild_id key)
+                if (firstElement.guild_id) {
+                    customPermissions = [firstElement];
+                } 
+                // Oder ein Object mit numerischen Keys
+                else if (typeof firstElement === 'object' && !Array.isArray(firstElement)) {
+                    const numericKeys = Object.keys(firstElement).filter(key => !isNaN(key));
+                    customPermissions = numericKeys.map(key => firstElement[key]);
+                }
+                // Oder schon ein Array
+                else if (Array.isArray(firstElement)) {
+                    customPermissions = firstElement;
+                }
+            }
+            
+            Logger.debug(`[SERVER-SELECTOR] Custom Permissions Array:`, customPermissions);
+        } catch (err) {
+            Logger.warn('[SERVER-SELECTOR] Fehler beim Laden von guild_staff (Tabelle existiert noch nicht?):', err.message);
+        }
+        
+        const customPermsMap = new Map();
+        customPermissions.forEach(p => {
+            customPermsMap.set(p.guild_id, p);
+        });
+        
+        Logger.debug(`[SERVER-SELECTOR] User hat ${customPermissions.length} Custom Permissions in guild_staff`);
 
         const botGuildsResponse = await ipcServer.broadcast("dashboard:GET_BOT_GUILDS");
         const botGuildIds = botGuildsResponse
@@ -441,7 +493,15 @@ exports.getServerSelector = async (req, res) => {
         const guilds = userGuilds.map(guild => {
             const isAdmin = (guild.permissions & 0x8) === 0x8;
             const isManager = (guild.permissions & 0x20) === 0x20;
-            const canManage = isAdmin || isManager || guild.owner;
+            
+            // Custom Permissions aus DB prüfen
+            const customPerm = customPermsMap.get(guild.id);
+            const hasCustomAccess = !!customPerm; // Wenn Eintrag in guild_staff existiert
+            const customRole = customPerm?.role || null;
+            
+            // canManage: Discord-Permissions ODER Custom DB-Permissions
+            const canManage = isAdmin || isManager || guild.owner || hasCustomAccess;
+            
             const botInGuild = botGuildIds.includes(guild.id);
 
             const settingsUrl = botInGuild
@@ -456,17 +516,28 @@ exports.getServerSelector = async (req, res) => {
                 ...guild,
                 admin: isAdmin || guild.owner,
                 canManage,
+                customRole, // 'admin', 'manager', 'moderator', 'viewer' oder null
+                hasCustomAccess,
                 botInGuild,
                 settingsUrl,
                 iconURL
             };
         });
 
+        // FIXME: Filtere nach canManage (Admin/Manager/Owner ODER Custom DB-Permission)!
+        // Zeige alle Server wo User Discord-Permissions ODER Custom-Permissions hat
+        const accessibleGuilds = guilds.filter(g => g.canManage);
+        
+        Logger.debug(`[SERVER-SELECTOR] User hat Zugriff auf ${accessibleGuilds.length} von ${guilds.length} Servern`);
+        accessibleGuilds.forEach(g => {
+            Logger.debug(`  - ${g.name} (${g.id}): owner=${g.owner}, admin=${g.admin}, customRole=${g.customRole}, canManage=${g.canManage}, botInGuild=${g.botInGuild}`);
+        });
+        
         return res.render("auth/server-selector", {
             title: "Server auswählen",
             activeMenu: "/auth/server-selector",
             user: req.session.user,
-            guilds: guilds.filter(g => g.owner === true),
+            guilds: accessibleGuilds,
             botOnline: true,
             errorMessage: errorMessage
         });
