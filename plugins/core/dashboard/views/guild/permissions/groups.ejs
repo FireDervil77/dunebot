@@ -1,0 +1,585 @@
+/plugins/core/permissions/groups<!-- 
+  Gruppen-Verwaltung - Permission System
+  Verwaltung von Benutzergruppen mit Berechtigungen
+-->
+
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h2 class="mb-1">
+          <i class="fa-solid fa-user-group text-primary me-2"></i>
+          Gruppen-Verwaltung
+        </h2>
+        <p class="text-muted mb-0">
+          Verwalte Benutzergruppen und deren Berechtigungen
+        </p>
+      </div>
+      
+      <% if (userPermissions.permissions['permissions.groups.create']) { %>
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+        <i class="fa-solid fa-plus me-2"></i>
+        Neue Gruppe
+      </button>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Info Alert -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="alert alert-info">
+      <i class="fa-solid fa-circle-info me-2"></i>
+      <strong>Tipp:</strong> 
+      Gruppen ermöglichen es, Berechtigungen zentral zu verwalten. Geschützte Gruppen können nicht gelöscht werden.
+    </div>
+  </div>
+</div>
+
+<!-- Gruppen-Karten -->
+<div class="row">
+  <% if (groups.length === 0) { %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body text-center py-5">
+        <i class="fa-solid fa-user-group text-muted" style="font-size: 4rem;"></i>
+        <h4 class="mt-3">Keine Gruppen vorhanden</h4>
+        <p class="text-muted">Erstelle die erste Gruppe, um zu beginnen.</p>
+        
+        <% if (userPermissions.permissions['permissions.groups.create']) { %>
+        <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+          <i class="fa-solid fa-plus me-2"></i>
+          Erste Gruppe erstellen
+        </button>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <% } else { %>
+    <% groups.forEach(group => { %>
+    <div class="col-md-6 col-lg-4 mb-4">
+      <div class="card h-100 group-card hover-shadow">
+        <div class="card-header" style="background-color: <%= group.color %>; color: #fff;">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+              <i class="<%= group.icon || 'fa-solid fa-users' %> me-2"></i>
+              <%= group.name %>
+            </h5>
+            <% if (group.is_protected) { %>
+            <span class="badge bg-dark" data-bs-toggle="tooltip" title="Diese Gruppe ist geschützt und kann nicht gelöscht werden">
+              <i class="fa-solid fa-shield-halved"></i>
+            </span>
+            <% } %>
+          </div>
+        </div>
+        
+        <div class="card-body">
+          <p class="text-muted mb-3">
+            <%= group.description || 'Keine Beschreibung vorhanden' %>
+          </p>
+          
+          <div class="d-flex align-items-center mb-2">
+            <i class="fa-solid fa-users text-muted me-2"></i>
+            <span class="text-muted"><%= group.member_count || 0 %> Mitglied(er)</span>
+          </div>
+          
+          <div class="d-flex align-items-center mb-2">
+            <i class="fa-solid fa-key text-muted me-2"></i>
+            <span class="text-muted">
+              <% 
+                let permCount = 0;
+                if (group.permissions) {
+                  if (typeof group.permissions === 'string') {
+                    try {
+                      const parsed = JSON.parse(group.permissions);
+                      permCount = Object.keys(parsed).filter(k => parsed[k] === true).length;
+                    } catch (e) {
+                      permCount = 0;
+                    }
+                  } else {
+                    permCount = Object.keys(group.permissions).filter(k => group.permissions[k] === true).length;
+                  }
+                }
+              %>
+              <%= permCount %> Berechtigung(en)
+            </span>
+          </div>
+          
+          <div class="d-flex align-items-center">
+            <i class="fa-solid fa-arrow-up text-muted me-2"></i>
+            <span class="text-muted">Priorität: <%= group.priority || 0 %></span>
+          </div>
+        </div>
+        
+        <div class="card-footer bg-light">
+          <div class="btn-group w-100" role="group">
+            <% if (userPermissions.permissions['permissions.groups.edit']) { %>
+            <button type="button" 
+                    class="btn btn-primary btn-sm btn-edit-group" 
+                    data-group-id="<%= group.id %>"
+                    data-group-name="<%= group.name %>"
+                    data-group-slug="<%= group.slug %>"
+                    data-group-description="<%= group.description || '' %>"
+                    data-group-color="<%= group.color %>"
+                    data-group-icon="<%= group.icon || 'fa-solid fa-users' %>"
+                    data-group-priority="<%= group.priority || 0 %>"
+                    data-group-permissions='<%= JSON.stringify(group.permissions || {}) %>'>
+              <i class="fa-solid fa-edit me-1"></i>
+              Bearbeiten
+            </button>
+            <% } %>
+            
+            <% if (userPermissions.permissions['permissions.groups.delete'] && !group.is_protected) { %>
+            <button type="button" 
+                    class="btn btn-danger btn-sm btn-delete-group" 
+                    data-group-id="<%= group.id %>"
+                    data-group-name="<%= group.name %>">
+              <i class="fa-solid fa-trash me-1"></i>
+              Löschen
+            </button>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+    <% }); %>
+  <% } %>
+</div>
+
+<!-- Create Group Modal -->
+<div class="modal fade" id="createGroupModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-plus me-2"></i>
+          Neue Gruppe erstellen
+        </h5>
+        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <form id="createGroupForm" class="guild-ajax-form" 
+            data-form-type="create-group"
+            data-method="POST"
+            action="/guild/<%= guildId %>/plugins/core/permissions/groups">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="create_name" class="form-label">
+                Gruppenname <span class="text-danger">*</span>
+              </label>
+              <input type="text" 
+                     class="form-control" 
+                     id="create_name" 
+                     name="name" 
+                     placeholder="z.B. Moderatoren"
+                     required>
+            </div>
+            
+            <div class="col-md-6 mb-3">
+              <label for="create_slug" class="form-label">
+                Slug <span class="text-danger">*</span>
+              </label>
+              <input type="text" 
+                     class="form-control" 
+                     id="create_slug" 
+                     name="slug" 
+                     placeholder="z.B. moderators"
+                     required>
+              <div class="form-text">Technischer Name (lowercase, keine Leerzeichen)</div>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="create_description" class="form-label">Beschreibung</label>
+            <textarea class="form-control" 
+                      id="create_description" 
+                      name="description" 
+                      rows="2"
+                      placeholder="Kurze Beschreibung der Gruppe..."></textarea>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="create_color" class="form-label">Farbe</label>
+              <input type="color" 
+                     class="form-control form-control-color" 
+                     id="create_color" 
+                     name="color" 
+                     value="#6c757d">
+            </div>
+            
+            <div class="col-md-4 mb-3">
+              <label for="create_icon" class="form-label">Icon</label>
+              <input type="text" 
+                     class="form-control" 
+                     id="create_icon" 
+                     name="icon" 
+                     value="fa-solid fa-users"
+                     placeholder="fa-solid fa-users">
+              <div class="form-text"><a href="https://fontawesome.com/icons" target="_blank">Font Awesome</a></div>
+            </div>
+            
+            <div class="col-md-4 mb-3">
+              <label for="create_priority" class="form-label">Priorität</label>
+              <input type="number" 
+                     class="form-control" 
+                     id="create_priority" 
+                     name="priority" 
+                     value="0"
+                     min="0">
+              <div class="form-text">Höhere Zahl = höhere Priorität</div>
+            </div>
+          </div>
+          
+          <hr>
+          
+          <h6 class="mb-3">
+            <i class="fa-solid fa-key me-2"></i>
+            Berechtigungen
+          </h6>
+          
+          <div id="create_permissions_tree">
+            <% if (permissions) { 
+              Object.keys(permissions).forEach(category => { %>
+              <div class="permission-category mb-3">
+                <h6 class="text-uppercase text-muted mb-2">
+                  <i class="fa-solid fa-folder-open me-2"></i>
+                  <%= category %>
+                </h6>
+                <div class="ps-3">
+                  <% permissions[category].forEach(perm => { %>
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" 
+                           type="checkbox" 
+                           name="permissions[<%= perm.permission_key %>]"
+                           id="create_perm_<%= perm.permission_key.replace(/\./g, '_') %>"
+                           value="true">
+                    <label class="form-check-label" 
+                           for="create_perm_<%= perm.permission_key.replace(/\./g, '_') %>">
+                      <strong><%= tr(`core:${perm.name_translation_key}`) %></strong>
+                      <% if (perm.description_translation_key) { %>
+                      <br><small class="text-muted"><%= tr(`core:${perm.description_translation_key}`) %></small>
+                      <% } %>
+                      <% if (perm.is_dangerous) { %>
+                      <span class="badge bg-danger ms-2">Kritisch</span>
+                      <% } %>
+                    </label>
+                  </div>
+                  <% }); %>
+                </div>
+              </div>
+            <% }); 
+            } %>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">
+            Abbrechen
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-save me-2"></i>
+            Gruppe erstellen
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Group Modal -->
+<div class="modal fade" id="editGroupModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-edit me-2"></i>
+          Gruppe bearbeiten
+        </h5>
+        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <form id="editGroupForm" class="guild-ajax-form"
+            data-form-type="edit-group"
+            data-method="PUT">
+        <input type="hidden" id="edit_group_id" name="group_id">
+        
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="edit_name" class="form-label">
+                Gruppenname <span class="text-danger">*</span>
+              </label>
+              <input type="text" 
+                     class="form-control" 
+                     id="edit_name" 
+                     name="name" 
+                     required>
+            </div>
+            
+            <div class="col-md-6 mb-3">
+              <label for="edit_slug" class="form-label">
+                Slug <span class="text-danger">*</span>
+              </label>
+              <input type="text" 
+                     class="form-control" 
+                     id="edit_slug" 
+                     name="slug" 
+                     required
+                     disabled>
+              <div class="form-text">Slug kann nach Erstellung nicht geändert werden</div>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="edit_description" class="form-label">Beschreibung</label>
+            <textarea class="form-control" 
+                      id="edit_description" 
+                      name="description" 
+                      rows="2"></textarea>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="edit_color" class="form-label">Farbe</label>
+              <input type="color" 
+                     class="form-control form-control-color" 
+                     id="edit_color" 
+                     name="color">
+            </div>
+            
+            <div class="col-md-4 mb-3">
+              <label for="edit_icon" class="form-label">Icon</label>
+              <input type="text" 
+                     class="form-control" 
+                     id="edit_icon" 
+                     name="icon">
+            </div>
+            
+            <div class="col-md-4 mb-3">
+              <label for="edit_priority" class="form-label">Priorität</label>
+              <input type="number" 
+                     class="form-control" 
+                     id="edit_priority" 
+                     name="priority"
+                     min="0">
+            </div>
+          </div>
+          
+          <hr>
+          
+          <h6 class="mb-3">
+            <i class="fa-solid fa-key me-2"></i>
+            Berechtigungen
+          </h6>
+          
+          <div id="edit_permissions_tree">
+            <% if (permissions) { 
+              Object.keys(permissions).forEach(category => { %>
+              <div class="permission-category mb-3">
+                <h6 class="text-uppercase text-muted mb-2">
+                  <i class="fa-solid fa-folder-open me-2"></i>
+                  <%= category %>
+                </h6>
+                <div class="ps-3">
+                  <% permissions[category].forEach(perm => { %>
+                  <div class="form-check mb-2">
+                    <input class="form-check-input edit-permission-checkbox" 
+                           type="checkbox" 
+                           name="permissions[<%= perm.permission_key %>]"
+                           id="edit_perm_<%= perm.permission_key.replace(/\./g, '_') %>"
+                           value="true"
+                           data-permission-key="<%= perm.permission_key %>">
+                    <label class="form-check-label" 
+                           for="edit_perm_<%= perm.permission_key.replace(/\./g, '_') %>">
+                      <strong><%= tr(`core:${perm.name_translation_key}`) %></strong>
+                      <% if (perm.description_translation_key) { %>
+                      <br><small class="text-muted"><%= tr(`core:${perm.description_translation_key}`) %></small>
+                      <% } %>
+                      <% if (perm.is_dangerous) { %>
+                      <span class="badge bg-danger ms-2">Kritisch</span>
+                      <% } %>
+                    </label>
+                  </div>
+                  <% }); %>
+                </div>
+              </div>
+            <% }); 
+            } %>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">
+            Abbrechen
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-save me-2"></i>
+            Änderungen speichern
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Group Modal -->
+<div class="modal fade" id="deleteGroupModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-exclamation-triangle me-2"></i>
+          Gruppe löschen
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <form id="deleteGroupForm" class="guild-ajax-form"
+            data-form-type="delete-group"
+            data-method="DELETE">
+        <input type="hidden" id="delete_group_id" name="group_id">
+        
+        <div class="modal-body">
+          <p>Möchtest du die Gruppe <strong id="delete_group_name"></strong> wirklich löschen?</p>
+          <div class="alert alert-warning mb-0">
+            <i class="fa-solid fa-exclamation-triangle me-2"></i>
+            <strong>Achtung:</strong> Alle Benutzer in dieser Gruppe verlieren die zugewiesenen Berechtigungen.
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">
+            Abbrechen
+          </button>
+          <button type="submit" class="btn btn-danger">
+            <i class="fa-solid fa-trash me-2"></i>
+            Gruppe löschen
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const guildId = '<%= guildId %>';
+  
+  // ===================================
+  // Bootstrap Modal Manual Initialization
+  // ===================================
+  const createModalElement = document.getElementById('createGroupModal');
+  const createModalBtn = document.querySelector('[data-bs-target="#createGroupModal"]');
+  
+  if (createModalElement && createModalBtn) {
+    const createModalInstance = new bootstrap.Modal(createModalElement, {
+      backdrop: true,
+      keyboard: true,
+      focus: false  // ← Verhindert aria-hidden Warning
+    });
+    
+    // Manual trigger (falls data-bs-toggle nicht funktioniert)
+    createModalBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      console.log('[Groups] Opening createGroupModal...');
+      createModalInstance.show();
+    });
+  }
+  
+  // Auto-generate slug from name
+  const createNameInput = document.getElementById('create_name');
+  const createSlugInput = document.getElementById('create_slug');
+  
+  if (createNameInput && createSlugInput) {
+    createNameInput.addEventListener('input', (e) => {
+      const slug = e.target.value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+      createSlugInput.value = slug;
+    });
+  }
+  
+  // Edit Group Button
+  document.querySelectorAll('.btn-edit-group').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const groupId = btn.dataset.groupId;
+      const groupName = btn.dataset.groupName;
+      const groupSlug = btn.dataset.groupSlug;
+      const groupDescription = btn.dataset.groupDescription;
+      const groupColor = btn.dataset.groupColor;
+      const groupIcon = btn.dataset.groupIcon;
+      const groupPriority = btn.dataset.groupPriority;
+      const groupPermissions = JSON.parse(btn.dataset.groupPermissions || '{}');
+      
+      // Populate form
+      document.getElementById('edit_group_id').value = groupId;
+      document.getElementById('edit_name').value = groupName;
+      document.getElementById('edit_slug').value = groupSlug;
+      document.getElementById('edit_description').value = groupDescription;
+      document.getElementById('edit_color').value = groupColor;
+      document.getElementById('edit_icon').value = groupIcon;
+      document.getElementById('edit_priority').value = groupPriority;
+      
+      // Set action URL
+      const form = document.getElementById('editGroupForm');
+      form.action = `/guild/${guildId}/plugins/core/permissions/groups/${groupId}`;
+      
+      // Update checkboxes
+      document.querySelectorAll('.edit-permission-checkbox').forEach(checkbox => {
+        const permKey = checkbox.dataset.permissionKey;
+        checkbox.checked = groupPermissions[permKey] === true;
+      });
+      
+      new bootstrap.Modal(document.getElementById('editGroupModal')).show();
+    });
+  });
+  
+  // Delete Group Button
+  document.querySelectorAll('.btn-delete-group').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const groupId = btn.dataset.groupId;
+      const groupName = btn.dataset.groupName;
+      
+      document.getElementById('delete_group_id').value = groupId;
+      document.getElementById('delete_group_name').textContent = groupName;
+      
+      // Set action URL
+      const form = document.getElementById('deleteGroupForm');
+      form.action = `/guild/${guildId}/plugins/core/permissions/groups/${groupId}`;
+      
+      new bootstrap.Modal(document.getElementById('deleteGroupModal')).show();
+    });
+  });
+  
+  // Initialize Bootstrap tooltips
+  const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+  tooltips.forEach(el => new bootstrap.Tooltip(el));
+});
+</script>
+
+<style>
+.group-card {
+  transition: all 0.3s ease;
+}
+
+.hover-shadow:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+.permission-category {
+  border-left: 3px solid #007bff;
+  padding-left: 1rem;
+}
+
+/* Checkboxen sind jetzt global in guild.css definiert */
+
+  background-color: #28a745;
+  border-color: #28a745;
+}
+</style>

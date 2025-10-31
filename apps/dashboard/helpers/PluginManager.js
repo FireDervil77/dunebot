@@ -243,35 +243,47 @@ class PluginManager extends BasePluginManager {
 
     /**
     * Prüft, ob ein User die erforderlichen Berechtigungen für ein Plugin in einer Guild hat
+    * Nutzt den PermissionManager für die Prüfung
+    * 
     * @param {string} userId - Discord User-ID
     * @param {string} guildId - Discord Guild-ID
-    * @param {string} pluginName - Name des Plugins
-    * @param {string|string[]} requiredPermissions - Erforderliche Berechtigungen
+    * @param {string} pluginName - Name des Plugins (wird ignoriert - Permissions sind plugin-unabhängig)
+    * @param {string|string[]} requiredPermissions - Erforderliche Permission-Keys (z.B. "SETTINGS.VIEW")
     * @returns {Promise<boolean>}
     */
     async checkUserGuildPluginPermissions(userId, guildId, pluginName, requiredPermissions) {
-        // Admins haben immer Zugriff
-        const user = await this.getUser(userId);
-        if (user?.admin) return true;
-
-        // Discord Guild Permissions prüfen (z.B. MANAGE_GUILD, ADMINISTRATOR)
-        const guild = await this.getGuild(guildId);
-        const member = guild?.members?.find(m => m.id === userId);
-        if (!member) return false;
-
-        // Discord-Permissions prüfen
-        const perms = member.permissions || [];
-        if (perms.includes("ADMINISTRATOR") || perms.includes("MANAGE_GUILD")) return true;
-
-        // Plugin-spezifische Berechtigungen prüfen (optional)
-        // TODO: Custom-Logik für Plugin-Rollen etc.
-
-        // requiredPermissions prüfen
-        if (!requiredPermissions) return true;
-        if (Array.isArray(requiredPermissions)) {
-            return requiredPermissions.every(perm => perms.includes(perm));
+        const Logger = ServiceManager.get('Logger');
+        const permissionManager = ServiceManager.get('permissionManager');
+        
+        try {
+            // Keine Permissions erforderlich? → Zugriff erlaubt
+            if (!requiredPermissions) {
+                return true;
+            }
+            
+            // Array von Permissions? → Alle müssen erfüllt sein
+            if (Array.isArray(requiredPermissions)) {
+                for (const permKey of requiredPermissions) {
+                    const hasPermission = await permissionManager.hasPermission(userId, guildId, permKey);
+                    if (!hasPermission) {
+                        Logger.debug(`[PluginManager] User ${userId} fehlt Permission: ${permKey}`);
+                        return false;
+                    }
+                }
+                return true; // Alle Permissions vorhanden
+            }
+            
+            // Einzelne Permission prüfen
+            const hasPermission = await permissionManager.hasPermission(userId, guildId, requiredPermissions);
+            if (!hasPermission) {
+                Logger.debug(`[PluginManager] User ${userId} fehlt Permission: ${requiredPermissions}`);
+            }
+            return hasPermission;
+            
+        } catch (error) {
+            Logger.error(`[PluginManager] Error checking permissions for user ${userId}:`, error);
+            return false; // Im Fehlerfall: Kein Zugriff
         }
-        return perms.includes(requiredPermissions);
     }
 
     /**
@@ -348,7 +360,7 @@ class PluginManager extends BasePluginManager {
         await super.registerPluginTables(plugin, 'dashboard');
         
         try {
-            // SQL-Dateien aus dashboard/sql/ laden
+            // SQL-Dateien aus dashboard/sql/ laden (MIT MIGRATION-TRACKING!)
             const dashboardSqlDir = path.join(this.pluginsDir, plugin.name, 'dashboard', 'sql');
             if (fs.existsSync(dashboardSqlDir)) {
                 await this.registerModelsFromDir(plugin, dashboardSqlDir, 'dashboard-sql');
@@ -360,6 +372,181 @@ class PluginManager extends BasePluginManager {
             // "register_tables_failed" Hook aufrufen
             await this.hooks.doAction('register_tables_failed', plugin, error);
             Logger.error(`Error registering dashboard tables for ${plugin.name}:`, error);
+        }
+    }
+
+    /**
+     * Registriert Permissions aus permissions.json eines Plugins
+     * Lädt automatisch die permissions.json und trägt sie in permission_definitions ein
+     * 
+     * @param {Object} plugin - Das Plugin-Objekt
+     * @returns {Promise<number>} Anzahl der registrierten Permissions
+     * @author FireDervil
+     */
+    async registerPluginPermissions(plugin) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        try {
+            // permissions.json Pfad
+            const permissionsFile = path.join(this.pluginsDir, plugin.name, 'dashboard', 'permissions.json');
+            
+            // Prüfen ob File existiert
+            if (!fs.existsSync(permissionsFile)) {
+                Logger.debug(`Plugin ${plugin.name} hat keine permissions.json - überspringe`);
+                return 0;
+            }
+            
+            // JSON laden
+            const permissionsData = JSON.parse(fs.readFileSync(permissionsFile, 'utf8'));
+            
+            if (!permissionsData.permissions || !Array.isArray(permissionsData.permissions)) {
+                Logger.warn(`permissions.json von ${plugin.name} hat ungültiges Format (permissions Array fehlt)`);
+                return 0;
+            }
+            
+            Logger.info(`📋 Registriere ${permissionsData.permissions.length} Permissions für Plugin ${plugin.name}...`);
+            
+            let registeredCount = 0;
+            
+            // Jede Permission registrieren
+            for (const perm of permissionsData.permissions) {
+                const {
+                    key,
+                    name,
+                    description,
+                    category,
+                    is_dangerous = 0,
+                    requires = null
+                } = perm;
+                
+                // Validierung
+                if (!key || !name || !category) {
+                    Logger.warn(`Überspringe ungültige Permission:`, perm);
+                    continue;
+                }
+                
+                // requires_permissions zu JSON konvertieren (erwartet Array oder null)
+                let requiresJson = null;
+                if (requires) {
+                    // Wenn String: Als Array mit einem Element behandeln
+                    const requiresArray = typeof requires === 'string' ? [requires] : requires;
+                    requiresJson = JSON.stringify(requiresArray);
+                }
+                
+                try {
+                    // INSERT ... ON DUPLICATE KEY UPDATE Pattern
+                    // Schema: permission_key, name_translation_key, description_translation_key, category, is_dangerous, requires_permissions, plugin_name
+                    await dbService.query(`
+                        INSERT INTO permission_definitions 
+                        (permission_key, name_translation_key, description_translation_key, category, is_dangerous, requires_permissions, plugin_name)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                            name_translation_key = VALUES(name_translation_key),
+                            description_translation_key = VALUES(description_translation_key),
+                            category = VALUES(category),
+                            is_dangerous = VALUES(is_dangerous),
+                            requires_permissions = VALUES(requires_permissions),
+                            plugin_name = VALUES(plugin_name)
+                    `, [key, name, description, category, is_dangerous, requiresJson, plugin.name]);
+                    
+                    registeredCount++;
+                    Logger.debug(`  ✅ Permission registriert: ${key}`);
+                    
+                } catch (err) {
+                    Logger.error(`Fehler beim Registrieren von Permission ${key}:`, err);
+                }
+            }
+            
+            Logger.success(`✅ ${registeredCount} Permissions für Plugin ${plugin.name} registriert`);
+            return registeredCount;
+            
+        } catch (error) {
+            Logger.error(`Fehler beim Registrieren der Permissions für Plugin ${plugin.name}:`, error);
+            return 0;
+        }
+    }
+
+    /**
+     * ÜBERSCHRIEBEN: Nutzt Migration-Tracking für SQL-Dateien
+     * Verhindert doppelte Ausführung von Schemas
+     * 
+     * @param {Object} plugin - Plugin-Instanz
+     * @param {string} dirPath - Pfad zum Models/SQL-Verzeichnis
+     * @param {string} context - Kontext (z.B. 'dashboard', 'bot', 'shared')
+     * @author FireDervil
+     */
+    async registerModelsFromDir(plugin, dirPath, context) {
+        const dbService = ServiceManager.get("dbService");
+        const Logger = ServiceManager.get('Logger');
+        
+        Logger.debug(`Suche nach ${context} Models in ${dirPath}`);
+
+        try {
+            // Nach JS-Dateien UND SQL-Dateien suchen
+            const modelFiles = fs.readdirSync(dirPath)
+                .filter(file => file.endsWith('.js') || file.endsWith('.sql'));
+                
+            for (const file of modelFiles) {
+                const modelName = path.basename(file, path.extname(file));
+                
+                try {
+                    if (file.endsWith('.sql')) {
+                        // ✅ NEU: SQL-Datei mit Migration-Tracking ausführen
+                        const sqlFilePath = path.join(dirPath, file);
+                        const pluginMeta = this.loadPluginMeta(plugin.name);
+                        const version = pluginMeta?.version || '0.0.0';
+                        
+                        const result = await this.executeSQLMigration(
+                            plugin.name, 
+                            sqlFilePath, 
+                            version, 
+                            null, // null = globales Schema, nicht guild-spezifisch
+                            false // force = false (überspringen wenn bereits ausgeführt)
+                        );
+                        
+                        if (result.skipped) {
+                            Logger.debug(`⏭️  ${file} übersprungen (bereits ausgeführt)`);
+                        }
+                        
+                    } else {
+                        // JS-Dateien wie bisher behandeln
+                        const modelModule = require(path.join(dirPath, file));
+                        
+                        if (typeof modelModule === 'string' && modelModule.trim().toLowerCase().startsWith('create table')) {
+                            await dbService.query(modelModule);
+                            Logger.debug(`SQL-Schema ${modelName} aus JS-Modul für Plugin ${plugin.name} (${context}) ausgeführt`);
+                        } else if (modelModule.schema && typeof modelModule.schema === 'string') {
+                            await dbService.query(modelModule.schema);
+                            Logger.debug(`SQL-Schema ${modelName} aus .schema Property für Plugin ${plugin.name} (${context}) ausgeführt`);
+                            
+                            // Trigger separat ausführen (falls vorhanden)
+                            if (modelModule.trigger && typeof modelModule.trigger === 'string') {
+                                try {
+                                    const triggerStatements = modelModule.trigger
+                                        .split(';')
+                                        .map(s => s.trim())
+                                        .filter(s => s.length > 0);
+                                    
+                                    for (const statement of triggerStatements) {
+                                        await dbService.query(statement);
+                                    }
+                                    
+                                    Logger.debug(`Trigger für ${modelName} (Plugin ${plugin.name}) erfolgreich erstellt`);
+                                } catch (triggerError) {
+                                    Logger.warn(`Trigger für ${modelName} konnte nicht erstellt werden:`, triggerError.message);
+                                }
+                            }
+                        } else {
+                            Logger.warn(`Model ${modelName} in ${plugin.name}/${context} hat kein gültiges SQL-Schema und wird übersprungen`);
+                        }
+                    }
+                } catch (error) {
+                    Logger.error(`Fehler beim Registrieren des Models ${modelName} aus ${dirPath}/${file}:`, error);
+                }
+            }
+        } catch (error) {
+            Logger.error(`Fehler beim Lesen des Verzeichnisses ${dirPath}:`, error);
         }
     }
 
@@ -433,6 +620,9 @@ class PluginManager extends BasePluginManager {
                     
                     // Tabellen registrieren vor dem Enable
                     await this.registerDashboardTables(plugin);
+                    
+                    // ✅ NEU: Permissions registrieren
+                    await this.registerPluginPermissions(plugin);
                     
                     // Plugin initialisieren
                     if (typeof plugin.onEnable === 'function') {
@@ -644,6 +834,22 @@ class PluginManager extends BasePluginManager {
         await this.hooks.doAction('before_disable_in_guild', pluginName, guildId);
 
         try {
+            // ════════════════════════════════════════════════════════════
+            // DEPENDENCY CHECK: Prüfe ob andere Plugins dieses Plugin brauchen
+            // ════════════════════════════════════════════════════════════
+            if (pluginName === 'masterserver') {
+                const gameserverActive = await this._isPluginActiveInGuild(guildId, 'gameserver');
+                if (gameserverActive) {
+                    const error = new Error(
+                        'Das Masterserver-Plugin kann nicht deaktiviert werden, ' +
+                        'solange das Gameserver-Plugin aktiv ist. ' +
+                        'Bitte deaktiviere zuerst das Gameserver-Plugin.'
+                    );
+                    await this.hooks.doAction('disable_in_guild_failed', pluginName, guildId, error);
+                    throw error;
+                }
+            }
+            
             // Core Plugin kann niemals deaktiviert werden
             if (pluginName === "core") {
                 const error = new Error("Cannot disable core plugin");
@@ -747,7 +953,7 @@ class PluginManager extends BasePluginManager {
      */
     loadPluginMeta(pluginName) {
         const Logger = ServiceManager.get('Logger');
-        const metaPath = path.join(this.pluginDir, pluginName, 'plugin.json');
+        const metaPath = path.join(this.pluginsDir, pluginName, 'plugin.json');
         
         if (!fs.existsSync(metaPath)) {
             Logger.debug(`[PluginManager] Kein plugin.json für ${pluginName} gefunden`);
@@ -977,7 +1183,7 @@ class PluginManager extends BasePluginManager {
             return;
         }
         
-        const migrationPath = path.join(this.pluginDir, pluginName, migrationFile);
+        const migrationPath = path.join(this.pluginsDir, pluginName, migrationFile);
         
         if (!fs.existsSync(migrationPath)) {
             throw new Error(`Migration-File nicht gefunden: ${migrationPath}`);
@@ -994,6 +1200,157 @@ class PluginManager extends BasePluginManager {
         }
         
         Logger.success(`[PluginManager] Migration erfolgreich: ${pluginName} v${targetVersion}`);
+    }
+
+    /**
+     * Prüft ob eine Migration bereits ausgeführt wurde
+     * @param {string} pluginName - Name des Plugins
+     * @param {string} migrationFile - Dateiname der Migration (z.B. "001_create_permissions.sql")
+     * @param {string} guildId - Guild-ID (IMMER erforderlich - alle Migrations sind guild-spezifisch!)
+     * @returns {Promise<boolean>} true wenn bereits ausgeführt
+     * @author FireDervil
+     */
+    async hasMigrationRun(pluginName, migrationFile, guildId) {
+        const dbService = ServiceManager.get('dbService');
+        
+        const [result] = await dbService.query(`
+            SELECT id FROM plugin_migrations 
+            WHERE plugin_name = ? 
+            AND migration_file = ? 
+            AND guild_id = ?
+            AND success = TRUE
+        `, [pluginName, migrationFile, guildId]);
+        
+        return !!result;
+    }
+
+    /**
+     * Markiert eine Migration als ausgeführt
+     * @param {string} pluginName - Name des Plugins
+     * @param {string} migrationFile - Dateiname der Migration
+     * @param {string} version - Plugin-Version
+     * @param {string} guildId - Guild-ID (IMMER erforderlich!)
+     * @param {number} executionTimeMs - Ausführungszeit in Millisekunden
+     * @param {string} migrationType - Art der Migration ('schema', 'data', 'update')
+     * @author FireDervil
+     */
+    async recordMigration(pluginName, migrationFile, version, guildId, executionTimeMs = 0, migrationType = 'schema') {
+        const dbService = ServiceManager.get('dbService');
+        
+        await dbService.query(`
+            INSERT INTO plugin_migrations 
+                (plugin_name, guild_id, migration_file, migration_version, 
+                 migration_type, execution_time_ms, success)
+            VALUES (?, ?, ?, ?, ?, ?, TRUE)
+            ON DUPLICATE KEY UPDATE
+                migration_version = VALUES(migration_version),
+                executed_at = CURRENT_TIMESTAMP,
+                execution_time_ms = VALUES(execution_time_ms),
+                success = TRUE,
+                error_log = NULL
+        `, [pluginName, guildId, migrationFile, version, migrationType, executionTimeMs]);
+    }
+
+    /**
+     * Markiert eine fehlgeschlagene Migration
+     * @param {string} pluginName 
+     * @param {string} migrationFile 
+     * @param {string} version 
+     * @param {string} guildId - Guild-ID (IMMER erforderlich!)
+     * @param {string} errorMessage 
+     * @author FireDervil
+     */
+    async recordMigrationError(pluginName, migrationFile, version, guildId, errorMessage) {
+        const dbService = ServiceManager.get('dbService');
+        
+        await dbService.query(`
+            INSERT INTO plugin_migrations 
+                (plugin_name, guild_id, migration_file, migration_version, success, error_log)
+            VALUES (?, ?, ?, ?, FALSE, ?)
+            ON DUPLICATE KEY UPDATE
+                success = FALSE,
+                error_log = VALUES(error_log),
+                executed_at = CURRENT_TIMESTAMP
+        `, [pluginName, guildId, migrationFile, version, errorMessage]);
+    }
+
+    /**
+     * Führt SQL-Datei aus (mit Migration-Tracking)
+     * Überspringt Dateien die bereits ausgeführt wurden
+     * 
+     * @param {string} pluginName - Name des Plugins
+     * @param {string} sqlFile - Pfad zur SQL-Datei
+     * @param {string} version - Plugin-Version
+     * @param {string|null} guildId - Guild-ID (null für globale Schemas)
+     * @param {boolean} force - Ausführung erzwingen (auch wenn bereits ausgeführt)
+     * @returns {Promise<{success: boolean, skipped?: boolean, error?: string}>}
+     * @author FireDervil
+     */
+    async executeSQLMigration(pluginName, sqlFile, version, guildId = null, force = false) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        const fileName = path.basename(sqlFile);
+        
+        // 1. Prüfen ob bereits ausgeführt
+        if (!force && await this.hasMigrationRun(pluginName, fileName, guildId)) {
+            Logger.debug(`[Migration] Überspringe ${fileName} für ${pluginName} (bereits ausgeführt)`);
+            return { success: true, skipped: true };
+        }
+        
+        try {
+            const startTime = Date.now();
+            
+            // 2. SQL-Datei lesen
+            let sql = fs.readFileSync(sqlFile, 'utf8');
+            
+            // 3. Pre-Processing: DELIMITER-Statements entfernen (MariaDB/MySQL kann die nicht)
+            // DELIMITER ist nur für CLI-Tools (mysql, mysqldump), nicht für mysql2 driver
+            sql = sql.replace(/DELIMITER\s+\$\$/gi, ''); // Entferne DELIMITER $$
+            sql = sql.replace(/DELIMITER\s+;/gi, '');    // Entferne DELIMITER ;
+            
+            // 4. Split in einzelne Statements (nur bei $$ als Trennzeichen)
+            const statements = sql
+                .split('$$')
+                .map(s => s.trim())
+                .filter(s => s.length > 0 && !s.match(/^(--|\/\*)/)); // Kommentare entfernen
+            
+            // 5. Jedes Statement einzeln ausführen
+            for (const statement of statements) {
+                if (statement.trim().length === 0) continue;
+                
+                try {
+                    await dbService.query(statement);
+                } catch (stmtError) {
+                    // Ignore "Object already exists" errors (für CREATE OR REPLACE, CREATE IF NOT EXISTS)
+                    if (
+                        stmtError.code === 'ER_TABLE_EXISTS_ERROR' ||
+                        stmtError.code === 'ER_DUP_KEYNAME' ||
+                        stmtError.message.includes('already exists')
+                    ) {
+                        Logger.debug(`[Migration] Statement übersprungen (Objekt existiert bereits): ${statement.substring(0, 50)}...`);
+                        continue;
+                    }
+                    throw stmtError; // Andere Fehler weiterwerfen
+                }
+            }
+            
+            const executionTime = Date.now() - startTime;
+            
+            // 6. Migration tracken
+            await this.recordMigration(pluginName, fileName, version, guildId, executionTime, 'schema');
+            
+            Logger.success(`[Migration] ✅ ${fileName} ausgeführt (${executionTime}ms)`);
+            return { success: true };
+            
+        } catch (error) {
+            Logger.error(`[Migration] ❌ ${fileName} fehlgeschlagen:`, error);
+            
+            // Fehler tracken
+            await this.recordMigrationError(pluginName, fileName, version, guildId, error.message);
+            
+            return { success: false, error: error.message };
+        }
     }
 
     /**
@@ -1260,7 +1617,11 @@ class PluginManager extends BasePluginManager {
     }
 
     /**
-     * Lädt ein Plugin-Update von GitHub herunter und installiert es
+     * Führt ein lokales Plugin-Update aus (ohne Download)
+     * Für Monorepo-Projekte: Code ist bereits da, nur Migrationen müssen laufen
+     * 
+     * WICHTIG: Führt ALLE Migrationen zwischen current_version und target_version aus!
+     * 
      * @param {string} pluginName - Name des Plugins
      * @param {string} version - Zielversion
      * @param {string} guildId - Guild ID für Guild-spezifische Updates
@@ -1270,65 +1631,146 @@ class PluginManager extends BasePluginManager {
     async downloadAndInstallUpdate(pluginName, version, guildId) {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
+        let pluginMeta = null; // Für catch-Block verfügbar machen
         
         try {
-            Logger.info(`[PluginManager] Starte Download: ${pluginName} v${version}`);
+            Logger.info(`[PluginManager] Starte lokales Update: ${pluginName} v${version} für Guild ${guildId}`);
             
-            // 1. Backup des aktuellen Plugins erstellen
-            const backupPath = await this.createPluginBackup(pluginName);
-            Logger.info(`[PluginManager] Backup erstellt: ${backupPath}`);
-            
-            // 2. GitHub Release URL
-            const releaseTag = `${pluginName}-v${version}`;
-            const downloadUrl = `https://github.com/FireDervil77/dunebot/archive/refs/tags/${releaseTag}.tar.gz`;
-            
-            // 3. Download Release
-            const tempDir = path.join(__dirname, '../../../temp');
-            if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
+            // 1. Prüfe ob Plugin existiert
+            const pluginPath = path.join(this.pluginsDir, pluginName);
+            if (!fs.existsSync(pluginPath)) {
+                throw new Error(`Plugin "${pluginName}" nicht gefunden in ${pluginPath}`);
             }
             
-            const tarballPath = path.join(tempDir, `${pluginName}-${version}.tar.gz`);
-            await this.downloadFile(downloadUrl, tarballPath);
-            Logger.info(`[PluginManager] Download abgeschlossen: ${tarballPath}`);
+            // 2. Lade Plugin-Metadaten
+            pluginMeta = await this.loadPluginMeta(pluginName);
+            if (!pluginMeta) {
+                throw new Error(`plugin.json für "${pluginName}" nicht gefunden`);
+            }
             
-            // 4. Extrahiere nur Plugin-Ordner
-            const extractDir = path.join(tempDir, `${pluginName}-${version}-extract`);
-            await this.extractPluginFromTarball(tarballPath, extractDir, pluginName);
-            Logger.info(`[PluginManager] Plugin extrahiert: ${extractDir}`);
+            // 3. Hole aktuelle Version aus DB
+            const [currentVersionRow] = await dbService.query(
+                'SELECT current_version FROM plugin_versions WHERE plugin_name = ? AND guild_id = ?',
+                [pluginName, guildId]
+            );
             
-            // 5. Installiere neues Plugin
-            const pluginPath = path.join(this.pluginDir, pluginName);
-            await this.replacePluginFiles(extractDir, pluginPath);
-            Logger.info(`[PluginManager] Plugin-Dateien aktualisiert`);
+            const currentVersion = currentVersionRow?.[0]?.current_version || '0.0.0';
+            Logger.info(`[PluginManager] Version-Upgrade: ${currentVersion} → ${version}`);
             
-            // 6. Cleanup
-            fs.rmSync(tarballPath, { force: true });
-            fs.rmSync(extractDir, { recursive: true, force: true });
+            // 4. Finde ALLE Migrationen zwischen current und target
+            const migrations = pluginMeta.migrations || {};
+            const migrationVersions = Object.keys(migrations).sort((a, b) => {
+                // Semver-Vergleich (einfach)
+                const [aMajor, aMinor, aPatch] = a.split('.').map(Number);
+                const [bMajor, bMinor, bPatch] = b.split('.').map(Number);
+                
+                if (aMajor !== bMajor) return aMajor - bMajor;
+                if (aMinor !== bMinor) return aMinor - bMinor;
+                return aPatch - bPatch;
+            });
             
-            // 7. Version in DB aktualisieren
+            // Filter: Nur Versionen > current UND <= target
+            const [currentMajor, currentMinor, currentPatch] = currentVersion.split('.').map(Number);
+            const [targetMajor, targetMinor, targetPatch] = version.split('.').map(Number);
+            
+            const migrationsToRun = migrationVersions.filter(v => {
+                const [major, minor, patch] = v.split('.').map(Number);
+                
+                // Ist größer als current?
+                if (major > currentMajor) return true;
+                if (major === currentMajor && minor > currentMinor) return true;
+                if (major === currentMajor && minor === currentMinor && patch > currentPatch) return true;
+                
+                // Ist kleiner oder gleich target?
+                if (major < targetMajor) return true;
+                if (major === targetMajor && minor < targetMinor) return true;
+                if (major === targetMajor && minor === targetMinor && patch <= targetPatch) return true;
+                
+                return false;
+            });
+            
+            if (migrationsToRun.length === 0) {
+                Logger.warn(`[PluginManager] Keine Migrationen zwischen ${currentVersion} und ${version} gefunden`);
+            } else {
+                Logger.info(`[PluginManager] Führe ${migrationsToRun.length} Migration(en) aus: ${migrationsToRun.join(', ')}`);
+                
+                // 5. Führe Migrationen SEQUENZIELL aus
+                for (const migrationVersion of migrationsToRun) {
+                    const migrationFile = migrations[migrationVersion];
+                    
+                    Logger.info(`[PluginManager] → Migration ${migrationVersion}: ${migrationFile}`);
+                    
+                    // Prüfe ob bereits ausgeführt (WICHTIG: Parameter-Reihenfolge beachten!)
+                    const alreadyRun = await this.hasMigrationRun(pluginName, migrationFile, guildId);
+                    
+                    if (alreadyRun) {
+                        Logger.info(`[PluginManager]   ⏭️ Bereits ausgeführt, überspringe`);
+                        continue;
+                    }
+                    
+                    // Migration ausführen
+                    const migrationPath = path.join(pluginPath, migrationFile);
+                    
+                    if (!fs.existsSync(migrationPath)) {
+                        throw new Error(`Migrations-Datei nicht gefunden: ${migrationPath}`);
+                    }
+                    
+                    const startTime = Date.now();
+                    const migration = require(migrationPath);
+                    
+                    if (typeof migration.up !== 'function') {
+                        throw new Error(`Migration ${migrationFile} hat keine up() Funktion`);
+                    }
+                    
+                    // Führe up() Migration aus
+                    await migration.up(dbService, guildId);
+                    
+                    const executionTime = Date.now() - startTime;
+                    
+                    // Markiere als ausgeführt
+                    await this.recordMigration(
+                        pluginName, 
+                        migrationFile, 
+                        migrationVersion, 
+                        guildId, 
+                        executionTime, 
+                        'data'
+                    );
+                    
+                    Logger.success(`[PluginManager]   ✅ Migration ${migrationVersion} erfolgreich (${executionTime}ms)`);
+                }
+            }
+            
+            // 7. Version in DB aktualisieren (UPSERT!)
             await dbService.query(`
-                UPDATE plugin_versions 
-                SET current_version = ?, 
+                INSERT INTO plugin_versions (plugin_name, guild_id, current_version, available_version, update_status, updated_at)
+                VALUES (?, ?, ?, NULL, 'up-to-date', NOW())
+                ON DUPLICATE KEY UPDATE
+                    current_version = VALUES(current_version),
                     available_version = NULL,
                     update_status = 'up-to-date',
                     updated_at = NOW()
-                WHERE plugin_name = ? AND guild_id = ?
-            `, [version, pluginName, guildId]);
+            `, [pluginName, guildId, version]);
             
-            Logger.success(`[PluginManager] ${pluginName} erfolgreich auf v${version} aktualisiert`);
+            Logger.success(`[PluginManager] ${pluginName} erfolgreich auf v${version} aktualisiert (Guild ${guildId})`);
             
             return { success: true };
             
         } catch (error) {
             Logger.error(`[PluginManager] Fehler beim Plugin-Update:`, error);
             
-            // Rollback bei Fehler
-            try {
-                await this.rollbackPlugin(pluginName);
-                Logger.info(`[PluginManager] Rollback durchgeführt`);
-            } catch (rollbackError) {
-                Logger.error(`[PluginManager] Rollback fehlgeschlagen:`, rollbackError);
+            // Bei lokalem Update: Migration-Fehler tracken
+            if (pluginMeta?.migrations?.[version]) {
+                const migrationFile = pluginMeta.migrations[version];
+                // recordMigrationError(pluginName, migrationFile, version, guildId, errorMessage)
+                await this.recordMigrationError(
+                    pluginName,
+                    migrationFile,
+                    version,
+                    guildId,
+                    error.message
+                );
+                Logger.warn(`[PluginManager] Migration-Fehler protokolliert`);
             }
             
             return { success: false, error: error.message };
@@ -1350,7 +1792,7 @@ class PluginManager extends BasePluginManager {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const backupPath = path.join(backupDir, `${pluginName}-backup-${timestamp}`);
         
-        const sourcePath = path.join(this.pluginDir, pluginName);
+        const sourcePath = path.join(this.pluginsDir, pluginName);
         
         // Kopiere rekursiv
         await this.copyDirectory(sourcePath, backupPath);
@@ -1489,7 +1931,7 @@ class PluginManager extends BasePluginManager {
         }
         
         const latestBackup = path.join(backupDir, backups[0]);
-        const pluginPath = path.join(this.pluginDir, pluginName);
+        const pluginPath = path.join(this.pluginsDir, pluginName);
         
         // Entferne fehlerhafte Version
         if (fs.existsSync(pluginPath)) {
@@ -1500,6 +1942,31 @@ class PluginManager extends BasePluginManager {
         await this.copyDirectory(latestBackup, pluginPath);
         
         Logger.info(`[PluginManager] Rollback erfolgreich: ${pluginName} wiederhergestellt`);
+    }
+
+    /**
+     * Hilfsfunktion: Prüft ob ein Plugin in einer Guild aktiv ist
+     * 
+     * @param {string} guildId - Discord Guild ID
+     * @param {string} pluginName - Name des zu prüfenden Plugins
+     * @returns {Promise<boolean>} True wenn Plugin aktiv ist
+     * @private
+     */
+    async _isPluginActiveInGuild(guildId, pluginName) {
+        const dbService = ServiceManager.get('dbService');
+        
+        try {
+            const [result] = await dbService.query(
+                'SELECT is_enabled FROM guild_plugins WHERE guild_id = ? AND plugin_name = ?',
+                [guildId, pluginName]
+            );
+            
+            return result ? result.is_enabled === 1 : false;
+        } catch (error) {
+            const Logger = ServiceManager.get('Logger');
+            Logger.error(`[PluginManager] Fehler beim Prüfen von Plugin ${pluginName} in Guild ${guildId}:`, error);
+            return false;
+        }
     }
 }
 

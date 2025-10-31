@@ -1,15 +1,16 @@
 const path = require("path");
 const router = require("express").Router();
 const { ServiceManager } = require("dunebot-sdk");
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
-// GET Route bleibt unverändert
+// GET Route - Kein Schutz nötig, ist Dashboard-Hauptseite
 router.get("/", (_req, res) => {
     res.render(path.join(__dirname, "views", "guild.ejs"), {
         config: res.locals.config,
     });
 });
 
-router.put("/", async (req, res) => {
+router.put("/", requirePermission('DASHBOARD.SETTINGS.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
 

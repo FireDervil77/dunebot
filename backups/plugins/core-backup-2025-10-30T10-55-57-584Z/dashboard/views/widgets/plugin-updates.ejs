@@ -1,0 +1,54 @@
+<!-- Plugin Updates Widget -->
+<% if (pendingUpdates && pendingUpdates.length > 0) { %>
+  <div class="alert alert-warning mb-3">
+    <h5 class="mb-2">
+      <i class="fas fa-exclamation-triangle"></i> 
+      <%= pendingUpdates.length %> Plugin-Update<%= pendingUpdates.length !== 1 ? 's' : '' %> verfügbar
+    </h5>
+    <p class="text-muted mb-3">
+      Es stehen Updates für installierte Plugins bereit. Bitte überprüfen Sie die Details und aktualisieren Sie rechtzeitig vor Ablauf der Frist.
+    </p>
+  </div>
+  
+  <div class="row">
+    <% pendingUpdates.forEach(function(update) { %>
+      <div class="col-md-4 mb-3">
+        <div class="card border-warning">
+          <div class="card-body">
+            <h6 class="card-title">
+              <strong><%= update.plugin_name %></strong>
+              <span class="badge badge-info ml-1">v<%= update.current_version %></span>
+              <i class="fas fa-arrow-right mx-1"></i>
+              <span class="badge badge-warning">v<%= update.available_version %></span>
+            </h6>
+            <p class="text-muted mb-2">
+              <small>
+                <i class="fas fa-clock"></i> 
+                <strong><%= update.daysLeft %> Tag<%= update.daysLeft !== 1 ? 'e' : '' %></strong> bis zur automatischen Aktualisierung
+              </small>
+            </p>
+            <% if (update.changelog && update.changelog.length > 0) { %>
+              <ul class="mb-0 pl-3" style="font-size:0.85rem;">
+                <% update.changelog.slice(0, 2).forEach(function(change) { %>
+                  <li><%= change %></li>
+                <% }); %>
+                <% if (update.changelog.length > 2) { %>
+                  <li class="text-muted"><em>... und <%= update.changelog.length - 2 %> weitere</em></li>
+                <% } %>
+              </ul>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+  
+  <a href="/guild/<%= guildId %>/plugins" class="btn btn-warning btn-block">
+    <i class="fas fa-sync-alt"></i> Alle Updates verwalten
+  </a>
+<% } else { %>
+  <div class="text-center text-muted py-3">
+    <i class="fas fa-check-circle fa-2x mb-2"></i>
+    <p class="mb-0">Alle Plugins sind auf dem neuesten Stand</p>
+  </div>
+<% } %>

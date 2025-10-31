@@ -556,4 +556,65 @@
   background-color: #f0f9ff;
 }
 
+/* ===========================================================================
+   GLOBAL CHECKBOX STYLES - Maximale Sichtbarkeit auf weißem Hintergrund
+   Wichtig: Ohne sichtbaren Rahmen sind Checkboxen auf weißem Hintergrund
+            praktisch unsichtbar, besonders in Modals!
+   ============================================================================ */
+
+/* Alle Checkboxen im Dashboard */
+.form-check-input,
+input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2.5px solid #2c3e50 !important;  /* Dicker, dunkler Rahmen für maximale Sichtbarkeit */
+  border-radius: 0.25rem;
+  cursor: pointer;
+  background-color: #fff !important;  /* Immer weißer Hintergrund wenn nicht checked */
+  margin-top: 0.1rem;
+  box-sizing: border-box;
+}
+
+/* Hover-Effekt */
+.form-check-input:hover:not(:disabled),
+input[type="checkbox"]:hover:not(:disabled) {
+  border-color: #007bff !important;
+  box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.3);
+  background-color: #f8f9fa !important;  /* Leichter grauer Hintergrund beim Hover */
+}
+
+/* Checked State */
+.form-check-input:checked,
+input[type="checkbox"]:checked {
+  background-color: #28a745 !important;
+  border-color: #28a745 !important;
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+/* Focus State (Tastatur-Navigation) */
+.form-check-input:focus,
+input[type="checkbox"]:focus {
+  border-color: #007bff !important;
+  outline: 0;
+  box-shadow: 0 0 0 0.3rem rgba(0, 123, 255, 0.3);
+}
+
+/* Disabled State */
+.form-check-input:disabled,
+input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  background-color: #e9ecef;
+}
+
+/* Größere Variante für Permission-Matrix */
+.permission-checkbox {
+  width: 22px;
+  height: 22px;
+}
+
+.permission-checkbox:hover:not(:disabled) {
+  transform: scale(1.1);
+  transition: all 0.2s;
+}
 

@@ -537,8 +537,10 @@ module.exports = class App {
                         "'unsafe-inline'", 
                         "'unsafe-eval'", 
                         "https://cdn.jsdelivr.net",
-                        "https://cdnjs.cloudflare.com" // Font Awesome
+                        "https://cdnjs.cloudflare.com", // Font Awesome
+                        "https://js.stripe.com" // Stripe SDK
                     ],
+                    scriptSrcAttr: ["'unsafe-inline'"], // Inline Event Handler (onclick, onload, etc.)
                     fontSrc: [
                         "'self'", 
                         "https://fonts.gstatic.com", 
@@ -552,7 +554,18 @@ module.exports = class App {
                         "ws:", 
                         "wss:",
                         "https://cdn.jsdelivr.net", // Source Maps für Chart.js, Toastr, etc.
-                        "https://cdnjs.cloudflare.com" // Source Maps für Font Awesome, etc.
+                        "https://cdnjs.cloudflare.com", // Source Maps für Font Awesome, etc.
+                        "https://api.stripe.com", // Stripe API
+                        "https://checkout.stripe.com" // Stripe Checkout
+                    ],
+                    frameSrc: [
+                        "'self'",
+                        "https://js.stripe.com", // Stripe Elements iframe
+                        "https://checkout.stripe.com" // Stripe Checkout iframe
+                    ],
+                    formAction: [
+                        "'self'",
+                        "https://checkout.stripe.com" // Stripe form submissions
                     ]
                 }
             },
@@ -620,6 +633,126 @@ module.exports = class App {
         
         // Error Middleware (MUSS als letztes registriert werden)
         this.app.use(errorMiddleware);
+    }
+
+    /**
+     * Post-Deployment Update-Check
+     * Prüft SOFORT nach Start ob Updates verfügbar sind und wendet sie an
+     * Wichtig für kritische Updates die nicht auf Cronjob warten sollen
+     * 
+     * @public
+     */
+    async checkAndApplyPendingUpdates() {
+        const Logger = ServiceManager.get("Logger");
+        const dbService = ServiceManager.get("dbService");
+        
+        try {
+            Logger.info("📦 [Post-Deployment] Prüfe Core-Plugin Version gegen package.json...");
+            
+            // Alle Guilds laden
+            const guilds = await dbService.query("SELECT _id FROM guilds");
+            
+            if (!guilds || guilds.length === 0) {
+                Logger.info("📦 [Post-Deployment] Keine Guilds gefunden");
+                return;
+            }
+            
+            Logger.info(`📦 [Post-Deployment] Prüfe Core-Plugin Updates für ${guilds.length} Guilds...`);
+            
+            // NUR CORE-PLUGIN: Post-Deployment Updates sind ausschließlich für Core relevant
+            // Andere Plugins werden über das normale Update-System verwaltet
+            const pluginName = 'core';
+            let totalUpdates = 0;
+            
+            // Sicherstellen dass Core-Plugin existiert (nutze isPluginEnabled() statt plugins.has())
+            if (!this.app.pluginManager.isPluginEnabled(pluginName)) {
+                Logger.warn(`📦 [Post-Deployment] Core-Plugin nicht geladen - überspringe Update-Check`);
+                return;
+            }
+            
+            try {
+                // Plugin-Metadaten aus package.json laden
+                const pluginMeta = this.app.pluginManager.loadPluginMeta(pluginName);
+                
+                if (!pluginMeta || !pluginMeta.version) {
+                    Logger.debug(`📦 [Post-Deployment] ${pluginName}: Keine package.json Version`);
+                    return;
+                }
+                
+                const packageVersion = pluginMeta.version;
+                const semver = require('semver');
+                
+                // Für jede Guild prüfen
+                for (const guild of guilds) {
+                    const guildId = guild._id;
+                    
+                    // Aktuelle Version aus DB
+                    const [versionRow] = await dbService.query(`
+                        SELECT current_version, update_status 
+                        FROM plugin_versions 
+                        WHERE plugin_name = ? AND guild_id = ?
+                    `, [pluginName, guildId]);
+                    
+                    const dbVersion = versionRow?.current_version || '0.0.0';
+                    
+                    if (semver.gt(packageVersion, dbVersion)) {
+                        Logger.warn(`📦 [Post-Deployment] ${pluginName} (Guild ${guildId}): ${dbVersion} → ${packageVersion} (UPDATE ERFORDERLICH!)`);
+                        
+                        // Update SOFORT anwenden (nicht in Queue)
+                        try {
+                            // 1. Version in DB setzen (als "available")
+                            await dbService.query(`
+                                INSERT INTO plugin_versions 
+                                    (plugin_name, guild_id, current_version, available_version, 
+                                     update_available_at, update_deadline_at, update_status)
+                                VALUES (?, ?, ?, ?, NOW(), NOW(), 'available')
+                                ON DUPLICATE KEY UPDATE
+                                    available_version = VALUES(available_version),
+                                    update_available_at = NOW(),
+                                    update_deadline_at = NOW(),
+                                    update_status = 'available'
+                            `, [pluginName, guildId, dbVersion, packageVersion]);
+                            
+                            // 2. Update ausführen (mit Migration + onUpdate Hook)
+                            Logger.info(`📦 [Post-Deployment] Starte Update: ${pluginName} für Guild ${guildId}...`);
+                            const updateResult = await this.app.pluginManager.updatePlugin(
+                                pluginName, 
+                                guildId, 
+                                false // nicht auto-update (manuell via deployment)
+                            );
+                            
+                            if (updateResult.success) {
+                                Logger.success(`✅ [Post-Deployment] ${pluginName} erfolgreich aktualisiert auf ${packageVersion}`);
+                                totalUpdates++;
+                            } else {
+                                Logger.error(`❌ [Post-Deployment] ${pluginName} Update fehlgeschlagen:`, updateResult.error);
+                            }
+                            
+                        } catch (updateError) {
+                            Logger.error(`❌ [Post-Deployment] Fehler beim Update von ${pluginName}:`, updateError);
+                        }
+                        
+                    } else if (semver.eq(packageVersion, dbVersion)) {
+                        Logger.debug(`✓ [Post-Deployment] ${pluginName} (Guild ${guildId}): v${dbVersion} ist aktuell`);
+                    } else {
+                        Logger.warn(`⚠️  [Post-Deployment] ${pluginName} (Guild ${guildId}): DB v${dbVersion} > package.json v${packageVersion} (Downgrade?)`);
+                    }
+                }
+                
+            } catch (pluginError) {
+                Logger.error(`❌ [Post-Deployment] Fehler beim Core-Plugin Update-Check:`, pluginError);
+            }
+            
+            if (totalUpdates > 0) {
+                Logger.success(`🎉 [Post-Deployment] ${totalUpdates} Core-Plugin-Update(s) erfolgreich angewendet!`);
+            } else {
+                Logger.info("✓ [Post-Deployment] Core-Plugin ist aktuell");
+            }
+            
+        } catch (error) {
+            Logger.error("❌ [Post-Deployment] Kritischer Fehler beim Update-Check:", error);
+            throw error;
+        }
     }
 
     /**

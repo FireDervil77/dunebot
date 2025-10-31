@@ -1,5 +1,6 @@
 const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
+const { requirePermission } = require('../../../apps/dashboard/middlewares/permissions.middleware');
 
 const path = require('path');
 
@@ -76,7 +77,7 @@ class AutoModPlugin extends DashboardPlugin {
         Logger.info('Registriere Routen für [AutoMod] Plugin ...');
 
         // === SETTINGS SEITE (Unter Core-Settings) ===
-        this.guildRouter.get('/settings', async (req, res) => {
+        this.guildRouter.get('/settings', requirePermission('AUTOMOD.VIEW'), async (req, res) => {
             const guildId = res.locals.guildId;
             const Logger = ServiceManager.get('Logger');
             
@@ -139,7 +140,7 @@ class AutoModPlugin extends DashboardPlugin {
         });
 
         // === SETTINGS SPEICHERN ===
-        this.guildRouter.put('/settings', async (req, res) => {
+        this.guildRouter.put('/settings', requirePermission('AUTOMOD.SETTINGS_EDIT'), async (req, res) => {
             const guildId = res.locals.guildId;
             const Logger = ServiceManager.get('Logger');
             const i18n = ServiceManager.get('i18n');

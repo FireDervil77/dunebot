@@ -1,0 +1,70 @@
+{
+  "plugin": "moderation",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "MODERATION.VIEW",
+      "name": "Moderation anzeigen",
+      "description": "Berechtigung um Moderation-Einstellungen zu sehen",
+      "category": "moderation",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "MODERATION.SETTINGS_EDIT",
+      "name": "Moderation-Einstellungen bearbeiten",
+      "description": "Berechtigung um Moderation-Einstellungen zu ändern (Automod-Regeln, Filter, etc.)",
+      "category": "moderation",
+      "is_dangerous": 0,
+      "requires": "MODERATION.VIEW"
+    },
+    {
+      "key": "MODERATION.BAN_EXECUTE",
+      "name": "Bans ausführen",
+      "description": "Berechtigung um User zu bannen (kritische Aktion)",
+      "category": "moderation",
+      "is_dangerous": 1,
+      "requires": "MODERATION.VIEW"
+    },
+    {
+      "key": "MODERATION.KICK_EXECUTE",
+      "name": "Kicks ausführen",
+      "description": "Berechtigung um User zu kicken",
+      "category": "moderation",
+      "is_dangerous": 0,
+      "requires": "MODERATION.VIEW"
+    },
+    {
+      "key": "MODERATION.MUTE_EXECUTE",
+      "name": "Mutes ausführen",
+      "description": "Berechtigung um User zu muten/unmuten",
+      "category": "moderation",
+      "is_dangerous": 0,
+      "requires": "MODERATION.VIEW"
+    },
+    {
+      "key": "MODERATION.WARN_EXECUTE",
+      "name": "Warnungen ausführen",
+      "description": "Berechtigung um User zu warnen",
+      "category": "moderation",
+      "is_dangerous": 0,
+      "requires": "MODERATION.VIEW"
+    },
+    {
+      "key": "MODERATION.LOGS_VIEW",
+      "name": "Moderation-Logs anzeigen",
+      "description": "Berechtigung um Moderation-Logs zu sehen (Bans, Kicks, Warns)",
+      "category": "moderation",
+      "is_dangerous": 0,
+      "requires": "MODERATION.VIEW"
+    },
+    {
+      "key": "MODERATION.CASES_MANAGE",
+      "name": "Cases verwalten",
+      "description": "Berechtigung um Moderation-Cases zu bearbeiten/löschen",
+      "category": "moderation",
+      "is_dangerous": 0,
+      "requires": "MODERATION.VIEW"
+    }
+  ]
+}

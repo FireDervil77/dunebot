@@ -1,0 +1,16 @@
+{
+    "LOCALE":  "de-DE",
+    "THEME_ENABLED": true,
+    "THEME": "default",
+    "THEME_PATH": "./themes",
+    "DASHBOARD_ENABLED": true,
+    "DASHBOARD_ENCRYPT": true,
+    "DASHBOARD_LOGO_NAME": "DuneBot",
+    "DASHBOARD_LOGO_URL": "/images/DuneBot.png",
+    "PREFIX_COMMANDS_ENABLED": true,
+    "PREFIX_COMMANDS_PREFIX": "!",
+    "DISABLED_PREFIX": [],
+    "INTERACTIONS_SLASH": true,
+    "INTERACTIONS_CONTEXT": false,
+    "DISABLED_SLASH": []
+}

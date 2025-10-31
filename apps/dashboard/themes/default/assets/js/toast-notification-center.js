@@ -9,8 +9,8 @@
     'use strict';
 
     // Konfiguration
-    const REFRESH_INTERVAL = 30000; // 30 Sekunden
-    const MAX_DISPLAY_TOASTS = 5;   // Max. Toasts im Dropdown
+    const REFRESH_INTERVAL = 300000; // 5 Minuten (statt 30 Sekunden)
+    const MAX_DISPLAY_TOASTS = 5;    // Max. Toasts im Dropdown
     const ERROR_BACKOFF_TIME = 5000; // 5 Sekunden Pause nach Fehler
 
     // State
@@ -66,6 +66,9 @@
             updateNotificationUI([]);
         }
     }
+    
+    // ✅ Exportiere loadToastNotifications global für Cross-Page Updates
+    window.loadToastNotifications = loadToastNotifications;
 
     /**
      * Ermittelt Guild-ID aus aktueller URL
@@ -142,8 +145,8 @@
 
                 return `
                     <li>
-                        <a href="#" class="dropdown-item py-2" 
-                           onclick="showToastDetails(${JSON.stringify(toast).replace(/"/g, '&quot;')}); return false;"
+                        <a href="#" class="dropdown-item py-2 toast-item-link" 
+                           data-toast='${JSON.stringify(toast).replace(/'/g, "&#39;")}'
                            style="white-space: normal; border-bottom: 1px solid rgba(0,0,0,0.05);">
                             <div class="d-flex align-items-start">
                                 <div class="flex-shrink-0">
@@ -153,11 +156,29 @@
                                     <div class="small text-muted">${timeAgo}</div>
                                     <div class="text-dark">${truncatedMessage}</div>
                                 </div>
+                                <button class="btn btn-sm btn-link text-muted dismiss-toast-btn p-0 ml-2" 
+                                        data-id="${toast.id}" 
+                                        title="Entfernen">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
                             </div>
                         </a>
                     </li>
                 `;
             }).join('');
+            
+            // "Alle löschen" Button hinzufügen wenn Toasts vorhanden
+            if (displayToasts.length > 0) {
+                list.innerHTML += `
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a href="#" class="dropdown-item text-center text-danger py-2 dismiss-all-toasts-btn">
+                            <i class="bi bi-trash me-2"></i>
+                            Alle löschen
+                        </a>
+                    </li>
+                `;
+            }
         }
     }
 
@@ -178,6 +199,60 @@ ${toast.metadata ? 'Metadata:\n' + JSON.stringify(toast.metadata, null, 2) : ''}
         `.trim();
 
         alert(details);
+    };
+
+    /**
+     * Löscht einen einzelnen Toast
+     */
+    window.dismissToast = async function(toastId) {
+        try {
+            const response = await fetch(`/api/core/toasts/dismiss/${toastId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                console.log(`[Toast Notifications] Toast ${toastId} dismissed`);
+                // UI sofort aktualisieren
+                await loadToastNotifications();
+            } else {
+                console.error('[Toast Notifications] Dismiss fehlgeschlagen:', result.error);
+            }
+        } catch (error) {
+            console.error('[Toast Notifications] Fehler beim Dismissing:', error);
+        }
+    };
+
+    /**
+     * Löscht alle Toasts des Users
+     */
+    window.dismissAllToasts = async function() {
+        if (!confirm('Wirklich alle Benachrichtigungen löschen?')) {
+            return;
+        }
+
+        try {
+            const guildId = getCurrentGuildId();
+            const response = await fetch('/api/core/toasts/dismiss-all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ guildId })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                console.log(`[Toast Notifications] ${result.count} Toasts dismissed`);
+                // UI sofort aktualisieren
+                await loadToastNotifications();
+            } else {
+                console.error('[Toast Notifications] Dismiss-All fehlgeschlagen:', result.error);
+            }
+        } catch (error) {
+            console.error('[Toast Notifications] Fehler beim Dismiss-All:', error);
+        }
     };
 
     /**
@@ -213,8 +288,53 @@ ${toast.metadata ? 'Metadata:\n' + JSON.stringify(toast.metadata, null, 2) : ''}
         // Initial laden
         loadToastNotifications();
 
-        // Periodisches Aktualisieren
+        // Periodisches Aktualisieren (5 Minuten statt 30 Sekunden)
         const refreshInterval = setInterval(loadToastNotifications, REFRESH_INTERVAL);
+
+        // ✅ NEU: On-Demand Laden wenn Dropdown geöffnet wird
+        const notificationBell = document.getElementById('toastNotificationBell');
+        if (notificationBell) {
+            notificationBell.addEventListener('click', function() {
+                console.log('[Toast Notifications] Dropdown geöffnet - lade aktuelle Toasts...');
+                loadToastNotifications();
+            });
+        }
+
+        // ✅ Event-Delegation für Toast-Details (CSP-konform)
+        document.addEventListener('click', function(e) {
+            const toastLink = e.target.closest('.toast-item-link');
+            if (toastLink) {
+                e.preventDefault();
+                try {
+                    const toastData = JSON.parse(toastLink.getAttribute('data-toast'));
+                    showToastDetails(toastData);
+                } catch (error) {
+                    console.error('[Toast Notifications] Fehler beim Parsen der Toast-Daten:', error);
+                }
+            }
+        });
+
+        // ✅ Event-Delegation für Dismiss-Button (CSP-konform)
+        document.addEventListener('click', function(e) {
+            const dismissBtn = e.target.closest('.dismiss-toast-btn');
+            if (dismissBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const toastId = parseInt(dismissBtn.getAttribute('data-id'));
+                if (toastId) {
+                    dismissToast(toastId);
+                }
+            }
+        });
+
+        // ✅ Event-Delegation für "Alle löschen" Button (CSP-konform)
+        document.addEventListener('click', function(e) {
+            const dismissAllBtn = e.target.closest('.dismiss-all-toasts-btn');
+            if (dismissAllBtn) {
+                e.preventDefault();
+                dismissAllToasts();
+            }
+        });
 
         // Bei jedem neuen Toast auch sofort aktualisieren
         // ✅ Named function für removeEventListener
@@ -230,7 +350,7 @@ ${toast.metadata ? 'Metadata:\n' + JSON.stringify(toast.metadata, null, 2) : ''}
             window._toastNotificationCenterInitialized = false;
         });
 
-        console.log('[Toast Notifications] Notification Center initialisiert');
+        console.log('[Toast Notifications] Notification Center initialisiert (Polling: 5 min)');
     });
 
     // CSS für Pulsier-Animation

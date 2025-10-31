@@ -138,6 +138,57 @@ class SessionManager {
             return 0;
         }
     }
+
+    /**
+     * Zerstört alle Sessions eines Users für eine bestimmte Guild
+     * WICHTIG: Wird aufgerufen wenn User aus Guild entfernt wird
+     * 
+     * @param {string} userId - Discord User ID
+     * @param {string} guildId - Guild ID
+     * @returns {Promise<number>} Anzahl zerstörter Sessions
+     */
+    async destroyUserGuildSessions(userId, guildId) {
+        try {
+            // Sessions finden die den User UND die Guild enthalten
+            const sessions = await this.dbService.query(
+                "SELECT session_id, data FROM sessions WHERE data LIKE ? AND expires > UNIX_TIMESTAMP()",
+                [`%"id":"${userId}"%`]
+            );
+
+            let destroyed = 0;
+            for (const session of sessions) {
+                try {
+                    const sessionData = JSON.parse(session.data);
+                    
+                    // Prüfe ob Session den User UND die Guild enthält
+                    if (sessionData.user?.info?.id === userId) {
+                        // Prüfe ob Session für diese Guild ist (currentGuildId oder guilds Array)
+                        const hasGuild = sessionData.currentGuildId === guildId || 
+                                       (sessionData.user?.guilds && sessionData.user.guilds.some(g => g.id === guildId));
+                        
+                        if (hasGuild) {
+                            await this.dbService.query(
+                                'DELETE FROM sessions WHERE session_id = ?',
+                                [session.session_id]
+                            );
+                            destroyed++;
+                        }
+                    }
+                } catch (parseError) {
+                    // Ignoriere defekte Session-Daten
+                }
+            }
+
+            if (destroyed > 0) {
+                this.Logger.info(`🗑️ ${destroyed} Sessions für User ${userId} in Guild ${guildId} zerstört`);
+            }
+
+            return destroyed;
+        } catch (error) {
+            this.Logger.error(`❌ Fehler beim Zerstören der User-Guild-Sessions:`, error);
+            return 0;
+        }
+    }
 }
 
 module.exports = SessionManager;

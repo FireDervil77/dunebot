@@ -403,11 +403,12 @@ class NavigationManager {
     }
 
     /**
-     * Lädt alle Navigationselemente für eine Guild
+     * Lädt alle Navigationselemente für eine Guild (mit Permission-Filterung)
      * @param {string} guildId - ID der Guild
+     * @param {string} [userId=null] - User ID für Permission-Check (null = keine Filterung)
      * @returns {Promise<Array>} - Array mit Navigationselementen
      */
-    async getNavigation(guildId) {
+    async getNavigation(guildId, userId = null) {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
 
@@ -416,6 +417,12 @@ class NavigationManager {
                 "SELECT * FROM nav_items WHERE guildid = ? AND visible = true and type = 'main' ORDER BY type ASC, parent ASC, sort_order ASC, title ASC",
                 [guildId]
             );
+            
+            // Permission-Filterung wenn userId vorhanden
+            if (userId) {
+                return await this._filterByPermissions(results, guildId, userId);
+            }
+            
             // Ergebnis zurückgeben
             return results;
         } catch (error) {
@@ -425,13 +432,14 @@ class NavigationManager {
     }
     
     /**
-     * Lädt alle Navigationselemente eines bestimmten Typs
+     * Lädt alle Navigationselemente eines bestimmten Typs (mit Permission-Filterung)
      * @param {string} guildId - ID der Guild
      * @param {string} type - Menütyp (main, settings, widget, metabox)
      * @param {string} [parent=null] - Übergeordnetes Menü (für Untermenüs)
+     * @param {string} [userId=null] - User ID für Permission-Check (null = keine Filterung)
      * @returns {Promise<Array>} - Array mit gefilterten Navigationselementen
      */
-    async getNavigationByType(guildId, type, parent = null) {
+    async getNavigationByType(guildId, type, parent = null, userId = null) {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
         try {
@@ -443,6 +451,12 @@ class NavigationManager {
             }
             sql += " ORDER BY sort_order ASC, title ASC";
             const results = await dbService.query(sql, params);
+            
+            // Permission-Filterung wenn userId vorhanden
+            if (userId) {
+                return await this._filterByPermissions(results, guildId, userId);
+            }
+            
             // Ergebnis zurückgeben
             return results;
         } catch (error) {
@@ -452,14 +466,15 @@ class NavigationManager {
     }
     
     /**
-     * Lädt das Hauptmenü mit allen Untermenüs
+     * Lädt das Hauptmenü mit allen Untermenüs (mit Permission-Filterung)
      * @param {string} guildId - ID der Guild
+     * @param {string} [userId=null] - User ID für Permission-Check (null = keine Filterung)
      * @returns {Promise<Array>} - Array mit strukturierten Menüs
      */
-    async getMainMenuWithSubmenu(guildId) {
+    async getMainMenuWithSubmenu(guildId, userId = null) {
         const Logger = ServiceManager.get('Logger');
         try {
-            const allMenuItems = await this.getNavigationByType(guildId, this.menuTypes.MAIN);
+            const allMenuItems = await this.getNavigationByType(guildId, this.menuTypes.MAIN, null, userId);
             
             // Navigation strukturieren
 
@@ -521,6 +536,94 @@ class NavigationManager {
         } catch (error) {
             Logger.error(`Fehler beim Entfernen der Navigation:`, error);
             return 0;
+        }
+    }
+
+    /**
+     * Filtert Navigations-Items basierend auf User-Permissions (mit Wildcard-Support)
+     * @private
+     * @param {Array} items - Array mit Navigationselementen
+     * @param {string} guildId - Guild ID
+     * @param {string} userId - User ID
+     * @returns {Promise<Array>} - Gefilterte Navigationselemente
+     */
+    async _filterByPermissions(items, guildId, userId) {
+        const Logger = ServiceManager.get('Logger');
+        
+        try {
+            // PermissionManager über ServiceManager holen (Singleton!)
+            const permissionManager = ServiceManager.get('permissionManager');
+            
+            if (!permissionManager) {
+                Logger.warn('[Navigation] PermissionManager nicht verfügbar - keine Filterung');
+                return items;
+            }
+            
+            // User-Permissions laden (gibt Objekt zurück: { permissions: {...}, groups: [], is_owner: bool })
+            const userPermsData = await permissionManager.getUserPermissions(userId, guildId);
+            const userPermissions = userPermsData.permissions || {};
+            const isOwner = userPermsData.is_owner || false;
+            
+            // Wildcard-Check: Wenn User wildcard hat, darf er alles sehen
+            if (userPermissions.wildcard || userPermissions['*']) {
+                Logger.debug(`[Navigation] User ${userId} hat Wildcard - zeige alle Items`);
+                return items;
+            }
+            
+            // Permissions-Object zu Array konvertieren (nur Keys mit truthy values)
+            const permissionKeys = Object.keys(userPermissions).filter(key => userPermissions[key]);
+            
+            Logger.debug(`[Navigation] User ${userId} hat ${permissionKeys.length} Permissions`, permissionKeys);
+            
+            // Items filtern
+            const filtered = items.filter(item => {
+                // ✅ NEU: requiresOwner-Check (SuperAdmin-Plugin)
+                // Wenn Item requiresOwner: true hat, muss User Bot-Owner sein
+                if (item.requiresOwner === true || item.requiresOwner === 1 || item.requiresOwner === '1') {
+                    // Prüfe ob User in OWNER_IDS ist
+                    const ownerIds = process.env.OWNER_IDS?.split(',') || [];
+                    const isBotOwner = ownerIds.includes(String(userId));
+                    
+                    if (!isBotOwner) {
+                        Logger.debug(`[Navigation] Item "${item.title}" versteckt (requiresOwner=true, User ist kein Bot-Owner)`);
+                        return false;
+                    }
+                    
+                    // User ist Bot-Owner → Item anzeigen (capability wird ignoriert)
+                    return true;
+                }
+                
+                // Kein capability-Feld? → Öffentlich sichtbar
+                if (!item.capability) {
+                    return true;
+                }
+                
+                // Exakter Match
+                if (permissionKeys.includes(item.capability)) {
+                    return true;
+                }
+                
+                // Wildcard-Match (z.B. gameserver.* erlaubt gameserver.start)
+                const parts = item.capability.split('.');
+                for (let i = parts.length - 1; i > 0; i--) {
+                    const wildcard = parts.slice(0, i).join('.') + '.*';
+                    if (permissionKeys.includes(wildcard)) {
+                        return true;
+                    }
+                }
+                
+                // Keine Permission → verstecken
+                Logger.debug(`[Navigation] Item "${item.title}" versteckt (capability: ${item.capability})`);
+                return false;
+            });
+            
+            Logger.debug(`[Navigation] ${items.length} Items → ${filtered.length} Items nach Filterung`);
+            return filtered;
+            
+        } catch (error) {
+            Logger.error(`Fehler beim Filtern der Navigation nach Permissions:`, error);
+            // Im Fehlerfall: Alle Items zurückgeben (fail-open)
+            return items;
         }
     }
 }

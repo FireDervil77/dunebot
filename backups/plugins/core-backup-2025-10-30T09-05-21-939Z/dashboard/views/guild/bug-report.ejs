@@ -1,0 +1,242 @@
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0"><%= tr('BUG_REPORT.TITLE', 'Bug Report') %></h1>
+            </div>
+            <div class="col-sm-6">
+                <button class="btn btn-danger float-right" data-toggle="modal" data-target="#createBugModal">
+                    <i class="fa-solid fa-bug me-1"></i> <%= tr('BUG_REPORT.CREATE_NEW', 'Bug melden') %>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="content">
+    <div class="container-fluid">
+        
+        <!-- Info-Box -->
+        <div class="alert alert-info alert-dismissible fade show mb-3" role="alert">
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+            <h5><i class="fa-solid fa-info-circle me-2"></i><%= tr('BUG_REPORT.INFO_TITLE', 'System Bug Report') %></h5>
+            <p class="mb-0"><%= tr('BUG_REPORT.INFO_TEXT') %></p>
+        </div>
+        
+        <!-- Statistik-Karten -->
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <div class="small-box bg-danger">
+                    <div class="inner">
+                        <h3><%= bugs.length %></h3>
+                        <p><%= tr('BUG_REPORT.TOTAL_BUGS', 'Bugs gesamt') %></p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-bug"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="small-box bg-warning">
+                    <div class="inner">
+                        <h3><%= bugs.filter(b => b.status === 'open').length %></h3>
+                        <p><%= tr('BUG_REPORT.OPEN_BUGS', 'Offen') %></p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="small-box bg-info">
+                    <div class="inner">
+                        <h3><%= bugs.filter(b => b.status === 'in_progress').length %></h3>
+                        <p><%= tr('BUG_REPORT.IN_PROGRESS', 'In Bearbeitung') %></p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-spinner"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="small-box bg-success">
+                    <div class="inner">
+                        <h3><%= bugs.filter(b => b.status === 'resolved').length %></h3>
+                        <p><%= tr('BUG_REPORT.RESOLVED', 'Gelöst') %></p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-check"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bug Liste -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><%= tr('BUG_REPORT.ALL_BUGS', 'Alle Bug Reports') %></h3>
+            </div>
+            <div class="card-body p-0">
+                <% if (bugs.length === 0) { %>
+                    <div class="text-center py-5">
+                        <i class="fa-solid fa-bug fa-3x text-muted mb-3"></i>
+                        <p class="text-muted"><%= tr('BUG_REPORT.NO_BUGS', 'Keine Bug Reports vorhanden') %></p>
+                    </div>
+                <% } else { %>
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th><%= tr('BUG_REPORT.TITLE_COL', 'Titel') %></th>
+                                <th><%= tr('BUG_REPORT.CATEGORY_COL', 'Kategorie') %></th>
+                                <th><%= tr('BUG_REPORT.STATUS_COL', 'Status') %></th>
+                                <th><%= tr('BUG_REPORT.PRIORITY_COL', 'Priorität') %></th>
+                                <th><%= tr('BUG_REPORT.REPORTER_COL', 'Gemeldet von') %></th>
+                                <th><%= tr('BUG_REPORT.DATE_COL', 'Datum') %></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% bugs.forEach((bug, index) => { %>
+                                <tr class="<%= bug.admin_response ? 'table-active' : '' %>">
+                                    <td><%= bug.id %></td>
+                                    <td>
+                                        <strong><%= bug.title %></strong>
+                                        <br><small class="text-muted"><%= bug.description.substring(0, 100) %>...</small>
+                                        <% if (bug.admin_response) { %>
+                                            <br>
+                                            <button 
+                                                class="btn btn-sm btn-outline-info mt-1" 
+                                                type="button" 
+                                                data-toggle="collapse" 
+                                                data-target="#adminResponse<%= bug.id %>" 
+                                                aria-expanded="false">
+                                                <i class="fas fa-comment-dots me-1"></i>Admin-Antwort anzeigen
+                                            </button>
+                                        <% } %>
+                                    </td>
+                                    <td><span class="badge bg-secondary"><%= bug.category || 'Allgemein' %></span></td>
+                                    <td>
+                                        <% 
+                                        const statusClass = {
+                                            open: 'warning',
+                                            in_progress: 'info',
+                                            resolved: 'success',
+                                            closed: 'secondary',
+                                            wontfix: 'dark'
+                                        };
+                                        %>
+                                        <span class="badge bg-<%= statusClass[bug.status] || 'secondary' %>">
+                                            <%= tr('STATUS.' + bug.status.toUpperCase(), bug.status) %>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <% 
+                                        const priorityClass = {
+                                            low: 'secondary',
+                                            medium: 'primary',
+                                            high: 'warning',
+                                            critical: 'danger'
+                                        };
+                                        %>
+                                        <span class="badge bg-<%= priorityClass[bug.priority] || 'secondary' %>">
+                                            <%= tr('PRIORITY.' + bug.priority.toUpperCase(), bug.priority) %>
+                                        </span>
+                                    </td>
+                                    <td><%= bug.user_tag || bug.user_id || 'Unbekannt' %></td>
+                                    <td><%= new Date(bug.created_at).toLocaleDateString('de-DE') %></td>
+                                </tr>
+                                <% if (bug.admin_response) { %>
+                                    <tr class="collapse" id="adminResponse<%= bug.id %>">
+                                        <td colspan="7" class="bg-light">
+                                            <div class="alert alert-info mb-0">
+                                                <h6 class="alert-heading">
+                                                    <i class="fas fa-reply me-2"></i><strong>Admin-Antwort</strong>
+                                                    <% if (bug.resolved_at) { %>
+                                                        <small class="text-muted float-end">
+                                                            <%= new Date(bug.resolved_at).toLocaleString('de-DE') %>
+                                                        </small>
+                                                    <% } %>
+                                                </h6>
+                                                <p class="mb-0"><%= bug.admin_response %></p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <% } %>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Bug erstellen -->
+<div class="modal fade" id="createBugModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><%= tr('BUG_REPORT.CREATE_NEW', 'Bug melden') %></h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="bugReportForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label"><%= tr('BUG_REPORT.TITLE_LABEL', 'Titel') %></label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><%= tr('BUG_REPORT.CATEGORY_LABEL', 'Kategorie') %></label>
+                        <select class="form-select" name="category">
+                            <option value="">Allgemein</option>
+                            <option value="commands">Commands</option>
+                            <option value="dashboard">Dashboard</option>
+                            <option value="performance">Performance</option>
+                            <option value="other">Sonstiges</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><%= tr('BUG_REPORT.DESCRIPTION_LABEL', 'Beschreibung') %></label>
+                        <textarea class="form-control" name="description" rows="6" required></textarea>
+                        <small class="text-muted"><%= tr('BUG_REPORT.DESCRIPTION_HINT', 'Beschreibe den Bug so detailliert wie möglich') %></small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= tr('BTN_CANCEL', 'Abbrechen') %></button>
+                    <button type="submit" class="btn btn-danger"><%= tr('BTN_SUBMIT', 'Absenden') %></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('bugReportForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+    
+    try {
+        const response = await fetch(window.location.pathname, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            $('#createBugModal').modal('hide');
+            window.location.reload();
+        } else {
+            alert(result.message);
+        }
+    } catch (error) {
+        alert('Fehler beim Erstellen des Bug Reports');
+    }
+});
+</script>

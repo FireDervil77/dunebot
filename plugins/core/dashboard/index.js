@@ -78,6 +78,11 @@ class CoreDashboardPlugin extends DashboardPlugin {
             this.apiRouter.use('/toasts', toastLoggerRouter);
             Logger.debug('[Core] Toast-Logger API-Route registriert');
 
+            // Donation/Stripe Checkout API
+            const createDonationRouter = require('./routes/api/create-donation');
+            this.apiRouter.use('/create-donation', createDonationRouter);
+            Logger.debug('[Core] Create-Donation API-Route registriert');
+
             // Notification Dismiss API
             this.apiRouter.post('/dismiss-notification', async (req, res) => {
                 try {
@@ -827,6 +832,10 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 }
             });
             
+            // Permissions Router
+            const permissionsRouter = require('./routes/permissions.router');
+            this.guildRouter.use('/permissions', permissionsRouter);
+            Logger.debug('[Core] Permissions-Router registriert');
 
             Logger.debug('[Core] Routen eingerichtet');
         } catch (error) {
@@ -1096,6 +1105,16 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 parent: null
             },
             {
+                title: 'NAV.PERMISSIONS',
+                url: `/guild/${guildId}/permissions`,
+                icon: 'fa-solid fa-user-lock',
+                order: 2500,
+                type: navigationManager.menuTypes.MAIN,
+                visible: true,
+                guildId,
+                parent: null
+            },
+            {
                 title: 'NAV.PLUGINS',
                 url: `/guild/${guildId}/plugins`,
                 icon: 'fa-solid fa-puzzle-piece',
@@ -1135,6 +1154,37 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 visible: true,
                 guildId,
                 parent: `/guild/${guildId}/plugins/core/settings`
+            },
+            // Subnav für Berechtigungen
+            {
+                title: 'NAV.PERMISSIONS_USERS',
+                url: `/guild/${guildId}/plugins/core/permissions/users`,
+                icon: 'fa-solid fa-users',
+                order: 10,
+                type: navigationManager.menuTypes.MAIN,
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}/plugins/core/permissions`
+            },
+            {
+                title: 'NAV.PERMISSIONS_GROUPS',
+                url: `/guild/${guildId}/plugins/core/permissions/groups`,
+                icon: 'fa-solid fa-users-cog',
+                order: 20,
+                type: navigationManager.menuTypes.MAIN,
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}/plugins/core/permissions`
+            },
+            {
+                title: 'NAV.PERMISSIONS_MATRIX',
+                url: `/guild/${guildId}/plugins/core/permissions/matrix`,
+                icon: 'fa-solid fa-table',
+                order: 30,
+                type: navigationManager.menuTypes.MAIN,
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}/plugins/core/permissions`
             }
         ];
 
@@ -1162,6 +1212,149 @@ class CoreDashboardPlugin extends DashboardPlugin {
       });
     }
   
+    /**
+     * Wird nach einem Plugin-Update ausgeführt
+     * Führt Migrations aus und aktualisiert System-Daten
+     * 
+     * @param {string} oldVersion - Alte Plugin-Version
+     * @param {string} newVersion - Neue Plugin-Version
+     * @param {string} guildId - Guild ID (optional, kann null sein für globale Updates)
+     * @returns {Promise<{success: boolean, message?: string, error?: string}>}
+     */
+    async onUpdate(oldVersion, newVersion, guildId = null) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        const PermissionManager = require('dunebot-sdk/lib/PermissionManager');
+        const semver = require('semver');
+        
+        Logger.info(`[Core] Update-Hook: ${oldVersion} → ${newVersion}${guildId ? ' (Guild: ' + guildId + ')' : ' (global)'}`);
+        
+        try {
+            // ====================================
+            // Version 6.6.0: Permission-System
+            // ====================================
+            if (semver.gte(newVersion, '6.6.0') && semver.lt(oldVersion, '6.6.0')) {
+                Logger.info('[Core] Erkannte Migration: Permission-System (v6.6.0)');
+                
+                // Migration wird automatisch vom PluginManager via runMigration() aufgerufen
+                // Hier nur zusätzliche Guild-spezifische Logik
+                
+                if (guildId) {
+                    // Sicherstellen, dass Standard-Gruppen existieren
+                    const [groups] = await dbService.query(
+                        'SELECT COUNT(*) as count FROM guild_groups WHERE guild_id = ?',
+                        [guildId]
+                    );
+                    
+                    if (!groups || groups.count === 0) {
+                        Logger.warn(`[Core] Keine Gruppen für Guild ${guildId}, erstelle Standard-Gruppen...`);
+                        await PermissionManager.seedDefaultGroups(guildId);
+                    }
+                    
+                    // Owner zur Admin-Gruppe hinzufügen (falls nicht schon passiert)
+                    const [guild] = await dbService.query(
+                        'SELECT owner_id FROM guilds WHERE _id = ?',
+                        [guildId]
+                    );
+                    
+                    if (guild && guild.owner_id) {
+                        const [userExists] = await dbService.query(
+                            'SELECT id FROM guild_users WHERE user_id = ? AND guild_id = ?',
+                            [guild.owner_id, guildId]
+                        );
+                        
+                        if (!userExists) {
+                            Logger.info(`[Core] Erstelle Owner-User für Guild ${guildId}`);
+                            await PermissionManager.upsertGuildUser(guild.owner_id, guildId, {
+                                is_owner: true,
+                                status: 'active'
+                            });
+                            
+                            // Zur Admin-Gruppe hinzufügen
+                            const [adminGroup] = await dbService.query(
+                                'SELECT id FROM guild_groups WHERE guild_id = ? AND slug = ?',
+                                [guildId, 'administrator']
+                            );
+                            
+                            if (adminGroup) {
+                                await PermissionManager.assignUserToGroup(guild.owner_id, adminGroup.id, 'system');
+                                Logger.success(`[Core] Owner zur Administrator-Gruppe hinzugefügt`);
+                            }
+                        }
+                    }
+                    
+                    // Navigation aktualisieren (WICHTIG: Core kann nicht deaktiviert werden!)
+                    Logger.info(`[Core] Aktualisiere Navigation für Guild ${guildId}...`);
+                    try {
+                        // Alte Navigation löschen
+                        await dbService.query(
+                            "DELETE FROM nav_items WHERE plugin = ? AND guildId = ?",
+                            ['core', guildId]
+                        );
+                        
+                        // Neue Navigation registrieren
+                        await this._registerNavigation(guildId);
+                        
+                        const [navCount] = await dbService.query(
+                            "SELECT COUNT(*) as count FROM nav_items WHERE plugin = ? AND guildId = ?",
+                            ['core', guildId]
+                        );
+                        
+                        Logger.success(`[Core] Navigation aktualisiert: ${navCount.count} Einträge`);
+                    } catch (navError) {
+                        Logger.error('[Core] Fehler beim Aktualisieren der Navigation:', navError);
+                        // Nicht abbrechen, Update ist trotzdem erfolgreich
+                    }
+                }
+                
+                Logger.success('[Core] Permission-System Update abgeschlossen');
+            }
+            
+            // ====================================
+            // GENERELLES: Navigation IMMER aktualisieren bei Core-Updates
+            // ====================================
+            if (guildId) {
+                Logger.info(`[Core] Aktualisiere Navigation für Guild ${guildId} (generell bei Core-Updates)...`);
+                try {
+                    // Alte Navigation löschen
+                    await dbService.query(
+                        "DELETE FROM nav_items WHERE plugin = ? AND guildId = ?",
+                        ['core', guildId]
+                    );
+                    
+                    // Neue Navigation registrieren
+                    await this._registerNavigation(guildId);
+                    
+                    const [navCount] = await dbService.query(
+                        "SELECT COUNT(*) as count FROM nav_items WHERE plugin = ? AND guildId = ?",
+                        ['core', guildId]
+                    );
+                    
+                    Logger.success(`[Core] Navigation aktualisiert: ${navCount.count} Einträge (genereller Update-Hook)`);
+                } catch (navError) {
+                    Logger.error('[Core] Fehler beim Aktualisieren der Navigation:', navError);
+                    // Nicht abbrechen, Update ist trotzdem erfolgreich
+                }
+            }
+            
+            // ====================================
+            // Weitere Versions-Checks hier...
+            // ====================================
+            
+            return {
+                success: true,
+                message: `Core-Plugin erfolgreich aktualisiert auf ${newVersion}`
+            };
+            
+        } catch (error) {
+            Logger.error('[Core] Fehler in onUpdate():', error);
+            return {
+                success: false,
+                error: `Update fehlgeschlagen: ${error.message}`
+            };
+        }
+    }
+
     /**
      * Registriert guild-spezifische Navigation
      * Wird aufgerufen, wenn das Plugin in einer Guild aktiviert wird

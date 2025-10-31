@@ -273,13 +273,16 @@ module.exports = async (req, res, next) => {
         if (isGuildRoute && guildId && !isAssetRoute) {
             try {
                 const navigationManager = ServiceManager.get('navigationManager');
-                const mainMenu = await navigationManager.getMainMenuWithSubmenu(guildId);
+                const userId = res.locals.user?.id || null; // User ID für Permission-Filterung
+                const mainMenu = await navigationManager.getMainMenuWithSubmenu(guildId, userId);
                 
                 // Navigation für das Template bereitstellen
                 res.locals.guildNav = mainMenu;
                 
                 Logger.debug('[Navigation] Navigation für Template bereitgestellt:', {
-                    itemCount: mainMenu?.length || 0
+                    itemCount: mainMenu?.length || 0,
+                    userId: userId || 'anonymous',
+                    permissionFiltered: !!userId
                 });
             } catch (error) {
                 Logger.error('[Navigation] Fehler beim Laden der Navigation:', error);

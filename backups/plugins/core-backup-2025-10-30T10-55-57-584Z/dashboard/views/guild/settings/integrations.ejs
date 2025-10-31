@@ -1,0 +1,136 @@
+<!-- Core Plugin - Integrationen -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">
+      <i class="fa-solid fa-plug me-2"></i>
+      <%= tr('core:INTEGRATIONS.TITLE') %>
+    </h3>
+  </div>
+  <div class="card-body">
+    
+    <div class="alert alert-info mb-4">
+      <i class="fa-solid fa-info-circle me-2"></i>
+      <strong><%= tr('core:USERS.NOTICE_TITLE') %></strong> <%= tr('core:INTEGRATIONS.NOTICE_TEXT') %>
+    </div>
+
+    <!-- Verfügbare Integrationen -->
+    <div class="row g-3">
+      
+      <!-- Webhook Integration -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+              <div class="flex-shrink-0">
+                <i class="fa-solid fa-webhook fa-2x text-primary"></i>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <h5 class="card-title mb-0"><%= tr('core:INTEGRATIONS.WEBHOOK_TITLE') %></h5>
+                <small class="text-muted"><%= tr('core:INTEGRATIONS.WEBHOOK_SUBTITLE') %></small>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="webhookEnabled" disabled>
+              </div>
+            </div>
+            <p class="card-text text-muted small">
+              <%= tr('core:INTEGRATIONS.WEBHOOK_DESC') %>
+            </p>
+            <button class="btn btn-sm btn-outline-secondary" disabled>
+              <i class="fa-solid fa-gear me-1"></i>
+              <%= tr('core:INTEGRATIONS.BTN_CONFIGURE') %>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Twitch Integration -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+              <div class="flex-shrink-0">
+                <i class="fa-brands fa-twitch fa-2x" style="color: #9146FF;"></i>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <h5 class="card-title mb-0"><%= tr('core:INTEGRATIONS.TWITCH_TITLE') %></h5>
+                <small class="text-muted"><%= tr('core:INTEGRATIONS.TWITCH_SUBTITLE') %></small>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="twitchEnabled" disabled>
+              </div>
+            </div>
+            <p class="card-text text-muted small">
+              <%= tr('core:INTEGRATIONS.TWITCH_DESC') %>
+            </p>
+            <button class="btn btn-sm btn-outline-secondary" disabled>
+              <i class="fa-solid fa-gear me-1"></i>
+              <%= tr('core:INTEGRATIONS.BTN_CONFIGURE') %>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- YouTube Integration -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+              <div class="flex-shrink-0">
+                <i class="fa-brands fa-youtube fa-2x text-danger"></i>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <h5 class="card-title mb-0"><%= tr('core:INTEGRATIONS.YOUTUBE_TITLE') %></h5>
+                <small class="text-muted"><%= tr('core:INTEGRATIONS.YOUTUBE_SUBTITLE') %></small>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="youtubeEnabled" disabled>
+              </div>
+            </div>
+            <p class="card-text text-muted small">
+              <%= tr('core:INTEGRATIONS.YOUTUBE_DESC') %>
+            </p>
+            <button class="btn btn-sm btn-outline-secondary" disabled>
+              <i class="fa-solid fa-gear me-1"></i>
+              <%= tr('core:INTEGRATIONS.BTN_CONFIGURE') %>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom API Integration -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+              <div class="flex-shrink-0">
+                <i class="fa-solid fa-code fa-2x text-success"></i>
+              </div>
+              <div class="flex-grow-1 ms-3">
+                <h5 class="card-title mb-0"><%= tr('core:INTEGRATIONS.CUSTOM_API_TITLE') %></h5>
+                <small class="text-muted"><%= tr('core:INTEGRATIONS.CUSTOM_API_SUBTITLE') %></small>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="customApiEnabled" disabled>
+              </div>
+            </div>
+            <p class="card-text text-muted small">
+              <%= tr('core:INTEGRATIONS.CUSTOM_API_DESC') %>
+            </p>
+            <button class="btn btn-sm btn-outline-secondary" disabled>
+              <i class="fa-solid fa-gear me-1"></i>
+              <%= tr('core:INTEGRATIONS.BTN_CONFIGURE') %>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Info Box -->
+    <div class="alert alert-warning mt-4">
+      <i class="fa-solid fa-triangle-exclamation me-2"></i>
+      <strong><%= tr('core:INTEGRATIONS.DEV_WARNING') %></strong> <%= tr('core:INTEGRATIONS.DEV_WARNING_TEXT') %>
+    </div>
+
+  </div>
+</div>

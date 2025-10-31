@@ -1,0 +1,194 @@
+{
+  "plugin": "core",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "DASHBOARD.SETTINGS.VIEW",
+      "name": "PERMISSIONS.DASHBOARD_SETTINGS_VIEW",
+      "description": "PERMISSIONS.DASHBOARD_SETTINGS_VIEW_DESC",
+      "category": "dashboard",
+      "is_dangerous": 0,
+      "sort_order": 11,
+      "requires": null
+    },
+    {
+      "key": "DASHBOARD.SETTINGS.EDIT",
+      "name": "PERMISSIONS.DASHBOARD_SETTINGS_EDIT",
+      "description": "PERMISSIONS.DASHBOARD_SETTINGS_EDIT_DESC",
+      "category": "dashboard",
+      "is_dangerous": 1,
+      "sort_order": 10,
+      "requires": "DASHBOARD.SETTINGS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.USERS.VIEW",
+      "name": "PERMISSIONS.USERS_VIEW",
+      "description": "PERMISSIONS.USERS_VIEW_DESC",
+      "category": "permissions",
+      "is_dangerous": 0,
+      "sort_order": 20,
+      "requires": null
+    },
+    {
+      "key": "PERMISSIONS.USERS.INVITE",
+      "name": "PERMISSIONS.USERS_INVITE",
+      "description": "PERMISSIONS.USERS_INVITE_DESC",
+      "category": "permissions",
+      "is_dangerous": 0,
+      "sort_order": 21,
+      "requires": "PERMISSIONS.USERS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.USERS.EDIT",
+      "name": "PERMISSIONS.USERS_EDIT",
+      "description": "PERMISSIONS.USERS_EDIT_DESC",
+      "category": "permissions",
+      "is_dangerous": 1,
+      "sort_order": 22,
+      "requires": "PERMISSIONS.USERS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.USERS.REMOVE",
+      "name": "PERMISSIONS.USERS_REMOVE",
+      "description": "PERMISSIONS.USERS_REMOVE_DESC",
+      "category": "permissions",
+      "is_dangerous": 1,
+      "sort_order": 23,
+      "requires": "PERMISSIONS.USERS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.GROUPS.VIEW",
+      "name": "PERMISSIONS.GROUPS_VIEW",
+      "description": "PERMISSIONS.GROUPS_VIEW_DESC",
+      "category": "permissions",
+      "is_dangerous": 0,
+      "sort_order": 30,
+      "requires": null
+    },
+    {
+      "key": "PERMISSIONS.GROUPS.CREATE",
+      "name": "PERMISSIONS.GROUPS_CREATE",
+      "description": "PERMISSIONS.GROUPS_CREATE_DESC",
+      "category": "permissions",
+      "is_dangerous": 0,
+      "sort_order": 31,
+      "requires": "PERMISSIONS.GROUPS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.GROUPS.EDIT",
+      "name": "PERMISSIONS.GROUPS_EDIT",
+      "description": "PERMISSIONS.GROUPS_EDIT_DESC",
+      "category": "permissions",
+      "is_dangerous": 1,
+      "sort_order": 32,
+      "requires": "PERMISSIONS.GROUPS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.GROUPS.DELETE",
+      "name": "PERMISSIONS.GROUPS_DELETE",
+      "description": "PERMISSIONS.GROUPS_DELETE_DESC",
+      "category": "permissions",
+      "is_dangerous": 1,
+      "sort_order": 33,
+      "requires": "PERMISSIONS.GROUPS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.ASSIGN",
+      "name": "PERMISSIONS.ASSIGN",
+      "description": "PERMISSIONS.ASSIGN_DESC",
+      "category": "permissions",
+      "is_dangerous": 1,
+      "sort_order": 40,
+      "requires": null
+    },
+    {
+      "key": "SETTINGS.VIEW",
+      "name": "CORE.PERM_SETTINGS_VIEW",
+      "description": "CORE.PERM_SETTINGS_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "SETTINGS.EDIT",
+      "name": "CORE.PERM_SETTINGS_EDIT",
+      "description": "CORE.PERM_SETTINGS_EDIT_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "requires": "SETTINGS.VIEW"
+    },
+    {
+      "key": "PLUGINS.VIEW",
+      "name": "CORE.PERM_PLUGINS_VIEW",
+      "description": "CORE.PERM_PLUGINS_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "PLUGINS.MANAGE",
+      "name": "CORE.PERM_PLUGINS_MANAGE",
+      "description": "CORE.PERM_PLUGINS_MANAGE_DESC",
+      "category": "core",
+      "is_dangerous": 1,
+      "requires": "PLUGINS.VIEW"
+    },
+    {
+      "key": "NAVIGATION.VIEW",
+      "name": "CORE.PERM_NAVIGATION_VIEW",
+      "description": "CORE.PERM_NAVIGATION_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "NAVIGATION.EDIT",
+      "name": "CORE.PERM_NAVIGATION_EDIT",
+      "description": "CORE.PERM_NAVIGATION_EDIT_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "requires": "NAVIGATION.VIEW"
+    },
+    {
+      "key": "LOCALES.VIEW",
+      "name": "CORE.PERM_LOCALES_VIEW",
+      "description": "CORE.PERM_LOCALES_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "LOCALES.EDIT",
+      "name": "CORE.PERM_LOCALES_EDIT",
+      "description": "CORE.PERM_LOCALES_EDIT_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "requires": "LOCALES.VIEW"
+    },
+    {
+      "key": "DONATE.VIEW",
+      "name": "CORE.PERM_DONATE_VIEW",
+      "description": "CORE.PERM_DONATE_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "DONATE.CREATE",
+      "name": "CORE.PERM_DONATE_CREATE",
+      "description": "CORE.PERM_DONATE_CREATE_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "requires": "DONATE.VIEW"
+    },
+    {
+      "key": "SUPERADMIN.*",
+      "name": "PERMISSIONS.SUPERADMIN_ALL",
+      "description": "PERMISSIONS.SUPERADMIN_ALL_DESC",
+      "category": "superadmin",
+      "is_dangerous": 1,
+      "sort_order": 1000,
+      "requires": null
+    }
+  ]
+}

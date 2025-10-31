@@ -421,104 +421,39 @@ download_binary() {
 # ============================================================================
 
 create_firebot_user() {
-    log_info "Erstelle firebot System-User..."
+    log_info "Prüfe System-Voraussetzungen..."
     
-    # Prüfe ob User bereits existiert
-    if id "firebot" &>/dev/null; then
-        log_info "firebot User existiert bereits"
-        
-        # Stelle sicher, dass Home-Dir existiert und Permissions stimmen
-        local home_dir=$(getent passwd firebot | cut -d: -f6)
-        if [[ -n "$home_dir" && ! -d "$home_dir" ]]; then
-            log_info "Erstelle fehlendes Home-Directory: $home_dir"
-            mkdir -p "$home_dir"
-            chown firebot:firebot "$home_dir"
-            chmod 755 "$home_dir"
-        fi
-        
-        return 0
-    fi
+    # HINWEIS: Daemon läuft als root (wie Pterodactyl Wings)
+    # Gameserver-Prozesse laufen als gs-guild_XXXXX User
+    # Kein firebot User mehr nötig - vereinfacht sudo-Komplexität
     
-    # User erstellen MIT Shell UND Home-Directory
-    # Home wird nach /var/lib/firebot gelegt (Best Practice für System-Services)
-    useradd --system \
-            --create-home \
-            --home-dir /var/lib/firebot \
-            --shell /bin/bash \
-            firebot
-    
-    if id "firebot" &>/dev/null; then
-        log_success "firebot User erstellt (Home: /var/lib/firebot, Shell: /bin/bash)"
-        
-        # Stelle sicher, dass Permissions stimmen
-        chown firebot:firebot /var/lib/firebot
-        chmod 755 /var/lib/firebot
-        
-        # steamcmd Gruppe erstellen (für SteamCMD Shared Access)
-        if ! getent group steamcmd &>/dev/null; then
-            log_info "Erstelle steamcmd Gruppe..."
-            groupadd --system steamcmd
-            log_success "steamcmd Gruppe erstellt"
-        fi
-        
-        # firebot zu steamcmd Gruppe hinzufügen
-        log_info "Füge firebot zu steamcmd Gruppe hinzu..."
-        usermod -a -G steamcmd firebot
-        log_success "firebot ist jetzt in steamcmd Gruppe"
+    # steamcmd Gruppe erstellen (für SteamCMD Shared Access)
+    if ! getent group steamcmd &>/dev/null; then
+        log_info "Erstelle steamcmd Gruppe..."
+        groupadd --system steamcmd
+        log_success "steamcmd Gruppe erstellt"
     else
-        log_error "firebot User konnte nicht erstellt werden!"
-        return 1
+        log_info "steamcmd Gruppe existiert bereits"
     fi
+    
+    log_success "System-Voraussetzungen geprüft (Daemon läuft als root)"
 }
 
 setup_sudoers() {
-    log_info "Konfiguriere sudoers für privilegierte Operations..."
+    log_info "Sudoers-Konfiguration wird übersprungen..."
+    log_success "Daemon läuft als root - keine sudoers-Regeln nötig"
     
-    local sudoers_file="/etc/sudoers.d/firebot-daemon"
-    
-    # Erstelle sudoers-File für firebot user
-    cat > "$sudoers_file" << 'EOF'
-# FireBot Daemon - Privilegierte Operations
-# Erlaubt dem firebot user bestimmte root-Befehle ohne Passwort
-
-# User-Management (für Gameserver-User)
-firebot ALL=(ALL) NOPASSWD: /usr/sbin/useradd
-firebot ALL=(ALL) NOPASSWD: /usr/sbin/groupadd
-firebot ALL=(ALL) NOPASSWD: /usr/sbin/usermod
-firebot ALL=(ALL) NOPASSWD: /usr/sbin/userdel
-firebot ALL=(ALL) NOPASSWD: /usr/sbin/groupdel
-
-# File-Permissions (für Gameserver-Verzeichnisse)
-firebot ALL=(ALL) NOPASSWD: /bin/chown
-firebot ALL=(ALL) NOPASSWD: /bin/chmod
-firebot ALL=(ALL) NOPASSWD: /usr/bin/mkdir
-
-# Process-Management (für Gameserver)
-firebot ALL=(ALL) NOPASSWD: /bin/kill
-firebot ALL=(ALL) NOPASSWD: /usr/bin/pkill
-
-# Systemctl (für Service-Management)
-firebot ALL=(ALL) NOPASSWD: /bin/systemctl restart firebot-daemon
-firebot ALL=(ALL) NOPASSWD: /bin/systemctl reload firebot-daemon
-firebot ALL=(ALL) NOPASSWD: /bin/systemctl status firebot-daemon
-
-# Run as ANY user - CRITICAL für SteamCMD!
-# Erlaubt: sudo -u gs-server001 /path/to/steamcmd.sh
-# firebot kann als JEDER User JEDEN Command ausführen
-firebot ALL=(ALL:ALL) NOPASSWD: ALL
-EOF
-
-    # Setze korrekte Permissions (CRITICAL!)
-    chmod 0440 "$sudoers_file"
-    
-    # Validiere sudoers-File
-    if visudo -c -f "$sudoers_file" &>/dev/null; then
-        log_success "Sudoers konfiguriert: $sudoers_file"
-    else
-        log_error "Sudoers-Datei ist ungültig!"
-        rm -f "$sudoers_file"
-        exit 1
+    # Alte sudoers-Dateien entfernen falls vorhanden
+    if [[ -f "/etc/sudoers.d/firebot" ]]; then
+        log_info "Entferne alte sudoers-Datei: /etc/sudoers.d/firebot"
+        rm -f "/etc/sudoers.d/firebot"
     fi
+    if [[ -f "/etc/sudoers.d/firebot-daemon" ]]; then
+        log_info "Entferne alte sudoers-Datei: /etc/sudoers.d/firebot-daemon"
+        rm -f "/etc/sudoers.d/firebot-daemon"
+    fi
+    
+    log_success "Keine sudo-Komplexität mehr - Daemon läuft direkt als root"
 }
 
 create_data_directories() {
@@ -529,15 +464,16 @@ create_data_directories() {
     # Basis-Verzeichnisse erstellen
     mkdir -p "$base_dir"/{servers,logs,backups,steamcmd}
     
-    # Ownership setzen
-    chown -R firebot:firebot "$base_dir"
+    # Ownership setzen auf root (Daemon läuft als root)
+    chown -R root:root "$base_dir"
     chmod 755 "$base_dir"
     
     # Sub-Verzeichnisse mit korrekten Permissions
     chmod 755 "$base_dir"/{servers,logs,backups,steamcmd}
     
     log_success "Daten-Verzeichnisse erstellt: $base_dir"
-    log_info "Verzeichnisse gehören firebot:firebot mit Permissions 755"
+    log_info "Verzeichnisse gehören root:root mit Permissions 755"
+    log_info "Gameserver-Prozesse laufen später als gs-guild_XXXXX User"
 }
 
 
@@ -599,8 +535,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=firebot
-Group=firebot
+User=root
+Group=root
 WorkingDirectory=/opt/firebot-daemon
 
 # Binary
@@ -626,7 +562,7 @@ WantedBy=multi-user.target
 EOF
 
     systemctl daemon-reload
-    log_success "Systemd Service erstellt"
+    log_success "Systemd Service erstellt (läuft als root)"
 }
 
 enable_service() {
@@ -715,18 +651,18 @@ show_post_install_info() {
     echo -e "   Verzeichnis: ${INSTALL_DIR}"
     echo -e "   Binary:      ${INSTALL_DIR}/${BINARY_NAME}"
     echo -e "   Config:      ${INSTALL_DIR}/${CONFIG_FILE}"
-    echo -e "   User:        ${GREEN}firebot${NC} (mit sudo-Rechten)"
+    echo -e "   User:        ${GREEN}root${NC} (Gameserver als gs-guild_* User)"
     echo ""
     echo -e "${CYAN}🔧 Service Management:${NC}"
     echo -e "   Status:      ${GREEN}systemctl status ${SERVICE_NAME}${NC}"
-    echo -e "   Stoppen:     sudo systemctl stop ${SERVICE_NAME}"
-    echo -e "   Neustarten:  sudo systemctl restart ${SERVICE_NAME}"
+    echo -e "   Stoppen:     systemctl stop ${SERVICE_NAME}"
+    echo -e "   Neustarten:  systemctl restart ${SERVICE_NAME}"
     echo -e "   Logs:        ${GREEN}journalctl -u ${SERVICE_NAME} -f${NC}"
     echo ""
-    echo -e "${CYAN}� Security:${NC}"
-    echo -e "   - Daemon läuft als unprivileged user 'firebot'"
-    echo -e "   - Privilegierte Operations via sudo (konfiguriert)"
-    echo -e "   - Sudoers: /etc/sudoers.d/firebot-daemon"
+    echo -e "${CYAN}🔒 Security:${NC}"
+    echo -e "   - Daemon läuft als root (wie Pterodactyl Wings)"
+    echo -e "   - Gameserver-Prozesse laufen als gs-guild_XXXXX User"
+    echo -e "   - User-Isolation pro Guild/RootServer"
     echo ""
     echo -e "${CYAN}�📊 Dashboard:${NC}"
     echo -e "   Öffne das Dashboard um den Daemon zu sehen:"
@@ -930,8 +866,8 @@ main() {
     setup_sudoers
     create_data_directories
     
-    # Ownership für Install-Dir setzen
-    chown -R firebot:firebot "$INSTALL_DIR"
+    # Ownership für Install-Dir setzen (root, da Daemon als root läuft)
+    chown -R root:root "$INSTALL_DIR"
     
     # Systemd Service
     create_systemd_service
@@ -949,13 +885,13 @@ main() {
     echo ""
     echo -e "${CYAN}Starte den Setup-Wizard mit:${NC}"
     echo ""
-    echo -e "   ${GREEN}sudo -u firebot /opt/firebot-daemon/firebot-daemon${NC}"
+    echo -e "   ${GREEN}sudo /opt/firebot-daemon/firebot-daemon${NC}"
     echo ""
     echo -e "${CYAN}Der Wizard führt dich durch die Konfiguration.${NC}"
     echo -e "${CYAN}Nach dem Setup läuft der Daemon automatisch als Service.${NC}"
     echo ""
-    echo -e "${YELLOW}ℹ️  Hinweis:${NC} Der Daemon läuft als User 'firebot' mit sudo-Rechten"
-    echo -e "   für privilegierte Operations (User-Erstellung, chown, etc.)"
+    echo -e "${YELLOW}ℹ️  Hinweis:${NC} Der Daemon läuft als root für direkte System-Operationen"
+    echo -e "   (User-Erstellung, chown, chmod, etc. ohne sudo-Komplexität)"
     echo ""
     echo -e "${CYAN}📊 Dashboard:${NC} ${BLUE}https://dev.firenetworks.de${NC}"
     echo -e "${CYAN}📋 Logs:${NC} journalctl -u ${SERVICE_NAME} -f"

@@ -1,0 +1,484 @@
+<!-- 
+  Benutzer-Verwaltung - Permission System
+  Liste aller Benutzer mit Gruppen-Zuweisungen und Direct Permissions
+-->
+
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h2 class="mb-1">
+          <i class="fa-solid fa-users text-primary me-2"></i>
+          Benutzer-Verwaltung
+        </h2>
+        <p class="text-muted mb-0">
+          Verwalte Zugriffsberechtigungen für Dashboard-Benutzer
+        </p>
+      </div>
+      
+      <% if (userPermissions.permissions['permissions.users.invite']) { %>
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#inviteUserModal">
+        <i class="fa-solid fa-user-plus me-2"></i>
+        Benutzer einladen
+      </button>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Info Alert -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="alert alert-info">
+      <i class="fa-solid fa-circle-info me-2"></i>
+      <strong>Tipp:</strong> 
+      Benutzer können mehreren Gruppen zugewiesen werden. Direct Permissions überschreiben Gruppen-Berechtigungen.
+    </div>
+  </div>
+</div>
+
+<!-- User-Liste -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-list me-2"></i>
+          Aktive Benutzer (<%= users.length %>)
+        </h3>
+        <div class="card-tools">
+          <div class="input-group input-group-sm" style="width: 250px;">
+            <input type="text" id="userSearchInput" class="form-control" placeholder="Benutzer suchen...">
+            <div class="input-group-append">
+              <span class="input-group-text">
+                <i class="fa-solid fa-search"></i>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card-body p-0">
+        <% if (users.length === 0) { %>
+        <div class="text-center py-5">
+          <i class="fa-solid fa-users text-muted" style="font-size: 4rem;"></i>
+          <h4 class="mt-3">Keine Benutzer vorhanden</h4>
+          <p class="text-muted">Lade den ersten Benutzer ein, um zu beginnen.</p>
+          
+          <% if (userPermissions.permissions['permissions.users.invite']) { %>
+          <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#inviteUserModal">
+            <i class="fa-solid fa-user-plus me-2"></i>
+            Ersten Benutzer einladen
+          </button>
+          <% } %>
+        </div>
+        <% } else { %>
+        
+        <div class="table-responsive">
+          <table class="table table-hover mb-0" id="usersTable">
+            <thead>
+              <tr>
+                <th style="width: 50px;"></th>
+                <th>Benutzer</th>
+                <th>Gruppen</th>
+                <th>Direct Permissions</th>
+                <th>Status</th>
+                <th>Seit</th>
+                <th style="width: 150px;">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% users.forEach(user => { %>
+              <tr data-user-id="<%= user.user_id %>">
+                <!-- Avatar -->
+                <td>
+                  <% if (user.avatar) { %>
+                  <img src="https://cdn.discordapp.com/avatars/<%= user.user_id %>/<%= user.avatar %>.png?size=64" 
+                       class="rounded-circle" 
+                       width="32" 
+                       height="32"
+                       alt="<%= user.username %>">
+                  <% } else { %>
+                  <div class="rounded-circle bg-secondary d-inline-flex align-items-center justify-content-center" 
+                       style="width: 32px; height: 32px;">
+                    <i class="fa-solid fa-user text-white"></i>
+                  </div>
+                  <% } %>
+                </td>
+                
+                <!-- Username -->
+                <td>
+                  <div>
+                    <strong><%= user.username || 'Unknown User' %></strong>
+                    <% if (user.is_owner) { %>
+                    <span class="badge bg-danger ms-2">
+                      <i class="fa-solid fa-crown"></i> Owner
+                    </span>
+                    <% } %>
+                    <br>
+                    <small class="text-muted">ID: <%= user.user_id %></small>
+                  </div>
+                </td>
+                
+                <!-- Gruppen -->
+                <td>
+                  <% if (user.group_names) { 
+                    const groups = user.group_names.split(', ');
+                    const colors = user.group_colors ? user.group_colors.split(',') : [];
+                    groups.forEach((groupName, index) => { 
+                      const color = colors[index] || '#6c757d';
+                  %>
+                    <span class="badge me-1" style="background-color: <%= color %>;">
+                      <%= groupName %>
+                    </span>
+                  <% }); 
+                  } else { %>
+                    <span class="text-muted"><i>Keine Gruppen</i></span>
+                  <% } %>
+                </td>
+                
+                <!-- Direct Permissions -->
+                <td>
+                  <% if (user.direct_permissions && Object.keys(user.direct_permissions).length > 0) { %>
+                    <span class="badge bg-warning text-dark">
+                      <i class="fa-solid fa-key"></i>
+                      <%= Object.keys(user.direct_permissions).length %> Custom
+                    </span>
+                  <% } else { %>
+                    <span class="text-muted">-</span>
+                  <% } %>
+                </td>
+                
+                <!-- Status -->
+                <td>
+                  <% if (user.status === 'active') { %>
+                  <span class="badge bg-success">Aktiv</span>
+                  <% } else if (user.status === 'invited') { %>
+                  <span class="badge bg-info">Eingeladen</span>
+                  <% } else if (user.status === 'suspended') { %>
+                  <span class="badge bg-warning">Suspendiert</span>
+                  <% } else { %>
+                  <span class="badge bg-secondary"><%= user.status %></span>
+                  <% } %>
+                </td>
+                
+                <!-- Datum -->
+                <td>
+                  <small class="text-muted">
+                    <%= new Date(user.created_at).toLocaleDateString('de-DE') %>
+                  </small>
+                </td>
+                
+                <!-- Aktionen -->
+                <td>
+                  <div class="btn-group btn-group-sm">
+                    <% if (userPermissions.permissions['permissions.users.edit'] && !user.is_owner) { %>
+                    <button type="button" 
+                            class="btn btn-primary btn-edit-user" 
+                            data-user-id="<%= user.user_id %>"
+                            data-bs-toggle="tooltip"
+                            title="Bearbeiten">
+                      <i class="fa-solid fa-edit"></i>
+                    </button>
+                    <% } %>
+                    
+                    <% if (userPermissions.permissions['permissions.users.remove'] && !user.is_owner) { %>
+                    <button type="button" 
+                            class="btn btn-danger btn-remove-user" 
+                            data-user-id="<%= user.user_id %>"
+                            data-username="<%= user.username %>"
+                            data-bs-toggle="tooltip"
+                            title="Entfernen">
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                    <% } %>
+                  </div>
+                </td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Invite User Modal -->
+<div class="modal fade" id="inviteUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-user-plus me-2"></i>
+          Benutzer einladen
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      
+      <form id="inviteUserForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="invite_user_id" class="form-label">Discord User ID</label>
+            <input type="text" 
+                   class="form-control" 
+                   id="invite_user_id" 
+                   name="user_id" 
+                   placeholder="z.B. 123456789012345678"
+                   required>
+            <div class="form-text">
+              Die Discord-ID des einzuladenden Benutzers.
+              <a href="#" data-bs-toggle="tooltip" title="Rechtsklick auf User → ID kopieren">
+                <i class="fa-solid fa-question-circle"></i>
+              </a>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="invite_default_group" class="form-label">Standard-Gruppe (optional)</label>
+            <select class="form-select" id="invite_default_group" name="default_group_id">
+              <option value="">Keine Gruppe zuweisen</option>
+              <!-- TODO: Gruppen dynamisch laden -->
+            </select>
+          </div>
+          
+          <div class="alert alert-info mb-0">
+            <i class="fa-solid fa-info-circle me-2"></i>
+            Der Benutzer erhält eine Discord-DM mit einem Einladungslink zum Dashboard.
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            Abbrechen
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-paper-plane me-2"></i>
+            Einladung senden
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-user-edit me-2"></i>
+          Benutzer bearbeiten
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      
+      <form id="editUserForm">
+        <input type="hidden" id="edit_user_id" name="user_id">
+        
+        <div class="modal-body">
+          <!-- TODO: Gruppen-Checkboxen -->
+          <!-- TODO: Direct Permissions Editor -->
+          <div class="alert alert-warning">
+            <i class="fa-solid fa-construction me-2"></i>
+            Edit-Modal wird noch implementiert...
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            Abbrechen
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-save me-2"></i>
+            Speichern
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Remove User Modal -->
+<div class="modal fade" id="removeUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-exclamation-triangle me-2"></i>
+          Benutzer entfernen
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      
+      <form id="removeUserForm">
+        <input type="hidden" id="remove_user_id" name="user_id">
+        
+        <div class="modal-body">
+          <p>Möchtest du den Benutzer <strong id="remove_username"></strong> wirklich entfernen?</p>
+          <p class="text-muted mb-0">Der Benutzer verliert sofort alle Zugriffsrechte auf das Dashboard.</p>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            Abbrechen
+          </button>
+          <button type="submit" class="btn btn-danger">
+            <i class="fa-solid fa-trash me-2"></i>
+            Entfernen
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript für AJAX-Handling -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const guildId = '<%= guildId %>';
+  
+  // Search functionality
+  const searchInput = document.getElementById('userSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const search = e.target.value.toLowerCase();
+      const rows = document.querySelectorAll('#usersTable tbody tr');
+      
+      rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(search) ? '' : 'none';
+      });
+    });
+  }
+  
+  // Invite User Form
+  const inviteForm = document.getElementById('inviteUserForm');
+  if (inviteForm) {
+    inviteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(inviteForm);
+      const data = Object.fromEntries(formData);
+      
+      try {
+        const response = await fetch(`/guild/${guildId}/permissions/users/invite`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // Toast anzeigen
+          showToast('success', result.message);
+          
+          // Modal schließen
+          bootstrap.Modal.getInstance(document.getElementById('inviteUserModal')).hide();
+          
+          // Seite neu laden
+          setTimeout(() => window.location.reload(), 1500);
+        } else {
+          showToast('error', result.message);
+        }
+      } catch (error) {
+        console.error('Error inviting user:', error);
+        showToast('error', 'Fehler beim Einladen des Benutzers');
+      }
+    });
+  }
+  
+  // Edit User Buttons
+  document.querySelectorAll('.btn-edit-user').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const userId = btn.dataset.userId;
+      document.getElementById('edit_user_id').value = userId;
+      
+      // TODO: Load user data and populate form
+      
+      new bootstrap.Modal(document.getElementById('editUserModal')).show();
+    });
+  });
+  
+  // Remove User Buttons
+  document.querySelectorAll('.btn-remove-user').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const userId = btn.dataset.userId;
+      const username = btn.dataset.username;
+      
+      document.getElementById('remove_user_id').value = userId;
+      document.getElementById('remove_username').textContent = username;
+      
+      new bootstrap.Modal(document.getElementById('removeUserModal')).show();
+    });
+  });
+  
+  // Remove User Form
+  const removeForm = document.getElementById('removeUserForm');
+  if (removeForm) {
+    removeForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const userId = document.getElementById('remove_user_id').value;
+      
+      try {
+        const response = await fetch(`/guild/${guildId}/permissions/users/${userId}`, {
+          method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showToast('success', result.message);
+          bootstrap.Modal.getInstance(document.getElementById('removeUserModal')).hide();
+          setTimeout(() => window.location.reload(), 1500);
+        } else {
+          showToast('error', result.message);
+        }
+      } catch (error) {
+        console.error('Error removing user:', error);
+        showToast('error', 'Fehler beim Entfernen des Benutzers');
+      }
+    });
+  }
+  
+  // Toast Helper
+  function showToast(type, message) {
+    // TODO: Integrate with existing toast system
+    console.log(`[${type}] ${message}`);
+    alert(message); // Temporary fallback
+  }
+  
+  // Initialize Bootstrap tooltips
+  const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+  tooltips.forEach(el => new bootstrap.Tooltip(el));
+});
+</script>
+
+<style>
+.icon-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hover-shadow:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+#usersTable tbody tr {
+  transition: background-color 0.2s;
+}
+
+#usersTable tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+</style>

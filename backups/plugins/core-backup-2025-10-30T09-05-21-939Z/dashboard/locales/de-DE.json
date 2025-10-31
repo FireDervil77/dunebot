@@ -1,0 +1,188 @@
+{
+    "TITLE": "Core",
+    "DESCRIPTION": "Kern Plugin für die Anwendung",
+
+    "SETTINGS_TITLE": "Einstellungen",
+    "PREFIX_TITLE": "Präfix",
+    "PREFIX_DESC": "Das Präfix für die Bot-Befehle",
+    "LOCALE_TITLE": "Sprache",
+    "LOCALE_DESC": "Die Sprache für den Bot",
+
+    "SERVER_DEFAULTS": "Servereinstellungen",
+    "SUPPORT": "Support-Server",
+    "SUPPORT_DESC": "Discord-Einladungslink für den Support-Server",
+    "SLASH": "Slash-Befehle",
+    "SLASH_DESC": "Aktivieren/deaktivieren von Slash-Befehlen",
+    "CONTEXT": "Kontextmenü",
+    "CONTEXT_DESC": "Aktivieren/deaktivieren von Kontextmenüs",
+
+    "DASH_DEFAULTS": "Dashboard-Einstellungen",
+    "LOGO": "Logo",
+    "LOGO_DESC": "Logo für das Dashboard",
+    "LOGO_URL": "Logo-URL",
+    "LOGO_URL_DESC": "URL zum Logo-Bild",
+
+    "ENABLED": "Aktiviert",
+    "DISABLED": "Deaktiviert",
+    
+
+    "SETTINGS": {
+        "GENERAL": {
+            "TITLE": "Grundkonfiguration",
+            "PREFIX_LABEL": "Bot-Präfix",
+            "PREFIX_HELP": "Das Präfix für Text-Befehle (z.B. <code>!help</code>, <code>!ping</code>)",
+            "LOCALE_LABEL": "Standard-Sprache",
+            "LOCALE_HELP": "Die Standard-Sprache für Bot-Antworten und Dashboard-Inhalte",
+            "THEME_LABEL": "Dashboard-Theme",
+            "THEME_HELP": "Weitere Themes werden in zukünftigen Updates hinzugefügt",
+            "THEME_DEFAULT": "Standard (Hell)",
+            "THEME_DARK": "Dark Mode (bald verfügbar)",
+            "THEME_NORD": "Nord Theme (bald verfügbar)",
+            "FEATURES_TITLE": "Features",
+            "SLASH_LABEL": "Slash-Commands aktivieren",
+            "SLASH_HELP": "Ermöglicht die Nutzung von Discord Slash-Commands (<code>/help</code> statt <code>!help</code>)",
+            "VERBOSE_LABEL": "Erweiterte Logs",
+            "VERBOSE_HELP": "Protokolliert alle Bot-Aktionen detailliert (für Administratoren empfohlen)",
+            "DEBUG_LABEL": "Debug-Modus",
+            "DEBUG_BADGE": "Für Entwickler",
+            "DEBUG_HELP": "Zeigt erweiterte Fehlerinfos und technische Details (kann die Performance beeinträchtigen)",
+            "RESET_BTN": "Zurücksetzen",
+            "SAVE_BTN": "Einstellungen speichern"
+        },
+        "HELP": {
+            "TITLE": "Hilfe & Tipps",
+            "PREFIX_TITLE": "Bot-Präfix",
+            "PREFIX_TEXT": "Wähle ein eindeutiges Präfix, das nicht mit anderen Bots kollidiert. Beliebte Präfixe: <code>!</code>, <code>?</code>, <code>.</code>",
+            "SLASH_TITLE": "Slash-Commands",
+            "SLASH_TEXT": "Slash-Commands sind die moderne Alternative zu Text-Befehlen. Sie bieten Auto-Vervollständigung und sind benutzerfreundlicher.",
+            "DEBUG_TITLE": "Debug-Modus",
+            "DEBUG_WARNING": "Achtung!",
+            "DEBUG_TEXT": "Der Debug-Modus sollte nur aktiviert werden, wenn du technische Probleme analysierst."
+        },
+        "STATUS": {
+            "TITLE": "Aktuelle Konfiguration",
+            "PREFIX": "Präfix",
+            "LOCALE": "Sprache",
+            "THEME": "Theme",
+            "SLASH": "Slash-Commands",
+            "ACTIVE": "Aktiv",
+            "INACTIVE": "Deaktiviert"
+        }
+    },
+    
+    "SETTINGS_OVERVIEW": {
+        "GENERAL_TITLE": "Allgemeine Einstellungen",
+        "GENERAL_SUBTITLE": "Bot-Grundkonfiguration",
+        "GENERAL_DESCRIPTION": "Konfiguriere Bot-Präfix, Standardsprache, Theme und aktiviere/deaktiviere Slash-Commands.",
+        "GENERAL_FEATURES": {
+            "PREFIX": "Bot-Präfix anpassen",
+            "LOCALE": "Sprache festlegen",
+            "THEME": "Theme auswählen",
+            "SLASH": "Slash-Commands verwalten"
+        },
+        "USER_TITLE": "Benutzer-Verwaltung",
+        "USER_SUBTITLE": "Rollen & Permissions",
+        "USER_DESCRIPTION": "Verwalte Berechtigungen, Admin-Rollen und Command-Zugriffe.",
+        "USER_FEATURES": {
+            "ROLES": "Rollen-Berechtigungen",
+            "ADMIN": "Admin-Zugriff",
+            "COMMANDS": "Command-Permissions",
+            "BLACKLIST": "Blacklist verwalten"
+        },
+        "INTEGRATIONS_TITLE": "Integrationen",
+        "INTEGRATIONS_SUBTITLE": "APIs & Webhooks",
+        "INTEGRATIONS_DESCRIPTION": "Konfiguriere externe Dienste, Webhooks und API-Zugriffe.",
+        "INTEGRATIONS_FEATURES": {
+            "WEBHOOKS": "Webhook-URLs",
+            "API_KEYS": "API-Keys",
+            "OAUTH": "OAuth-Verbindungen",
+            "THIRD_PARTY": "Drittanbieter-Dienste",
+            "DISCORD_LOGS": "Discord Logs",
+            "EXTERNAL_SERVICES": "Externe Services"
+        },
+        "COMING_SOON": "Bald verfügbar",
+        "BTN_CONFIGURE": "Konfigurieren",
+        "BTN_OPEN": "Öffnen",
+        "PLUGIN_SETTINGS_TITLE": "Plugin-Einstellungen",
+        "PLUGIN_SETTINGS_DESC": "Aktivierte Plugins können eigene Einstellungsseiten bereitstellen. Diese erscheinen automatisch in der Navigation.",
+        "PLUGIN_SETTINGS_TIP": "Tipp",
+        "PLUGIN_SETTINGS_TIP_TEXT": "Schau dir die linke Navigation an - Plugin-spezifische Einstellungen findest du unter dem jeweiligen Plugin-Namen in den Untermenüs.",
+        "SYSTEM_STATUS_TITLE": "System-Status",
+        "STATUS_BOT": "Bot-Status",
+        "STATUS_BOT_ONLINE": "Online",
+        "STATUS_DATABASE": "Datenbank",
+        "STATUS_DATABASE_CONNECTED": "Verbunden",
+        "STATUS_PLUGINS": "Plugins",
+        "STATUS_PLUGINS_ACTIVE": "Aktiv",
+        "STATUS_PERFORMANCE": "Performance",
+        "STATUS_PERFORMANCE_STABLE": "Stabil"
+    },
+    "USERS": {
+        "TITLE": "Benutzer-Verwaltung",
+        "NOTICE_TITLE": "Hinweis:",
+        "NOTICE_TEXT": "Diese Seite befindet sich noch in Entwicklung. Hier werden zukünftig Benutzerrechte, Rollen und Permissions verwaltet.",
+        "TABLE_USER": "Benutzer",
+        "TABLE_ROLE": "Rolle",
+        "TABLE_JOINED": "Beigetreten",
+        "TABLE_ACTIONS": "Aktionen",
+        "TABLE_EMPTY": "Keine Benutzer-Daten verfügbar",
+        "ROLES_TITLE": "Rollen & Berechtigungen",
+        "ROLES_DESC": "Verwalte Discord-Rollen und deren Berechtigungen für Bot-Befehle.",
+        "BANNED_TITLE": "Gesperrte Benutzer",
+        "BANNED_DESC": "Verwalte Benutzer, die vom Bot gesperrt wurden.",
+        "COMING_SOON": "Bald verfügbar"
+    },
+    "INTEGRATIONS": {
+        "TITLE": "Integrationen",
+        "NOTICE_TEXT": "Verbinde DuneBot mit externen Services und APIs.",
+        "WEBHOOK_TITLE": "Webhooks",
+        "WEBHOOK_SUBTITLE": "Empfange externe Events",
+        "WEBHOOK_DESC": "Konfiguriere Webhooks um externe Events in deinem Server zu empfangen.",
+        "TWITCH_TITLE": "Twitch",
+        "TWITCH_SUBTITLE": "Stream-Benachrichtigungen",
+        "TWITCH_DESC": "Erhalte Benachrichtigungen wenn deine Streamer live gehen.",
+        "YOUTUBE_TITLE": "YouTube",
+        "YOUTUBE_SUBTITLE": "Video-Benachrichtigungen",
+        "YOUTUBE_DESC": "Benachrichtigungen bei neuen Videos deiner Lieblings-YouTuber.",
+        "CUSTOM_API_TITLE": "Custom API",
+        "CUSTOM_API_SUBTITLE": "Eigene API-Integration",
+        "CUSTOM_API_DESC": "Verbinde den Bot mit deiner eigenen API oder externen Services.",
+        "BTN_CONFIGURE": "Konfigurieren",
+        "DEV_WARNING": "In Entwicklung:",
+        "DEV_WARNING_TEXT": "Diese Features werden in zukünftigen Updates verfügbar sein."
+    },
+    "WIDGETS": {
+        "ACTIVE_PLUGINS": {
+            "BTN_CONFIGURE": "Konfigurieren",
+            "NO_PLUGINS": "Keine Plugins aktiviert oder verfügbar für diesen Server.",
+            "ACTIVATE_NOW": "Jetzt Plugins aktivieren"
+        },
+        "SERVER_INFO": {
+            "MEMORY_USAGE": "Speichernutzung",
+            "BTN_MANAGE_PLUGINS": "Plugins verwalten"
+        },
+        "BOT_PERMISSIONS": {
+            "NO_ROLE": "Keine Rolle",
+            "PERM_SEND_MESSAGES": "Nachrichten senden",
+            "PERM_MANAGE_SERVER": "Server verwalten",
+            "PERM_MANAGE_ROLES": "Rollen verwalten",
+            "JOINED_AT": "Bot beigetreten am:",
+            "NO_DATA": "Keine Bot-Berechtigungsdaten verfügbar"
+        },
+        "SERVER_ANALYSIS": {
+            "MEMBERS": "Mitglieder",
+            "CHANNELS": "Kanäle",
+            "ROLES": "Rollen",
+            "CACHE_EFFICIENCY": "Cache-Effektivität",
+            "CACHED_MEMBERS": "Mitglieder im Cache:",
+            "SERVER_AGE": "Server-Alter",
+            "DAYS": "Tage",
+            "NO_DATA": "Keine Daten verfügbar",
+            "PREMIUM_STATUS": "Premium-Status",
+            "LEVEL": "Level",
+            "BOOSTS": "Boosts"
+        }
+    } 
+    
+}
+

@@ -1,6 +1,7 @@
 const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 const path = require('path');
+const { requirePermission } = require('../../../apps/dashboard/middlewares/permissions.middleware');
 
 class ModerationPlugin extends DashboardPlugin {
     constructor(app) {
@@ -47,7 +48,8 @@ class ModerationPlugin extends DashboardPlugin {
         const ipcServer = ServiceManager.get('ipcServer');
 
         try {
-            this.guildRouter.get('/', async (req, res) => {
+            // GET / - View Moderation Settings
+            this.guildRouter.get('/', requirePermission('MODERATION.VIEW'), async (req, res) => {
                 const guildId = req.params.guildId || res.locals.guildId;
                 
                 try {
@@ -83,8 +85,8 @@ class ModerationPlugin extends DashboardPlugin {
                 }
             });
 
-            // Alternative Save-Route per POST (robuster als PUT hinter manchen Proxies)
-            this.guildRouter.post('/save', async (req, res) => {
+            // POST /save - Save Moderation Settings (Alternative zu PUT)
+            this.guildRouter.post('/save', requirePermission('MODERATION.SETTINGS.EDIT'), async (req, res) => {
                 const guildId = req.params.guildId || res.locals.guildId;
                 
                 // Unterstütze beide Content-Types: JSON und Form-Data
@@ -160,8 +162,8 @@ class ModerationPlugin extends DashboardPlugin {
                 }
             });
 
-            // Alte Route: PUT /
-            this.guildRouter.put('/', async (req, res) => {
+            // PUT / - Save Moderation Settings (Legacy)
+            this.guildRouter.put('/', requirePermission('MODERATION.SETTINGS.EDIT'), async (req, res) => {
                 const guildId = req.params.guildId || res.locals.guildId;
                 const { log_channel, maxwarn_count, maxwarn_action, modlog_events, dm_on_warn, dm_on_kick, dm_on_ban, dm_on_timeout, default_reason } = req.body;
                 const Logger = ServiceManager.get('Logger');

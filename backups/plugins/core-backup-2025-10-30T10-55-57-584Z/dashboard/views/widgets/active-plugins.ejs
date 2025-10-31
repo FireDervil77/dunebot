@@ -1,0 +1,50 @@
+<!--  Aktivierte Plugins -->
+<% if (locals.enabledPlugins && enabledPlugins.length > 0) { %>
+  <div class="row">
+    <% enabledPlugins.forEach(plugin => { %>
+      <div class="col-md-3 col-lg-2 mb-3">
+        <div class="plugin-card text-center position-relative">
+          <% if (plugin.badge && plugin.badge.status) { %>
+            <span class="position-absolute top-0 end-0 translate-middle badge rounded-pill bg-<%= 
+              plugin.badge.status === 'new' ? 'success' : 
+              plugin.badge.status === 'beta' ? 'warning' : 
+              plugin.badge.status === 'updated' ? 'info' : 
+              plugin.badge.status === 'deprecated' ? 'danger' : 'secondary' 
+            %> plugin-badge">
+              <%= plugin.badge.status === 'new' ? 'NEU' : 
+                  plugin.badge.status === 'beta' ? 'BETA' : 
+                  plugin.badge.status === 'updated' ? 'UPDATE' : 
+                  plugin.badge.status === 'deprecated' ? 'DEPRECATED' : 
+                  plugin.badge.status.toUpperCase() %>
+            </span>
+          <% } %>
+          <% if (plugin.badge && plugin.badge.featured) { %>
+            <div class="plugin-featured-star">
+              <i class="bi bi-star-fill text-warning"></i>
+            </div>
+          <% } %>
+          <div class="plugin-icon mb-2">
+            <i class="bi bi-puzzle fs-3 text-primary"></i>
+          </div>
+          <h5 class="plugin-name mb-1"><%= plugin.name %></h5>
+          <div class="d-flex gap-1 justify-content-center">
+            <a href="/guild/<%= guildId %>/plugins/<%= plugin.name %>" class="btn btn-sm btn-primary">
+              <i class="bi bi-gear-fill me-1"></i> <%= tr('core:WIDGETS.ACTIVE_PLUGINS.BTN_CONFIGURE') %>
+            </a>
+            <%# Reload-Button komplett deaktiviert (auch für Core) %>
+            <%# if (locals.isSuperAdmin) { %>
+            
+            <%# } %>
+          </div>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+<% } else { %>
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle me-2"></i>
+    <%= tr('core:WIDGETS.ACTIVE_PLUGINS.NO_PLUGINS') %>
+    <a href="/guild/<%= guildId %>/plugins" class="alert-link"><%= tr('core:WIDGETS.ACTIVE_PLUGINS.ACTIVATE_NOW') %></a>
+  </div>
+<% } %>
+   

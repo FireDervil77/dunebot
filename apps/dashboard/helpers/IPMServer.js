@@ -17,6 +17,8 @@ const WebSocket = require('ws');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { ServiceManager } = require('dunebot-core');
+const { MessageValidator, MessageBuilder } = require('dunebot-sdk');
+const eventRouter = require('./IPMEventRouter');
 
 class IPMServer {
     /**
@@ -253,10 +255,10 @@ class IPMServer {
                     
                     await this._logDaemonEvent(daemon_id, 'reconnected', { version });
                     
-                    // Server-Registry laden (alle Server die zu diesem Daemon gehören)
-                    const servers = await this.dbService.query(
-                        `SELECT server_id, server_name, ram_limit_gb, disk_limit_gb, custom_path
-                         FROM daemon_servers 
+                    // ✅ RootServer-Info laden (kein serverRegistry mehr - 1:1 Beziehung!)
+                    const [rootserver] = await this.dbService.query(
+                        `SELECT id, name, base_directory, system_user
+                         FROM rootserver 
                          WHERE daemon_id = ?`,
                         [daemon_id]
                     );
@@ -264,7 +266,7 @@ class IPMServer {
                     ws.send(JSON.stringify({ 
                         type: 'registered', 
                         sessionToken: newSessionToken,
-                        serverRegistry: servers // ✅ Server-Registry mitschicken
+                        rootserver: rootserver || null // ✅ RootServer-Info mitschicken
                     }));
                     
                     return { 
@@ -350,10 +352,10 @@ class IPMServer {
             // Audit-Log
             await this._logDaemonEvent(daemon_id, 'first_registration', { version });
 
-            // Server-Registry laden (alle Server die zu diesem Daemon gehören)
-            const servers = await this.dbService.query(
-                `SELECT server_id, server_name, ram_limit_gb, disk_limit_gb, custom_path
-                 FROM daemon_servers 
+            // ✅ RootServer-Info laden (kein serverRegistry mehr - 1:1 Beziehung!)
+            const [rootserver] = await this.dbService.query(
+                `SELECT id, name, base_directory, system_user
+                 FROM rootserver 
                  WHERE daemon_id = ?`,
                 [daemon_id]
             );
@@ -361,7 +363,7 @@ class IPMServer {
             ws.send(JSON.stringify({ 
                 type: 'registered', 
                 sessionToken,
-                serverRegistry: servers // ✅ Server-Registry mitschicken
+                rootserver: rootserver || null // ✅ RootServer-Info mitschicken
             }));
 
             return { 
@@ -392,6 +394,21 @@ class IPMServer {
         // ✅ Case-insensitive Type-Matching (Go-Daemon sendet UPPERCASE)
         const normalizedType = type?.toLowerCase();
 
+        // ✅ NEU: Standardisierte Messages über Event-Router routen
+        // Validierung + Routing für Command/Event Messages
+        if (message.namespace && message.action) {
+            // Standardisierte IPM-Message → Event-Router
+            await eventRouter.route(message, { daemonId });
+            
+            // Bei Commands: Auch alte Logik beibehalten (für Rückwärtskompatibilität)
+            if (normalizedType === 'command' || normalizedType === 'response') {
+                // Weiterhin durch switch-case laufen lassen
+            } else {
+                // Events wurden bereits geroutet, fertig
+                return;
+            }
+        }
+
         switch (normalizedType) {
             case 'heartbeat':
                 await this._handleHeartbeat(daemonId, payload);
@@ -411,7 +428,10 @@ class IPMServer {
 
             case 'event':
                 // Event vom Daemon (Server-Status, Error, etc.)
-                await this._handleDaemonEvent(daemonId, payload);
+                // ✅ ALT: Legacy-Format (ohne namespace/action)
+                if (!message.namespace) {
+                    await this._handleDaemonEvent(daemonId, payload);
+                }
                 break;
 
             case 'log':
@@ -438,18 +458,14 @@ class IPMServer {
         if (payload.hardware) {
             conn.metadata.hardware = payload.hardware;
             
-            // ✅ Hardware-Stats auch in daemon_servers speichern (für alle Virtual Server dieses Daemons)
-            const DaemonServer = require('../../../plugins/masterserver/dashboard/models/DaemonServer');
+            // ✅ Hardware-Stats in rootserver Tabelle speichern
+            const RootServer = require('../../../plugins/masterserver/dashboard/models/RootServer');
             
-            // Alle Server dieses Daemons abrufen
-            const servers = await this.dbService.query(
-                'SELECT server_id FROM daemon_servers WHERE daemon_id = ?',
-                [daemonId]
-            );
-            
-            // Für jeden Server Hardware-Stats updaten
-            for (const server of servers) {
-                await DaemonServer.updateHardwareStats(server.server_id, payload.hardware);
+            try {
+                await RootServer.updateHardwareStats(daemonId, payload.hardware);
+                this.Logger.debug('[IPMServer] Hardware-Stats in DB gespeichert');
+            } catch (error) {
+                this.Logger.error('[IPMServer] Fehler beim Speichern der Hardware-Stats:', error);
             }
         }
 
@@ -535,6 +551,10 @@ class IPMServer {
                 await this._handleGameserverInstallFailed(daemonId, data);
                 break;
 
+            case 'gameserver.status_changed':
+                await this._handleGameserverStatusChanged(daemonId, data);
+                break;
+
             // Weitere Events hier hinzufügen...
         }
     }
@@ -577,6 +597,43 @@ class IPMServer {
              WHERE id = ?`,
             [server_id]
         );
+    }
+
+    /**
+     * Gameserver Status-Änderung (z.B. crashed, stopped)
+     * Wird vom Daemon gesendet wenn Health-Check fehlschlägt
+     * 
+     * @param {string} daemonId - Daemon ID
+     * @param {object} data - Event-Daten { server_id, status, timestamp }
+     * @private
+     */
+    async _handleGameserverStatusChanged(daemonId, data) {
+        const { server_id, status, timestamp } = data;
+        
+        this.Logger.info(`[IPMServer] 🔄 Gameserver ${server_id} Status-Änderung: ${status} (von Daemon ${daemonId})`);
+
+        try {
+            // ✅ Status-Mapping: Daemon 'crashed' → MySQL 'error'
+            const dbStatus = status === 'crashed' ? 'error' : status;
+
+            // Server-Status in MySQL aktualisieren
+            const result = await this.dbService.query(
+                `UPDATE gameservers 
+                 SET status = ?, 
+                     updated_at = NOW() 
+                 WHERE id = ?`,
+                [dbStatus, server_id]
+            );
+
+            if (result.affectedRows > 0) {
+                this.Logger.success(`[IPMServer] ✅ Gameserver ${server_id} Status → ${dbStatus} (MySQL synchronized)`);
+            } else {
+                this.Logger.warn(`[IPMServer] ⚠️ Gameserver ${server_id} nicht in MySQL gefunden`);
+            }
+
+        } catch (error) {
+            this.Logger.error(`[IPMServer] ❌ Fehler beim Status-Update für Server ${server_id}:`, error);
+        }
     }
 
     /**
@@ -839,26 +896,20 @@ class IPMServer {
         try {
             this.Logger.info(`[IPMServer] Prüfe hängende Installationen für Daemon ${daemonId}...`);
 
-            // Alle Virtual Server für diesen Daemon laden
-            const virtualServers = await this.dbService.query(
-                `SELECT server_id FROM daemon_servers WHERE daemon_id = ?`,
-                [daemonId]
-            );
-
-            if (!virtualServers || virtualServers.length === 0) {
-                this.Logger.debug(`[IPMServer] Keine Virtual Server für Daemon ${daemonId}`);
+            // ⚠️ TODO: Gameserver-Plugin-Kompatibilität!
+            // Wenn gameservers-Tabelle existiert, Installationen re-triggern
+            const hasGameserversTable = await this.dbService.tableExists('gameservers');
+            
+            if (!hasGameserversTable) {
+                this.Logger.debug(`[IPMServer] gameservers-Tabelle existiert nicht (Gameserver-Plugin nicht installiert)`);
                 return;
             }
 
-            const virtualServerIds = virtualServers.map(v => v.server_id);
-
-            // Gameserver mit Status 'installing' für diese Virtual Server
-            // IN (?)-Platzhalter für jedes Array-Element erstellen
-            const placeholders = virtualServerIds.map(() => '?').join(',');
+            // Gameserver mit Status 'installing' für diesen RootServer (via daemon_id)
             const pendingServers = await this.dbService.query(
                 `SELECT 
                     gs.id as server_id,
-                    gs.daemon_server_id,
+                    gs.rootserver_id,
                     gs.addon_marketplace_id,
                     gs.name,
                     gs.ports,
@@ -869,9 +920,10 @@ class IPMServer {
                     am.name as addon_name
                  FROM gameservers gs
                  LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
-                 WHERE gs.daemon_server_id IN (${placeholders})
+                 LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+                 WHERE r.daemon_id = ?
                  AND gs.status = 'installing'`,
-                virtualServerIds
+                [daemonId]
             );
 
             if (!pendingServers || pendingServers.length === 0) {
@@ -931,7 +983,7 @@ class IPMServer {
 
                     const response = await this.sendCommand(daemonId, 'gameserver.install', {
                         server_id: server.server_id,
-                        daemon_server_id: server.daemon_server_id,
+                        rootserver_id: server.rootserver_id, // ✅ rootserver_id statt daemon_server_id
                         addon_slug: server.addon_slug,
                         addon_name: server.addon_name,
                         template_name: null, // Template-Name nicht in DB gespeichert

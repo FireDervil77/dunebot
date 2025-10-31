@@ -271,20 +271,109 @@ class DashboardPlugin {
 
     /**
      * Wird aufgerufen, wenn das Plugin in einer Guild aktiviert wird
+     * Registriert automatisch Permissions aus permissions.json
+     * 
      * @param {string} guildId - ID der Guild
      */
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get('Logger');
         Logger.debug(`Plugin ${this.name} in Guild ${guildId} aktiviert`);
+        
+        // Automatische Permission-Registrierung
+        try {
+            const permissionManager = ServiceManager.get('permissionManager');
+            const permissions = this.getPermissions();
+            
+            if (permissions && permissions.length > 0) {
+                Logger.info(`[Plugin ${this.name}] Registering ${permissions.length} permissions for guild ${guildId}...`);
+                
+                const registered = await permissionManager.registerPluginPermissions(
+                    this.name,
+                    guildId,
+                    permissions
+                );
+                
+                Logger.success(`[Plugin ${this.name}] Registered ${registered} permissions for guild ${guildId}`);
+            } else {
+                Logger.debug(`[Plugin ${this.name}] No permissions.json found, skipping permission registration`);
+            }
+        } catch (error) {
+            Logger.error(`[Plugin ${this.name}] Failed to register permissions for guild ${guildId}:`, error);
+            // Nicht werfen - Plugin sollte trotzdem funktionieren
+        }
     }
 
     /**
      * Wird aufgerufen, wenn das Plugin in einer Guild deaktiviert wird
+     * Entfernt automatisch Permissions aus permission_definitions
+     * 
      * @param {string} guildId - ID der Guild
      */
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get('Logger');
         Logger.debug(`Plugin ${this.name} in Guild ${guildId} deaktiviert`);
+        
+        // Automatische Permission-Entfernung
+        try {
+            const permissionManager = ServiceManager.get('permissionManager');
+            
+            Logger.info(`[Plugin ${this.name}] Unregistering permissions for guild ${guildId}...`);
+            
+            const result = await permissionManager.unregisterPluginPermissions(
+                this.name,
+                guildId
+            );
+            
+            Logger.success(
+                `[Plugin ${this.name}] Unregistered permissions for guild ${guildId}: ` +
+                `${result.permissionsDeleted} deleted, ${result.groupsUpdated} groups updated`
+            );
+        } catch (error) {
+            Logger.error(`[Plugin ${this.name}] Failed to unregister permissions for guild ${guildId}:`, error);
+            // Nicht werfen - Plugin sollte trotzdem deaktiviert werden
+        }
+    }
+    
+    /**
+     * Lädt permissions.json aus dem Plugin-Verzeichnis
+     * Format: { plugin: "name", version: "1.0.0", permissions: [...] }
+     * 
+     * @returns {Array|null} Array von Permission-Objekten oder null wenn nicht vorhanden
+     */
+    getPermissions() {
+        const Logger = ServiceManager.get('Logger');
+        
+        try {
+            const permissionsPath = path.join(this.baseDir, 'permissions.json');
+            
+            if (!fs.existsSync(permissionsPath)) {
+                return null;  // Kein permissions.json vorhanden
+            }
+            
+            const permissionsData = require(permissionsPath);
+            
+            // Validierung
+            if (!permissionsData.permissions || !Array.isArray(permissionsData.permissions)) {
+                Logger.warn(`[Plugin ${this.name}] Invalid permissions.json format (missing permissions array)`);
+                return null;
+            }
+            
+            // Plugin-Name Check (optional - Warnung bei Mismatch)
+            if (permissionsData.plugin && permissionsData.plugin !== this.name) {
+                Logger.warn(
+                    `[Plugin ${this.name}] permissions.json plugin name mismatch: ` +
+                    `expected "${this.name}", got "${permissionsData.plugin}"`
+                );
+            }
+            
+            Logger.debug(`[Plugin ${this.name}] Loaded ${permissionsData.permissions.length} permissions from permissions.json`);
+            
+            return permissionsData.permissions;
+            
+        } catch (error) {
+            Logger.error(`[Plugin ${this.name}] Failed to load permissions.json:`, error.message);
+            return null;
+        }
     }
 
     /**

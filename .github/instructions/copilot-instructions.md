@@ -17,6 +17,16 @@ DuneBot ist ein modulares Discord-Bot-System mit einem WordPress-ähnlichen Plug
 - **DASHBOARD**: Nutzte Adminlte & Bootstrap (nichts anderes nutzten!)
 - **Frontend**: Nutzte LUMIA THEME (Bootstrap)
 
+## 🚧 ACTIVE DEVELOPMENT PLAN
+
+**Aktuelles Großprojekt:** Event-Bus Architecture Umbau  
+**Detaillierter Plan:** [`docs/EVENT_BUS_ARCHITECTURE_PLAN.md`](../../docs/EVENT_BUS_ARCHITECTURE_PLAN.md)
+
+**Wichtig:** Bei allen Änderungen an der Kommunikations-Architektur (IPM, SSE, Events) den Plan konsultieren und den Fortschritt dort aktualisieren!
+
+**Wichtig** Den process dunebot-dashboard-dev nicht neustarten wenn er in pm2 offline ist. dann ist er bereits in der Developper-Terminal aktiv!
+
+
 ## CORE ARCHITECTURE PRINCIPLES
 
 ### ServiceManager Pattern
@@ -239,6 +249,128 @@ export VEZA_DEBUG=true        # Veza-Debug-Logs aktivieren
 # IPM (Daemon ↔ Dashboard)
 export DEBUG_IPM=true         # IPM-Debug-Logs aktivieren (falls implementiert)
 ```
+
+---
+
+## 🗂️ FIREBOT DAEMON FILESYSTEM ARCHITECTURE
+
+### Definitive Verzeichnisstruktur
+
+**Diese Struktur ist VERBINDLICH für alle Daemon-Entwicklungen!**
+
+```
+/home/firecenter/                          # Base Directory (User-definiert bei Setup)
+├── steamcmd/                              # Shared SteamCMD Installation
+│   ├── steamcmd.sh                        # SteamCMD Binary
+│   └── ...                                # Steam Runtime Files
+│   # Ownership: root:steamcmd (775)
+│   # Alle gs-* User sind in steamcmd Gruppe
+│
+├── daemon-logs/                           # Daemon System Logs
+│   └── firebot-daemon.log
+│   # Ownership: root:root
+│
+├── gs-guild_1403034310/                   # USER HOME für Guild 1403034310
+│   # Ownership: gs-guild_1403034310:gs-guild_1403034310 (755)
+│   # User Shell: /bin/bash
+│   # User UID/GID: Automatisch vom System vergeben
+│   │
+│   ├── .config/                           # User Config Directory
+│   ├── .steam/                            # Steam User Data
+│   ├── .local/                            # Local Application Data
+│   ├── .cache/                            # Cache Directory
+│   │
+│   ├── rootserver_1/                      # RootServer 1 (MySQL ID)
+│   │   ├── data/                          # RootServer-spezifische Daten
+│   │   ├── backups/                       # RootServer Backups
+│   │   ├── logs/                          # RootServer Logs
+│   │   └── gameservers/                   # Gameserver Installationen
+│   │       ├── csgo-server-001/           # Counter-Strike 2 Server
+│   │       │   ├── start.sh               # Start-Script (generiert)
+│   │       │   ├── game/                  # Game Files
+│   │       │   └── ...
+│   │       ├── palworld-server-001/       # Palworld Server
+│   │       │   ├── start.sh
+│   │       │   ├── Pal/                   # Game Files
+│   │       │   └── ...
+│   │       └── ...
+│   │
+│   └── rootserver_2/                      # RootServer 2 (falls mehrere)
+│       └── gameservers/
+│           └── ...
+│
+└── gs-guild_9876543210/                   # Anderer Guild User
+    ├── .config/
+    ├── .steam/
+    ├── .local/
+    ├── .cache/
+    └── rootserver_1/
+        └── gameservers/
+            └── ...
+```
+
+### Path-Generierung (Code-Konvention)
+
+**User Home Directory:**
+```go
+// IMMER: /home/{base_directory}/{username}/
+userHome := filepath.Join(cfg.Filesystem.BaseDirectory, username)
+// Beispiel: /home/firecenter/gs-guild_1403034310/
+```
+
+**RootServer Directory:**
+```go
+// IMMER: {userHome}/rootserver_{mysql_id}/
+rootserverPath := filepath.Join(userHome, fmt.Sprintf("rootserver_%d", mysqlID))
+// Beispiel: /home/firecenter/gs-guild_1403034310/rootserver_1/
+```
+
+**Gameserver Installation:**
+```go
+// IMMER: {rootserverPath}/gameservers/{server-slug}/
+gameserverPath := filepath.Join(rootserverPath, "gameservers", serverSlug)
+// Beispiel: /home/firecenter/gs-guild_1403034310/rootserver_1/gameservers/csgo-001/
+```
+
+### User-Management
+
+**User-Erstellung:**
+```go
+username := fmt.Sprintf("gs-guild_%s", guildID)
+homeDir := filepath.Join(baseDir, username)  // /home/firecenter/gs-guild_XXXXX/
+
+cmd := exec.Command("useradd",
+    "--system",                    // System-User
+    "--home-dir", homeDir,         // Home im Base Directory
+    "--create-home",               // Home automatisch erstellen
+    "--shell", "/bin/bash",        // Bash Shell (für Scripts)
+    "--groups", "steamcmd",        // SteamCMD Gruppe
+    username)
+```
+
+**User-Verzeichnisse:**
+- Werden automatisch bei User-Erstellung in `{homeDir}` erstellt
+- `.config`, `.steam`, `.local`, `.cache` müssen explizit angelegt werden
+- Ownership: User:User (z.B. `gs-guild_1403034310:gs-guild_1403034310`)
+
+### Wichtige Regeln
+
+1. **Kein `/opt/firebot/` mehr!** Historisch, jetzt `BaseDirectory` aus Config
+2. **Kein `/vserver/{daemon_id}/` mehr!** Verwirrendes Zwischenlevel entfernt
+3. **User-Home = Base Directory + Username** - IMMER!
+4. **RootServer UNTER User-Home** - Pro MySQL-ID ein Verzeichnis
+5. **Gameservers UNTER RootServer** - In `gameservers/` Subfolder
+6. **Daemon läuft als root** - User-Wechsel via `syscall.Credential`
+7. **SteamCMD Shared** - Ownership `root:steamcmd`, alle gs-* User in Gruppe
+
+### Code-Locations
+
+- **User-Erstellung:** `firebot_daemon/internal/rootserver/virtual.go`
+- **RootServer-Setup:** `firebot_daemon/internal/rootserver/virtual.go`
+- **Gameserver-Installation:** `firebot_daemon/internal/gameserver/install.go`
+- **Path-Helpers:** `firebot_daemon/internal/rootserver/directory.go`
+
+---
 
 ### Plugin Architecture
 
@@ -736,3 +868,338 @@ class CoreDashboardPlugin extends DashboardPlugin {
 - **Schema Loading**: `.sql`-Dateien und JS-Module aus Plugin-Verzeichnissen
 - **Migration**: Tabellen werden automatisch bei Plugin-Aktivierung erstellt
 - **Config System**: JSON-basierte Konfiguration über `dbService.setConfig()`/`getConfig()`
+
+---
+
+## 🔄 PLUGIN MIGRATION SYSTEM (STANDARD FÜR ALLE PLUGINS!)
+
+### Übersicht
+
+**Seit v6.6.0 haben wir ein robustes Migration-System für alle Plugins!**
+
+- ✅ **Sequential Execution**: Migrationen laufen automatisch in der richtigen Reihenfolge
+- ✅ **Idempotent**: Jede Migration wird nur einmal ausgeführt (Tracking via `plugin_migrations` Tabelle)
+- ✅ **Production-Safe**: Fresh Installs und Updates werden gleich behandelt
+- ✅ **Rollback-Support**: Jede Migration kann `down()` Methode für Rollback haben
+- ✅ **Lokales System**: Keine Downloads, Code ist bereits im Monorepo
+
+### Migration-Tabelle
+
+**Datenbank:** `plugin_migrations` (automatisch erstellt bei Core-Plugin-Installation)
+
+```sql
+CREATE TABLE plugin_migrations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    plugin_name VARCHAR(100) NOT NULL,
+    guild_id VARCHAR(50) DEFAULT NULL,      -- NULL = global migration
+    migration_file VARCHAR(255) NOT NULL,    -- z.B. "dashboard/migrations/6.6.0-permissions.js"
+    migration_version VARCHAR(20) NOT NULL,  -- z.B. "6.6.0"
+    migration_type ENUM('schema', 'data', 'update') DEFAULT 'data',
+    executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    execution_time_ms INT DEFAULT 0,
+    success BOOLEAN DEFAULT TRUE,
+    error_log TEXT DEFAULT NULL,
+    rollback_file VARCHAR(255) DEFAULT NULL,
+    rolled_back_at TIMESTAMP NULL DEFAULT NULL,
+    UNIQUE KEY unique_migration (plugin_name, guild_id, migration_file)
+);
+```
+
+### Wann brauche ich eine Migration?
+
+**✅ Migration ERFORDERLICH bei:**
+- 🗄️ Neue Tabellen erstellen
+- 🔧 Spalten hinzufügen/ändern/löschen
+- 📊 Daten migrieren (alte Struktur → neue Struktur)
+- 🧭 Navigation grundlegend ändern
+- 🔑 Default-Daten für Guilds erstellen
+- 🗑️ Alte Daten löschen/aufräumen
+
+**❌ KEINE Migration bei:**
+- 💻 Bug-Fixes in Code
+- 🎨 UI/CSS-Änderungen
+- ⚡ Performance-Optimierungen
+- 🔄 Refactoring (ohne DB-Änderungen)
+- 📝 Neue Files hinzufügen (Commands, Routes)
+- 🗂️ Files löschen/umbenennen (DB bleibt gleich)
+
+**Faustregel:** Ändert sich die Datenbank? → Migration! Nur Code? → Kein Update nötig!
+
+### Migration erstellen (Schritt-für-Schritt)
+
+#### 1. Version in package.json erhöhen
+
+```json
+// plugins/myplugin/package.json
+{
+  "name": "myplugin",
+  "version": "1.2.0",  // ← Von 1.1.0 erhöhen!
+  ...
+}
+```
+
+#### 2. Migration-Datei erstellen
+
+**Pfad:** `plugins/myplugin/dashboard/migrations/1.2.0-feature-name.js`
+
+**Template:**
+```javascript
+/**
+ * Migration 1.2.0: Feature Description
+ * 
+ * Beschreibung was die Migration macht
+ * 
+ * @author YourName
+ * @version 1.2.0
+ */
+
+module.exports = {
+    version: '1.2.0',
+    name: 'Feature Implementation',
+    
+    /**
+     * Migration ausführen
+     * @param {object} dbService - Database Service
+     * @param {string} guildId - Guild ID (kann NULL sein für globale Migrations)
+     */
+    async up(dbService, guildId) {
+        const Logger = require('dunebot-core').ServiceManager.get('Logger');
+        
+        Logger.info(`[Plugin Migration 1.2.0] Starte Migration${guildId ? ` für Guild ${guildId}` : ''}...`);
+        
+        try {
+            // ========================================
+            // SCHEMA-ÄNDERUNGEN (Tabellen/Spalten)
+            // ========================================
+            
+            // Neue Spalte hinzufügen
+            await dbService.query(`
+                ALTER TABLE my_table 
+                ADD COLUMN new_field VARCHAR(100) DEFAULT NULL
+            `);
+            
+            // Neue Tabelle erstellen
+            await dbService.query(`
+                CREATE TABLE IF NOT EXISTS my_new_table (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    guild_id VARCHAR(20) NOT NULL,
+                    data JSON,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (guild_id) REFERENCES guilds(_id) ON DELETE CASCADE
+                )
+            `);
+            
+            // ========================================
+            // DATEN-MIGRATION (Werte umwandeln)
+            // ========================================
+            
+            if (guildId) {
+                // Guild-spezifische Migration
+                await dbService.query(`
+                    UPDATE my_table 
+                    SET new_field = 'default_value' 
+                    WHERE guild_id = ?
+                `, [guildId]);
+            } else {
+                // Globale Migration
+                await dbService.query(`
+                    UPDATE my_table 
+                    SET new_field = 'default_value'
+                `);
+            }
+            
+            // ========================================
+            // NAVIGATION AKTUALISIEREN (optional)
+            // ========================================
+            
+            if (guildId) {
+                const NavigationManager = require('dunebot-core').ServiceManager.get('navigationManager');
+                
+                // Alte Navigation löschen
+                await dbService.query(
+                    'DELETE FROM nav_items WHERE plugin = ? AND guildId = ?',
+                    ['myplugin', guildId]
+                );
+                
+                // Neue Navigation registrieren
+                const pluginManager = require('dunebot-core').ServiceManager.get('pluginManager');
+                if (pluginManager.isPluginEnabled('myplugin')) {
+                    const plugin = pluginManager.getPlugin('myplugin');
+                    if (plugin && typeof plugin._registerNavigation === 'function') {
+                        await plugin._registerNavigation(guildId);
+                    }
+                }
+            }
+            
+            Logger.success(`[Plugin Migration 1.2.0] Migration erfolgreich!`);
+            return { success: true };
+            
+        } catch (error) {
+            Logger.error(`[Plugin Migration 1.2.0] Migration fehlgeschlagen:`, error);
+            throw error;
+        }
+    },
+    
+    /**
+     * Rollback (optional aber empfohlen!)
+     * @param {object} dbService 
+     * @param {string} guildId 
+     */
+    async down(dbService, guildId) {
+        const Logger = require('dunebot-core').ServiceManager.get('Logger');
+        
+        Logger.info(`[Plugin Migration 1.2.0] ROLLBACK${guildId ? ` für Guild ${guildId}` : ''}...`);
+        
+        try {
+            // Rückgängig machen (umgekehrte Reihenfolge!)
+            
+            // Spalte entfernen
+            await dbService.query(`
+                ALTER TABLE my_table 
+                DROP COLUMN new_field
+            `);
+            
+            // Tabelle löschen
+            await dbService.query(`
+                DROP TABLE IF EXISTS my_new_table
+            `);
+            
+            Logger.success(`[Plugin Migration 1.2.0] Rollback erfolgreich!`);
+            
+        } catch (error) {
+            Logger.error(`[Plugin Migration 1.2.0] Rollback fehlgeschlagen:`, error);
+            throw error;
+        }
+    }
+};
+```
+
+#### 3. plugin.json aktualisieren
+
+```json
+// plugins/myplugin/plugin.json
+{
+  "name": "myplugin",
+  "version": "1.2.0",  // ← Gleiche Version wie package.json!
+  "migrations": {
+    "1.0.0": "dashboard/migrations/1.0.0-initial.js",
+    "1.1.0": "dashboard/migrations/1.1.0-feature-a.js",
+    "1.2.0": "dashboard/migrations/1.2.0-feature-b.js"  // ← NEU!
+  },
+  ...
+}
+```
+
+#### 4. Dashboard neu starten → Fertig! ✨
+
+Das System macht automatisch:
+1. ✅ Erkennt: Version in DB (z.B. 1.1.0) < Version in Code (1.2.0)
+2. ✅ Findet alle Migrationen zwischen 1.1.0 und 1.2.0 (nur 1.2.0 in diesem Fall)
+3. ✅ Führt Migration(en) sequenziell aus
+4. ✅ Markiert in `plugin_migrations` als ausgeführt
+5. ✅ Updated `plugin_versions.current_version = '1.2.0'`
+
+### Sequential Migration - Mehrere Versionen auf einmal
+
+**Szenario:** DEV hat 1.0.0 → 1.1.0 → 1.2.0 schrittweise gemacht, PROD springt direkt von 1.0.0 → 1.2.0
+
+```json
+// plugin.json
+{
+  "migrations": {
+    "1.0.0": "dashboard/migrations/1.0.0-initial.js",
+    "1.1.0": "dashboard/migrations/1.1.0-add-feature-a.js",
+    "1.2.0": "dashboard/migrations/1.2.0-add-feature-b.js"
+  }
+}
+```
+
+**PROD Update von 1.0.0 → 1.2.0:**
+```
+System erkennt: current = 1.0.0, target = 1.2.0
+Findet Migrationen: 1.1.0, 1.2.0 (beide > 1.0.0 und <= 1.2.0)
+Führt aus:
+  1. Migration 1.1.0 (erstellt Feature A)
+  2. Migration 1.2.0 (erstellt Feature B, nutzt Feature A!)
+Ergebnis: ✅ Beide Migrationen laufen automatisch nacheinander!
+```
+
+**WICHTIG:** Migrationen müssen unabhängig voneinander lauffähig sein, ABER können aufeinander aufbauen!
+
+### Migration-Fehler beheben
+
+Falls eine Migration fehlschlägt:
+
+```bash
+# Migration-Eintrag löschen (ermöglicht erneuten Versuch)
+cd /home/firedervil/dunebot_dev && node -e "
+const mysql = require('mysql2/promise');
+require('dotenv').config({ path: './apps/dashboard/.env' });
+
+(async () => {
+  const conn = await mysql.createConnection({
+    host: process.env.MYSQL_HOST,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    database: process.env.MYSQL_DATABASE
+  });
+  
+  // Migration zurücksetzen
+  await conn.query(
+    'DELETE FROM plugin_migrations WHERE plugin_name = ? AND migration_file = ?',
+    ['myplugin', 'dashboard/migrations/1.2.0-feature.js']
+  );
+  
+  // Version zurücksetzen (optional)
+  await conn.query(
+    'UPDATE plugin_versions SET current_version = ? WHERE plugin_name = ?',
+    ['1.1.0', 'myplugin']
+  );
+  
+  await conn.end();
+  console.log('✅ Migration zurückgesetzt! Dashboard neu starten für Retry.');
+})();
+"
+```
+
+### Best Practices
+
+1. **✅ Immer `up()` UND `down()` implementieren** - Rollback ist Gold wert!
+2. **✅ Idempotent schreiben** - Migration sollte mehrfach laufbar sein
+   - Nutze `CREATE TABLE IF NOT EXISTS`
+   - Prüfe ob Spalte bereits existiert vor `ALTER TABLE ADD`
+   - Nutze `INSERT IGNORE` oder `ON DUPLICATE KEY UPDATE`
+3. **✅ Transactions bei kritischen Operationen** - Alles oder nichts!
+4. **✅ Ausführliche Logs** - Logger.info() für jeden Schritt
+5. **✅ Fehlerbehandlung** - try/catch und sinnvolle Fehlermeldungen
+6. **✅ Versionsnummern sinnvoll wählen** - Semver! (Major.Minor.Patch)
+7. **❌ KEINE Breaking Changes ohne Major-Version-Bump**
+8. **✅ Teste Migration IMMER mit Fresh Install (0.0.0 → new)**
+
+### Debugging
+
+**Prüfe ausgeführte Migrationen:**
+```sql
+SELECT * FROM plugin_migrations 
+WHERE plugin_name = 'myplugin' 
+ORDER BY executed_at DESC;
+```
+
+**Prüfe Plugin-Version:**
+```sql
+SELECT * FROM plugin_versions 
+WHERE plugin_name = 'myplugin';
+```
+
+**Log-Ausgabe:**
+```
+[PluginManager] Version-Upgrade: 1.1.0 → 1.2.0
+[PluginManager] Führe 1 Migration(en) aus: 1.2.0
+[PluginManager] → Migration 1.2.0: dashboard/migrations/1.2.0-feature.js
+[Plugin Migration 1.2.0] Starte Migration für Guild 1403034310172475416...
+[Plugin Migration 1.2.0] Migration erfolgreich!
+[PluginManager]   ✅ Migration 1.2.0 erfolgreich (42ms)
+[PluginManager] myplugin erfolgreich auf v1.2.0 aktualisiert
+```
+
+---

@@ -191,7 +191,75 @@ function parseHierarchicalChangelog(changesText) {
         return [];
     }
 
-    const lines = changesText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    // ✅ HYBRID-MODUS: Unterstütze SOWOHL Plain-Text ALS AUCH HTML-Format
+    let processedText = changesText;
+    
+    // ⚡ SCHRITT 0: <br> Tags in Newlines umwandeln (KRITISCH!)
+    // TinyMCE speichert mehrere Items in EINEM <p>-Tag mit <br>-Trennung!
+    // <p>! Fix 1<br>! Fix 2<br>! Fix 3</p> → mehrere Zeilen
+    processedText = processedText.replace(/<br\s*\/?>/gi, '\n');
+    
+    // SCHRITT 1: Überschriften normalisieren (HTML → Plain-Text für Parsing)
+    // <h2>Header</h2> → # Header
+    processedText = processedText.replace(/<h2[^>]*>(.*?)<\/h2>/gi, (match, content) => {
+        // Behalte inneres HTML (für Bold, Links, etc.)
+        return '\n# ' + content.trim() + '\n';
+    });
+    
+    // <h3>Subheader</h3> → ## Subheader  
+    processedText = processedText.replace(/<h3[^>]*>(.*?)<\/h3>/gi, (match, content) => {
+        return '\n## ' + content.trim() + '\n';
+    });
+    
+    // SCHRITT 2: Items mit Symbolen extrahieren (BEHALTE HTML im Text!)
+    // <p>! Bugfix: <strong>Server crash</strong> fixed</p> → ! Bugfix: <strong>Server crash</strong> fixed
+    // ⚡ WICHTIG: Durch <br>→\n sind jetzt mehrere Zeilen in separaten <p>-Tags!
+    processedText = processedText.replace(/<p[^>]*>([!+\-*])\s+(.*?)<\/p>/gi, (match, symbol, content) => {
+        // Symbol + Leerzeichen + ORIGINAL HTML-CONTENT
+        return '\n' + symbol + ' ' + content.trim() + '\n';
+    });
+    
+    // ✅ NEU: Normalen Text (ohne Symbol) als DESCRIPTION-Marker
+    // <p>Dies ist eine Beschreibung der Sektion</p> → DESC: Dies ist eine Beschreibung...
+    processedText = processedText.replace(/<p[^>]*>((?![!+\-*]\s).*?)<\/p>/gi, (match, content) => {
+        // Nur wenn es KEIN Symbol am Anfang ist
+        const trimmed = content.trim();
+        if (trimmed.length > 0 && !/^[!+\-*]\s/.test(trimmed)) {
+            return '\nDESC: ' + trimmed + '\n';
+        }
+        return '';
+    });
+    
+    // SCHRITT 3: <ul>/<li> Listen → * Items (BEHALTE HTML im Text!)
+    processedText = processedText.replace(/<li[^>]*>(.*?)<\/li>/gi, (match, content) => {
+        // Wenn schon Symbol am Anfang, nicht nochmal * hinzufügen
+        const trimmed = content.trim();
+        if (/^[!+\-*]\s/.test(trimmed)) {
+            return '\n' + trimmed + '\n';
+        }
+        return '\n* ' + trimmed + '\n';
+    });
+    processedText = processedText.replace(/<\/?ul[^>]*>/gi, '');
+    processedText = processedText.replace(/<\/?ol[^>]*>/gi, '');
+    
+    // SCHRITT 4: Alle anderen <p> ohne Symbol UND ohne DESC schon entfernt (siehe oben)
+    
+    // SCHRITT 5: HTML-Entities dekodieren (für Text-Vergleiche)
+    processedText = processedText.replace(/&nbsp;/g, ' ');
+    processedText = processedText.replace(/&lt;/g, '<');
+    processedText = processedText.replace(/&gt;/g, '>');
+    processedText = processedText.replace(/&amp;/g, '&');
+    processedText = processedText.replace(/&quot;/g, '"');
+    // Deutsche Umlaute
+    processedText = processedText.replace(/&uuml;/g, 'ü');
+    processedText = processedText.replace(/&ouml;/g, 'ö');
+    processedText = processedText.replace(/&auml;/g, 'ä');
+    processedText = processedText.replace(/&Uuml;/g, 'Ü');
+    processedText = processedText.replace(/&Ouml;/g, 'Ö');
+    processedText = processedText.replace(/&Auml;/g, 'Ä');
+    processedText = processedText.replace(/&szlig;/g, 'ß');
+
+    const lines = processedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     const result = [];
     let currentGroup = null;
     let currentSubgroup = null;
@@ -226,6 +294,7 @@ function parseHierarchicalChangelog(changesText) {
                 type: 'subgroup',
                 title,
                 level: 2,
+                description: null,  // ✅ NEU: Beschreibung für Subgroup
                 items: []
             };
 
@@ -244,10 +313,48 @@ function parseHierarchicalChangelog(changesText) {
             continue;
         }
 
+        // ✅ NEU: Description-Zeilen erkennen (DESC: ...)
+        if (line.startsWith('DESC: ')) {
+            const descText = line.substring(6).trim();
+            
+            // Füge Description zur aktuellen Subgroup hinzu
+            if (currentSubgroup) {
+                // Wenn schon eine Description existiert, füge mit <br> hinzu
+                if (currentSubgroup.description) {
+                    currentSubgroup.description += '<br>' + descText;
+                } else {
+                    currentSubgroup.description = descText;
+                }
+            }
+            // Wenn keine Subgroup, erstelle "Allgemein" und füge dort hinzu
+            else if (currentGroup) {
+                let generalSubgroup = currentGroup.children.find(sg => sg.title === 'Allgemein');
+                if (!generalSubgroup) {
+                    generalSubgroup = {
+                        type: 'subgroup',
+                        title: 'Allgemein',
+                        level: 2,
+                        description: descText,
+                        items: []
+                    };
+                    currentGroup.children.push(generalSubgroup);
+                    currentSubgroup = generalSubgroup;
+                } else {
+                    if (generalSubgroup.description) {
+                        generalSubgroup.description += '<br>' + descText;
+                    } else {
+                        generalSubgroup.description = descText;
+                    }
+                }
+            }
+            continue;
+        }
+
         // Items erkennen (!, +, -, *)
         const firstChar = line.charAt(0);
         if (itemTypeMap[firstChar]) {
             const itemMeta = itemTypeMap[firstChar];
+            // ✅ WICHTIG: Text BEHÄLT HTML-Tags (strong, em, code, a, etc.)
             const text = line.substring(1).trim();
 
             const item = {
@@ -255,7 +362,7 @@ function parseHierarchicalChangelog(changesText) {
                 icon: itemMeta.icon,
                 class: itemMeta.class,
                 category: itemMeta.category,
-                text
+                text  // Text MIT HTML!
             };
 
             // Wenn Subgroup existiert, füge Item zur Subgroup hinzu

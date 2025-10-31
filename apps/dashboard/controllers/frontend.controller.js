@@ -29,6 +29,7 @@ module.exports.getIndex = async (req, res) => {
         
         // News aus der Datenbank laden
         let newsList = [];
+        let carouselNews = []; // Letzte 3 News für den Hero-Carousel
         try {
             const rawNews = await dbService.query(
                 "SELECT * FROM news WHERE status = 'published' ORDER BY created_at DESC LIMIT 6"
@@ -36,6 +37,9 @@ module.exports.getIndex = async (req, res) => {
             
             // News lokalisieren basierend auf User-Locale
             newsList = NewsHelper.getLocalizedNewsList(rawNews, userLocale);
+            
+            // Letzte 3 News für Carousel-Slides extrahieren
+            carouselNews = newsList.slice(0, 3);
         } catch (err) {
             Logger.error("Fehler beim Laden der News:", err);
         }
@@ -133,6 +137,7 @@ module.exports.getIndex = async (req, res) => {
             title: "Willkommen bei DuneBot",
             user: req.session?.user || null,
             newsList: localizedNewsList,
+            carouselNews: carouselNews, // Letzte 3 News für den Hero-Carousel
             changelogsList: localizedChangelogsList,
             pluginsList: pluginsList
         });

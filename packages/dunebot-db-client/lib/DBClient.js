@@ -91,6 +91,25 @@ class DBClient {
     }
 
     /**
+     * Prüft ob eine Tabelle existiert
+     * @param {string} tableName Name der Tabelle
+     * @returns {Promise<boolean>} true wenn Tabelle existiert
+     */
+    async tableExists(tableName) {
+        try {
+            const rows = await this.query(
+                'SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?',
+                [tableName]
+            );
+            return rows[0].count > 0;
+        } catch (error) {
+            const Logger = ServiceManager.get('Logger');
+            Logger.error(`[DBClient] Fehler beim Prüfen der Tabelle ${tableName}:`, error);
+            return false;
+        }
+    }
+
+    /**
      * Schließt den Connection-Pool
      */
     async close() {

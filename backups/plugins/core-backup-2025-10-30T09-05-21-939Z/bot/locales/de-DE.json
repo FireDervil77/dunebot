@@ -1,0 +1,94 @@
+{
+    "TITLE": "Core",
+    "DESCRIPTION": "Kernmodul für die Anwendung",
+    "ENABLED": "Aktiviert",
+    "DISABLED": "Deaktiviert",
+
+    "HANDLER": {
+        "PLUGIN_DISABLED": "Dieses Plugin ist vom Serveradministrator deaktiviert",
+        "CMD_DISABLED": "Dieser Befehl ist vom Serveradministrator deaktiviert",
+        "CMD_NOT_FOUND": "Befehl nicht gefunden",
+        "OWNER_ONLY": "Dieser Befehl ist nur für den Bot-Besitzer verfügbar",
+        "USER_PERMISSIONS": "Du benötigst die folgenden Berechtigungen, um diesen Befehl auszuführen: {{permissions}}",
+        "BOT_PERMISSIONS": "Ich benötige die folgenden Berechtigungen, um diesen Befehl auszuführen: {{permissions}}",
+        "COOLDOWN": "Du bist im Cooldown! Bitte warte {{time}} Sekunden",
+        "ERROR": "Beim Ausführen dieses Befehls ist ein Fehler aufgetreten"
+    },
+
+    "HELP": {
+        "DESCRIPTION": "Befehls-Hilfemenü",
+        "PLUGIN_DESC": "Name des Plugins",
+        "COMMAND_DESC": "Name des Befehls",
+
+        "PLUGIN_NOT_FOUND": "Kein passendes Plugin gefunden",
+        "COMMAND_NOT_FOUND": "Kein passender Befehl gefunden",
+        "NOT_FOUND": "Kein passendes Plugin oder Befehl gefunden",
+
+        "MENU_DESC": "Befehle im {{plugin}} Plugin anzeigen",
+        "MENU_PLACEHOLDER": "Wählen Sie das Plugin aus, für das Sie Hilfe benötigen",
+        "EMPTY_CATEGORY": "In diesem Plugin sind keine Befehle vorhanden",
+
+        "CMD_DESC": "Beschreibung",
+        "CMD_SUBCOMMANDS": "Unterbefehle",
+        "PLUGIN_EMBED_FOOTER": "Seite {{page}} von {{pages}}. Tippe {{prefix}}help <command> für weitere Informationen zu diesem Befehl"
+    },
+
+    "PING": {
+        "DESCRIPTION": "zeigt den aktuellen Ping vom Bot zu den Discord-Servern an",
+        "TITLE": "🏓 Pong",
+        "RESPONSE": "🏓 Pong : `{{ping}}ms`",
+        "MESSAGE_LATENCY": "📨 Nachrichtenlatenz",
+        "RESPONSE_TIME": "⚡ Antwortzeit",
+        "API_LATENCY": "🌐 API-Latenz"
+    }, 
+
+    "PLUGIN": {
+        "NAME": "Name des Plugins",
+        "COMMAND_NAME": "Name des Befehls",
+        "LIST_ALL": "Alle Plugins auflisten",
+        "GET_INFO": "Informationen zu einem Plugin abrufen",
+        "MANAGE_STATUS": "Status eines Plugins verwalten",
+        "SUB_OPT_NAME": "Plugin Name",
+        "DESCRIPTION": "Plugin-Management-Befehle",
+        "SUB_LIST": "Alle Plugins auflisten",
+        "SUB_INFO": "Informationen zu einem Plugin abrufen",
+        "SUB_STATUS": "Status eines Plugins verwalten",
+
+        "LIST_EMBED_TITLE": "Liste der verfügbaren Plugins",
+        "LIST_EMBED_FOOTER": "Total: {{count}}",
+        "ENABLED": "Aktiviert",
+        "DISABLED": "Deaktiviert",
+
+        "INFO_MISSING_PLUGIN": "Plugin-Name fehlt",
+        "NOT_FOUND": "Kein Plugin mit dem Namen gefunden: {{plugin}}",
+        "INFO_EMBED_TITLE": "Plugin Info: {{plugin}}",
+        "INFO_EMBED_DESC": "**Name:** {{name}}\n**Version:** {{version}}\n**Status:** {{status}}\n**Prefix Commands:** {{prefixCmds}}\n**Slash Commands:** {{slashCmds}}",
+
+        "STATUS_SELECT_PLACEHOLDER": "Verfügbare Plugins",
+        "STATUS_SELECT_PROMPT": "Wählen Sie die Plugins aus, die Sie aktivieren/deaktivieren möchten",
+        "STATUS_SELECT_TIMEOUT": "Timeout! Sie haben keine Auswahl getroffen",
+        "STATUS_SELECT_PROCESSING": "Verarbeite Ihre Auswahl...",
+        "STATUS_SELECT_SUCCESS": "Die ausgewählten Plugins wurden erfolgreich aktiviert/deaktiviert",
+
+        "SUB_ENABLE": "ein Plugin aktivieren",
+        "SUB_DISABLE": "ein Plugin deaktivieren"
+    },
+
+    "LANG": {
+        "DESCRIPTION": "setzt die Sprache des Bots",
+        "NEW_LANG": "neue Sprache",
+        "INVALID_LANG": "Oops! `{{lang}}` ist keine gültige Sprache.\nVerfügbare Sprachen: `{{langChoices}}`",
+        "SUCCESS": "Erfolg! Die Sprache wurde auf `{{lang}}` gesetzt"
+    },
+
+    "PREFIX": {
+        "DESCRIPTION": "setzt einen neuen Prefix für diesen Server",
+        "NEW_PREFIX": "neuer Prefix",
+        "TOO_LONG": "Der Prefix ist zu lang! Er muss 2 Zeichen oder weniger haben.",
+        "SUCCESS": "Der neue Prefix wurde auf `{{prefix}}` gesetzt"
+    },
+     "SETTINGS": {
+        "NEW_LANGUAGE": "neue Sprache",
+        "NEW_PREFIX": "neuer Prefix"
+    }
+}

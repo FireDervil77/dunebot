@@ -54,15 +54,18 @@ router.post('/', async (req, res) => {
     try {
         const { amount, message, guild_id } = req.body;
         
-        // Validierung: Betrag
-        if (!amount || typeof amount !== 'number' || amount < 1) {
+        // Validierung: Betrag (akzeptiere Number oder String)
+        const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+        
+        if (!numAmount || isNaN(numAmount) || numAmount < 1) {
+            Logger.warn(`[Create-Donation] Ungültiger Betrag: ${amount} (Type: ${typeof amount})`);
             return res.status(400).json({ 
                 success: false, 
                 message: 'Ungültiger Betrag. Mindestbetrag: €1' 
             });
         }
         
-        if (amount > 10000) {
+        if (numAmount > 10000) {
             return res.status(400).json({ 
                 success: false, 
                 message: 'Maximalbetrag: €10.000' 
@@ -97,7 +100,7 @@ router.post('/', async (req, res) => {
                         description: sanitizedMessage || 'Vielen Dank für deine Spende!',
                         images: [`${process.env.DASHBOARD_BASE_URL}/themes/default/assets/images/DuneBot.png`]
                     },
-                    unit_amount: Math.round(amount * 100) // EUR zu Cent
+                    unit_amount: Math.round(numAmount * 100) // EUR zu Cent
                 },
                 quantity: 1
             }],
@@ -120,7 +123,7 @@ router.post('/', async (req, res) => {
         });
         
         Logger.info(`[Donation] Stripe-Session erstellt: ${session.id} für User ${user.id} (${user.username})`);
-        Logger.debug(`[Donation] Betrag: €${amount}, Guild: ${guild_id || 'N/A'}`);
+        Logger.debug(`[Donation] Betrag: €${numAmount}, Guild: ${guild_id || 'N/A'}`);
         
         res.json({ 
             success: true, 

@@ -32,6 +32,19 @@ class GuildAjaxHandler {
 
     static async handleForm(form) {
         console.log('[GuildAjax] handleForm called for:', form.dataset.formType);
+        
+        // Submit-Button finden und Loading-State setzen
+        const submitBtn = ButtonLoader.findSubmitButton(form);
+        const loadingText = form.dataset.loadingText || 'Bitte warten...';
+        const originalBtnState = submitBtn ? ButtonLoader.setLoading(submitBtn, loadingText) : null;
+        
+        // Optional: Loading-Toast für lange Operationen
+        const showLoadingToast = form.dataset.loadingToast === 'true';
+        if (showLoadingToast) {
+            const toastMessage = form.dataset.loadingToastMessage || 'Vorgang wird ausgeführt...';
+            this.showToast('info', toastMessage);
+        }
+        
         try {
             const formData = new FormData(form);
             const formType = form.dataset.formType || 'default';
@@ -43,14 +56,42 @@ class GuildAjaxHandler {
             // HTTP-Methode aus Form oder data-method Attribut
             const method = form.dataset.method || form.method || 'POST';
 
+            // Konvertiere FormData zu Object (behandelt Arrays korrekt)
+            const formObject = {};
+            for (let [key, value] of formData.entries()) {
+                // Behandle Array-Felder (z.B. group_ids[])
+                if (key.endsWith('[]')) {
+                    const arrayKey = key.slice(0, -2); // Entferne '[]'
+                    if (!formObject[arrayKey]) {
+                        formObject[arrayKey] = [];
+                    }
+                    formObject[arrayKey].push(value);
+                } else {
+                    // Behandle nested object notation (z.B. direct_permissions[key])
+                    const match = key.match(/^(.+?)\[(.+?)\]$/);
+                    if (match) {
+                        const objKey = match[1];
+                        const subKey = match[2];
+                        if (!formObject[objKey]) {
+                            formObject[objKey] = {};
+                        }
+                        formObject[objKey][subKey] = value;
+                    } else {
+                        formObject[key] = value;
+                    }
+                }
+            }
+
+            console.log('[GuildAjax] Serialized form data:', formObject);
+
             const response = await fetch(url, {
                 method: method.toUpperCase(),
                 headers: {
                     'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
                     'Accept': 'application/json',
-                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                    'Content-Type': 'application/json'
                 },
-                body: new URLSearchParams(formData)
+                body: JSON.stringify(formObject)
             });
 
             if (!response.ok) {
@@ -113,6 +154,34 @@ class GuildAjaxHandler {
                     await this.handleModerationSettingsResponse(form, result);
                     break;
                 
+                // ========================================
+                // PERMISSIONS SYSTEM HANDLERS
+                // ========================================
+                
+                case 'create-group':
+                    await this.handleCreateGroupResponse(form, result);
+                    break;
+                
+                case 'edit-group':
+                    await this.handleEditGroupResponse(form, result);
+                    break;
+                
+                case 'delete-group':
+                    await this.handleDeleteGroupResponse(form, result);
+                    break;
+                
+                case 'edit-user':
+                    await this.handleEditUserResponse(form, result);
+                    break;
+                
+                case 'remove-user':
+                    await this.handleRemoveUserResponse(form, result);
+                    break;
+                
+                // ========================================
+                // SERVER CONFIG
+                // ========================================
+                
                 case 'server-config':
                     await this.handleServerConfigResponse(form, result);
                     break;
@@ -132,6 +201,14 @@ class GuildAjaxHandler {
                 
                 case 'token-generate':
                     await this.handleTokenGenerateResponse(form, result);
+                    break;
+                
+                case 'rootserver-create-wizard':
+                    await this.handleRootServerWizardResponse(form, result);
+                    break;
+                
+                case 'rootserver-create':
+                    await this.handleRootServerCreateResponse(form, result);
                     break;
                 
                 case 'create-server':
@@ -162,10 +239,28 @@ class GuildAjaxHandler {
 
             // Button-Status und UI aktualisieren
             await this.updateUI(form, result);
+            
+            // Button wiederherstellen (bei Erfolg)
+            if (submitBtn && originalBtnState) {
+                if (result.success) {
+                    ButtonLoader.setSuccess(submitBtn, 'Erfolgreich!', 1500);
+                    // Nach Success-Animation Original State wiederherstellen
+                    setTimeout(() => ButtonLoader.restore(submitBtn, originalBtnState), 1500);
+                } else {
+                    ButtonLoader.setError(submitBtn, 'Fehler', 2000);
+                    setTimeout(() => ButtonLoader.restore(submitBtn, originalBtnState), 2000);
+                }
+            }
 
         } catch (error) {
             this.showToast('error', window.i18n?.COMMON?.NETWORK_ERROR || 'Netzwerkfehler oder Serverfehler');
             console.error(error);
+            
+            // Button wiederherstellen (bei Error)
+            if (submitBtn && originalBtnState) {
+                ButtonLoader.setError(submitBtn, 'Fehler!', 2000);
+                setTimeout(() => ButtonLoader.restore(submitBtn, originalBtnState), 2000);
+            }
         }
     }
 
@@ -427,6 +522,62 @@ class GuildAjaxHandler {
         }
     }
 
+    /**
+     * RootServer Wizard Response Handler
+     * Nach erfolgreicher Erstellung: Weiterleitung zur Details-Seite
+     */
+    static async handleRootServerWizardResponse(form, result) {
+        console.log('[GuildAjax] handleRootServerWizardResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'RootServer erfolgreich erstellt!');
+            
+            // Redirect zur Details-Seite nach 1,5s
+            if (result.data && result.data.redirectUrl) {
+                setTimeout(() => {
+                    window.location.href = result.data.redirectUrl;
+                }, 1500);
+            } else {
+                // Fallback: Reload nach 2s
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Erstellen des RootServers');
+        }
+    }
+
+    /**
+     * Handler für RootServer-Create (Simple - Pterodactyl-Style)
+     * Nach erfolgreicher Erstellung: Weiterleitung zur Details-Seite mit Token-Anzeige
+     */
+    static async handleRootServerCreateResponse(form, result) {
+        console.log('[GuildAjax] handleRootServerCreateResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'RootServer erfolgreich erstellt!');
+            
+            // Redirect zur Details-Seite (zeigt Token & Installations-Command)
+            if (result.data && result.data.redirectUrl) {
+                setTimeout(() => {
+                    window.location.href = result.data.redirectUrl;
+                }, 1500);
+            } else if (result.data && result.data.id) {
+                // Fallback: Direkt zur Details-Seite mit ID
+                const guildId = form.getAttribute('action').match(/\/guild\/(\d+)\//)[1];
+                setTimeout(() => {
+                    window.location.href = `/guild/${guildId}/plugins/masterserver/rootservers/${result.data.id}`;
+                }, 1500);
+            } else {
+                // Fallback: Zur Liste
+                setTimeout(() => {
+                    window.location.href = form.getAttribute('action').replace(/\/rootservers.*/, '/rootservers');
+                }, 2000);
+            }
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Erstellen des RootServers');
+        }
+    }
+
     static async handleCoreSettingsResponse(form, result) {
         if (result.success) {
             this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.CORE_SETTINGS_SAVED || 'Einstellungen erfolgreich gespeichert'));
@@ -684,6 +835,142 @@ class GuildAjaxHandler {
         } else {
             this.showToast('error', result.message || 'Fehler beim Setzen des Badges');
         }
+    }
+    
+    // ============================================================================
+    // PERMISSIONS SYSTEM HANDLERS
+    // ============================================================================
+    
+    /**
+     * Handler für Gruppen-Erstellung
+     */
+    static async handleCreateGroupResponse(form, result) {
+        console.log('[GuildAjax] handleCreateGroupResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Gruppe erfolgreich erstellt');
+            // Modal schließen
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createGroupModal'));
+            if (modal) modal.hide();
+            // Form zurücksetzen
+            form.reset();
+            // Seite nach 1,5s neu laden
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Erstellen der Gruppe');
+        }
+    }
+    
+    /**
+     * Handler für Gruppen-Bearbeitung
+     */
+    static async handleEditGroupResponse(form, result) {
+        console.log('[GuildAjax] handleEditGroupResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Gruppe erfolgreich aktualisiert');
+            // Modal schließen
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editGroupModal'));
+            if (modal) modal.hide();
+            // Seite nach 1,5s neu laden
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Aktualisieren der Gruppe');
+        }
+    }
+    
+    /**
+     * Handler für Gruppen-Löschung
+     */
+    static async handleDeleteGroupResponse(form, result) {
+        console.log('[GuildAjax] handleDeleteGroupResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Gruppe erfolgreich gelöscht');
+            // Modal schließen
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteGroupModal'));
+            if (modal) modal.hide();
+            // Seite nach 1,5s neu laden
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Löschen der Gruppe');
+        }
+    }
+    
+    /**
+     * Handler für User-Bearbeitung
+     */
+    static async handleEditUserResponse(form, result) {
+        console.log('[GuildAjax] handleEditUserResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Benutzer erfolgreich aktualisiert');
+            
+            // Modal schließen - nutze gespeicherte Instanz oder Bootstrap API
+            const modalElement = document.getElementById('editUserModal');
+            if (modalElement) {
+                try {
+                    // 1. Versuche gespeicherte Instanz
+                    if (modalElement._bsModalInstance) {
+                        console.log('[GuildAjax] Closing modal via saved instance');
+                        modalElement._bsModalInstance.hide();
+                    }
+                    // 2. Fallback: Bootstrap getInstance
+                    else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        const existingModal = bootstrap.Modal.getInstance(modalElement);
+                        if (existingModal) {
+                            console.log('[GuildAjax] Closing modal via getInstance');
+                            existingModal.hide();
+                        } else {
+                            console.warn('[GuildAjax] No modal instance found, manual cleanup');
+                            this._manualModalClose(modalElement);
+                        }
+                    } else {
+                        this._manualModalClose(modalElement);
+                    }
+                } catch (e) {
+                    console.warn('[GuildAjax] Modal close failed, using manual cleanup:', e);
+                    this._manualModalClose(modalElement);
+                }
+            }
+            
+            // Seite nach 1,5s neu laden
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Aktualisieren des Benutzers');
+        }
+    }
+    
+    /**
+     * Handler für User-Entfernung
+     */
+    static async handleRemoveUserResponse(form, result) {
+        console.log('[GuildAjax] handleRemoveUserResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Benutzer erfolgreich entfernt');
+            // Modal schließen
+            const modal = bootstrap.Modal.getInstance(document.getElementById('removeUserModal'));
+            if (modal) modal.hide();
+            // Seite nach 1,5s neu laden
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Entfernen des Benutzers');
+        }
+    }
+    
+    /**
+     * Manuelles Schließen eines Modals (Fallback)
+     */
+    static _manualModalClose(modalElement) {
+        modalElement.classList.remove('show');
+        modalElement.style.display = 'none';
+        modalElement.setAttribute('aria-hidden', 'true');
+        modalElement.removeAttribute('aria-modal');
+        document.body.classList.remove('modal-open');
+        
+        // Backdrop entfernen
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) backdrop.remove();
+        
+        // Body-Styles zurücksetzen
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
     }
 }
 

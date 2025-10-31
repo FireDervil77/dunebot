@@ -307,6 +307,9 @@ class IPCClient {
                 case "GET_GUILD_MEMBERS":
                     return await this.#handleGetGuildMembers(message, payload);
                     
+                case "GET_ALL_GUILD_MEMBERS":
+                    return await this.#handleGetAllGuildMembers(message, payload);
+                    
                 case "BOT_HEALTH_CHECK":
                     return await this.#handleBotHealthCheck(message);
                     
@@ -659,6 +662,88 @@ class IPCClient {
             });
         } catch (error) {
             this.logger.error("[IPC] Fehler beim Abrufen der Guild-Members:", error);
+            return message.reply({
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Get All Guild Members Handler
+     * Gibt ALLE Mitglieder einer Guild zurück (für Mitglieder-Auswahl)
+     * @param {object} message - Veza-Nachrichtenobjekt
+     * @param {object} payload - Enthält guildId
+     * @returns {Promise<void>}
+     * @private
+     */
+    async #handleGetAllGuildMembers(message, payload) {
+        try {
+            if (!payload?.guildId) {
+                this.logger.warn('[IPC] GET_ALL_GUILD_MEMBERS: Keine guildId im Payload');
+                return message.reply({
+                    success: false,
+                    error: "Guild-ID ist erforderlich"
+                });
+            }
+            
+            const guild = this.discordClient.guilds.cache.get(payload.guildId);
+            if (!guild) {
+                this.logger.warn(`[IPC] GET_ALL_GUILD_MEMBERS: Guild ${payload.guildId} nicht gefunden`);
+                return message.reply({
+                    success: false,
+                    error: "Guild nicht gefunden"
+                });
+            }
+
+            // Fetch ALLE Members (force = true holt ALLE, auch Offline!)
+            try {
+                await guild.members.fetch({ force: true });
+                this.logger.debug(`[IPC] GET_ALL_GUILD_MEMBERS: ${guild.members.cache.size} Members gefetcht (inkl. Offline)`);
+            } catch (err) {
+                this.logger.warn('[IPC] Member-Fetch fehlgeschlagen, nutze Cache:', err.message);
+            }
+            
+            // Alle Members formatieren
+            const members = guild.members.cache.map(member => ({
+                user: {
+                    id: member.user.id,
+                    username: member.user.username,
+                    discriminator: member.user.discriminator,
+                    avatar: member.user.avatar,
+                    avatarURL: member.user.displayAvatarURL({ dynamic: true, size: 128 }),
+                    tag: member.user.tag,
+                    bot: member.user.bot || false
+                },
+                nick: member.nickname || null,
+                displayName: member.displayName || member.user.username,
+                joinedAt: member.joinedTimestamp ? new Date(member.joinedTimestamp).toISOString() : null,
+                roles: member.roles.cache
+                    .filter(role => role.id !== guild.id) // Exclude @everyone
+                    .map(role => ({
+                        id: role.id,
+                        name: role.name,
+                        color: role.hexColor,
+                        position: role.position
+                    }))
+                    .sort((a, b) => b.position - a.position) // Highest role first
+            }));
+
+            // Sortiere nach Display-Name
+            members.sort((a, b) => {
+                const nameA = a.displayName.toLowerCase();
+                const nameB = b.displayName.toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+
+            this.logger.info(`[IPC] GET_ALL_GUILD_MEMBERS: ${members.length} Members für Guild ${payload.guildId}`);
+
+            return message.reply({
+                success: true,
+                members: members
+            });
+        } catch (error) {
+            this.logger.error("[IPC] Fehler beim Abrufen ALLER Guild-Members:", error);
             return message.reply({
                 success: false,
                 error: error.message

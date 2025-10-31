@@ -172,7 +172,6 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         return true;
     }
 
-
     /**
      * Vollständige Routen für SuperAdmin einrichten
      */
@@ -765,7 +764,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     title_de, title_en,
                     description_de, description_en,
                     changes_de, changes_en,
-                    version, type, component, component_name, is_public, release_date, author_id
+                    version, type, component, component_name, is_public, release_date, author_id,
+                    status, slug, author  // ✅ NEU: Settings-Tab Felder
                 } = req.body;
 
                 try {
@@ -773,15 +773,15 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     const translations = {
                         title: {
                             'de-DE': title_de || '',
-                            'en-GB': title_en || ''
+                            'en-GB': title_en || ''  // Optional
                         },
                         description: {
                             'de-DE': description_de || '',
-                            'en-GB': description_en || ''
+                            'en-GB': description_en || ''  // Optional
                         },
                         changes: {
                             'de-DE': changes_de || '',
-                            'en-GB': changes_en || ''
+                            'en-GB': changes_en || ''  // Optional
                         }
                     };
 
@@ -793,7 +793,11 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                         component_name: component_name || null,
                         is_public: is_public !== undefined ? is_public : 1,
                         release_date: release_date || new Date(),
-                        author_id: author_id || req.session.user?.id || '0'
+                        author_id: author_id || req.session.user?.id || '0',
+                        // ✅ NEU: Settings-Tab Daten
+                        status: status || 'published',
+                        slug: slug || `v${version.replace(/\./g, '-')}`,
+                        author: author || req.session.user?.info?.username || 'FireBot Team'
                     };
 
                     // prepareChangelogForDB nutzen
@@ -808,6 +812,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                                 changes_translations = ?,
                                 version = ?, type = ?, component = ?, component_name = ?,
                                 is_public = ?, release_date = ?, author_id = ?,
+                                status = ?, slug = ?, author = ?,
                                 updated_at = NOW()
                             WHERE id = ?
                         `, [
@@ -821,6 +826,9 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             changelogData.is_public,
                             changelogData.release_date,
                             changelogData.author_id,
+                            metadata.status,
+                            metadata.slug,
+                            metadata.author,
                             changelogId
                         ]);
                         
@@ -835,8 +843,9 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             INSERT INTO changelogs 
                             (title_translations, description_translations, changes_translations,
                              version, type, component, component_name, is_public, release_date, author_id,
+                             status, slug, author,
                              created_at, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                         `, [
                             changelogData.title_translations,
                             changelogData.description_translations,
@@ -847,7 +856,10 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             changelogData.component_name,
                             changelogData.is_public,
                             changelogData.release_date,
-                            changelogData.author_id
+                            changelogData.author_id,
+                            metadata.status,
+                            metadata.slug,
+                            metadata.author
                         ]);
                         
                         req.session.toast = {
@@ -1374,7 +1386,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         
         Logger.debug(`[SuperAdmin] Registriere Navigation für Control-Guild ${guildId}`);
         
-        // Navigation registrieren
+        // Navigation registrieren (NUR FÜR BOT-OWNER SICHTBAR!)
         const navItems = [
             {
                 title: 'superadmin:NAV.SUPERADMIN',
@@ -1382,7 +1394,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 icon: 'fa-solid fa-shield-halved',
                 order: 999999,  // Ganz am Ende der Navigation (nach Core: 10-40)
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.FEEDBACK',
@@ -1391,7 +1404,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 order: null,  // Zwischen Notifications und News
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.NEWS',
@@ -1400,7 +1414,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.NOTIFICATIONS',
@@ -1409,7 +1424,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.CHANGELOGS',
@@ -1418,7 +1434,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.PLUGIN_BADGES',
@@ -1427,7 +1444,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.STATISTICS',
@@ -1436,7 +1454,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.DONATIONS',
@@ -1445,7 +1464,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 order: null,  // Nach Statistics
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             }
         ];
 
