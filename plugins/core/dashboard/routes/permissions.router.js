@@ -164,11 +164,12 @@ router.get('/users', requirePermission('PERMISSIONS.USERS.VIEW'), async (req, re
         // Hole alle Gruppen für Dropdowns/Modals
         const availableGroups = await permissionManager.getGuildGroups(guildId);
         
-        // Hole alle Permissions für Direct-Permission-Editor
+        // Hole alle Permissions für Direct-Permission-Editor (NUR guild-spezifische!)
         const allPermissions = await dbService.query(`
             SELECT * FROM permission_definitions
+            WHERE guild_id = ?
             ORDER BY category, sort_order, permission_key
-        `);
+        `, [guildId]);
         
         // Gruppiere Permissions nach Kategorie
         const permissionsByCategory = {};
@@ -368,13 +369,19 @@ router.post('/users/add-guild-member', requirePermission('PERMISSIONS.USERS.INVI
             });
         }
         
-        // User in DB anlegen (Status: active)
+        // ========================================
+        // User in DB anlegen mit Dashboard-Access-Permission
+        // ========================================
+        const defaultPermissions = {
+            'DASHBOARD.ACCESS': true  // Automatisch setzen für neuen User
+        };
+        
         await dbService.query(`
             INSERT INTO guild_users (user_id, guild_id, status, is_owner, direct_permissions)
-            VALUES (?, ?, 'active', false, '{}')
-        `, [user_id, guildId]);
+            VALUES (?, ?, 'active', false, ?)
+        `, [user_id, guildId, JSON.stringify(defaultPermissions)]);
         
-        Logger.info(`[Permissions] User ${user_id} added to guild ${guildId}`);
+        Logger.info(`[Permissions] User ${user_id} added to guild ${guildId} with DASHBOARD.ACCESS`);
         
         res.json({
             success: true,
@@ -479,7 +486,15 @@ router.put('/users/:userId', requirePermission('PERMISSIONS.USERS.EDIT'), async 
         
         // Update Direct Permissions
         if (direct_permissions !== undefined) {
-            const directPermsJson = direct_permissions ? JSON.stringify(direct_permissions) : null;
+            // Konvertiere String "true" zu boolean true
+            const cleanedPerms = {};
+            if (direct_permissions && typeof direct_permissions === 'object') {
+                Object.keys(direct_permissions).forEach(key => {
+                    cleanedPerms[key] = direct_permissions[key] === 'true' || direct_permissions[key] === true;
+                });
+            }
+            
+            const directPermsJson = Object.keys(cleanedPerms).length > 0 ? JSON.stringify(cleanedPerms) : null;
             await dbService.query(`
                 UPDATE guild_users 
                 SET direct_permissions = ?, updated_at = NOW()
@@ -698,11 +713,12 @@ router.get('/groups', requirePermission('PERMISSIONS.GROUPS.VIEW'), async (req, 
             }
         });
         
-        // Hole alle verfügbaren Permissions für Checkboxes
+        // Hole alle verfügbaren Permissions für Checkboxes (NUR guild-spezifische!)
         const permissions = await dbService.query(`
             SELECT * FROM permission_definitions
+            WHERE guild_id = ?
             ORDER BY category, sort_order, permission_key
-        `);
+        `, [guildId]);
         
         // Gruppiere Permissions nach Kategorie
         const permissionsByCategory = {};

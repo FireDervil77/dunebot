@@ -1,6 +1,6 @@
 {
   "name": "core",
-  "version": "6.7.2",
+  "version": "6.8.0",
   "displayName": "FireBot Core-Plugin",
   "description": "Das Core-Plugin des FireBots. Wird automatisch in jeder neuen Guild aktiviert.",
   "author": "FireBot Team",
@@ -27,7 +27,8 @@
     "6.6.6": "dashboard/migrations/6.6.6-fix-groups-view.js",
     "6.7.0": "dashboard/migrations/6.7.0-dynamic-permissions.js",
     "6.7.1": "dashboard/migrations/6.7.1-add-requiresOwner-to-nav.js",
-    "6.7.2": "dashboard/migrations/6.7.2-load-core-permissions.js"
+    "6.7.2": "dashboard/migrations/6.7.2-load-core-permissions.js",
+    "6.8.0": "dashboard/migrations/6.8.0-dashboard-access-permission.js"
   },
   
   "permissions": [

@@ -263,7 +263,8 @@ class PermissionManager {
         [guildId]
       );
       
-      if (guild && guild[0]?.owner_id === userId) {
+      if (guild && guild.owner_id === userId) {
+        this.logger.debug(`[Permission] ✅ User ${userId} ist Guild-Owner → Alle Permissions`);
         return true; // Owner hat immer alle Rechte
       }
 
@@ -578,11 +579,11 @@ class PermissionManager {
     } = options;
 
     // Prüfe ob User Owner ist
-    const [guild] = await this.dbService.query(
+    const guilds = await this.dbService.query(
       'SELECT owner_id FROM guilds WHERE _id = ?',
       [guildId]
     );
-    const isOwner = guild && guild[0]?.owner_id === userId;
+    const isOwner = guilds && guilds[0]?.owner_id === userId ? 1 : 0;
 
     const directPermsJson = direct_permissions ? JSON.stringify(direct_permissions) : null;
 
@@ -789,7 +790,19 @@ class PermissionManager {
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
         updateFields.push(`${key} = ?`);
-        updateValues.push(key === 'permissions' ? JSON.stringify(value) : value);
+        
+        if (key === 'permissions') {
+          // Konvertiere String "true" zu boolean true in permissions
+          const cleanedPerms = {};
+          if (value && typeof value === 'object') {
+            Object.keys(value).forEach(permKey => {
+              cleanedPerms[permKey] = value[permKey] === 'true' || value[permKey] === true;
+            });
+          }
+          updateValues.push(JSON.stringify(cleanedPerms));
+        } else {
+          updateValues.push(value);
+        }
       }
     }
 

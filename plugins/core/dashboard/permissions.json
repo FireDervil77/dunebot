@@ -21,6 +21,15 @@
       "requires": "DASHBOARD.SETTINGS.VIEW"
     },
     {
+      "key": "DASHBOARD.ACCESS",
+      "name": "PERMISSIONS.DASHBOARD_ACCESS",
+      "description": "PERMISSIONS.DASHBOARD_ACCESS_DESC",
+      "category": "dashboard",
+      "is_dangerous": 0,
+      "sort_order": 9,
+      "requires": null
+    },
+    {
       "key": "PERMISSIONS.USERS.VIEW",
       "name": "PERMISSIONS.USERS_VIEW",
       "description": "PERMISSIONS.USERS_VIEW_DESC",

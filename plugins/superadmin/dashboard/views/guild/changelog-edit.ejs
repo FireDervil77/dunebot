@@ -120,7 +120,7 @@
                                           id="changes_de" 
                                           name="changes_de" 
                                           rows="15" 
-                                          required><%= changelog?.changes_de || '' %></textarea>
+                                          data-required="true"><%= changelog?.changes_de || '' %></textarea>
                                 <small class="form-text text-muted">
                                     <strong>Hierarchische Struktur verwenden:</strong><br>
                                     <code># Hauptgruppe</code> (z.B. "# PLUGINS" oder "# SYSTEM")<br>
@@ -358,6 +358,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Basis-Formatierungen
         block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Preformatted=pre',
+        
+        // ✅ FIX: URL-Handling für CSP-Compliance
+        relative_urls: true,        // Nutze relative URLs statt absolute
+        remove_script_host: true,   // Entferne Host aus URLs
+        convert_urls: false,        // Nicht automatisch URLs konvertieren
         
         // Setup-Callback für Custom-Logik
         setup: function(editor) {
@@ -662,20 +667,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 tinymce.triggerSave(); // Synchronisiert ALLE Editoren
                 console.log('[ChangelogEdit] ✅ TinyMCE content synced');
                 
-                // Debug: Prüfe ob Felder jetzt gefüllt sind
-                const requiredFields = ['changes_de', 'description_de'];
+                // ⚡ VALIDIERUNG: Prüfe required Felder
+                const requiredFields = ['changes_de', 'description_de', 'title_de'];
+                let hasErrors = false;
+                
                 requiredFields.forEach(fieldName => {
                     const field = document.getElementById(fieldName);
                     if (field) {
                         const isEmpty = !field.value || field.value.trim() === '';
                         console.log(`[ChangelogEdit] Field ${fieldName}: ${isEmpty ? '❌ LEER' : '✅ gefüllt'} (${field.value.length} chars)`);
                         
-                        // Entferne is-invalid wenn jetzt gefüllt
-                        if (!isEmpty) {
+                        if (isEmpty) {
+                            // Markiere als invalid
+                            field.classList.add('is-invalid');
+                            hasErrors = true;
+                        } else {
+                            // Entferne is-invalid wenn jetzt gefüllt
                             field.classList.remove('is-invalid');
                         }
                     }
                 });
+                
+                // Verhindere Submit wenn Fehler
+                if (hasErrors) {
+                    e.preventDefault();
+                    alert('Bitte fülle alle Pflichtfelder aus (Titel, Beschreibung, Änderungen auf Deutsch)');
+                    console.error('[ChangelogEdit] ❌ Validierung fehlgeschlagen - Submit abgebrochen');
+                    return false;
+                }
             }
             
             // Form wird normal weiter abgesendet (keine e.preventDefault!)

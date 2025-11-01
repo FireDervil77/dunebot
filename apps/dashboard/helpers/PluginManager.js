@@ -468,6 +468,97 @@ class PluginManager extends BasePluginManager {
     }
 
     /**
+     * Registriert Permissions für eine spezifische Guild
+     * Lädt permissions.json und trägt sie MIT guild_id ein
+     * 
+     * @param {Object} plugin - Das Plugin-Objekt
+     * @param {string} guildId - Die Guild-ID
+     * @returns {Promise<number>} Anzahl der registrierten Permissions
+     * @author FireDervil
+     */
+    async registerPluginPermissionsForGuild(plugin, guildId) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        try {
+            // permissions.json Pfad
+            const permissionsFile = path.join(this.pluginsDir, plugin.name, 'dashboard', 'permissions.json');
+            
+            // Prüfen ob File existiert
+            if (!fs.existsSync(permissionsFile)) {
+                Logger.debug(`Plugin ${plugin.name} hat keine permissions.json - überspringe`);
+                return 0;
+            }
+            
+            // JSON laden
+            const permissionsData = JSON.parse(fs.readFileSync(permissionsFile, 'utf8'));
+            
+            if (!permissionsData.permissions || !Array.isArray(permissionsData.permissions)) {
+                Logger.warn(`permissions.json von ${plugin.name} hat ungültiges Format (permissions Array fehlt)`);
+                return 0;
+            }
+            
+            Logger.info(`📋 Registriere ${permissionsData.permissions.length} Permissions für Plugin ${plugin.name} in Guild ${guildId}...`);
+            
+            let registeredCount = 0;
+            
+            // Jede Permission registrieren
+            for (const perm of permissionsData.permissions) {
+                const {
+                    key,
+                    name,
+                    description,
+                    category,
+                    is_dangerous = 0,
+                    requires = null
+                } = perm;
+                
+                // Validierung
+                if (!key || !name || !category) {
+                    Logger.warn(`Überspringe ungültige Permission:`, perm);
+                    continue;
+                }
+                
+                // requires_permissions zu JSON konvertieren
+                let requiresJson = null;
+                if (requires) {
+                    const requiresArray = typeof requires === 'string' ? [requires] : requires;
+                    requiresJson = JSON.stringify(requiresArray);
+                }
+                
+                try {
+                    // INSERT mit guild_id
+                    await dbService.query(`
+                        INSERT INTO permission_definitions 
+                        (guild_id, permission_key, name_translation_key, description_translation_key, category, is_dangerous, requires_permissions, plugin_name)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                            name_translation_key = VALUES(name_translation_key),
+                            description_translation_key = VALUES(description_translation_key),
+                            category = VALUES(category),
+                            is_dangerous = VALUES(is_dangerous),
+                            requires_permissions = VALUES(requires_permissions),
+                            plugin_name = VALUES(plugin_name)
+                    `, [guildId, key, name, description, category, is_dangerous, requiresJson, plugin.name]);
+                    
+                    registeredCount++;
+                    Logger.debug(`  ✅ Permission registriert: ${key} (Guild: ${guildId})`);
+                    
+                } catch (err) {
+                    Logger.error(`Fehler beim Registrieren von Permission ${key} für Guild ${guildId}:`, err);
+                }
+            }
+            
+            Logger.success(`✅ ${registeredCount} Permissions für Plugin ${plugin.name} in Guild ${guildId} registriert`);
+            return registeredCount;
+            
+        } catch (error) {
+            Logger.error(`Fehler beim Registrieren der Permissions für Plugin ${plugin.name} in Guild ${guildId}:`, error);
+            return 0;
+        }
+    }
+
+    /**
      * ÜBERSCHRIEBEN: Nutzt Migration-Tracking für SQL-Dateien
      * Verhindert doppelte Ausführung von Schemas
      * 
@@ -621,8 +712,8 @@ class PluginManager extends BasePluginManager {
                     // Tabellen registrieren vor dem Enable
                     await this.registerDashboardTables(plugin);
                     
-                    // ✅ NEU: Permissions registrieren
-                    await this.registerPluginPermissions(plugin);
+                    // ❌ DEAKTIVIERT: Permissions werden jetzt NUR noch guild-spezifisch registriert
+                    // await this.registerPluginPermissions(plugin);
                     
                     // Plugin initialisieren
                     if (typeof plugin.onEnable === 'function') {
@@ -794,6 +885,9 @@ class PluginManager extends BasePluginManager {
             await dbService.enablePluginForGuild(guildId, pluginName, pluginVersion, userId);
             Logger.debug(`Plugin ${pluginName} (v${pluginVersion}) in guild_plugins für Guild ${guildId} aktiviert (User: ${userId || 'System'})`);
 
+            // ✅ NEU: Permissions für Guild registrieren
+            await this.registerPluginPermissionsForGuild(plugin, guildId);
+
             // Plugin-spezifische Guild-Aktivierung aufrufen
             await this.hooks.doAction('before_plugin_guild_enable_method', plugin, guildId);
             
@@ -922,7 +1016,20 @@ class PluginManager extends BasePluginManager {
 
             await this.hooks.doAction('after_update_guild_settings_disable', plugin, guildId);
 
-            // 5. Navigation entfernen - NEU: Nutze NavigationManager statt ThemeManager
+            // 5. Permissions entfernen
+            try {
+                const permissionManager = ServiceManager.get('permissionManager');
+                if (permissionManager) {
+                    await permissionManager.unregisterPluginPermissions(pluginName, guildId);
+                    Logger.debug(`Permissions für Plugin ${pluginName} in Guild ${guildId} entfernt`);
+                } else {
+                    Logger.warn('PermissionManager nicht verfügbar - Permissions konnten nicht entfernt werden');
+                }
+            } catch (permError) {
+                Logger.error(`Fehler beim Entfernen der Permissions für ${pluginName}:`, permError);
+            }
+
+            // 6. Navigation entfernen - NEU: Nutze NavigationManager statt ThemeManager
             if (navigationManager) {
                 await navigationManager.removeNavigation(pluginName, guildId);
                 Logger.debug(`Navigation für Plugin ${pluginName} in Guild ${guildId} entfernt`);

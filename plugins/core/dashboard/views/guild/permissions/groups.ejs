@@ -1,4 +1,4 @@
-/plugins/core/permissions/groups<!-- 
+<!-- 
   Gruppen-Verwaltung - Permission System
   Verwaltung von Benutzergruppen mit Berechtigungen
 -->
@@ -16,7 +16,7 @@
         </p>
       </div>
       
-      <% if (userPermissions.permissions['permissions.groups.create']) { %>
+      <% if (userPermissions.permissions['PERMISSIONS.GROUPS.CREATE']) { %>
       <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGroupModal">
         <i class="fa-solid fa-plus me-2"></i>
         Neue Gruppe
@@ -81,7 +81,7 @@
           
           <div class="d-flex align-items-center mb-2">
             <i class="fa-solid fa-users text-muted me-2"></i>
-            <span class="text-muted"><%= group.member_count || 0 %> Mitglied(er)</span>
+            <span class="text-muted"><%= group.actual_member_count || 0 %> Mitglied(er)</span>
           </div>
           
           <div class="d-flex align-items-center mb-2">
@@ -114,7 +114,7 @@
         
         <div class="card-footer bg-light">
           <div class="btn-group w-100" role="group">
-            <% if (userPermissions.permissions['permissions.groups.edit']) { %>
+            <% if (userPermissions.permissions['PERMISSIONS.GROUPS.EDIT']) { %>
             <button type="button" 
                     class="btn btn-primary btn-sm btn-edit-group" 
                     data-group-id="<%= group.id %>"
@@ -130,7 +130,7 @@
             </button>
             <% } %>
             
-            <% if (userPermissions.permissions['permissions.groups.delete'] && !group.is_protected) { %>
+            <% if (userPermissions.permissions['PERMISSIONS.GROUPS.DELETE'] && !group.is_protected) { %>
             <button type="button" 
                     class="btn btn-danger btn-sm btn-delete-group" 
                     data-group-id="<%= group.id %>"
@@ -258,9 +258,9 @@
                            value="true">
                     <label class="form-check-label" 
                            for="create_perm_<%= perm.permission_key.replace(/\./g, '_') %>">
-                      <strong><%= tr(`core:${perm.name_translation_key}`) %></strong>
+                      <strong><%= tr(perm.name_translation_key) %></strong>
                       <% if (perm.description_translation_key) { %>
-                      <br><small class="text-muted"><%= tr(`core:${perm.description_translation_key}`) %></small>
+                      <br><small class="text-muted"><%= tr(perm.description_translation_key) %></small>
                       <% } %>
                       <% if (perm.is_dangerous) { %>
                       <span class="badge bg-danger ms-2">Kritisch</span>
@@ -386,7 +386,7 @@
                 <div class="ps-3">
                   <% permissions[category].forEach(perm => { %>
                   <div class="form-check mb-2">
-                    <input class="form-check-input edit-permission-checkbox" 
+                    <input class="form-check-input permission-checkbox" 
                            type="checkbox" 
                            name="permissions[<%= perm.permission_key %>]"
                            id="edit_perm_<%= perm.permission_key.replace(/\./g, '_') %>"
@@ -394,9 +394,9 @@
                            data-permission-key="<%= perm.permission_key %>">
                     <label class="form-check-label" 
                            for="edit_perm_<%= perm.permission_key.replace(/\./g, '_') %>">
-                      <strong><%= tr(`core:${perm.name_translation_key}`) %></strong>
+                      <strong><%= tr(perm.name_translation_key) %></strong>
                       <% if (perm.description_translation_key) { %>
-                      <br><small class="text-muted"><%= tr(`core:${perm.description_translation_key}`) %></small>
+                      <br><small class="text-muted"><%= tr(perm.description_translation_key) %></small>
                       <% } %>
                       <% if (perm.is_dangerous) { %>
                       <span class="badge bg-danger ms-2">Kritisch</span>

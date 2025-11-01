@@ -74,6 +74,8 @@
     },
     
     "PERMISSIONS": {
+        "DASHBOARD_ACCESS": "Dashboard-Zugriff",
+        "DASHBOARD_ACCESS_DESC": "Erlaubt den grundlegenden Zugriff auf das Dashboard",
         "DASHBOARD_SETTINGS_VIEW": "Dashboard-Einstellungen ansehen",
         "DASHBOARD_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Dashboard-Konfiguration",
         "DASHBOARD_SETTINGS_EDIT": "Dashboard-Einstellungen bearbeiten",

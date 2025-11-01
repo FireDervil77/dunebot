@@ -432,8 +432,9 @@ exports.getServerSelector = async (req, res) => {
         const userId = req.session.user.info.id;
 
         Logger.debug(`[SERVER-SELECTOR] Lade Custom Permissions für User-ID: ${userId}`);
+        Logger.debug(`[SERVER-SELECTOR] OAuth2-Guilds: ${userGuilds.length}`);
 
-        // Custom Permissions aus DB laden (guild_staff)
+        // Custom Permissions aus DB laden (guild_staff - ALTE TABELLE)
         const dbService = ServiceManager.get('dbService');
         let customPermissions = [];
         try {
@@ -482,6 +483,52 @@ exports.getServerSelector = async (req, res) => {
         
         Logger.debug(`[SERVER-SELECTOR] User hat ${customPermissions.length} Custom Permissions in guild_staff`);
 
+        // ========================================================================
+        // NEU: Guilds aus guild_users laden (NEUES PERMISSION-SYSTEM!)
+        // Diese Guilds sind explizit im Dashboard freigeschaltet, auch ohne Discord-Admin-Rechte!
+        // ========================================================================
+        let guildUserGuilds = [];
+        try {
+            const result = await dbService.query(`
+                SELECT gu.guild_id, g.guild_name, g.owner_id
+                FROM guild_users gu
+                JOIN guilds g ON gu.guild_id = g._id
+                WHERE gu.user_id = ? 
+                AND gu.status = 'active'
+            `, [userId]);
+            
+            if (result && Array.isArray(result)) {
+                guildUserGuilds = result.map(row => ({
+                    id: row.guild_id,
+                    name: row.guild_name,
+                    owner: row.owner_id === userId, // Ist User der Discord-Owner?
+                    permissions: 0, // Keine Discord-Permissions (deshalb ist User in guild_users!)
+                    icon: null, // Kein Icon verfügbar (müsste vom Bot geholt werden)
+                    fromGuildUsers: true // Flag: Kommt aus DB, nicht von Discord!
+                }));
+            }
+            
+            Logger.debug(`[SERVER-SELECTOR] ${guildUserGuilds.length} zusätzliche Guilds aus guild_users geladen`);
+            guildUserGuilds.forEach(g => {
+                Logger.debug(`   - ${g.name} (${g.id}) [DB-Permission]`);
+            });
+        } catch (err) {
+            Logger.warn('[SERVER-SELECTOR] Fehler beim Laden von guild_users:', err.message);
+        }
+
+        // Merge OAuth2-Guilds und guild_users-Guilds (keine Duplikate!)
+        const allGuilds = [...userGuilds];
+        const existingGuildIds = new Set(userGuilds.map(g => g.id));
+        
+        guildUserGuilds.forEach(g => {
+            if (!existingGuildIds.has(g.id)) {
+                allGuilds.push(g);
+                Logger.debug(`[SERVER-SELECTOR] ➕ Guild "${g.name}" hinzugefügt (nur via guild_users)`);
+            }
+        });
+        
+        Logger.debug(`[SERVER-SELECTOR] Gesamt: ${allGuilds.length} Guilds (${userGuilds.length} OAuth2 + ${guildUserGuilds.length} DB-only)`);
+
         const botGuildsResponse = await ipcServer.broadcast("dashboard:GET_BOT_GUILDS");
         const botGuildIds = botGuildsResponse
             .filter(r => r && r.success)
@@ -490,17 +537,20 @@ exports.getServerSelector = async (req, res) => {
 
         Logger.debug(`Bot ist in ${botGuildIds.length} Servern`);
 
-        const guilds = userGuilds.map(guild => {
+        const guilds = allGuilds.map(guild => {
             const isAdmin = (guild.permissions & 0x8) === 0x8;
             const isManager = (guild.permissions & 0x20) === 0x20;
             
-            // Custom Permissions aus DB prüfen
+            // Custom Permissions aus DB prüfen (guild_staff - ALTE TABELLE)
             const customPerm = customPermsMap.get(guild.id);
             const hasCustomAccess = !!customPerm; // Wenn Eintrag in guild_staff existiert
+            
+            // guild_users-Zugriff (NEUES SYSTEM!)
+            const hasGuildUserAccess = guild.fromGuildUsers === true;
             const customRole = customPerm?.role || null;
             
-            // canManage: Discord-Permissions ODER Custom DB-Permissions
-            const canManage = isAdmin || isManager || guild.owner || hasCustomAccess;
+            // canManage: Discord-Permissions ODER Custom DB-Permissions ODER guild_users
+            const canManage = isAdmin || isManager || guild.owner || hasCustomAccess || hasGuildUserAccess;
             
             const botInGuild = botGuildIds.includes(guild.id);
 
@@ -517,7 +567,9 @@ exports.getServerSelector = async (req, res) => {
                 admin: isAdmin || guild.owner,
                 canManage,
                 customRole, // 'admin', 'manager', 'moderator', 'viewer' oder null
-                hasCustomAccess,
+                hasCustomAccess, // guild_staff (alte Tabelle)
+                hasGuildUserAccess, // guild_users (neues Permission-System)
+                fromGuildUsers: guild.fromGuildUsers || false,
                 botInGuild,
                 settingsUrl,
                 iconURL

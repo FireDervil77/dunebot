@@ -4,7 +4,16 @@
  * @author FireDervil
  */
 class GuildAjaxHandler {
+    static _initialized = false; // Guard gegen Doppel-Initialisierung
+    
     static init() {
+        // Verhindere doppelte Initialisierung
+        if (this._initialized) {
+            console.log('[GuildAjax] Already initialized, skipping...');
+            return;
+        }
+        this._initialized = true;
+        
         // Toast-Container initialisieren
         if (!document.getElementById('toast-container')) {
             const container = document.createElement('div');
@@ -22,11 +31,16 @@ class GuildAjaxHandler {
         
         forms.forEach(form => {
             console.log('[GuildAjax] Registriere Form:', form.dataset.formType);
-            form.addEventListener('submit', e => {
-                console.log('[GuildAjax] Form submitted:', form.dataset.formType);
+            
+            // Entferne vorherige Event-Listener (falls vorhanden)
+            form.replaceWith(form.cloneNode(true));
+            const freshForm = document.querySelector(`[data-form-type="${form.dataset.formType}"]`);
+            
+            freshForm.addEventListener('submit', e => {
+                console.log('[GuildAjax] Form submitted:', freshForm.dataset.formType);
                 e.preventDefault();
-                GuildAjaxHandler.handleForm(form);
-            });
+                GuildAjaxHandler.handleForm(freshForm);
+            }, { once: false }); // once:false erlaubt mehrfaches Submit (bei Fehler z.B.)
         });
     }
 
@@ -942,6 +956,13 @@ class GuildAjaxHandler {
      */
     static async handleRemoveUserResponse(form, result) {
         console.log('[GuildAjax] handleRemoveUserResponse called:', result);
+        
+        // Verhindere doppeltes Triggering
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        
         if (result.success) {
             this.showToast('success', result.message || 'Benutzer erfolgreich entfernt');
             // Modal schließen
@@ -951,6 +972,10 @@ class GuildAjaxHandler {
             setTimeout(() => window.location.reload(), 1500);
         } else {
             this.showToast('error', result.message || 'Fehler beim Entfernen des Benutzers');
+            // Re-enable Button bei Fehler
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
         }
     }
     

@@ -81,6 +81,12 @@ module.exports = async (req, res, next) => {
         return res.redirect('/auth/server-selector');
     }
 
+    // User-Session prüfen BEVOR auf guilds zugegriffen wird
+    if (!req.session || !req.session.user || !req.session.user.guilds) {
+        Logger.warn('[Guild Middleware] Session ungültig oder keine Guilds - Redirect zu Login');
+        return res.redirect('/auth/login');
+    }
+
     const guildData = req.session.user.guilds.find((guild) => guild.id === guildId);   
 
     // User-Daten für Templates bereitstellen

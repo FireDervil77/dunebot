@@ -16,7 +16,7 @@
         </p>
       </div>
       
-      <% if (userPermissions.permissions['permissions.users.invite']) { %>
+      <% if (userPermissions.permissions['PERMISSIONS.USERS.INVITE']) { %>
       <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addGuildMemberModal">
         <i class="fa-solid fa-user-plus me-2"></i>
         Mitglied hinzufügen
@@ -168,7 +168,7 @@
                 <!-- Aktionen -->
                 <td class="text-center">
                   <div class="btn-group btn-group-sm" role="group">
-                    <% if (userPermissions.permissions['permissions.users.edit'] && !user.is_owner) { %>
+                    <% if (userPermissions.permissions['PERMISSIONS.USERS.EDIT'] && !user.is_owner) { %>
                     <button type="button" 
                             class="btn btn-primary btn-edit-user" 
                             data-user-id="<%= user.user_id %>"
@@ -178,7 +178,7 @@
                     </button>
                     <% } %>
                     
-                    <% if (userPermissions.permissions['permissions.users.remove'] && !user.is_owner) { %>
+                    <% if (userPermissions.permissions['PERMISSIONS.USERS.REMOVE'] && !user.is_owner) { %>
                     <button type="button" 
                             class="btn btn-danger btn-remove-user" 
                             data-user-id="<%= user.user_id %>"
@@ -395,7 +395,7 @@
                                data-permission-key="<%= perm.permission_key %>">
                         <label class="form-check-label" 
                                for="edit_direct_perm_<%= perm.permission_key.replace(/\./g, '_') %>">
-                          <strong><%= tr(`core:${perm.name_translation_key}`) %></strong>
+                          <strong><%= tr(perm.name_translation_key) %></strong>
                           <% if (perm.is_dangerous) { %>
                           <span class="badge bg-danger ms-2">Kritisch</span>
                           <% } %>
@@ -824,7 +824,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const form = document.getElementById('removeUserForm');
       form.action = `/guild/${guildId}/plugins/core/permissions/users/${userId}`;
       
-      new bootstrap.Modal(document.getElementById('removeUserModal')).show();
+      // WICHTIG: Wiederverwendung bestehender Instanz oder neue erstellen
+      const modalElement = document.getElementById('removeUserModal');
+      let modal = bootstrap.Modal.getInstance(modalElement);
+      if (!modal) {
+        modal = new bootstrap.Modal(modalElement);
+      }
+      modal.show();
     });
   });
   

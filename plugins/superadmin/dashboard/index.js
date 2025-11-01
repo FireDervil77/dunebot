@@ -759,6 +759,20 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             this.guildRouter.post('/changelogs/save', async (req, res) => {
                 const guildId = req.body.guildId || res.locals.guildId || req.params.guildId;
                 const dbService = ServiceManager.get('dbService');
+                
+                // ✅ DEBUG: Was kommt an?
+                Logger.info('[SuperAdmin] Changelog Save Request Body:', {
+                    guildId: req.body.guildId,
+                    changelogId: req.body.changelogId,
+                    version: req.body.version,
+                    status: req.body.status,
+                    slug: req.body.slug,
+                    author: req.body.author,
+                    title_de_length: req.body.title_de?.length,
+                    changes_de_length: req.body.changes_de?.length,
+                    allKeys: Object.keys(req.body)
+                });
+                
                 const {
                     changelogId,
                     title_de, title_en,

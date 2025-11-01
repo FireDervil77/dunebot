@@ -16,7 +16,7 @@
         </p>
       </div>
       
-      <% if (userPermissions.permissions['permissions.assign']) { %>
+      <% if (userPermissions.permissions['PERMISSIONS.MATRIX.EDIT']) { %>
       <button type="button" class="btn btn-success" id="saveMatrixBtn">
         <i class="fa-solid fa-save me-2"></i>
         Änderungen speichern
@@ -103,9 +103,9 @@
                 <tr data-permission="<%= perm.permission_key %>">
                   <td style="position: sticky; left: 0; z-index: 5; background-color: white;">
                     <div class="ps-3">
-                      <strong><%= tr(`core:${perm.name_translation_key}`) %></strong>
+                      <strong><%= tr(perm.name_translation_key) %></strong>
                       <% if (perm.description_translation_key) { %>
-                      <br><small class="text-muted"><%= tr(`core:${perm.description_translation_key}`) %></small>
+                      <br><small class="text-muted"><%= tr(perm.description_translation_key) %></small>
                       <% } %>
                       <% if (perm.is_dangerous) { %>
                       <br><span class="badge bg-danger">Kritisch</span>
@@ -123,7 +123,7 @@
                       <i class="fa-solid fa-check-circle text-success" 
                          data-bs-toggle="tooltip" 
                          title="Durch Wildcard-Berechtigung gewährt"></i>
-                    <% } else if (userPermissions.permissions['permissions.assign']) { %>
+                    <% } else if (userPermissions.permissions['PERMISSIONS.MATRIX.EDIT']) { %>
                       <!-- Bearbeitbare Checkbox -->
                       <div class="form-check d-flex justify-content-center">
                         <input class="form-check-input permission-checkbox" 
@@ -158,7 +158,7 @@
         </div>
       </div>
       
-      <% if (userPermissions.permissions['permissions.assign']) { %>
+      <% if (userPermissions.permissions['PERMISSIONS.MATRIX.EDIT']) { %>
       <div class="card-footer bg-light">
         <div class="d-flex justify-content-between align-items-center">
           <div>

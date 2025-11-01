@@ -565,6 +565,7 @@ module.exports = class App {
                     ],
                     formAction: [
                         "'self'",
+                        "https://firenetworks.de", // PROD Domain (für TinyMCE/AJAX Forms)
                         "https://checkout.stripe.com" // Stripe form submissions
                     ]
                 }

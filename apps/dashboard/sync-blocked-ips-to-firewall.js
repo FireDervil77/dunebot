@@ -4,18 +4,19 @@
  * 
  * Liest blocked_ips aus der Datenbank und blockt sie auf Firewall-Ebene
  * - Erstellt iptables-Regeln für jede IP
- - Muss als Root oder mit sudo ausgeführt werden
+ * - Muss als Root oder mit sudo ausgeführt werden
  * - Sollte als Cronjob laufen (z.B. alle 5 Minuten)
  * 
  * Usage:
  *   sudo node sync-blocked-ips-to-firewall.js
  *   oder als Cronjob:
- *   */5 * * * * /usr/bin/sudo /usr/bin/node /path/to/sync-blocked-ips-to-firewall.js
+ *   (crontab) slash-five slash-asterisk slash-asterisk slash-asterisk slash-asterisk sudo node /path/to/sync-blocked-ips-to-firewall.js
  * 
  * @author FireBot Team
  */
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const mysql = require('mysql2/promise');
 const { execSync } = require('child_process');
 
@@ -36,7 +37,7 @@ async function main() {
     try {
         // Alle geblockten IPs aus DB laden
         const [rows] = await connection.query(
-            'SELECT ip_address FROM blocked_ips WHERE is_active = 1'
+            'SELECT ip FROM blocked_ips WHERE is_whitelisted = FALSE'
         );
 
         console.log(`[Firewall-Sync] Found ${rows.length} blocked IPs in database`);
@@ -62,7 +63,7 @@ async function main() {
         // Neue Regeln hinzufügen
         let blocked = 0;
         for (const row of rows) {
-            const ip = row.ip_address;
+            const ip = row.ip;
             try {
                 // DROP alle Pakete von dieser IP
                 execSync(`iptables -A ${CHAIN_NAME} -s ${ip} -j DROP`);

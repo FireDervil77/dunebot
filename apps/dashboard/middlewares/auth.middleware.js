@@ -96,21 +96,42 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
         // Guild existiert in DB - Jetzt OAuth2-Rechte prüfen
         const guild = req.session.user.guilds.find(g => g.id === guildId);
         
-        if (!guild) {
-            Logger.warn(`⚠️ User ${req.session.user.info.id} hat keinen OAuth2-Zugriff auf Guild ${guildId}`);
+        // Prüfe ob User explizit in guild_users eingetragen ist (NEUES PERMISSION-SYSTEM!)
+        let hasGuildUserAccess = false;
+        try {
+            const guildUser = await dbService.query(`
+                SELECT status 
+                FROM guild_users 
+                WHERE guild_id = ? AND user_id = ? 
+                AND status = 'active'
+            `, [guildId, req.session.user.info.id]);
+            
+            if (guildUser && guildUser[0]) {
+                hasGuildUserAccess = true;
+                Logger.debug(`✅ User ${req.session.user.info.id} hat guild_users-Zugriff auf Guild ${guildId}`);
+            }
+        } catch (err) {
+            Logger.warn('[requireGuildAccess] Fehler beim Laden von guild_users:', err.message);
+        }
+        
+        // Wenn User in guild_users ist, erlaube Zugriff auch OHNE Discord-OAuth2-Permission!
+        if (!guild && !hasGuildUserAccess) {
+            Logger.warn(`⚠️ User ${req.session.user.info.id} hat KEINEN Zugriff auf Guild ${guildId}`);
+            Logger.warn(`   - Kein OAuth2-Zugriff (Discord-Permissions fehlen)`);
+            Logger.warn(`   - Nicht in guild_users eingetragen`);
             return res.status(403).render("error", {
                 message: "Du hast keinen Zugriff auf diesen Server",
                 error: { status: 403 }
             });
         }
         
-        // Überprüfen Discord-Permissions
-        const isAdmin = (guild.permissions & 0x8) === 0x8;
-        const isManager = (guild.permissions & 0x20) === 0x20;
-        const isOwner = guild.owner === true;
+        // Überprüfen Discord-Permissions (falls OAuth2-Guild existiert)
+        const isAdmin = guild ? (guild.permissions & 0x8) === 0x8 : false;
+        const isManager = guild ? (guild.permissions & 0x20) === 0x20 : false;
+        const isOwner = guild ? guild.owner === true : false;
         const isBotOwner = req.session.user.admin === true;
         
-        // Custom Permissions aus guild_staff prüfen
+        // Custom Permissions aus guild_staff prüfen (ALTE TABELLE - Backward-Compatibility)
         let hasCustomAccess = false;
         try {
             const result = await dbService.query(`
@@ -129,14 +150,61 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
             Logger.warn('[requireGuildAccess] Fehler beim Laden von guild_staff:', err.message);
         }
         
-        // Zugriff prüfen: Discord-Permissions ODER Custom DB-Permissions
-        const hasAccess = isAdmin || isManager || isOwner || isBotOwner || hasCustomAccess;
+        // Zugriff prüfen: Discord-Permissions ODER Custom DB-Permissions ODER guild_users
+        const hasAccess = isAdmin || isManager || isOwner || isBotOwner || hasCustomAccess || hasGuildUserAccess;
         
         if (!hasAccess) {
+            Logger.warn(`⚠️ User ${req.session.user.info.id} hat KEINE ausreichenden Rechte für Guild ${guildId}`);
+            Logger.warn(`   - isAdmin: ${isAdmin}, isManager: ${isManager}, isOwner: ${isOwner}`);
+            Logger.warn(`   - isBotOwner: ${isBotOwner}, hasCustomAccess: ${hasCustomAccess}`);
+            Logger.warn(`   - hasGuildUserAccess: ${hasGuildUserAccess}`);
             return res.status(403).render("error", {
                 message: "Du benötigst Administrator-Rechte, um diesen Server zu verwalten",
                 error: { status: 403 }
             });
+        }
+        
+        // ========================================
+        // Dashboard-Access-Permission Check
+        // ========================================
+        // Für guild_users ohne Discord-Admin-Rechte muss die Permission "DASHBOARD.ACCESS" vorhanden sein
+        // Discord Admins/Owner/BotOwner bekommen automatisch Zugriff (Bypass)
+        if (hasGuildUserAccess && !isAdmin && !isManager && !isOwner && !isBotOwner && !hasCustomAccess) {
+            Logger.debug(`[Dashboard-Access] User ${req.session.user.info.id} hat nur guild_users-Zugriff → Permission prüfen`);
+            
+            try {
+                const permissionManager = ServiceManager.get('permissionManager');
+                const hasDashboardAccess = await permissionManager.hasPermission(
+                    req.session.user.info.id, 
+                    guildId, 
+                    'DASHBOARD.ACCESS'
+                );
+                
+                if (!hasDashboardAccess) {
+                    Logger.warn(`⚠️ User ${req.session.user.info.id} hat KEINE DASHBOARD.ACCESS Permission!`);
+                    Logger.warn(`   Guild: ${guildId}`);
+                    Logger.warn(`   → Zugriff verweigert (kein Discord-Admin UND keine Dashboard-Permission)`);
+                    
+                    return res.status(403).render("error", {
+                        message: "Du hast keinen Zugriff auf dieses Dashboard",
+                        error: { 
+                            status: 403,
+                            details: "Fehlende Berechtigung: Dashboard-Zugriff. Bitte kontaktiere einen Server-Administrator."
+                        }
+                    });
+                }
+                
+                Logger.debug(`✅ User ${req.session.user.info.id} hat DASHBOARD.ACCESS → Zugriff gewährt`);
+                
+            } catch (err) {
+                Logger.error('[Dashboard-Access] Fehler beim Permission-Check:', err);
+                return res.status(500).render("error", {
+                    message: "Fehler beim Überprüfen der Zugriffsrechte",
+                    error: { status: 500 }
+                });
+            }
+        } else {
+            Logger.debug(`[Dashboard-Access] User ${req.session.user.info.id} hat Discord/Owner-Rechte → Auto-Zugriff`);
         }
         
         // WICHTIG: Active-Status für diese Guild setzen
