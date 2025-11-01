@@ -3,7 +3,7 @@
     "displayName": "Auto-Moderation - Plugin",
     "description": "The Auto-Moderation Plugin for FireBot",
     "version": "1.0.0",
-    "author": "FireDervil",
+    "author": "FireBot Team",
     "license": "none",
     "type":"commonjs",
     "peerDependencies": {

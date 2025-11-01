@@ -778,6 +778,47 @@ async getAllConfigs() {
     }
 
     /**
+     * Holt alle aktivierten Plugins für eine Guild MIT Badge-Informationen (GLOBAL)
+     * @param {string} guildId Guild-ID
+     * @returns {Promise<Array<Object>>} Array mit Plugin-Objekten inkl. Badge-Info
+     * @author FireDervil
+     */
+    async getEnabledPluginsWithBadges(guildId) {
+        const rows = await this.query(`
+            SELECT 
+                gp.plugin_name, 
+                gp.plugin_version, 
+                gp.enabled_at, 
+                gp.enabled_by,
+                pb.badge_status,
+                pb.badge_until,
+                pb.is_featured,
+                CASE 
+                    WHEN pb.badge_status IS NOT NULL 
+                         AND (pb.badge_until IS NULL OR pb.badge_until >= CURDATE())
+                    THEN 1
+                    ELSE 0
+                END as has_active_badge
+            FROM guild_plugins gp
+            LEFT JOIN plugin_badges pb ON gp.plugin_name = pb.plugin_name
+            WHERE gp.guild_id = ? AND gp.is_enabled = 1
+            ORDER BY pb.is_featured DESC, gp.plugin_name
+        `, [guildId]);
+        
+        return rows.map(row => ({
+            name: row.plugin_name,
+            version: row.plugin_version,
+            enabledAt: row.enabled_at,
+            enabledBy: row.enabled_by,
+            badge: row.has_active_badge ? {
+                status: row.badge_status,
+                until: row.badge_until,
+                featured: Boolean(row.is_featured)
+            } : null
+        }));
+    }
+
+    /**
      * Prüft ob ein Plugin für eine Guild aktiviert ist
      * @param {string} guildId Guild-ID
      * @param {string} pluginName Plugin-Name
@@ -809,6 +850,90 @@ async getAllConfigs() {
                 updated_at = NOW()
             WHERE guild_id = ? AND plugin_name = ?
         `, [newVersion, guildId, pluginName]);
+    }
+
+    /**
+     * Setzt oder aktualisiert ein GLOBALES Plugin-Badge (für alle Guilds)
+     * @param {string} pluginName Plugin-Name
+     * @param {string} badgeStatus Badge-Status (new, beta, updated, deprecated)
+     * @param {Date|string|null} badgeUntil Badge-Ablaufdatum (NULL = permanent)
+     * @param {boolean} isFeatured Featured-Status
+     * @returns {Promise<Object>}
+     * @author FireDervil
+     */
+    async setPluginBadge(pluginName, badgeStatus, badgeUntil = null, isFeatured = false) {
+        return await this.query(`
+            INSERT INTO plugin_badges (plugin_name, badge_status, badge_until, is_featured)
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                badge_status = VALUES(badge_status),
+                badge_until = VALUES(badge_until),
+                is_featured = VALUES(is_featured),
+                updated_at = NOW()
+        `, [pluginName, badgeStatus, badgeUntil, isFeatured ? 1 : 0]);
+    }
+
+    /**
+     * Entfernt ein GLOBALES Plugin-Badge
+     * @param {string} pluginName Plugin-Name
+     * @returns {Promise<Object>}
+     * @author FireDervil
+     */
+    async removePluginBadge(pluginName) {
+        return await this.query(`
+            DELETE FROM plugin_badges WHERE plugin_name = ?
+        `, [pluginName]);
+    }
+
+    /**
+     * Holt alle GLOBALEN Plugin-Badges
+     * @returns {Promise<Array<Object>>} Array mit Badge-Objekten
+     * @author FireDervil
+     */
+    async getAllPluginBadges() {
+        return await this.query(`
+            SELECT 
+                plugin_name,
+                badge_status,
+                badge_until,
+                is_featured,
+                created_at,
+                updated_at,
+                CASE 
+                    WHEN badge_until IS NULL OR badge_until >= CURDATE()
+                    THEN 1
+                    ELSE 0
+                END as is_active
+            FROM plugin_badges
+            ORDER BY is_featured DESC, created_at DESC
+        `);
+    }
+
+    /**
+     * Holt Badge-Info für ein spezifisches Plugin
+     * @param {string} pluginName Plugin-Name
+     * @returns {Promise<Object|null>} Badge-Objekt oder null
+     * @author FireDervil
+     */
+    async getPluginBadge(pluginName) {
+        const [badge] = await this.query(`
+            SELECT 
+                plugin_name,
+                badge_status,
+                badge_until,
+                is_featured,
+                created_at,
+                updated_at,
+                CASE 
+                    WHEN badge_until IS NULL OR badge_until >= CURDATE()
+                    THEN 1
+                    ELSE 0
+                END as is_active
+            FROM plugin_badges
+            WHERE plugin_name = ?
+        `, [pluginName]);
+        
+        return badge || null;
     }
 
     /**

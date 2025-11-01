@@ -9,17 +9,26 @@
         <!-- Carousel für mehrere Hero-Slides -->
         <div id="heroCarousel" class="carousel slide carousel-fade" data-ride="carousel" data-interval="5000">
           
-          <!-- Carousel Indicators (Dots) -->
+          <!-- Carousel Indicators (Dots) - Dynamisch für gemischte Slides (3 Standard + bis zu 3 News = max 6) -->
           <div class="carousel-indicators">
-            <button type="button" data-target="#heroCarousel" data-slide-to="0" class="active"></button>
-            <button type="button" data-target="#heroCarousel" data-slide-to="1"></button>
-            <button type="button" data-target="#heroCarousel" data-slide-to="2"></button>
+            <%
+              // Berechne Gesamtzahl der Slides (3 Standard-Slides gemischt mit News)
+              const newsCount = (carouselNews && carouselNews.length > 0) ? carouselNews.length : 0;
+              const totalSlides = 3 + newsCount; // 3 Standard + News (max 6 Slides)
+            %>
+            <% for (let i = 0; i < totalSlides; i++) { %>
+              <button type="button" data-target="#heroCarousel" data-slide-to="<%= i %>" <%= i === 0 ? 'class="active"' : '' %>></button>
+            <% } %>
           </div>
 
-          <!-- Carousel Slides -->
+          <!-- Carousel Slides - Gemischt: Standard 1, News 1, Standard 2, News 2, Standard 3, News 3 -->
           <div class="carousel-inner">
+            <%
+              // Slide-Reihenfolge: Standard Slide 1 → News 1 → Standard Slide 2 → News 2 → Standard Slide 3 → News 3
+              let slideIndex = 0;
+            %>
             
-            <!-- Slide 1: Haupttext (Original) -->
+            <!-- Slide <%= slideIndex++ %>: Standard 1 - Haupttext (immer zuerst) -->
             <div class="carousel-item active">
               <div class="text-center">
                 <h2><%= tr('LANDING.HERO') %></h2>
@@ -32,7 +41,21 @@
               </div>
             </div>
 
-            <!-- Slide 2: Plugin-System -->
+            <!-- News 1 (falls vorhanden) -->
+            <% if (carouselNews && carouselNews.length > 0) { %>
+              <div class="carousel-item">
+                <div class="text-center">
+                  <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[0].title %></h2>
+                  <p><%= carouselNews[0].excerpt || carouselNews[0].content.substring(0, 150) + '...' %></p>
+                  <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[0].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
+                  <a href="/news-details/<%= carouselNews[0].slug %>" class="btn-hero btn-get-started">
+                    <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
+                  </a>
+                </div>
+              </div>
+            <% } %>
+
+            <!-- Slide <%= slideIndex++ %>: Standard 2 - Plugin-System -->
             <div class="carousel-item">
               <div class="text-center">
                 <h2><%= tr('LANDING.HERO_SLIDE2_TITLE') %></h2>
@@ -45,7 +68,21 @@
               </div>
             </div>
 
-            <!-- Slide 3: Community Features -->
+            <!-- News 2 (falls vorhanden) -->
+            <% if (carouselNews && carouselNews.length > 1) { %>
+              <div class="carousel-item">
+                <div class="text-center">
+                  <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[1].title %></h2>
+                  <p><%= carouselNews[1].excerpt || carouselNews[1].content.substring(0, 150) + '...' %></p>
+                  <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[1].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
+                  <a href="/news-details/<%= carouselNews[1].slug %>" class="btn-hero btn-get-started">
+                    <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
+                  </a>
+                </div>
+              </div>
+            <% } %>
+
+            <!-- Slide <%= slideIndex++ %>: Standard 3 - Community Features -->
             <div class="carousel-item">
               <div class="text-center">
                 <h2><%= tr('LANDING.HERO_SLIDE3_TITLE') %></h2>
@@ -57,6 +94,20 @@
                 </a>
               </div>
             </div>
+
+            <!-- News 3 (falls vorhanden) -->
+            <% if (carouselNews && carouselNews.length > 2) { %>
+              <div class="carousel-item">
+                <div class="text-center">
+                  <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[2].title %></h2>
+                  <p><%= carouselNews[2].excerpt || carouselNews[2].content.substring(0, 150) + '...' %></p>
+                  <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[2].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
+                  <a href="/news-details/<%= carouselNews[2].slug %>" class="btn-hero btn-get-started">
+                    <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
+                  </a>
+                </div>
+              </div>
+            <% } %>
 
           </div>
 

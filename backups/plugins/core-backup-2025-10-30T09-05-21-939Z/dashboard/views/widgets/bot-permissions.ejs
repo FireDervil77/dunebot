@@ -1,0 +1,50 @@
+<% if (stats?.botStats) { %>
+  <div class="d-flex align-items-center mb-3">
+    <% 
+    // Sichere Farbauswahl mit Fallback
+    const roleColor = stats.botStats && stats.botStats.highestRoleColor ? 
+      stats.botStats.highestRoleColor : '#999999';
+    %>
+    <div style="width: 15px; height: 15px; background-color: <%= roleColor %>;" class="rounded-circle me-2"></div>
+    <span><%= stats.botStats.highestRole || tr('core:WIDGETS.BOT_PERMISSIONS.NO_ROLE') %></span>
+  </div>
+  
+  <ul class="list-group mb-3">
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <%= tr('core:WIDGETS.BOT_PERMISSIONS.PERM_SEND_MESSAGES') %>
+      <span>
+        <% if (stats.botStats.canSendMessages) { %>
+          <i class="bi bi-check-circle-fill text-success"></i>
+        <% } else { %>
+          <i class="bi bi-x-circle-fill text-danger"></i>
+        <% } %>
+      </span>
+    </li>
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <%= tr('core:WIDGETS.BOT_PERMISSIONS.PERM_MANAGE_SERVER') %>
+      <span>
+        <% if (stats.botStats.canManageServer) { %>
+          <i class="bi bi-check-circle-fill text-success"></i>
+        <% } else { %>
+          <i class="bi bi-x-circle-fill text-danger"></i>
+        <% } %>
+      </span>
+    </li>
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <%= tr('core:WIDGETS.BOT_PERMISSIONS.PERM_MANAGE_ROLES') %>
+      <span>
+        <% if (stats.botStats.canManageRoles) { %>
+          <i class="bi bi-check-circle-fill text-success"></i>
+        <% } else { %>
+          <i class="bi bi-x-circle-fill text-danger"></i>
+        <% } %>
+      </span>
+    </li>
+  </ul>
+  
+  <small class="text-muted"><%= tr('core:WIDGETS.BOT_PERMISSIONS.JOINED_AT') %> <%= new Date(stats.botStats.joinedAt).toLocaleDateString() %></small>
+<% } else { %>
+  <div class="alert alert-warning">
+    <%= tr('core:WIDGETS.BOT_PERMISSIONS.NO_DATA') %>
+  </div>
+<% } %> 

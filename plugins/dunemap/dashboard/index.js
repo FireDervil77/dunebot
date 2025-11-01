@@ -1,5 +1,6 @@
 const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
+const { requirePermission } = require('../../../apps/dashboard/middlewares/permissions.middleware');
 
 const path = require('path');
 
@@ -77,7 +78,7 @@ class DuneMapPlugin extends DashboardPlugin {
         
         try {
             // === HAUPTSEITE (Dashboard/Übersicht) ===
-            this.guildRouter.get('/', async (req, res) => {
+            this.guildRouter.get('/', requirePermission('DUNEMAP.VIEW'), async (req, res) => {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 const i18n = ServiceManager.get('i18n');
@@ -184,7 +185,7 @@ class DuneMapPlugin extends DashboardPlugin {
             });
             
             // Settings-Route
-            this.guildRouter.get('/settings', async (req, res) => {
+            this.guildRouter.get('/settings', requirePermission('DUNEMAP.VIEW'), async (req, res) => {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 
@@ -277,7 +278,7 @@ class DuneMapPlugin extends DashboardPlugin {
             });
             
             // POST: Settings speichern
-            this.guildRouter.post('/settings', async (req, res) => {
+            this.guildRouter.post('/settings', requirePermission('DUNEMAP.SETTINGS_EDIT'), async (req, res) => {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 const i18n = ServiceManager.get('i18n');
@@ -341,7 +342,7 @@ class DuneMapPlugin extends DashboardPlugin {
             });
             
             // === ADMIN-INTERFACE (Sektor-Karte mit Marker-Editor) ===
-            this.guildRouter.get('/admin', async (req, res) => {
+            this.guildRouter.get('/admin', requirePermission('DUNEMAP.ADMIN_MANAGE'), async (req, res) => {
                 const Logger = ServiceManager.get('Logger');
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
@@ -447,7 +448,7 @@ class DuneMapPlugin extends DashboardPlugin {
             });
             
             // POST: Marker erstellen/löschen
-            this.guildRouter.post('/admin/marker', async (req, res) => {
+            this.guildRouter.post('/admin/marker', requirePermission('DUNEMAP.MARKERS_CREATE'), async (req, res) => {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 const Logger = ServiceManager.get('Logger');
@@ -579,7 +580,7 @@ class DuneMapPlugin extends DashboardPlugin {
             });
             
             // === API: CORIOLIS STORM TIMER ===
-            this.guildRouter.get('/api/storm-timer', async (req, res) => {
+            this.guildRouter.get('/api/storm-timer', requirePermission('DUNEMAP.VIEW'), async (req, res) => {
                 const Logger = ServiceManager.get('Logger');
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
@@ -644,16 +645,16 @@ class DuneMapPlugin extends DashboardPlugin {
         const dbService = ServiceManager.get('dbService');
         
         try {
-            Logger.info('Deaktiviere DuneMap Plugin und entferne Tabellen...');
+            Logger.info('Deaktiviere [DuneMap] Plugin und entferne Tabellen...');
             
             // Tabellen in umgekehrter Reihenfolge löschen (wegen Foreign Keys)
             //await dbService.query('DROP TABLE IF EXISTS dunemap_storm_timer');
             //await dbService.query('DROP TABLE IF EXISTS dunemap_markers');
             
-            Logger.success('DuneMap Tabellen erfolgreich entfernt');
+            Logger.success('[DuneMap] Tabellen erfolgreich entfernt');
             return true;
         } catch (error) {
-            Logger.error('Fehler beim Entfernen der DuneMap Tabellen:', error);
+            Logger.error('Fehler beim Entfernen der [DuneMap] Tabellen:', error);
             throw error;
         }
     }
@@ -667,11 +668,11 @@ class DuneMapPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
         
-        Logger.debug(`Registriere Navigation für dunemap in Guild ${guildId}`);
+        Logger.debug(`Registriere Navigation für [dunemap] in Guild ${guildId}`);
         await this._registerNavigation(guildId);
 
         // DB Models registrieren
-        Logger.debug(`Registriere Models für dunemap in Guild ${guildId}`);
+        Logger.debug(`Registriere Models für [dunemap] in Guild ${guildId}`);
         // TODO: Models wieder aktivieren wenn benötigt
         // await this.registerModel(require('./models/Marker'));
         // await this.registerModel(require('./models/StormTimer'));
@@ -758,7 +759,7 @@ class DuneMapPlugin extends DashboardPlugin {
         const navigationManager = ServiceManager.get('navigationManager');
         
         try {
-            Logger.info(`Deaktiviere DuneMap Plugin für Guild ${guildId}...`);
+            Logger.info(`Deaktiviere [DuneMap] Plugin für Guild ${guildId}...`);
             
             // Navigation über NavigationManager entfernen
             await navigationManager.removeNavigation(this.name, guildId);
@@ -773,10 +774,10 @@ class DuneMapPlugin extends DashboardPlugin {
                 [this.name, guildId]
             );
             
-            Logger.success(`DuneMap Daten für Guild ${guildId} erfolgreich entfernt (storm_timer, markers, gps_markers, configs)`);
+            Logger.success(`[DuneMap] Daten für Guild ${guildId} erfolgreich entfernt (storm_timer, markers, gps_markers, configs)`);
             return true;
         } catch (error) {
-            Logger.error(`Fehler beim Entfernen der DuneMap Daten für Guild ${guildId}:`, error);
+            Logger.error(`Fehler beim Entfernen der [DuneMap] Daten für Guild ${guildId}:`, error);
             throw error;
         }
     }
@@ -796,7 +797,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 title: 'dunemap:NAV.DUNEMAP',
                 path: `/guild/${guildId}/plugins/dunemap`,
                 icon: 'fa-solid fa-map',
-                order: 50,
+                order: null,
                 type: 'main',
                 visible: true
             },
@@ -804,7 +805,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 title: 'dunemap:NAV.SEKTOR_CARD',
                 path: `/guild/${guildId}/plugins/dunemap/admin`,
                 icon: 'fa-solid fa-map-marked-alt',
-                order: 51,
+                order: 10,
                 parent: `/guild/${guildId}/plugins/dunemap`,
                 type: 'main',
                 visible: true
@@ -814,7 +815,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 title: 'dunemap:NAV.DUNEMAP',
                 path: `/guild/${guildId}/plugins/dunemap/settings`,
                 icon: 'fa-solid fa-map',
-                order: 24,  // Nach Core-Settings (21, 22, 23)
+                order: null,  // Nach Core-Settings (21, 22, 23)
                 parent: `/guild/${guildId}/plugins/core/settings`,  // ← Parent ist Core-Settings!
                 type: 'main',
                 visible: true
@@ -845,8 +846,8 @@ class DuneMapPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const pluginManager = ServiceManager.get('pluginManager');
         const themeManager = ServiceManager.get("themeManager");
-        
-        Logger.debug('Core Plugin Widgets registriert');
+
+        Logger.debug('[DuneMap] Plugin Widgets registriert');
     }
 
     /**

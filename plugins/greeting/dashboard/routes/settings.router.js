@@ -8,12 +8,13 @@
 
 const express = require('express');
 const router = express.Router();
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
 /**
  * GET /plugins/greeting/settings
  * Plugin-Einstellungen (system-weit, falls benötigt)
  */
-router.get('/settings', async (req, res) => {
+router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => {
     const { ServiceManager } = require('dunebot-core');
     const themeManager = ServiceManager.get('themeManager');
     

@@ -110,7 +110,11 @@ document.querySelector('form').addEventListener('submit', function(e) {
             </div>
         <% } %>
 
-        <form action="/guild/<%= guildId %>/plugins/superadmin/notifications/save" method="POST">
+        <form class="guild-ajax-form" 
+              data-form-type="notification-save" 
+              data-method="POST"
+              action="/guild/<%= guildId %>/plugins/superadmin/notifications/save" 
+              method="POST">
             <input type="hidden" name="guildId" value="<%= guildId %>">
             <% if (notification && notification.id) { %>
                 <input type="hidden" name="notificationId" value="<%= notification.id %>">

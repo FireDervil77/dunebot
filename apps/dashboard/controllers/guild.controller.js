@@ -250,6 +250,24 @@ exports.getPlugins = async (req, res) => {
             enabledServerPlugins = ["core"];
         }
 
+        // NEU: Plugin-Badges laden
+        let pluginBadges = {};
+        try {
+            const badges = await dbService.getAllPluginBadges();
+            pluginBadges = badges.reduce((acc, badge) => {
+                acc[badge.plugin_name] = {
+                    status: badge.badge_status,
+                    until: badge.badge_until,
+                    featured: badge.is_featured,
+                    active: badge.is_active
+                };
+                return acc;
+            }, {});
+        } catch (err) {
+            Logger.error(`Fehler beim Laden der Plugin-Badges:`, err);
+            pluginBadges = {};
+        }
+
         // Plugins-Verzeichnis ermitteln (vom Controller aus relativ zum Projekt-Root)
         const pluginsDir = path.resolve(__dirname, "../../../plugins");
 
@@ -356,7 +374,9 @@ exports.getPlugins = async (req, res) => {
                         settingsUrl: hasSettings ? `/guild/${guildId}/plugins/${pluginName}/settings` : null,
                         icon,
                         isCore,
-                        canDisable: !isCore
+                        canDisable: !isCore,
+                        // NEU: Badge-Informationen hinzufügen
+                        badge: pluginBadges[pluginName] || null
                     };
 
                     if (plugin.enabled) {

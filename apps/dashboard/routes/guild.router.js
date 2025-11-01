@@ -40,7 +40,7 @@ router.post("/:guildId/plugins/:pluginName/update", CheckGuildAccess, guildContr
 router.get("/:guildId/locales", CheckGuildAccess, guildController.getLocales);
 
 // Plugin-spezifische Routen (MIT Auth-Check!)
-router.use("/:guildId/plugins/:pluginName", CheckGuildAccess, pluginMiddleware.loadPlugin, (req, res, next) => {
+router.use("/:guildId/plugins/:pluginName", CheckAuth, CheckGuildAccess, pluginMiddleware.loadPlugin, (req, res, next) => {
     const plugin = res.locals.plugin;
     const Logger = ServiceManager.get('Logger');
 

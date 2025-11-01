@@ -1,15 +1,16 @@
 const path = require("path");
 const router = require("express").Router();
 const { ServiceManager } = require("dunebot-core");
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
 
-router.get("/", async (_req, res) => {
+router.get("/", requirePermission('SETTINGS.VIEW'), async (_req, res) => {
     const dbService = ServiceManager.get("dbService");
     const settings = await dbService.getSettings(res.locals.guild);
     res.render(path.join(__dirname, "views/settings.ejs"), { settings });
 });
 
-router.put("/", async (req, res) => {
+router.put("/", requirePermission('SETTINGS.EDIT'), async (req, res) => {
     const dbService = ServiceManager.get("dbService");
     const i18n = ServiceManager.get("i18n");
     const Logger = ServiceManager.get("Logger");

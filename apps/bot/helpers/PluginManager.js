@@ -602,25 +602,29 @@ async enablePlugin(pluginName) {
                 // Guild aus dem Cache holen (die ECHTE Guild, nicht das Partial!)
                 const guild = client.guilds.cache.get(guildId);
                 
-                // STRIKT: Guild MUSS im Cache sein!
-                if (!guild) {
+                // AUSNAHME: Bei guildDelete ist es NORMAL dass Guild nicht im Cache ist!
+                if (!guild && eventName !== "guildDelete") {
                     Logger.error(`[PluginManager] ❌ GHOST-ID BLOCKIERT: Guild ${guildId} NICHT im Discord-Cache!`);
                     Logger.error(`[PluginManager] Event="${eventName}", Partial=${!guildPartial.name}`);
                     Logger.error(`[PluginManager] Bekannte Guilds: ${Array.from(client.guilds.cache.keys()).join(', ')}`);
-                    return []; // Strikt blockieren
+                    return []; // Strikt blockieren (außer bei guildDelete)
                 }
                 
-                Logger.debug(`[PluginManager] ✅ Guild gefunden: ${guild.name} (${guild.id})`);
+                if (guild) {
+                    Logger.debug(`[PluginManager] ✅ Guild gefunden: ${guild.name} (${guild.id})`);
+                } else if (eventName === "guildDelete") {
+                    Logger.debug(`[PluginManager] ✅ guildDelete Event für Guild ${guildId} (Cache-Ausnahme)`);
+                }
                 
                 // 2. Prüfen ob Guild in Datenbank ist
                 const [guildExists] = await dbService.query(
                     "SELECT 1 FROM guilds WHERE _id = ? LIMIT 1",
-                    [guild.id]
+                    [guildId]
                 );
                 
                 if (!guildExists) {
-                    Logger.error(`[PluginManager] ❌ GHOST-ID BLOCKIERT: Guild ${guild.id} NICHT in Datenbank!`);
-                    Logger.error(`[PluginManager] Guild "${guild.name}" muss erst via guildCreate registriert werden!`);
+                    Logger.error(`[PluginManager] ❌ GHOST-ID BLOCKIERT: Guild ${guildId} NICHT in Datenbank!`);
+                    Logger.error(`[PluginManager] Guild muss erst via guildCreate registriert werden!`);
                     return []; // Strikt blockieren
                 }
                 
@@ -628,7 +632,7 @@ async enablePlugin(pluginName) {
                 // NEU: guild_plugins Tabelle statt configs.ENABLED_PLUGINS
                 const pluginRows = await dbService.query(
                     "SELECT plugin_name FROM guild_plugins WHERE guild_id = ? AND is_enabled = 1",
-                    [guild.id]
+                    [guildId] // Verwende guildId statt guild.id (für guildDelete Kompatibilität)
                 );
                 
                 enabled_plugins = pluginRows.map(row => row.plugin_name);
@@ -638,7 +642,7 @@ async enablePlugin(pluginName) {
                     enabled_plugins.push("core");
                 }
                 
-                Logger.debug(`[PluginManager] Aktivierte Plugins für Guild ${guild.id}: ${enabled_plugins.join(', ')}`);
+                Logger.debug(`[PluginManager] Aktivierte Plugins für Guild ${guildId}: ${enabled_plugins.join(', ')}`);
             }
         } catch (error) {
             Logger.warn(`[PluginManager] Fehler beim Ermitteln aktivierter Plugins für Event ${eventName}:`, error);
@@ -700,82 +704,6 @@ async enablePlugin(pluginName) {
         return responseMap;
     }
     
-    
-
-    /**
-     * Bleibt für keine ahnung bestehen
-    */ 
-   /**
-    async emit(eventName, ...args) {
-        const Logger = ServiceManager.get("Logger");
-        const dbService = ServiceManager.get("dbService");
-        const results = [];
-
-        // Bei Guild-Events die Guild-ID extrahieren
-        let guildId = null;
-        if (args[0]?.guild?.id) {
-            guildId = args[0].guild.id;
-        } else if (args[0]?.id && args[0]?.members) {
-            guildId = args[0].id; 
-        }
-        
-        // 1. Prüfen ob Events für dieses Plugin registriert sind
-        if (!this.#listeningEvents.has(eventName)) {
-            return [];
-        }
-
-        // 2. Default: Alle Plugins sind aktiviert
-        let enabled_plugins = ["core"]; // Core ist IMMER aktiviert
-
-        // 3. Guild-Kontext ermitteln und guild-spezifische Plugins laden
-        try {
-            const guild = args[0];
-            if (guild?.id && eventName !== "guildCreate") {
-                // Zuerst prüfen ob die Guild existiert
-                const [guildExists] = await dbService.query(
-                    "SELECT 1 FROM guilds WHERE _id = ? LIMIT 1",
-                    [guild.id]
-                );
-                
-                if (guildExists) {
-                    const configs = await dbService.getConfigs(guild.id, "core", "shared");
-                    
-                    if (configs?.ENABLED_PLUGINS) {
-                        enabled_plugins = typeof configs.ENABLED_PLUGINS === 'string'
-                            ? JSON.parse(configs.ENABLED_PLUGINS)
-                            : configs.ENABLED_PLUGINS;
-                        
-                        // Sicherstellen dass core immer aktiviert ist
-                        if (!enabled_plugins.includes("core")) {
-                        enabled_plugins.push("core");
-                    }
-                }
-            }
-        } catch (error) {
-            Logger.warn(`[PluginManager] Fehler beim Ermitteln aktivierter Plugins für Event ${eventName}:`, error);
-        }
-        
-        // 4. Events ausführen - nur für aktivierte Plugins
-        return Promise.all(
-            this.plugins
-                .filter(plugin => 
-                    enabled_plugins.includes(plugin.name) && // Plugin muss für Guild aktiviert sein
-                    plugin.eventHandlers && 
-                    plugin.eventHandlers.has(eventName)     // Plugin muss Event-Handler haben
-                )
-                .map(async plugin => {
-                    try {
-                        const handler = plugin.eventHandlers.get(eventName);
-                        const data = await handler(...args);
-                        return { name: plugin.name, success: true, data };
-                    } catch (error) {
-                        Logger.error(`Error in plugin ${plugin.name}:`, error);
-                        return { name: plugin.name, success: false, data: null };
-                    }
-                })
-        );
-    }
-    */
 }
 
 module.exports = PluginManager;

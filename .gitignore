@@ -51,3 +51,26 @@ config/secrets.json
 *.pem
 *.key
 test_*.js
+cookies.txt
+
+# Excluded Plugins (nicht für Repo)
+plugins/fun/
+plugins/economy/
+plugins/giveaway/
+plugins/masterserver/
+plugins/gameserver/
+plugins/imageserver/
+plugins/statistik/
+plugins/ticket/
+plugins/voiceserver/
+
+# Daemon Binaries (separat laden)
+apps/dashboard/downloads/daemon/binaries/
+downloads/binarys/
+*.exe
+firebot-daemon
+firebot-daemon-*
+
+#docs and docs folder
+docs/
+docs/*

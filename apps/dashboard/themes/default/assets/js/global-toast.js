@@ -81,10 +81,10 @@
             console.warn('[Toast] Toastr nicht verfügbar - Fallback auf Console:', type, translatedMessage);
         }
 
-        // Server-Logging für kritische Toasts
+        // Server-Logging NUR für Errors (nicht mehr für warnings)
         const shouldLog = options.logToServer !== undefined 
             ? options.logToServer 
-            : (type === 'error' || type === 'warning');
+            : (type === 'error'); // Nur noch Errors, keine Warnings mehr
 
         if (shouldLog && window.logToastToServer) {
             window.logToastToServer(type, message, options.metadata);
@@ -183,6 +183,9 @@
         }
     };
 
-    console.log('[Toast] Globales Toast-System initialisiert');
+    // System ready (nur in Debug-Mode loggen)
+    if (window.location.search.includes('debug')) {
+        console.log('[Toast] Globales Toast-System initialisiert');
+    }
 
 })(window);

@@ -9,6 +9,6 @@
   "BUYMEACOFFE_URL" : "https://buymeacoffee.com/firedervil",
   "PLUGIN_AUTO_UPDATE_ENABLED": true,
   "PLUGIN_UPDATE_GRACE_DAYS": 5,
-  "DASHBOARD_VERSION" : "1.10.15",
-  "BOT_VERSION" : "1.15.1"
+  "DASHBOARD_VERSION" : "2.5.3",
+  "BOT_VERSION" : "4.3.2"
 }

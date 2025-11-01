@@ -5,6 +5,7 @@ require("dotenv").config();
 
 // ServiceManager aus SDK holen
 const PluginManager = require("./helpers/PluginManager");
+const { SessionManager, BotHealthMonitor } = require("dunebot-sdk");
 const { ServiceManager, I18nManager } = require("dunebot-core");
 const { parseJsonArray } = require("dunebot-sdk/utils");
 const { ThemeManager, AssetManager } = require('dunebot-sdk');
@@ -52,7 +53,8 @@ module.exports = class App {
             frontend: require("./routes/frontend.router"),
             auth: require("./routes/auth.router"),
             guild: require("./routes/guild.router"),
-            api: require("./routes/api.router")
+            api: require("./routes/api.router"),
+            downloads: require("./routes/downloads.router")
         };
 
         // Weitere Manager initialisieren...
@@ -81,6 +83,9 @@ module.exports = class App {
         this.app.assetManager = new AssetManager();
         ServiceManager.register("assetManager", this.app.assetManager);
 
+        // Session-Manager initialisieren
+        this.app.sessionManager = new SessionManager();
+        ServiceManager.register("sessionManager", this.app.sessionManager);
         
         // Plugin-Manager initialisieren
         this.app.pluginManager = new PluginManager(
@@ -130,13 +135,12 @@ module.exports = class App {
             this.routerManager
                 .register('/', this.routers.frontend)
                 .register('/auth', this.routers.auth)
+                .register('/downloads', this.routers.downloads) // Öffentlich, keine Auth
                 .register('/guild', this.routers.guild, { 
                     auth: true,  // Aktiviert CheckAuth Middleware
                     middlewares: [guildMiddleware]  // Zusätzliche Middleware
                 })
-                .register('/api', this.routers.api, { 
-                    auth: true  // Aktiviert CheckAuth Middleware
-                });
+                .register('/api', this.routers.api); // FIXED: Keine automatische Auth - wird in Routes selbst gehandhabt
             
             // Theme initialisieren - übernimmt bereits die View-Engine-Initialisierung
             await this.app.themeManager.initialize(this.config.THEME || 'default');
@@ -184,6 +188,28 @@ module.exports = class App {
             if (this.app.pluginManager && this.app.pluginManager.hooks) {
                 await this.app.pluginManager.hooks.doAction('after_dashboard_initialize', this.app);
             }
+
+            // Session-Cleanup starten (nach erfolgreicher Initialisierung)
+            if (this.app.sessionManager) {
+                this.app.sessionManager.startCleanup(60); // Alle 60 Minuten
+            }
+
+            // Bot Health Monitor starten (nach IPC-Initialisierung)
+            Logger.debug('[INIT] Erstelle BotHealthMonitor-Instanz...');
+            this.app.botHealthMonitor = new BotHealthMonitor();
+            ServiceManager.register("botHealthMonitor", this.app.botHealthMonitor);
+            Logger.debug('[INIT] BotHealthMonitor registriert, starte setTimeout...');
+            
+            // Warte kurz bis IPC vollständig connected ist
+            setTimeout(() => {
+                Logger.debug('[INIT] setTimeout gefeuert! Starte Monitoring...');
+                try {
+                    this.app.botHealthMonitor.startMonitoring(60000); // Alle 60 Sekunden
+                    Logger.success("🏥 Bot Health Monitoring gestartet (60s Intervall)");
+                } catch (error) {
+                    Logger.error('[INIT] Fehler beim Starten des BotHealthMonitors:', error);
+                }
+            }, 3000); // 3s Verzögerung für IPC-Connect
 
             this.#initializeErrorHandling();
             
@@ -243,6 +269,12 @@ module.exports = class App {
                 FROM guild_plugins 
                 WHERE is_enabled = 1 AND plugin_name != 'core'
             `);
+            
+            // Sicherstellen dass pluginRows ein Array ist
+            if (!Array.isArray(pluginRows)) {
+                Logger.error('[Plugin Load] Query lieferte kein Array:', pluginRows);
+                throw new Error('rows.map is not a function - pluginRows ist kein Array');
+            }
             
             let enabledPlugins = pluginRows.map(row => row.plugin_name);
             
@@ -401,13 +433,35 @@ module.exports = class App {
         const Logger = ServiceManager.get("Logger");
         for (const plugin of this.app.pluginManager.plugins) {
             if (plugin.publicAssets) {
-                const assetsPath = path.join(this.app.pluginManager.pluginsDir, plugin.name, 'dashboard', 'public');
-                if (fs.existsSync(assetsPath)) {
-                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(assetsPath));
-                    Logger.debug(`Assets für Plugin ${plugin.name} registriert unter /assets/plugins/${plugin.name}`);
+                // NEUE LOGIK: Mount direkt auf Plugin-Root (ohne public-Verwirrung)
+                const pluginRootPath = path.join(this.app.pluginManager.pluginsDir, plugin.name);
+                
+                // 1. Dashboard-spezifische Assets (falls vorhanden)
+                const dashboardAssetsPath = path.join(pluginRootPath, 'dashboard', 'public');
+                if (fs.existsSync(dashboardAssetsPath)) {
+                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(dashboardAssetsPath));
+                    Logger.debug(`Dashboard-Assets für Plugin ${plugin.name} registriert`);
+                }
+                
+                // 2. Plugin-Root Assets (neue Hierarchie: /assets, /icons, etc.)
+                const rootAssetsPath = path.join(pluginRootPath, 'assets');
+                if (fs.existsSync(rootAssetsPath)) {
+                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(rootAssetsPath));
+                    Logger.debug(`Root-Assets für Plugin ${plugin.name} registriert unter /assets/plugins/${plugin.name}`);
+                }
+                
+                // 3. Backward-Compatibility: /public im Plugin-Root
+                const legacyPublicPath = path.join(pluginRootPath, 'public');
+                if (fs.existsSync(legacyPublicPath)) {
+                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(legacyPublicPath));
+                    Logger.debug(`Legacy-Public-Assets für Plugin ${plugin.name} registriert`);
                 }
             }
         }
+        
+        Logger.debug('Plugin-Asset-Registrierung abgeschlossen');
+        // Beispiel: /assets/plugins/dunemap/icons/map.png
+        // wird aus plugins/dunemap/assets/icons/map.png bereitgestellt
     }
 
     /**
@@ -453,19 +507,108 @@ module.exports = class App {
      * @private
      */
     #initializeMiddlewares() {
+        // === WICHTIG: Stripe Webhook Route VOR express.json() ===
+        // Webhook benötigt raw body für Signature Verification!
+        this.app.use(
+            '/api/superadmin/webhooks/stripe', 
+            express.raw({ type: 'application/json' }), 
+            require('../../plugins/superadmin/dashboard/routes/api/stripe-webhook')
+        );
+        
+        // =====================================================
+        // SECURITY MIDDLEWARES (Reihenfolge wichtig!)
+        // =====================================================
+        
+        // 1. Helmet - HTTP Security Headers
+        const helmet = require('helmet');
+        this.app.use(helmet({
+            contentSecurityPolicy: {
+                directives: {
+                    defaultSrc: ["'self'"],
+                    styleSrc: [
+                        "'self'", 
+                        "'unsafe-inline'", 
+                        "https://fonts.googleapis.com", 
+                        "https://cdn.jsdelivr.net",
+                        "https://cdnjs.cloudflare.com" // Font Awesome
+                    ],
+                    scriptSrc: [
+                        "'self'", 
+                        "'unsafe-inline'", 
+                        "'unsafe-eval'", 
+                        "https://cdn.jsdelivr.net",
+                        "https://cdnjs.cloudflare.com", // Font Awesome
+                        "https://js.stripe.com" // Stripe SDK
+                    ],
+                    scriptSrcAttr: ["'unsafe-inline'"], // Inline Event Handler (onclick, onload, etc.)
+                    fontSrc: [
+                        "'self'", 
+                        "https://fonts.gstatic.com", 
+                        "https://cdn.jsdelivr.net",
+                        "https://cdnjs.cloudflare.com", // Font Awesome
+                        "data:" // Font-Data-URLs
+                    ],
+                    imgSrc: ["'self'", "data:", "https:", "http:"],
+                    connectSrc: [
+                        "'self'", 
+                        "ws:", 
+                        "wss:",
+                        "https://cdn.jsdelivr.net", // Source Maps für Chart.js, Toastr, etc.
+                        "https://cdnjs.cloudflare.com", // Source Maps für Font Awesome, etc.
+                        "https://api.stripe.com", // Stripe API
+                        "https://checkout.stripe.com" // Stripe Checkout
+                    ],
+                    frameSrc: [
+                        "'self'",
+                        "https://js.stripe.com", // Stripe Elements iframe
+                        "https://checkout.stripe.com" // Stripe Checkout iframe
+                    ],
+                    formAction: [
+                        "'self'",
+                        "https://firenetworks.de", // PROD Domain (für TinyMCE/AJAX Forms)
+                        "https://checkout.stripe.com" // Stripe form submissions
+                    ]
+                }
+            },
+            hsts: {
+                maxAge: 31536000,
+                includeSubDomains: true,
+                preload: true
+            }
+        }));
+        
+        // 2. Exploit-Blocker (PHP-Scans, Path-Traversal, SQL-Injection)
+        const exploitBlocker = require('./middlewares/security/exploit-blocker.middleware');
+        this.app.use(exploitBlocker);
+        
+        // 3. Rate Limiting - Allgemeines Limit
+        const { generalLimiter } = require('./middlewares/security/rate-limiter.middleware');
+        this.app.use(generalLimiter);
+        
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
+        
+        // Cookie Parser (für CSRF Double-Submit-Cookie)
+        const cookieParser = require('cookie-parser');
+        this.app.use(cookieParser());
+        
         this.app.use(expressLayouts);
         
         // Theme Assets (JS, CSS, Images, Fonts, Vendor)
         // Beispiel: /themes/default/assets/js/guild.js
         this.app.use('/themes', express.static(path.join(__dirname, 'themes')));
         
+
         // Plugin Assets werden dynamisch in registerPluginAssets() registriert
         // Beispiel: /assets/plugins/dunemap/images/map.png
         
         // Session & Auth
         this.app.use(sessionMiddleware);
+        
+        // 4. CSRF Protection (nach Session und Cookie-Parser!)
+        const { csrfMiddleware, csrfProtection } = require('./middlewares/security/csrf-protection.middleware');
+        this.app.use(csrfMiddleware); // Token generieren
+        // csrfProtection wird pro-Route angewendet (siehe unten)
         
         // Rest of the middlewares
         this.app.use(hookMiddleware);
@@ -491,6 +634,126 @@ module.exports = class App {
         
         // Error Middleware (MUSS als letztes registriert werden)
         this.app.use(errorMiddleware);
+    }
+
+    /**
+     * Post-Deployment Update-Check
+     * Prüft SOFORT nach Start ob Updates verfügbar sind und wendet sie an
+     * Wichtig für kritische Updates die nicht auf Cronjob warten sollen
+     * 
+     * @public
+     */
+    async checkAndApplyPendingUpdates() {
+        const Logger = ServiceManager.get("Logger");
+        const dbService = ServiceManager.get("dbService");
+        
+        try {
+            Logger.info("📦 [Post-Deployment] Prüfe Core-Plugin Version gegen package.json...");
+            
+            // Alle Guilds laden
+            const guilds = await dbService.query("SELECT _id FROM guilds");
+            
+            if (!guilds || guilds.length === 0) {
+                Logger.info("📦 [Post-Deployment] Keine Guilds gefunden");
+                return;
+            }
+            
+            Logger.info(`📦 [Post-Deployment] Prüfe Core-Plugin Updates für ${guilds.length} Guilds...`);
+            
+            // NUR CORE-PLUGIN: Post-Deployment Updates sind ausschließlich für Core relevant
+            // Andere Plugins werden über das normale Update-System verwaltet
+            const pluginName = 'core';
+            let totalUpdates = 0;
+            
+            // Sicherstellen dass Core-Plugin existiert (nutze isPluginEnabled() statt plugins.has())
+            if (!this.app.pluginManager.isPluginEnabled(pluginName)) {
+                Logger.warn(`📦 [Post-Deployment] Core-Plugin nicht geladen - überspringe Update-Check`);
+                return;
+            }
+            
+            try {
+                // Plugin-Metadaten aus package.json laden
+                const pluginMeta = this.app.pluginManager.loadPluginMeta(pluginName);
+                
+                if (!pluginMeta || !pluginMeta.version) {
+                    Logger.debug(`📦 [Post-Deployment] ${pluginName}: Keine package.json Version`);
+                    return;
+                }
+                
+                const packageVersion = pluginMeta.version;
+                const semver = require('semver');
+                
+                // Für jede Guild prüfen
+                for (const guild of guilds) {
+                    const guildId = guild._id;
+                    
+                    // Aktuelle Version aus DB
+                    const [versionRow] = await dbService.query(`
+                        SELECT current_version, update_status 
+                        FROM plugin_versions 
+                        WHERE plugin_name = ? AND guild_id = ?
+                    `, [pluginName, guildId]);
+                    
+                    const dbVersion = versionRow?.current_version || '0.0.0';
+                    
+                    if (semver.gt(packageVersion, dbVersion)) {
+                        Logger.warn(`📦 [Post-Deployment] ${pluginName} (Guild ${guildId}): ${dbVersion} → ${packageVersion} (UPDATE ERFORDERLICH!)`);
+                        
+                        // Update SOFORT anwenden (nicht in Queue)
+                        try {
+                            // 1. Version in DB setzen (als "available")
+                            await dbService.query(`
+                                INSERT INTO plugin_versions 
+                                    (plugin_name, guild_id, current_version, available_version, 
+                                     update_available_at, update_deadline_at, update_status)
+                                VALUES (?, ?, ?, ?, NOW(), NOW(), 'available')
+                                ON DUPLICATE KEY UPDATE
+                                    available_version = VALUES(available_version),
+                                    update_available_at = NOW(),
+                                    update_deadline_at = NOW(),
+                                    update_status = 'available'
+                            `, [pluginName, guildId, dbVersion, packageVersion]);
+                            
+                            // 2. Update ausführen (mit Migration + onUpdate Hook)
+                            Logger.info(`📦 [Post-Deployment] Starte Update: ${pluginName} für Guild ${guildId}...`);
+                            const updateResult = await this.app.pluginManager.updatePlugin(
+                                pluginName, 
+                                guildId, 
+                                false // nicht auto-update (manuell via deployment)
+                            );
+                            
+                            if (updateResult.success) {
+                                Logger.success(`✅ [Post-Deployment] ${pluginName} erfolgreich aktualisiert auf ${packageVersion}`);
+                                totalUpdates++;
+                            } else {
+                                Logger.error(`❌ [Post-Deployment] ${pluginName} Update fehlgeschlagen:`, updateResult.error);
+                            }
+                            
+                        } catch (updateError) {
+                            Logger.error(`❌ [Post-Deployment] Fehler beim Update von ${pluginName}:`, updateError);
+                        }
+                        
+                    } else if (semver.eq(packageVersion, dbVersion)) {
+                        Logger.debug(`✓ [Post-Deployment] ${pluginName} (Guild ${guildId}): v${dbVersion} ist aktuell`);
+                    } else {
+                        Logger.warn(`⚠️  [Post-Deployment] ${pluginName} (Guild ${guildId}): DB v${dbVersion} > package.json v${packageVersion} (Downgrade?)`);
+                    }
+                }
+                
+            } catch (pluginError) {
+                Logger.error(`❌ [Post-Deployment] Fehler beim Core-Plugin Update-Check:`, pluginError);
+            }
+            
+            if (totalUpdates > 0) {
+                Logger.success(`🎉 [Post-Deployment] ${totalUpdates} Core-Plugin-Update(s) erfolgreich angewendet!`);
+            } else {
+                Logger.info("✓ [Post-Deployment] Core-Plugin ist aktuell");
+            }
+            
+        } catch (error) {
+            Logger.error("❌ [Post-Deployment] Kritischer Fehler beim Update-Check:", error);
+            throw error;
+        }
     }
 
     /**

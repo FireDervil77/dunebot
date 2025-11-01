@@ -1,0 +1,86 @@
+{
+  "plugin": "dunemap",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "DUNEMAP.VIEW",
+      "name": "DuneMap anzeigen",
+      "description": "Berechtigung um DuneMap-Features zu sehen",
+      "category": "dunemap",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "DUNEMAP.SETTINGS_EDIT",
+      "name": "DuneMap-Einstellungen bearbeiten",
+      "description": "Berechtigung um DuneMap-Konfiguration zu ändern",
+      "category": "dunemap",
+      "is_dangerous": 0,
+      "requires": "DUNEMAP.VIEW"
+    },
+    {
+      "key": "DUNEMAP.SECTORS_VIEW",
+      "name": "Sektoren anzeigen",
+      "description": "Berechtigung um Sektoren-Karten zu sehen",
+      "category": "dunemap",
+      "is_dangerous": 0,
+      "requires": "DUNEMAP.VIEW"
+    },
+    {
+      "key": "DUNEMAP.SECTORS_CREATE",
+      "name": "Sektoren erstellen",
+      "description": "Berechtigung um neue Sektoren anzulegen",
+      "category": "dunemap",
+      "is_dangerous": 0,
+      "requires": "DUNEMAP.VIEW"
+    },
+    {
+      "key": "DUNEMAP.SECTORS_EDIT",
+      "name": "Sektoren bearbeiten",
+      "description": "Berechtigung um bestehende Sektoren zu ändern",
+      "category": "dunemap",
+      "is_dangerous": 0,
+      "requires": "DUNEMAP.VIEW"
+    },
+    {
+      "key": "DUNEMAP.SECTORS_DELETE",
+      "name": "Sektoren löschen",
+      "description": "Berechtigung um Sektoren zu entfernen (kritisch)",
+      "category": "dunemap",
+      "is_dangerous": 1,
+      "requires": "DUNEMAP.VIEW"
+    },
+    {
+      "key": "DUNEMAP.MARKERS_CREATE",
+      "name": "Marker erstellen",
+      "description": "Berechtigung um Map-Marker zu setzen",
+      "category": "dunemap",
+      "is_dangerous": 0,
+      "requires": "DUNEMAP.VIEW"
+    },
+    {
+      "key": "DUNEMAP.MARKERS_EDIT",
+      "name": "Marker bearbeiten",
+      "description": "Berechtigung um bestehende Marker zu ändern",
+      "category": "dunemap",
+      "is_dangerous": 0,
+      "requires": "DUNEMAP.VIEW"
+    },
+    {
+      "key": "DUNEMAP.MARKERS_DELETE",
+      "name": "Marker löschen",
+      "description": "Berechtigung um Marker zu entfernen",
+      "category": "dunemap",
+      "is_dangerous": 0,
+      "requires": "DUNEMAP.VIEW"
+    },
+    {
+      "key": "DUNEMAP.ADMIN_MANAGE",
+      "name": "Admin-Panel verwalten",
+      "description": "Berechtigung für erweiterte Admin-Funktionen (Sektor-Karten, Export, etc.)",
+      "category": "dunemap",
+      "is_dangerous": 0,
+      "requires": "DUNEMAP.VIEW"
+    }
+  ]
+}

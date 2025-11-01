@@ -11,10 +11,10 @@ const pluginMiddleware = require("../middlewares/context/plugin.middleware");
 const { CheckAuth } = require("../middlewares/auth.middleware");
 
 
-// Basis-API-Endpunkte
-router.get("/user", apiController.getUserInfo);
-router.get("/guilds", apiController.getGuilds);
-router.get("/guilds/:guildId", apiController.getGuildInfo);
+// Basis-API-Endpunkte (mit Authentication!)
+router.get("/user", CheckAuth, apiController.getUserInfo);
+router.get("/guilds", CheckAuth, apiController.getGuilds);
+router.get("/guilds/:guildId", CheckAuth, apiController.getGuildInfo);
 
 /**
  * Spracheinstellung des Benutzers aktualisieren
@@ -36,11 +36,128 @@ router.post('/language/guest', apiController.updateGuestLanguage);
  */
 router.get('/bot-status/:guildId', CheckAuth, authController.checkBotInGuild);
 
+/**
+ * TEST-Route um API-Erreichbarkeit zu prüfen (NUR FÜR DEVELOPMENT!)
+ * @route GET /api/test
+ * @security Nur in NODE_ENV=development verfügbar
+ */
+if (process.env.NODE_ENV === 'development') {
+    router.get('/test', (req, res) => {
+        const Logger = ServiceManager.get('Logger');
+        Logger.info('🧪 [TEST] API Test-Route aufgerufen');
+        res.json({ 
+            success: true, 
+            message: 'API ist erreichbar (DEV MODE)',
+            timestamp: new Date().toISOString(),
+            session: !!req.session,
+            user: req.session?.user?.info?.id || 'NICHT EINGELOGGT'
+        });
+    });
 
-// Plugin-spezifische API-Endpunkte
+    /**
+     * Anonymer Session-Test (NUR FÜR DEVELOPMENT!)
+     * @route GET /api/session-test
+     */
+    router.get('/session-test', (req, res) => {
+        const Logger = ServiceManager.get('Logger');
+        Logger.info('🧪 [SESSION-TEST] Anonymer Session-Test aufgerufen');
+        res.json({ 
+            success: true, 
+            message: 'Session-Test erfolgreich (DEV MODE)',
+            sessionExists: !!req.session,
+            sessionId: req.session?.id || 'NO_SESSION',
+            timestamp: new Date().toISOString()
+        });
+    });
+}
+
+/**
+ * Session-Statistiken (nur für Admins)
+ * @route GET /api/sessions/stats
+ */
+router.get('/sessions/stats', CheckAuth, async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const sessionManager = ServiceManager.get('sessionManager');
+    
+    try {
+        // Nur für SuperAdmin
+        if (!req.session?.user?.info?.isSuperAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: 'Nur für SuperAdmins'
+            });
+        }
+        
+        const stats = await sessionManager.getSessionStats();
+        
+        if (!stats) {
+            return res.status(500).json({
+                success: false,
+                message: 'Fehler beim Abruf der Session-Statistiken'
+            });
+        }
+        
+        Logger.info(`📊 Session-Stats abgerufen: ${JSON.stringify(stats)}`);
+        
+        res.json({
+            success: true,
+            data: stats
+        });
+        
+    } catch (error) {
+        Logger.error('❌ Fehler beim Abruf der Session-Stats:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Interner Serverfehler'
+        });
+    }
+});
+
+/**
+ * Manuelles Session-Cleanup (nur für Admins)
+ * @route POST /api/sessions/cleanup
+ */
+router.post('/sessions/cleanup', CheckAuth, async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const sessionManager = ServiceManager.get('sessionManager');
+    
+    try {
+        // Nur für SuperAdmin
+        if (!req.session?.user?.info?.isSuperAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: 'Nur für SuperAdmins'
+            });
+        }
+        
+        const cleanedCount = await sessionManager.cleanupExpiredSessions();
+        
+        Logger.info(`🧹 Manuelles Session-Cleanup: ${cleanedCount} Sessions bereinigt`);
+        
+        res.json({
+            success: true,
+            message: `${cleanedCount} abgelaufene Sessions bereinigt`,
+            cleaned: cleanedCount
+        });
+        
+    } catch (error) {
+        Logger.error('❌ Fehler beim manuellen Session-Cleanup:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Interner Serverfehler'
+        });
+    }
+});
+
+// Plugin-spezifische API-Endpunkte (AM ENDE!)
+// HINWEIS: Plugins MÜSSEN CheckAuth selbst in ihren Routen verwenden!
+// Das Base-API-System schützt nicht automatisch alle Plugin-Endpunkte
 router.use("/:pluginName", pluginMiddleware.loadPlugin, (req, res, next) => {
+    const Logger = ServiceManager.get('Logger');
     const plugin = res.locals.plugin;
+    
     if (!plugin || !plugin.apiRouter) {
+        Logger.warn(`[API Security] Plugin ${req.params.pluginName} nicht gefunden oder keine API`);
         return res.status(404).json({ 
             success: false,
             error: "Plugin nicht gefunden oder keine API verfügbar"
@@ -52,26 +169,50 @@ router.use("/:pluginName", pluginMiddleware.loadPlugin, (req, res, next) => {
 });
 
 /**
- * Markiert eine Benachrichtigung als gelesen
+ * Markiert eine Benachrichtigung als gelesen für den aktuellen User
  * @route POST /api/notifications/dismiss/:id
+ * @security Authentifizierung erforderlich
  */
-router.post('/dismiss/:id', async (req, res) => {
+router.post('/notifications/dismiss/:id', CheckAuth, async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const notificationManager = ServiceManager.get('notificationManager');
+    
+    // ERWEITERES DEBUG LOGGING
+    Logger.info('🔍 [DEBUG] Notification Dismiss Request:');
+    Logger.info(`   - Notification ID: ${req.params.id}`);
+    Logger.info(`   - Session existiert: ${!!req.session}`);
+    Logger.info(`   - Session User: ${JSON.stringify(req.session?.user?.info || 'KEINE')}`);
+    Logger.info(`   - req.user: ${JSON.stringify(req.user?.info || 'KEINE')}`);
+    Logger.info(`   - Headers: ${JSON.stringify(req.headers.authorization || 'KEINE AUTH HEADER')}`);
+    
     try {
         if (!notificationManager) {
+            Logger.error('❌ NotificationManager nicht verfügbar!');
             return res.status(501).json({ success: false, message: 'Benachrichtigungssystem nicht verfügbar' });
         }
+
+        // User-ID aus Session holen
+        const userId = req.session?.user?.info?.id || req.user?.info?.id;
+        Logger.info(`🎯 [DEBUG] Extrahierte User-ID: ${userId}`);
         
-        const success = await notificationManager.dismissNotification(req.params.id);
+        if (!userId) {
+            Logger.error('❌ Keine User-ID gefunden in Session!');
+            return res.status(401).json({ success: false, message: 'Nicht authentifiziert' });
+        }
+        
+        Logger.info(`📤 [DEBUG] Rufe notificationManager.dismissNotification(${req.params.id}, ${userId}) auf...`);
+        const success = await notificationManager.dismissNotification(req.params.id, userId);
+        Logger.info(`📥 [DEBUG] NotificationManager Ergebnis: ${success}`);
         
         if (success) {
+            Logger.success(`✅ Notification ${req.params.id} erfolgreich dismissed für User ${userId}`);
             return res.json({ success: true });
         } else {
-            return res.status(404).json({ success: false, message: 'Benachrichtigung nicht gefunden' });
+            Logger.error(`❌ NotificationManager dismiss fehlgeschlagen für Notification ${req.params.id}, User ${userId}`);
+            return res.status(500).json({ success: false, message: 'Fehler beim Dismissing' });
         }
     } catch (error) {
-        Logger.error('Fehler beim Markieren der Benachrichtigung als gelesen:', error);
+        Logger.error('💥 [DEBUG] Fehler beim Markieren der Benachrichtigung als gelesen:', error);
         return res.status(500).json({ success: false, message: 'Interner Serverfehler' });
     }
 });

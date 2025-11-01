@@ -1,0 +1,186 @@
+{
+    "TITLE": "Core",
+    "DESCRIPTION": "Core module for the application",
+
+    "SETTINGS_TITLE": "Settings",
+    "PREFIX_TITLE": "Prefix",
+    "PREFIX_DESC": "The prefix for the bot commands",
+    "LOCALE_TITLE": "Locale",
+    "LOCALE_DESC": "The locale for the bot",
+
+    "SERVER_DEFAULTS": "Server Defaults",
+    "SUPPORT": "Support Server",
+    "SUPPORT_DESC": "Discord invite link for the support server",
+    "SLASH": "Slash Commands",
+    "SLASH_DESC": "Enable/disable slash commands",
+    "CONTEXT": "Context Menu",
+    "CONTEXT_DESC": "Enable/disable context menus",
+
+    "DASH_DEFAULTS": "Dashboard Defaults",
+    "LOGO": "Logo",
+    "LOGO_DESC": "Logo for the dashboard",
+    "LOGO_URL": "Logo URL",
+    "LOGO_URL_DESC": "URL to the logo image",
+
+    "ENABLED": "Enabled",
+    "DISABLED": "Disabled",
+
+    "SETTINGS": {
+        "GENERAL": {
+            "TITLE": "Basic Configuration",
+            "PREFIX_LABEL": "Bot Prefix",
+            "PREFIX_HELP": "The prefix for text commands (e.g. <code>!help</code>, <code>!ping</code>)",
+            "LOCALE_LABEL": "Default Language",
+            "LOCALE_HELP": "The default language for bot responses and dashboard content",
+            "THEME_LABEL": "Dashboard Theme",
+            "THEME_HELP": "More themes will be added in future updates",
+            "THEME_DEFAULT": "Default (Light)",
+            "THEME_DARK": "Dark Mode (coming soon)",
+            "THEME_NORD": "Nord Theme (coming soon)",
+            "FEATURES_TITLE": "Features",
+            "SLASH_LABEL": "Enable Slash Commands",
+            "SLASH_HELP": "Allows the use of Discord Slash Commands (<code>/help</code> instead of <code>!help</code>)",
+            "VERBOSE_LABEL": "Verbose Logs",
+            "VERBOSE_HELP": "Logs all bot actions in detail (recommended for administrators)",
+            "DEBUG_LABEL": "Debug Mode",
+            "DEBUG_BADGE": "For Developers",
+            "DEBUG_HELP": "Shows advanced error information and technical details (may affect performance)",
+            "RESET_BTN": "Reset",
+            "SAVE_BTN": "Save Settings"
+        },
+        "HELP": {
+            "TITLE": "Help & Tips",
+            "PREFIX_TITLE": "Bot Prefix",
+            "PREFIX_TEXT": "Choose a unique prefix that doesn't conflict with other bots. Popular prefixes: <code>!</code>, <code>?</code>, <code>.</code>",
+            "SLASH_TITLE": "Slash Commands",
+            "SLASH_TEXT": "Slash commands are the modern alternative to text commands. They offer auto-completion and are more user-friendly.",
+            "DEBUG_TITLE": "Debug Mode",
+            "DEBUG_WARNING": "Warning!",
+            "DEBUG_TEXT": "Debug mode should only be enabled when analyzing technical issues."
+        },
+        "STATUS": {
+            "TITLE": "Current Configuration",
+            "PREFIX": "Prefix",
+            "LOCALE": "Language",
+            "THEME": "Theme",
+            "SLASH": "Slash Commands",
+            "ACTIVE": "Active",
+            "INACTIVE": "Disabled"
+        }
+    },
+
+    "SETTINGS_OVERVIEW": {
+        "GENERAL_TITLE": "General Settings",
+        "GENERAL_SUBTITLE": "Bot Basic Configuration",
+        "GENERAL_DESCRIPTION": "Configure bot prefix, default language, theme and enable/disable slash commands.",
+        "GENERAL_FEATURES": {
+            "PREFIX": "Customize Bot Prefix",
+            "LOCALE": "Set Language",
+            "THEME": "Select Theme",
+            "SLASH": "Manage Slash Commands"
+        },
+        "USER_TITLE": "User Management",
+        "USER_SUBTITLE": "Roles & Permissions",
+        "USER_DESCRIPTION": "Manage permissions, admin roles and command access.",
+        "USER_FEATURES": {
+            "ROLES": "Role Permissions",
+            "ADMIN": "Admin Access",
+            "COMMANDS": "Command Permissions",
+            "BLACKLIST": "Manage Blacklist"
+        },
+        "INTEGRATIONS_TITLE": "Integrations",
+        "INTEGRATIONS_SUBTITLE": "APIs & Webhooks",
+        "INTEGRATIONS_DESCRIPTION": "Configure external services, webhooks and API access.",
+        "INTEGRATIONS_FEATURES": {
+            "WEBHOOKS": "Webhook URLs",
+            "API_KEYS": "API Keys",
+            "OAUTH": "OAuth Connections",
+            "THIRD_PARTY": "Third-party Services",
+            "DISCORD_LOGS": "Discord Logs",
+            "EXTERNAL_SERVICES": "External Services"
+        },
+        "COMING_SOON": "Coming Soon",
+        "BTN_CONFIGURE": "Configure",
+        "BTN_OPEN": "Open",
+        "PLUGIN_SETTINGS_TITLE": "Plugin Settings",
+        "PLUGIN_SETTINGS_DESC": "Enabled plugins can provide their own settings pages. These appear automatically in the navigation.",
+        "PLUGIN_SETTINGS_TIP": "Tip",
+        "PLUGIN_SETTINGS_TIP_TEXT": "Check the left navigation - plugin-specific settings can be found under the respective plugin name in the submenus.",
+        "SYSTEM_STATUS_TITLE": "System Status",
+        "STATUS_BOT": "Bot Status",
+        "STATUS_BOT_ONLINE": "Online",
+        "STATUS_DATABASE": "Database",
+        "STATUS_DATABASE_CONNECTED": "Connected",
+        "STATUS_PLUGINS": "Plugins",
+        "STATUS_PLUGINS_ACTIVE": "Active",
+        "STATUS_PERFORMANCE": "Performance",
+        "STATUS_PERFORMANCE_STABLE": "Stable"
+    },
+    "USERS": {
+        "TITLE": "User Management",
+        "NOTICE_TITLE": "Notice:",
+        "NOTICE_TEXT": "This page is still under development. User permissions, roles and permissions will be managed here in the future.",
+        "TABLE_USER": "User",
+        "TABLE_ROLE": "Role",
+        "TABLE_JOINED": "Joined",
+        "TABLE_ACTIONS": "Actions",
+        "TABLE_EMPTY": "No user data available",
+        "ROLES_TITLE": "Roles & Permissions",
+        "ROLES_DESC": "Manage Discord roles and their permissions for bot commands.",
+        "BANNED_TITLE": "Banned Users",
+        "BANNED_DESC": "Manage users who have been banned from the bot.",
+        "COMING_SOON": "Coming soon"
+    },
+    "INTEGRATIONS": {
+        "TITLE": "Integrations",
+        "NOTICE_TEXT": "Connect DuneBot with external services and APIs.",
+        "WEBHOOK_TITLE": "Webhooks",
+        "WEBHOOK_SUBTITLE": "Receive external events",
+        "WEBHOOK_DESC": "Configure webhooks to receive external events on your server.",
+        "TWITCH_TITLE": "Twitch",
+        "TWITCH_SUBTITLE": "Stream notifications",
+        "TWITCH_DESC": "Get notified when your streamers go live.",
+        "YOUTUBE_TITLE": "YouTube",
+        "YOUTUBE_SUBTITLE": "Video notifications",
+        "YOUTUBE_DESC": "Notifications for new videos from your favourite YouTubers.",
+        "CUSTOM_API_TITLE": "Custom API",
+        "CUSTOM_API_SUBTITLE": "Custom API integration",
+        "CUSTOM_API_DESC": "Connect the bot to your own API or external services.",
+        "BTN_CONFIGURE": "Configure",
+        "DEV_WARNING": "In Development:",
+        "DEV_WARNING_TEXT": "These features will be available in future updates."
+    },
+    "WIDGETS": {
+        "ACTIVE_PLUGINS": {
+            "BTN_CONFIGURE": "Configure",
+            "NO_PLUGINS": "No plugins activated or available for this server.",
+            "ACTIVATE_NOW": "Activate plugins now"
+        },
+        "SERVER_INFO": {
+            "MEMORY_USAGE": "Memory Usage",
+            "BTN_MANAGE_PLUGINS": "Manage Plugins"
+        },
+        "BOT_PERMISSIONS": {
+            "NO_ROLE": "No Role",
+            "PERM_SEND_MESSAGES": "Send Messages",
+            "PERM_MANAGE_SERVER": "Manage Server",
+            "PERM_MANAGE_ROLES": "Manage Roles",
+            "JOINED_AT": "Bot joined on:",
+            "NO_DATA": "No bot permission data available"
+        },
+        "SERVER_ANALYSIS": {
+            "MEMBERS": "Members",
+            "CHANNELS": "Channels",
+            "ROLES": "Roles",
+            "CACHE_EFFICIENCY": "Cache Efficiency",
+            "CACHED_MEMBERS": "Members in cache:",
+            "SERVER_AGE": "Server Age",
+            "DAYS": "Days",
+            "NO_DATA": "No data available",
+            "PREMIUM_STATUS": "Premium Status",
+            "LEVEL": "Level",
+            "BOOSTS": "Boosts"
+        }
+    }
+}
+

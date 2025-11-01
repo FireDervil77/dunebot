@@ -53,18 +53,29 @@ async function sendNotification() {
   const formData = new FormData(document.getElementById('notificationForm'));
   const data = Object.fromEntries(formData.entries());
   
-  const response = await fetch(`/api/guild/<%= guildId %>/plugins/superadmin/notifications/send`, {
+  console.log('[SuperAdmin Widget] Sende Notification:', data);
+  console.log('[SuperAdmin Widget] GuildId:', '<%= guildId %>');
+  console.log('[SuperAdmin Widget] Ziel-URL:', `/guild/<%= guildId %>/plugins/superadmin/api/notifications/send`);
+  
+  const response = await fetch(`/guild/<%= guildId %>/plugins/superadmin/api/notifications/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
   
+  console.log('[SuperAdmin Widget] Response Status:', response.status);
+  console.log('[SuperAdmin Widget] Response URL:', response.url);
+  
   if (response.ok) {
     const result = await response.json();
+    console.log('[SuperAdmin Widget] Success Result:', result);
     alert(`Notification an ${result.count} Guild(s) gesendet!`);
     document.getElementById('notificationForm').reset();
   } else {
-    alert('Fehler beim Senden!');
+    console.error('[SuperAdmin Widget] Error Response:', response);
+    const errorText = await response.text();
+    console.error('[SuperAdmin Widget] Error Text:', errorText);
+    alert('Fehler beim Senden: ' + response.status);
   }
 }
 </script>

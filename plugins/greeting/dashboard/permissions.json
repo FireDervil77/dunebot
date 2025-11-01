@@ -1,0 +1,54 @@
+{
+  "plugin": "greeting",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "GREETING.VIEW",
+      "name": "Begrüßung anzeigen",
+      "description": "Berechtigung um Begrüßungs-Einstellungen zu sehen",
+      "category": "greeting",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "GREETING.SETTINGS_EDIT",
+      "name": "Begrüßungs-Einstellungen bearbeiten",
+      "description": "Berechtigung um Begrüßungsnachrichten zu konfigurieren",
+      "category": "greeting",
+      "is_dangerous": 0,
+      "requires": "GREETING.VIEW"
+    },
+    {
+      "key": "GREETING.TEMPLATES_CREATE",
+      "name": "Begrüßungs-Templates erstellen",
+      "description": "Berechtigung um neue Begrüßungs-Vorlagen zu erstellen",
+      "category": "greeting",
+      "is_dangerous": 0,
+      "requires": "GREETING.VIEW"
+    },
+    {
+      "key": "GREETING.TEMPLATES_EDIT",
+      "name": "Begrüßungs-Templates bearbeiten",
+      "description": "Berechtigung um bestehende Begrüßungs-Vorlagen zu ändern",
+      "category": "greeting",
+      "is_dangerous": 0,
+      "requires": "GREETING.VIEW"
+    },
+    {
+      "key": "GREETING.TEMPLATES_DELETE",
+      "name": "Begrüßungs-Templates löschen",
+      "description": "Berechtigung um Begrüßungs-Vorlagen zu entfernen",
+      "category": "greeting",
+      "is_dangerous": 1,
+      "requires": "GREETING.VIEW"
+    },
+    {
+      "key": "GREETING.TEST_EXECUTE",
+      "name": "Test-Begrüßung senden",
+      "description": "Berechtigung um Test-Begrüßungen zu senden",
+      "category": "greeting",
+      "is_dangerous": 0,
+      "requires": "GREETING.VIEW"
+    }
+  ]
+}

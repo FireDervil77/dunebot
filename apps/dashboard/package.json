@@ -5,7 +5,7 @@
     "main": "index.js",
     "author": "FireDervil",
     "license": "none",
-    "type":"commonjs",
+    "type": "commonjs",
     "scripts": {
         "start": "node index.js",
         "dev": "nodemon index.js"
@@ -16,14 +16,15 @@
         "discord-oauth2": "^2.12.1",
         "discord.js": "^14.19.0",
         "dotenv": "^16.5.0",
+        "dunebot-core": "*",
+        "dunebot-db-client": "*",
+        "dunebot-sdk": "*",
         "ejs": "^3.1.10",
         "execa": "^5.1.1",
         "express": "^5.1.0",
         "express-ejs-layouts": "^2.5.1",
         "express-session": "^1.18.2",
-        "dunebot-core": "*",
-        "dunebot-db-client": "*",
-        "dunebot-sdk": "*",
+        "node-cron": "^4.2.1",
         "veza": "^1.2.0"
     },
     "peerDependencies": {

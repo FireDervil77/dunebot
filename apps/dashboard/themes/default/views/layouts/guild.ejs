@@ -131,6 +131,7 @@ window.i18n = {
 };
 </script>
 
+<script src="/themes/default/assets/js/button-loading.js"></script>
 <script src="/themes/default/assets/js/guild.js"></script>
 <script src="/themes/default/assets/js/guild-switcher.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" crossorigin="anonymous"></script>
@@ -241,13 +242,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             try {
-                // API-Call zum Speichern des Dismiss-Status
-                const response = await fetch('/api/core/dismiss-notification', {
+                // API-Call zum Speichern des Dismiss-Status (KORRIGIERTE URL)
+                const response = await fetch(`/api/notifications/dismiss/${notificationId}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ notificationId: parseInt(notificationId) })
+                    }
+                    // Keine body - notificationId ist in der URL
                 });
                 
                 const data = await response.json();

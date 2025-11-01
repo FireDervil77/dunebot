@@ -1,0 +1,67 @@
+{
+  "name": "core",
+  "version": "6.8.0",
+  "displayName": "FireBot Core-Plugin",
+  "description": "Das Core-Plugin des FireBots. Wird automatisch in jeder neuen Guild aktiviert.",
+  "author": "FireBot Team",
+  "type": "system",
+  "required": true,
+  "icon": "fa-fire",
+  "color": "#e74c3c",
+  "repository": "https://github.com/firedervil77/dunebot-plugins",
+  "homepage": "https://firebot.gg",
+  "license": "MIT",
+  
+  "main": {
+    "bot": "bot/index.js",
+    "dashboard": "dashboard/index.js"
+  },
+  
+  "migrations": {
+    "6.6.0": "dashboard/migrations/6.6.0-permissions.js",
+    "6.6.1": "dashboard/migrations/6.6.1-fix-navigation-urls.js",
+    "6.6.2": "dashboard/migrations/6.6.2-verify-routes.js",
+    "6.6.3": "dashboard/migrations/6.6.3-fix-permissions-view.js",
+    "6.6.4": "dashboard/migrations/6.6.4-test-sequential.js",
+    "6.6.5": "dashboard/migrations/6.6.5-seed-default-groups.js",
+    "6.6.6": "dashboard/migrations/6.6.6-fix-groups-view.js",
+    "6.7.0": "dashboard/migrations/6.7.0-dynamic-permissions.js",
+    "6.7.1": "dashboard/migrations/6.7.1-add-requiresOwner-to-nav.js",
+    "6.7.2": "dashboard/migrations/6.7.2-load-core-permissions.js",
+    "6.8.0": "dashboard/migrations/6.8.0-dashboard-access-permission.js"
+  },
+  
+  "permissions": [
+    "core.admin",
+    "core.settings.view",
+    "core.settings.edit",
+    "core.dashboard.access",
+    "core.plugins.manage",
+    "core.users.manage",
+    "core.groups.manage"
+  ],
+  
+  "dependencies": {
+    "dunebot-sdk": "*"
+  },
+  
+  "scripts": {
+    "test": "echo 'No tests defined'"
+  },
+  
+  "features": [
+    "dashboard",
+    "bot",
+    "permissions",
+    "navigation",
+    "settings",
+    "plugins",
+    "themes"
+  ],
+  
+  "config": {
+    "autoEnable": true,
+    "canBeDisabled": false,
+    "requiresOwner": false
+  }
+}

@@ -401,6 +401,200 @@ class BotPlugin {
     }
 
     /**
+     * Reload-Methode für Plugin-Komponenten
+     * Lädt Schemas, Models, Commands und Events neu ohne Server-Restart
+     * 
+     * @param {Object} options - Reload-Optionen
+     * @param {boolean} [options.schemas=true] - Schemas neu laden
+     * @param {boolean} [options.models=true] - Models neu registrieren
+     * @param {boolean} [options.commands=false] - Commands neu laden
+     * @param {boolean} [options.events=false] - Events neu laden
+     * @param {boolean} [options.config=false] - Config refreshen
+     * @returns {Promise<Object>} Reload-Status mit Details
+     * @author DuneBot Team
+     */
+    async onReload(options = {}) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
+        const opts = {
+            schemas: options.schemas !== false,
+            models: options.models !== false,
+            commands: options.commands === true,
+            events: options.events === true,
+            config: options.config === true
+        };
+        
+        const result = {
+            success: true,
+            schemas: { loaded: 0, failed: 0, files: [] },
+            models: { registered: 0, failed: 0, names: [] },
+            commands: { loaded: 0, failed: 0, names: [] },
+            events: { loaded: 0, failed: 0, names: [] },
+            config: { refreshed: false },
+            errors: []
+        };
+        
+        Logger.info(`[Reload] Starting reload for plugin ${this.name}`, opts);
+        
+        try {
+            // 1. Schemas nachladen
+            if (opts.schemas && dbService) {
+                try {
+                    const schemasDir = path.join(this.baseDir, 'schemas');
+                    if (fs.existsSync(schemasDir)) {
+                        const schemaFiles = fs.readdirSync(schemasDir)
+                            .filter(f => f.endsWith('.sql') || f.endsWith('.js'));
+                        
+                        for (const file of schemaFiles) {
+                            try {
+                                const schemaPath = path.join(schemasDir, file);
+                                
+                                if (file.endsWith('.sql')) {
+                                    const sql = fs.readFileSync(schemaPath, 'utf8');
+                                    await dbService.query(sql);
+                                    result.schemas.loaded++;
+                                    result.schemas.files.push(file);
+                                    Logger.debug(`[Reload] Schema loaded: ${file}`);
+                                } else if (file.endsWith('.js')) {
+                                    delete require.cache[require.resolve(schemaPath)];
+                                    const schema = require(schemaPath);
+                                    if (typeof schema === 'function') {
+                                        await schema(dbService);
+                                    }
+                                    result.schemas.loaded++;
+                                    result.schemas.files.push(file);
+                                    Logger.debug(`[Reload] Schema executed: ${file}`);
+                                }
+                            } catch (error) {
+                                result.schemas.failed++;
+                                result.errors.push(`Schema ${file}: ${error.message}`);
+                                Logger.error(`[Reload] Failed to load schema ${file}:`, error);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    result.errors.push(`Schemas: ${error.message}`);
+                    Logger.error('[Reload] Schema loading failed:', error);
+                }
+            }
+            
+            // 2. Models neu registrieren
+            if (opts.models && dbService) {
+                try {
+                    const modelsDir = path.join(this.baseDir, 'models');
+                    if (fs.existsSync(modelsDir)) {
+                        const modelFiles = fs.readdirSync(modelsDir)
+                            .filter(f => f.endsWith('.js'));
+                        
+                        for (const file of modelFiles) {
+                            try {
+                                const modelPath = path.join(modelsDir, file);
+                                delete require.cache[require.resolve(modelPath)];
+                                const model = require(modelPath);
+                                
+                                if (model && model.name) {
+                                    // Model im DBService registrieren (falls Methode existiert)
+                                    if (typeof dbService.registerModel === 'function') {
+                                        await dbService.registerModel(model.name, model);
+                                        result.models.registered++;
+                                        result.models.names.push(model.name);
+                                        Logger.debug(`[Reload] Model registered: ${model.name}`);
+                                    }
+                                }
+                            } catch (error) {
+                                result.models.failed++;
+                                result.errors.push(`Model ${file}: ${error.message}`);
+                                Logger.error(`[Reload] Failed to register model ${file}:`, error);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    result.errors.push(`Models: ${error.message}`);
+                    Logger.error('[Reload] Model registration failed:', error);
+                }
+            }
+            
+            // 3. Commands neu laden (optional, da Commands im CommandManager sind)
+            if (opts.commands) {
+                try {
+                    const botDir = path.join(this.pluginDir, 'bot');
+                    const baseDir = fs.existsSync(botDir) ? botDir : this.baseDir;
+                    
+                    // Commands cachen und neu laden
+                    this.commands.clear();
+                    this.prefixCount = 0;
+                    this.slashCount = 0;
+                    this.#loadCommands(baseDir);
+                    
+                    result.commands.loaded = this.commands.size;
+                    result.commands.names = Array.from(this.commands).map(cmd => cmd.name);
+                    Logger.debug(`[Reload] Commands reloaded: ${result.commands.loaded} total`);
+                } catch (error) {
+                    result.commands.failed++;
+                    result.errors.push(`Commands: ${error.message}`);
+                    Logger.error('[Reload] Command reload failed:', error);
+                }
+            }
+            
+            // 4. Events neu laden (optional)
+            if (opts.events) {
+                try {
+                    const botDir = path.join(this.pluginDir, 'bot');
+                    const baseDir = fs.existsSync(botDir) ? botDir : this.baseDir;
+                    
+                    // Events cachen und neu laden
+                    this.eventHandlers.clear();
+                    this.events.clear();
+                    this.ipcEvents.clear();
+                    this.#loadEvents(baseDir);
+                    
+                    result.events.loaded = this.eventHandlers.size + this.ipcEvents.size;
+                    result.events.names = [
+                        ...Array.from(this.eventHandlers.keys()),
+                        ...Array.from(this.ipcEvents.keys())
+                    ];
+                    Logger.debug(`[Reload] Events reloaded: ${result.events.loaded} total`);
+                } catch (error) {
+                    result.events.failed++;
+                    result.errors.push(`Events: ${error.message}`);
+                    Logger.error('[Reload] Event reload failed:', error);
+                }
+            }
+            
+            // 5. Config refreshen
+            if (opts.config) {
+                try {
+                    await this.config.reload();
+                    result.config.refreshed = true;
+                    Logger.debug('[Reload] Config refreshed');
+                } catch (error) {
+                    result.errors.push(`Config: ${error.message}`);
+                    Logger.error('[Reload] Config refresh failed:', error);
+                }
+            }
+            
+            result.success = result.errors.length === 0;
+            Logger.info(`[Reload] Completed for plugin ${this.name}:`, {
+                schemas: `${result.schemas.loaded} loaded, ${result.schemas.failed} failed`,
+                models: `${result.models.registered} registered, ${result.models.failed} failed`,
+                commands: opts.commands ? `${result.commands.loaded} loaded` : 'skipped',
+                events: opts.events ? `${result.events.loaded} loaded` : 'skipped',
+                config: result.config.refreshed ? 'refreshed' : 'skipped',
+                errors: result.errors.length
+            });
+            
+            return result;
+            
+        } catch (error) {
+            Logger.error(`[Reload] Critical error for plugin ${this.name}:`, error);
+            result.success = false;
+            result.errors.push(`Critical: ${error.message}`);
+            return result;
+        }
+    }
+
+    /**
      * Lädt die Konfiguration des Plugins
      * @param {string} [context='shared'] - Kontext der Konfiguration
      * @returns {Promise<Object>} Die Konfiguration

@@ -131,30 +131,57 @@ class NotificationManager {
     }
 
     /**
-     * Markiert Benachrichtigungen als gelesen
+     * Markiert eine Benachrichtigung als dismissed für einen User
+     * @param {number} notificationId ID der Benachrichtigung
+     * @param {string} userId Discord User ID
+     * @returns {Promise<boolean>} Erfolg der Operation
+     */
+    async dismissNotification(notificationId, userId) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+
+        if (!notificationId || !userId) {
+            Logger.warn('[NotificationManager] dismissNotification: Missing notificationId or userId');
+            return false;
+        }
+
+        try {
+            // Lade aktuelle dismissed IDs für diesen User
+            let dismissedIds = [];
+            try {
+                const userDismissed = await dbService.getUserConfig(userId, 'core', 'DISMISSED_NOTIFICATIONS');
+                if (Array.isArray(userDismissed)) {
+                    dismissedIds = userDismissed;
+                }
+            } catch (err) {
+                Logger.debug('[NotificationManager] Keine dismissed IDs gefunden, erstelle neue Liste');
+            }
+
+            // Füge neue ID hinzu (wenn noch nicht vorhanden)
+            if (!dismissedIds.includes(notificationId)) {
+                dismissedIds.push(notificationId);
+            }
+
+            // Speichere aktualisierte Liste
+            await dbService.setUserConfig(userId, 'core', 'DISMISSED_NOTIFICATIONS', dismissedIds);
+            
+            Logger.debug(`[NotificationManager] Notification ${notificationId} für User ${userId} dismissed`);
+            return true;
+        } catch (error) {
+            Logger.error('Fehler beim Markieren der Benachrichtigung als dismissed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Markiert Benachrichtigungen als gelesen (DEPRECATED - use dismissNotification)
      * @param {number[]} notificationIds Array von Benachrichtigungs-IDs
      * @returns {Promise<boolean>} Erfolg der Operation
      */
     async dismissNotifications(notificationIds) {
         const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-
-        if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
-            return false;
-        }
-
-        try {
-            await dbService.query(`
-                UPDATE notifications 
-                SET dismissed = 1 
-                WHERE _id = ?
-            `, [notificationId]);
-            
-            return true;
-        } catch (error) {
-            Logger.error('Fehler beim Markieren der Benachrichtigung:', error);
-            return false;
-        }
+        Logger.warn('[NotificationManager] dismissNotifications (plural) ist deprecated, nutze dismissNotification (singular)');
+        return false;
     }
 
     /**

@@ -1,6 +1,7 @@
 const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 const path = require('path');
+const { requirePermission } = require('../../../apps/dashboard/middlewares/permissions.middleware');
 
 class ModerationPlugin extends DashboardPlugin {
     constructor(app) {
@@ -47,7 +48,8 @@ class ModerationPlugin extends DashboardPlugin {
         const ipcServer = ServiceManager.get('ipcServer');
 
         try {
-            this.guildRouter.get('/', async (req, res) => {
+            // GET / - View Moderation Settings
+            this.guildRouter.get('/', requirePermission('MODERATION.VIEW'), async (req, res) => {
                 const guildId = req.params.guildId || res.locals.guildId;
                 
                 try {
@@ -83,8 +85,8 @@ class ModerationPlugin extends DashboardPlugin {
                 }
             });
 
-            // Alternative Save-Route per POST (robuster als PUT hinter manchen Proxies)
-            this.guildRouter.post('/save', async (req, res) => {
+            // POST /save - Save Moderation Settings (Alternative zu PUT)
+            this.guildRouter.post('/save', requirePermission('MODERATION.SETTINGS.EDIT'), async (req, res) => {
                 const guildId = req.params.guildId || res.locals.guildId;
                 
                 // Unterstütze beide Content-Types: JSON und Form-Data
@@ -160,8 +162,8 @@ class ModerationPlugin extends DashboardPlugin {
                 }
             });
 
-            // Alte Route: PUT /
-            this.guildRouter.put('/', async (req, res) => {
+            // PUT / - Save Moderation Settings (Legacy)
+            this.guildRouter.put('/', requirePermission('MODERATION.SETTINGS.EDIT'), async (req, res) => {
                 const guildId = req.params.guildId || res.locals.guildId;
                 const { log_channel, maxwarn_count, maxwarn_action, modlog_events, dm_on_warn, dm_on_kick, dm_on_ban, dm_on_timeout, default_reason } = req.body;
                 const Logger = ServiceManager.get('Logger');
@@ -205,21 +207,21 @@ class ModerationPlugin extends DashboardPlugin {
             
             Logger.info('[Moderation] Routen eingerichtet für guildRouter');
         } catch (error) {
-            Logger.error('Fehler beim Einrichten der Moderation Plugin Routen:', error);
+            Logger.error('Fehler beim Einrichten der [Moderation] Plugin Routen:', error);
             throw error;
         }
     }
 
     async onDisable() {
         const Logger = ServiceManager.get('Logger');
-        Logger.info('Deaktiviere Moderation Plugin...');
-        Logger.success('Moderation Plugin deaktiviert');
+        Logger.info('Deaktiviere [Moderation] Plugin...');
+        Logger.success('[Moderation] Plugin deaktiviert');
         return true;
     }
     
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get('Logger');
-        Logger.debug(`Registriere Navigation für Moderation in Guild ${guildId}`);
+        Logger.debug(`Registriere Navigation für [Moderation] in Guild ${guildId}`);
         await this._registerNavigation(guildId);
     }
 
@@ -228,12 +230,12 @@ class ModerationPlugin extends DashboardPlugin {
         const dbService = ServiceManager.get('dbService');
         
         try {
-            Logger.info(`Entferne Navigation für Moderation aus Guild ${guildId}`);
+            Logger.info(`Entferne Navigation für [Moderation] aus Guild ${guildId}`);
             await dbService.query("DELETE FROM nav_items WHERE plugin = ? AND guildId = ?", [this.name, guildId]);
-            Logger.success(`Moderation Navigation für Guild ${guildId} entfernt`);
+            Logger.success(`[Moderation] Navigation für Guild ${guildId} entfernt`);
             return true;
         } catch (error) {
-            Logger.error(`Fehler beim Entfernen der Moderation Navigation für Guild ${guildId}:`, error);
+            Logger.error(`Fehler beim Entfernen der [Moderation] Navigation für Guild ${guildId}:`, error);
             throw error;
         }
     }
@@ -246,7 +248,7 @@ class ModerationPlugin extends DashboardPlugin {
             title: 'moderation:NAV.MODERATION',
             path: `/guild/${guildId}/plugins/moderation`,
             icon: 'fa-solid fa-shield-halved',
-            order: 24,
+            order: null,
             parent: `/guild/${guildId}/plugins/core/settings`,
             type: 'main',
             visible: true

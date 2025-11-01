@@ -230,10 +230,16 @@
         "GENERAL": "General",
         "USERS": "Users",
         "INTEGRATIONS": "Integrations",
+        "PERMISSIONS": "Permissions",
+        "PERMISSIONS_USERS": "Users",
+        "PERMISSIONS_GROUPS": "Groups",
+        "PERMISSIONS_MATRIX": "Permission Matrix",
         "PLUGINS": "Plugins",
         "LOCALES": "Localisation",
         "BUG_REPORT": "Bug Report",
-        "FEATURE_REQUEST": "Feature Request"
+        "FEATURE_REQUEST": "Feature Request",
+        "SUPPORT_DUNEBOT": "Support DuneBot",
+        "HALL_OF_FAME": "Hall of Fame"
     },
 
     "BREADCRUMB": {
@@ -553,5 +559,18 @@
         "MEDIUM": "Medium",
         "HIGH": "High",
         "CRITICAL": "Critical"
+    },
+    "PLUGIN_BADGES": {
+        "INFO_TITLE": "What do the Badges mean?",
+        "NEW_TITLE": "Newly Released",
+        "NEW_DESC": "This plugin has been recently added to the bot and is brand new.",
+        "BETA_TITLE": "In Testing Phase",
+        "BETA_DESC": "This plugin is still under development. Errors may occur.",
+        "UPDATED_TITLE": "Recently Updated",
+        "UPDATED_DESC": "This plugin has been recently updated with new features or bug fixes.",
+        "DEPRECATED_TITLE": "Deprecated",
+        "DEPRECATED_DESC": "This plugin is outdated and may be removed in the future.",
+        "FEATURED_TITLE": "Featured",
+        "FEATURED_DESC": "Highlighted plugin - especially recommended or popular in the community."
     }
 }

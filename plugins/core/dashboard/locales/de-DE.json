@@ -25,6 +25,147 @@
     "ENABLED": "Aktiviert",
     "DISABLED": "Deaktiviert",
     
+    "PERM_SETTINGS_VIEW": "Einstellungen ansehen",
+    "PERM_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Guild-Einstellungen",
+    "PERM_SETTINGS_EDIT": "Einstellungen bearbeiten",
+    "PERM_SETTINGS_EDIT_DESC": "Erlaubt das Bearbeiten der Guild-Einstellungen (Präfix, Sprache, etc.)",
+    
+    "PERM_PLUGINS_VIEW": "Plugins ansehen",
+    "PERM_PLUGINS_VIEW_DESC": "Erlaubt das Ansehen der installierten Plugins",
+    "PERM_PLUGINS_MANAGE": "Plugins verwalten",
+    "PERM_PLUGINS_MANAGE_DESC": "Erlaubt das Aktivieren/Deaktivieren von Plugins (KRITISCH)",
+    
+    "PERM_NAVIGATION_VIEW": "Navigation ansehen",
+    "PERM_NAVIGATION_VIEW_DESC": "Erlaubt das Ansehen der Navigationseinstellungen",
+    "PERM_NAVIGATION_EDIT": "Navigation bearbeiten",
+    "PERM_NAVIGATION_EDIT_DESC": "Erlaubt das Bearbeiten der Navigationsstruktur",
+    
+    "PERM_LOCALES_VIEW": "Übersetzungen ansehen",
+    "PERM_LOCALES_VIEW_DESC": "Erlaubt das Ansehen der Locale-Bundles",
+    "PERM_LOCALES_EDIT": "Übersetzungen bearbeiten",
+    "PERM_LOCALES_EDIT_DESC": "Erlaubt das Bearbeiten der Übersetzungen",
+    
+    "PERM_DONATE_VIEW": "Spenden ansehen",
+    "PERM_DONATE_VIEW_DESC": "Erlaubt das Ansehen des Spendenbereichs",
+    "PERM_DONATE_CREATE": "Spenden erstellen",
+    "PERM_DONATE_CREATE_DESC": "Erlaubt das Erstellen von Spendenlinks über Stripe",
+    
+    "CORE": {
+        "PERM_SETTINGS_VIEW": "Einstellungen ansehen",
+        "PERM_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Guild-Einstellungen",
+        "PERM_SETTINGS_EDIT": "Einstellungen bearbeiten",
+        "PERM_SETTINGS_EDIT_DESC": "Erlaubt das Bearbeiten der Guild-Einstellungen (Präfix, Sprache, etc.)",
+        "PERM_PLUGINS_VIEW": "Plugins ansehen",
+        "PERM_PLUGINS_VIEW_DESC": "Erlaubt das Ansehen der installierten Plugins",
+        "PERM_PLUGINS_MANAGE": "Plugins verwalten",
+        "PERM_PLUGINS_MANAGE_DESC": "Erlaubt das Aktivieren/Deaktivieren von Plugins (KRITISCH)",
+        "PERM_NAVIGATION_VIEW": "Navigation ansehen",
+        "PERM_NAVIGATION_VIEW_DESC": "Erlaubt das Ansehen der Navigationseinstellungen",
+        "PERM_NAVIGATION_EDIT": "Navigation bearbeiten",
+        "PERM_NAVIGATION_EDIT_DESC": "Erlaubt das Bearbeiten der Navigationsstruktur",
+        "PERM_LOCALES_VIEW": "Übersetzungen ansehen",
+        "PERM_LOCALES_VIEW_DESC": "Erlaubt das Ansehen der Locale-Bundles",
+        "PERM_LOCALES_EDIT": "Übersetzungen bearbeiten",
+        "PERM_LOCALES_EDIT_DESC": "Erlaubt das Bearbeiten der Übersetzungen",
+        "PERM_DONATE_VIEW": "Spenden ansehen",
+        "PERM_DONATE_VIEW_DESC": "Erlaubt das Ansehen des Spendenbereichs",
+        "PERM_DONATE_CREATE": "Spenden erstellen",
+        "PERM_DONATE_CREATE_DESC": "Erlaubt das Erstellen von Spendenlinks über Stripe"
+    },
+    
+    "PERMISSIONS": {
+        "DASHBOARD_ACCESS": "Dashboard-Zugriff",
+        "DASHBOARD_ACCESS_DESC": "Erlaubt den grundlegenden Zugriff auf das Dashboard",
+        "DASHBOARD_SETTINGS_VIEW": "Dashboard-Einstellungen ansehen",
+        "DASHBOARD_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Dashboard-Konfiguration",
+        "DASHBOARD_SETTINGS_EDIT": "Dashboard-Einstellungen bearbeiten",
+        "DASHBOARD_SETTINGS_EDIT_DESC": "Erlaubt das Bearbeiten der Dashboard-Einstellungen",
+        
+        "USERS_VIEW": "Benutzer ansehen",
+        "USERS_VIEW_DESC": "Erlaubt das Ansehen der Benutzer-Liste",
+        "USERS_INVITE": "Benutzer einladen",
+        "USERS_INVITE_DESC": "Erlaubt das Hinzufügen neuer Benutzer zum System",
+        "USERS_EDIT": "Benutzer bearbeiten",
+        "USERS_EDIT_DESC": "Erlaubt das Bearbeiten von Benutzer-Daten",
+        "USERS_REMOVE": "Benutzer entfernen",
+        "USERS_REMOVE_DESC": "Erlaubt das Entfernen von Benutzern aus dem System",
+        
+        "GROUPS_VIEW": "Gruppen ansehen",
+        "GROUPS_VIEW_DESC": "Erlaubt das Ansehen der Berechtigungs-Gruppen",
+        "GROUPS_CREATE": "Gruppen erstellen",
+        "GROUPS_CREATE_DESC": "Erlaubt das Erstellen neuer Berechtigungs-Gruppen",
+        "GROUPS_EDIT": "Gruppen bearbeiten",
+        "GROUPS_EDIT_DESC": "Erlaubt das Bearbeiten bestehender Gruppen",
+        "GROUPS_DELETE": "Gruppen löschen",
+        "GROUPS_DELETE_DESC": "Erlaubt das Löschen von Berechtigungs-Gruppen",
+        
+        "ASSIGN": "Berechtigungen zuweisen",
+        "ASSIGN_DESC": "Erlaubt das Zuweisen von Berechtigungen an Gruppen (KRITISCH)",
+        
+        "SUPERADMIN_ALL": "SuperAdmin (Alle Rechte)",
+        "SUPERADMIN_ALL_DESC": "Vollständiger Zugriff auf alle Funktionen (SEHR KRITISCH)",
+        
+        "AUTOMOD_SETTINGS_VIEW": "AutoMod-Einstellungen ansehen",
+        "AUTOMOD_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der AutoMod-Konfiguration",
+        "AUTOMOD_SETTINGS_EDIT": "AutoMod-Einstellungen bearbeiten",
+        "AUTOMOD_SETTINGS_EDIT_DESC": "Erlaubt das Bearbeiten der AutoMod-Regeln",
+        
+        "GAMESERVER_VIEW": "Gameserver ansehen",
+        "GAMESERVER_VIEW_DESC": "Erlaubt das Ansehen der Gameserver-Liste",
+        "GAMESERVER_CREATE": "Gameserver erstellen",
+        "GAMESERVER_CREATE_DESC": "Erlaubt das Erstellen neuer Gameserver",
+        "GAMESERVER_DELETE": "Gameserver löschen",
+        "GAMESERVER_DELETE_DESC": "Erlaubt das Löschen von Gameservern",
+        "GAMESERVER_START": "Gameserver starten",
+        "GAMESERVER_START_DESC": "Erlaubt das Starten von Gameservern",
+        "GAMESERVER_STOP": "Gameserver stoppen",
+        "GAMESERVER_STOP_DESC": "Erlaubt das Stoppen von Gameservern",
+        "GAMESERVER_RESTART": "Gameserver neu starten",
+        "GAMESERVER_RESTART_DESC": "Erlaubt das Neustarten von Gameservern",
+        "GAMESERVER_SETTINGS_VIEW": "Gameserver-Einstellungen ansehen",
+        "GAMESERVER_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Gameserver-Konfiguration",
+        "GAMESERVER_SETTINGS_EDIT": "Gameserver-Einstellungen bearbeiten",
+        "GAMESERVER_SETTINGS_EDIT_DESC": "Erlaubt das Bearbeiten der Gameserver-Einstellungen",
+        "GAMESERVER_CONSOLE_VIEW": "Gameserver-Konsole ansehen",
+        "GAMESERVER_CONSOLE_VIEW_DESC": "Erlaubt das Ansehen der Gameserver-Konsole",
+        "GAMESERVER_CONSOLE_EXECUTE": "Gameserver-Konsole nutzen",
+        "GAMESERVER_CONSOLE_EXECUTE_DESC": "Erlaubt das Ausführen von Befehlen in der Gameserver-Konsole",
+        "GAMESERVER_FILES_VIEW": "Gameserver-Dateien ansehen",
+        "GAMESERVER_FILES_VIEW_DESC": "Erlaubt das Ansehen der Gameserver-Dateien",
+        "GAMESERVER_FILES_UPLOAD": "Gameserver-Dateien hochladen",
+        "GAMESERVER_FILES_UPLOAD_DESC": "Erlaubt das Hochladen von Dateien auf den Gameserver",
+        "GAMESERVER_FILES_DOWNLOAD": "Gameserver-Dateien herunterladen",
+        "GAMESERVER_FILES_DOWNLOAD_DESC": "Erlaubt das Herunterladen von Gameserver-Dateien",
+        "GAMESERVER_FILES_EDIT": "Gameserver-Dateien bearbeiten",
+        "GAMESERVER_FILES_EDIT_DESC": "Erlaubt das Bearbeiten von Gameserver-Dateien",
+        "GAMESERVER_FILES_DELETE": "Gameserver-Dateien löschen",
+        "GAMESERVER_FILES_DELETE_DESC": "Erlaubt das Löschen von Gameserver-Dateien",
+        
+        "GREETING_SETTINGS_VIEW": "Begrüßungs-Einstellungen ansehen",
+        "GREETING_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Begrüßungs-Konfiguration",
+        "GREETING_SETTINGS_EDIT": "Begrüßungs-Einstellungen bearbeiten",
+        "GREETING_SETTINGS_EDIT_DESC": "Erlaubt das Bearbeiten der Begrüßungs-Nachrichten",
+        
+        "INFORMATION_SETTINGS_VIEW": "Informations-Einstellungen ansehen",
+        "INFORMATION_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Informations-Konfiguration",
+        "INFORMATION_SETTINGS_EDIT": "Informations-Einstellungen bearbeiten",
+        "INFORMATION_SETTINGS_EDIT_DESC": "Erlaubt das Bearbeiten der Informations-Einstellungen",
+        
+        "MODERATION_VIEW": "Moderation ansehen",
+        "MODERATION_VIEW_DESC": "Erlaubt das Ansehen der Moderations-Logs",
+        "MODERATION_WARN": "Verwarnungen aussprechen",
+        "MODERATION_WARN_DESC": "Erlaubt das Verwarnen von Benutzern",
+        "MODERATION_MUTE": "Benutzer stummschalten",
+        "MODERATION_MUTE_DESC": "Erlaubt das Stummschalten von Benutzern",
+        "MODERATION_KICK": "Benutzer kicken",
+        "MODERATION_KICK_DESC": "Erlaubt das Kicken von Benutzern vom Server",
+        "MODERATION_BAN": "Benutzer bannen",
+        "MODERATION_BAN_DESC": "Erlaubt das Bannen von Benutzern vom Server",
+        "MODERATION_SETTINGS_VIEW": "Moderations-Einstellungen ansehen",
+        "MODERATION_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Moderations-Konfiguration",
+        "MODERATION_SETTINGS_EDIT": "Moderations-Einstellungen bearbeiten",
+        "MODERATION_SETTINGS_EDIT_DESC": "Erlaubt das Bearbeiten der Moderations-Einstellungen"
+    },
 
     "SETTINGS": {
         "GENERAL": {
@@ -69,7 +210,7 @@
             "INACTIVE": "Deaktiviert"
         }
     },
-
+    
     "SETTINGS_OVERVIEW": {
         "GENERAL_TITLE": "Allgemeine Einstellungen",
         "GENERAL_SUBTITLE": "Bot-Grundkonfiguration",
@@ -182,5 +323,7 @@
             "LEVEL": "Level",
             "BOOSTS": "Boosts"
         }
-    }
+    } 
+    
 }
+

@@ -1,0 +1,62 @@
+{
+  "plugin": "automod",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "AUTOMOD.VIEW",
+      "name": "AutoMod anzeigen",
+      "description": "Berechtigung um AutoMod-Einstellungen zu sehen",
+      "category": "automod",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "AUTOMOD.SETTINGS_EDIT",
+      "name": "AutoMod-Einstellungen bearbeiten",
+      "description": "Berechtigung um AutoMod-Regeln zu konfigurieren (Spam-Filter, Link-Filter, etc.)",
+      "category": "automod",
+      "is_dangerous": 0,
+      "requires": "AUTOMOD.VIEW"
+    },
+    {
+      "key": "AUTOMOD.RULES_CREATE",
+      "name": "AutoMod-Regeln erstellen",
+      "description": "Berechtigung um neue AutoMod-Regeln zu erstellen",
+      "category": "automod",
+      "is_dangerous": 0,
+      "requires": "AUTOMOD.VIEW"
+    },
+    {
+      "key": "AUTOMOD.RULES_EDIT",
+      "name": "AutoMod-Regeln bearbeiten",
+      "description": "Berechtigung um bestehende AutoMod-Regeln zu ändern",
+      "category": "automod",
+      "is_dangerous": 0,
+      "requires": "AUTOMOD.VIEW"
+    },
+    {
+      "key": "AUTOMOD.RULES_DELETE",
+      "name": "AutoMod-Regeln löschen",
+      "description": "Berechtigung um AutoMod-Regeln zu entfernen (kritisch)",
+      "category": "automod",
+      "is_dangerous": 1,
+      "requires": "AUTOMOD.VIEW"
+    },
+    {
+      "key": "AUTOMOD.WHITELIST_MANAGE",
+      "name": "AutoMod-Whitelist verwalten",
+      "description": "Berechtigung um User/Channels von AutoMod auszunehmen",
+      "category": "automod",
+      "is_dangerous": 0,
+      "requires": "AUTOMOD.VIEW"
+    },
+    {
+      "key": "AUTOMOD.LOGS_VIEW",
+      "name": "AutoMod-Logs anzeigen",
+      "description": "Berechtigung um AutoMod-Aktionen zu sehen (Gelöschte Nachrichten, Warns, etc.)",
+      "category": "automod",
+      "is_dangerous": 0,
+      "requires": "AUTOMOD.VIEW"
+    }
+  ]
+}

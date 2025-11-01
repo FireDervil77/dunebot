@@ -2,8 +2,8 @@ const express = require("express");
 const { ServiceManager } = require("dunebot-core");
 const frontendController = require("../controllers/frontend.controller");
 const apiController = require("../controllers/api.controller");
-const { getLocalizedNews } = require("../helpers/newsHelper");
-const { getLocalizedChangelog, parseHierarchicalChangelog } = require("../helpers/changelogHelper");
+const { NewsHelper } = require("dunebot-sdk/utils");
+const { ChangelogHelper } = require("dunebot-sdk/utils");
 
 // Router erstellen
 const router = express.Router();
@@ -24,9 +24,9 @@ const getNewsDetails = async (req, res) => {
             return res.status(404).render('frontend/404');
         }
 
-        // News lokalisieren
-        const userLocale = req.session.locale || res.locals.locale || 'de-DE';
-        const localizedNews = getLocalizedNews(rawNews[0], userLocale);
+        // News lokalisieren (nutze res.locals.locale statt Session-Zugriff)
+        const userLocale = res.locals.locale || 'de-DE';
+        const localizedNews = NewsHelper.getLocalizedNews(rawNews[0], userLocale);
 
         // Layout setzen
         res.locals.layout = themeManager.getLayout('frontend');
@@ -63,9 +63,9 @@ const getChangelogsList = async (req, res) => {
             ORDER BY release_date DESC
         `);
 
-        // Changelogs lokalisieren
-        const userLocale = req.session.locale || res.locals.locale || 'de-DE';
-        const localizedChangelogs = rawChangelogs.map(cl => getLocalizedChangelog(cl, userLocale));
+        // Changelogs lokalisieren (nutze res.locals.locale statt Session-Zugriff)
+        const userLocale = res.locals.locale || 'de-DE';
+        const localizedChangelogs = rawChangelogs.map(cl => ChangelogHelper.getLocalizedChangelog(cl, userLocale));
 
         // Layout setzen
         res.locals.layout = themeManager.getLayout('frontend');
@@ -96,12 +96,12 @@ const getChangelogDetails = async (req, res) => {
             return res.status(404).render('frontend/404');
         }
 
-        // Changelog lokalisieren
-        const userLocale = req.session.locale || res.locals.locale || 'de-DE';
-        const localizedChangelog = getLocalizedChangelog(rawChangelog[0], userLocale);
+        // Changelog lokalisieren (nutze res.locals.locale statt Session-Zugriff)
+        const userLocale = res.locals.locale || 'de-DE';
+        const localizedChangelog = ChangelogHelper.getLocalizedChangelog(rawChangelog[0], userLocale);
 
         // Parse hierarchische Struktur aus changes-Text
-        const hierarchicalData = parseHierarchicalChangelog(localizedChangelog.changes);
+        const hierarchicalData = ChangelogHelper.parseHierarchicalChangelog(localizedChangelog.changes);
 
         // Layout setzen
         res.locals.layout = themeManager.getLayout('frontend');

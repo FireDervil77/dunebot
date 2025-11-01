@@ -196,6 +196,14 @@ exports.callback = async (req, res) => {
         
         req.session.locale = userData.locale || req.session.locale || "de";
         
+        // DEBUG: Session-Inhalt VOR dem Speichern loggen
+        Logger.debug('[CALLBACK] Session-Inhalt VOR save():', {
+            hasUser: !!req.session.user,
+            hasGuilds: !!req.session.user?.guilds,
+            guildsCount: req.session.user?.guilds?.length || 0,
+            userId: req.session.user?.info?.id
+        });
+        
         // Session speichern und dann weiterleiten
         req.session.save((err) => {
             if (err) {
@@ -207,6 +215,11 @@ exports.callback = async (req, res) => {
             }
             
             Logger.debug("Session gespeichert, leite weiter zu:", redirectURL);
+            Logger.debug('[CALLBACK] Session-Inhalt NACH save():', {
+                hasUser: !!req.session.user,
+                hasGuilds: !!req.session.user?.guilds,
+                guildsCount: req.session.user?.guilds?.length || 0
+            });
             
             // Hook nach erfolgreicher Anmeldung
             if (pluginManager?.hooks) {
@@ -241,17 +254,18 @@ exports.logout = async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get("dbService");
     const pluginManager = ServiceManager.get('pluginManager');
+    const sessionManager = ServiceManager.get('sessionManager');
     const themeManager = ServiceManager.get('themeManager');
 
    try {
+        const userId = req.session?.user?.info?.id;
+        
         // Hook vor dem Logout
         if (pluginManager?.hooks && req.session.user) {
             await pluginManager.hooks.doAction('before_user_logout', req.session.user, req, res);
         }
         
-        if (req.session?.user?.info?.id) {
-            const userId = req.session.user.info.id;
-
+        if (userId) {
             // Transaktion starten
             await dbService.query('START TRANSACTION');
 
@@ -269,9 +283,14 @@ exports.logout = async (req, res) => {
                     [userId]
                 );
 
+                // 3. Alle Sessions des Users zerstören (Session-Cleanup)
+                if (sessionManager) {
+                    await sessionManager.destroyUserSessions(userId);
+                }
+
                 // Transaktion bestätigen
                 await dbService.query('COMMIT');
-                Logger.debug(`Logout erfolgreich: User ${userId} abgemeldet und Guild-Zuweisungen entfernt`);
+                Logger.debug(`Logout erfolgreich: User ${userId} abgemeldet, Guild-Zuweisungen entfernt und Sessions bereinigt`);
 
             } catch (error) {
                 // Bei Fehler Transaktion zurückrollen
@@ -280,7 +299,7 @@ exports.logout = async (req, res) => {
             }
         }
 
-        // Session zerstören
+        // Aktuelle Session zerstören
         req.session.destroy();
         
         // Auth-Layout für Logout-Bestätigung
@@ -361,8 +380,24 @@ exports.getServerSelector = async (req, res) => {
     try {
         res.locals.layout = themeManager.getLayout('auth');
 
+        // DEBUG: Session-Inhalt loggen
+        Logger.debug('[SERVER-SELECTOR] Session-Check:', {
+            hasSession: !!req.session,
+            hasUser: !!req.session?.user,
+            hasGuilds: !!req.session?.user?.guilds,
+            guildsCount: req.session?.user?.guilds?.length || 0,
+            userId: req.session?.user?.info?.id || 'KEINE USER-ID'
+        });
+
         if (!req.session.user?.guilds) {
+            Logger.warn('[SERVER-SELECTOR] Keine Guilds in Session - Redirect zu /auth/login');
             return res.redirect('/auth/login');
+        }
+
+        // Session-Fehlermeldung auslesen (von guild.middleware)
+        const errorMessage = req.session.errorMessage || null;
+        if (errorMessage) {
+            delete req.session.errorMessage; // Nach dem Auslesen löschen
         }
 
         // BOT ONLINE CHECK
@@ -387,12 +422,112 @@ exports.getServerSelector = async (req, res) => {
                 user: req.session.user,
                 guilds: [],
                 botOnline: false,
+                errorMessage: errorMessage,
                 offlineReason: "Der Bot ist derzeit offline oder wird neu gestartet. Ein Zugriff auf Server-Daten ist temporär nicht möglich."
             });
         }
 
         // Normaler Flow (Bot online)
         const userGuilds = req.session.user.guilds;
+        const userId = req.session.user.info.id;
+
+        Logger.debug(`[SERVER-SELECTOR] Lade Custom Permissions für User-ID: ${userId}`);
+        Logger.debug(`[SERVER-SELECTOR] OAuth2-Guilds: ${userGuilds.length}`);
+
+        // Custom Permissions aus DB laden (guild_staff - ALTE TABELLE)
+        const dbService = ServiceManager.get('dbService');
+        let customPermissions = [];
+        try {
+            const result = await dbService.query(`
+                SELECT 
+                    guild_id,
+                    role,
+                    can_manage_settings,
+                    can_manage_plugins,
+                    can_view_logs
+                FROM guild_staff
+                WHERE user_id = ?
+                AND (expires_at IS NULL OR expires_at > NOW())
+            `, [userId]);
+            
+            // dbService.query gibt direkt die Row zurück wenn nur 1 Row!
+            // Bei 1 Row: result = [{guild_id: "...", role: "..."}, fields]
+            // Bei mehreren Rows: result = [{0: row1, 1: row2}, fields]
+            if (result && result[0]) {
+                const firstElement = result[0];
+                
+                // Check ob es direkt eine Row ist (hat guild_id key)
+                if (firstElement.guild_id) {
+                    customPermissions = [firstElement];
+                } 
+                // Oder ein Object mit numerischen Keys
+                else if (typeof firstElement === 'object' && !Array.isArray(firstElement)) {
+                    const numericKeys = Object.keys(firstElement).filter(key => !isNaN(key));
+                    customPermissions = numericKeys.map(key => firstElement[key]);
+                }
+                // Oder schon ein Array
+                else if (Array.isArray(firstElement)) {
+                    customPermissions = firstElement;
+                }
+            }
+            
+            Logger.debug(`[SERVER-SELECTOR] Custom Permissions Array:`, customPermissions);
+        } catch (err) {
+            Logger.warn('[SERVER-SELECTOR] Fehler beim Laden von guild_staff (Tabelle existiert noch nicht?):', err.message);
+        }
+        
+        const customPermsMap = new Map();
+        customPermissions.forEach(p => {
+            customPermsMap.set(p.guild_id, p);
+        });
+        
+        Logger.debug(`[SERVER-SELECTOR] User hat ${customPermissions.length} Custom Permissions in guild_staff`);
+
+        // ========================================================================
+        // NEU: Guilds aus guild_users laden (NEUES PERMISSION-SYSTEM!)
+        // Diese Guilds sind explizit im Dashboard freigeschaltet, auch ohne Discord-Admin-Rechte!
+        // ========================================================================
+        let guildUserGuilds = [];
+        try {
+            const result = await dbService.query(`
+                SELECT gu.guild_id, g.guild_name, g.owner_id
+                FROM guild_users gu
+                JOIN guilds g ON gu.guild_id = g._id
+                WHERE gu.user_id = ? 
+                AND gu.status = 'active'
+            `, [userId]);
+            
+            if (result && Array.isArray(result)) {
+                guildUserGuilds = result.map(row => ({
+                    id: row.guild_id,
+                    name: row.guild_name,
+                    owner: row.owner_id === userId, // Ist User der Discord-Owner?
+                    permissions: 0, // Keine Discord-Permissions (deshalb ist User in guild_users!)
+                    icon: null, // Kein Icon verfügbar (müsste vom Bot geholt werden)
+                    fromGuildUsers: true // Flag: Kommt aus DB, nicht von Discord!
+                }));
+            }
+            
+            Logger.debug(`[SERVER-SELECTOR] ${guildUserGuilds.length} zusätzliche Guilds aus guild_users geladen`);
+            guildUserGuilds.forEach(g => {
+                Logger.debug(`   - ${g.name} (${g.id}) [DB-Permission]`);
+            });
+        } catch (err) {
+            Logger.warn('[SERVER-SELECTOR] Fehler beim Laden von guild_users:', err.message);
+        }
+
+        // Merge OAuth2-Guilds und guild_users-Guilds (keine Duplikate!)
+        const allGuilds = [...userGuilds];
+        const existingGuildIds = new Set(userGuilds.map(g => g.id));
+        
+        guildUserGuilds.forEach(g => {
+            if (!existingGuildIds.has(g.id)) {
+                allGuilds.push(g);
+                Logger.debug(`[SERVER-SELECTOR] ➕ Guild "${g.name}" hinzugefügt (nur via guild_users)`);
+            }
+        });
+        
+        Logger.debug(`[SERVER-SELECTOR] Gesamt: ${allGuilds.length} Guilds (${userGuilds.length} OAuth2 + ${guildUserGuilds.length} DB-only)`);
 
         const botGuildsResponse = await ipcServer.broadcast("dashboard:GET_BOT_GUILDS");
         const botGuildIds = botGuildsResponse
@@ -402,10 +537,21 @@ exports.getServerSelector = async (req, res) => {
 
         Logger.debug(`Bot ist in ${botGuildIds.length} Servern`);
 
-        const guilds = userGuilds.map(guild => {
+        const guilds = allGuilds.map(guild => {
             const isAdmin = (guild.permissions & 0x8) === 0x8;
             const isManager = (guild.permissions & 0x20) === 0x20;
-            const canManage = isAdmin || isManager || guild.owner;
+            
+            // Custom Permissions aus DB prüfen (guild_staff - ALTE TABELLE)
+            const customPerm = customPermsMap.get(guild.id);
+            const hasCustomAccess = !!customPerm; // Wenn Eintrag in guild_staff existiert
+            
+            // guild_users-Zugriff (NEUES SYSTEM!)
+            const hasGuildUserAccess = guild.fromGuildUsers === true;
+            const customRole = customPerm?.role || null;
+            
+            // canManage: Discord-Permissions ODER Custom DB-Permissions ODER guild_users
+            const canManage = isAdmin || isManager || guild.owner || hasCustomAccess || hasGuildUserAccess;
+            
             const botInGuild = botGuildIds.includes(guild.id);
 
             const settingsUrl = botInGuild
@@ -420,18 +566,32 @@ exports.getServerSelector = async (req, res) => {
                 ...guild,
                 admin: isAdmin || guild.owner,
                 canManage,
+                customRole, // 'admin', 'manager', 'moderator', 'viewer' oder null
+                hasCustomAccess, // guild_staff (alte Tabelle)
+                hasGuildUserAccess, // guild_users (neues Permission-System)
+                fromGuildUsers: guild.fromGuildUsers || false,
                 botInGuild,
                 settingsUrl,
                 iconURL
             };
         });
 
+        // FIXME: Filtere nach canManage (Admin/Manager/Owner ODER Custom DB-Permission)!
+        // Zeige alle Server wo User Discord-Permissions ODER Custom-Permissions hat
+        const accessibleGuilds = guilds.filter(g => g.canManage);
+        
+        Logger.debug(`[SERVER-SELECTOR] User hat Zugriff auf ${accessibleGuilds.length} von ${guilds.length} Servern`);
+        accessibleGuilds.forEach(g => {
+            Logger.debug(`  - ${g.name} (${g.id}): owner=${g.owner}, admin=${g.admin}, customRole=${g.customRole}, canManage=${g.canManage}, botInGuild=${g.botInGuild}`);
+        });
+        
         return res.render("auth/server-selector", {
             title: "Server auswählen",
             activeMenu: "/auth/server-selector",
             user: req.session.user,
-            guilds: guilds.filter(g => g.owner === true),
-            botOnline: true
+            guilds: accessibleGuilds,
+            botOnline: true,
+            errorMessage: errorMessage
         });
     } catch (error) {
         Logger.error('Fehler beim Rendern des Server-Selectors:', error);

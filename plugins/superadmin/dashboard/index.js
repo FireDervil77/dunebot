@@ -11,18 +11,16 @@ const fs = require('fs');
 
 const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
-const { getLocalizedNews, getLocalizedNewsList, prepareNewsForDB } = require('../../../apps/dashboard/helpers/newsHelper');
-const { getLocalizedNotification, getLocalizedNotificationList, prepareNotificationForDB } = require('../../../apps/dashboard/helpers/notificationHelper');
-const { getLocalizedChangelog, getLocalizedChangelogList, prepareChangelogForDB, getTypeBadge, getComponentBadge } = require('../../../apps/dashboard/helpers/changelogHelper');
+const { NewsHelper, ChangelogHelper, NotificationHelper } = require('dunebot-sdk/utils');
 
 class SuperAdminDashboardPlugin extends DashboardPlugin {
     constructor(app) {
         super({
             name: 'superadmin',
             displayName: 'SuperAdmin Panel',
-            description: 'Globale Verwaltung - Nur für Bot-Owner',
+            description: 'Globale Verwaltung - Nur für den Bot-Owner',
             version: VersionHelper.getVersionFromContext(__dirname),
-            author: 'DuneBot Team',
+            author: 'FireBot Team',
             icon: 'fa-solid fa-shield-halved',
             baseDir: __dirname,
             requiresOwner: true
@@ -59,15 +57,21 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         const notifications = await dbService.query('SELECT COUNT(*) as count FROM notifications');
         stats.notifications = notifications[0]?.count || 0;
 
-        // Top Guilds nach created_at
+        // Top Guilds nach created_at (neueste zuerst)
         try {
             stats.topGuilds = await dbService.query(`
-                SELECT _id, guild_name, guild_id, created_at
+                SELECT 
+                    _id as guild_id,
+                    guild_name, 
+                    created_at,
+                    is_active_guild
                 FROM guilds 
                 ORDER BY created_at DESC
                 LIMIT 10
             `);
+            Logger.debug(`[SuperAdmin] Loaded ${stats.topGuilds.length} guilds for stats`);
         } catch (err) {
+            Logger.error('[SuperAdmin] Fehler beim Laden der Top Guilds:', err);
             stats.topGuilds = [];
         }
 
@@ -148,14 +152,25 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
      */
     async onEnable() {
         const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        
         Logger.info('[SuperAdmin] Aktiviere Dashboard-Plugin global...');
+
+        // Config aus config.json laden und in DB schreiben
+        try {
+            const config = this._loadConfig();
+            Logger.debug('[SuperAdmin] Lade Config aus config.json:', config);
+            
+            Logger.success('[SuperAdmin] Config erfolgreich in DB synchronisiert');
+        } catch (error) {
+            Logger.error('[SuperAdmin] Fehler beim Laden/Speichern der Config:', error);
+        }
 
         this._setupRoutes();
         
         Logger.success('[SuperAdmin] Dashboard-Plugin global aktiviert (Routen registriert)');
         return true;
     }
-
 
     /**
      * Vollständige Routen für SuperAdmin einrichten
@@ -170,16 +185,23 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             // API-Routen (ohne Owner-Check für bestimmte Endpoints)
             const toastHistoryApi = require('./routes/api/toast-history');
             const botGuildsApi = require('./routes/api/bot-guilds');
+            const notificationsApi = require('./routes/api/notifications');
             this.apiRouter = express.Router();
             this.apiRouter.use('/toast-history', toastHistoryApi);
             Logger.debug('[SuperAdmin] API-Routen registriert (toast-history)');
             
             // Guild-spezifische API-Routen (VOR dem Owner-Check!)
             this.guildRouter.use('/api/bot-guilds', botGuildsApi);
-            Logger.debug('[SuperAdmin] Guild API-Routen registriert (bot-guilds)');
+            this.guildRouter.use('/api/notifications', notificationsApi);
+            Logger.debug('[SuperAdmin] Guild API-Routen registriert (bot-guilds, notifications)');
             
-            // Middleware: Owner-Check für ALLE SuperAdmin-Routen (nach API-Routen!)
+            // Middleware: Owner-Check für ALLE anderen SuperAdmin-Routen (nach API-Routen!)
             this.guildRouter.use(this._checkOwner.bind(this));
+
+            // === DONATIONS MANAGEMENT ===
+            const donationsRouter = require('./routes/donations');
+            this.guildRouter.use('/donations', donationsRouter);
+            Logger.debug('[SuperAdmin] Donations Management Route registriert');
 
             // === HAUPTSEITE (Dashboard-Übersicht) ===
             this.guildRouter.get('/', async (req, res) => {
@@ -264,7 +286,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 `);
 
                 // News lokalisieren für die Liste
-                const newsList = getLocalizedNewsList(rawNewsList, userLocale).map(news => ({
+                const newsList = NewsHelper.getLocalizedNewsList(rawNewsList, userLocale).map(news => ({
                     ...news,
                     formattedDate: new Date(news.date).toLocaleString(userLocale, {
                         year: 'numeric',
@@ -330,7 +352,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     };
 
                     // prepareNewsForDB nutzen
-                    const newsData = prepareNewsForDB(translations, metadata);
+                    const newsData = NewsHelper.prepareNewsForDB(translations, metadata);
 
                     if (newsId) {
                         // Update existierender News-Eintrag
@@ -408,7 +430,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     `);
                     
                     // Lokalisiere Notifications für die Anzeige
-                    const notificationsList = getLocalizedNotificationList(rawNotifications, userLocale).map(notif => ({
+                    const notificationsList = NotificationHelper.getLocalizedNotificationList(rawNotifications, userLocale).map(notif => ({
                         ...notif,
                         formattedDate: new Date(notif.created_at).toLocaleString(userLocale, {
                             year: 'numeric',
@@ -489,7 +511,8 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
 
             // Notification speichern (POST) - Multi-Language Support
             this.guildRouter.post('/notifications/save', async (req, res) => {
-                const guildId = req.body.guildId || res.locals.guildId || req.params.guildId;
+                // Guild-ID aus res.locals (wird von CheckGuildAccess-Middleware gesetzt)
+                const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 const {
                     notificationId,
@@ -534,7 +557,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     };
 
                     // prepareNotificationForDB nutzen
-                    const notificationData = prepareNotificationForDB(translations, metadata);
+                    const notificationData = NotificationHelper.prepareNotificationForDB(translations, metadata);
 
                     if (notificationId) {
                         // Update existierende Notification
@@ -561,15 +584,14 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             notificationId
                         ]);
                         
-                        // Redirect mit Toast-Notification
-                        req.session.toast = {
-                            type: 'success',
-                            message: 'Notification erfolgreich aktualisiert'
-                        };
-                        res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
+                        // JSON-Response für AJAX-System
+                        return res.json({ 
+                            success: true, 
+                            message: 'Notification erfolgreich aktualisiert' 
+                        });
                     } else {
                         // Neue Notification
-                        const [result] = await dbService.query(`
+                        const result = await dbService.query(`
                             INSERT INTO notifications 
                             (title_translations, message_translations, action_text_translations,
                              type, action_url, expiry, roles, dismissed,
@@ -612,29 +634,26 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             } catch (ipcError) {
                                 Logger.error('[SuperAdmin] Fehler beim Senden der Notification an Bot:', ipcError);
                                 // Notification wurde gespeichert, aber Discord-Versand fehlgeschlagen
-                                req.session.toast = {
-                                    type: 'warning',
-                                    message: 'Notification gespeichert, aber Discord-Versand fehlgeschlagen: ' + ipcError.message
-                                };
-                                return res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
+                                return res.json({ 
+                                    success: false, 
+                                    message: 'Notification gespeichert, aber Discord-Versand fehlgeschlagen: ' + ipcError.message 
+                                });
                             }
                         }
                         
-                        // Redirect mit Toast-Notification
-                        req.session.toast = {
-                            type: 'success',
-                            message: 'Notification erfolgreich erstellt'
-                        };
-                        res.redirect(`/guild/${guildId}/plugins/superadmin/notifications`);
+                        // JSON-Response für AJAX-System
+                        return res.json({ 
+                            success: true, 
+                            message: 'Notification erfolgreich erstellt' 
+                        });
                     }
                 } catch (error) {
                     Logger.error('Fehler beim Speichern der Notification:', error);
                     
-                    req.session.toast = {
-                        type: 'danger',
-                        message: 'Fehler beim Speichern: ' + error.message
-                    };
-                    res.redirect(`/guild/${req.params.guildId}/plugins/superadmin/notifications`);
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Fehler beim Speichern: ' + error.message 
+                    });
                 }
             });
 
@@ -663,15 +682,15 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 `);
 
                 // Lokalisiere Changelogs für die Liste
-                const changelogsList = getLocalizedChangelogList(rawChangelogs, userLocale).map(changelog => ({
+                const changelogsList = ChangelogHelper.getLocalizedChangelogList(rawChangelogs, userLocale).map(changelog => ({
                     ...changelog,
                     formattedDate: new Date(changelog.release_date).toLocaleString(userLocale, {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'
                     }),
-                    typeBadge: getTypeBadge(changelog.type),
-                    componentBadge: getComponentBadge(changelog.component)
+                    typeBadge: ChangelogHelper.getTypeBadge(changelog.type),
+                    componentBadge: ChangelogHelper.getComponentBadge(changelog.component)
                 }));
 
                 // Toast aus Session holen und löschen
@@ -740,12 +759,27 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
             this.guildRouter.post('/changelogs/save', async (req, res) => {
                 const guildId = req.body.guildId || res.locals.guildId || req.params.guildId;
                 const dbService = ServiceManager.get('dbService');
+                
+                // ✅ DEBUG: Was kommt an?
+                Logger.info('[SuperAdmin] Changelog Save Request Body:', {
+                    guildId: req.body.guildId,
+                    changelogId: req.body.changelogId,
+                    version: req.body.version,
+                    status: req.body.status,
+                    slug: req.body.slug,
+                    author: req.body.author,
+                    title_de_length: req.body.title_de?.length,
+                    changes_de_length: req.body.changes_de?.length,
+                    allKeys: Object.keys(req.body)
+                });
+                
                 const {
                     changelogId,
                     title_de, title_en,
                     description_de, description_en,
                     changes_de, changes_en,
-                    version, type, component, component_name, is_public, release_date, author_id
+                    version, type, component, component_name, is_public, release_date, author_id,
+                    status, slug, author  // ✅ NEU: Settings-Tab Felder
                 } = req.body;
 
                 try {
@@ -753,15 +787,15 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                     const translations = {
                         title: {
                             'de-DE': title_de || '',
-                            'en-GB': title_en || ''
+                            'en-GB': title_en || ''  // Optional
                         },
                         description: {
                             'de-DE': description_de || '',
-                            'en-GB': description_en || ''
+                            'en-GB': description_en || ''  // Optional
                         },
                         changes: {
                             'de-DE': changes_de || '',
-                            'en-GB': changes_en || ''
+                            'en-GB': changes_en || ''  // Optional
                         }
                     };
 
@@ -773,11 +807,15 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                         component_name: component_name || null,
                         is_public: is_public !== undefined ? is_public : 1,
                         release_date: release_date || new Date(),
-                        author_id: author_id || req.session.user?.id || '0'
+                        author_id: author_id || req.session.user?.id || '0',
+                        // ✅ NEU: Settings-Tab Daten
+                        status: status || 'published',
+                        slug: slug || `v${version.replace(/\./g, '-')}`,
+                        author: author || req.session.user?.info?.username || 'FireBot Team'
                     };
 
                     // prepareChangelogForDB nutzen
-                    const changelogData = prepareChangelogForDB(translations, metadata);
+                    const changelogData = ChangelogHelper.prepareChangelogForDB(translations, metadata);
 
                     if (changelogId) {
                         // Update existierender Changelog
@@ -788,6 +826,7 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                                 changes_translations = ?,
                                 version = ?, type = ?, component = ?, component_name = ?,
                                 is_public = ?, release_date = ?, author_id = ?,
+                                status = ?, slug = ?, author = ?,
                                 updated_at = NOW()
                             WHERE id = ?
                         `, [
@@ -801,6 +840,9 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             changelogData.is_public,
                             changelogData.release_date,
                             changelogData.author_id,
+                            metadata.status,
+                            metadata.slug,
+                            metadata.author,
                             changelogId
                         ]);
                         
@@ -815,8 +857,9 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             INSERT INTO changelogs 
                             (title_translations, description_translations, changes_translations,
                              version, type, component, component_name, is_public, release_date, author_id,
+                             status, slug, author,
                              created_at, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                         `, [
                             changelogData.title_translations,
                             changelogData.description_translations,
@@ -827,7 +870,10 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                             changelogData.component_name,
                             changelogData.is_public,
                             changelogData.release_date,
-                            changelogData.author_id
+                            changelogData.author_id,
+                            metadata.status,
+                            metadata.slug,
+                            metadata.author
                         ]);
                         
                         req.session.toast = {
@@ -974,6 +1020,87 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 }
             });
 
+            // === PLUGIN BADGE MANAGEMENT ===
+            // GET: Badge-Management Übersicht
+            this.guildRouter.get('/plugin-badges', async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                
+                try {
+                    // Alle Badges laden
+                    const badges = await dbService.getAllPluginBadges();
+                    
+                    // Verfügbare Plugins direkt vom Disk auslesen (alle Ordner im plugins-Verzeichnis)
+                    const fs = require('fs');
+                    const pluginsDir = path.join(__dirname, '../..');
+                    const availablePlugins = fs.readdirSync(pluginsDir, { withFileTypes: true })
+                        .filter(dirent => dirent.isDirectory() && dirent.name !== 'node_modules' && !dirent.name.startsWith('.'))
+                        .map(dirent => dirent.name)
+                        .sort();
+                    
+                    await themeManager.renderView(res, 'guild/plugin-badges', {
+                        title: 'Plugin Badge Management',
+                        activeMenu: `/guild/${guildId}/plugins/superadmin/plugin-badges`,
+                        guildId,
+                        badges,
+                        availablePlugins,
+                        plugin: this
+                    });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Laden der Plugin-Badges:', error);
+                    res.status(500).send('Fehler beim Laden der Plugin-Badges');
+                }
+            });
+
+            // POST: Badge setzen
+            this.guildRouter.post('/plugin-badges', async (req, res) => {
+                const dbService = ServiceManager.get('dbService');
+                const { pluginName, badgeStatus, badgeUntil, isFeatured } = req.body;
+                
+                try {
+                    // Validierung
+                    if (!pluginName || !badgeStatus) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: 'Plugin-Name und Badge-Status sind erforderlich' 
+                        });
+                    }
+                    
+                    // Badge setzen
+                    await dbService.setPluginBadge(
+                        pluginName, 
+                        badgeStatus, 
+                        badgeUntil || null, 
+                        isFeatured === '1' || isFeatured === true
+                    );
+                    
+                    res.json({ 
+                        success: true, 
+                        message: `Badge für Plugin "${pluginName}" erfolgreich gesetzt` 
+                    });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Setzen des Plugin-Badges:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
+            // DELETE: Badge entfernen
+            this.guildRouter.delete('/plugin-badges/:pluginName', async (req, res) => {
+                const dbService = ServiceManager.get('dbService');
+                const { pluginName } = req.params;
+                
+                try {
+                    await dbService.removePluginBadge(pluginName);
+                    res.json({ 
+                        success: true, 
+                        message: `Badge für Plugin "${pluginName}" erfolgreich entfernt` 
+                    });
+                } catch (error) {
+                    Logger.error('[SuperAdmin] Fehler beim Entfernen des Plugin-Badges:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
             // === TOAST-HISTORY (Monitoring/Debugging) ===
             this.guildRouter.get('/toast-history', async (req, res) => {
                 const guildId = res.locals.guildId;
@@ -1098,12 +1225,22 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
      */
     async _isOwner(user, guildId) {
         const config = this._loadConfig();
-        const ownerId = config.BOT_OWNER_ID;
+        const ownerId = config.BOT_OWNER_ID || process.env.OWNER_IDS?.split(',')[0];
         const controlGuildId = process.env.CONTROL_GUILD_ID;
 
         // Beide Bedingungen müssen erfüllt sein!
         const isOwner = user && String(user.info?.id) === String(ownerId);
         const isControlGuild = String(guildId) === String(controlGuildId);
+
+        console.log('[SuperAdmin Owner Check]', {
+            userId: user?.info?.id,
+            ownerId,
+            guildId,
+            controlGuildId,
+            isOwner,
+            isControlGuild,
+            result: isOwner && isControlGuild
+        });
 
         return isOwner && isControlGuild;
     }
@@ -1263,60 +1400,86 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
         
         Logger.debug(`[SuperAdmin] Registriere Navigation für Control-Guild ${guildId}`);
         
-        // Navigation registrieren
+        // Navigation registrieren (NUR FÜR BOT-OWNER SICHTBAR!)
         const navItems = [
             {
                 title: 'superadmin:NAV.SUPERADMIN',
                 path: `/guild/${guildId}/plugins/superadmin`,
                 icon: 'fa-solid fa-shield-halved',
-                order: 90,  // Ganz am Ende der Navigation (nach Core: 10-40)
+                order: 999999,  // Ganz am Ende der Navigation (nach Core: 10-40)
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.FEEDBACK',
                 path: `/guild/${guildId}/plugins/superadmin/feedback`,
                 icon: 'fa-solid fa-comments',
-                order: 91.5,  // Zwischen Notifications und News
+                order: null,  // Zwischen Notifications und News
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.NEWS',
                 path: `/guild/${guildId}/plugins/superadmin/news`,
                 icon: 'fa-solid fa-newspaper',
-                order: 91,  // Untermenü-Reihenfolge
+                order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.NOTIFICATIONS',
                 path: `/guild/${guildId}/plugins/superadmin/notifications`,
                 icon: 'fa-solid fa-bell',
-                order: 92,  // Untermenü-Reihenfolge
+                order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.CHANGELOGS',
                 path: `/guild/${guildId}/plugins/superadmin/changelogs`,
                 icon: 'fa-solid fa-code-commit',
-                order: 93,  // Untermenü-Reihenfolge
+                order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
+            },
+            {
+                title: 'superadmin:NAV.PLUGIN_BADGES',
+                path: `/guild/${guildId}/plugins/superadmin/plugin-badges`,
+                icon: 'fa-solid fa-tags',
+                order: null,  // Untermenü-Reihenfolge
+                parent: `/guild/${guildId}/plugins/superadmin`,
+                type: 'main',
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             },
             {
                 title: 'superadmin:NAV.STATISTICS',
                 path: `/guild/${guildId}/plugins/superadmin/stats`,
                 icon: 'fa-solid fa-chart-line',
-                order: 94,  // Untermenü-Reihenfolge
+                order: null,  // Untermenü-Reihenfolge
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
-                visible: true
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
+            },
+            {
+                title: 'superadmin:NAV.DONATIONS',
+                path: `/guild/${guildId}/plugins/superadmin/donations`,
+                icon: 'fa-solid fa-heart',
+                order: null,  // Nach Statistics
+                parent: `/guild/${guildId}/plugins/superadmin`,
+                type: 'main',
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
             }
         ];
 

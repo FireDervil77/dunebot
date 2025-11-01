@@ -1,6 +1,32 @@
-/* Kompakte Sidebar-Navigation */
+/* Kompakte Sidebar-Navigation mit Scrolling */
 .app-sidebar {
   width: 250px;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling auf iOS */
+  z-index: 1038; /* Unter navbar (1039) aber über content */
+}
+
+/* Scrollbar Styling für Desktop Sidebar */
+.app-sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.app-sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.app-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.app-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .app-sidebar .nav-sidebar {
@@ -122,16 +148,75 @@
 .toast {
     transition: all 0.3s ease-in-out;
     margin-top: 1rem;
+    /* KEIN SCHLEIER - Vollständig opak! */
+    opacity: 1 !important;
+    background-color: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Bootstrap Toast Variables überschreiben */
+.toast, .toast * {
+    --bs-toast-bg: rgba(255, 255, 255, 1) !important;
+    opacity: 1 !important;
+}
+
+/* Toast-Varianten mit vollständig opaken Hintergründen */
+.toast-success {
+    background-color: #198754 !important;
+}
+
+.toast-success .toast-header,
+.toast-success .toast-body {
+    background-color: #198754 !important;
+    color: #ffffff !important;
+    opacity: 1 !important;
+}
+
+.toast-error,
+.toast-danger {
+    background-color: #dc3545 !important;
+}
+
+.toast-error .toast-header,
+.toast-error .toast-body,
+.toast-danger .toast-header,
+.toast-danger .toast-body {
+    background-color: #dc3545 !important;
+    color: #ffffff !important;
+    opacity: 1 !important;
+}
+
+.toast-info {
+    background-color: #0dcaf0 !important;
+}
+
+.toast-info .toast-header,
+.toast-info .toast-body {
+    background-color: #0dcaf0 !important;
+    color: #000000 !important;
+    opacity: 1 !important;
+}
+
+.toast-warning {
+    background-color: #ffc107 !important;
+}
+
+.toast-warning .toast-header,
+.toast-warning .toast-body {
+    background-color: #ffc107 !important;
+    color: #000000 !important;
+    opacity: 1 !important;
 }
 
 .toast.showing {
     transform: translateY(-100%);
-    opacity: 0;
+    opacity: 0 !important;
 }
 
 .toast.show {
     transform: translateY(0);
-    opacity: 1;
+    opacity: 1 !important;
 }
 
 /* Alert Visibility Improvements */
@@ -273,3 +358,263 @@
         font-size: 12px;
     }
 }
+
+/* Notification Dropdown Styling */
+.notification-item {
+  cursor: default;
+  white-space: normal;
+  padding: 0.75rem 1rem;
+}
+
+.notification-item:hover {
+  background-color: #f8f9fa;
+}
+
+.notification-item .dismiss-notification {
+  padding: 0.25rem 0.5rem;
+  margin-left: 0.5rem;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.notification-item .dismiss-notification:hover {
+  opacity: 1;
+  color: #dc3545;
+}
+
+.notification-item .flex-grow-1 {
+  max-width: calc(100% - 40px);
+}
+
+.navbar .navbar-badge {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  font-size: 0.6rem;
+  padding: 0.15rem 0.4rem;
+}
+
+/* Notification Dropdown Styling */
+.notification-item {
+  cursor: default;
+  white-space: normal;
+  padding: 0.75rem 1rem;
+}
+
+.notification-item:hover {
+  background-color: #f8f9fa;
+}
+
+.notification-item .dismiss-notification {
+  padding: 0.25rem 0.5rem;
+  margin-left: 0.5rem;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.notification-item .dismiss-notification:hover {
+  opacity: 1;
+}
+
+.notification-item .flex-grow-1 {
+  max-width: calc(100% - 40px);
+}
+
+.navbar-badge {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  font-size: 0.6rem;
+  padding: 0.15rem 0.4rem;
+}
+
+/* Plugin Badge System */
+.plugin-card {
+  position: relative;
+  padding: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+  transition: box-shadow 0.2s;
+}
+
+.plugin-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.plugin-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  letter-spacing: 0.5px;
+  z-index: 2;
+  top: -0.5rem !important;
+  right: -0.5rem !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.plugin-featured-star {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  font-size: 1.2rem;
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.plugin-badge.bg-success {
+  background-color: #198754 !important;
+  color: #ffffff !important;
+}
+
+.plugin-badge.bg-warning {
+  background-color: #ffc107 !important;
+  color: #000000 !important;
+}
+
+.plugin-badge.bg-info {
+  background-color: #0dcaf0 !important;
+  color: #000000 !important;
+}
+
+.plugin-badge.bg-danger {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE - Sidebar Scrolling
+   ============================================ */
+
+@media (max-width: 767.98px) {
+  /* Mobile Sidebar - bereits durch Desktop-Styles definiert */
+  .app-sidebar {
+    width: 250px;
+    /* overflow und scrolling bereits durch Desktop-Styles aktiv */
+  }
+  
+  /* Navbar-Höhe auf Mobile berücksichtigen */
+  .app-sidebar {
+    top: 57px; /* AdminLTE navbar height */
+  }
+  
+  /* Scrollbar schmaler auf Mobile */
+  .app-sidebar::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  /* Content Padding auf Mobile reduzieren */
+  .app-main {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+@media (max-width: 991.98px) {
+  /* Tablet - Scrollbar etwas schmaler */
+  .app-sidebar::-webkit-scrollbar {
+    width: 6px;
+  }
+}
+
+/* ================================================= */
+/* Gameserver Creation Wizard Styles */
+/* ================================================= */
+
+/* Wizard Step Container */
+.step {
+  position: relative;
+}
+
+/* Wizard Step Icons (Circular Badges) */
+.step-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+}
+
+/* Selectable Template & Daemon Cards */
+.template-card, .daemon-card {
+  border: 2px solid transparent;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+/* Card Hover Effects */
+.template-card:hover, .daemon-card:hover {
+  border-color: #007bff;
+  box-shadow: 0 4px 8px rgba(0,123,255,0.2);
+}
+
+/* Card Selected State */
+.template-card.selected, .daemon-card.selected {
+  border-color: #28a745;
+  background-color: #f0f9ff;
+}
+
+/* ===========================================================================
+   GLOBAL CHECKBOX STYLES - Maximale Sichtbarkeit auf weißem Hintergrund
+   Wichtig: Ohne sichtbaren Rahmen sind Checkboxen auf weißem Hintergrund
+            praktisch unsichtbar, besonders in Modals!
+   ============================================================================ */
+
+/* Alle Checkboxen im Dashboard */
+.form-check-input,
+input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2.5px solid #2c3e50 !important;  /* Dicker, dunkler Rahmen für maximale Sichtbarkeit */
+  border-radius: 0.25rem;
+  cursor: pointer;
+  background-color: #fff !important;  /* Immer weißer Hintergrund wenn nicht checked */
+  margin-top: 0.1rem;
+  box-sizing: border-box;
+}
+
+/* Hover-Effekt */
+.form-check-input:hover:not(:disabled),
+input[type="checkbox"]:hover:not(:disabled) {
+  border-color: #007bff !important;
+  box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.3);
+  background-color: #f8f9fa !important;  /* Leichter grauer Hintergrund beim Hover */
+}
+
+/* Checked State */
+.form-check-input:checked,
+input[type="checkbox"]:checked {
+  background-color: #28a745 !important;
+  border-color: #28a745 !important;
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+/* Focus State (Tastatur-Navigation) */
+.form-check-input:focus,
+input[type="checkbox"]:focus {
+  border-color: #007bff !important;
+  outline: 0;
+  box-shadow: 0 0 0 0.3rem rgba(0, 123, 255, 0.3);
+}
+
+/* Disabled State */
+.form-check-input:disabled,
+input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  background-color: #e9ecef;
+}
+
+/* Größere Variante für Permission-Matrix */
+.permission-checkbox {
+  width: 22px;
+  height: 22px;
+}
+
+.permission-checkbox:hover:not(:disabled) {
+  transform: scale(1.1);
+  transition: all 0.2s;
+}
+

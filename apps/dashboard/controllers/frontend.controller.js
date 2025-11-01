@@ -6,7 +6,7 @@ const { ServiceManager } = require("dunebot-core");
  * @author firedervil
  */
 
-const { getLocalizedNewsList } = require('../helpers/newsHelper');
+const { NewsHelper } = require('dunebot-sdk/utils');
 
 /**
  * Controller für Frontend-Routen
@@ -29,13 +29,17 @@ module.exports.getIndex = async (req, res) => {
         
         // News aus der Datenbank laden
         let newsList = [];
+        let carouselNews = []; // Letzte 3 News für den Hero-Carousel
         try {
             const rawNews = await dbService.query(
                 "SELECT * FROM news WHERE status = 'published' ORDER BY created_at DESC LIMIT 6"
             );
             
             // News lokalisieren basierend auf User-Locale
-            newsList = getLocalizedNewsList(rawNews, userLocale);
+            newsList = NewsHelper.getLocalizedNewsList(rawNews, userLocale);
+            
+            // Letzte 3 News für Carousel-Slides extrahieren
+            carouselNews = newsList.slice(0, 3);
         } catch (err) {
             Logger.error("Fehler beim Laden der News:", err);
         }
@@ -48,8 +52,8 @@ module.exports.getIndex = async (req, res) => {
             );
             
             // Changelogs lokalisieren
-            const { getLocalizedChangelogList } = require('../helpers/changelogHelper');
-            changelogsList = getLocalizedChangelogList(rawChangelogs, userLocale);
+            const { ChangelogHelper } = require('dunebot-sdk/utils');
+            changelogsList = ChangelogHelper.getLocalizedChangelogList(rawChangelogs, userLocale);
         } catch (err) {
             Logger.error("Fehler beim Laden der Changelogs:", err);
         }
@@ -133,6 +137,7 @@ module.exports.getIndex = async (req, res) => {
             title: "Willkommen bei DuneBot",
             user: req.session?.user || null,
             newsList: localizedNewsList,
+            carouselNews: carouselNews, // Letzte 3 News für den Hero-Carousel
             changelogsList: localizedChangelogsList,
             pluginsList: pluginsList
         });

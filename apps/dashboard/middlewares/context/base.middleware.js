@@ -29,6 +29,16 @@ module.exports = async (req, res, next) => {
     try {
         // Core Config laden
         const coreConfig = await pluginManager.getPlugin("core").getConfig();
+        
+        // SuperAdmin globale Configs laden (Versionen, Support-URLs)
+        // WICHTIG: Diese sind GLOBAL (guildId = null) und gelten für alle Guilds
+        const dashboardVersion = await dbService.getConfig('superadmin', 'DASHBOARD_VERSION', 'shared', null);
+        const botVersion = await dbService.getConfig('superadmin', 'BOT_VERSION', 'shared', null);
+        
+        // Versionen zu coreConfig hinzufügen für Frontend-Footer Kompatibilität
+        coreConfig.dashboardVersion = dashboardVersion || '1.0.0';
+        coreConfig.botVersion = botVersion || '1.0.0';
+        
         res.locals.coreConfig = coreConfig;
 
         // Map kurze Sprachcodes auf vollständige Codes
@@ -74,15 +84,15 @@ module.exports = async (req, res, next) => {
             } catch (err) {
                 Logger.warn('[i18n] Fehler beim Laden der Guild-Locale:', err);
             }
-        } else if (req.session.locale) {
-            // Wenn kein Guild-Kontext, nutze Session-Locale als Fallback
+        } else if (req.session && req.session.locale) {
+            // Wenn kein Guild-Kontext, nutze Session-Locale als Fallback (falls Session existiert)
             finalLocale = req.session.locale;
             Logger.debug(`[i18n] Nutze Session-Locale: ${finalLocale}`);
         }
         
         // 2. User-Override prüfen (höchste Priorität!)
         //    → User kann persönliche Sprache unabhängig von Guild setzen
-        if (req.session.user) {
+        if (req.session && req.session.user) {
             const [user] = await dbService.query(
                 "SELECT locale FROM users WHERE _id = ?",
                 [req.session.user.info.id]
@@ -94,14 +104,18 @@ module.exports = async (req, res, next) => {
             }
         }
         
-        // WICHTIG: Session-Locale IMMER aktualisieren, wenn finalLocale ermittelt wurde!
-        // Dies stellt sicher, dass die User-Locale auch im Guild-Kontext verfügbar ist
-        req.session.locale = finalLocale;
-        if (req.session.save && !isGuildContext) {
-            // Session nur außerhalb Guild-Kontext speichern (Performance)
-            req.session.save((err) => {
-                if (err) Logger.error("[i18n] Failed to save session", err);
-            });
+        // WICHTIG: Session-Locale NUR für authentifizierte User speichern!
+        // Anonyme User bekommen keine Session-Erstellung durch Locale-Tracking
+        if (req.session && req.session.user && req.session.locale !== finalLocale) {
+            req.session.locale = finalLocale;
+            Logger.debug(`[i18n] Session-Locale für User aktualisiert: ${finalLocale}`);
+            
+            if (req.session.save && !isGuildContext) {
+                // Session nur außerhalb Guild-Kontext speichern (Performance)
+                req.session.save((err) => {
+                    if (err) Logger.error("[i18n] Failed to save session", err);
+                });
+            }
         }
 
         // Normalisiere Sprachcode falls nötig
@@ -259,13 +273,16 @@ module.exports = async (req, res, next) => {
         if (isGuildRoute && guildId && !isAssetRoute) {
             try {
                 const navigationManager = ServiceManager.get('navigationManager');
-                const mainMenu = await navigationManager.getMainMenuWithSubmenu(guildId);
+                const userId = res.locals.user?.id || null; // User ID für Permission-Filterung
+                const mainMenu = await navigationManager.getMainMenuWithSubmenu(guildId, userId);
                 
                 // Navigation für das Template bereitstellen
                 res.locals.guildNav = mainMenu;
                 
                 Logger.debug('[Navigation] Navigation für Template bereitgestellt:', {
-                    itemCount: mainMenu?.length || 0
+                    itemCount: mainMenu?.length || 0,
+                    userId: userId || 'anonymous',
+                    permissionFiltered: !!userId
                 });
             } catch (error) {
                 Logger.error('[Navigation] Fehler beim Laden der Navigation:', error);
@@ -442,6 +459,10 @@ module.exports = async (req, res, next) => {
       
         if (themeManager) {
             await themeManager.loadGlobalNotifications(req, res);
+            // Map globalNotifications zu notifications für Template-Kompatibilität
+            if (res.locals.globalNotifications && Array.isArray(res.locals.globalNotifications)) {
+                res.locals.notifications = res.locals.globalNotifications;
+            }
         }
 
         

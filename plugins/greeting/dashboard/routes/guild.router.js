@@ -9,12 +9,13 @@
 const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
 /**
  * GET /guild/:guildId/plugins/greeting/settings
  * Zeigt Guild-spezifische Greeting-Einstellungen
  */
-router.get('/settings', async (req, res) => {
+router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
     const dbService = ServiceManager.get('dbService');
     const ipcServer = ServiceManager.get('ipcServer');
@@ -152,7 +153,7 @@ router.get('/settings', async (req, res) => {
  * PUT /guild/:guildId/plugins/greeting/settings
  * Speichert Guild-spezifische Greeting-Einstellungen
  */
-router.put('/settings', async (req, res) => {
+router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;

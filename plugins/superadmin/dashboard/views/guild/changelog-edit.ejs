@@ -73,7 +73,7 @@
                         </div>
                     </div>
 
-                    <!-- Sprach-Tabs -->
+                    <!-- Sprach-Tabs mit Settings -->
                     <ul class="nav nav-tabs mb-3" id="langTabs" role="tablist">
                         <li class="nav-item">
                             <a class="nav-link active" id="de-tab" data-toggle="tab" href="#de-content" role="tab">
@@ -83,6 +83,11 @@
                         <li class="nav-item">
                             <a class="nav-link" id="en-tab" data-toggle="tab" href="#en-content" role="tab">
                                 <i class="fas fa-flag mr-1"></i> English
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="settings-tab" data-toggle="tab" href="#settings-content" role="tab">
+                                <i class="fas fa-cog mr-1"></i> Einstellungen
                             </a>
                         </li>
                     </ul>
@@ -115,7 +120,7 @@
                                           id="changes_de" 
                                           name="changes_de" 
                                           rows="15" 
-                                          required><%= changelog?.changes_de || '' %></textarea>
+                                          data-required="true"><%= changelog?.changes_de || '' %></textarea>
                                 <small class="form-text text-muted">
                                     <strong>Hierarchische Struktur verwenden:</strong><br>
                                     <code># Hauptgruppe</code> (z.B. "# PLUGINS" oder "# SYSTEM")<br>
@@ -142,13 +147,19 @@
 
                         <!-- English Tab -->
                         <div class="tab-pane fade" id="en-content" role="tabpanel">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                <strong>Optional:</strong> Englische Übersetzung kann leer gelassen werden. Der Changelog wird dann nur auf Deutsch angezeigt.
+                            </div>
+
                             <div class="form-group">
-                                <label for="title_en"><%= tr('CHANGELOGS.FORM.TITLE') %> (EN) <span class="text-danger">*</span></label>
+                                <label for="title_en"><%= tr('CHANGELOGS.FORM.TITLE') %> (EN)</label>
                                 <input type="text" 
                                        class="form-control" 
                                        id="title_en" 
                                        name="title_en" 
-                                       value="<%= changelog?.title_en || '' %>">
+                                       value="<%= changelog?.title_en || '' %>"
+                                       placeholder="Optional - leave empty for German-only">
                             </div>
 
                             <div class="form-group">
@@ -156,16 +167,18 @@
                                 <textarea class="form-control" 
                                           id="description_en" 
                                           name="description_en" 
-                                          rows="3"><%= changelog?.description_en || '' %></textarea>
+                                          rows="3"
+                                          placeholder="Optional - leave empty for German-only"><%= changelog?.description_en || '' %></textarea>
                                 <small class="form-text text-muted">Short summary of the version</small>
                             </div>
 
                             <div class="form-group">
-                                <label for="changes_en"><%= tr('CHANGELOGS.FORM.CHANGES') %> (EN) <span class="text-danger">*</span></label>
+                                <label for="changes_en"><%= tr('CHANGELOGS.FORM.CHANGES') %> (EN)</label>
                                 <textarea class="form-control font-monospace" 
                                           id="changes_en" 
                                           name="changes_en" 
-                                          rows="15"><%= changelog?.changes_en || '' %></textarea>
+                                          rows="15"
+                                          placeholder="Optional - leave empty for German-only"><%= changelog?.changes_en || '' %></textarea>
                                 <small class="form-text text-muted">
                                     <strong>Use hierarchical structure:</strong><br>
                                     <code># Main Group</code> (e.g. "# PLUGINS" or "# SYSTEM")<br>
@@ -189,19 +202,74 @@
                                 </small>
                             </div>
                         </div>
+
+                        <!-- Settings Tab (NEU!) -->
+                        <div class="tab-pane fade" id="settings-content" role="tabpanel">
+                            <h5 class="mb-3">Changelog-Einstellungen</h5>
+
+                            <!-- Status -->
+                            <div class="form-group">
+                                <label for="status">Status <span class="text-danger">*</span></label>
+                                <select class="form-control" id="status" name="status" required>
+                                    <option value="draft" <%= changelog?.status === 'draft' ? 'selected' : '' %>>
+                                        📝 Entwurf (nicht sichtbar)
+                                    </option>
+                                    <option value="published" <%= !changelog || changelog?.status === 'published' ? 'selected' : '' %>>
+                                        ✅ Veröffentlicht
+                                    </option>
+                                </select>
+                                <small class="form-text text-muted">
+                                    Entwürfe sind nur im SuperAdmin-Bereich sichtbar, nicht auf der Website
+                                </small>
+                            </div>
+
+                            <!-- Slug -->
+                            <div class="form-group">
+                                <label for="slug">Slug <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="slug" 
+                                       name="slug" 
+                                       value="<%= changelog?.slug || '' %>"
+                                       placeholder="z.B. v2-1-0"
+                                       required>
+                                <small class="form-text text-muted">
+                                    URL-freundlicher Name (wird automatisch aus Version generiert)
+                                </small>
+                            </div>
+
+                            <!-- Author -->
+                            <div class="form-group">
+                                <label for="author">Autor <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="author" 
+                                       name="author" 
+                                       value="<%= changelog?.author || user?.info?.username || 'FireBot Team' %>"
+                                       required>
+                                <small class="form-text text-muted">
+                                    Name des Autors (wird im Changelog angezeigt)
+                                </small>
+                            </div>
+
+                            <hr>
+
+                            <!-- Release Date (verschoben aus Hauptbereich) -->
+                            <div class="form-group">
+                                <label for="release_date"><%= tr('CHANGELOGS.FORM.RELEASED_AT') %> <span class="text-danger">*</span></label>
+                                <input type="datetime-local" 
+                                       class="form-control" 
+                                       id="release_date" 
+                                       name="release_date" 
+                                       value="<%= changelog?.release_date ? new Date(changelog.release_date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16) %>"
+                                       required>
+                            </div>
+                        </div>
                     </div>
 
-                    <hr>
+                    <hr class="mt-4">
 
-                    <div class="form-group">
-                        <label for="release_date"><%= tr('CHANGELOGS.FORM.RELEASED_AT') %> <span class="text-danger">*</span></label>
-                        <input type="datetime-local" 
-                               class="form-control" 
-                               id="release_date" 
-                               name="release_date" 
-                               value="<%= changelog?.release_date ? new Date(changelog.release_date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16) %>"
-                               required>
-                    </div>
+                    <!-- Release Date entfernt (jetzt in Settings-Tab) -->
                 </div>
 
                 <div class="card-footer">
@@ -246,12 +314,140 @@
     </div>
 </div>
 
+<!-- TinyMCE WYSIWYG Editor -->
+<script src="/themes/default/assets/vendor/tinymce/tinymce.min.js"></script>
 <script>
-// Hierarchisches Parsing für Vorschau
+console.log('[TinyMCE] Script geladen, warte auf DOMContentLoaded...');
+
+// TinyMCE für Deutsch und English Textareas initialisieren
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[TinyMCE] DOM geladen, initialisiere Editor...');
+    
+    // Prüfe ob Textareas existieren
+    const textareas = document.querySelectorAll('#changes_de, #changes_en, #description_de, #description_en');
+    console.log('[TinyMCE] Gefundene Textareas:', textareas.length);
+    
+    if (textareas.length === 0) {
+        console.error('[TinyMCE] FEHLER: Keine Textareas gefunden!');
+        return;
+    }
+    
+    // Konfiguration für beide Sprachen
+    const tinymceConfig = {
+        selector: '#changes_de, #changes_en, #description_de, #description_en',
+        height: 500,
+        menubar: true,
+        plugins: [
+            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+            'insertdatetime', 'media', 'table', 'help', 'wordcount'
+        ],
+        toolbar: 'undo redo | blocks | ' +
+            'bold italic forecolor | alignleft aligncenter ' +
+            'alignright alignjustify | bullist numlist outdent indent | ' +
+            'removeformat | help',
+        content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
+        // language: 'de', // ❌ Deaktiviert - TinyMCE 7 benötigt separat heruntergeladene Language Packs
+        branding: false,
+        promotion: false,
+        license_key: 'gpl', // Open Source GPL Lizenz
+        
+        // Automatische Höhenanpassung
+        autoresize_bottom_margin: 50,
+        min_height: 400,
+        
+        // Basis-Formatierungen
+        block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Preformatted=pre',
+        
+        // ✅ FIX: URL-Handling für CSP-Compliance
+        relative_urls: true,        // Nutze relative URLs statt absolute
+        remove_script_host: true,   // Entferne Host aus URLs
+        convert_urls: false,        // Nicht automatisch URLs konvertieren
+        
+        // Setup-Callback für Custom-Logik
+        setup: function(editor) {
+            editor.on('init', function() {
+                console.log('[TinyMCE] ✅ Editor initialisiert für:', editor.targetElm.id);
+            });
+        }
+    };
+    
+    // TinyMCE initialisieren
+    console.log('[TinyMCE] Starte tinymce.init()...');
+    tinymce.init(tinymceConfig).then(function(editors) {
+        console.log('[TinyMCE] ✅ Erfolgreich initialisiert, Anzahl Editoren:', editors.length);
+    }).catch(function(error) {
+        console.error('[TinyMCE] ❌ FEHLER bei Initialisierung:', error);
+    });
+});
+</script>
+
+<script>
+// Hierarchisches Parsing für Vorschau (✅ MIT HTML-SUPPORT!)
 function parseHierarchicalChangelog(changesText) {
     if (!changesText || typeof changesText !== 'string') return [];
     
-    const lines = changesText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    // ✅ HTML-Tags konvertieren (wie im Server-Parser)
+    let processedText = changesText;
+    
+    // ⚡ KRITISCH: <br> Tags in Newlines umwandeln (ZUERST!)
+    // TinyMCE speichert mehrere Items in EINEM <p>-Tag mit <br>-Trennung!
+    // <p>! Fix 1<br>! Fix 2<br>! Fix 3</p> → <p>! Fix 1</p>\n<p>! Fix 2</p>\n<p>! Fix 3</p>
+    processedText = processedText.replace(/<br\s*\/?>/gi, '\n');
+    
+    // <h2>Header</h2> → # Header
+    processedText = processedText.replace(/<h2[^>]*>(.*?)<\/h2>/gi, (match, content) => {
+        return '\n# ' + content.trim() + '\n';
+    });
+    
+    // <h3>Subheader</h3> → ## Subheader
+    processedText = processedText.replace(/<h3[^>]*>(.*?)<\/h3>/gi, (match, content) => {
+        return '\n## ' + content.trim() + '\n';
+    });
+    
+    // <p>! Bugfix...</p> → ! Bugfix... (BEHALTE HTML im Text!)
+    // ⚡ WICHTIG: Durch <br>→\n Konvertierung sind jetzt mehrere Zeilen getrennt!
+    processedText = processedText.replace(/<p[^>]*>([!+\-*])\s+(.*?)<\/p>/gi, (match, symbol, content) => {
+        return '\n' + symbol + ' ' + content.trim() + '\n';
+    });
+    
+    // ✅ Description-Support: <p>Normal text</p> → DESC: Normal text
+    processedText = processedText.replace(/<p[^>]*>((?![!+\-*]\s).*?)<\/p>/gi, (match, content) => {
+        const trimmed = content.trim();
+        if (trimmed.length > 0 && !/^[!+\-*]\s/.test(trimmed)) {
+            return '\nDESC: ' + trimmed + '\n';
+        }
+        return '';
+    });
+    
+    // <ul>/<li> Listen → * Items
+    processedText = processedText.replace(/<li[^>]*>(.*?)<\/li>/gi, (match, content) => {
+        const trimmed = content.trim();
+        if (/^[!+\-*]\s/.test(trimmed)) {
+            return '\n' + trimmed + '\n';
+        }
+        return '\n* ' + trimmed + '\n';
+    });
+    processedText = processedText.replace(/<\/?ul[^>]*>/gi, '');
+    processedText = processedText.replace(/<\/?ol[^>]*>/gi, '');
+    
+    // HTML-Entities dekodieren
+    processedText = processedText.replace(/&nbsp;/g, ' ');
+    processedText = processedText.replace(/&lt;/g, '<');
+    processedText = processedText.replace(/&gt;/g, '>');
+    processedText = processedText.replace(/&amp;/g, '&');
+    processedText = processedText.replace(/&quot;/g, '"');
+    processedText = processedText.replace(/&uuml;/g, 'ü');
+    processedText = processedText.replace(/&ouml;/g, 'ö');
+    processedText = processedText.replace(/&auml;/g, 'ä');
+    processedText = processedText.replace(/&Uuml;/g, 'Ü');
+    processedText = processedText.replace(/&Ouml;/g, 'Ö');
+    processedText = processedText.replace(/&Auml;/g, 'Ä');
+    processedText = processedText.replace(/&szlig;/g, 'ß');
+    
+    console.log('[Parser] 🔧 Processed Text (nach <br> → \\n):', processedText.substring(0, 500));
+    
+    const lines = processedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     const result = [];
     let currentGroup = null;
     let currentSubgroup = null;
@@ -274,7 +470,7 @@ function parseHierarchicalChangelog(changesText) {
 
         if (line.startsWith('## ')) {
             const title = line.substring(3).trim();
-            currentSubgroup = { type: 'subgroup', title, level: 2, items: [] };
+            currentSubgroup = { type: 'subgroup', title, level: 2, description: null, items: [] };
             
             if (!currentGroup) {
                 currentGroup = { type: 'group', title: 'Änderungen', level: 1, children: [] };
@@ -284,11 +480,38 @@ function parseHierarchicalChangelog(changesText) {
             currentGroup.children.push(currentSubgroup);
             continue;
         }
+        
+        // ✅ Description-Zeilen
+        if (line.startsWith('DESC: ')) {
+            const descText = line.substring(6).trim();
+            
+            if (currentSubgroup) {
+                if (currentSubgroup.description) {
+                    currentSubgroup.description += '<br>' + descText;
+                } else {
+                    currentSubgroup.description = descText;
+                }
+            } else if (currentGroup) {
+                let generalSubgroup = currentGroup.children.find(sg => sg.title === 'Allgemein');
+                if (!generalSubgroup) {
+                    generalSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, description: descText, items: [] };
+                    currentGroup.children.push(generalSubgroup);
+                    currentSubgroup = generalSubgroup;
+                } else {
+                    if (generalSubgroup.description) {
+                        generalSubgroup.description += '<br>' + descText;
+                    } else {
+                        generalSubgroup.description = descText;
+                    }
+                }
+            }
+            continue;
+        }
 
         const firstChar = line.charAt(0);
         if (itemTypeMap[firstChar]) {
             const itemMeta = itemTypeMap[firstChar];
-            const text = line.substring(1).trim();
+            const text = line.substring(1).trim(); // ✅ Text BEHÄLT HTML!
             const item = {
                 type: itemMeta.type,
                 icon: itemMeta.icon,
@@ -302,14 +525,14 @@ function parseHierarchicalChangelog(changesText) {
             } else if (currentGroup) {
                 let generalSubgroup = currentGroup.children.find(sg => sg.title === 'Allgemein');
                 if (!generalSubgroup) {
-                    generalSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, items: [] };
+                    generalSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, description: null, items: [] };
                     currentGroup.children.push(generalSubgroup);
                 }
                 generalSubgroup.items.push(item);
                 currentSubgroup = generalSubgroup;
             } else {
                 currentGroup = { type: 'group', title: 'Änderungen', level: 1, children: [] };
-                currentSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, items: [] };
+                currentSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, description: null, items: [] };
                 currentGroup.children.push(currentSubgroup);
                 result.push(currentGroup);
                 currentSubgroup.items.push(item);
@@ -341,6 +564,13 @@ function renderHierarchicalHTML(hierarchicalData) {
                         <h5 class="text-muted mb-2">
                             <i class="fas fa-folder-open mr-2"></i>${subgroup.title}
                         </h5>`;
+                    
+                    // ✅ Description anzeigen (falls vorhanden)
+                    if (subgroup.description) {
+                        html += `<div class="alert alert-info ml-4 mb-2" style="font-style: italic; font-size: 0.9rem;">
+                            ${subgroup.description}
+                        </div>`;
+                    }
                     
                     if (subgroup.items && subgroup.items.length > 0) {
                         html += '<ul class="list-unstyled ml-4">';
@@ -377,15 +607,44 @@ document.addEventListener('DOMContentLoaded', function() {
     const previewDe = document.getElementById('preview-de');
     const previewEn = document.getElementById('preview-en');
 
+    // Auto-generate slug from version
+    const versionInput = document.getElementById('version');
+    const slugInput = document.getElementById('slug');
+    const isNewChangelog = <%= changelog && changelog.id ? 'false' : 'true' %>;
+    
+    if (versionInput && slugInput) {
+        versionInput.addEventListener('input', function(e) {
+            if (!slugInput.value || isNewChangelog) {
+                // Version zu Slug: "2.1.0" → "v2-1-0"
+                const slug = 'v' + e.target.value
+                    .replace(/\./g, '-')
+                    .replace(/[^a-z0-9-]/gi, '')
+                    .toLowerCase();
+                slugInput.value = slug;
+            }
+        });
+    }
+
     previewBtn.addEventListener('click', function(e) {
         e.preventDefault();
         
+        // ✅ NEU: Content von TinyMCE-Editoren holen (nicht von Textarea!)
+        const changesDeContent = tinymce.get('changes_de') ? tinymce.get('changes_de').getContent() : changesDe.value;
+        const changesEnContent = tinymce.get('changes_en') ? tinymce.get('changes_en').getContent() : changesEn.value;
+        
+        console.log('[Preview] 🔍 DE RAW HTML (KOMPLETT):');
+        console.log(changesDeContent); // ✅ VOLLSTÄNDIGES HTML anzeigen
+        console.log('[Preview] 🔍 EN RAW HTML (KOMPLETT):');
+        console.log(changesEnContent);
+        
         // Parse und rendere Deutsch
-        const hierarchyDe = parseHierarchicalChangelog(changesDe.value);
+        const hierarchyDe = parseHierarchicalChangelog(changesDeContent);
+        console.log('[Preview] ✅ DE Hierarchy (parsed):', hierarchyDe);
         previewDe.innerHTML = renderHierarchicalHTML(hierarchyDe);
         
         // Parse und rendere English
-        const hierarchyEn = parseHierarchicalChangelog(changesEn.value);
+        const hierarchyEn = parseHierarchicalChangelog(changesEnContent);
+        console.log('[Preview] ✅ EN Hierarchy (parsed):', hierarchyEn);
         previewEn.innerHTML = renderHierarchicalHTML(hierarchyEn);
         
         // Zeige Vorschau
@@ -396,5 +655,51 @@ document.addEventListener('DOMContentLoaded', function() {
     closePreviewBtn.addEventListener('click', function() {
         previewCard.style.display = 'none';
     });
+    
+    // ⚡ KRITISCH: Form-Submit-Handler für TinyMCE-Sync
+    const changelogForm = document.querySelector('form[action*="/changelogs/save"]');
+    if (changelogForm) {
+        changelogForm.addEventListener('submit', function(e) {
+            console.log('[ChangelogEdit] Form submit triggered, syncing TinyMCE...');
+            
+            // TinyMCE-Inhalte in Original-Textareas zurückschreiben
+            if (typeof tinymce !== 'undefined') {
+                tinymce.triggerSave(); // Synchronisiert ALLE Editoren
+                console.log('[ChangelogEdit] ✅ TinyMCE content synced');
+                
+                // ⚡ VALIDIERUNG: Prüfe required Felder
+                const requiredFields = ['changes_de', 'description_de', 'title_de'];
+                let hasErrors = false;
+                
+                requiredFields.forEach(fieldName => {
+                    const field = document.getElementById(fieldName);
+                    if (field) {
+                        const isEmpty = !field.value || field.value.trim() === '';
+                        console.log(`[ChangelogEdit] Field ${fieldName}: ${isEmpty ? '❌ LEER' : '✅ gefüllt'} (${field.value.length} chars)`);
+                        
+                        if (isEmpty) {
+                            // Markiere als invalid
+                            field.classList.add('is-invalid');
+                            hasErrors = true;
+                        } else {
+                            // Entferne is-invalid wenn jetzt gefüllt
+                            field.classList.remove('is-invalid');
+                        }
+                    }
+                });
+                
+                // Verhindere Submit wenn Fehler
+                if (hasErrors) {
+                    e.preventDefault();
+                    alert('Bitte fülle alle Pflichtfelder aus (Titel, Beschreibung, Änderungen auf Deutsch)');
+                    console.error('[ChangelogEdit] ❌ Validierung fehlgeschlagen - Submit abgebrochen');
+                    return false;
+                }
+            }
+            
+            // Form wird normal weiter abgesendet (keine e.preventDefault!)
+        });
+        console.log('[ChangelogEdit] ✅ Form submit handler registered');
+    }
 });
 </script>

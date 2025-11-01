@@ -8,15 +8,15 @@
 
       <nav id="navmenu" class="navmenu">
         <ul>
-          <li><a href="/" class="active"><%= tr('LANDING.HOME') %></a></li>
-          <li><a href="#features"><%= tr('LANDING.FEATURES') %></a></li>
-          <li><a href="#news"><%= tr('LANDING.NEWS') %></a></li>
-          <li class="dropdown"><a href="#documentation"><span><%= tr('LANDING.SERVICES') %></span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+          <li><a href="/"><%= tr('LANDING.HOME') %></a></li>
+          <li><a href="/#features"><%= tr('LANDING.FEATURES') %></a></li>
+          <li><a href="/#news"><%= tr('LANDING.NEWS') %></a></li>
+          <li class="dropdown"><a href="/#documentation"><span><%= tr('LANDING.SERVICES') %></span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
             <ul>
-              <li><a href="#documentation"><%= tr('LANDING.DOCUMENTATION') %></a></li>
+              <li><a href="/#documentation"><%= tr('LANDING.DOCUMENTATION') %></a></li>
               <li><a href="/changelogs"><%= tr('LANDING.CHANGELOGS') %></a></li>
-              <li><a href="#"><%= tr('LANDING.PLUGINS') %></a></li>
-              <li><a href="<%= coreConfig.githubUrl %>"><%= tr('LANDING.GITHUB') %></a></li>
+              <li><a href="/#plugins"><%= tr('LANDING.PLUGINS') %></a></li>
+              <li><a href="<%= coreConfig.githubUrl %>" target="_blank"><%= tr('LANDING.GITHUB') %></a></li>
               <li><a href="/tos"><%= tr('FOOTER.TERMS_OF_SERVICE') %></a></li>
               <li><a href="/privacy"><%= tr('FOOTER.PRIVACY_POLICY') %></a></li>
               <li><a href="/guild"><%= tr('LANDING.DASHBOARD') %></a></li>

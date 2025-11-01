@@ -120,15 +120,16 @@ class ThemeManager {
 
 
     /**
-     * Gibt die Navigation für einen Bereich zurück.
+     * Gibt die Navigation für einen Bereich zurück (mit Permission-Filterung)
      * Holt die Navigation immer vom NavigationManager.
-     * @param {string} area - Bereich (z.B. 'guild', 'frontend', 'auth')
+     * @param {string} area - Bereich (Guild ID)
+     * @param {string} [userId=null] - User ID für Permission-Filterung (optional)
      * @returns {Promise<Array>} Navigationseinträge für den Bereich
      * @author firedervil
      */
-    async getNavigation(area) {
+    async getNavigation(area, userId = null) {
         const navigationManager = ServiceManager.get('navigationManager');
-        return await navigationManager.getNavigation(area);
+        return await navigationManager.getNavigation(area, userId);
     }
 
     /**
@@ -589,6 +590,96 @@ class ThemeManager {
                 : (BigInt(user.info.id) >> BigInt(22)) % BigInt(5);
             
             return `https://cdn.discordapp.com/embed/avatars/${defaultAvatarIndex}.png`;
+        };
+
+        // ============================================================================
+        // PERMISSION HELPERS - Zugriff auf User-Berechtigungen in Views
+        // ============================================================================
+        
+        /**
+         * Prüft ob der aktuelle User eine bestimmte Permission hat
+         * Nutzt: this.userPermissions (aus loadUserPermissions Middleware)
+         * 
+         * Aufruf in EJS: <% if (hasPermission('gameserver.start')) { %>
+         * 
+         * @param {string} permissionKey - Permission-Key (z.B. 'gameserver.start')
+         * @returns {boolean} - Hat User die Permission?
+         */
+        this.app.locals.hasPermission = function(permissionKey) {
+            // this.userPermissions kommt von res.locals (siehe loadUserPermissions middleware)
+            if (!this.userPermissions || !this.userPermissions.permissions) {
+                return false;
+            }
+            
+            // Wildcard-Check (Admin hat alles)
+            if (this.userPermissions.permissions['*'] === true || 
+                this.userPermissions.permissions['wildcard'] === true) {
+                return true;
+            }
+            
+            // Direkte Permission
+            if (this.userPermissions.permissions[permissionKey] === true) {
+                return true;
+            }
+            
+            // Wildcard für Kategorie (z.B. 'gameserver.*' erlaubt 'gameserver.start')
+            const parts = permissionKey.split('.');
+            for (let i = parts.length - 1; i >= 0; i--) {
+                const wildcardKey = parts.slice(0, i).join('.') + '.*';
+                if (this.userPermissions.permissions[wildcardKey] === true) {
+                    return true;
+                }
+            }
+            
+            return false;
+        };
+        
+        /**
+         * Prüft ob User MINDESTENS EINE der angegebenen Permissions hat
+         * 
+         * Aufruf in EJS: <% if (hasAnyPermission(['gameserver.start', 'gameserver.stop'])) { %>
+         * 
+         * @param {Array<string>} permissionKeys - Array von Permission-Keys
+         * @returns {boolean} - Hat User mindestens eine Permission?
+         */
+        this.app.locals.hasAnyPermission = function(permissionKeys) {
+            if (!Array.isArray(permissionKeys)) return false;
+            return permissionKeys.some(perm => this.hasPermission(perm));
+        };
+        
+        /**
+         * Prüft ob User ALLE angegebenen Permissions hat
+         * 
+         * Aufruf in EJS: <% if (hasAllPermissions(['gameserver.view', 'gameserver.start'])) { %>
+         * 
+         * @param {Array<string>} permissionKeys - Array von Permission-Keys
+         * @returns {boolean} - Hat User alle Permissions?
+         */
+        this.app.locals.hasAllPermissions = function(permissionKeys) {
+            if (!Array.isArray(permissionKeys)) return false;
+            return permissionKeys.every(perm => this.hasPermission(perm));
+        };
+        
+        /**
+         * Prüft ob der aktuelle User Guild-Owner ist
+         * 
+         * Aufruf in EJS: <% if (isGuildOwner()) { %>
+         * 
+         * @returns {boolean} - Ist User Guild-Owner?
+         */
+        this.app.locals.isGuildOwner = function() {
+            return this.userPermissions?.isOwner === true;
+        };
+        
+        /**
+         * Gibt alle Permissions des aktuellen Users zurück (für Debugging)
+         * 
+         * Aufruf in EJS: <%- JSON.stringify(getUserPermissions(), null, 2) %>
+         * 
+         * @returns {Object} - User-Permissions-Objekt
+         */
+        this.app.locals.getUserPermissions = function() {
+            return this.userPermissions?.permissions || {};
         };
 
         Logger.debug('View-Engine konfiguriert mit Pfaden:', this.app.get('views'));

@@ -24,6 +24,148 @@
 
     "ENABLED": "Enabled",
     "DISABLED": "Disabled",
+    
+    "PERM_SETTINGS_VIEW": "View Settings",
+    "PERM_SETTINGS_VIEW_DESC": "Allows viewing guild settings",
+    "PERM_SETTINGS_EDIT": "Edit Settings",
+    "PERM_SETTINGS_EDIT_DESC": "Allows editing guild settings (prefix, language, etc.)",
+    
+    "PERM_PLUGINS_VIEW": "View Plugins",
+    "PERM_PLUGINS_VIEW_DESC": "Allows viewing installed plugins",
+    "PERM_PLUGINS_MANAGE": "Manage Plugins",
+    "PERM_PLUGINS_MANAGE_DESC": "Allows enabling/disabling plugins (CRITICAL)",
+    
+    "PERM_NAVIGATION_VIEW": "View Navigation",
+    "PERM_NAVIGATION_VIEW_DESC": "Allows viewing navigation settings",
+    "PERM_NAVIGATION_EDIT": "Edit Navigation",
+    "PERM_NAVIGATION_EDIT_DESC": "Allows editing navigation structure",
+    
+    "PERM_LOCALES_VIEW": "View Translations",
+    "PERM_LOCALES_VIEW_DESC": "Allows viewing locale bundles",
+    "PERM_LOCALES_EDIT": "Edit Translations",
+    "PERM_LOCALES_EDIT_DESC": "Allows editing translations",
+    
+    "PERM_DONATE_VIEW": "View Donations",
+    "PERM_DONATE_VIEW_DESC": "Allows viewing donation area",
+    "PERM_DONATE_CREATE": "Create Donations",
+    "PERM_DONATE_CREATE_DESC": "Allows creating donation links via Stripe",
+    
+    "CORE": {
+        "PERM_SETTINGS_VIEW": "View Settings",
+        "PERM_SETTINGS_VIEW_DESC": "Allows viewing guild settings",
+        "PERM_SETTINGS_EDIT": "Edit Settings",
+        "PERM_SETTINGS_EDIT_DESC": "Allows editing guild settings (prefix, language, etc.)",
+        "PERM_PLUGINS_VIEW": "View Plugins",
+        "PERM_PLUGINS_VIEW_DESC": "Allows viewing installed plugins",
+        "PERM_PLUGINS_MANAGE": "Manage Plugins",
+        "PERM_PLUGINS_MANAGE_DESC": "Allows enabling/disabling plugins (CRITICAL)",
+        "PERM_NAVIGATION_VIEW": "View Navigation",
+        "PERM_NAVIGATION_VIEW_DESC": "Allows viewing navigation settings",
+        "PERM_NAVIGATION_EDIT": "Edit Navigation",
+        "PERM_NAVIGATION_EDIT_DESC": "Allows editing navigation structure",
+        "PERM_LOCALES_VIEW": "View Translations",
+        "PERM_LOCALES_VIEW_DESC": "Allows viewing locale bundles",
+        "PERM_LOCALES_EDIT": "Edit Translations",
+        "PERM_LOCALES_EDIT_DESC": "Allows editing translations",
+        "PERM_DONATE_VIEW": "View Donations",
+        "PERM_DONATE_VIEW_DESC": "Allows viewing donation area",
+        "PERM_DONATE_CREATE": "Create Donations",
+        "PERM_DONATE_CREATE_DESC": "Allows creating donation links via Stripe"
+    },
+    
+    "PERMISSIONS": {
+        "DASHBOARD_ACCESS": "Dashboard Access",
+        "DASHBOARD_ACCESS_DESC": "Allows basic access to the dashboard",
+        "DASHBOARD_SETTINGS_VIEW": "View Dashboard Settings",
+        "DASHBOARD_SETTINGS_VIEW_DESC": "Allows viewing dashboard configuration",
+        "DASHBOARD_SETTINGS_EDIT": "Edit Dashboard Settings",
+        "DASHBOARD_SETTINGS_EDIT_DESC": "Allows editing dashboard settings",
+        
+        "USERS_VIEW": "View Users",
+        "USERS_VIEW_DESC": "Allows viewing user list",
+        "USERS_INVITE": "Invite Users",
+        "USERS_INVITE_DESC": "Allows adding new users to the system",
+        "USERS_EDIT": "Edit Users",
+        "USERS_EDIT_DESC": "Allows editing user data",
+        "USERS_REMOVE": "Remove Users",
+        "USERS_REMOVE_DESC": "Allows removing users from the system",
+        
+        "GROUPS_VIEW": "View Groups",
+        "GROUPS_VIEW_DESC": "Allows viewing permission groups",
+        "GROUPS_CREATE": "Create Groups",
+        "GROUPS_CREATE_DESC": "Allows creating new permission groups",
+        "GROUPS_EDIT": "Edit Groups",
+        "GROUPS_EDIT_DESC": "Allows editing existing groups",
+        "GROUPS_DELETE": "Delete Groups",
+        "GROUPS_DELETE_DESC": "Allows deleting permission groups",
+        
+        "ASSIGN": "Assign Permissions",
+        "ASSIGN_DESC": "Allows assigning permissions to groups (CRITICAL)",
+        
+        "SUPERADMIN_ALL": "SuperAdmin (All Rights)",
+        "SUPERADMIN_ALL_DESC": "Complete access to all functions (VERY CRITICAL)",
+        
+        "AUTOMOD_SETTINGS_VIEW": "View AutoMod Settings",
+        "AUTOMOD_SETTINGS_VIEW_DESC": "Allows viewing AutoMod configuration",
+        "AUTOMOD_SETTINGS_EDIT": "Edit AutoMod Settings",
+        "AUTOMOD_SETTINGS_EDIT_DESC": "Allows editing AutoMod rules",
+        
+        "GAMESERVER_VIEW": "View Gameservers",
+        "GAMESERVER_VIEW_DESC": "Allows viewing gameserver list",
+        "GAMESERVER_CREATE": "Create Gameservers",
+        "GAMESERVER_CREATE_DESC": "Allows creating new gameservers",
+        "GAMESERVER_DELETE": "Delete Gameservers",
+        "GAMESERVER_DELETE_DESC": "Allows deleting gameservers",
+        "GAMESERVER_START": "Start Gameservers",
+        "GAMESERVER_START_DESC": "Allows starting gameservers",
+        "GAMESERVER_STOP": "Stop Gameservers",
+        "GAMESERVER_STOP_DESC": "Allows stopping gameservers",
+        "GAMESERVER_RESTART": "Restart Gameservers",
+        "GAMESERVER_RESTART_DESC": "Allows restarting gameservers",
+        "GAMESERVER_SETTINGS_VIEW": "View Gameserver Settings",
+        "GAMESERVER_SETTINGS_VIEW_DESC": "Allows viewing gameserver configuration",
+        "GAMESERVER_SETTINGS_EDIT": "Edit Gameserver Settings",
+        "GAMESERVER_SETTINGS_EDIT_DESC": "Allows editing gameserver settings",
+        "GAMESERVER_CONSOLE_VIEW": "View Gameserver Console",
+        "GAMESERVER_CONSOLE_VIEW_DESC": "Allows viewing gameserver console",
+        "GAMESERVER_CONSOLE_EXECUTE": "Use Gameserver Console",
+        "GAMESERVER_CONSOLE_EXECUTE_DESC": "Allows executing commands in gameserver console",
+        "GAMESERVER_FILES_VIEW": "View Gameserver Files",
+        "GAMESERVER_FILES_VIEW_DESC": "Allows viewing gameserver files",
+        "GAMESERVER_FILES_UPLOAD": "Upload Gameserver Files",
+        "GAMESERVER_FILES_UPLOAD_DESC": "Allows uploading files to gameserver",
+        "GAMESERVER_FILES_DOWNLOAD": "Download Gameserver Files",
+        "GAMESERVER_FILES_DOWNLOAD_DESC": "Allows downloading gameserver files",
+        "GAMESERVER_FILES_EDIT": "Edit Gameserver Files",
+        "GAMESERVER_FILES_EDIT_DESC": "Allows editing gameserver files",
+        "GAMESERVER_FILES_DELETE": "Delete Gameserver Files",
+        "GAMESERVER_FILES_DELETE_DESC": "Allows deleting gameserver files",
+        
+        "GREETING_SETTINGS_VIEW": "View Greeting Settings",
+        "GREETING_SETTINGS_VIEW_DESC": "Allows viewing greeting configuration",
+        "GREETING_SETTINGS_EDIT": "Edit Greeting Settings",
+        "GREETING_SETTINGS_EDIT_DESC": "Allows editing greeting messages",
+        
+        "INFORMATION_SETTINGS_VIEW": "View Information Settings",
+        "INFORMATION_SETTINGS_VIEW_DESC": "Allows viewing information configuration",
+        "INFORMATION_SETTINGS_EDIT": "Edit Information Settings",
+        "INFORMATION_SETTINGS_EDIT_DESC": "Allows editing information settings",
+        
+        "MODERATION_VIEW": "View Moderation",
+        "MODERATION_VIEW_DESC": "Allows viewing moderation logs",
+        "MODERATION_WARN": "Warn Users",
+        "MODERATION_WARN_DESC": "Allows warning users",
+        "MODERATION_MUTE": "Mute Users",
+        "MODERATION_MUTE_DESC": "Allows muting users",
+        "MODERATION_KICK": "Kick Users",
+        "MODERATION_KICK_DESC": "Allows kicking users from the server",
+        "MODERATION_BAN": "Ban Users",
+        "MODERATION_BAN_DESC": "Allows banning users from the server",
+        "MODERATION_SETTINGS_VIEW": "View Moderation Settings",
+        "MODERATION_SETTINGS_VIEW_DESC": "Allows viewing moderation configuration",
+        "MODERATION_SETTINGS_EDIT": "Edit Moderation Settings",
+        "MODERATION_SETTINGS_EDIT_DESC": "Allows editing moderation settings"
+    },
 
     "SETTINGS": {
         "GENERAL": {
@@ -183,3 +325,4 @@
         }
     }
 }
+

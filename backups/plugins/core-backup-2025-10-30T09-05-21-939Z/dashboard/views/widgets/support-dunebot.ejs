@@ -1,0 +1,76 @@
+<!-- 
+    Support-Widget für DuneBot Dashboard
+    Zeigt Donation-Button und Supporter-Badge
+-->
+
+<div class="card card-danger card-outline">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-heart text-danger me-2"></i>Unterstütze DuneBot
+        </h3>
+    </div>
+    <div class="card-body text-center">
+        
+        <!-- Haupt-Text -->
+        <p class="mb-3">
+            DuneBot ist <strong>kostenlos</strong> und Open-Source.<br>
+            Hilf uns, das Projekt weiter zu entwickeln!
+        </p>
+        
+        <!-- Supporter-Badge (falls vorhanden) -->
+        <% if (userBadge) { %>
+        <div class="alert alert-success mb-3">
+            <!-- Badge-Icon basierend auf Level -->
+            <% if (userBadge.badge_level === 'platinum') { %>
+                <i class="fas fa-crown fa-2x text-secondary mb-2"></i>
+                <br><strong>⭐⭐⭐⭐ Platinum Supporter</strong>
+            <% } else if (userBadge.badge_level === 'gold') { %>
+                <i class="fas fa-trophy fa-2x text-warning mb-2"></i>
+                <br><strong>⭐⭐⭐ Gold Supporter</strong>
+            <% } else if (userBadge.badge_level === 'silver') { %>
+                <i class="fas fa-medal fa-2x text-secondary mb-2"></i>
+                <br><strong>⭐⭐ Silver Supporter</strong>
+            <% } else { %>
+                <i class="fas fa-award fa-2x text-info mb-2"></i>
+                <br><strong>⭐ Bronze Supporter</strong>
+            <% } %>
+            
+            <div class="mt-2">
+                <small>
+                    <i class="fas fa-heart text-danger me-1"></i>
+                    Vielen Dank für deine <strong>€<%= userBadge.total_donated.toFixed(2) %></strong> Unterstützung!
+                </small>
+            </div>
+        </div>
+        <% } %>
+        
+        <!-- Haupt-Button -->
+        <a href="/guild/<%= guildId %>/plugins/core/donate" 
+           class="btn btn-lg btn-success btn-block mb-3">
+            <i class="fas fa-heart me-2"></i>Jetzt spenden
+        </a>
+        
+        <!-- Community-Stats -->
+        <div class="row text-center">
+            <div class="col-6">
+                <div class="small-box bg-success p-2">
+                    <h4 class="mb-0">€<%= (communityStats.total_amount || 0).toFixed(0) %></h4>
+                    <small>Gesamt</small>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="small-box bg-info p-2">
+                    <h4 class="mb-0"><%= communityStats.supporter_count || 0 %></h4>
+                    <small>Supporter</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info-Text -->
+        <p class="text-muted small mt-3 mb-0">
+            <i class="fas fa-shield-alt me-1"></i>
+            Sichere Zahlung via Stripe
+        </p>
+        
+    </div>
+</div>

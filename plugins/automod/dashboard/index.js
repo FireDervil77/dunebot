@@ -1,5 +1,6 @@
 const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
+const { requirePermission } = require('../../../apps/dashboard/middlewares/permissions.middleware');
 
 const path = require('path');
 
@@ -76,7 +77,7 @@ class AutoModPlugin extends DashboardPlugin {
         Logger.info('Registriere Routen für [AutoMod] Plugin ...');
 
         // === SETTINGS SEITE (Unter Core-Settings) ===
-        this.guildRouter.get('/settings', async (req, res) => {
+        this.guildRouter.get('/settings', requirePermission('AUTOMOD.VIEW'), async (req, res) => {
             const guildId = res.locals.guildId;
             const Logger = ServiceManager.get('Logger');
             
@@ -134,12 +135,12 @@ class AutoModPlugin extends DashboardPlugin {
                 
             } catch (error) {
                 Logger.error('[AutoMod] Fehler beim Laden der Settings:', error);
-                res.status(500).send('Fehler beim Laden der AutoMod-Einstellungen');
+                res.status(500).send('Fehler beim Laden der [AutoMod]-Einstellungen');
             }
         });
 
         // === SETTINGS SPEICHERN ===
-        this.guildRouter.put('/settings', async (req, res) => {
+        this.guildRouter.put('/settings', requirePermission('AUTOMOD.SETTINGS_EDIT'), async (req, res) => {
             const guildId = res.locals.guildId;
             const Logger = ServiceManager.get('Logger');
             const i18n = ServiceManager.get('i18n');
@@ -161,7 +162,7 @@ class AutoModPlugin extends DashboardPlugin {
             };
             
             try {
-                Logger.info(`[AutoMod] 💾 Settings speichern für Guild ${guildId}`, req.body);
+                Logger.info(`[AutoMod] Settings speichern für Guild ${guildId}`, req.body);
                 
                 // Validierung
                 const {
@@ -218,7 +219,7 @@ class AutoModPlugin extends DashboardPlugin {
                 // Settings speichern
                 await AutoModSettings.updateSettings(guildId, updates);
                 
-                Logger.info(`[AutoMod] ✅ Settings gespeichert für Guild ${guildId}`);
+                Logger.info(`[AutoMod] Settings gespeichert für Guild ${guildId}`);
                 
                 res.json({ 
                     success: true, 
@@ -330,7 +331,7 @@ class AutoModPlugin extends DashboardPlugin {
                 title: 'automod:NAV.AUTOMOD',
                 path: `/guild/${guildId}/plugins/automod/settings`,
                 icon: 'fa-solid fa-shield-halved',
-                order: 25,  // Nach Core-Settings (21-24)
+                order: null,  
                 parent: `/guild/${guildId}/plugins/core/settings`,  // ← Parent ist Core-Settings!
                 type: 'main',
                 visible: true
