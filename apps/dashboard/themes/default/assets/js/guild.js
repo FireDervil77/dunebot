@@ -29,18 +29,15 @@ class GuildAjaxHandler {
         const forms = document.querySelectorAll('.guild-ajax-form');
         console.log('[GuildAjax] Gefundene Forms:', forms.length);
         
-        forms.forEach(form => {
-            console.log('[GuildAjax] Registriere Form:', form.dataset.formType);
+        forms.forEach((form, index) => {
+            console.log('[GuildAjax] Registriere Form:', form.dataset.formType, 'Index:', index);
             
-            // Entferne vorherige Event-Listener (falls vorhanden)
-            form.replaceWith(form.cloneNode(true));
-            const freshForm = document.querySelector(`[data-form-type="${form.dataset.formType}"]`);
-            
-            freshForm.addEventListener('submit', e => {
-                console.log('[GuildAjax] Form submitted:', freshForm.dataset.formType);
+            // Event-Listener direkt auf dem Formular registrieren (kein Klonen nötig!)
+            form.addEventListener('submit', e => {
+                console.log('[GuildAjax] Form submitted:', form.dataset.formType);
                 e.preventDefault();
-                GuildAjaxHandler.handleForm(freshForm);
-            }, { once: false }); // once:false erlaubt mehrfaches Submit (bei Fehler z.B.)
+                GuildAjaxHandler.handleForm(form);
+            });
         });
     }
 

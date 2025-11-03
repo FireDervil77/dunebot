@@ -266,11 +266,13 @@ class NavigationManager {
                     sort_order: sortOrder,
                     parent: item.parent || null,
                     type: item.type || this.menuTypes.MAIN,
-                    capability: item.capability || 'manage_guild',
+                    // ✅ requiresOwner-Items benötigen KEINE capability (Zugriff nur via ENV OWNER_IDS!)
+                    capability: item.requiresOwner ? null : (item.capability || 'DASHBOARD.ACCESS'),
                     target: item.target || '_self',
                     visible: item.visible ?? true,
                     classes: item.classes || '',
-                    position: item.position || 'normal'
+                    position: item.position || 'normal',
+                    requiresOwner: item.requiresOwner || false // Bot-Owner-Only Flag
                 };
             }));
 
@@ -280,8 +282,8 @@ class NavigationManager {
                     INSERT INTO nav_items (
                         plugin, guildId, title, url, icon, 
                         sort_order, parent, type, capability, 
-                        target, visible, classes, position
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        target, visible, classes, position, requiresOwner
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `, [
                     navItem.plugin,
                     navItem.guildId,
@@ -295,7 +297,8 @@ class NavigationManager {
                     navItem.target,
                     navItem.visible ? 1 : 0,
                     navItem.classes,
-                    navItem.position
+                    navItem.position,
+                    navItem.requiresOwner ? 1 : 0
                 ]);
                 
                 Logger.debug(`[NavigationManager] Erstellt: ${navItem.title} (sort_order=${navItem.sort_order})`);
@@ -571,6 +574,7 @@ class NavigationManager {
             }
             
             // Permissions-Object zu Array konvertieren (nur Keys mit truthy values)
+            // WICHTIG: Keine Konvertierung! Nur UPPERCASE Permissions im System erlaubt!
             const permissionKeys = Object.keys(userPermissions).filter(key => userPermissions[key]);
             
             Logger.debug(`[Navigation] User ${userId} hat ${permissionKeys.length} Permissions`, permissionKeys);
@@ -593,17 +597,21 @@ class NavigationManager {
                     return true;
                 }
                 
-                // Kein capability-Feld? → Öffentlich sichtbar
+                // Kein capability-Feld? → Verstecken (Sicherheit geht vor!)
                 if (!item.capability) {
-                    return true;
+                    Logger.debug(`[Navigation] Item "${item.title}" versteckt (keine capability definiert)`);
+                    return false;
                 }
+                
+                // WICHTIG: NUR exakter UPPERCASE Match - keine Konvertierung!
+                // Capabilities MÜSSEN bereits in UPPERCASE in der DB sein!
                 
                 // Exakter Match
                 if (permissionKeys.includes(item.capability)) {
                     return true;
                 }
                 
-                // Wildcard-Match (z.B. gameserver.* erlaubt gameserver.start)
+                // Wildcard-Match (z.B. GAMESERVER.* erlaubt GAMESERVER.START)
                 const parts = item.capability.split('.');
                 for (let i = parts.length - 1; i > 0; i--) {
                     const wildcard = parts.slice(0, i).join('.') + '.*';

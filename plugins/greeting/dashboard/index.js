@@ -147,7 +147,8 @@ class GreetingDashboardPlugin extends DashboardPlugin {
                 order: 25,  // Nach Core-Settings und DuneMap
                 parent: `/guild/${guildId}/plugins/core/settings`,
                 type: 'main',
-                visible: true
+                visible: true,
+                capability: 'GREETING.SETTINGS'
             }
         ];
 

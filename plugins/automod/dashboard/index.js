@@ -334,7 +334,8 @@ class AutoModPlugin extends DashboardPlugin {
                 order: null,  
                 parent: `/guild/${guildId}/plugins/core/settings`,  // ← Parent ist Core-Settings!
                 type: 'main',
-                visible: true
+                visible: true,
+                capability: 'AUTOMOD.SETTINGS'
             }
         ];
 

@@ -799,7 +799,8 @@ class DuneMapPlugin extends DashboardPlugin {
                 icon: 'fa-solid fa-map',
                 order: null,
                 type: 'main',
-                visible: true
+                visible: true,
+                capability: 'DUNEMAP.VIEW' // ✅ UPPERCASE!
             },
             {
                 title: 'dunemap:NAV.SEKTOR_CARD',
@@ -808,7 +809,8 @@ class DuneMapPlugin extends DashboardPlugin {
                 order: 10,
                 parent: `/guild/${guildId}/plugins/dunemap`,
                 type: 'main',
-                visible: true
+                visible: true,
+                capability: 'DUNEMAP.ADMIN' // ✅ UPPERCASE! Admin-Bereich
             },
             // Settings als Subnav UNTER CORE-EINSTELLUNGEN!
             {
@@ -818,7 +820,8 @@ class DuneMapPlugin extends DashboardPlugin {
                 order: null,  // Nach Core-Settings (21, 22, 23)
                 parent: `/guild/${guildId}/plugins/core/settings`,  // ← Parent ist Core-Settings!
                 type: 'main',
-                visible: true
+                visible: true,
+                capability: 'DUNEMAP.SETTINGS' // ✅ UPPERCASE! Settings-Bereich
             }
         ];
 

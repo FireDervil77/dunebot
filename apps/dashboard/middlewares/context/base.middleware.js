@@ -351,6 +351,12 @@ module.exports = async (req, res, next) => {
             (pluginManager?.getPlugin?.("core")?.version || '1.0.0') : 
             Date.now();
         
+        // AssetManager für Plugin-Assets (Scripts & Styles)
+        const assetManager = ServiceManager.get('assetManager');
+        if (assetManager) {
+            res.locals.assetManager = assetManager;
+        }
+        
         // Hilfsfunktionen für Templates
         res.locals.formatDate = (date) => {
             if (!date) return '';

@@ -251,7 +251,8 @@ class ModerationPlugin extends DashboardPlugin {
             order: null,
             parent: `/guild/${guildId}/plugins/core/settings`,
             type: 'main',
-            visible: true
+            visible: true,
+            capability: 'MODERATION.VIEW'
         }];
 
         try {
