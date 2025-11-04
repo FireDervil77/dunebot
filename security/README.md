@@ -16,11 +16,55 @@ Dieses Verzeichnis enthält alle Fail2Ban-Konfigurationsdateien und Setup-Script
 
 ### Helper-Scripts
 - `fail2ban-db-reader.py` - Python-Script zum Auslesen blockierter IPs aus MySQL
+- `manage-blocked-ips.js` - Node.js-Tool zur Verwaltung der blocked_ips Tabelle
+- `sync-blocked-ips-to-firewall.js` - Script zum Synchronisieren von DB-IPs zu iptables
 
 ### DDoS-Protection
 - `fail2ban-filter-ddos.conf` - Filter für DDoS-Erkennung (Apache2 Access-Logs)
 - `fail2ban-jail-ddos.conf` - Jail für automatisches DDoS-Bannen
 - `setup-fail2ban-ddos.sh` - Setup-Script für DDoS-Protection
+
+---
+
+## 🛠️ IP-Management Tools
+
+### Blocked IPs verwalten
+
+```bash
+# Alle geblockte IPs anzeigen
+cd /home/firedervil/dunebot_dev/security
+node manage-blocked-ips.js list
+
+# Statistiken anzeigen
+node manage-blocked-ips.js stats
+
+# IP entblocken (aus DB löschen)
+node manage-blocked-ips.js unblock 192.168.1.100
+
+# IP whitelisten (False Positive markieren)
+node manage-blocked-ips.js whitelist 192.168.1.100 "Interner Server"
+
+# Blocked IPs von PROD importieren
+node manage-blocked-ips.js import-from-prod
+```
+
+### IPs zu Firewall synchronisieren
+
+```bash
+# Manuelle Synchronisation (alle DB-IPs → iptables)
+sudo node sync-blocked-ips-to-firewall.js
+
+# Als Cronjob (empfohlen):
+# */5 * * * * sudo /usr/bin/node /home/firedervil/dunebot_dev/security/sync-blocked-ips-to-firewall.js
+```
+
+**Was passiert:**
+1. Liest alle `blocked_ips` mit `is_whitelisted = FALSE` aus DB
+2. Erstellt/leert iptables Chain `DUNEBOT_BLOCKED`
+3. Fügt DROP-Regel für jede IP hinzu
+4. Blockiert IPs auf Firewall-Ebene (zusätzlich zu Fail2Ban)
+
+**Vorteil:** Persistente IP-Blocks auch ohne Fail2Ban, zentrale DB-Verwaltung
 
 ---
 

@@ -14,7 +14,7 @@
  * @author FireBot Team
  */
 
-require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+require('dotenv').config({ path: require('path').join(__dirname, '../apps/dashboard/.env') });
 const mysql = require('mysql2/promise');
 
 // MySQL-Connection erstellen

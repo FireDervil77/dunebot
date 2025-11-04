@@ -78,39 +78,39 @@ class PermissionManager {
       const adminPerms = JSON.stringify({
         wildcard: true,
         // Explizite Permissions für bessere UI-Kompatibilität
-        'permissions.view': true,
-        'permissions.users.view': true,
-        'permissions.users.invite': true,
-        'permissions.users.edit': true,
-        'permissions.users.remove': true,
-        'permissions.groups.view': true,
-        'permissions.groups.create': true,
-        'permissions.groups.edit': true,
-        'permissions.groups.delete': true,
-        'permissions.assign': true,  // ← WICHTIG für Matrix-Editing!
-        'gameserver.view': true,
-        'gameserver.create': true,
-        'gameserver.edit': true,
-        'gameserver.delete': true,
-        'gameserver.start': true,
-        'gameserver.stop': true,
-        'gameserver.restart': true,
-        'gameserver.console.view': true,
-        'gameserver.console.execute': true,
-        'gameserver.files.view': true,
-        'gameserver.files.upload': true,
-        'gameserver.files.download': true,
-        'gameserver.files.delete': true,
-        'gameserver.settings.edit': true,
-        'moderation.view': true,
-        'moderation.ban': true,
-        'moderation.kick': true,
-        'moderation.warn': true,
-        'moderation.mute': true,
-        'moderation.settings.edit': true,
-        'core.settings.view': true,
-        'core.settings.edit': true,
-        'core.plugins.manage': true
+        'PERMISSIONS.VIEW': true,
+        'PERMISSIONS.USERS.VIEW': true,
+        'PERMISSIONS.USERS.INVITE': true,
+        'PERMISSIONS.USERS.EDIT': true,
+        'PERMISSIONS.USERS.REMOVE': true,
+        'PERMISSIONS.GROUPS.VIEW': true,
+        'PERMISSIONS.GROUPS.CREATE': true,
+        'PERMISSIONS.GROUPS.EDIT': true,
+        'PERMISSIONS.GROUPS.DELETE': true,
+        'PERMISSIONS.ASSIGN': true,  // ← WICHTIG für Matrix-Editing!
+        'GAMESERVER.VIEW': true,
+        'GAMESERVER.CREATE': true,
+        'GAMESERVER.EDIT': true,
+        'GAMESERVER.DELETE': true,
+        'GAMESERVER.START': true,
+        'GAMESERVER.STOP': true,
+        'GAMESERVER.RESTART': true,
+        'GAMESERVER.CONSOLE.VIEW': true,
+        'GAMESERVER.CONSOLE.EXECUTE': true,
+        'GAMESERVER.FILES.VIEW': true,
+        'GAMESERVER.FILES.UPLOAD': true,
+        'GAMESERVER.FILES.DOWNLOAD': true,
+        'GAMESERVER.FILES.DELETE': true,
+        'GAMESERVER.SETTINGS.EDIT': true,
+        'MODERATION.VIEW': true,
+        'MODERATION.BAN': true,
+        'MODERATION.KICK': true,
+        'MODERATION.WARN': true,
+        'MODERATION.MUTE': true,
+        'MODERATION.SETTINGS.EDIT': true,
+        'CORE.SETTINGS.VIEW': true,
+        'CORE.SETTINGS.EDIT': true,
+        'CORE.PLUGINS.MANAGE': true
       });
       const [adminResult] = await this.dbService.query(
         `INSERT INTO guild_groups 
@@ -133,20 +133,20 @@ class PermissionManager {
 
       // 2. Moderatoren-Gruppe
       const modPerms = JSON.stringify({
-        'gameserver.view': true,
-        'gameserver.start': true,
-        'gameserver.stop': true,
-        'gameserver.restart': true,
-        'gameserver.console.view': true,
-        'gameserver.console.execute': true,
-        'gameserver.files.view': true,
-        'gameserver.files.upload': true,
-        'gameserver.files.download': true,
-        'moderation.view': true,
-        'moderation.ban': true,
-        'moderation.kick': true,
-        'moderation.warn': true,
-        'moderation.mute': true
+        'GAMESERVER.VIEW': true,
+        'GAMESERVER.START': true,
+        'GAMESERVER.STOP': true,
+        'GAMESERVER.RESTART': true,
+        'GAMESERVER.CONSOLE.VIEW': true,
+        'GAMESERVER.CONSOLE.EXECUTE': true,
+        'GAMESERVER.FILES.VIEW': true,
+        'GAMESERVER.FILES.UPLOAD': true,
+        'GAMESERVER.FILES.DOWNLOAD': true,
+        'MODERATION.VIEW': true,
+        'MODERATION.BAN': true,
+        'MODERATION.KICK': true,
+        'MODERATION.WARN': true,
+        'MODERATION.MUTE': true
       });
       
       const [modResult] = await this.dbService.query(
@@ -170,11 +170,11 @@ class PermissionManager {
 
       // 3. Support-Gruppe
       const supportPerms = JSON.stringify({
-        'gameserver.view': true,
-        'gameserver.console.view': true,
-        'gameserver.files.view': true,
-        'gameserver.files.download': true,
-        'moderation.view': true
+        'GAMESERVER.VIEW': true,
+        'GAMESERVER.CONSOLE.VIEW': true,
+        'GAMESERVER.FILES.VIEW': true,
+        'GAMESERVER.FILES.DOWNLOAD': true,
+        'MODERATION.VIEW': true
       });
       
       const [supportResult] = await this.dbService.query(
@@ -529,9 +529,22 @@ class PermissionManager {
         permissions = { ...permissions, ...directPerms };
       }
 
-      // Owner hat Wildcard
+      // Owner hat Wildcard UND alle expliziten Permissions
       if (isOwner) {
         permissions.wildcard = true;
+        
+        // ✅ FIX: Owner bekommt ALLE registrierten Permissions explizit
+        // Das ist wichtig für die UI (z.B. Permissions-Seite zeigt alle verfügbaren Rechte)
+        const allPermissions = await this.dbService.query(
+          'SELECT permission_key FROM permission_definitions WHERE guild_id = ?',
+          [guildId]
+        );
+        
+        if (allPermissions && allPermissions.length > 0) {
+          for (const perm of allPermissions) {
+            permissions[perm.permission_key] = true;
+          }
+        }
       }
 
       // 4. Hole Gruppen-Details
@@ -988,55 +1001,38 @@ class PermissionManager {
     this.logger.info(`[PermissionManager] Unregistering permissions for plugin "${pluginName}" in guild ${guildId}...`);
     
     try {
-      // 1. Hole alle Permission-Keys dieses Plugins
-      const [permissions] = await this.dbService.query(
-        'SELECT permission_key FROM permission_definitions WHERE guild_id = ? AND plugin_name = ?',
+      // 1. Hole alle Permission-IDs dieses Plugins
+      const permissions = await this.dbService.query(
+        'SELECT id, permission_key FROM permission_definitions WHERE guild_id = ? AND plugin_name = ?',
         [guildId, pluginName]
       );
       
       if (!permissions || permissions.length === 0) {
         this.logger.warn(`[PermissionManager] No permissions found for plugin "${pluginName}" in guild ${guildId}`);
-        return { permissionsDeleted: 0, groupsUpdated: 0 };
+        return { permissionsDeleted: 0, groupAssignmentsDeleted: 0 };
       }
       
+      const permIds = permissions.map(p => p.id);
       const permKeys = permissions.map(p => p.permission_key);
       this.logger.debug(`[PermissionManager] Found ${permKeys.length} permissions to remove: ${permKeys.join(', ')}`);
       
-      // 2. Entferne aus allen Gruppen (JSON-Field bereinigen)
-      const [groups] = await this.dbService.query(
-        'SELECT id, permissions FROM guild_groups WHERE guild_id = ?',
-        [guildId]
-      );
+      // 2. Entferne aus group_permissions (CASCADE DELETE macht das automatisch!)
+      // Aber wir wollen die Anzahl wissen für Logging
+      let groupAssignmentsCount = 0;
       
-      let groupsUpdated = 0;
-      
-      for (const group of groups) {
-        try {
-          const perms = JSON.parse(group.permissions || '{}');
-          let modified = false;
-          
-          // Entferne alle Plugin-Permissions
-          permKeys.forEach(key => {
-            if (perms[key] !== undefined) {
-              delete perms[key];
-              modified = true;
-            }
-          });
-          
-          if (modified) {
-            await this.dbService.query(
-              'UPDATE guild_groups SET permissions = ? WHERE id = ?',
-              [JSON.stringify(perms), group.id]
-            );
-            groupsUpdated++;
-          }
-        } catch (err) {
-          this.logger.warn(`[PermissionManager] Failed to update group ${group.id}:`, err.message);
-        }
+      if (permIds.length > 0) {
+        // ✅ FIX: Erstelle richtige Anzahl Platzhalter für IN-Clause
+        const placeholders = permIds.map(() => '?').join(',');
+        const groupAssignments = await this.dbService.query(
+          `SELECT COUNT(*) as count FROM group_permissions WHERE permission_id IN (${placeholders})`,
+          permIds
+        );
+        
+        groupAssignmentsCount = groupAssignments[0]?.count || 0;
       }
       
-      // 3. Entferne Permissions aus permission_definitions
-      const [result] = await this.dbService.query(
+      // 3. DELETE aus permission_definitions (CASCADE löscht group_permissions automatisch!)
+      const result = await this.dbService.query(
         'DELETE FROM permission_definitions WHERE guild_id = ? AND plugin_name = ?',
         [guildId, pluginName]
       );
@@ -1045,10 +1041,10 @@ class PermissionManager {
       
       this.logger.success(
         `[PermissionManager] Unregistered plugin "${pluginName}": ` +
-        `${permissionsDeleted} permissions deleted, ${groupsUpdated} groups updated`
+        `${permissionsDeleted} permissions deleted, ${groupAssignmentsCount} group assignments CASCADE deleted`
       );
       
-      return { permissionsDeleted, groupsUpdated };
+      return { permissionsDeleted, groupAssignmentsDeleted: groupAssignmentsCount };
       
     } catch (error) {
       this.logger.error(`[PermissionManager] Failed to unregister plugin "${pluginName}":`, error);

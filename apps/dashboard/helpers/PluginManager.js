@@ -550,6 +550,76 @@ class PluginManager extends BasePluginManager {
             }
             
             Logger.success(`✅ ${registeredCount} Permissions für Plugin ${plugin.name} in Guild ${guildId} registriert`);
+            
+            // ════════════════════════════════════════════════════════════
+            // NEU: Administrator-Gruppe automatisch alle Permissions geben
+            // ════════════════════════════════════════════════════════════
+            try {
+                // Administrator-Gruppe finden (KORREKTUR: guild_groups statt permission_groups)
+                const [adminGroups] = await dbService.query(
+                    'SELECT id FROM guild_groups WHERE guild_id = ? AND slug = ?',
+                    [guildId, 'administrator']
+                );
+                
+                if (adminGroups && adminGroups.length > 0) {
+                    const adminGroup = adminGroups[0];
+                    Logger.debug(`Administrator-Gruppe gefunden (ID: ${adminGroup.id}), weise neue Permissions zu...`);
+                    
+                    // Alle Permission-Keys des Plugins aus permissions.json holen
+                    const permissionsData = JSON.parse(fs.readFileSync(permissionsFile, 'utf8'));
+                    let addedCount = 0;
+                    
+                    for (const perm of permissionsData.permissions) {
+                        // WICHTIG: permission_key ist OHNE Plugin-Prefix gespeichert!
+                        const permKey = perm.key; // z.B. "GAMESERVER.VIEW" (nicht "gameserver:GAMESERVER.VIEW")
+                        
+                        try {
+                            // 1. Finde permission_id in permission_definitions
+                            const [permDefs] = await dbService.query(
+                                'SELECT id FROM permission_definitions WHERE guild_id = ? AND permission_key = ? LIMIT 1',
+                                [guildId, permKey]
+                            );
+                            
+                            if (!permDefs || permDefs.length === 0) {
+                                Logger.warn(`  ⚠️  Permission ${permKey} nicht in permission_definitions gefunden - Skip`);
+                                continue;
+                            }
+                            
+                            const permissionId = permDefs[0].id;
+                            
+                            // 2. INSERT IGNORE in group_permissions (relational!)
+                            const [insertResult] = await dbService.query(
+                                `INSERT IGNORE INTO group_permissions 
+                                 (group_id, permission_id, assigned_at, assigned_by, is_inherited, grant_option) 
+                                 VALUES (?, ?, NOW(), NULL, 0, 0)`,
+                                [adminGroup.id, permissionId]
+                            );
+                            
+                            // INSERT IGNORE gibt affectedRows = 0 wenn bereits existiert
+                            if (insertResult.affectedRows > 0) {
+                                addedCount++;
+                                Logger.debug(`  ✅ Permission ${permKey} zu Administrator-Gruppe hinzugefügt (permission_id: ${permissionId})`);
+                            } else {
+                                Logger.debug(`  ℹ️  Permission ${permKey} bereits in Administrator-Gruppe vorhanden`);
+                            }
+                            
+                        } catch (permError) {
+                            Logger.error(`  ❌ Fehler bei Permission ${permKey}:`, permError.message);
+                        }
+                    }
+                    
+                    if (addedCount > 0) {
+                        Logger.success(`✅ ${addedCount} neue Permissions automatisch zur Administrator-Gruppe hinzugefügt`);
+                    } else {
+                        Logger.debug('Alle Permissions bereits in Administrator-Gruppe vorhanden');
+                    }
+                } else {
+                    Logger.warn(`⚠️  Administrator-Gruppe nicht gefunden für Guild ${guildId} - Permissions nicht automatisch zugewiesen`);
+                }
+            } catch (adminError) {
+                Logger.error(`Fehler beim automatischen Zuweisen der Permissions zur Administrator-Gruppe:`, adminError);
+            }
+            
             return registeredCount;
             
         } catch (error) {
@@ -886,7 +956,9 @@ class PluginManager extends BasePluginManager {
             Logger.debug(`Plugin ${pluginName} (v${pluginVersion}) in guild_plugins für Guild ${guildId} aktiviert (User: ${userId || 'System'})`);
 
             // ✅ NEU: Permissions für Guild registrieren
+            Logger.info(`🔍 [DEBUG] Vor registerPluginPermissionsForGuild für ${pluginName} in Guild ${guildId}`);
             await this.registerPluginPermissionsForGuild(plugin, guildId);
+            Logger.info(`🔍 [DEBUG] Nach registerPluginPermissionsForGuild für ${pluginName} in Guild ${guildId}`);
 
             // Plugin-spezifische Guild-Aktivierung aufrufen
             await this.hooks.doAction('before_plugin_guild_enable_method', plugin, guildId);

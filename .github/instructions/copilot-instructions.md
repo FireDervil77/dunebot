@@ -29,6 +29,8 @@ DuneBot ist ein modulares Discord-Bot-System mit einem WordPress-ähnlichen Plug
 
 ## CORE ARCHITECTURE PRINCIPLES
 
+- Check and review bevor building new things
+
 ### ServiceManager Pattern
 
 Zentraler Service-Registry für alle wichtigen Services. Zugriff via `ServiceManager.get('serviceName')`:

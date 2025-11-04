@@ -23,6 +23,7 @@
         "DASHBOARD": "Dashboard",
         "BOTNAME": "DuneBot",
         "GITHUB": "GitHub",
+        "READ_MORE": "Read more...",
         "DOCUMENTATION": "Documentation",
         "CHANGELOGS": "Changelogs",
         "CHANGELOGS_TITLE": "Version Updates",
@@ -416,6 +417,9 @@
     "DASHBOARD_COMMON": {
         "MEMBER_SINCE": "Member since",
         "DAYS": "days",
+        "LAST_LOGIN": "Last login on",
+        "TO_FRONTEND": "To Homepage",
+        "USER_SETTINGS": "Settings",
         "SERVER": "Server",
         "COPYRIGHT": "Copyright",
         "ALL_RIGHTS_RESERVED": "All rights reserved",

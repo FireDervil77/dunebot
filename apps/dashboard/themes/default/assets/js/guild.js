@@ -497,12 +497,15 @@ class GuildAjaxHandler {
         console.log('[GuildAjax] handleGameserverEditResponse called:', result);
         if (result.success) {
             this.showToast('success', result.message || 'Server erfolgreich aktualisiert');
-            // Nach 1,5s zur Server-Liste zurückkehren
+            // Nach 1,5s zur Server-Detail-Seite zurückkehren
             setTimeout(() => {
                 const pathParts = window.location.pathname.split('/');
                 const guildIdIndex = pathParts.indexOf('guild') + 1;
                 const guildId = pathParts[guildIdIndex];
-                window.location.href = `/guild/${guildId}/plugins/gameserver/servers`;
+                // Server-ID aus URL extrahieren (z.B. /guild/:guildId/plugins/gameserver/servers/:serverId/edit)
+                const serverIdIndex = pathParts.indexOf('servers') + 1;
+                const serverId = pathParts[serverIdIndex];
+                window.location.href = `/guild/${guildId}/plugins/gameserver/servers/${serverId}`;
             }, 1500);
         } else {
             this.showToast('error', result.message || 'Fehler beim Aktualisieren des Servers');

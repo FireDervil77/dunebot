@@ -181,6 +181,18 @@ exports.callback = async (req, res) => {
             Logger.error("Fehler beim Speichern der Benutzerinformationen:", error);
         }
         
+        // Last Login aus DB laden (updated_at = letzter Login)
+        let lastLogin = null;
+        try {
+            const [userRow] = await dbService.query(
+                'SELECT updated_at FROM users WHERE _id = ?',
+                [userData.id]
+            );
+            lastLogin = userRow?.updated_at || null;
+        } catch (error) {
+            Logger.error("Fehler beim Laden von updated_at:", error);
+        }
+        
         // WICHTIG: IMMER zum Server-Selector weiterleiten nach Login
         // Dies stellt sicher, dass der Benutzer zunächst einen Server auswählt
         const redirectURL = "/auth/server-selector";
@@ -191,7 +203,8 @@ exports.callback = async (req, res) => {
             info: userData,
             guilds: guildsData,
             admin: isAdmin,
-            token: tokens.access_token
+            token: tokens.access_token,
+            lastLogin: lastLogin
         };
         
         req.session.locale = userData.locale || req.session.locale || "de";

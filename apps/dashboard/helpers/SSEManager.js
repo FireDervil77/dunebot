@@ -82,6 +82,15 @@ class SSEManager extends EventEmitter {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     
+    // ⚠️ WICHTIG: Timeout deaktivieren (SSE ist langlebig!)
+    res.setTimeout(0);
+    
+    // ⚠️ Request-Socket offen halten
+    if (res.socket) {
+      res.socket.setKeepAlive(true);
+      res.socket.setNoDelay(true);
+    }
+    
     // Guild-Map erstellen falls nicht vorhanden
     if (!this.clients.has(guildId)) {
       this.clients.set(guildId, new Map());
@@ -110,6 +119,12 @@ class SSEManager extends EventEmitter {
     
     // Connection-Close-Handler
     res.on('close', () => {
+      this._handleClientDisconnect(guildId, clientId);
+    });
+    
+    // Error-Handler (wichtig für Debugging!)
+    res.on('error', (error) => {
+      this.Logger.error(`[SSEManager] Response-Error für Client ${clientId}:`, error);
       this._handleClientDisconnect(guildId, clientId);
     });
     
@@ -233,7 +248,7 @@ class SSEManager extends EventEmitter {
   }
 
   /**
-   * Sendet ein SSE-Event
+   * Sendet ein SSE-Event an Client
    * 
    * @private
    * @param {Response} res - Express Response
@@ -241,8 +256,13 @@ class SSEManager extends EventEmitter {
    * @param {Object} data - Event-Daten
    */
   _sendEvent(res, event, data) {
-    res.write(`event: ${event}\n`);
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    try {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    } catch (error) {
+      this.Logger.error(`[SSEManager] Fehler beim Senden von Event "${event}":`, error);
+      // Connection ist wahrscheinlich tot - wird vom close-Handler behandelt
+    }
   }
 
   /**
