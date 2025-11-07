@@ -8,8 +8,8 @@ class AutoModPlugin extends DashboardPlugin {
     constructor(app) {
         super({
             name: 'automod',
-            displayName: 'AutoMod Plugin',
-            description: 'Das AutoMod Plugin',
+            displayName: 'AutoMod',
+            description: 'Das AutoModeartions Plugin',
             version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireBot Team',
             icon: 'fa-solid fa-map',

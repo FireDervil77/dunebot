@@ -56,6 +56,11 @@ class AssetManager {
             return false;
         }
 
+        // Vendor-Heuristik: Wenn Pfad auf einen Vendor-Unterordner zeigt, als Vendor markieren
+        const isVendor = typeof options.vendor === 'boolean'
+            ? options.vendor
+            : /(^|\/)vendor\//.test(src);
+
         const asset = {
             handle,
             src: this._resolveAssetPath(src, options.plugin, 'js'),
@@ -66,7 +71,8 @@ class AssetManager {
             localize: options.localize,
             defer: options.defer || false,
             async: options.async || false,
-            type: 'script'
+            type: 'script',
+            vendor: isVendor
         };
 
         this.scripts.set(handle, asset);
@@ -95,6 +101,11 @@ class AssetManager {
             return false;
         }
 
+        // Vendor-Heuristik: Wenn Pfad auf einen Vendor-Unterordner zeigt, als Vendor markieren
+        const isVendor = typeof options.vendor === 'boolean'
+            ? options.vendor
+            : /(^|\/)vendor\//.test(src);
+
         const asset = {
             handle,
             src: this._resolveAssetPath(src, options.plugin, 'css'),
@@ -102,7 +113,8 @@ class AssetManager {
             version: options.version || '1.0.0',
             media: options.media || 'all',
             plugin: options.plugin,
-            type: 'style'
+            type: 'style',
+            vendor: isVendor
         };
 
         this.styles.set(handle, asset);
@@ -188,7 +200,17 @@ class AssetManager {
             this.scripts
         );
 
-        for (const handle of orderedHandles) {
+        // Vendor-Skripte zuerst rendern, dann Nicht-Vendor – innerhalb der Gruppen bleibt die Dep-Reihenfolge erhalten
+        const partitionedHandles = orderedHandles.reduce((acc, handle) => {
+            const asset = this.scripts.get(handle);
+            if (!asset) return acc;
+            if (asset.vendor) acc.vendor.push(handle); else acc.app.push(handle);
+            return acc;
+        }, { vendor: [], app: [] });
+
+        const handlesToRender = [...partitionedHandles.vendor, ...partitionedHandles.app];
+
+        for (const handle of handlesToRender) {
             const asset = this.scripts.get(handle);
             
             // Nur Scripts für die richtige Position (head/footer)
@@ -236,7 +258,17 @@ class AssetManager {
             this.styles
         );
 
-        for (const handle of orderedHandles) {
+        // Vendor-Styles zuerst, dann App-Styles – innerhalb der Gruppen Reihenfolge beibehalten
+        const partitionedHandles = orderedHandles.reduce((acc, handle) => {
+            const asset = this.styles.get(handle);
+            if (!asset) return acc;
+            if (asset.vendor) acc.vendor.push(handle); else acc.app.push(handle);
+            return acc;
+        }, { vendor: [], app: [] });
+
+        const handlesToRender = [...partitionedHandles.vendor, ...partitionedHandles.app];
+
+        for (const handle of handlesToRender) {
             const asset = this.styles.get(handle);
             const versionedSrc = `${asset.src}?ver=${asset.version}`;
             
@@ -246,6 +278,30 @@ class AssetManager {
         }
 
         return styles.join('\n');
+    }
+
+    /**
+     * Convenience: Registriert ein Vendor-Script (wird vor App-Skripten gerendert)
+     * 
+     * @param {string} handle
+     * @param {string} src
+     * @param {Object} options - gleiche Optionen wie registerScript
+     * @returns {boolean}
+     */
+    registerVendorScript(handle, src, options = {}) {
+        return this.registerScript(handle, src, { ...options, vendor: true });
+    }
+
+    /**
+     * Convenience: Registriert ein Vendor-Stylesheet (wird vor App-Styles gerendert)
+     * 
+     * @param {string} handle
+     * @param {string} src
+     * @param {Object} options - gleiche Optionen wie registerStyle
+     * @returns {boolean}
+     */
+    registerVendorStyle(handle, src, options = {}) {
+        return this.registerStyle(handle, src, { ...options, vendor: true });
     }
 
     /**
@@ -294,6 +350,7 @@ class AssetManager {
         }
 
         // Plugin-Assets: /assets/plugins/{name}/{src}
+        // WICHTIG: Muss mit Express Static Route übereinstimmen (siehe app.js)
         if (plugin) {
             return `/assets/plugins/${plugin}/${src}`;
         }

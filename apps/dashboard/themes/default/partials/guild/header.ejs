@@ -35,6 +35,11 @@
 <% if (locals.assetManager) { %>
   <%- assetManager.renderStyles() %>
 <% } %>
+
+<!-- Plugin Head Scripts (AssetManager) -->
+<% if (locals.assetManager) { %>
+  <%- assetManager.renderScripts(false) %>
+<% } %>
   
 <!-- Hook: dashboard_head -->
 <% if (locals.hooks && hooks.getViewHooks) { %>

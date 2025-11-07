@@ -1,6 +1,6 @@
 {
     "name": "moderation",
-    "displayName": "Moderation - Plugin",
+    "displayName": "Moderation",
     "description": "The Moderation Plugin for FireBot",
     "version": "1.8.2",
     "author": "FireBot Team",

@@ -461,19 +461,22 @@ create_data_directories() {
     
     local base_dir="/data/firebot"
     
-    # Basis-Verzeichnisse erstellen
-    mkdir -p "$base_dir"/{servers,logs,backups,steamcmd}
+    # Nur die minimal notwendigen Verzeichnisse erstellen
+    # HINWEIS: User-spezifische Ordner (gs-guild_*/) werden automatisch vom Daemon erstellt
+    mkdir -p "$base_dir"/daemon-logs    # Daemon-Logs
+    mkdir -p "$base_dir"/steamcmd       # Shared SteamCMD für alle Guilds
     
     # Ownership setzen auf root (Daemon läuft als root)
     chown -R root:root "$base_dir"
     chmod 755 "$base_dir"
-    
-    # Sub-Verzeichnisse mit korrekten Permissions
-    chmod 755 "$base_dir"/{servers,logs,backups,steamcmd}
+    chmod 755 "$base_dir"/daemon-logs
+    chmod 755 "$base_dir"/steamcmd
     
     log_success "Daten-Verzeichnisse erstellt: $base_dir"
+    log_info "  - $base_dir/daemon-logs/ (Daemon-System-Logs)"
+    log_info "  - $base_dir/steamcmd/ (Shared für alle Guilds)"
     log_info "Verzeichnisse gehören root:root mit Permissions 755"
-    log_info "Gameserver-Prozesse laufen später als gs-guild_XXXXX User"
+    log_info "User-spezifische Ordner (gs-guild_*/) werden automatisch erstellt"
 }
 
 

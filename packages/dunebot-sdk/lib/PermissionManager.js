@@ -24,6 +24,56 @@ class PermissionManager {
   }
 
   /**
+   * Normalisiert einen Permission-Key auf UPPERCASE (Trim)
+   * @param {string} key
+   * @returns {string}
+   */
+  _normalizeKey(key) {
+    return (key || '').toString().toUpperCase().trim();
+  }
+
+  /**
+   * Normalisiert ein Permissions-Objekt: Keys → UPPERCASE, Werte → boolean, wildcard bleibt erhalten
+   * @param {object|string|null} perms
+   * @returns {object}
+   */
+  _normalizePerms(perms) {
+    let obj = perms;
+    if (!perms) return {};
+    if (typeof perms === 'string') {
+      try {
+        obj = JSON.parse(perms);
+      } catch (_) {
+        // Falls es eine konkatenierte Darstellung ist ("{}|||{}"), später zusammenführen
+        obj = perms;
+      }
+    }
+    if (typeof obj === 'string') {
+      // Konkatenierte Strings unterstützen: "{...}|||{...}"
+      const merged = {};
+      const parts = obj.split('|||').filter(Boolean);
+      for (const part of parts) {
+        try {
+          const p = JSON.parse(part);
+          Object.assign(merged, p);
+        } catch (_) {
+          // ignorieren
+        }
+      }
+      obj = merged;
+    }
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === 'wildcard') {
+        out.wildcard = v === true || v === 'true';
+      } else {
+        out[this._normalizeKey(k)] = v === true || v === 'true';
+      }
+    }
+    return out;
+  }
+
+  /**
    * Initialisiert den PermissionManager mit Services
    */
   async initialize() {
@@ -257,6 +307,7 @@ class PermissionManager {
     this._ensureInitialized();
     
     try {
+      const normalizedKey = this._normalizeKey(permissionKey);
       // 1. Prüfe ob User Guild-Owner ist
       const [guild] = await this.dbService.query(
         'SELECT owner_id FROM guilds WHERE _id = ?',
@@ -287,31 +338,31 @@ class PermissionManager {
 
       // 3. Prüfe Direct Permissions (haben Vorrang)
       if (userData.direct_permissions) {
-        const directPerms = typeof userData.direct_permissions === 'string' 
-          ? JSON.parse(userData.direct_permissions) 
-          : userData.direct_permissions;
-        
+        const directPerms = this._normalizePerms(userData.direct_permissions);
         // Wildcard in direct permissions
         if (directPerms.wildcard === true) {
           return true;
         }
         
         // Explizite Permission in direct permissions
-        if (directPerms[permissionKey] === true) {
+        if (directPerms[normalizedKey] === true) {
           return true;
         }
         
         // Explizit verweigert in direct permissions
-        if (directPerms[permissionKey] === false) {
+        if (directPerms[normalizedKey] === false) {
           return false;
         }
       }
 
       // 4. Prüfe Gruppen-Permissions
       if (userData.group_permissions) {
-        const groupPerms = typeof userData.group_permissions === 'string'
-          ? JSON.parse(userData.group_permissions)
-          : userData.group_permissions;
+        let groupPerms;
+        try {
+          groupPerms = this._normalizePerms(userData.group_permissions);
+        } catch (e) {
+          groupPerms = {};
+        }
         
         // Wildcard in Gruppen
         if (groupPerms.wildcard === true) {
@@ -319,7 +370,7 @@ class PermissionManager {
         }
         
         // Explizite Permission in Gruppen
-        if (groupPerms[permissionKey] === true) {
+        if (groupPerms[normalizedKey] === true) {
           return true;
         }
       }
@@ -378,12 +429,12 @@ class PermissionManager {
     
     try {
       // 1. Prüfe ob Owner oder Bot-Admin
-      const [guild] = await this.dbService.query(
+      const guildRows = await this.dbService.query(
         'SELECT owner_id FROM guilds WHERE _id = ?',
         [guildId]
       );
       
-      const isOwner = guild && guild[0]?.owner_id === userId;
+      const isOwner = Array.isArray(guildRows) && guildRows[0]?.owner_id === userId;
       
       // Bot-Admin-Check (aus .env OWNER_IDS)
       const botAdminIds = process.env.OWNER_IDS ? process.env.OWNER_IDS.split(',') : [];
@@ -498,7 +549,7 @@ class PermissionManager {
       let permissions = {};
 
       // Gruppen-Permissions (Basis)
-      // WICHTIG: group_permissions ist concatenated String "perm1|||perm2|||..."
+      // WICHTIG: group_permissions kann ein konkatenierter String "{}|||{}" oder JSON sein
       if (userData && userData.group_permissions) {
         const groupPermsRaw = userData.group_permissions;
         
@@ -518,14 +569,14 @@ class PermissionManager {
               // Ignore ungültige JSON-Strings
             }
           }
+        } else if (typeof groupPermsRaw === 'object') {
+          permissions = { ...permissions, ...groupPermsRaw };
         }
       }
 
       // Direct Permissions (überschreiben Gruppen)
       if (userData.direct_permissions) {
-        const directPerms = typeof userData.direct_permissions === 'string'
-          ? JSON.parse(userData.direct_permissions)
-          : userData.direct_permissions;
+        const directPerms = this._normalizePerms(userData.direct_permissions);
         permissions = { ...permissions, ...directPerms };
       }
 
@@ -542,10 +593,13 @@ class PermissionManager {
         
         if (allPermissions && allPermissions.length > 0) {
           for (const perm of allPermissions) {
-            permissions[perm.permission_key] = true;
+            permissions[this._normalizeKey(perm.permission_key)] = true;
           }
         }
       }
+
+      // Keys final normalisieren (UPPERCASE), Werte → boolean
+      permissions = this._normalizePerms(permissions);
 
       // 4. Hole Gruppen-Details
       const groups = await this.dbService.query(
@@ -634,12 +688,12 @@ class PermissionManager {
     this._ensureInitialized();
     
     // Owner kann nicht entfernt werden
-    const [guild] = await this.dbService.query(
+    const guildRows = await this.dbService.query(
       'SELECT owner_id FROM guilds WHERE _id = ?',
       [guildId]
     );
     
-    if (guild && guild[0]?.owner_id === userId) {
+    if (Array.isArray(guildRows) && guildRows[0]?.owner_id === userId) {
       throw new Error('Cannot remove guild owner');
     }
 
@@ -775,52 +829,55 @@ class PermissionManager {
 
   /**
    * Aktualisiert eine Gruppe
+   * WICHTIG: Permissions werden über group_permissions Tabelle verwaltet, NICHT über JSON!
    * 
    * @param {number} groupId - Group ID
-   * @param {Object} updates - Felder zum Aktualisieren
+   * @param {Object} updates - Felder zum Aktualisieren (ohne permissions!)
    * @returns {Promise<boolean>}
    */
   async updateGroup(groupId, updates) {
     this._ensureInitialized();
     
     // Prüfe ob Gruppe protected ist
-    const [group] = await this.dbService.query(
-      'SELECT is_protected FROM guild_groups WHERE id = ?',
+    const groups = await this.dbService.query(
+      'SELECT is_protected, guild_id FROM guild_groups WHERE id = ?',
       [groupId]
     );
 
-    if (group && group[0]?.is_protected) {
+    if (!groups || groups.length === 0) {
+      throw new Error('Group not found');
+    }
+
+    const group = groups[0];
+
+    if (group.is_protected) {
       // Protected Gruppen: Nur permissions dürfen geändert werden
       if (Object.keys(updates).some(key => key !== 'permissions')) {
         throw new Error('Cannot modify protected group (only permissions can be changed)');
       }
     }
 
-    const allowedFields = ['name', 'slug', 'description', 'color', 'icon', 'permissions', 'priority'];
+    // Permissions separat behandeln (relational über group_permissions!)
+    if (updates.permissions) {
+      await this._updateGroupPermissionsRelational(groupId, group.guild_id, updates.permissions);
+      delete updates.permissions; // Nicht in UPDATE statement
+    }
+
+    // Nur Meta-Daten updaten (name, slug, description, color, icon, priority)
+    const allowedFields = ['name', 'slug', 'description', 'color', 'icon', 'priority'];
     const updateFields = [];
     const updateValues = [];
 
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
         updateFields.push(`${key} = ?`);
-        
-        if (key === 'permissions') {
-          // Konvertiere String "true" zu boolean true in permissions
-          const cleanedPerms = {};
-          if (value && typeof value === 'object') {
-            Object.keys(value).forEach(permKey => {
-              cleanedPerms[permKey] = value[permKey] === 'true' || value[permKey] === true;
-            });
-          }
-          updateValues.push(JSON.stringify(cleanedPerms));
-        } else {
-          updateValues.push(value);
-        }
+        updateValues.push(value);
       }
     }
 
     if (updateFields.length === 0) {
-      return false;
+      this.logger.info(`[PermissionManager] Group ${groupId} - Keine Meta-Updates, nur Permissions`);
+      return true; // Nur Permissions wurden aktualisiert
     }
 
     updateValues.push(groupId);
@@ -830,8 +887,65 @@ class PermissionManager {
       updateValues
     );
 
-    this.logger.info(`[PermissionManager] Updated group ${groupId}`);
+    this.logger.info(`[PermissionManager] Updated group ${groupId} meta-data`);
     return true;
+  }
+
+  /**
+   * Aktualisiert Permissions einer Gruppe (RELATIONAL!)
+   * Löscht alte Einträge und fügt neue ein
+   * 
+   * @param {number} groupId - Group ID
+   * @param {string} guildId - Guild ID
+   * @param {Object} permissions - { PERMISSION_KEY: true/false }
+   * @private
+   */
+  async _updateGroupPermissionsRelational(groupId, guildId, permissions) {
+    this.logger.info(`[PermissionManager] Aktualisiere Permissions für Gruppe ${groupId} (RELATIONAL)`);
+
+    // 1. Alle alten Permissions löschen
+    await this.dbService.query(
+      'DELETE FROM group_permissions WHERE group_id = ?',
+      [groupId]
+    );
+
+    this.logger.debug(`[PermissionManager] Alte Permissions gelöscht`);
+
+    // 2. Neue Permissions einfügen (nur true-Werte!)
+    const truePermissions = Object.entries(permissions)
+      .filter(([key, value]) => value === true || value === 'true')
+      .map(([key]) => key);
+
+    if (truePermissions.length === 0) {
+      this.logger.warn(`[PermissionManager] Keine aktiven Permissions für Gruppe ${groupId}`);
+      return;
+    }
+
+    // 3. Permission-IDs aus permission_definitions holen
+    const placeholders = truePermissions.map(() => '?').join(',');
+    const permissionRecords = await this.dbService.query(
+      `SELECT id, permission_key FROM permission_definitions 
+       WHERE guild_id = ? AND permission_key IN (${placeholders})`,
+      [guildId, ...truePermissions]
+    );
+
+    if (permissionRecords.length === 0) {
+      this.logger.error(`[PermissionManager] Keine Permission-Definitionen gefunden für Keys:`, truePermissions);
+      return;
+    }
+
+    // 4. INSERT in group_permissions
+    const values = permissionRecords.map(p => 
+      `(${groupId}, ${p.id}, NOW(), 'system', 0, 0)`
+    ).join(',');
+
+    await this.dbService.query(
+      `INSERT INTO group_permissions 
+       (group_id, permission_id, assigned_at, assigned_by, is_inherited, grant_option)
+       VALUES ${values}`
+    );
+
+    this.logger.success(`[PermissionManager] ${permissionRecords.length} Permissions relational gespeichert`);
   }
 
   /**

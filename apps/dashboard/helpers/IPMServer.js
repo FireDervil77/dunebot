@@ -185,6 +185,71 @@ class IPMServer {
     }
 
     /**
+     * Message-Routing (Commands, Events, Responses)
+     * @private
+     */
+    async _routeMessage(daemonId, message) {
+        try {
+            const { type, namespace, action } = message;
+            
+            // Response-Handling (für Commands von Dashboard → Daemon)
+            if (type === 'response' || type === 'command_response') {
+                this._resolveCommand(message.id, message);
+                return;
+            }
+            
+            // ✅ NEU: Event-Routing über IPMEventRouter
+            if (type === 'event' && namespace && action) {
+                this.Logger.debug(`[IPMServer] Event empfangen: ${namespace}.${action} von Daemon ${daemonId}`);
+                
+                // An EventRouter weiterleiten
+                await eventRouter.route(message, { daemonId });
+                return;
+            }
+            
+            // ════════════════════════════════════════════════════════════
+            // ⚠️  DEPRECATED: Legacy Event-Handling (für Backwards-Compat)
+            // ════════════════════════════════════════════════════════════
+            // TODO: Entfernen wenn Daemon vollständig auf protocol.Message umgestellt ist
+            
+            const event = message.event;  // Legacy-Format
+            
+            if (!event) {
+                this.Logger.warn('[IPMServer] Message ohne event/namespace:', message);
+                return;
+            }
+
+            // Legacy-Event-Mapping
+            switch (event) {
+                case 'heartbeat':
+                    this._handleHeartbeat(daemonId, message.data);
+                    break;
+
+                case 'install.progress':
+                    await this._handleInstallProgress(daemonId, message.data);
+                    break;
+
+                case 'install.completed':
+                    await this._handleInstallCompleted(daemonId, message.data);
+                    break;
+
+                case 'install.failed':
+                    await this._handleInstallFailed(daemonId, message.data);
+                    break;
+
+                case 'gameserver.status_changed':
+                    await this._handleGameserverStatusChanged(daemonId, message.data);
+                    break;
+
+                default:
+                    this.Logger.debug(`[IPMServer] Unbekanntes Event: ${event}`);
+            }
+        } catch (error) {
+            this.Logger.error('[IPMServer] Fehler beim Message-Routing:', error);
+        }
+    }
+
+    /**
      * Daemon-Registrierung mit 2-Token-System (Setup-Token + JWT Session-Token)
      * 
      * Flow:
@@ -420,10 +485,12 @@ class IPMServer {
                 break;
 
             case 'command_response':
-                // ✅ Alternative Response-Format vom Go-Daemon
-                // Go-Daemon sendet: { type: "command_response", id: "...", payload: {...} }
-                // payload enthält: { success: bool, error: string, ... }
-                this._resolveCommand(id, payload);
+                // ✅ Go-Daemon sendet unterschiedliche Formate:
+                // Format 1: { type: "command_response", id: "...", success: true, data: {...} }
+                // Format 2: { type: "command_response", id: "...", payload: { success: true, ... } }
+                // Versuche payload zuerst, dann message als Fallback
+                const responseData = message.payload || message;
+                this._resolveCommand(id, responseData);
                 break;
 
             case 'event':
@@ -794,11 +861,10 @@ class IPMServer {
 
         this.pendingCommands.delete(commandId);
 
-        if (response.success) {
-            // ✅ Go-Daemon sendet payload direkt, nicht verschachtelt in .data
+        if (response && response.success) {
             pending.resolve(response);
         } else {
-            pending.reject(new Error(response.error || 'Command failed'));
+            pending.reject(new Error(response?.error || 'Command failed'));
         }
     }
 

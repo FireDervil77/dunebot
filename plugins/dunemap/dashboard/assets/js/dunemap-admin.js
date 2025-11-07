@@ -28,12 +28,12 @@
   }
   
   function init() {
-    console.log('[DuneMap] ✅ Initialisierung gestartet');
+    console.log('[DuneMap] Initialisierung gestartet');
     
     const grid = document.getElementById('sectorGrid');
     if (!grid) {
       // Kein Fehler loggen, da Script auf allen Seiten geladen wird
-      console.log('[DuneMap] ℹ️ Grid nicht auf dieser Seite (normal für Nicht-Admin-Seiten)');
+      console.log('[DuneMap]  Grid nicht auf dieser Seite (normal für Nicht-Admin-Seiten)');
       return;
     }
     
@@ -100,7 +100,7 @@
         markerList.innerHTML = sectorMarkers.map(m => `
           <div class="d-flex align-items-center justify-content-between mb-2 p-2 bg-light rounded">
             <div class="d-flex align-items-center gap-2">
-              <img src="/assets/plugins/dunemap/icons/${m.marker_type}.png" style="width: 24px; height: 24px;">
+              <img src="/assets/plugins/dunemap/images/icons/${m.marker_type}.png" style="width: 24px; height: 24px;">
               <small><strong>${m.marker_type}</strong></small>
             </div>
             <button class="btn btn-danger btn-sm" onclick="window.removeMarker(${m.id})">
@@ -189,7 +189,7 @@
       const addBtn = document.getElementById('addMarkerBtn');
       
       if (this.value) {
-        previewImg.src = `/assets/plugins/dunemap/icons/${this.value}.png`;
+        previewImg.src = `/assets/plugins/dunemap/images/icons/${this.value}.png`;
         previewImg.alt = this.value;
         iconPreview.style.display = 'block';
         addBtn.disabled = false;
@@ -228,7 +228,7 @@
             const cell = document.querySelector(`[data-sector-x="${currentSectorX}"][data-sector-y="${currentSectorY}"]`);
             if (cell) {
               const img = document.createElement('img');
-              img.src = `/assets/plugins/dunemap/icons/${result.marker.marker_type}.png`;
+              img.src = `/assets/plugins/dunemap/images/icons/${result.marker.marker_type}.png`;
               img.alt = result.marker.marker_type;
               img.style.cssText = 'width: 32px; height: 32px; object-fit: contain;';
               cell.appendChild(img);
@@ -291,7 +291,7 @@
               // Alle verbleibenden Marker wieder einfügen
               sectorMarkers.forEach(marker => {
                 const img = document.createElement('img');
-                img.src = `/assets/plugins/dunemap/icons/${marker.marker_type}.png`;
+                img.src = `/assets/plugins/dunemap/images/icons/${marker.marker_type}.png`;
                 img.alt = marker.marker_type;
                 img.style.cssText = 'width: 32px; height: 32px; object-fit: contain;';
                 cell.appendChild(img);

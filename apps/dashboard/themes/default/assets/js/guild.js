@@ -322,11 +322,8 @@ class GuildAjaxHandler {
         if (result.success) {
             this.showToast('success', result.message || 'Benutzer erfolgreich hinzugefügt');
             
-            // Modal schließen
-            const modal = bootstrap.Modal.getInstance(document.getElementById('addStaffModal'));
-            if (modal) {
-                modal.hide();
-            }
+            // Modal schließen (Bootstrap 4 API)
+            $('#addStaffModal').modal('hide');
             
             // Formular zurücksetzen
             form.reset();
@@ -862,9 +859,8 @@ class GuildAjaxHandler {
         console.log('[GuildAjax] handleCreateGroupResponse called:', result);
         if (result.success) {
             this.showToast('success', result.message || 'Gruppe erfolgreich erstellt');
-            // Modal schließen
-            const modal = bootstrap.Modal.getInstance(document.getElementById('createGroupModal'));
-            if (modal) modal.hide();
+            // Modal schließen (Bootstrap 4 API)
+            $('#createGroupModal').modal('hide');
             // Form zurücksetzen
             form.reset();
             // Seite nach 1,5s neu laden
@@ -881,9 +877,10 @@ class GuildAjaxHandler {
         console.log('[GuildAjax] handleEditGroupResponse called:', result);
         if (result.success) {
             this.showToast('success', result.message || 'Gruppe erfolgreich aktualisiert');
-            // Modal schließen
-            const modal = bootstrap.Modal.getInstance(document.getElementById('editGroupModal'));
-            if (modal) modal.hide();
+            
+            // Modal schließen (Bootstrap 4 API)
+            $('#editGroupModal').modal('hide');
+            
             // Seite nach 1,5s neu laden
             setTimeout(() => window.location.reload(), 1500);
         } else {
@@ -898,9 +895,8 @@ class GuildAjaxHandler {
         console.log('[GuildAjax] handleDeleteGroupResponse called:', result);
         if (result.success) {
             this.showToast('success', result.message || 'Gruppe erfolgreich gelöscht');
-            // Modal schließen
-            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteGroupModal'));
-            if (modal) modal.hide();
+            // Modal schließen (Bootstrap 4 API)
+            $('#deleteGroupModal').modal('hide');
             // Seite nach 1,5s neu laden
             setTimeout(() => window.location.reload(), 1500);
         } else {
@@ -916,33 +912,8 @@ class GuildAjaxHandler {
         if (result.success) {
             this.showToast('success', result.message || 'Benutzer erfolgreich aktualisiert');
             
-            // Modal schließen - nutze gespeicherte Instanz oder Bootstrap API
-            const modalElement = document.getElementById('editUserModal');
-            if (modalElement) {
-                try {
-                    // 1. Versuche gespeicherte Instanz
-                    if (modalElement._bsModalInstance) {
-                        console.log('[GuildAjax] Closing modal via saved instance');
-                        modalElement._bsModalInstance.hide();
-                    }
-                    // 2. Fallback: Bootstrap getInstance
-                    else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                        const existingModal = bootstrap.Modal.getInstance(modalElement);
-                        if (existingModal) {
-                            console.log('[GuildAjax] Closing modal via getInstance');
-                            existingModal.hide();
-                        } else {
-                            console.warn('[GuildAjax] No modal instance found, manual cleanup');
-                            this._manualModalClose(modalElement);
-                        }
-                    } else {
-                        this._manualModalClose(modalElement);
-                    }
-                } catch (e) {
-                    console.warn('[GuildAjax] Modal close failed, using manual cleanup:', e);
-                    this._manualModalClose(modalElement);
-                }
-            }
+            // Modal schließen (Bootstrap 4 API)
+            $('#editUserModal').modal('hide');
             
             // Seite nach 1,5s neu laden
             setTimeout(() => window.location.reload(), 1500);
@@ -965,9 +936,8 @@ class GuildAjaxHandler {
         
         if (result.success) {
             this.showToast('success', result.message || 'Benutzer erfolgreich entfernt');
-            // Modal schließen
-            const modal = bootstrap.Modal.getInstance(document.getElementById('removeUserModal'));
-            if (modal) modal.hide();
+            // Modal schließen (Bootstrap 4 API)
+            $('#removeUserModal').modal('hide');
             // Seite nach 1,5s neu laden
             setTimeout(() => window.location.reload(), 1500);
         } else {

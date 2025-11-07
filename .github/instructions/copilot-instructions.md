@@ -14,7 +14,7 @@ DuneBot ist ein modulares Discord-Bot-System mit einem WordPress-ähnlichen Plug
 - **Theme-System**: Anpassbare UI-Themes für das Dashboard
 - **Hook-System**: WordPress-ähnliche Hooks für Plugin-Interaktion
 - **MySQL-Datenbank**: Nativer SQL-Client (keine ORM)
-- **DASHBOARD**: Nutzte Adminlte & Bootstrap (nichts anderes nutzten!)
+- **DASHBOARD**: Nutzte AdminLTE 3 & Bootstrap 4 (nichts anderes nutzten!)
 - **Frontend**: Nutzte LUMIA THEME (Bootstrap)
 
 ## 🚧 ACTIVE DEVELOPMENT PLAN
@@ -25,7 +25,6 @@ DuneBot ist ein modulares Discord-Bot-System mit einem WordPress-ähnlichen Plug
 **Wichtig:** Bei allen Änderungen an der Kommunikations-Architektur (IPM, SSE, Events) den Plan konsultieren und den Fortschritt dort aktualisieren!
 
 **Wichtig** Den process dunebot-dashboard-dev nicht neustarten wenn er in pm2 offline ist. dann ist er bereits in der Developper-Terminal aktiv!
-
 
 ## CORE ARCHITECTURE PRINCIPLES
 
@@ -49,6 +48,7 @@ Zentraler Service-Registry für alle wichtigen Services. Zugriff via `ServiceMan
 **Zweck:** Kommunikation zwischen Discord Bot und Dashboard
 
 Bot und Dashboard kommunizieren über **Veza-IPC** für Discord-bezogene Operationen:
+
 - Guild-Daten abrufen
 - Bot-Status überwachen
 - Commands synchronisieren
@@ -56,6 +56,7 @@ Bot und Dashboard kommunizieren über **Veza-IPC** für Discord-bezogene Operati
 - Plugin-Management (Bot-seitig)
 
 **Architektur:**
+
 ```
 ┌─────────────┐         Veza-IPC          ┌──────────────┐
 │             │◄──────────────────────────►│              │
@@ -69,31 +70,33 @@ Bot und Dashboard kommunizieren über **Veza-IPC** für Discord-bezogene Operati
 **IPC Server:** `apps/bot/bot.js` (Port konfiguriert in `.env`: `IPC_SERVER_HOST`, `IPC_SERVER_PORT`)  
 **IPC Client:** `apps/dashboard/helpers/IPCClient.js`
 
-**Wichtig:** 
+**Wichtig:**
+
 - ❌ **NICHT** für Gameserver/Daemon-Kommunikation verwenden!
 - ✅ **NUR** für Bot ↔ Dashboard Kommunikation
 - ✅ Nutze `ServiceManager.get('ipcClient')` im Dashboard
 - ✅ Nutze `ServiceManager.get('ipcServer')` im Bot
 
 **Verfügbare IPC-Calls:**
+
 ```javascript
 // Discord/Guild-bezogen
-ipcClient.send('dashboard:VALIDATE_GUILD', { guildId });
-ipcClient.send('dashboard:GET_BOT_GUILDS');
-ipcClient.send('dashboard:GET_GUILD_STATS', { guildId });
+ipcClient.send("dashboard:VALIDATE_GUILD", { guildId });
+ipcClient.send("dashboard:GET_BOT_GUILDS");
+ipcClient.send("dashboard:GET_GUILD_STATS", { guildId });
 
 // Commands
-ipcClient.send('dashboard:GET_CMDS_SUMMARY', { guildId });
-ipcClient.send('dashboard:GET_PLUGIN_CMDS', { type: 'slash' | 'prefix' });
+ipcClient.send("dashboard:GET_CMDS_SUMMARY", { guildId });
+ipcClient.send("dashboard:GET_PLUGIN_CMDS", { type: "slash" | "prefix" });
 
 // Locales
-ipcClient.send('dashboard:GET_LOCALE_BUNDLE', { locale });
-ipcClient.send('dashboard:SET_LOCALE_BUNDLE', { locale, data });
+ipcClient.send("dashboard:GET_LOCALE_BUNDLE", { locale });
+ipcClient.send("dashboard:SET_LOCALE_BUNDLE", { locale, data });
 
 // Plugin-Management (Bot-Plugins!)
-ipcClient.send('dashboard:UPDATE_PLUGIN', { 
-    pluginName, 
-    action: 'enable' | 'disable' | 'guildEnable' | 'guildDisable'
+ipcClient.send("dashboard:UPDATE_PLUGIN", {
+  pluginName,
+  action: "enable" | "disable" | "guildEnable" | "guildDisable",
 });
 ```
 
@@ -105,6 +108,7 @@ ipcClient.send('dashboard:UPDATE_PLUGIN', {
 **Zweck:** Kommunikation zwischen FireBot Daemon (Go) und Dashboard (Node.js)
 
 Daemon und Dashboard kommunizieren über **WebSocket-basiertes IPM (Inter-Process Messaging)** für Gameserver-Management:
+
 - Rootserver-Status
 - Gameserver-Lifecycle (Start/Stop/Restart)
 - Echtzeit-Logs & Konsole
@@ -112,6 +116,7 @@ Daemon und Dashboard kommunizieren über **WebSocket-basiertes IPM (Inter-Proces
 - Installation-Queue-Updates
 
 **Architektur:**
+
 ```
 ┌──────────────┐      WebSocket (IPM)      ┌──────────────┐
 │              │◄─────────────────────────►│              │
@@ -120,23 +125,26 @@ Daemon und Dashboard kommunizieren über **WebSocket-basiertes IPM (Inter-Proces
 │              │                           │              │
 └──────────────┘                           └──────────────┘
   Externer Server                            Process 2
-  (z.B. VPS/Dedicated)                      
+  (z.B. VPS/Dedicated)
 ```
 
 **IPM Server:** `firebot_daemon/internal/websocket/` (Go-Implementierung)  
 **IPM Client:** Dashboard Plugin (z.B. `plugins/masterserver/dashboard/helpers/IPMClient.js`)
 
-**Port-Konfiguration:** 
+**Port-Konfiguration:**
+
 - Daemon: `daemon.yaml` → `ipm_server.port` (Standard: 8081)
 - Dashboard: `.env` → `IPM_SERVER_URL=ws://daemon-host:8081`
 
-**Wichtig:** 
+**Wichtig:**
+
 - ❌ **NICHT** IPC (Veza) nennen - das ist für Bot ↔ Dashboard!
 - ✅ **IMMER** IPM, IPMServer, IPMClient oder ipmServer/ipmClient verwenden
 - ✅ **Authentifizierung:** API-Keys aus `rootserver`-Tabelle
 - ✅ **Binary Protocol:** Für Logs/Console kann Binary WebSocket genutzt werden
 
 **IPM Message Pattern:**
+
 ```javascript
 // Client → Daemon (Request)
 {
@@ -170,45 +178,47 @@ Daemon und Dashboard kommunizieren über **WebSocket-basiertes IPM (Inter-Proces
 ```
 
 **Verfügbare IPM-Actions (Beispiele):**
+
 ```javascript
 // RootServer Management
-ipmClient.send('rootserver:list', { guildId });
-ipmClient.send('rootserver:status', { rootserverId });
-ipmClient.send('rootserver:resources', { rootserverId }); // CPU, RAM, Disk
+ipmClient.send("rootserver:list", { guildId });
+ipmClient.send("rootserver:status", { rootserverId });
+ipmClient.send("rootserver:resources", { rootserverId }); // CPU, RAM, Disk
 
 // GameServer Lifecycle
-ipmClient.send('gameserver:start', { serverId });
-ipmClient.send('gameserver:stop', { serverId });
-ipmClient.send('gameserver:restart', { serverId });
-ipmClient.send('gameserver:status', { serverId });
+ipmClient.send("gameserver:start", { serverId });
+ipmClient.send("gameserver:stop", { serverId });
+ipmClient.send("gameserver:restart", { serverId });
+ipmClient.send("gameserver:status", { serverId });
 
 // Console/Logs
-ipmClient.send('console:attach', { serverId }); // Subscribe to output
-ipmClient.send('console:send', { serverId, command: 'say Hello' });
-ipmClient.send('logs:fetch', { serverId, lines: 100 });
+ipmClient.send("console:attach", { serverId }); // Subscribe to output
+ipmClient.send("console:send", { serverId, command: "say Hello" });
+ipmClient.send("logs:fetch", { serverId, lines: 100 });
 
 // Installation
-ipmClient.send('install:rootserver', { config });
-ipmClient.send('install:gameserver', { rootserverId, gameType, config });
-ipmClient.send('install:status', { installId });
+ipmClient.send("install:rootserver", { config });
+ipmClient.send("install:gameserver", { rootserverId, gameType, config });
+ipmClient.send("install:status", { installId });
 ```
 
 **Event-Handling (Daemon Push-Events):**
+
 ```javascript
 // Im Dashboard IPMClient
-ipmClient.on('event:server:status_changed', (data) => {
-    console.log(`Server ${data.serverId} → ${data.newStatus}`);
-    // Update UI, DB, etc.
+ipmClient.on("event:server:status_changed", (data) => {
+  console.log(`Server ${data.serverId} → ${data.newStatus}`);
+  // Update UI, DB, etc.
 });
 
-ipmClient.on('event:console:output', (data) => {
-    console.log(`[${data.serverId}] ${data.line}`);
-    // Append to console widget
+ipmClient.on("event:console:output", (data) => {
+  console.log(`[${data.serverId}] ${data.line}`);
+  // Append to console widget
 });
 
-ipmClient.on('event:server:crashed', (data) => {
-    console.error(`Server ${data.serverId} crashed!`);
-    // Send notification, log, restart?
+ipmClient.on("event:server:crashed", (data) => {
+  console.error(`Server ${data.serverId} crashed!`);
+  // Send notification, log, restart?
 });
 ```
 
@@ -218,32 +228,34 @@ ipmClient.on('event:server:crashed', (data) => {
 
 **IPC vs. IPM - Wann was nutzen?**
 
-| Aspekt | IPC (Bot ↔ Dashboard) | IPM (Daemon ↔ Dashboard) |
-|--------|----------------------|-------------------------|
-| **Technologie** | Veza (TCP, Node.js) | WebSocket (ws Library) |
-| **Zweck** | Discord-Bot-Daten | Gameserver-Management |
-| **Protokoll** | Veza-Messages | JSON WebSocket Messages |
-| **Verbindung** | Lokal (beide Node.js) | Remote (Go ↔ Node.js) |
-| **Auth** | Keine (vertrauenswürdig) | API-Keys (rootserver-Tabelle) |
-| **Beispiel-Use-Cases** | Guild-Liste, Commands, Locales | Server starten, Logs, Monitoring |
-| **Service-Name** | `ipcClient` / `ipcServer` | `ipmClient` / `ipmServer` |
-| **Code-Location** | `apps/bot/`, `apps/dashboard/helpers/` | `firebot_daemon/internal/websocket/`, `plugins/masterserver/dashboard/` |
+| Aspekt                 | IPC (Bot ↔ Dashboard)                 | IPM (Daemon ↔ Dashboard)                                               |
+| ---------------------- | -------------------------------------- | ----------------------------------------------------------------------- |
+| **Technologie**        | Veza (TCP, Node.js)                    | WebSocket (ws Library)                                                  |
+| **Zweck**              | Discord-Bot-Daten                      | Gameserver-Management                                                   |
+| **Protokoll**          | Veza-Messages                          | JSON WebSocket Messages                                                 |
+| **Verbindung**         | Lokal (beide Node.js)                  | Remote (Go ↔ Node.js)                                                  |
+| **Auth**               | Keine (vertrauenswürdig)               | API-Keys (rootserver-Tabelle)                                           |
+| **Beispiel-Use-Cases** | Guild-Liste, Commands, Locales         | Server starten, Logs, Monitoring                                        |
+| **Service-Name**       | `ipcClient` / `ipcServer`              | `ipmClient` / `ipmServer`                                               |
+| **Code-Location**      | `apps/bot/`, `apps/dashboard/helpers/` | `firebot_daemon/internal/websocket/`, `plugins/masterserver/dashboard/` |
 
 **Naming Convention:**
+
 ```javascript
 // ✅ RICHTIG
-const ipcClient = ServiceManager.get('ipcClient');  // Bot-Communication
-const ipmClient = require('./helpers/IPMClient');   // Daemon-Communication
+const ipcClient = ServiceManager.get("ipcClient"); // Bot-Communication
+const ipmClient = require("./helpers/IPMClient"); // Daemon-Communication
 
-ipcClient.send('dashboard:GET_BOT_GUILDS');         // Bot-Daten
-ipmClient.send('gameserver:start', { serverId });   // Gameserver-Action
+ipcClient.send("dashboard:GET_BOT_GUILDS"); // Bot-Daten
+ipmClient.send("gameserver:start", { serverId }); // Gameserver-Action
 
 // ❌ FALSCH
-const ipcClient = new IPCClient();                  // IPC für Daemon (FALSCH!)
-ipmClient.send('dashboard:GET_BOT_GUILDS');         // IPM für Bot (FALSCH!)
+const ipcClient = new IPCClient(); // IPC für Daemon (FALSCH!)
+ipmClient.send("dashboard:GET_BOT_GUILDS"); // IPM für Bot (FALSCH!)
 ```
 
 **Debugging:**
+
 ```bash
 # IPC (Bot ↔ Dashboard)
 export VEZA_DEBUG=true        # Veza-Debug-Logs aktivieren
@@ -314,6 +326,7 @@ export DEBUG_IPM=true         # IPM-Debug-Logs aktivieren (falls implementiert)
 ### Path-Generierung (Code-Konvention)
 
 **User Home Directory:**
+
 ```go
 // IMMER: /home/{base_directory}/{username}/
 userHome := filepath.Join(cfg.Filesystem.BaseDirectory, username)
@@ -321,6 +334,7 @@ userHome := filepath.Join(cfg.Filesystem.BaseDirectory, username)
 ```
 
 **RootServer Directory:**
+
 ```go
 // IMMER: {userHome}/rootserver_{mysql_id}/
 rootserverPath := filepath.Join(userHome, fmt.Sprintf("rootserver_%d", mysqlID))
@@ -328,6 +342,7 @@ rootserverPath := filepath.Join(userHome, fmt.Sprintf("rootserver_%d", mysqlID))
 ```
 
 **Gameserver Installation:**
+
 ```go
 // IMMER: {rootserverPath}/gameservers/{server-slug}/
 gameserverPath := filepath.Join(rootserverPath, "gameservers", serverSlug)
@@ -337,6 +352,7 @@ gameserverPath := filepath.Join(rootserverPath, "gameservers", serverSlug)
 ### User-Management
 
 **User-Erstellung:**
+
 ```go
 username := fmt.Sprintf("gs-guild_%s", guildID)
 homeDir := filepath.Join(baseDir, username)  // /home/firecenter/gs-guild_XXXXX/
@@ -351,6 +367,7 @@ cmd := exec.Command("useradd",
 ```
 
 **User-Verzeichnisse:**
+
 - Werden automatisch bei User-Erstellung in `{homeDir}` erstellt
 - `.config`, `.steam`, `.local`, `.cache` müssen explizit angelegt werden
 - Ownership: User:User (z.B. `gs-guild_1403034310:gs-guild_1403034310`)
@@ -363,7 +380,7 @@ cmd := exec.Command("useradd",
 4. **RootServer UNTER User-Home** - Pro MySQL-ID ein Verzeichnis
 5. **Gameservers UNTER RootServer** - In `gameservers/` Subfolder
 6. **Daemon läuft als root** - User-Wechsel via `syscall.Credential`
-7. **SteamCMD Shared** - Ownership `root:steamcmd`, alle gs-* User in Gruppe
+7. **SteamCMD Shared** - Ownership `root:steamcmd`, alle gs-\* User in Gruppe
 
 ### Code-Locations
 
@@ -910,6 +927,7 @@ CREATE TABLE plugin_migrations (
 ### Wann brauche ich eine Migration?
 
 **✅ Migration ERFORDERLICH bei:**
+
 - 🗄️ Neue Tabellen erstellen
 - 🔧 Spalten hinzufügen/ändern/löschen
 - 📊 Daten migrieren (alte Struktur → neue Struktur)
@@ -918,6 +936,7 @@ CREATE TABLE plugin_migrations (
 - 🗑️ Alte Daten löschen/aufräumen
 
 **❌ KEINE Migration bei:**
+
 - 💻 Bug-Fixes in Code
 - 🎨 UI/CSS-Änderungen
 - ⚡ Performance-Optimierungen
@@ -945,43 +964,46 @@ CREATE TABLE plugin_migrations (
 **Pfad:** `plugins/myplugin/dashboard/migrations/1.2.0-feature-name.js`
 
 **Template:**
+
 ```javascript
 /**
  * Migration 1.2.0: Feature Description
- * 
+ *
  * Beschreibung was die Migration macht
- * 
+ *
  * @author YourName
  * @version 1.2.0
  */
 
 module.exports = {
-    version: '1.2.0',
-    name: 'Feature Implementation',
-    
-    /**
-     * Migration ausführen
-     * @param {object} dbService - Database Service
-     * @param {string} guildId - Guild ID (kann NULL sein für globale Migrations)
-     */
-    async up(dbService, guildId) {
-        const Logger = require('dunebot-core').ServiceManager.get('Logger');
-        
-        Logger.info(`[Plugin Migration 1.2.0] Starte Migration${guildId ? ` für Guild ${guildId}` : ''}...`);
-        
-        try {
-            // ========================================
-            // SCHEMA-ÄNDERUNGEN (Tabellen/Spalten)
-            // ========================================
-            
-            // Neue Spalte hinzufügen
-            await dbService.query(`
+  version: "1.2.0",
+  name: "Feature Implementation",
+
+  /**
+   * Migration ausführen
+   * @param {object} dbService - Database Service
+   * @param {string} guildId - Guild ID (kann NULL sein für globale Migrations)
+   */
+  async up(dbService, guildId) {
+    const Logger = require("dunebot-core").ServiceManager.get("Logger");
+
+    Logger.info(
+      `[Plugin Migration 1.2.0] Starte Migration${guildId ? ` für Guild ${guildId}` : ""}...`
+    );
+
+    try {
+      // ========================================
+      // SCHEMA-ÄNDERUNGEN (Tabellen/Spalten)
+      // ========================================
+
+      // Neue Spalte hinzufügen
+      await dbService.query(`
                 ALTER TABLE my_table 
                 ADD COLUMN new_field VARCHAR(100) DEFAULT NULL
             `);
-            
-            // Neue Tabelle erstellen
-            await dbService.query(`
+
+      // Neue Tabelle erstellen
+      await dbService.query(`
                 CREATE TABLE IF NOT EXISTS my_new_table (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     guild_id VARCHAR(20) NOT NULL,
@@ -990,89 +1012,94 @@ module.exports = {
                     FOREIGN KEY (guild_id) REFERENCES guilds(_id) ON DELETE CASCADE
                 )
             `);
-            
-            // ========================================
-            // DATEN-MIGRATION (Werte umwandeln)
-            // ========================================
-            
-            if (guildId) {
-                // Guild-spezifische Migration
-                await dbService.query(`
+
+      // ========================================
+      // DATEN-MIGRATION (Werte umwandeln)
+      // ========================================
+
+      if (guildId) {
+        // Guild-spezifische Migration
+        await dbService.query(
+          `
                     UPDATE my_table 
                     SET new_field = 'default_value' 
                     WHERE guild_id = ?
-                `, [guildId]);
-            } else {
-                // Globale Migration
-                await dbService.query(`
+                `,
+          [guildId]
+        );
+      } else {
+        // Globale Migration
+        await dbService.query(`
                     UPDATE my_table 
                     SET new_field = 'default_value'
                 `);
-            }
-            
-            // ========================================
-            // NAVIGATION AKTUALISIEREN (optional)
-            // ========================================
-            
-            if (guildId) {
-                const NavigationManager = require('dunebot-core').ServiceManager.get('navigationManager');
-                
-                // Alte Navigation löschen
-                await dbService.query(
-                    'DELETE FROM nav_items WHERE plugin = ? AND guildId = ?',
-                    ['myplugin', guildId]
-                );
-                
-                // Neue Navigation registrieren
-                const pluginManager = require('dunebot-core').ServiceManager.get('pluginManager');
-                if (pluginManager.isPluginEnabled('myplugin')) {
-                    const plugin = pluginManager.getPlugin('myplugin');
-                    if (plugin && typeof plugin._registerNavigation === 'function') {
-                        await plugin._registerNavigation(guildId);
-                    }
-                }
-            }
-            
-            Logger.success(`[Plugin Migration 1.2.0] Migration erfolgreich!`);
-            return { success: true };
-            
-        } catch (error) {
-            Logger.error(`[Plugin Migration 1.2.0] Migration fehlgeschlagen:`, error);
-            throw error;
+      }
+
+      // ========================================
+      // NAVIGATION AKTUALISIEREN (optional)
+      // ========================================
+
+      if (guildId) {
+        const NavigationManager =
+          require("dunebot-core").ServiceManager.get("navigationManager");
+
+        // Alte Navigation löschen
+        await dbService.query(
+          "DELETE FROM nav_items WHERE plugin = ? AND guildId = ?",
+          ["myplugin", guildId]
+        );
+
+        // Neue Navigation registrieren
+        const pluginManager =
+          require("dunebot-core").ServiceManager.get("pluginManager");
+        if (pluginManager.isPluginEnabled("myplugin")) {
+          const plugin = pluginManager.getPlugin("myplugin");
+          if (plugin && typeof plugin._registerNavigation === "function") {
+            await plugin._registerNavigation(guildId);
+          }
         }
-    },
-    
-    /**
-     * Rollback (optional aber empfohlen!)
-     * @param {object} dbService 
-     * @param {string} guildId 
-     */
-    async down(dbService, guildId) {
-        const Logger = require('dunebot-core').ServiceManager.get('Logger');
-        
-        Logger.info(`[Plugin Migration 1.2.0] ROLLBACK${guildId ? ` für Guild ${guildId}` : ''}...`);
-        
-        try {
-            // Rückgängig machen (umgekehrte Reihenfolge!)
-            
-            // Spalte entfernen
-            await dbService.query(`
+      }
+
+      Logger.success(`[Plugin Migration 1.2.0] Migration erfolgreich!`);
+      return { success: true };
+    } catch (error) {
+      Logger.error(`[Plugin Migration 1.2.0] Migration fehlgeschlagen:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Rollback (optional aber empfohlen!)
+   * @param {object} dbService
+   * @param {string} guildId
+   */
+  async down(dbService, guildId) {
+    const Logger = require("dunebot-core").ServiceManager.get("Logger");
+
+    Logger.info(
+      `[Plugin Migration 1.2.0] ROLLBACK${guildId ? ` für Guild ${guildId}` : ""}...`
+    );
+
+    try {
+      // Rückgängig machen (umgekehrte Reihenfolge!)
+
+      // Spalte entfernen
+      await dbService.query(`
                 ALTER TABLE my_table 
                 DROP COLUMN new_field
             `);
-            
-            // Tabelle löschen
-            await dbService.query(`
+
+      // Tabelle löschen
+      await dbService.query(`
                 DROP TABLE IF EXISTS my_new_table
             `);
-            
-            Logger.success(`[Plugin Migration 1.2.0] Rollback erfolgreich!`);
-            
-        } catch (error) {
-            Logger.error(`[Plugin Migration 1.2.0] Rollback fehlgeschlagen:`, error);
-            throw error;
-        }
+
+      Logger.success(`[Plugin Migration 1.2.0] Rollback erfolgreich!`);
+    } catch (error) {
+      Logger.error(`[Plugin Migration 1.2.0] Rollback fehlgeschlagen:`, error);
+      throw error;
     }
+  },
 };
 ```
 
@@ -1095,6 +1122,7 @@ module.exports = {
 #### 4. Dashboard neu starten → Fertig! ✨
 
 Das System macht automatisch:
+
 1. ✅ Erkennt: Version in DB (z.B. 1.1.0) < Version in Code (1.2.0)
 2. ✅ Findet alle Migrationen zwischen 1.1.0 und 1.2.0 (nur 1.2.0 in diesem Fall)
 3. ✅ Führt Migration(en) sequenziell aus
@@ -1117,6 +1145,7 @@ Das System macht automatisch:
 ```
 
 **PROD Update von 1.0.0 → 1.2.0:**
+
 ```
 System erkennt: current = 1.0.0, target = 1.2.0
 Findet Migrationen: 1.1.0, 1.2.0 (beide > 1.0.0 und <= 1.2.0)
@@ -1145,19 +1174,19 @@ require('dotenv').config({ path: './apps/dashboard/.env' });
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE
   });
-  
+
   // Migration zurücksetzen
   await conn.query(
     'DELETE FROM plugin_migrations WHERE plugin_name = ? AND migration_file = ?',
     ['myplugin', 'dashboard/migrations/1.2.0-feature.js']
   );
-  
+
   // Version zurücksetzen (optional)
   await conn.query(
     'UPDATE plugin_versions SET current_version = ? WHERE plugin_name = ?',
     ['1.1.0', 'myplugin']
   );
-  
+
   await conn.end();
   console.log('✅ Migration zurückgesetzt! Dashboard neu starten für Retry.');
 })();
@@ -1181,19 +1210,22 @@ require('dotenv').config({ path: './apps/dashboard/.env' });
 ### Debugging
 
 **Prüfe ausgeführte Migrationen:**
+
 ```sql
-SELECT * FROM plugin_migrations 
-WHERE plugin_name = 'myplugin' 
+SELECT * FROM plugin_migrations
+WHERE plugin_name = 'myplugin'
 ORDER BY executed_at DESC;
 ```
 
 **Prüfe Plugin-Version:**
+
 ```sql
-SELECT * FROM plugin_versions 
+SELECT * FROM plugin_versions
 WHERE plugin_name = 'myplugin';
 ```
 
 **Log-Ausgabe:**
+
 ```
 [PluginManager] Version-Upgrade: 1.1.0 → 1.2.0
 [PluginManager] Führe 1 Migration(en) aus: 1.2.0

@@ -1,6 +1,6 @@
 {
     "name": "automod",
-    "displayName": "Auto-Moderation - Plugin",
+    "displayName": "AutoMod",
     "description": "The Auto-Moderation Plugin for FireBot",
     "version": "1.0.0",
     "author": "FireBot Team",

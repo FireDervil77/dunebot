@@ -706,12 +706,26 @@ router.get('/groups', requirePermission('PERMISSIONS.GROUPS.VIEW'), async (req, 
         // Hole alle Gruppen mit member_count
         const groups = await permissionManager.getGuildGroups(guildId);
         
-        // Parse JSON permissions
-        groups.forEach(group => {
-            if (group.permissions) {
-                group.permissions = JSON.parse(group.permissions);
+        // Lade Permissions RELATIONAL aus group_permissions (NICHT aus JSON!)
+        for (const group of groups) {
+            const groupPerms = await dbService.query(`
+                SELECT pd.permission_key
+                FROM group_permissions gp
+                JOIN permission_definitions pd ON gp.permission_id = pd.id
+                WHERE gp.group_id = ?
+            `, [group.id]);
+            
+            // Baue Permissions-Object { KEY: true }
+            group.permissions = {};
+            groupPerms.forEach(p => {
+                group.permissions[p.permission_key] = true;
+            });
+            
+            Logger.info(`[Permissions GET /groups] Gruppe ${group.name} (ID: ${group.id}): ${groupPerms.length} Permissions geladen`);
+            if (group.name === 'Administrator' && groupPerms.length > 0) {
+                Logger.debug('[Permissions GET /groups] Administrator Permissions:', Object.keys(group.permissions).slice(0, 10));
             }
-        });
+        }
         
         // Hole alle verfügbaren Permissions für Checkboxes (NUR guild-spezifische!)
         const permissions = await dbService.query(`
@@ -895,12 +909,21 @@ router.get('/matrix', requireAnyPermission(['PERMISSIONS.GROUPS.VIEW', 'PERMISSI
         // Hole alle Gruppen
         const groups = await permissionManager.getGuildGroups(guildId);
         
-        // Parse Permissions
-        groups.forEach(group => {
-            if (group.permissions) {
-                group.permissions = JSON.parse(group.permissions);
-            }
-        });
+        // Lade Permissions RELATIONAL aus group_permissions (NICHT aus JSON!)
+        for (const group of groups) {
+            const groupPerms = await dbService.query(`
+                SELECT pd.permission_key
+                FROM group_permissions gp
+                JOIN permission_definitions pd ON gp.permission_id = pd.id
+                WHERE gp.group_id = ?
+            `, [group.id]);
+            
+            // Baue Permissions-Object { KEY: true }
+            group.permissions = {};
+            groupPerms.forEach(p => {
+                group.permissions[p.permission_key] = true;
+            });
+        }
         
         // Hole alle Permissions (NUR guild-spezifische!)
         const permissions = await dbService.query(`
@@ -941,11 +964,12 @@ router.get('/matrix', requireAnyPermission(['PERMISSIONS.GROUPS.VIEW', 'PERMISSI
 
 /**
  * POST /permissions/matrix
- * Speichert Bulk-Updates für die Berechtigungsmatrix
+ * Speichert Bulk-Updates für die Berechtigungsmatrix (RELATIONAL!)
  */
 router.post('/matrix', requirePermission('PERMISSIONS.ASSIGN'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
+    const permissionManager = ServiceManager.get('permissionManager');
     const guildId = res.locals.guildId;
     const { updates } = req.body;
     
@@ -957,11 +981,11 @@ router.post('/matrix', requirePermission('PERMISSIONS.ASSIGN'), async (req, res)
             });
         }
         
-        // Für jede Gruppe: Permissions aktualisieren
+        // Für jede Gruppe: Permissions aktualisieren (RELATIONAL!)
         for (const [groupId, permissions] of Object.entries(updates)) {
             // Prüfe ob Gruppe zu dieser Guild gehört
             const groups = await dbService.query(
-                'SELECT permissions FROM guild_groups WHERE id = ? AND guild_id = ?',
+                'SELECT guild_id FROM guild_groups WHERE id = ? AND guild_id = ?',
                 [groupId, guildId]
             );
             
@@ -970,24 +994,10 @@ router.post('/matrix', requirePermission('PERMISSIONS.ASSIGN'), async (req, res)
                 continue;
             }
             
-            // Lade aktuelle Permissions
-            let currentPermissions = {};
-            try {
-                currentPermissions = JSON.parse(groups[0].permissions || '{}');
-            } catch (e) {
-                currentPermissions = {};
-            }
+            // Nutze updateGroup mit permissions-Object (wird relational gespeichert!)
+            await permissionManager.updateGroup(parseInt(groupId), { permissions });
             
-            // Merge mit Updates (überschreibt nur die geänderten Keys)
-            const updatedPermissions = { ...currentPermissions, ...permissions };
-            
-            // Update in DB
-            await dbService.query(
-                'UPDATE guild_groups SET permissions = ?, updated_at = NOW() WHERE id = ? AND guild_id = ?',
-                [JSON.stringify(updatedPermissions), groupId, guildId]
-            );
-            
-            Logger.info(`[Permissions] Updated permissions for group ${groupId} in guild ${guildId}`);
+            Logger.info(`[Permissions] Updated permissions for group ${groupId} (RELATIONAL)`);
         }
         
         res.json({

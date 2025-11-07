@@ -556,7 +556,7 @@ class PluginManager extends BasePluginManager {
             // ════════════════════════════════════════════════════════════
             try {
                 // Administrator-Gruppe finden (KORREKTUR: guild_groups statt permission_groups)
-                const [adminGroups] = await dbService.query(
+                const adminGroups = await dbService.query(
                     'SELECT id FROM guild_groups WHERE guild_id = ? AND slug = ?',
                     [guildId, 'administrator']
                 );
@@ -575,7 +575,7 @@ class PluginManager extends BasePluginManager {
                         
                         try {
                             // 1. Finde permission_id in permission_definitions
-                            const [permDefs] = await dbService.query(
+                            const permDefs = await dbService.query(
                                 'SELECT id FROM permission_definitions WHERE guild_id = ? AND permission_key = ? LIMIT 1',
                                 [guildId, permKey]
                             );
@@ -588,10 +588,10 @@ class PluginManager extends BasePluginManager {
                             const permissionId = permDefs[0].id;
                             
                             // 2. INSERT IGNORE in group_permissions (relational!)
-                            const [insertResult] = await dbService.query(
+                            const insertResult = await dbService.query(
                                 `INSERT IGNORE INTO group_permissions 
                                  (group_id, permission_id, assigned_at, assigned_by, is_inherited, grant_option) 
-                                 VALUES (?, ?, NOW(), NULL, 0, 0)`,
+                                 VALUES (?, ?, NOW(), 'system', 0, 0)`,
                                 [adminGroup.id, permissionId]
                             );
                             
@@ -609,7 +609,7 @@ class PluginManager extends BasePluginManager {
                     }
                     
                     if (addedCount > 0) {
-                        Logger.success(`✅ ${addedCount} neue Permissions automatisch zur Administrator-Gruppe hinzugefügt`);
+                        Logger.success(`✅ ${addedCount} neue Permissions automatisch zur Administrator-Gruppe hinzugefügt (RELATIONAL)`);
                     } else {
                         Logger.debug('Alle Permissions bereits in Administrator-Gruppe vorhanden');
                     }
@@ -618,6 +618,53 @@ class PluginManager extends BasePluginManager {
                 }
             } catch (adminError) {
                 Logger.error(`Fehler beim automatischen Zuweisen der Permissions zur Administrator-Gruppe:`, adminError);
+            }
+            
+            // ════════════════════════════════════════════════════════════
+            // NEU: Guild-Owner automatisch zur Administrator-Gruppe hinzufügen
+            // ════════════════════════════════════════════════════════════
+            try {
+                // 1. Administrator-Gruppe finden
+                const adminGroupRows = await dbService.query(
+                    'SELECT id FROM guild_groups WHERE guild_id = ? AND slug = ?',
+                    [guildId, 'administrator']
+                );
+                
+                if (!adminGroupRows || adminGroupRows.length === 0) {
+                    Logger.warn(`⚠️  Administrator-Gruppe nicht gefunden für Guild ${guildId} - Owner kann nicht zugewiesen werden`);
+                } else {
+                    const adminGroupId = adminGroupRows[0].id;
+                    
+                    // 2. Guild-Owner finden
+                    const ownerRows = await dbService.query(
+                        'SELECT id, user_id FROM guild_users WHERE guild_id = ? AND is_owner = 1',
+                        [guildId]
+                    );
+                    
+                    if (ownerRows && ownerRows.length > 0) {
+                        const guildUserId = ownerRows[0].id;      // guild_users.id (Primary Key)
+                        const ownerId = ownerRows[0].user_id;      // Discord User ID
+                        
+                        Logger.debug(`Guild-Owner gefunden (User ID: ${ownerId}), füge zur Administrator-Gruppe hinzu...`);
+                        
+                        // 3. Owner zur Administrator-Gruppe hinzufügen (falls noch nicht drin)
+                        const insertResult = await dbService.query(`
+                            INSERT IGNORE INTO guild_user_groups 
+                            (guild_user_id, group_id, assigned_at, assigned_by)
+                            VALUES (?, ?, NOW(), 'system')
+                        `, [guildUserId, adminGroupId]);
+                        
+                        if (insertResult.affectedRows > 0) {
+                            Logger.success(`✅ Guild-Owner automatisch zur Administrator-Gruppe hinzugefügt`);
+                        } else {
+                            Logger.debug('Guild-Owner ist bereits in der Administrator-Gruppe');
+                        }
+                    } else {
+                        Logger.warn(`⚠️  Guild-Owner nicht in guild_users gefunden für Guild ${guildId}`);
+                    }
+                }
+            } catch (ownerError) {
+                Logger.error(`Fehler beim Hinzufügen des Guild-Owners zur Administrator-Gruppe:`, ownerError);
             }
             
             return registeredCount;

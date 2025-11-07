@@ -8,10 +8,10 @@ class DuneMapPlugin extends DashboardPlugin {
     constructor(app) {
         super({
             name: 'dunemap',
-            displayName: 'DuneMap Plugin',
-            description: 'Das lägendäre dunemap plugin',
+            displayName: 'DuneMap',
+            description: 'Das lägendäre DuneMap Plugin',
             version: VersionHelper.getVersionFromContext(__dirname),
-            author: 'DuneBot Team',
+            author: 'FireBot Team',
             icon: 'fa-solid fa-map',
             baseDir: __dirname,
             publicAssets: true  // Assets aus /public/ bereitstellen
@@ -19,6 +19,10 @@ class DuneMapPlugin extends DashboardPlugin {
         
         this.app = app;
         this.guildRouter = require('express').Router();
+        
+        // Shared Assets für Backend-Nutzung laden (nur einmal beim Init!)
+        this.markerTypes = require(path.join(__dirname, 'assets', 'js', 'markerTypes'));
+        this.coriolisStormConfig = require(path.join(__dirname, 'assets', 'js', 'coriolisStormConfig'));
     }
 
     /**
@@ -60,10 +64,27 @@ class DuneMapPlugin extends DashboardPlugin {
             version: this.version,
             inFooter: true,
             defer: false
-            // HINWEIS: debugSrc entfernt, da dunemap-admin.dev.js nicht existiert
-            // Die normale dunemap-admin.js wird auch im Debug-Modus verwendet
+     
         });
         
+        // Map Generator Script
+        assetManager.registerScript('mapGenerator', 'js/MapGenerator.js', {
+            plugin: 'dunemap',
+            deps: [], 
+            version: this.version,
+            inFooter: true, 
+            defer: false
+        });
+
+        // Map Generator Script
+        assetManager.registerScript('markerTypes', 'js/markerTypes.js', {
+            plugin: 'dunemap',
+            deps: [], 
+            version: this.version,
+            inFooter: true, 
+            defer: false
+        });
+
         // CSS ist inline im Template (kein separates File)
         
         Logger.debug('[DuneMap] Assets registriert (dunemap-admin.js)');
@@ -156,8 +177,8 @@ class DuneMapPlugin extends DashboardPlugin {
                             : (marker.placed_by || 'Bot');
                     });
                     
-                    // Marker-Typen laden
-                    const { getMarkerTypesByCategory } = require('../shared/markerTypes');
+                    // Marker-Typen aus Constructor nutzen
+                    const { getMarkerTypesByCategory } = this.markerTypes;
                     const markerTypes = getMarkerTypesByCategory();
                     
                     Logger.debug('[DuneMap] Marker-Typen geladen:', {
@@ -365,7 +386,7 @@ class DuneMapPlugin extends DashboardPlugin {
                     }
                 };
                 
-                Logger.info(`[DuneMap] 🗺️ /admin Route aufgerufen für Guild ${guildId}`);
+                Logger.info(`[DuneMap] /admin Route aufgerufen für Guild ${guildId}`);
                 
                 try {
                     // Lade alle Marker für diese Guild
@@ -584,7 +605,9 @@ class DuneMapPlugin extends DashboardPlugin {
                 const Logger = ServiceManager.get('Logger');
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
-                const { getNextStormTiming, getRegionConfig } = require('../shared/coriolisStormConfig');
+                
+                // Storm Config aus Constructor nutzen
+                const { getNextStormTiming, getRegionConfig } = this.coriolisStormConfig;
                 
                 try {
                     // Lade gespeicherte Region aus Config

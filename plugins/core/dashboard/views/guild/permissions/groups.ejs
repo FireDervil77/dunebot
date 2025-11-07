@@ -124,7 +124,8 @@
                     data-group-color="<%= group.color %>"
                     data-group-icon="<%= group.icon || 'fa-solid fa-users' %>"
                     data-group-priority="<%= group.priority || 0 %>"
-                    data-group-permissions='<%= JSON.stringify(group.permissions || {}) %>'>
+                    data-group-permissions='<%= JSON.stringify(group.permissions || {}) %>'
+                    data-debug-perm-count="<%= Object.keys(group.permissions || {}).length %>">
               <i class="fa-solid fa-edit me-1"></i>
               Bearbeiten
             </button>
@@ -386,7 +387,7 @@
                 <div class="ps-3">
                   <% permissions[category].forEach(perm => { %>
                   <div class="form-check mb-2">
-                    <input class="form-check-input permission-checkbox" 
+                    <input class="form-check-input permission-checkbox edit-permission-checkbox" 
                            type="checkbox" 
                            name="permissions[<%= perm.permission_key %>]"
                            id="edit_perm_<%= perm.permission_key.replace(/\./g, '_') %>"
@@ -516,6 +517,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const groupPriority = btn.dataset.groupPriority;
       const groupPermissions = JSON.parse(btn.dataset.groupPermissions || '{}');
       
+      // 🔍 DEBUG
+      console.log('[DEBUG] Gruppe:', groupName);
+      console.log('[DEBUG] Permissions Count:', Object.keys(groupPermissions).length);
+      console.log('[DEBUG] Has AUTOMOD.VIEW?', groupPermissions['AUTOMOD.VIEW']);
+      console.log('[DEBUG] Permissions:', groupPermissions);
+      
       // Populate form
       document.getElementById('edit_group_id').value = groupId;
       document.getElementById('edit_name').value = groupName;
@@ -533,6 +540,11 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.edit-permission-checkbox').forEach(checkbox => {
         const permKey = checkbox.dataset.permissionKey;
         checkbox.checked = groupPermissions[permKey] === true;
+        
+        // 🔍 DEBUG: Log für jede AUTOMOD-Permission
+        if (permKey.startsWith('AUTOMOD.')) {
+          console.log(`[DEBUG] Checkbox ${permKey}: groupPermissions[${permKey}] = ${groupPermissions[permKey]}, checked = ${checkbox.checked}`);
+        }
       });
       
       new bootstrap.Modal(document.getElementById('editGroupModal')).show();

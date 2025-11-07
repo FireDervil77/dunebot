@@ -24,6 +24,7 @@
         "express": "^5.1.0",
         "express-ejs-layouts": "^2.5.1",
         "express-session": "^1.18.2",
+        "express-ws": "^5.0.2",
         "node-cron": "^4.2.1",
         "veza": "^1.2.0"
     },

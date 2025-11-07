@@ -13,10 +13,10 @@ class GreetingDashboardPlugin extends DashboardPlugin {
     constructor() {
         super({
             name: 'greeting',
-            displayName: 'Greeting Plugin',
+            displayName: 'Greeting',
             description: 'Willkommens- und Verabschiedungsnachrichten für neue/ausgetretene Member',
             version: VersionHelper.getVersionFromContext(__dirname),
-            author: 'DuneBot Team',
+            author: 'FireBot Team',
             icon: 'fa-solid fa-hand-wave',
             baseDir: __dirname,
             publicAssets: true

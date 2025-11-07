@@ -274,12 +274,12 @@ function requireGuildOwner() {
             }
             
             // Prüfe ob User Guild-Owner ist
-            const [guild] = await dbService.query(
+            const guildRows = await dbService.query(
                 'SELECT owner_id FROM guilds WHERE _id = ?',
                 [guildId]
             );
             
-            if (!guild || guild.length === 0) {
+            if (!Array.isArray(guildRows) || guildRows.length === 0) {
                 Logger.error(`[Permission] Guild ${guildId} nicht gefunden`);
                 return res.status(404).json({
                     success: false,
@@ -287,7 +287,7 @@ function requireGuildOwner() {
                 });
             }
             
-            const isOwner = guild[0].owner_id === userId;
+            const isOwner = guildRows[0].owner_id === userId;
             
             if (!isOwner) {
                 Logger.warn(`[Permission] User ${userId} ist NICHT Owner von Guild ${guildId}`);

@@ -67,11 +67,20 @@ const IPMServer = require('./helpers/IPMServer');
         Logger.success("IPM-Server gestartet");
         ServiceManager.register('ipmServer', ipmServer);
 
+        // Event Router initialisieren (IPM-Message-Routing)
+        Logger.info("Initialisiere Event-Router...");
+        const eventRouter = require('./helpers/IPMEventRouter');
+        ServiceManager.register('eventRouter', eventRouter);
+        Logger.success("Event-Router initialisiert");
+
         // SSE Manager initialisieren (Server-Sent Events für Browser)
         Logger.info("Initialisiere SSE-Manager...");
         const sseManager = require('./helpers/SSEManager');
         ServiceManager.register('sseManager', sseManager);
         Logger.success("SSE-Manager initialisiert");
+
+        // Console Manager wird vom Gameserver-Plugin registriert
+        // (Entfernt, da Plugin-spezifisch und nicht Core-Service)
 
         // Dashboard-App initialisieren
         Logger.info("Initialisiere Dashboard-App...");

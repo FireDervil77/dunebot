@@ -40,6 +40,13 @@ module.exports = class App {
         if (!dbService) throw new Error("DB Service required");
         
         this.app = express();
+        // WebSocket-Unterstützung für Express aktivieren (router.ws())
+        try {
+            require('express-ws')(this.app);
+        } catch (e) {
+            // Fallback: Wenn express-ws nicht installiert ist, loggen wir nur
+            console.warn('[WS] express-ws konnte nicht initialisiert werden. WebSocket-Routen sind deaktiviert.');
+        }
         this.app.set('trust proxy', 1);
         
         const Logger = ServiceManager.get("Logger");
@@ -433,29 +440,40 @@ module.exports = class App {
         const Logger = ServiceManager.get("Logger");
         for (const plugin of this.app.pluginManager.plugins) {
             if (plugin.publicAssets) {
-                // NEUE LOGIK: Mount direkt auf Plugin-Root (ohne public-Verwirrung)
+                // SICHERE LOGIK: NUR assets/ Ordner verwenden (KEIN public/ aus Sicherheitsgründen)
                 const pluginRootPath = path.join(this.app.pluginManager.pluginsDir, plugin.name);
                 
-                // 1. Dashboard-spezifische Assets (falls vorhanden)
-                const dashboardAssetsPath = path.join(pluginRootPath, 'dashboard', 'public');
+                // Express Static Optionen mit korrekten MIME-Types
+                const staticOptions = {
+                    setHeaders: (res, filepath) => {
+                        // Explizite MIME-Types für JavaScript
+                        if (filepath.endsWith('.js')) {
+                            res.setHeader('Content-Type', 'application/javascript; charset=UTF-8');
+                        } else if (filepath.endsWith('.mjs')) {
+                            res.setHeader('Content-Type', 'application/javascript; charset=UTF-8');
+                        } else if (filepath.endsWith('.json')) {
+                            res.setHeader('Content-Type', 'application/json; charset=UTF-8');
+                        } else if (filepath.endsWith('.css')) {
+                            res.setHeader('Content-Type', 'text/css; charset=UTF-8');
+                        }
+                    }
+                };
+                
+                // 1. Dashboard-spezifische Assets: dashboard/assets/
+                const dashboardAssetsPath = path.join(pluginRootPath, 'dashboard', 'assets');
                 if (fs.existsSync(dashboardAssetsPath)) {
-                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(dashboardAssetsPath));
-                    Logger.debug(`Dashboard-Assets für Plugin ${plugin.name} registriert`);
+                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(dashboardAssetsPath, staticOptions));
+                    Logger.debug(`Dashboard-Assets für Plugin ${plugin.name} registriert: dashboard/assets/`);
                 }
                 
-                // 2. Plugin-Root Assets (neue Hierarchie: /assets, /icons, etc.)
+                // 2. Plugin-Root Assets: /assets/ (für gemeinsame Assets)
                 const rootAssetsPath = path.join(pluginRootPath, 'assets');
                 if (fs.existsSync(rootAssetsPath)) {
-                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(rootAssetsPath));
-                    Logger.debug(`Root-Assets für Plugin ${plugin.name} registriert unter /assets/plugins/${plugin.name}`);
+                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(rootAssetsPath, staticOptions));
+                    Logger.debug(`Root-Assets für Plugin ${plugin.name} registriert: /assets/`);
                 }
                 
-                // 3. Backward-Compatibility: /public im Plugin-Root
-                const legacyPublicPath = path.join(pluginRootPath, 'public');
-                if (fs.existsSync(legacyPublicPath)) {
-                    this.app.use(`/assets/plugins/${plugin.name}`, express.static(legacyPublicPath));
-                    Logger.debug(`Legacy-Public-Assets für Plugin ${plugin.name} registriert`);
-                }
+                // SICHERHEIT: Keine public/ Ordner mehr - nur assets/
             }
         }
         

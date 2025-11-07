@@ -1,6 +1,6 @@
 {
     "name": "information",
-    "displayName": "Information´s Plugin",
+    "displayName": "Informationen",
     "description": "FireBot Information´s Plugin - Serves different Informations around Server / Owner / Member.",
     "version": "1.5.6",
     "main": "dashboard/index.js",

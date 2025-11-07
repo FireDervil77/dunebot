@@ -5,21 +5,25 @@ Dieses Verzeichnis enthält alle Fail2Ban-Konfigurationsdateien und Setup-Script
 ## 📁 Dateien
 
 ### Setup-Scripts
+
 - `setup-fail2ban.sh` - Standard Fail2Ban Setup (Log-basiert)
 - `setup-fail2ban-db.sh` - Erweitertes Setup mit MySQL-Integration
 
 ### Fail2Ban Konfiguration
+
 - `fail2ban-dunebot-exploits.conf` - Filter für Exploit-Versuche
 - `fail2ban-jail-dunebot.conf` - Jail-Konfiguration (Standard)
 - `fail2ban-filter-dunebot-db.conf` - Filter für DB-Integration
 - `fail2ban-jail-dunebot-db.conf` - Jail-Konfiguration (DB-basiert)
 
 ### Helper-Scripts
+
 - `fail2ban-db-reader.py` - Python-Script zum Auslesen blockierter IPs aus MySQL
 - `manage-blocked-ips.js` - Node.js-Tool zur Verwaltung der blocked_ips Tabelle
 - `sync-blocked-ips-to-firewall.js` - Script zum Synchronisieren von DB-IPs zu iptables
 
 ### DDoS-Protection
+
 - `fail2ban-filter-ddos.conf` - Filter für DDoS-Erkennung (Apache2 Access-Logs)
 - `fail2ban-jail-ddos.conf` - Jail für automatisches DDoS-Bannen
 - `setup-fail2ban-ddos.sh` - Setup-Script für DDoS-Protection
@@ -59,6 +63,7 @@ sudo node sync-blocked-ips-to-firewall.js
 ```
 
 **Was passiert:**
+
 1. Liest alle `blocked_ips` mit `is_whitelisted = FALSE` aus DB
 2. Erstellt/leert iptables Chain `DUNEBOT_BLOCKED`
 3. Fügt DROP-Regel für jede IP hinzu
@@ -78,11 +83,13 @@ sudo ./setup-fail2ban.sh
 ```
 
 **Was wird installiert:**
+
 - Fail2Ban Filter für DuneBot-Exploits
 - Jail-Konfiguration für automatisches Bannen
 - Log-Datei `/var/log/dunebot-exploits.log`
 
 **Überwachung:**
+
 ```bash
 # Logs anzeigen
 sudo tail -f /var/log/dunebot-exploits.log
@@ -104,11 +111,13 @@ sudo ./setup-fail2ban-ddos.sh
 ```
 
 **Was wird installiert:**
+
 - DDoS-Filter für Apache2 Access-Logs
 - Rate-Limiting: Max. 100 Requests / 60 Sekunden pro IP
 - Automatisches Bannen für 1 Stunde
 
 **Konfiguration anpassen:**
+
 ```bash
 sudo nano /etc/fail2ban/jail.d/dunebot-ddos.conf
 
@@ -121,6 +130,7 @@ sudo systemctl restart fail2ban
 ```
 
 **Überwachung:**
+
 ```bash
 # Jail-Status
 sudo fail2ban-client status dunebot-ddos
@@ -145,18 +155,21 @@ sudo ./setup-fail2ban-db.sh
 ```
 
 **Was wird installiert:**
+
 - DB-Reader-Script (`/usr/local/bin/fail2ban-db-reader`)
 - Fail2Ban Filter für DB-Integration
 - Jail-Konfiguration für MySQL-basiertes Bannen
 - Cronjob (alle 5 Minuten)
 
 **Funktionsweise:**
+
 1. Dashboard schreibt blockierte IPs in MySQL-Tabelle `blocked_ips`
 2. Cronjob liest alle 5 Minuten neue IPs aus der DB
 3. Fail2Ban sperrt IPs via iptables
 4. Garantiert: **Keine doppelten Bans**, IPs bleiben konsistent in DB + Firewall
 
 **Überwachung:**
+
 ```bash
 # DB-Reader manuell testen
 sudo /usr/local/bin/fail2ban-db-reader
@@ -228,6 +241,7 @@ sudo crontab -l | grep fail2ban-db-reader
 ## 🔐 Sicherheitshinweise
 
 1. **Log-Rotation:** `/var/log/dunebot-exploits.log` und `/var/log/dunebot-db.log` wachsen unbegrenzt!
+
    ```bash
    sudo nano /etc/logrotate.d/dunebot-fail2ban
    ```
@@ -235,6 +249,7 @@ sudo crontab -l | grep fail2ban-db-reader
 2. **Cronjob-Intervall:** Standardmäßig alle 5 Minuten. Bei hohem Traffic anpassen.
 
 3. **Firewall-Persistenz:** iptables-Regeln gehen bei Reboot verloren!
+
    ```bash
    sudo apt install iptables-persistent
    sudo netfilter-persistent save
@@ -255,6 +270,7 @@ sudo crontab -l | grep fail2ban-db-reader
 ## 👤 Support
 
 Bei Problemen siehe:
+
 - `/var/log/fail2ban.log` - Fail2Ban-Logs
 - `/var/log/dunebot-exploits.log` - Exploit-Versuche
 - `/var/log/dunebot-db.log` - DB-Reader-Output
