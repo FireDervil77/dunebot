@@ -81,6 +81,10 @@
 <!-- SERVING SCRIPTS -->
 <!--begin::Third Party Plugin(OverlayScrollbars)-->
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+
+<!-- Bootstrap MUSS VOR body-Content geladen werden! -->
+<script src="/themes/default/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
 <script
       src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"
       crossorigin="anonymous"
@@ -96,8 +100,6 @@
 
 <!-- Toast Notification Center -->
 <script src="/themes/default/assets/js/toast-notification-center.js"></script>
-
-<script src="/themes/default/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script src="/themes/default/assets/js/adminlte.min.js"></script>
 
 <!-- i18n Übersetzungen für Client-Side JavaScript -->
@@ -266,6 +268,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<!-- Toast Container für guild.js Toasts -->
+<div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
 
 </body>
 </html>

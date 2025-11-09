@@ -599,7 +599,11 @@ module.exports = class App {
         const exploitBlocker = require('./middlewares/security/exploit-blocker.middleware');
         this.app.use(exploitBlocker);
         
-        // 3. Rate Limiting - Allgemeines Limit
+        // 3. Block Sensitive Files (.env, .git, node_modules, etc.)
+        const blockSensitiveFiles = require('./middleware/blockSensitiveFiles');
+        this.app.use(blockSensitiveFiles);
+        
+        // 4. Rate Limiting - Allgemeines Limit
         const { generalLimiter } = require('./middlewares/security/rate-limiter.middleware');
         this.app.use(generalLimiter);
         

@@ -120,13 +120,13 @@ exports.callback = async (req, res) => {
             }
         });
         const oauthGuilds = oauthGuildsResponse.data;
-        Logger.debug(`🔍 [GHOST-DEBUG] OAuth2 API lieferte ${oauthGuilds.length} Guilds`);
+        //Logger.debug(`🔍 [GHOST-DEBUG] OAuth2 API lieferte ${oauthGuilds.length} Guilds`);
         
         // Guilds aus Datenbank laden (wo Bot bereits ist)
         const dbGuilds = await dbService.query(
             "SELECT _id, guild_name, owner_id FROM guilds WHERE left_at IS NULL"
         );
-        Logger.debug(`🔍 [GHOST-DEBUG] Datenbank enthält ${dbGuilds.length} aktive Guilds mit Bot`);
+        //Logger.debug(`🔍 [GHOST-DEBUG] Datenbank enthält ${dbGuilds.length} aktive Guilds mit Bot`);
         
         // Alle OAuth2-Guilds verwenden, aber mit Bot-Status anreichern
         const guildsData = oauthGuilds.map(oauthGuild => {
@@ -143,7 +143,7 @@ exports.callback = async (req, res) => {
             };
         });
         
-        Logger.debug(`✅ [GHOST-DEBUG] Finale Guild-Liste: ${guildsData.length} Guilds (${guildsData.filter(g => g.botPresent).length} mit Bot)`);
+        //Logger.debug(`✅ [GHOST-DEBUG] Finale Guild-Liste: ${guildsData.length} Guilds (${guildsData.filter(g => g.botPresent).length} mit Bot)`);
         guildsData.forEach(g => Logger.debug(`  - ${g.id} (${g.name}) ${g.botPresent ? '✅ Bot' : '❌ Kein Bot'}`));
         
         // Prüfen, ob der Benutzer Admin ist

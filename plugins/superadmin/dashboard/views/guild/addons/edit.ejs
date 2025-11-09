@@ -1,0 +1,324 @@
+<%# SuperAdmin: Addon Edit/Review %>
+<div class="content-wrapper">
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fa-solid fa-edit"></i>
+                        <%= addon.name %>
+                    </h1>
+                    <p class="text-muted">
+                        ID: <%= addon.id %> | Slug: <%= addon.slug %>
+                    </p>
+                </div>
+                <div class="col-sm-6">
+                    <div class="float-sm-right">
+                        <a href="/guild/<%= guildId %>/plugins/superadmin/addons" class="btn btn-secondary">
+                            <i class="fa-solid fa-arrow-left"></i> Zurück
+                        </a>
+                        <button class="btn btn-success" id="btnApprove">
+                            <i class="fa-solid fa-check"></i> Approve & Publish
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="container-fluid">
+            
+            <%# Status-Badges %>
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <span class="badge badge-lg <%= addon.trust_level === 'official' ? 'badge-success' : addon.trust_level === 'verified' ? 'badge-info' : 'badge-secondary' %>">
+                        Trust: <%= addon.trust_level %>
+                    </span>
+                    <span class="badge badge-lg <%= addon.visibility === 'public' || addon.visibility === 'official' ? 'badge-success' : addon.visibility === 'unlisted' ? 'badge-warning' : 'badge-secondary' %>">
+                        Visibility: <%= addon.visibility %>
+                    </span>
+                    <span class="badge badge-lg <%= addon.runtime_type === 'native' ? 'badge-success' : 'badge-primary' %>">
+                        Runtime: <%= addon.runtime_type %>
+                    </span>
+                    <% if (addon.source_type === 'pterodactyl') { %>
+                        <span class="badge badge-lg badge-info">
+                            <i class="fa-solid fa-egg"></i> Pterodactyl Import
+                        </span>
+                    <% } %>
+                </div>
+            </div>
+
+            <div class="row">
+                
+                <%# Linke Spalte: Metadata %>
+                <div class="col-md-6">
+                    
+                    <%# Basis-Informationen %>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-info-circle"></i>
+                                Basis-Informationen
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="metadataForm">
+                                <div class="form-group">
+                                    <label>Name</label>
+                                    <input type="text" class="form-control" name="name" value="<%= addon.name %>" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Slug</label>
+                                    <input type="text" class="form-control" name="slug" value="<%= addon.slug %>" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Beschreibung</label>
+                                    <textarea class="form-control" name="description" rows="4"><%= addon.description || '' %></textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Runtime Type</label>
+                                    <select class="form-control" name="runtime_type">
+                                        <option value="native" <%= addon.runtime_type === 'native' ? 'selected' : '' %>>Native Linux</option>
+                                        <option value="proton" <%= addon.runtime_type === 'proton' ? 'selected' : '' %>>Proton</option>
+                                        <option value="wine" <%= addon.runtime_type === 'wine' ? 'selected' : '' %>>Wine</option>
+                                        <option value="java" <%= addon.runtime_type === 'java' ? 'selected' : '' %>>Java</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Tags (comma-separated)</label>
+                                    <input type="text" class="form-control" name="tags" 
+                                           value="<%= addon.tags ? JSON.parse(addon.tags).join(', ') : '' %>">
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa-solid fa-save"></i> Speichern
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <%# Approval-Settings %>
+                    <div class="card">
+                        <div class="card-header bg-warning">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-shield-check"></i>
+                                SuperAdmin Approval
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="approvalForm">
+                                <div class="form-group">
+                                    <label>Trust Level</label>
+                                    <select class="form-control" name="trust_level">
+                                        <option value="unverified" <%= addon.trust_level === 'unverified' ? 'selected' : '' %>>
+                                            Unverified (Neu, nicht getestet)
+                                        </option>
+                                        <option value="verified" <%= addon.trust_level === 'verified' ? 'selected' : '' %>>
+                                            Verified (Getestet, funktioniert)
+                                        </option>
+                                        <option value="trusted" <%= addon.trust_level === 'trusted' ? 'selected' : '' %>>
+                                            Trusted (10+ Installs, 4+ Rating)
+                                        </option>
+                                        <option value="official" <%= addon.trust_level === 'official' ? 'selected' : '' %>>
+                                            Official (FireBot Team)
+                                        </option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Visibility</label>
+                                    <select class="form-control" name="visibility">
+                                        <option value="unlisted" <%= addon.visibility === 'unlisted' ? 'selected' : '' %>>
+                                            Unlisted (Nicht gelistet, über Link erreichbar)
+                                        </option>
+                                        <option value="public" <%= addon.visibility === 'public' ? 'selected' : '' %>>
+                                            Public (Im Marketplace sichtbar)
+                                        </option>
+                                        <option value="private" <%= addon.visibility === 'private' ? 'selected' : '' %>>
+                                            Private (Nur für bestimmte Guilds)
+                                        </option>
+                                        <option value="official" <%= addon.visibility === 'official' ? 'selected' : '' %>>
+                                            Official (Offiziell von FireBot Team)
+                                        </option>
+                                    </select>
+                                </div>
+                                
+                                <div class="alert alert-info">
+                                    <i class="fa-solid fa-info-circle"></i>
+                                    <strong>Verified:</strong> <%= addon.verified_at ? new Date(addon.verified_at).toLocaleString('de-DE') : 'Noch nicht verifiziert' %><br>
+                                    <strong>Last Tested:</strong> <%= addon.last_tested_at ? new Date(addon.last_tested_at).toLocaleString('de-DE') : 'Nie' %>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-success btn-block">
+                                    <i class="fa-solid fa-check"></i> Approve & Update
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+
+                <%# Rechte Spalte: Technical Details %>
+                <div class="col-md-6">
+                    
+                    <%# Variables %>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-sliders"></i>
+                                Variables
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <pre class="bg-light p-3" style="max-height: 300px; overflow-y: auto;"><%= JSON.stringify(addon.variables || [], null, 2) %></pre>
+                            <p class="text-muted">
+                                <i class="fa-solid fa-info-circle"></i>
+                                <strong><%= Array.isArray(addon.variables) ? addon.variables.length : 0 %></strong> Variables definiert
+                            </p>
+                            <a href="/guild/<%= guildId %>/plugins/gameserver/addons/<%= addon.id %>" class="btn btn-sm btn-primary" target="_blank">
+                                <i class="fa-solid fa-edit"></i> Im Gameserver-Plugin bearbeiten
+                            </a>
+                        </div>
+                    </div>
+
+                    <%# Ports %>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-ethernet"></i>
+                                Ports
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <pre class="bg-light p-3" style="max-height: 200px; overflow-y: auto;"><%= JSON.stringify(addon.ports || [], null, 2) %></pre>
+                            <p class="text-muted">
+                                <i class="fa-solid fa-info-circle"></i>
+                                <strong><%= Array.isArray(addon.ports) ? addon.ports.length : 0 %></strong> Ports definiert
+                            </p>
+                        </div>
+                    </div>
+
+                    <%# Installation Script %>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-terminal"></i>
+                                Installation Script
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <pre class="bg-dark text-light p-3" style="max-height: 300px; overflow-y: auto; font-family: monospace;"><%= addon.scripts && addon.scripts.installation ? addon.scripts.installation.script : 'Kein Script definiert' %></pre>
+                            <p class="text-muted">
+                                <% if (addon.scripts && addon.scripts.installation && addon.scripts.installation.script) { %>
+                                    <i class="fa-solid fa-check-circle text-success"></i> Script vorhanden
+                                <% } else { %>
+                                    <i class="fa-solid fa-exclamation-triangle text-warning"></i> Kein Script - Manuell erstellen nötig!
+                                <% } %>
+                            </p>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const guildId = '<%= guildId %>';
+    const addonId = <%= addon.id %>;
+    
+    // Metadata-Form Submit
+    document.getElementById('metadataForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const payload = Object.fromEntries(formData);
+        
+        try {
+            const response = await fetch(`/guild/${guildId}/plugins/gameserver/addons/${addonId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('✅ Metadaten gespeichert!');
+            } else {
+                alert('❌ Fehler: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Fehler beim Speichern');
+        }
+    });
+    
+    // Approval-Form Submit
+    document.getElementById('approvalForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const payload = Object.fromEntries(formData);
+        
+        if (!confirm('Addon wirklich mit diesen Einstellungen freigeben?')) return;
+        
+        try {
+            const response = await fetch(`/guild/${guildId}/plugins/superadmin/addons/${addonId}/approve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('✅ Addon freigegeben!');
+                location.reload();
+            } else {
+                alert('❌ Fehler: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Fehler beim Freigeben');
+        }
+    });
+    
+    // Quick-Approve Button (Header)
+    document.getElementById('btnApprove').addEventListener('click', async function() {
+        if (!confirm('Addon als VERIFIED und PUBLIC freigeben?')) return;
+        
+        try {
+            const response = await fetch(`/guild/${guildId}/plugins/superadmin/addons/${addonId}/approve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    trust_level: 'verified',
+                    visibility: 'public'
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('✅ Addon freigegeben!');
+                location.reload();
+            } else {
+                alert('❌ Fehler: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Fehler beim Freigeben');
+        }
+    });
+});
+</script>

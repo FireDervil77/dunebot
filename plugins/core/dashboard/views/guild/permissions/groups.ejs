@@ -17,7 +17,7 @@
       </div>
       
       <% if (userPermissions.permissions['PERMISSIONS.GROUPS.CREATE']) { %>
-      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#createGroupModal">
         <i class="fa-solid fa-plus me-2"></i>
         Neue Gruppe
       </button>
@@ -48,7 +48,7 @@
         <p class="text-muted">Erstelle die erste Gruppe, um zu beginnen.</p>
         
         <% if (userPermissions.permissions['PERMISSIONS.GROUPS.CREATE']) { %>
-        <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+        <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#createGroupModal">
           <i class="fa-solid fa-plus me-2"></i>
           Erste Gruppe erstellen
         </button>
@@ -67,7 +67,7 @@
               <%= group.name %>
             </h5>
             <% if (group.is_protected) { %>
-            <span class="badge bg-dark" data-bs-toggle="tooltip" title="Diese Gruppe ist geschützt und kann nicht gelöscht werden">
+            <span class="badge bg-dark" data-toggle="tooltip" title="Diese Gruppe ist geschützt und kann nicht gelöscht werden">
               <i class="fa-solid fa-shield-halved"></i>
             </span>
             <% } %>
@@ -470,26 +470,8 @@
 document.addEventListener('DOMContentLoaded', () => {
   const guildId = '<%= guildId %>';
   
-  // ===================================
-  // Bootstrap Modal Manual Initialization
-  // ===================================
-  const createModalElement = document.getElementById('createGroupModal');
-  const createModalBtn = document.querySelector('[data-bs-target="#createGroupModal"]');
-  
-  if (createModalElement && createModalBtn) {
-    const createModalInstance = new bootstrap.Modal(createModalElement, {
-      backdrop: true,
-      keyboard: true,
-      focus: false  // ← Verhindert aria-hidden Warning
-    });
-    
-    // Manual trigger (falls data-bs-toggle nicht funktioniert)
-    createModalBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      console.log('[Groups] Opening createGroupModal...');
-      createModalInstance.show();
-    });
-  }
+  // Bootstrap 4 Modals funktionieren automatisch via data-toggle="modal"
+  // Keine manuelle Initialisierung nötig!
   
   // Auto-generate slug from name
   const createNameInput = document.getElementById('create_name');
@@ -547,7 +529,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
       
-      new bootstrap.Modal(document.getElementById('editGroupModal')).show();
+      // Modal öffnen (Bootstrap 4 Syntax mit jQuery!)
+      $('#editGroupModal').modal('show');
     });
   });
   
@@ -564,13 +547,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const form = document.getElementById('deleteGroupForm');
       form.action = `/guild/${guildId}/plugins/core/permissions/groups/${groupId}`;
       
-      new bootstrap.Modal(document.getElementById('deleteGroupModal')).show();
+      // Modal öffnen (Bootstrap 4 Syntax mit jQuery!)
+      $('#deleteGroupModal').modal('show');
     });
   });
   
-  // Initialize Bootstrap tooltips
-  const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-  tooltips.forEach(el => new bootstrap.Tooltip(el));
+  // Initialize Bootstrap tooltips (Bootstrap 4 Syntax mit jQuery!)
+  $('[data-toggle="tooltip"]').tooltip();
 });
 </script>
 

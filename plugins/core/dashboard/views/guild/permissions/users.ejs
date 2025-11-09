@@ -17,7 +17,7 @@
       </div>
       
       <% if (userPermissions.permissions['PERMISSIONS.USERS.INVITE']) { %>
-      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addGuildMemberModal">
+      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addGuildMemberModal">
         <i class="fa-solid fa-user-plus me-2"></i>
         Mitglied hinzufügen
       </button>
@@ -66,7 +66,7 @@
           <p class="text-muted">Lade den ersten Benutzer ein, um zu beginnen.</p>
           
           <% if (userPermissions.permissions['PERMISSIONS.USERS.INVITE']) { %>
-          <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#inviteUserModal">
+          <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#inviteUserModal">
             <i class="fa-solid fa-user-plus me-2"></i>
             Ersten Benutzer einladen
           </button>
@@ -90,20 +90,29 @@
               <tr data-user-id="<%= user.user_id %>">
                 <!-- Avatar -->
                 <td class="text-center">
-                  <% if (user.avatar) { %>
-                  <img src="https://cdn.discordapp.com/avatars/<%= user.user_id %>/<%= user.avatar %>.png?size=64" 
+                  <% 
+                    // Discord Avatar URL - Bot sendet komplette URL via IPC
+                    let avatarUrl;
+                    if (user.avatar && user.avatar.startsWith('http')) {
+                      // Bot sendet komplette URL (displayAvatarURL)
+                      avatarUrl = user.avatar;
+                    } else if (user.avatar) {
+                      // Fallback: Avatar-Hash → URL konstruieren
+                      avatarUrl = `https://cdn.discordapp.com/avatars/${user.user_id}/${user.avatar}.png?size=64`;
+                    } else {
+                      // Discord Default-Avatar: discriminator % 5 (0-4)
+                      const defaultAvatar = user.discriminator ? (parseInt(user.discriminator) % 5) : 0;
+                      avatarUrl = `https://cdn.discordapp.com/embed/avatars/${defaultAvatar}.png`;
+                    }
+                  %>
+                  <img src="<%= avatarUrl %>" 
                        class="rounded-circle" 
                        width="40" 
                        height="40"
                        alt="<%= user.username %>"
-                       data-bs-toggle="tooltip"
-                       title="<%= user.username %>">
-                  <% } else { %>
-                  <div class="rounded-circle bg-secondary d-inline-flex align-items-center justify-content-center" 
-                       style="width: 40px; height: 40px;">
-                    <i class="fa-solid fa-user text-white"></i>
-                  </div>
-                  <% } %>
+                       data-toggle="tooltip"
+                       title="<%= user.username %>"
+                       onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
                 </td>
                 
                 <!-- Name -->
@@ -172,7 +181,7 @@
                     <button type="button" 
                             class="btn btn-primary btn-edit-user" 
                             data-user-id="<%= user.user_id %>"
-                            data-bs-toggle="tooltip"
+                            data-toggle="tooltip"
                             title="Bearbeiten">
                       <i class="fa-solid fa-edit"></i>
                     </button>
@@ -183,7 +192,7 @@
                             class="btn btn-danger btn-remove-user" 
                             data-user-id="<%= user.user_id %>"
                             data-username="<%= user.username %>"
-                            data-bs-toggle="tooltip"
+                            data-toggle="tooltip"
                             title="Entfernen">
                       <i class="fa-solid fa-trash"></i>
                     </button>
@@ -191,7 +200,7 @@
                     <button type="button" 
                             class="btn btn-secondary" 
                             disabled
-                            data-bs-toggle="tooltip"
+                            data-toggle="tooltip"
                             title="Owner kann nicht entfernt werden">
                       <i class="fa-solid fa-lock"></i>
                     </button>
@@ -489,7 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let modalInstance = null; // Speichere Instanz global
   
   // Bootstrap Modal initialisieren
-  const addMemberButton = document.querySelector('[data-bs-target="#addGuildMemberModal"]');
+  const addMemberButton = document.querySelector('[data-target="#addGuildMemberModal"]');
   const addMemberModalElement = document.getElementById('addGuildMemberModal');
   
   if (addMemberButton && addMemberModalElement) {
@@ -707,8 +716,8 @@ document.addEventListener('DOMContentLoaded', () => {
           // Toast anzeigen
           showToast('success', result.message);
           
-          // Modal schließen
-          bootstrap.Modal.getInstance(document.getElementById('inviteUserModal')).hide();
+          // Modal schließen (Bootstrap 4 Syntax mit jQuery!)
+          $('#inviteUserModal').modal('hide');
           
           // Seite neu laden
           setTimeout(() => window.location.reload(), 1500);
@@ -746,23 +755,27 @@ document.addEventListener('DOMContentLoaded', () => {
           document.getElementById('edit_user_display_name').textContent = user.displayName || user.username;
           document.getElementById('edit_user_id_display').textContent = `ID: ${user.user_id}`;
           
-          // Avatar
+          // Avatar (mit Discord Default-Avatar Fallback)
           const avatarContainer = document.getElementById('edit_user_avatar');
-          if (user.avatar) {
-            avatarContainer.innerHTML = `
-              <img src="https://cdn.discordapp.com/avatars/${user.user_id}/${user.avatar}.png?size=64" 
-                   class="rounded-circle" 
-                   width="48" 
-                   height="48">
-            `;
+          let avatarUrl;
+          if (user.avatar && user.avatar.startsWith('http')) {
+            // Bot sendet komplette URL (displayAvatarURL)
+            avatarUrl = user.avatar;
+          } else if (user.avatar) {
+            // Fallback: Avatar-Hash → URL konstruieren
+            avatarUrl = `https://cdn.discordapp.com/avatars/${user.user_id}/${user.avatar}.png?size=64`;
           } else {
-            avatarContainer.innerHTML = `
-              <div class="rounded-circle bg-secondary d-inline-flex align-items-center justify-content-center" 
-                   style="width: 48px; height: 48px;">
-                <i class="fa-solid fa-user text-white"></i>
-              </div>
-            `;
+            // Discord Default-Avatar basierend auf Discriminator
+            const defaultAvatar = user.discriminator ? (parseInt(user.discriminator) % 5) : 0;
+            avatarUrl = `https://cdn.discordapp.com/embed/avatars/${defaultAvatar}.png`;
           }
+          avatarContainer.innerHTML = `
+            <img src="${avatarUrl}" 
+                 class="rounded-circle" 
+                 width="48" 
+                 height="48"
+                 onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+          `;
           
           // Status
           document.getElementById('edit_status').value = user.status || 'active';
@@ -825,12 +838,8 @@ document.addEventListener('DOMContentLoaded', () => {
       form.action = `/guild/${guildId}/plugins/core/permissions/users/${userId}`;
       
       // WICHTIG: Wiederverwendung bestehender Instanz oder neue erstellen
-      const modalElement = document.getElementById('removeUserModal');
-      let modal = bootstrap.Modal.getInstance(modalElement);
-      if (!modal) {
-        modal = new bootstrap.Modal(modalElement);
-      }
-      modal.show();
+      // Modal öffnen (Bootstrap 4 Syntax mit jQuery!)
+      $('#removeUserModal').modal('show');
     });
   });
   
@@ -839,9 +848,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Toast Helper - Nutzt globales Toast-System aus global-toast.js
   // (window.showToast ist bereits verfügbar)
   
-  // Initialize Bootstrap tooltips
-  const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-  tooltips.forEach(el => new bootstrap.Tooltip(el));
+  // Initialize Bootstrap tooltips (Bootstrap 4 Syntax mit jQuery!)
+  $('[data-toggle="tooltip"]').tooltip();
 });
 </script>
 

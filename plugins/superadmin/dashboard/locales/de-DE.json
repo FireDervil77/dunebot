@@ -8,7 +8,8 @@
         "PLUGIN_BADGES": "Plugin Badges",
         "STATISTICS": "Statistiken",
         "TRANSLATIONS": "Übersetzungen",
-        "DONATIONS": "Donations"
+        "DONATIONS": "Donations",
+        "ADDON_MARKETPLACE": "Addon Marketplace"
     },
     "FEEDBACK": {
         "TITLE": "User Feedback Verwaltung"

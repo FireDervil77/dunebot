@@ -394,16 +394,16 @@ module.exports = async (req, res, next) => {
                         "SELECT * FROM nav_items WHERE guildid = ? AND (type = 'main' OR type = 'widget') AND visible = 1",
                         [guildId]
                     );
-                    
-                    Logger.debug('[Navigation] DB-Test Query:', {
-                        found: testQuery?.length || 0,
-                        items: testQuery?.map(i => ({
-                            id: i.id,
-                            title: i.title,
-                            type: i.type,
-                            parent: i.parent
-                        }))
-                    });
+
+                    // Logger.debug('[Navigation] DB-Test Query:', {
+                    //     found: testQuery?.length || 0,
+                    //     items: testQuery?.map(i => ({
+                    //         id: i.id,
+                    //         title: i.title,
+                    //         type: i.type,
+                    //       parent: i.parent
+                    //    }))
+                    //});
                     
                     // Navigation laden
                     const mainMenu = await navManager.getMainMenuWithSubmenu(guildId);

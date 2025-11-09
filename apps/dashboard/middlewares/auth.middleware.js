@@ -62,12 +62,12 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
         
         const guildId = req.params.guildId;
         
-        Logger.debug(`🔍 [GHOST-DEBUG] CheckGuildAccess für Guild: ${guildId}`);
-        Logger.debug(`🔍 [GHOST-DEBUG] OAuth2 Session Guilds:`, req.session.user.guilds.map(g => ({
-            id: g.id,
-            name: g.name,
-            source: 'OAuth2-Session'
-        })));
+        //Logger.debug(`🔍 [GHOST-DEBUG] CheckGuildAccess für Guild: ${guildId}`);
+        //Logger.debug(`🔍 [GHOST-DEBUG] OAuth2 Session Guilds:`, req.session.user.guilds.map(g => ({
+        //    id: g.id,
+        //    name: g.name,
+        //    source: 'OAuth2-Session'
+        //})));
         
         // =====================================================
         // KRITISCH: ZUERST in Datenbank prüfen!
@@ -79,7 +79,7 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
             [guildId]
         );
         
-        Logger.debug(`🔍 [GHOST-DEBUG] Guild in DB gefunden:`, dbGuild ? 'JA' : 'NEIN');
+        //Logger.debug(`🔍 [GHOST-DEBUG] Guild in DB gefunden:`, dbGuild ? 'JA' : 'NEIN');
         
         if (!dbGuild) {
             // Guild NICHT in DB = GHOST-ID!

@@ -821,10 +821,18 @@ router.put('/groups/:groupId', requirePermission('PERMISSIONS.GROUPS.EDIT'), asy
     const groupId = req.params.groupId;
     const updates = req.body;
     
+    // DEBUG: Log incoming request
+    Logger.info(`[Permissions PUT /groups/${groupId}] Request body keys:`, Object.keys(updates));
+    if (updates.permissions) {
+        const permCount = Object.keys(updates.permissions).length;
+        const trueCount = Object.values(updates.permissions).filter(v => v === true || v === 'true').length;
+        Logger.info(`[Permissions PUT /groups/${groupId}] Permissions: ${permCount} total, ${trueCount} true`);
+    }
+    
     try {
         await permissionManager.updateGroup(groupId, updates);
         
-        Logger.info(`[Permissions] Group ${groupId} updated`);
+        Logger.info(`[Permissions] Group ${groupId} updated successfully`);
         
         res.json({
             success: true,
@@ -832,7 +840,8 @@ router.put('/groups/:groupId', requirePermission('PERMISSIONS.GROUPS.EDIT'), asy
         });
         
     } catch (error) {
-        Logger.error('[Permissions] Error updating group:', error);
+        Logger.error(`[Permissions] Error updating group ${groupId}:`, error);
+        Logger.error(`[Permissions] Error stack:`, error.stack);
         
         if (error.message.includes('Cannot modify protected group')) {
             return res.status(403).json({

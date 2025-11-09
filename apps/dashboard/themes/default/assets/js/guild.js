@@ -67,6 +67,35 @@ class GuildAjaxHandler {
             // HTTP-Methode aus Form oder data-method Attribut
             const method = form.dataset.method || form.method || 'POST';
 
+            // ========================================
+            // SPEZIAL-BEHANDLUNG: Group-Edit/Create
+            // Problem: Checkboxen werden nur als FormData aufgenommen wenn checked!
+            // Lösung: Alle Checkboxen manuell sammeln (checked = true, unchecked = false)
+            // ========================================
+            console.log('[GuildAjax] DEBUG: formType =', formType, 'checking if edit-group or create-group...');
+            if (formType === 'edit-group' || formType === 'create-group') {
+                console.log('[GuildAjax] DEBUG: Inside group edit block, searching for checkboxes...');
+                const allCheckboxes = form.querySelectorAll('.permission-checkbox');
+                console.log('[GuildAjax] DEBUG: Found', allCheckboxes.length, 'checkboxes');
+                
+                let serializedCount = 0;
+                allCheckboxes.forEach(checkbox => {
+                    const permKey = checkbox.dataset.permissionKey;
+                    console.log('[GuildAjax] DEBUG: Processing checkbox, permKey =', permKey, 'checked =', checkbox.checked);
+                    if (permKey) {
+                        // Überschreibe FormData mit aktuellem Checked-State
+                        const fieldName = `permissions[${permKey}]`;
+                        formData.delete(fieldName); // Lösche alte Werte
+                        // Setze explizit true/false (NICHT "true"/"false" als String!)
+                        formData.set(fieldName, checkbox.checked ? 'true' : 'false');
+                        serializedCount++;
+                    }
+                });
+                console.log('[GuildAjax] Permissions manuell serialisiert:', serializedCount, 'von', allCheckboxes.length, 'Checkboxen');
+            } else {
+                console.log('[GuildAjax] DEBUG: NOT a group form, skipping checkbox serialization');
+            }
+
             // Konvertiere FormData zu Object (behandelt Arrays korrekt)
             const formObject = {};
             for (let [key, value] of formData.entries()) {
@@ -94,6 +123,12 @@ class GuildAjaxHandler {
             }
 
             console.log('[GuildAjax] Serialized form data:', formObject);
+            
+            // DEBUG: Zeige alle Permission-Keys im Object
+            if (formObject.permissions) {
+                console.log('[GuildAjax] DEBUG: Permission keys in formObject:', Object.keys(formObject.permissions).length, 'keys');
+                console.log('[GuildAjax] DEBUG: Permission sample (first 10):', Object.keys(formObject.permissions).slice(0, 10));
+            }
 
             const response = await fetch(url, {
                 method: method.toUpperCase(),
@@ -163,6 +198,10 @@ class GuildAjaxHandler {
                 
                 case 'moderation-settings':
                     await this.handleModerationSettingsResponse(form, result);
+                    break;
+                
+                case 'egg-editor':
+                    await this.handleEggEditorResponse(form, result);
                     break;
                 
                 // ========================================
@@ -966,6 +1005,28 @@ class GuildAjaxHandler {
         // Body-Styles zurücksetzen
         document.body.style.overflow = '';
         document.body.style.paddingRight = '';
+    }
+    
+    /**
+     * Egg Editor Response Handler
+     */
+    static async handleEggEditorResponse(form, result) {
+        console.log('[GuildAjax] handleEggEditorResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Egg erfolgreich gespeichert!');
+            
+            // Wenn redirect angegeben, nach 1,5s weiterleiten
+            if (result.redirect) {
+                setTimeout(() => {
+                    window.location.href = result.redirect;
+                }, 1500);
+            } else {
+                // Fallback: reload
+                setTimeout(() => window.location.reload(), 1500);
+            }
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Speichern des Eggs');
+        }
     }
 }
 

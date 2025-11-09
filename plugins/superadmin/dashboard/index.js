@@ -1113,6 +1113,11 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 });
             });
 
+            // === ADDON MARKETPLACE MANAGEMENT (NEU!) ===
+            const addonsRouter = require('./routes/addons');
+            this.guildRouter.use('/addons', addonsRouter);
+            Logger.info('[SuperAdmin] Addon-Management-Routen registriert');
+
             Logger.info('[SuperAdmin] Routen eingerichtet für guildRouter');
             Logger.info(`[SuperAdmin] guildRouter enthält ${this.guildRouter.stack?.length || 0} routes/middleware`);
         } catch (error) {
@@ -1476,6 +1481,16 @@ class SuperAdminDashboardPlugin extends DashboardPlugin {
                 path: `/guild/${guildId}/plugins/superadmin/donations`,
                 icon: 'fa-solid fa-heart',
                 order: null,  // Nach Statistics
+                parent: `/guild/${guildId}/plugins/superadmin`,
+                type: 'main',
+                visible: true,
+                requiresOwner: true  // ← NUR für Bot-Owner sichtbar!
+            },
+            {
+                title: 'superadmin:NAV.ADDON_MARKETPLACE',
+                path: `/guild/${guildId}/plugins/superadmin/addons`,
+                icon: 'fa-solid fa-puzzle-piece',
+                order: null,  // Nach Donations
                 parent: `/guild/${guildId}/plugins/superadmin`,
                 type: 'main',
                 visible: true,
