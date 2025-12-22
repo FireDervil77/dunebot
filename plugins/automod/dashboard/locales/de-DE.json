@@ -153,12 +153,22 @@
         "RAID": {
             "TITLE": "Raid-Schutz",
             "SUBTITLE": "Raid-Protection & Join-Spam",
+            "ENABLE": "Raid-Schutz aktivieren",
+            "JOIN_THRESHOLD": "Max. Joins",
+            "JOIN_TIMESPAN": "Zeitfenster (Sekunden)",
+            "MIN_ACCOUNT_AGE": "Min. Account-Alter (Tage)",
+            "ACTION": "Standard-Aktion",
+            "LOCKDOWN": "Lockdown bei Raid aktivieren",
+            "LOCKDOWN_ACTIVE": "LOCKDOWN AKTIV!",
+            "ALERT_CHANNEL": "Raid-Alert Channel",
+            "ALERT_MENTION_MODS": "@Mods bei Raid erwähnen",
+            "TRUSTED_INVITES": "Whitelist von Invite-Codes",
             "PLANNED_FEATURES": "Geplante Features",
             "FEATURE_1": "Join-Spam Detection (X User in Y Sekunden)",
             "FEATURE_2": "Account-Age Check (Min. 7 Tage Alt)",
             "FEATURE_3": "Lockdown-Modus bei Raid-Erkennung",
             "FEATURE_4": "Automatische Actions (Kick/Ban neue User)",
-            "ETA": "Verfügbar in ca. 1-2 Wochen"
+            "ETA": "✅ JETZT VERFÜGBAR!"
         }
     },
 

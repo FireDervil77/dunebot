@@ -7,7 +7,7 @@ const path = require("path");
  * DuneBot Sharding-Manager
  * Verwaltet mehrere Bot-Instanzen für große Discord-Bots
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 // Initialize the logger

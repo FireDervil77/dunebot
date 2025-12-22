@@ -4,7 +4,7 @@
  * Migriert alle Permissions aus guild_groups.permissions (JSON) 
  * in die neue group_permissions Tabelle (relational)
  * 
- * @author FireDervil + GitHub Copilot
+ * @author FireBot Team
  * @version 1.0.0
  * @date 2025-11-03
  */

@@ -418,7 +418,7 @@ class IPCClient {
      * @param {object} payload - Enthält die Guild-ID
      * @returns {Promise<void>}
      * @private
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async #handleGetGuildChannels(message, payload) {
         const { ChannelType } = require('discord.js');
@@ -483,7 +483,7 @@ class IPCClient {
      * @param {object} payload - Enthält die Guild-ID
      * @returns {Promise<void>}
      * @private
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async #handleGetGuildRoles(message, payload) {
         try {
@@ -570,7 +570,7 @@ class IPCClient {
      * @param {object} payload - Enthält guildId und userIds
      * @returns {Promise<void>}
      * @private
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async #handleGetGuildMembers(message, payload) {
         try {

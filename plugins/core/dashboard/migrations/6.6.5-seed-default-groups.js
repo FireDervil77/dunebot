@@ -4,7 +4,7 @@
  * Erstellt Standard-Gruppen (Moderator, Support, User) für Guilds,
  * die bisher nur die Administrator-Gruppe haben.
  * 
- * @author FireDervil + GitHub Copilot
+ * @author FireBot Team
  * @version 6.6.5
  * @date 30. Oktober 2025
  */

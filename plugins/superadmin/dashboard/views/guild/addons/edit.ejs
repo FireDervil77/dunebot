@@ -253,13 +253,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             
             if (result.success) {
-                alert('✅ Metadaten gespeichert!');
+                toastr.success('Metadaten erfolgreich gespeichert!');
             } else {
-                alert('❌ Fehler: ' + result.message);
+                toastr.error(result.message || 'Fehler beim Speichern der Metadaten');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Fehler beim Speichern');
+            toastr.error('Fehler beim Speichern der Metadaten');
         }
     });
     
@@ -282,14 +282,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             
             if (result.success) {
-                alert('✅ Addon freigegeben!');
-                location.reload();
+                toastr.success('Addon erfolgreich freigegeben!');
+                setTimeout(() => location.reload(), 1500);
             } else {
-                alert('❌ Fehler: ' + result.message);
+                toastr.error(result.message || 'Fehler beim Freigeben des Addons');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Fehler beim Freigeben');
+            toastr.error('Fehler beim Freigeben des Addons');
         }
     });
     
@@ -310,14 +310,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             
             if (result.success) {
-                alert('✅ Addon freigegeben!');
-                location.reload();
+                toastr.success('Addon erfolgreich freigegeben!');
+                setTimeout(() => location.reload(), 1500);
             } else {
-                alert('❌ Fehler: ' + result.message);
+                toastr.error(result.message || 'Fehler beim Freigeben des Addons');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Fehler beim Freigeben');
+            toastr.error('Fehler beim Freigeben des Addons');
         }
     });
 });

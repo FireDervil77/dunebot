@@ -2,7 +2,7 @@
  * Core-Plugin für DuneBot - Bot-Teil
  * Stellt Basisfunktionalitäten für den Bot bereit
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 const path = require('path');
 const fs = require('fs');
@@ -14,7 +14,7 @@ const { ServiceManager } = require('dunebot-core');
  * Implementiert grundlegende Bot-Funktionen und Konfigurationen
  * 
  * @extends {BotPlugin}
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class CoreBotPlugin extends BotPlugin {
     /**
@@ -41,7 +41,7 @@ class CoreBotPlugin extends BotPlugin {
      * 
      * @param {import('discord.js').Client} client - Discord.js Client
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onEnable(client) {
         const Logger = ServiceManager.get("Logger");
@@ -56,7 +56,7 @@ class CoreBotPlugin extends BotPlugin {
      * 
      * @param {import('discord.js').Client} client - Discord.js Client
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onDisable(client) {
         const Logger = ServiceManager.get("Logger");
@@ -71,7 +71,7 @@ class CoreBotPlugin extends BotPlugin {
      * 
      * @param {string} guildId - ID der Discord-Guild
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get("Logger");
@@ -84,7 +84,7 @@ class CoreBotPlugin extends BotPlugin {
      * 
      * @param {string} guildId - ID der Discord-Guild
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get("Logger");
@@ -98,7 +98,7 @@ class CoreBotPlugin extends BotPlugin {
      * 
      * @param {import('dunebot-sdk').HookSystem} hooks - Das Hook-System
      * @returns {void}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     registerHooks(hooks) {
         const Logger = ServiceManager.get("Logger");

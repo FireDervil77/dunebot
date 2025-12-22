@@ -60,6 +60,9 @@ class IPMServer {
 
         // Heartbeat-Monitor (alle 30s prüfen)
         this._startHeartbeatMonitor();
+        
+        // ✅ Event-Handler für gameserver.status_changed registrieren
+        this._registerEventHandlers();
 
         this.Logger.info(`[IPMServer] WebSocket Server gestartet auf Port ${this.port}`);
     }
@@ -204,7 +207,7 @@ class IPMServer {
                 
                 // An EventRouter weiterleiten
                 await eventRouter.route(message, { daemonId });
-                return;
+                // ⚠️  KEIN return hier - Legacy-Handler sollen auch laufen!
             }
             
             // ════════════════════════════════════════════════════════════
@@ -212,7 +215,11 @@ class IPMServer {
             // ════════════════════════════════════════════════════════════
             // TODO: Entfernen wenn Daemon vollständig auf protocol.Message umgestellt ist
             
-            const event = message.event;  // Legacy-Format
+            // Legacy-Format: message.event ODER namespace.action kombinieren
+            const event = message.event || (namespace && action ? `${namespace}.${action}` : null);
+            
+            // Payload-Mapping: Neues Format nutzt message.payload, Legacy nutzt message.data
+            const eventData = message.payload || message.data;
             
             if (!event) {
                 this.Logger.warn('[IPMServer] Message ohne event/namespace:', message);
@@ -644,6 +651,29 @@ class IPMServer {
             [server_id]
         );
 
+        // ✅ Install-Counter in addon_marketplace erhöhen
+        try {
+            // Addon-Slug aus gameserver-Tabelle holen
+            const [server] = await this.dbService.query(
+                'SELECT addon_slug FROM gameservers WHERE id = ?',
+                [server_id]
+            );
+            
+            if (server && server.addon_slug) {
+                await this.dbService.query(
+                    'UPDATE addon_marketplace SET install_count = install_count + 1 WHERE addon_slug = ?',
+                    [server.addon_slug]
+                );
+                
+                this.Logger.success(`[IPMServer] Install-Counter für Addon '${server.addon_slug}' erhöht`);
+            } else {
+                this.Logger.warn(`[IPMServer] Server ${server_id} hat keinen addon_slug - Counter nicht erhöht`);
+            }
+        } catch (error) {
+            this.Logger.error(`[IPMServer] Fehler beim Erhöhen des Install-Counters:`, error);
+            // Nicht kritisch - Installation war erfolgreich
+        }
+
         this.Logger.success(`[IPMServer] Gameserver ${server_id} Status → offline`);
     }
 
@@ -694,6 +724,29 @@ class IPMServer {
 
             if (result.affectedRows > 0) {
                 this.Logger.success(`[IPMServer] ✅ Gameserver ${server_id} Status → ${dbStatus} (MySQL synchronized)`);
+                
+                // ✅ Guild-ID holen für SSE-Broadcast
+                const [server] = await this.dbService.query(
+                    'SELECT guild_id, name FROM gameservers WHERE id = ?',
+                    [server_id]
+                );
+                
+                if (server) {
+                    // ✅ SSE-Broadcast an Browser-Clients
+                    const sseManager = ServiceManager.get('sseManager');
+                    if (sseManager) {
+                        sseManager.broadcast(server.guild_id, 'gameserver', {
+                            action: 'status_changed',
+                            server_id: server_id,
+                            status: dbStatus,
+                            timestamp: timestamp || Date.now()
+                        });
+                        
+                        this.Logger.debug(`[IPMServer] 📡 SSE-Broadcast gesendet für Server ${server_id} → ${dbStatus}`);
+                    }
+                } else {
+                    this.Logger.warn(`[IPMServer] ⚠️ Konnte Server ${server_id} nicht für SSE-Broadcast laden`);
+                }
             } else {
                 this.Logger.warn(`[IPMServer] ⚠️ Gameserver ${server_id} nicht in MySQL gefunden`);
             }
@@ -1057,7 +1110,8 @@ class IPMServer {
                         startup_command: server.startup_command,
                         ports,
                         env_variables: envVariables,
-                        install_path: `/gameservers/${server.addon_slug}-${server.server_id}`
+                        install_path: `/gameservers/${server.addon_slug}-${server.server_id}`,
+                        game_data: gameData // ✅ NEU: game_data aus frozen_game_data mitsenden
                     }, 60000);
 
                     if (response.success) {
@@ -1086,6 +1140,49 @@ class IPMServer {
         } catch (error) {
             this.Logger.error('[IPMServer] Fehler beim Re-trigger von Installationen:', error);
         }
+    }
+    
+    /**
+     * Registriert Event-Handler im IPMEventRouter
+     * @private
+     */
+    _registerEventHandlers() {
+        // ✅ Handler für gameserver.status_changed
+        // EventRouter ruft auf mit: handler(payload, message, context)
+        eventRouter.register('gameserver', 'status_changed', async (payload, message, context) => {
+            await this._handleGameserverStatusChanged(context.daemonId, payload);
+        }, { priority: 1 });
+        
+        // ✅ Handler für gameserver.crashed
+        eventRouter.register('gameserver', 'crashed', async (payload, message, context) => {
+            const { server_id } = payload;
+            this.Logger.warn(`[IPMServer] 💥 Gameserver ${server_id} crashed!`);
+            
+            // Status auf 'error' setzen
+            await this.dbService.query(
+                'UPDATE gameservers SET status = ?, updated_at = NOW() WHERE id = ?',
+                ['error', server_id]
+            );
+            
+            // SSE-Broadcast
+            const [server] = await this.dbService.query(
+                'SELECT guild_id FROM gameservers WHERE id = ?',
+                [server_id]
+            );
+            
+            if (server) {
+                const sseManager = ServiceManager.get('sseManager');
+                if (sseManager) {
+                    sseManager.broadcast(server.guild_id, 'gameserver', {
+                        action: 'crashed',
+                        server_id: server_id,
+                        timestamp: Date.now()
+                    });
+                }
+            }
+        }, { priority: 1 });
+        
+        this.Logger.info('[IPMServer] Event-Handler registriert (gameserver.status_changed, gameserver.crashed)');
     }
 }
 

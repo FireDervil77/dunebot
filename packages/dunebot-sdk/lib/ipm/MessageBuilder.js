@@ -2,7 +2,7 @@
  * MessageBuilder - Helper-Klasse zum Erstellen standardisierter IPM-Messages
  * 
  * @module ipm/MessageBuilder
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 const { v4: uuidv4 } = require('uuid');

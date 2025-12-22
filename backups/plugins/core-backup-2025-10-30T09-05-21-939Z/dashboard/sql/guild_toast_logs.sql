@@ -2,7 +2,7 @@
 -- Ersetzt Session-basiertes Toast-Logging durch persistente DB-Lösung
 -- Integriert sich in das zentrale Guild-Control-System
 -- 
--- @author firedervil
+-- @author FireBot Team
 -- @created 2025-10-15
 
 CREATE TABLE IF NOT EXISTS guild_toast_logs (

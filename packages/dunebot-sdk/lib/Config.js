@@ -100,7 +100,7 @@ class Config {
      * 
      * @param {string} [context=null] - Spezifischer Kontext oder null für alle
      * @returns {Promise<Object>} Die neu geladene Konfiguration
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async reload(context = null) {
         const Logger = ServiceManager.get('Logger');

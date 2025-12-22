@@ -1,7 +1,7 @@
 -- User-Configs Tabelle für user-spezifische Einstellungen
 -- Verwaltet Präferenzen wie dismissed notifications, theme, language, etc.
 -- 
--- @author firedervil
+-- @author FireBot Team
 -- @created 2025-10-13
 
 CREATE TABLE IF NOT EXISTS user_configs (

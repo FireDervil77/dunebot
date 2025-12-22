@@ -32,6 +32,7 @@ router.get('/', async (req, res) => {
                 slug,
                 runtime_type,
                 source_type,
+                status,
                 trust_level,
                 visibility,
                 verified_at,
@@ -188,17 +189,24 @@ router.post('/:id/approve', async (req, res) => {
             });
         }
         
-        // Update Addon (inkl. source_type → native nach Approval)
+        // ✅ Prüfe ob Author = FireDervil (544578232704565262) → Auto-Official
+        const [addon] = await dbService.query('SELECT author_user_id FROM addon_marketplace WHERE id = ?', [addonId]);
+        const authorId = addon[0]?.author_user_id;
+        const finalTrustLevel = (authorId === '544578232704565262') ? 'official' : trust_level;
+        
+        // Update Addon (inkl. status → approved, published_at setzen und source_type → native nach Approval)
         await dbService.query(`
             UPDATE addon_marketplace
             SET 
+                status = 'approved',
                 trust_level = ?,
                 visibility = ?,
                 source_type = 'native',
                 verified_by = ?,
-                verified_at = NOW()
+                verified_at = NOW(),
+                published_at = NOW()
             WHERE id = ?
-        `, [trust_level, visibility, user?.info?.id || null, addonId]);
+        `, [finalTrustLevel, visibility, user?.info?.id || null, addonId]);
         
         Logger.info(`[SuperAdmin Addons] Addon ${addonId} approved: ${trust_level}, ${visibility} by ${user?.info?.username || 'Unknown'}`);
         
@@ -266,7 +274,7 @@ router.post('/', async (req, res) => {
             name, slug, description, category,
             runtime_type, source_type,
             variables, ports, scripts,
-            meta, install, startup, config
+            meta, install, installation, startup, config  // ✅ installation hinzugefügt
         } = req.body;
         
         // Validierung
@@ -304,28 +312,44 @@ router.post('/', async (req, res) => {
         
         // PTDL_v2 game_data strukturieren
         const gameData = {
-            meta: meta || {
+            meta: {
                 version: 'PTDL_v2',
-                name: name,
+                name: name || 'Imported Egg',
                 author: 'Pterodactyl Community',
                 description: description || '',
                 category: category || 'imported'
             },
             install: install || {},
+            installation: installation || {},  // ✅ NEU: installation für Daemon
             startup: startup || {},
             config: config || {},
             scripts: scripts || {},
-            variables: Array.isArray(variables) ? variables : (variables ? JSON.parse(variables) : []),
-            ports: Array.isArray(ports) ? ports : (ports ? JSON.parse(ports) : [])
+            // ✅ variables kann jetzt Object (Map) oder Array sein
+            variables: typeof variables === 'object' && variables !== null 
+                ? variables 
+                : (typeof variables === 'string' ? JSON.parse(variables) : []),
+            // ✅ ports kann Object oder Array sein
+            ports: typeof ports === 'object' && ports !== null
+                ? ports
+                : (typeof ports === 'string' ? JSON.parse(ports) : [])
         };
+        
+        // ✅ Steam App ID extrahieren (aus variables Map)
+        let steamAppId = null;
+        if (typeof variables === 'object' && variables !== null) {
+            // Suche nach SRCDS_APPID, STEAM_APPID, APP_ID etc.
+            steamAppId = variables.SRCDS_APPID || variables.STEAM_APPID || 
+                         variables.APP_ID || variables.STEAM_APP_ID || null;
+        }
         
         // INSERT in addon_marketplace (Spalten-Reihenfolge entspricht SQL-Schema!)
         const result = await dbService.query(`
             INSERT INTO addon_marketplace (
                 name, slug, description, author_user_id,
                 visibility, status, trust_level,
-                game_data, category, runtime_type, source_type
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                game_data, category, runtime_type, source_type,
+                steam_app_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             name || 'Unnamed Addon',                                    // name
             finalSlug,                                                  // slug
@@ -337,7 +361,8 @@ router.post('/', async (req, res) => {
             JSON.stringify(gameData),                                   // game_data (JSON)
             category || 'other',                                        // category (ENUM: fps, survival, sandbox, mmorpg, racing, strategy, horror, scifi, other)
             runtime_type || 'native_steamcmd',                          // runtime_type (ENUM: native_steamcmd, proton, wine, java, nodejs, python, custom)
-            source_type || 'pterodactyl'                                // source_type (ENUM: native, pterodactyl, custom)
+            source_type || 'pterodactyl',                               // source_type (ENUM: native, pterodactyl, custom)
+            steamAppId                                                  // steam_app_id (INT NULL)
         ]);
         
         Logger.info(`[SuperAdmin Addons] Pterodactyl-Egg importiert: ${name} (ID: ${result.insertId}) von User ${userId}`);
@@ -367,6 +392,19 @@ router.delete('/:id', async (req, res) => {
     const addonId = req.params.id;
     
     try {
+        // Prüfen ob Server mit diesem Addon existieren
+        const servers = await dbService.query(
+            'SELECT COUNT(*) as count FROM gameservers WHERE addon_marketplace_id = ?',
+            [addonId]
+        );
+        
+        if (servers[0].count > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Addon kann nicht gelöscht werden: ${servers[0].count} Server nutzen dieses Addon. Bitte zuerst die Server löschen.`
+            });
+        }
+        
         await dbService.query('DELETE FROM addon_marketplace WHERE id = ?', [addonId]);
         
         Logger.info(`[SuperAdmin Addons] Addon ${addonId} gelöscht`);
@@ -378,6 +416,15 @@ router.delete('/:id', async (req, res) => {
         
     } catch (error) {
         Logger.error('[SuperAdmin Addons] Fehler beim Löschen:', error);
+        
+        // Foreign Key Constraint Error
+        if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+            return res.status(400).json({
+                success: false,
+                message: 'Addon kann nicht gelöscht werden: Es existieren noch Server die dieses Addon nutzen'
+            });
+        }
+        
         res.status(500).json({
             success: false,
             message: 'Fehler beim Löschen des Addons'
@@ -456,11 +503,24 @@ router.get('/pterodactyl/eggs/:category', async (req, res) => {
  * GET /pterodactyl/fetch/:category/:eggName
  * Fetch + Convert spezifisches Pterodactyl Egg (nutzt DB-Cache!)
  */
-router.get('/pterodactyl/fetch/:category/:eggName', async (req, res) => {
+// Route für Pterodactyl Egg Import
+// Nutzt Query-Parameter um Slashes im eggName zu unterstützen
+router.get('/pterodactyl/fetch/:category', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const path = require('path');
-    const { category, eggName } = req.params;
+    
+    const category = req.params.category;
+    const eggName = req.query.egg; // Query-Parameter: ?egg=valheim/valheim_vanilla
+    
+    Logger.info(`[SuperAdmin Addons] Pterodactyl fetch: category=${category}, egg=${eggName}`);
+    
+    if (!eggName) {
+        return res.status(400).json({
+            success: false,
+            message: 'Missing egg parameter. Use: /pterodactyl/fetch/CATEGORY?egg=EGG_NAME'
+        });
+    }
     
     try {
         Logger.info(`[SuperAdmin Addons] Importing Pterodactyl egg: ${category}/${eggName}`);

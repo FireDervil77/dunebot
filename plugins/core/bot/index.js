@@ -2,7 +2,7 @@
  * Core-Plugin für DuneBot - Bot-Teil
  * Stellt Basisfunktionalitäten für den Bot bereit
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 const path = require('path');
 const fs = require('fs');
@@ -14,7 +14,7 @@ const { ServiceManager } = require('dunebot-core');
  * Implementiert grundlegende Bot-Funktionen und Konfigurationen
  * 
  * @extends {BotPlugin}
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class CoreBotPlugin extends BotPlugin {
     /**

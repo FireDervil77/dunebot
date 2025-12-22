@@ -103,6 +103,7 @@
                                 <th>Name</th>
                                 <th>Runtime</th>
                                 <th>Source</th>
+                                <th>Status</th>
                                 <th>Trust Level</th>
                                 <th>Visibility</th>
                                 <th>Last Tested</th>
@@ -147,6 +148,29 @@
                                             <% } %>
                                         </td>
                                         <td>
+                                            <% if (addon.status === 'approved') { %>
+                                                <span class="badge badge-success">
+                                                    <i class="fa-solid fa-check"></i> Approved
+                                                </span>
+                                            <% } else if (addon.status === 'pending_review') { %>
+                                                <span class="badge badge-warning">
+                                                    <i class="fa-solid fa-clock"></i> Pending
+                                                </span>
+                                            <% } else if (addon.status === 'rejected') { %>
+                                                <span class="badge badge-danger">
+                                                    <i class="fa-solid fa-times"></i> Rejected
+                                                </span>
+                                            <% } else if (addon.status === 'draft') { %>
+                                                <span class="badge badge-secondary">
+                                                    <i class="fa-solid fa-file"></i> Draft
+                                                </span>
+                                            <% } else { %>
+                                                <span class="badge badge-secondary">
+                                                    <i class="fa-solid fa-question"></i> <%= addon.status || 'Unknown' %>
+                                                </span>
+                                            <% } %>
+                                        </td>
+                                        <td>
                                             <% if (addon.trust_level === 'official') { %>
                                                 <span class="badge badge-success">
                                                     <i class="fa-solid fa-crown"></i> Official
@@ -166,17 +190,25 @@
                                             <% } %>
                                         </td>
                                         <td>
-                                            <% if (addon.visibility === 'public') { %>
+                                            <% if (addon.visibility === 'official') { %>
+                                                <span class="badge badge-danger">
+                                                    <i class="fa-solid fa-crown"></i> Official
+                                                </span>
+                                            <% } else if (addon.visibility === 'public') { %>
                                                 <span class="badge badge-success">
                                                     <i class="fa-solid fa-eye"></i> Public
                                                 </span>
-                                            <% } else if (addon.visibility === 'pending_review') { %>
-                                                <span class="badge badge-warning">
-                                                    <i class="fa-solid fa-clock"></i> Pending
+                                            <% } else if (addon.visibility === 'unlisted') { %>
+                                                <span class="badge badge-info">
+                                                    <i class="fa-solid fa-link"></i> Unlisted
                                                 </span>
-                                            <% } else { %>
+                                            <% } else if (addon.visibility === 'private') { %>
                                                 <span class="badge badge-secondary">
                                                     <i class="fa-solid fa-eye-slash"></i> Private
+                                                </span>
+                                            <% } else { %>
+                                                <span class="badge badge-warning">
+                                                    <i class="fa-solid fa-question"></i> <%= addon.visibility || 'Unknown' %>
                                                 </span>
                                             <% } %>
                                         </td>
@@ -198,7 +230,9 @@
                                                     <i class="fa-solid fa-flask"></i>
                                                 </button>
                                                 <button class="btn btn-danger btn-delete-addon" 
-                                                        data-addon-id="<%= addon.id %>" title="Delete">
+                                                        data-addon-id="<%= addon.id %>" 
+                                                        data-addon-name="<%= addon.name %>" 
+                                                        title="Delete">
                                                     <i class="fa-solid fa-trash"></i>
                                                 </button>
                                             </div>
@@ -207,7 +241,7 @@
                                 <% }); %>
                             <% } else { %>
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted">
+                                    <td colspan="9" class="text-center text-muted">
                                         <i class="fa-solid fa-inbox"></i><br>
                                         Keine Addons vorhanden<br>
                                         <a href="/guild/<%= guildId %>/plugins/superadmin/addons/import" class="btn btn-primary btn-sm mt-2">
@@ -271,8 +305,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.btn-delete-addon').forEach(btn => {
         btn.addEventListener('click', async function() {
             const addonId = this.dataset.addonId;
+            const addonName = this.dataset.addonName || 'dieses Addon';
             
-            if (!confirm('Addon wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) return;
+            // ✅ Erste Bestätigung bleibt
+            if (!confirm(`Addon "${addonName}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden!`)) return;
             
             try {
                 const response = await fetch(`/guild/${guildId}/plugins/superadmin/addons/${addonId}`, {
@@ -282,15 +318,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const result = await response.json();
                 
+                // ✅ Zweite Bestätigung durch Toast ersetzt
                 if (result.success) {
-                    alert('✅ ' + result.message);
-                    location.reload();
+                    toastr.success(result.message || 'Addon erfolgreich gelöscht');
+                    setTimeout(() => location.reload(), 1500);
                 } else {
-                    alert('❌ ' + result.message);
+                    toastr.error(result.message || 'Fehler beim Löschen');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Fehler beim Löschen');
+                toastr.error('Netzwerkfehler beim Löschen des Addons');
             }
         });
     });

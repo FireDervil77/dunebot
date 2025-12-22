@@ -88,7 +88,7 @@ class BotPlugin {
      * @param {import('discord.js').Client} botClient - Discord.js Client
      * @param {import('dunebot-db-client').DBService} dbService - Datenbank-Service
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async enable(botClient) {
         const Logger = ServiceManager.get('Logger');
@@ -364,7 +364,7 @@ class BotPlugin {
      * 
      * @param {import('discord.js').Client} botClient - Discord.js Client
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async disable(botClient) {
         const Logger = ServiceManager.get('Logger');
@@ -411,7 +411,7 @@ class BotPlugin {
      * @param {boolean} [options.events=false] - Events neu laden
      * @param {boolean} [options.config=false] - Config refreshen
      * @returns {Promise<Object>} Reload-Status mit Details
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onReload(options = {}) {
         const Logger = ServiceManager.get('Logger');

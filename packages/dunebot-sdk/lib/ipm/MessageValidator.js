@@ -2,7 +2,7 @@
  * MessageValidator - Validierung von IPM-Messages (Sicherheit!)
  * 
  * @module ipm/MessageValidator
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 const MessageTypes = require('./MessageTypes');

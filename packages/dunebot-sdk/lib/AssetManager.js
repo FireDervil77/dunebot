@@ -5,7 +5,7 @@ const path = require('path');
  * AssetManager - WordPress-ähnliches Asset-Enqueuing-System
  * Ermöglicht Plugins das Registrieren von CSS/JS mit Abhängigkeiten und Versionen
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class AssetManager {
     constructor() {
@@ -48,7 +48,7 @@ class AssetManager {
      *   localize: { guildId: '12345', markers: [...] }
      * });
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     registerScript(handle, src, options = {}) {
         if (this.scripts.has(handle)) {
@@ -93,7 +93,7 @@ class AssetManager {
      * 
      * @returns {boolean} true bei Erfolg
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     registerStyle(handle, src, options = {}) {
         if (this.styles.has(handle)) {
@@ -128,7 +128,7 @@ class AssetManager {
      * @param {string} handle - Handle des zu ladenden Scripts
      * @returns {boolean} true bei Erfolg
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     enqueueScript(handle) {
         if (!this.scripts.has(handle)) {
@@ -158,7 +158,7 @@ class AssetManager {
      * @param {string} handle - Handle des zu ladenden Styles
      * @returns {boolean} true bei Erfolg
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     enqueueStyle(handle) {
         if (!this.styles.has(handle)) {
@@ -188,7 +188,7 @@ class AssetManager {
      * @param {boolean} [inFooter=true] - Nur Footer-Scripts oder nur Head-Scripts
      * @returns {string} HTML <script>-Tags
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     renderScripts(inFooter = true) {
         const scripts = [];
@@ -247,7 +247,7 @@ class AssetManager {
      * 
      * @returns {string} HTML <link>-Tags
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     renderStyles() {
         const styles = [];
@@ -310,7 +310,7 @@ class AssetManager {
      * @param {string} handle - Handle des zu entfernenden Scripts
      * @returns {boolean} true bei Erfolg
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     deregisterScript(handle) {
         this.scripts.delete(handle);
@@ -324,7 +324,7 @@ class AssetManager {
      * @param {string} handle - Handle des zu entfernenden Styles
      * @returns {boolean} true bei Erfolg
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     deregisterStyle(handle) {
         this.styles.delete(handle);
@@ -341,7 +341,7 @@ class AssetManager {
      * @param {string} type - 'js' oder 'css'
      * @returns {string} Absoluter URL-Pfad
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     _resolveAssetPath(src, plugin, type) {
         // Wenn bereits absolut (startet mit / oder http), unverändert zurückgeben
@@ -367,7 +367,7 @@ class AssetManager {
      * @param {Map} assetMap - Map mit Asset-Definitionen
      * @returns {Array<string>} Sortierte Handles
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     _resolveDependencyOrder(handles, assetMap) {
         const sorted = [];
@@ -400,7 +400,7 @@ class AssetManager {
      * 
      * @returns {Object} {scripts: Array, styles: Array}
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     getRegisteredAssets() {
         return {
@@ -414,7 +414,7 @@ class AssetManager {
     /**
      * Reset für Tests
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     reset() {
         this.scripts.clear();

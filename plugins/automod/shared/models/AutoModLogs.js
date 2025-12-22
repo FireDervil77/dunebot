@@ -5,7 +5,7 @@ const { ServiceManager } = require('dunebot-core');
  * Speichert vollständige Violation-History für Audit-Trail
  * Behält ALLE Violations, auch wenn unter Strike-Threshold
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class AutoModLogs {
     /**

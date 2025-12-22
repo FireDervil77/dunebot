@@ -6,7 +6,7 @@
  * @param {Discord.Client} client - Discord.js Client
  * @returns {Promise<Object>} Erfolgs-Status mit Message-IDs
  * 
- * @author firedervil
+ * @author FireBot Team
  */
 
 const { ServiceManager } = require('dunebot-core');

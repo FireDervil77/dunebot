@@ -4,7 +4,7 @@
  * Dieses Script läuft einmalig nach dem Refactor und weist ALLE Permissions
  * aus permission_definitions automatisch der Administrator-Gruppe jeder Guild zu.
  * 
- * @author FireDervil + GitHub Copilot
+ * @author FireBot Team
  * @date 2025-11-03
  */
 

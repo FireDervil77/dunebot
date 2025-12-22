@@ -11,7 +11,7 @@
  * - Filter-Support (z.B. nur bestimmte Server)
  * 
  * @module helpers/SSEManager
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 const { ServiceManager } = require('dunebot-core');

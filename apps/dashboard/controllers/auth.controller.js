@@ -665,7 +665,7 @@ exports.setActiveGuild = async (req, res) => {
 
 /**
  * Bot-Status in einer Guild prüfen (API-Route)
- * @author GitHub Copilot
+ * @author FireBot Team
  * @param {import('express').Request} req - Express Request Objekt
  * @param {import('express').Response} res - Express Response Objekt
  * @returns {Promise<void>}

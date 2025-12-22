@@ -176,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
             eggGroup.style.display = 'block';
         } catch (error) {
             console.error('Error loading eggs:', error);
-            alert('Fehler beim Laden der Eggs');
+            toastr.error('Fehler beim Laden der Eggs aus GitHub');
         }
     });
     
@@ -200,8 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
         preview.style.display = 'none';
         
         try {
-            // Fetch Egg (nutzt SuperAdmin-Route!)
-            const response = await fetch(`/guild/${guildId}/plugins/superadmin/addons/pterodactyl/fetch/${category}/${encodeURIComponent(eggName)}`);
+            // Fetch Egg (nutzt SuperAdmin-Route mit Query-Parameter!)
+            const response = await fetch(`/guild/${guildId}/plugins/superadmin/addons/pterodactyl/fetch/${category}?egg=${encodeURIComponent(eggName)}`);
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Error importing egg:', error);
-            alert(`❌ Fehler beim Importieren:\n${error.message}`);
+            toastr.error(`Fehler beim Importieren: ${error.message}`);
         } finally {
             spinner.style.display = 'none';
         }
@@ -282,9 +282,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // PTDL_v2 Struktur direkt übergeben
                 meta: importedData.meta,
                 install: importedData.install,
+                installation: importedData.installation || {},  // ✅ FÜR DAEMON! (script_content)
                 startup: importedData.startup,
                 config: importedData.config,
-                scripts: importedData.scripts,
+                scripts: importedData.scripts,  // ℹ️ Für Kompatibilität (Dashboard nutzt das noch)
                 variables: importedData.variables || [],
                 ports: importedData.ports || []
             };
@@ -299,17 +300,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             
             if (result.success) {
-                alert('✅ Addon erfolgreich importiert! ID: ' + result.id);
-                // Redirect zum Edit
-                window.location.href = `/guild/${guildId}/plugins/superadmin/addons/${result.id}`;
+                toastr.success(result.message || 'Addon erfolgreich importiert!');
+                // Redirect zum Edit nach 1,5s
+                setTimeout(() => {
+                    window.location.href = `/guild/${guildId}/plugins/superadmin/addons/${result.id}`;
+                }, 1500);
             } else {
-                alert('❌ Fehler beim Speichern: ' + result.message);
+                toastr.error(result.message || 'Fehler beim Speichern des Addons');
                 saveBtn.disabled = false;
                 saveBtn.innerHTML = '<i class="fa-solid fa-save"></i> Als Addon speichern (Draft)';
             }
         } catch (error) {
             console.error('Error saving addon:', error);
-            alert('Fehler beim Speichern');
+            toastr.error('Netzwerkfehler beim Speichern des Addons');
             saveBtn.disabled = false;
             saveBtn.innerHTML = '<i class="fa-solid fa-save"></i> Als Addon speichern (Draft)';
         }

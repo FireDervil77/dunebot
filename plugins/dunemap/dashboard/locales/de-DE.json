@@ -65,7 +65,8 @@
   
   "NAV": {
     "DUNEMAP": "DuneMap",
-    "SEKTOR_CARD": "Sektor-Karte"
+    "SEKTOR_CARD": "Sektor-Karte",
+    "QUEST_FINDER": "Quest-Finder"
   },
 
   "SETTINGS": {

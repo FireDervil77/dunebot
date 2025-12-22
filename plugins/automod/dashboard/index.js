@@ -43,7 +43,7 @@ class AutoModPlugin extends DashboardPlugin {
 
     /**
      * WordPress-Style Asset Registration
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     _registerAssets() {
         const assetManager = ServiceManager.get('assetManager');
@@ -180,7 +180,17 @@ class AutoModPlugin extends DashboardPlugin {
                     max_lines,
                     max_mentions,
                     max_role_mentions,
-                    whitelisted_channels
+                    whitelisted_channels,
+                    // Raid Protection
+                    raid_protection_enabled,
+                    raid_join_threshold,
+                    raid_join_timespan,
+                    raid_min_account_age_days,
+                    raid_action,
+                    raid_lockdown_enabled,
+                    raid_alert_channel,
+                    raid_alert_mention_mods,
+                    raid_trusted_invites
                 } = req.body;
                 
                 // Baue Update-Object
@@ -191,14 +201,18 @@ class AutoModPlugin extends DashboardPlugin {
                 if (action !== undefined && ['TIMEOUT', 'KICK', 'BAN'].includes(action)) {
                     updates.action = action;
                 }
-                if (debug_mode !== undefined) updates.debug_mode = debug_mode === 'true' || debug_mode === true || debug_mode === 1;
-                if (anti_ghostping !== undefined) updates.anti_ghostping = anti_ghostping === 'true' || anti_ghostping === true || anti_ghostping === 1;
-                if (anti_spam !== undefined) updates.anti_spam = anti_spam === 'true' || anti_spam === true || anti_spam === 1;
-                if (anti_massmention !== undefined) updates.anti_massmention = anti_massmention === 'true' || anti_massmention === true || anti_massmention === 1;
+                
+                // Boolean-Checkboxen: String '1' oder '0' zu Boolean konvertieren
+                const toBool = (val) => val === '1' || val === 1 || val === true || val === 'true';
+                
+                if (debug_mode !== undefined) updates.debug_mode = toBool(debug_mode);
+                if (anti_ghostping !== undefined) updates.anti_ghostping = toBool(anti_ghostping);
+                if (anti_spam !== undefined) updates.anti_spam = toBool(anti_spam);
+                if (anti_massmention !== undefined) updates.anti_massmention = toBool(anti_massmention);
                 if (anti_massmention_threshold !== undefined) updates.anti_massmention_threshold = parseInt(anti_massmention_threshold) || 3;
-                if (anti_attachments !== undefined) updates.anti_attachments = anti_attachments === 'true' || anti_attachments === true || anti_attachments === 1;
-                if (anti_invites !== undefined) updates.anti_invites = anti_invites === 'true' || anti_invites === true || anti_invites === 1;
-                if (anti_links !== undefined) updates.anti_links = anti_links === 'true' || anti_links === true || anti_links === 1;
+                if (anti_attachments !== undefined) updates.anti_attachments = toBool(anti_attachments);
+                if (anti_invites !== undefined) updates.anti_invites = toBool(anti_invites);
+                if (anti_links !== undefined) updates.anti_links = toBool(anti_links);
                 if (max_lines !== undefined) updates.max_lines = parseInt(max_lines) || 0;
                 if (max_mentions !== undefined) updates.max_mentions = parseInt(max_mentions) || 0;
                 if (max_role_mentions !== undefined) updates.max_role_mentions = parseInt(max_role_mentions) || 0;
@@ -213,6 +227,44 @@ class AutoModPlugin extends DashboardPlugin {
                         } catch {
                             updates.whitelisted_channels = [];
                         }
+                    }
+                }
+                
+                // ========================================
+                // RAID PROTECTION SETTINGS
+                // ========================================
+                
+                if (raid_protection_enabled !== undefined) updates.raid_protection_enabled = toBool(raid_protection_enabled);
+                if (raid_join_threshold !== undefined) updates.raid_join_threshold = parseInt(raid_join_threshold) || 5;
+                if (raid_join_timespan !== undefined) updates.raid_join_timespan = parseInt(raid_join_timespan) || 10;
+                if (raid_min_account_age_days !== undefined) updates.raid_min_account_age_days = parseInt(raid_min_account_age_days) || 0;
+                
+                if (raid_action !== undefined && ['KICK', 'BAN'].includes(raid_action)) {
+                    updates.raid_action = raid_action;
+                }
+                
+                if (raid_lockdown_enabled !== undefined) updates.raid_lockdown_enabled = toBool(raid_lockdown_enabled);
+                if (raid_alert_channel !== undefined) updates.raid_alert_channel = raid_alert_channel || null;
+                if (raid_alert_mention_mods !== undefined) updates.raid_alert_mention_mods = toBool(raid_alert_mention_mods);
+                
+                // Trusted Invites (Textarea → Array)
+                if (raid_trusted_invites !== undefined) {
+                    if (typeof raid_trusted_invites === 'string') {
+                        // Split by newline, trim, filter empty
+                        const invites = raid_trusted_invites
+                            .split(/\r?\n/)
+                            .map(line => line.trim())
+                            .filter(line => line.length > 0)
+                            .map(line => {
+                                // Extract code from full URL if provided
+                                const match = line.match(/discord\.gg\/([A-Za-z0-9]+)/);
+                                return match ? match[1] : line;
+                            });
+                        updates.raid_trusted_invites = invites;
+                    } else if (Array.isArray(raid_trusted_invites)) {
+                        updates.raid_trusted_invites = raid_trusted_invites;
+                    } else {
+                        updates.raid_trusted_invites = [];
                     }
                 }
                 

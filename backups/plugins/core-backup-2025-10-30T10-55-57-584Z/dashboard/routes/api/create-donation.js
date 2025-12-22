@@ -3,7 +3,7 @@
  * Route: POST /api/core/create-donation
  * 
  * @module plugins/core/dashboard/routes/api/create-donation
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 const express = require('express');

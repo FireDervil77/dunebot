@@ -2,7 +2,7 @@
  * SuperAdmin Donations Management Routes
  * Nur für Control-Guild sichtbar
  * 
- * @author DuneBot Development Team
+ * @author FireBot Team
  */
 
 const express = require('express');

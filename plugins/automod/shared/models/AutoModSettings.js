@@ -4,7 +4,7 @@ const { ServiceManager } = require('dunebot-core');
  * Model für AutoMod Settings
  * Verwaltet Guild-spezifische AutoMod-Konfiguration
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class AutoModSettings {
     /**
@@ -30,7 +30,7 @@ class AutoModSettings {
             
             const settings = rows[0];
             
-            // JSON-Felder parsen
+            // JSON-Felder parsen: whitelisted_channels
             if (settings.whitelisted_channels && typeof settings.whitelisted_channels === 'string') {
                 try {
                     settings.whitelisted_channels = JSON.parse(settings.whitelisted_channels);
@@ -42,6 +42,20 @@ class AutoModSettings {
             // Sicherstellen dass es ein Array ist
             if (!Array.isArray(settings.whitelisted_channels)) {
                 settings.whitelisted_channels = [];
+            }
+            
+            // JSON-Felder parsen: raid_trusted_invites
+            if (settings.raid_trusted_invites && typeof settings.raid_trusted_invites === 'string') {
+                try {
+                    settings.raid_trusted_invites = JSON.parse(settings.raid_trusted_invites);
+                } catch {
+                    settings.raid_trusted_invites = [];
+                }
+            }
+            
+            // Sicherstellen dass es ein Array ist
+            if (!Array.isArray(settings.raid_trusted_invites)) {
+                settings.raid_trusted_invites = [];
             }
             
             return settings;
@@ -92,6 +106,9 @@ class AutoModSettings {
             // JSON-Felder stringifizieren
             if (updates.whitelisted_channels !== undefined) {
                 updates.whitelisted_channels = JSON.stringify(updates.whitelisted_channels);
+            }
+            if (updates.raid_trusted_invites !== undefined) {
+                updates.raid_trusted_invites = JSON.stringify(updates.raid_trusted_invites);
             }
 
             // Dynamisches UPDATE-Statement bauen

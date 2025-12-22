@@ -3,7 +3,7 @@
  * Genutzt für Daemon ↔ Dashboard ↔ Browser Kommunikation
  * 
  * @module ipm/MessageTypes
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 // =====================================================

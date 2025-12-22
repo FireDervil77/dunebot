@@ -3,7 +3,7 @@
  * 
  * Aktualisiert v_guild_groups_summary View um description und permissions Spalten hinzuzufügen
  * 
- * @author FireDervil + GitHub Copilot
+ * @author FireBot
  * @version 6.6.6
  * @date 30. Oktober 2025
  */

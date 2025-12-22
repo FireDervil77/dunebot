@@ -12,7 +12,7 @@ const defaultConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
  * Wird ausgeführt, wenn der Bot sich bei Discord angemeldet hat
  * Initialisiert Guilds, lädt Einstellungen und registriert Befehle
  * 
- * @author firedervil
+ * @author FireBot Team
  * @param {import('discord.js').Client} client
  */
 module.exports = async (client) => {

@@ -8,7 +8,7 @@
  * - Error-Handling und Logging
  * 
  * @module helpers/IPMEventRouter
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 const { MessageValidator, MessageTypes } = require('dunebot-sdk');

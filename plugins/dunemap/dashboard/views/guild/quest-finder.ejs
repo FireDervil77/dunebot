@@ -1,0 +1,320 @@
+<%
+/**
+ * Quest-Finder View
+ * Dune Awakening Quest-Datenbank
+ * 
+ * Phase 2: Backend API komplett
+ * @author FireBot Team
+ */
+%>
+
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0"><i class="fa-solid fa-scroll"></i> Quest-Finder</h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/dunemap">DuneMap</a></li>
+                    <li class="breadcrumb-item active">Quest-Finder</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+        
+        <!-- Statistiken -->
+        <div class="row mb-3">
+            <div class="col-lg-4 col-6">
+                <div class="small-box bg-info">
+                    <div class="inner">
+                        <h3><%= stats.totalQuests %></h3>
+                        <p>Quests in Datenbank</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fa-solid fa-scroll"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4 col-6">
+                <div class="small-box bg-success">
+                    <div class="inner">
+                        <h3><%= stats.totalChains %></h3>
+                        <p>Quest-Chains</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fa-solid fa-link"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4 col-6">
+                <div class="small-box bg-warning">
+                    <div class="inner">
+                        <h3><%= stats.totalNpcs %></h3>
+                        <p>Quest-Geber (NPCs)</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Suchfilter -->
+        <div class="card card-primary">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-filter"></i> Quest-Suche</h3>
+            </div>
+            <div class="card-body">
+                <form id="questSearchForm">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Quest-Typ</label>
+                                <select class="form-control" name="type" id="filterType">
+                                    <option value="">Alle Typen</option>
+                                    <% questTypes.forEach(type => { %>
+                                        <option value="<%= type.quest_type %>"><%= type.quest_type %> (<%= type.count %>)</option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Faction</label>
+                                <select class="form-control" name="faction" id="filterFaction">
+                                    <option value="">Alle Factions</option>
+                                    <% factions.forEach(faction => { %>
+                                        <option value="<%= faction.faction %>"><%= faction.faction %> (<%= faction.count %>)</option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Schwierigkeit</label>
+                                <select class="form-control" name="difficulty" id="filterDifficulty">
+                                    <option value="">Alle</option>
+                                    <option value="1">⭐ Sehr Leicht</option>
+                                    <option value="2">⭐⭐ Leicht</option>
+                                    <option value="3">⭐⭐⭐ Mittel</option>
+                                    <option value="4">⭐⭐⭐⭐ Schwer</option>
+                                    <option value="5">⭐⭐⭐⭐⭐ Sehr Schwer</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Freitextsuche</label>
+                                <input type="text" class="form-control" name="search" id="filterSearch" placeholder="Quest-Name...">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa-solid fa-search"></i> Suchen
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="btnResetFilters">
+                                <i class="fa-solid fa-times"></i> Filter zurücksetzen
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Suchergebnisse -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-list"></i> Quests (<span id="questCount">0</span>)</h3>
+                <div class="card-tools">
+                    <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="loadingSpinner" class="text-center p-4" style="display: none;">
+                    <i class="fas fa-spinner fa-spin fa-3x"></i>
+                    <p class="mt-2">Lade Quests...</p>
+                </div>
+                <div id="questResults">
+                    <div class="text-center p-4 text-muted">
+                        <i class="fa-solid fa-search fa-3x mb-3"></i>
+                        <p>Nutze die Filter oben, um Quests zu suchen.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchForm = document.getElementById('questSearchForm');
+    const resultsContainer = document.getElementById('questResults');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const questCount = document.getElementById('questCount');
+    const btnReset = document.getElementById('btnResetFilters');
+    
+    // Initial laden (alle Quests)
+    loadQuests();
+    
+    // Suchformular Submit
+    searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        loadQuests();
+    });
+    
+    // Filter zurücksetzen
+    btnReset.addEventListener('click', function() {
+        searchForm.reset();
+        loadQuests();
+    });
+    
+    // Quests laden via API
+    function loadQuests() {
+        const formData = new FormData(searchForm);
+        const params = new URLSearchParams();
+        
+        // Nur nicht-leere Werte hinzufügen
+        for (const [key, value] of formData.entries()) {
+            if (value) params.append(key, value);
+        }
+        
+        // Limit setzen
+        params.append('limit', '50');
+        
+        // Loading anzeigen
+        loadingSpinner.style.display = 'block';
+        resultsContainer.innerHTML = '';
+        
+        // API-Call
+        fetch(`/guild/<%= guildId %>/plugins/dunemap/api/quests/search?${params.toString()}`)
+            .then(res => res.json())
+            .then(data => {
+                loadingSpinner.style.display = 'none';
+                
+                if (!data.success) {
+                    resultsContainer.innerHTML = `
+                        <div class="alert alert-danger m-3">
+                            <i class="fa-solid fa-exclamation-triangle"></i>
+                            Fehler beim Laden: ${data.message || 'Unbekannter Fehler'}
+                        </div>
+                    `;
+                    return;
+                }
+                
+                questCount.textContent = data.total;
+                
+                if (data.quests.length === 0) {
+                    resultsContainer.innerHTML = `
+                        <div class="text-center p-4 text-muted">
+                            <i class="fa-solid fa-search fa-3x mb-3"></i>
+                            <p>Keine Quests gefunden. Versuche andere Filter.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                renderQuests(data.quests);
+            })
+            .catch(err => {
+                loadingSpinner.style.display = 'none';
+                resultsContainer.innerHTML = `
+                    <div class="alert alert-danger m-3">
+                        <i class="fa-solid fa-exclamation-triangle"></i>
+                        Netzwerkfehler: ${err.message}
+                    </div>
+                `;
+                console.error('Quest API Error:', err);
+            });
+    }
+    
+    // Quests rendern
+    function renderQuests(quests) {
+        let html = '<div class="table-responsive"><table class="table table-striped table-hover">';
+        html += `
+            <thead>
+                <tr>
+                    <th>Quest</th>
+                    <th>Typ</th>
+                    <th>Faction</th>
+                    <th>Quest-Geber</th>
+                    <th>Belohnungen</th>
+                    <th>Aktion</th>
+                </tr>
+            </thead>
+            <tbody>
+        `;
+        
+        quests.forEach(quest => {
+            const questName = quest.quest_name_de || quest.quest_name_en;
+            const npcName = quest.npc_name || 'Unbekannt';
+            const location = quest.quest_location || quest.quest_region || '?';
+            
+            // Faction-Badge-Farbe
+            const factionColors = {
+                'imperial': 'secondary',
+                'atreides': 'primary',
+                'harkonnen': 'danger',
+                'fremen': 'success',
+                'guild': 'warning',
+                'bene_gesserit': 'info',
+                'neutral': 'light'
+            };
+            const factionColor = factionColors[quest.faction] || 'light';
+            
+            // Quest-Typ-Badge
+            const typeColors = {
+                'main_story': 'danger',
+                'journey': 'primary',
+                'trial': 'warning',
+                'faction': 'info',
+                'side_quest': 'secondary'
+            };
+            const typeColor = typeColors[quest.quest_type] || 'secondary';
+            
+            html += `
+                <tr>
+                    <td>
+                        <strong>${questName}</strong>
+                        ${quest.chain_name_en ? `<br><small class="text-muted"><i class="fa-solid fa-link"></i> ${quest.chain_name_de || quest.chain_name_en} (${quest.quest_chain_position || '?'}/${quest.total_quests || '?'})</small>` : ''}
+                    </td>
+                    <td><span class="badge badge-${typeColor}">${quest.quest_type}</span></td>
+                    <td><span class="badge badge-${factionColor}">${quest.faction}</span></td>
+                    <td>
+                        ${npcName}
+                        <br><small class="text-muted"><i class="fa-solid fa-map-marker-alt"></i> ${location}</small>
+                    </td>
+                    <td>
+                        ${quest.reward_xp ? `<span class="badge badge-success">${quest.reward_xp} XP</span> ` : ''}
+                        ${quest.reward_solari ? `<span class="badge badge-warning">${quest.reward_solari} <i class="fa-solid fa-coins"></i></span>` : ''}
+                        ${quest.reward_items && quest.reward_items.length > 0 ? `<br><small class="text-muted">${quest.reward_items.length} Items</small>` : ''}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="viewQuestDetails('${quest.quest_slug}')">
+                            <i class="fa-solid fa-eye"></i> Details
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table></div>';
+        resultsContainer.innerHTML = html;
+    }
+    
+    // Quest-Details anzeigen (TODO: Modal oder eigene Seite)
+    window.viewQuestDetails = function(slug) {
+        alert(`Quest-Details für: ${slug}\n\nTODO: Modal mit vollständigen Quest-Infos implementieren (Phase 3)`);
+    };
+});
+</script>

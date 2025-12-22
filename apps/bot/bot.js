@@ -41,7 +41,7 @@ ServiceManager.register("bootHooks", bootHooks);
  * Hauptfunktion für die Bot-Initialisierung
  * Implementiert den gesamten Boot-Prozess mit Hook-System
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 (async () => {
     try {

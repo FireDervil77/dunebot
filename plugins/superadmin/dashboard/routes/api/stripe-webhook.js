@@ -4,7 +4,7 @@
  * 
  * WICHTIG: Muss express.raw() Middleware verwenden für Signature Verification!
  * 
- * @author DuneBot Development Team
+ * @author FireBot Team
  */
 
 const express = require('express');

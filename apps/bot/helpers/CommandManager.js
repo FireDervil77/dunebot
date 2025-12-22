@@ -6,7 +6,7 @@ const { ServiceManager } = require("dunebot-core");
  * Verwaltet Bot-Befehle (Prefix-Commands, Slash-Commands, Context-Menüs)
  * Angepasst für das neue WordPress-ähnliche Plugin-System
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class CommandManager {
     /**

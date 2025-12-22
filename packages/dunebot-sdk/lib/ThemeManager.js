@@ -690,7 +690,7 @@ class ThemeManager {
      * @param {string} widgetName - Name des Widgets (z.B. 'server-info')
      * @param {Object} data - Kontextdaten für das Widget
      * @returns {Promise<string>} - Gerenderter HTML-String
-     * @author DuneBot Team
+     * @author FireBot Team
      */
      async renderWidgetPartial(widgetName, data = {}) {
         const Logger = ServiceManager.get('Logger');
@@ -768,7 +768,7 @@ class ThemeManager {
      * Theme-Assets für Express registrieren
      * Macht die Assets unter /themes/<themeName>/assets/ verfügbar
      * 
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     registerThemeAssets() {
         const PathConfig = require('./utils/PathConfig').getInstance();

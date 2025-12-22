@@ -5,7 +5,7 @@ const { ServiceManager } = require('dunebot-core');
  * Verwaltet Member-spezifische Strike-Counter
  * Strikes werden bei Bestrafung zurückgesetzt
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class AutoModStrikes {
     /**

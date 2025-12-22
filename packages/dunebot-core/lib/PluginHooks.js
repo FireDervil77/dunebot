@@ -5,14 +5,14 @@ require("dotenv").config();
  * Ermöglicht das Registrieren und Ausführen von Filtern und Actions
  * Wird sowohl im Dashboard als auch im Bot verwendet
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class PluginHooks {
 
     /**
      * Erstellt eine neue Instanz des PluginHooks-Systems
      * @param {Object} logger - Logger-Instanz
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     constructor(logger) {
         this.logger = logger;
@@ -29,7 +29,7 @@ class PluginHooks {
      * @param {string} name - Name der Action
      * @param {Function} callback - Callback-Funktion
      * @param {number} [priority=10] - Priorität der Action
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     addAction(name, callback, priority = 10) {
         if (!this.actions[name]) this.actions[name] = [];
@@ -43,7 +43,7 @@ class PluginHooks {
      * @param {string} name - Name der Action
      * @param {...any} args - Argumente für die Callback-Funktionen
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async doAction(name, ...args) {
         if (!this.actions[name]) return;
@@ -66,7 +66,7 @@ class PluginHooks {
      * @param {string} name - Name des Filters
      * @param {Function} callback - Callback-Funktion
      * @param {number} [priority=10] - Priorität des Filters
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     addFilter(name, callback, priority = 10) {
         if (!this.filters[name]) this.filters[name] = [];
@@ -81,7 +81,7 @@ class PluginHooks {
      * @param {any} value - Ursprungswert
      * @param {...any} args - Zusätzliche Argumente für die Filter
      * @returns {Promise<any>} - Gefilterter Wert
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async applyFilter(name, value, ...args) {
         if (!this.filters[name]) return value;
@@ -108,7 +108,7 @@ class PluginHooks {
      * @param {any} value - Ursprungswert
      * @param {...any} args - Zusätzliche Argumente
      * @returns {Promise<any>} - Gefilterter Wert
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async applyFilters(name, value, ...args) {
         return this.applyFilter(name, value, ...args);
@@ -120,7 +120,7 @@ class PluginHooks {
      * @param {string} location - Position im View
      * @param {any} component - Zu registrierender View-Komponent
      * @param {number} [priority=10] - Priorität des Hooks
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     addViewHook(location, component, priority = 10) {
 
@@ -134,7 +134,7 @@ class PluginHooks {
      * Gibt alle View-Hooks für eine bestimmte Position zurück
      * @param {string} location - Position im View
      * @returns {Array} - Liste der View-Hooks
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     getViewHooks(location) {
         return this.viewHooks[location] || [];
@@ -146,7 +146,7 @@ class PluginHooks {
      * @param {string} title - Titel der Sektion
      * @param {any} component - Komponente der Sektion
      * @param {number} [priority=10] - Priorität der Sektion
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     registerGuildSection(id, title, component, priority = 10) {
         if (!this.guildSections[id]) {
@@ -162,7 +162,7 @@ class PluginHooks {
     /**
      * Gibt alle registrierten Guild-Sektionen zurück
      * @returns {Array<Object>} - Liste der Guild-Sektionen
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     getGuildSections() {
         return Object.entries(this.guildSections)
@@ -175,7 +175,7 @@ class PluginHooks {
      * @param {string} name - Name der Action
      * @param {Function} [callback] - Spezifische Callback-Funktion (optional)
      * @returns {boolean} - true, wenn Actions entfernt wurden
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     removeAction(name, callback) {
         if (!this.actions[name]) {
@@ -200,7 +200,7 @@ class PluginHooks {
      * @param {string} name - Name des Filters
      * @param {Function} [callback] - Spezifische Callback-Funktion (optional)
      * @returns {boolean} - true, wenn Filter entfernt wurden
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     removeFilter(name, callback) {
         if (!this.filters[name]) {
@@ -224,7 +224,7 @@ class PluginHooks {
      * Prüft, ob eine Action registriert ist
      * @param {string} name - Name der Action
      * @returns {boolean} - true, wenn die Action existiert
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     hasAction(name) {
         return this.actions[name] && this.actions[name].length > 0;
@@ -234,7 +234,7 @@ class PluginHooks {
      * Prüft, ob ein Filter registriert ist
      * @param {string} name - Name des Filters
      * @returns {boolean} - true, wenn der Filter existiert
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     hasFilter(name) {
         return this.filters[name] && this.filters[name].length > 0;
@@ -244,7 +244,7 @@ class PluginHooks {
      * Gibt die Anzahl der registrierten Handler für eine Action zurück
      * @param {string} name - Name der Action
      * @returns {number} - Anzahl der Handler
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     getActionCount(name) {
         return this.actions[name] ? this.actions[name].length : 0;
@@ -254,7 +254,7 @@ class PluginHooks {
      * Gibt die Anzahl der registrierten Handler für einen Filter zurück
      * @param {string} name - Name des Filters
      * @returns {number} - Anzahl der Handler
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     getFilterCount(name) {
         return this.filters[name] ? this.filters[name].length : 0;

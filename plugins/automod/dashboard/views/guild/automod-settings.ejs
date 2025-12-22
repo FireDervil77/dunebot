@@ -82,98 +82,29 @@
   </div>
 </div>
 
-<!-- Tab-State JavaScript - Must be at the end after Bootstrap loads -->
+<!-- Tab-State JavaScript for Bootstrap 4 -->
 <script>
 (function() {
     'use strict';
     
-    // Wait for DOM and Bootstrap to be ready
-    function initTabs() {
-        if (typeof bootstrap === 'undefined') {
-            console.error('[AutoMod Tabs] Bootstrap not loaded yet! Retrying in 100ms...');
-            setTimeout(initTabs, 100);
-            return;
-        }
-        
-        const tabButtons = document.querySelectorAll('#automodTabs button[data-bs-toggle="tab"]');
-        const tabPanes = document.querySelectorAll('#automodTabsContent .tab-pane');
+    // Wait for DOM and jQuery to be ready
+    $(document).ready(function() {
         const storageKey = 'automod_active_tab_<%= guildId %>';
         
-        console.log('[AutoMod Tabs] Found', tabButtons.length, 'tab buttons');
-        console.log('[AutoMod Tabs] Found', tabPanes.length, 'tab panes');
-        
-        if (tabButtons.length === 0) {
-            console.error('[AutoMod Tabs] No tab buttons found!');
-            return;
-        }
-        
-        // Funktion zum Wechseln der Tabs
-        function showTab(targetId, clickedButton) {
-            console.log('[AutoMod Tabs] Switching to tab:', targetId);
-            
-            // Alle Tab-Buttons deaktivieren
-            tabButtons.forEach(btn => {
-                btn.classList.remove('active');
-                btn.setAttribute('aria-selected', 'false');
-            });
-            
-            // Alle Tab-Panes ausblenden
-            tabPanes.forEach(pane => {
-                pane.classList.remove('show', 'active');
-            });
-            
-            // Angeklickten Button aktivieren
-            if (clickedButton) {
-                clickedButton.classList.add('active');
-                clickedButton.setAttribute('aria-selected', 'true');
-            }
-            
-            // Ziel-Pane anzeigen
-            const targetPane = document.querySelector(targetId);
-            if (targetPane) {
-                targetPane.classList.add('show', 'active');
-                console.log('[AutoMod Tabs] Tab switched successfully to:', targetId);
-            } else {
-                console.error('[AutoMod Tabs] Target pane not found:', targetId);
-            }
-            
-            // In localStorage speichern
-            localStorage.setItem(storageKey, targetId);
-        }
-        
-        // Click-Handler für alle Tabs
-        tabButtons.forEach(tabButton => {
-            const targetId = tabButton.getAttribute('data-bs-target');
-            console.log('[AutoMod Tabs] Attaching handler to:', targetId);
-            
-            tabButton.addEventListener('click', function(e) {
-                e.preventDefault();
-                console.log('[AutoMod Tabs] Tab clicked:', targetId);
-                showTab(targetId, tabButton);
-            });
+        // Tab-Wechsel speichern
+        $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+            const activeTab = $(e.target).attr('href'); // e.g. #tab-basic
+            localStorage.setItem(storageKey, activeTab);
+            console.log('[AutoMod Tabs] Switched to:', activeTab);
         });
         
         // Letzten aktiven Tab wiederherstellen
         const lastActiveTab = localStorage.getItem(storageKey);
-        console.log('[AutoMod Tabs] Last active tab from storage:', lastActiveTab);
-        
         if (lastActiveTab) {
-            const tabButton = document.querySelector(`button[data-bs-target="${lastActiveTab}"]`);
-            if (tabButton) {
-                console.log('[AutoMod Tabs] Restoring tab:', lastActiveTab);
-                showTab(lastActiveTab, tabButton);
-            }
+            $(`a[href="${lastActiveTab}"]`).tab('show');
+            console.log('[AutoMod Tabs] Restored tab:', lastActiveTab);
         }
-        
-        console.log('[AutoMod Tabs] Tab system initialized successfully!');
-    }
-    
-    // Initialize when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initTabs);
-    } else {
-        initTabs();
-    }
+    });
 })();
 </script>
 <div class="row">
@@ -187,38 +118,38 @@
       </div>
       <div class="card-body">
         
-        <!-- Tab Navigation -->
+        <!-- Tab Navigation - Bootstrap 4 Syntax! -->
         <ul class="nav nav-tabs mb-4" id="automodTabs" role="tablist">
           <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="tab-basic-btn" data-bs-toggle="tab" data-bs-target="#tab-basic" type="button" role="tab" aria-controls="tab-basic" aria-selected="true">
+            <a class="nav-link active" id="tab-basic-btn" data-toggle="tab" href="#tab-basic" role="tab" aria-controls="tab-basic" aria-selected="true">
               <i class="fa-solid fa-cog me-1"></i>
               <%= tr('automod:TABS.BASIC.TITLE') %>
-            </button>
+            </a>
           </li>
           <li class="nav-item" role="presentation">
-            <button class="nav-link" id="tab-content-btn" data-bs-toggle="tab" data-bs-target="#tab-content" type="button" role="tab" aria-controls="tab-content" aria-selected="false">
+            <a class="nav-link" id="tab-content-btn" data-toggle="tab" href="#tab-content" role="tab" aria-controls="tab-content" aria-selected="false">
               <i class="fa-solid fa-shield-halved me-1"></i>
               <%= tr('automod:TABS.CONTENT.TITLE') %>
-            </button>
+            </a>
           </li>
           <li class="nav-item" role="presentation">
-            <button class="nav-link" id="tab-limits-btn" data-bs-toggle="tab" data-bs-target="#tab-limits" type="button" role="tab" aria-controls="tab-limits" aria-selected="false">
+            <a class="nav-link" id="tab-limits-btn" data-toggle="tab" href="#tab-limits" role="tab" aria-controls="tab-limits" aria-selected="false">
               <i class="fa-solid fa-sliders me-1"></i>
               <%= tr('automod:TABS.LIMITS.TITLE') %>
-            </button>
+            </a>
           </li>
           <li class="nav-item" role="presentation">
-            <button class="nav-link" id="tab-whitelist-btn" data-bs-toggle="tab" data-bs-target="#tab-whitelist" type="button" role="tab" aria-controls="tab-whitelist" aria-selected="false">
+            <a class="nav-link" id="tab-whitelist-btn" data-toggle="tab" href="#tab-whitelist" role="tab" aria-controls="tab-whitelist" aria-selected="false">
               <i class="fa-solid fa-user-check me-1"></i>
               <%= tr('automod:TABS.WHITELIST.TITLE') %>
-            </button>
+            </a>
           </li>
           <li class="nav-item" role="presentation">
-            <button class="nav-link" id="tab-raid-btn" data-bs-toggle="tab" data-bs-target="#tab-raid" type="button" role="tab" aria-controls="tab-raid" aria-selected="false">
+            <a class="nav-link" id="tab-raid-btn" data-toggle="tab" href="#tab-raid" role="tab" aria-controls="tab-raid" aria-selected="false">
               <i class="fa-solid fa-shield-virus me-1"></i>
               <%= tr('automod:TABS.RAID.TITLE') %>
-              <span class="badge bg-warning text-dark ms-1"><%= tr('automod:TABS.COMING_SOON') %></span>
-            </button>
+              <span class="badge bg-success text-white ms-1">NEU</span>
+            </a>
           </li>
         </ul>
 
@@ -523,44 +454,202 @@
             </div>
             <!-- END TAB 4 -->
 
-            <!-- ==================== TAB 5: RAID-SCHUTZ (COMING SOON) ==================== -->
+            <!-- ==================== TAB 5: RAID-SCHUTZ ==================== -->
             <div class="tab-pane fade" id="tab-raid" role="tabpanel" aria-labelledby="tab-raid-btn">
-              <div class="text-center py-5">
-                <i class="fa-solid fa-shield-virus text-warning mb-3" style="font-size: 4rem;"></i>
-                <h4 class="mb-3">
-                  <span class="badge bg-warning text-dark"><%= tr('automod:TABS.COMING_SOON') %></span>
-                </h4>
-                <h5 class="mb-4"><%= tr('automod:TABS.RAID.SUBTITLE') %></h5>
+              <h5 class="mb-4">
+                <i class="fa-solid fa-shield-virus me-2 text-danger"></i>
+                <%= tr('automod:TABS.RAID.SUBTITLE') %>
+              </h5>
+
+              <!-- Raid Protection aktivieren -->
+              <div class="mb-4">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="raid_protection_enabled" name="raid_protection_enabled" 
+                         value="1" <%= settings.raid_protection_enabled ? 'checked' : '' %>>
+                  <label class="form-check-label fw-bold" for="raid_protection_enabled">
+                    <i class="fa-solid fa-shield-halved me-2"></i>
+                    Raid-Schutz aktivieren
+                  </label>
+                </div>
+                <small class="text-muted">Schützt vor massiven Join-Angriffen und jungen Accounts</small>
+              </div>
+
+              <hr class="my-4">
+
+              <!-- Join-Spam Detection -->
+              <h6 class="mb-3">
+                <i class="fa-solid fa-users me-2"></i>
+                Join-Spam Detection
+              </h6>
+
+              <div class="row mb-4">
+                <div class="col-md-6">
+                  <label for="raid_join_threshold" class="form-label fw-bold">
+                    <i class="fa-solid fa-hashtag me-2"></i>
+                    Max. Joins
+                  </label>
+                  <input type="number" class="form-control" id="raid_join_threshold" name="raid_join_threshold" 
+                         value="<%= settings.raid_join_threshold || 5 %>" min="2" max="50">
+                  <small class="text-muted">Anzahl User die in X Sekunden joinen dürfen</small>
+                </div>
+
+                <div class="col-md-6">
+                  <label for="raid_join_timespan" class="form-label fw-bold">
+                    <i class="fa-solid fa-clock me-2"></i>
+                    Zeitfenster (Sekunden)
+                  </label>
+                  <input type="number" class="form-control" id="raid_join_timespan" name="raid_join_timespan" 
+                         value="<%= settings.raid_join_timespan || 10 %>" min="5" max="60">
+                  <small class="text-muted">Zeitspanne für Raid-Erkennung</small>
+                </div>
+              </div>
+
+              <!-- Account-Age Filter -->
+              <div class="mb-4">
+                <label for="raid_min_account_age_days" class="form-label fw-bold">
+                  <i class="fa-solid fa-calendar-check me-2"></i>
+                  Min. Account-Alter (Tage)
+                </label>
+                <input type="number" class="form-control" id="raid_min_account_age_days" name="raid_min_account_age_days" 
+                       value="<%= settings.raid_min_account_age_days || 7 %>" min="0" max="365">
+                <small class="text-muted">User mit jüngerem Account werden gekickt (0 = deaktiviert)</small>
+              </div>
+
+              <hr class="my-4">
+
+              <!-- Actions & Lockdown -->
+              <h6 class="mb-3">
+                <i class="fa-solid fa-gavel me-2"></i>
+                Aktionen bei Raid
+              </h6>
+
+              <div class="mb-4">
+                <label for="raid_action" class="form-label fw-bold">
+                  <i class="fa-solid fa-bolt me-2"></i>
+                  Standard-Aktion
+                </label>
+                <select class="form-select" id="raid_action" name="raid_action">
+                  <option value="KICK" <%= settings.raid_action === 'KICK' ? 'selected' : '' %>>
+                    👢 Kick (Automatisch)
+                  </option>
+                  <option value="BAN" <%= settings.raid_action === 'BAN' ? 'selected' : '' %>>
+                    🔨 Ban (Manuell empfohlen)
+                  </option>
+                </select>
+                <small class="text-muted">Kick wird automatisch ausgeführt, Ban ist für manuelle Nachbearbeitung gedacht</small>
+              </div>
+
+              <!-- Lockdown -->
+              <div class="mb-4">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="raid_lockdown_enabled" name="raid_lockdown_enabled" 
+                         value="1" <%= settings.raid_lockdown_enabled ? 'checked' : '' %>>
+                  <label class="form-check-label fw-bold" for="raid_lockdown_enabled">
+                    <i class="fa-solid fa-lock me-2"></i>
+                    Lockdown bei Raid aktivieren
+                  </label>
+                </div>
+                <small class="text-muted">Sperrt Server automatisch (Verification HIGH + @everyone Permissions entfernt)</small>
                 
-                <div class="row justify-content-center">
-                  <div class="col-md-8">
-                    <div class="card bg-light">
-                      <div class="card-body text-start">
-                        <h6 class="mb-3"><i class="fa-solid fa-list-check me-2"></i><%= tr('automod:TABS.RAID.PLANNED_FEATURES') %>:</h6>
-                        <ul class="list-unstyled mb-0">
-                          <li class="mb-2">
-                            <i class="fa-solid fa-check-circle text-success me-2"></i>
-                            <%= tr('automod:TABS.RAID.FEATURE_1') %>
-                          </li>
-                          <li class="mb-2">
-                            <i class="fa-solid fa-check-circle text-success me-2"></i>
-                            <%= tr('automod:TABS.RAID.FEATURE_2') %>
-                          </li>
-                          <li class="mb-2">
-                            <i class="fa-solid fa-check-circle text-success me-2"></i>
-                            <%= tr('automod:TABS.RAID.FEATURE_3') %>
-                          </li>
-                          <li class="mb-0">
-                            <i class="fa-solid fa-check-circle text-success me-2"></i>
-                            <%= tr('automod:TABS.RAID.FEATURE_4') %>
-                          </li>
-                        </ul>
+                <% if (settings.raid_lockdown_active) { %>
+                  <div class="alert alert-danger mt-3 mb-0">
+                    <div class="d-flex align-items-center">
+                      <i class="fa-solid fa-lock fs-3 me-3"></i>
+                      <div>
+                        <strong>🔒 LOCKDOWN AKTIV!</strong><br>
+                        <small>Der Server ist derzeit gesperrt. Nutze <code>/automod unlock</code> oder das Dashboard um den Lockdown zu deaktivieren.</small>
                       </div>
                     </div>
-                    <p class="text-muted mt-3 mb-0">
-                      <i class="fa-solid fa-calendar-alt me-2"></i>
-                      <%= tr('automod:TABS.RAID.ETA') %>
-                    </p>
+                  </div>
+                <% } %>
+              </div>
+
+              <hr class="my-4">
+
+              <!-- Alert-Benachrichtigungen -->
+              <h6 class="mb-3">
+                <i class="fa-solid fa-bell me-2"></i>
+                Benachrichtigungen
+              </h6>
+
+              <div class="mb-4">
+                <label for="raid_alert_channel" class="form-label fw-bold">
+                  <i class="fa-solid fa-bullhorn me-2"></i>
+                  Raid-Alert Channel
+                </label>
+                
+                <% if (guildChannels && guildChannels.length > 0) { %>
+                  <select class="form-select" id="raid_alert_channel" name="raid_alert_channel">
+                    <option value="">Kein Channel ausgewählt</option>
+                    <% 
+                      let currentCategory = null;
+                      const selectedChannelId = String(settings.raid_alert_channel || '');
+                      
+                      guildChannels.forEach(channel => { 
+                        if (channel.parentName && channel.parentName !== currentCategory) {
+                          currentCategory = channel.parentName;
+                    %>
+                      <option disabled>━━━━ <%= currentCategory %> ━━━━</option>
+                    <%  } 
+                        const isSelected = selectedChannelId === String(channel.id);
+                    %>
+                      <option value="<%= channel.id %>" <%= isSelected ? 'selected' : '' %>>
+                        <%= channel.parentName ? '  └─ ' : '' %>#<%= channel.name %>
+                      </option>
+                    <% }); %>
+                  </select>
+                <% } else { %>
+                  <input type="text" class="form-control" id="raid_alert_channel" name="raid_alert_channel" 
+                         value="<%= settings.raid_alert_channel || '' %>" 
+                         placeholder="Channel-ID eingeben">
+                <% } %>
+                <small class="text-muted">Channel für Raid-Warnungen</small>
+              </div>
+
+              <div class="mb-4">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="raid_alert_mention_mods" name="raid_alert_mention_mods" 
+                         value="1" <%= settings.raid_alert_mention_mods ? 'checked' : '' %>>
+                  <label class="form-check-label" for="raid_alert_mention_mods">
+                    <i class="fa-solid fa-at me-2"></i>
+                    @Mods bei Raid erwähnen
+                  </label>
+                </div>
+                <small class="text-muted">Erwähnt Moderator-Rollen im Alert-Channel</small>
+              </div>
+
+              <hr class="my-4">
+
+              <!-- Trusted Invites -->
+              <h6 class="mb-3">
+                <i class="fa-solid fa-user-check me-2"></i>
+                Trusted Invite-Links
+              </h6>
+
+              <div class="mb-4">
+                <label for="raid_trusted_invites" class="form-label fw-bold">
+                  <i class="fa-solid fa-link me-2"></i>
+                  Whitelist von Invite-Codes
+                </label>
+                <textarea class="form-control" id="raid_trusted_invites" name="raid_trusted_invites" rows="4" 
+                          placeholder="discord.gg/ABC123&#10;discord.gg/XYZ789&#10;(Ein Code pro Zeile)"><%= (settings.raid_trusted_invites || []).join('\n') %></textarea>
+                <small class="text-muted">
+                  <i class="fa-solid fa-info-circle me-1"></i>
+                  User die über diese Invites joinen werden NICHT vom Raid-Check erfasst. Nur die Codes eingeben (z.B. <code>ABC123</code>), nicht die komplette URL.
+                </small>
+              </div>
+
+              <!-- Info-Box -->
+              <div class="alert alert-info">
+                <div class="d-flex align-items-start">
+                  <i class="fa-solid fa-lightbulb fs-3 me-3 mt-1"></i>
+                  <div>
+                    <strong>💡 Tipp:</strong><br>
+                    <ul class="mb-0 ps-3">
+                      <li>Trusted Invites sind ideal für Partner-Server oder offizielle Einladungen</li>
+                      <li>Lockdown muss <strong>manuell</strong> deaktiviert werden (Sicherheit!)</li>
+                      <li>Teste die Settings mit <code>debug_mode</code> im Basic-Tab</li>
+                    </ul>
                   </div>
                 </div>
               </div>
@@ -579,6 +668,63 @@
           </div>
 
         </form>
+        
+        <!-- Checkbox Serialization Script -->
+        <script>
+        (function() {
+            'use strict';
+            
+            // Form-Handler für AutoMod Settings
+            const form = document.querySelector('form[data-form-type="automod-settings"]');
+            if (!form) return;
+            
+            form.addEventListener('submit', function(e) {
+                console.log('[AutoMod] Form submit intercepted for checkbox serialization');
+                
+                // Alle Checkboxen finden
+                const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+                
+                checkboxes.forEach(checkbox => {
+                    // Für jede Checkbox: Setze explizit true/false
+                    if (!checkbox.checked) {
+                        // Erstelle Hidden-Input für unchecked Checkbox
+                        const hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = checkbox.name;
+                        hidden.value = '0'; // false
+                        checkbox.parentNode.appendChild(hidden);
+                        console.log(`[AutoMod] Added hidden input for unchecked: ${checkbox.name} = 0`);
+                    } else {
+                        console.log(`[AutoMod] Checkbox checked: ${checkbox.name} = 1`);
+                    }
+                });
+                
+                // Multi-Select Channels serialisieren
+                const multiSelect = form.querySelector('select[multiple]');
+                if (multiSelect) {
+                    const selectedOptions = Array.from(multiSelect.selectedOptions).map(opt => opt.value);
+                    console.log('[AutoMod] Whitelisted channels:', selectedOptions);
+                    
+                    // Entferne alte Inputs
+                    form.querySelectorAll('input[name="whitelisted_channels"]').forEach(input => input.remove());
+                    
+                    // Füge jede ausgewählte Channel-ID als separates Input hinzu
+                    selectedOptions.forEach(channelId => {
+                        const hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = 'whitelisted_channels';
+                        hidden.value = channelId;
+                        form.appendChild(hidden);
+                    });
+                    
+                    // Deaktiviere Multi-Select (damit es nicht doppelt gesendet wird)
+                    multiSelect.disabled = true;
+                }
+                
+                // Form fortfahren (guild.js übernimmt)
+            });
+        })();
+        </script>
       </div>
     </div>
   </div>

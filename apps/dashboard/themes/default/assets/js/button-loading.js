@@ -3,7 +3,7 @@
  * 
  * Verhindert Doppelklicks und zeigt User-Feedback während IPM-Operationen
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class ButtonLoader {
     /**

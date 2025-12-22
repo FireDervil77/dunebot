@@ -1,13 +1,13 @@
 const { ServiceManager } = require("dunebot-core");
 const express = require('express');
 const path = require('path');
-const { CheckAuth } = require("../../../apps/dashboard/middlewares/auth.middleware");
+const { CheckAuth, CheckGuildAccess } = require("../../../apps/dashboard/middlewares/auth.middleware");
 
 
 /**
  * Zentrales Routing-Management für das Dashboard
  * Verwaltet Routen, Middleware und deren Beziehungen
- * @author Dunebot-Team
+ * @author FireBot-Team
  */
 class RouterManager {
     /**
@@ -83,12 +83,13 @@ class RouterManager {
      */
     registerPluginRoutes(plugin) {
         try {
-            // Guild Routes
+            // Guild Routes (mit CheckGuildAccess für Guild-basierte Routen!)
             if (plugin.guildRouter) {
                 this.register(`/guild/:guildId/plugins/${plugin.name}`,
                     plugin.guildRouter,
                     { 
                         auth: true,
+                        middlewares: [CheckGuildAccess], // ✅ Guild-Access-Prüfung hinzufügen
                         plugin
                     }
                 );

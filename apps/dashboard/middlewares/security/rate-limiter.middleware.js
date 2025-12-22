@@ -40,7 +40,7 @@ const authLimiter = rateLimit({
  */
 const apiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 Minute
-    max: 60, // Max 60 Requests pro Minute
+    max: process.env.NODE_ENV === 'production' ? 60 : 200, // Dev: 200 req/min, Prod: 60 req/min
     message: {
         success: false,
         message: 'Zu viele API-Anfragen. Bitte verlangsame dich.'
@@ -87,7 +87,7 @@ const guildActionLimiter = rateLimit({
  */
 const generalLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 Minute
-    max: 120, // Max 120 Requests pro Minute (2 pro Sekunde)
+    max: process.env.NODE_ENV === 'production' ? 120 : 500, // Dev: 500 req/min, Prod: 120 req/min
     message: 'Zu viele Anfragen. Bitte verlangsame dich.',
     standardHeaders: true,
     legacyHeaders: false,

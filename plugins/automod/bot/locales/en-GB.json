@@ -57,6 +57,7 @@
         "CONFIG_WHITELIST_ADD_CH": "the channel to add to the whitelist",
         "CONFIG_WHITELIST_REM": "remove a channel from the whitelist",
         "CONFIG_WHITELIST_REM_CH": "the channel to remove from the whitelist",
+        "CONFIG_UNLOCK": "unlock server (deactivate raid lockdown)",
 
         "STATUS_EMBED_TITLE": "Automod Configuration",
         "STATUS_EMBED_MAXLINES": "Max Lines",
@@ -91,7 +92,11 @@
         "WHITELIST_ALREADY": "That channel is already whitelisted",
         "WHITELIST_ADDED": "Done! Channel is now whitelisted.",
         "WHITELIST_NOT": "That channel is not whitelisted",
-        "WHITELIST_REMOVED": "Done! Channel is no longer whitelisted."
+        "WHITELIST_REMOVED": "Done! Channel is no longer whitelisted.",
+        
+        "UNLOCK_NOT_LOCKED": "❌ The server is not in lockdown mode.",
+        "UNLOCK_SUCCESS": "✅ Lockdown successfully deactivated! Server unlocked. Verification level and @everyone permissions have been restored.",
+        "UNLOCK_ERROR": "❌ Error deactivating lockdown: {{error}}"
     },
 
     "HANDLER": {

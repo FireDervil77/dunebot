@@ -192,6 +192,10 @@ class GuildAjaxHandler {
                     await this.handleDuneMapSettingsResponse(form, result);
                     break;
                 
+                case 'launch-params':
+                    await this.handleLaunchParamsResponse(form, result);
+                    break;
+                
                 case 'automod-settings':
                     await this.handleAutoModSettingsResponse(form, result);
                     break;
@@ -202,6 +206,10 @@ class GuildAjaxHandler {
                 
                 case 'egg-editor':
                     await this.handleEggEditorResponse(form, result);
+                    break;
+                
+                case 'automod-settings':
+                    await this.handleAutomodSettingsResponse(form, result);
                     break;
                 
                 // ========================================
@@ -1026,6 +1034,49 @@ class GuildAjaxHandler {
             }
         } else {
             this.showToast('error', result.message || 'Fehler beim Speichern des Eggs');
+        }
+    }
+    
+    /**
+     * AutoMod Settings Response Handler
+     */
+    static async handleAutomodSettingsResponse(form, result) {
+        console.log('[GuildAjax] handleAutomodSettingsResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'AutoMod Einstellungen gespeichert');
+            // Kein Reload nötig - Settings bleiben sichtbar
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Speichern der Einstellungen');
+        }
+    }
+    
+    /**
+     * Handler für Launch-Params Update
+     */
+    static async handleLaunchParamsResponse(form, result) {
+        console.log('[GuildAjax] handleLaunchParamsResponse called:', result);
+        
+        if (result.success) {
+            // Toast mit Warnung falls Server läuft
+            if (result.warning) {
+                this.showToast('warning', result.message);
+            } else {
+                this.showToast('success', result.message);
+            }
+            
+            // Update Display-Text
+            const displayElement = document.getElementById('launch-params-display');
+            if (displayElement && result.data && result.data.launch_params) {
+                displayElement.textContent = result.data.launch_params;
+            }
+            
+            // Zurück zu View-Mode
+            if (typeof toggleLaunchParamsEdit === 'function') {
+                toggleLaunchParamsEdit(false);
+            }
+            
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Speichern der Start-Parameter');
         }
     }
 }

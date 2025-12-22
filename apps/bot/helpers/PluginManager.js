@@ -8,7 +8,7 @@ const { BotPlugin, Config } = require("dunebot-sdk");
  * Bot-spezifischer Plugin-Manager für die Verwaltung von Bot-Plugins
  * Unterstützt die neue WordPress-ähnliche Plugin-Struktur
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class PluginManager extends BasePluginManager {
     #listeningEvents = new Set();

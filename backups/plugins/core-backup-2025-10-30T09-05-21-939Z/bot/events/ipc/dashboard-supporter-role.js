@@ -2,7 +2,7 @@
  * IPC Event: dashboard:SET_SUPPORTER_ROLE
  * Weist Discord Supporter-Roles auf allen Servern zu
  * 
- * @author DuneBot Development Team
+ * @author FireBot Team
  */
 
 const { ServiceManager } = require('dunebot-core');

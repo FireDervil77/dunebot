@@ -98,6 +98,66 @@ class DuneMapPlugin extends DashboardPlugin {
         const themeManager = ServiceManager.get('themeManager');
         
         try {
+            // === QUEST API ROUTES ===
+            // Quest-Datenbank API (Phase 2) - TEMPORARILY DISABLED
+            // TODO: Wieder aktivieren sobald vollständige Quest-Datenbank vorhanden
+            /*
+            const questRouter = require('./routes/quests');
+            this.guildRouter.use('/api/quests', questRouter);
+            Logger.debug('[DuneMap] Quest-API-Routes registriert');
+            
+            // === QUEST-FINDER VIEW ===
+            // TEMPORARILY DISABLED - Quest-Daten noch nicht vollständig
+            this.guildRouter.get('/quests', requirePermission('DUNEMAP.VIEW'), async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                const Logger = ServiceManager.get('Logger');
+                
+                try {
+                    // Statistiken für die Übersicht
+                    const [totalQuests] = await dbService.query('SELECT COUNT(*) as count FROM dune_quests');
+                    const [totalChains] = await dbService.query('SELECT COUNT(*) as count FROM dune_quest_chains');
+                    const [totalNpcs] = await dbService.query('SELECT COUNT(*) as count FROM dune_npcs');
+                    
+                    // Quest-Typen für Filter
+                    const questTypes = await dbService.query(`
+                        SELECT DISTINCT quest_type, COUNT(*) as count
+                        FROM dune_quests
+                        GROUP BY quest_type
+                        ORDER BY count DESC
+                    `);
+                    
+                    // Factions für Filter
+                    const factions = await dbService.query(`
+                        SELECT DISTINCT faction, COUNT(*) as count
+                        FROM dune_quests
+                        GROUP BY faction
+                        ORDER BY count DESC
+                    `);
+                    
+                    await themeManager.renderView(res, 'guild/quest-finder', {
+                        title: 'Quest-Finder',
+                        activeMenu: `/guild/${guildId}/plugins/dunemap/quests`,
+                        guildId,
+                        stats: {
+                            totalQuests: totalQuests.count,
+                            totalChains: totalChains.count,
+                            totalNpcs: totalNpcs.count
+                        },
+                        questTypes,
+                        factions,
+                        plugin: this
+                    });
+                } catch (error) {
+                    Logger.error('[DuneMap] Fehler bei /quests:', error);
+                    res.status(500).render('error', { 
+                        message: 'Fehler beim Laden des Quest-Finders', 
+                        error 
+                    });
+                }
+            });
+            */
+
             // === HAUPTSEITE (Dashboard/Übersicht) ===
             this.guildRouter.get('/', requirePermission('DUNEMAP.VIEW'), async (req, res) => {
                 const guildId = res.locals.guildId;
@@ -835,6 +895,20 @@ class DuneMapPlugin extends DashboardPlugin {
                 visible: true,
                 capability: 'DUNEMAP.ADMIN' // ✅ UPPERCASE! Admin-Bereich
             },
+            // Quest-Finder Navigation - TEMPORARILY DISABLED (Quest-Daten noch nicht vollständig)
+            // TODO: Wieder aktivieren sobald vollständige Quest-Datenbank vorhanden
+            /*
+             {
+                title: 'dunemap:NAV.QUEST_FINDER',
+                path: `/guild/${guildId}/plugins/dunemap/quests`,
+                icon: 'fa-solid fa-scroll',
+                order: 20,
+                parent: `/guild/${guildId}/plugins/dunemap`,
+                type: 'main',
+                visible: true,
+                capability: 'DUNEMAP.VIEW' // Quest-Finder für alle sichtbar
+            }, 
+            */
             // Settings als Subnav UNTER CORE-EINSTELLUNGEN!
             {
                 title: 'dunemap:NAV.DUNEMAP',

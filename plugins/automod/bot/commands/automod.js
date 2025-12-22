@@ -46,6 +46,10 @@ module.exports = {
                 trigger: "whitelistremove <channel>",
                 description: "automod:AUTOMOD.CONFIG_WHITELIST_REM",
             },
+            {
+                trigger: "unlock",
+                description: "automod:AUTOMOD.CONFIG_UNLOCK",
+            },
         ],
     },
     slashCommand: {
@@ -167,6 +171,11 @@ module.exports = {
                     },
                 ],
             },
+            {
+                name: "unlock",
+                description: "automod:AUTOMOD.CONFIG_UNLOCK",
+                type: ApplicationCommandOptionType.Subcommand,
+            },
         ],
     },
 
@@ -266,6 +275,8 @@ module.exports = {
         } else if (sub === "whitelistremove") {
             const channelId = interaction.options.getChannel("channel").id;
             response = await whiteListRemove(settings, channelId, interaction.guild);
+        } else if (sub === "unlock") {
+            response = await unlockServer(settings, interaction.guild);
         } else response = interaction.guild.getT("INVALID_SUBCOMMAND", { sub });
 
         await interaction.followUp(response);
@@ -398,4 +409,25 @@ async function whiteListRemove(settings, channelId, guild) {
     const updated = settings.whitelisted_channels.filter(id => id !== channelId);
     await AutoModSettings.updateSettings(guild.id, { whitelisted_channels: updated });
     return guild.getT("automod:AUTOMOD.WHITELIST_REMOVED");
+}
+
+async function unlockServer(settings, guild) {
+    const Logger = require("dunebot-core").ServiceManager.get("Logger");
+    
+    if (!settings.raid_lockdown_active) {
+        return guild.getT("automod:AUTOMOD.UNLOCK_NOT_LOCKED");
+    }
+    
+    try {
+        // Import deactivateLockdown dynamisch
+        const { deactivateLockdown } = require('../events/guildMemberAdd');
+        
+        await deactivateLockdown(guild);
+        
+        Logger.info(`[AutoMod] Lockdown manuell deaktiviert für Guild ${guild.id} via Command`);
+        return guild.getT("automod:AUTOMOD.UNLOCK_SUCCESS");
+    } catch (err) {
+        Logger.error(`[AutoMod] Fehler beim Deaktivieren des Lockdowns:`, err);
+        return guild.getT("automod:AUTOMOD.UNLOCK_ERROR", { error: err.message });
+    }
 }

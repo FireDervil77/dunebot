@@ -2,11 +2,12 @@
  * AutoMod Shared Models
  * Exportiert alle Models für Bot und Dashboard
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 module.exports = {
     AutoModSettings: require('./AutoModSettings'),
     AutoModStrikes: require('./AutoModStrikes'),
-    AutoModLogs: require('./AutoModLogs')
+    AutoModLogs: require('./AutoModLogs'),
+    AutoModRaidEvents: require('./AutoModRaidEvents')
 };
