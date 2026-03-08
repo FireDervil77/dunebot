@@ -30,13 +30,7 @@ module.exports.CheckAuth = async (req, res, next) => {
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next
  */
-module.exports.CheckAdmin = async (req, res, next) => {
-    if (!req.session.user?.info.isOwner) {
-        return res.redirect("/guild");
-    }
-
-    return next();
-};
+module.exports.CheckAdmin = require('./admin.middleware').CheckAdmin;
 
 /**
  * Middleware zur Überprüfung des Server-Zugriffs
@@ -131,27 +125,8 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
         const isOwner = guild ? guild.owner === true : false;
         const isBotOwner = req.session.user.admin === true;
         
-        // Custom Permissions aus guild_staff prüfen (ALTE TABELLE - Backward-Compatibility)
-        let hasCustomAccess = false;
-        try {
-            const result = await dbService.query(`
-                SELECT role 
-                FROM guild_staff 
-                WHERE guild_id = ? AND user_id = ? 
-                AND (expires_at IS NULL OR expires_at > NOW())
-            `, [guildId, req.session.user.info.id]);
-            
-            // dbService.query gibt direkt die Row zurück wenn nur 1 Row
-            if (result && result[0]) {
-                const firstElement = result[0];
-                hasCustomAccess = !!(firstElement.role); // Hat irgendeine Rolle = Zugriff
-            }
-        } catch (err) {
-            Logger.warn('[requireGuildAccess] Fehler beim Laden von guild_staff:', err.message);
-        }
-        
-        // Zugriff prüfen: Discord-Permissions ODER Custom DB-Permissions ODER guild_users
-        const hasAccess = isAdmin || isManager || isOwner || isBotOwner || hasCustomAccess || hasGuildUserAccess;
+        // Zugriff prüfen: Discord-Permissions ODER guild_users (neues System)
+        const hasAccess = isAdmin || isManager || isOwner || isBotOwner || hasGuildUserAccess;
         
         if (!hasAccess) {
             Logger.warn(`⚠️ User ${req.session.user.info.id} hat KEINE ausreichenden Rechte für Guild ${guildId}`);
@@ -169,7 +144,7 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
         // ========================================
         // Für guild_users ohne Discord-Admin-Rechte muss die Permission "DASHBOARD.ACCESS" vorhanden sein
         // Discord Admins/Owner/BotOwner bekommen automatisch Zugriff (Bypass)
-        if (hasGuildUserAccess && !isAdmin && !isManager && !isOwner && !isBotOwner && !hasCustomAccess) {
+        if (hasGuildUserAccess && !isAdmin && !isManager && !isOwner && !isBotOwner) {
             Logger.debug(`[Dashboard-Access] User ${req.session.user.info.id} hat nur guild_users-Zugriff → Permission prüfen`);
             
             try {
@@ -235,7 +210,8 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
         res.locals.guildId = guildId;
         
         // User-Daten für Templates bereitstellen
-        res.locals.user = req.session.user;
+        // WICHTIG: .info verwenden, damit isOwner/hasSystemAccess korrekt gesetzt ist!
+        res.locals.user = req.session.user?.info || null;
         res.locals.isServerOwner = guild.owner === true;
         res.locals.isServerAdmin = hasAccess;
         

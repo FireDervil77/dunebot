@@ -384,7 +384,7 @@ class AutoModPlugin extends DashboardPlugin {
                 path: `/guild/${guildId}/plugins/automod/settings`,
                 icon: 'fa-solid fa-shield-halved',
                 order: null,  
-                parent: `/guild/${guildId}/plugins/core/settings`,  // ← Parent ist Core-Settings!
+                parent: `/guild/${guildId}/settings`,  // ← Parent ist Core-Settings!
                 type: 'main',
                 visible: true,
                 capability: 'AUTOMOD.SETTINGS'

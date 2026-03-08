@@ -1,0 +1,142 @@
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0"><%= tr('CHANGELOGS.TITLE') %></h1>
+            </div>
+            <div class="col-sm-6">
+                <div class="float-sm-right">
+                    <a href="/admin/changelogs/new" class="btn btn-primary">
+                        <i class="fas fa-plus mr-2"></i><%= tr('CHANGELOGS.ADD_NEW') %>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="content">
+    <div class="container-fluid">
+        <% if (locals.toast) { %>
+            <div class="alert alert-<%= toast.type %> alert-dismissible fade show">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <%= toast.message %>
+            </div>
+        <% } %>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><%= tr('CHANGELOGS.ALL_CHANGELOGS') %></h3>
+            </div>
+            <div class="card-body p-0">
+                <% if (changelogs && changelogs.length > 0) { %>
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 120px"><%= tr('CHANGELOGS.TABLE.VERSION') %></th>
+                                <th><%= tr('CHANGELOGS.TABLE.TITLE') %></th>
+                                <th><%= tr('CHANGELOGS.TABLE.TYPE') %></th>
+                                <th><%= tr('CHANGELOGS.TABLE.RELEASED') %></th>
+                                <th style="width: 120px"><%= tr('CHANGELOGS.TABLE.ACTIONS') %></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% changelogs.forEach(changelog => { %>
+                                <tr>
+                                    <td>
+                                        <span class="badge badge-<%= changelog.type === 'major' ? 'danger' : changelog.type === 'minor' ? 'warning' : 'info' %> badge-lg">
+                                            v<%= changelog.version %>
+                                        </span>
+                                    </td>
+                                    <td><strong><%= changelog.title || 'Untitled' %></strong></td>
+                                    <td>
+                                        <% 
+                                        const typeIcons = {
+                                            major: 'rocket text-danger',
+                                            minor: 'star text-warning',
+                                            patch: 'wrench text-info'
+                                        };
+                                        const icon = typeIcons[changelog.type] || 'code-branch';
+                                        %>
+                                        <i class="fas fa-<%= icon %>"></i>
+                                        <span class="ml-1"><%= changelog.type %></span>
+                                    </td>
+                                    <td><%= new Date(changelog.release_date).toLocaleDateString(currentLocale) %></td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/admin/changelogs/edit/<%= changelog.id %>" 
+                                               class="btn btn-info" 
+                                               title="<%= tr('CHANGELOGS.EDIT') %>">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button type="button" 
+                                                    class="btn btn-danger" 
+                                                    onclick="deleteChangelog('<%= changelog.id %>')"
+                                                    title="<%= tr('CHANGELOGS.DELETE') %>">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                <% } else { %>
+                    <div class="p-4 text-center text-muted">
+                        <i class="fas fa-code-branch fa-3x mb-3"></i>
+                        <p><%= tr('CHANGELOGS.NO_CHANGELOGS') %></p>
+                        <a href="/admin/changelogs/new" class="btn btn-primary">
+                            <i class="fas fa-plus mr-2"></i><%= tr('CHANGELOGS.ADD_FIRST') %>
+                        </a>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+console.log('[CHANGELOG] Script loaded, guildId:', '<%= guildId %>');
+
+function deleteChangelog(id) {
+    console.log('[CHANGELOG] deleteChangelog called with id:', id);
+    console.log('[CHANGELOG] Confirm message:', '<%= tr("CHANGELOGS.CONFIRM_DELETE") %>');
+    
+    if (!confirm('<%= tr("CHANGELOGS.CONFIRM_DELETE") %>')) {
+        console.log('[CHANGELOG] User cancelled deletion');
+        return;
+    }
+    
+    const url = `/admin/changelogs/delete/${id}`;
+    console.log('[CHANGELOG] Fetching URL:', url);
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        console.log('[CHANGELOG] Response status:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        console.log('[CHANGELOG] Response data:', data);
+        if (data.success) {
+            console.log('[CHANGELOG] Deletion successful, reloading...');
+            window.location.reload();
+        } else {
+            alert(data.message || '<%= tr("CHANGELOGS.DELETE_ERROR") %>');
+        }
+    })
+    .catch(error => {
+        console.error('[CHANGELOG] Error:', error);
+        alert('<%= tr("CHANGELOGS.DELETE_ERROR") %>');
+    });
+}
+
+console.log('[CHANGELOG] deleteChangelog function defined:', typeof deleteChangelog);
+</script>
+

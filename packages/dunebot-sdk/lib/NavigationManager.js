@@ -207,13 +207,11 @@ class NavigationManager {
                 const isMainNavItem = !item.parent && item.type === this.menuTypes.MAIN;
                 const isSubmenuItem = item.parent && item.type === this.menuTypes.MAIN;
                 
-                // === RESERVED RANGE CHECK (90000-99999 für Superadmin) ===
+                // === RESERVED RANGE CHECK (90000-99999 für System/Admin) ===
                 if (item.order !== null && item.order !== undefined && 
-                    item.order >= 90000 && item.order < 100000 && 
-                    pluginName !== 'superadmin') {
-                    Logger.error(`[NavigationManager] Plugin '${pluginName}' versucht reservierte Range 90000-99999 zu nutzen!`);
-                    Logger.error(`[NavigationManager] Diese Range ist für das Superadmin-Plugin reserviert!`);
-                    throw new Error(`Reserved navigation order range 90000-99999 (Superadmin only). Plugin: ${pluginName}, Item: ${item.title}`);
+                    item.order >= 90000 && item.order < 100000) {
+                    Logger.error(`[NavigationManager] Plugin '${pluginName}' versucht reservierte System-Range 90000-99999 zu nutzen!`);
+                    throw new Error(`Reserved navigation order range 90000-99999 (System only). Plugin: ${pluginName}, Item: ${item.title}`);
                 }
                 
                 if (item.order === null || item.order === undefined) {
@@ -581,19 +579,17 @@ class NavigationManager {
             
             // Items filtern
             const filtered = items.filter(item => {
-                // ✅ NEU: requiresOwner-Check (SuperAdmin-Plugin)
-                // Wenn Item requiresOwner: true hat, muss User Bot-Owner sein
+                // ✅ requiresOwner-Check
                 if (item.requiresOwner === true || item.requiresOwner === 1 || item.requiresOwner === '1') {
-                    // Prüfe ob User in OWNER_IDS ist
-                    const ownerIds = process.env.OWNER_IDS?.split(',') || [];
-                    const isBotOwner = ownerIds.includes(String(userId));
+                    // requiresOwner = Guild-Owner Check
+                    const hasOwnerAccess = isOwner; // von getUserPermissions()
                     
-                    if (!isBotOwner) {
-                        Logger.debug(`[Navigation] Item "${item.title}" versteckt (requiresOwner=true, User ist kein Bot-Owner)`);
+                    if (!hasOwnerAccess) {
+                        Logger.debug(`[Navigation] Item "${item.title}" versteckt (requiresOwner=true, User ist kein Guild-Owner)`);
                         return false;
                     }
                     
-                    // User ist Bot-Owner → Item anzeigen (capability wird ignoriert)
+                    // User ist Owner → Item anzeigen
                     return true;
                 }
                 

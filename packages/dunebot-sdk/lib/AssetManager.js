@@ -237,6 +237,11 @@ class AssetManager {
             scripts.push(
                 `<script src="${versionedSrc}"${attrs.length ? ' ' + attrs.join(' ') : ''}></script>`
             );
+
+            // Inline-Code direkt nach dem Script ausgeben
+            if (asset.inlineCode) {
+                scripts.push(`<script>${asset.inlineCode}</script>`);
+            }
         }
 
         return [...localizeScripts, ...scripts].join('\n');
@@ -355,8 +360,15 @@ class AssetManager {
             return `/assets/plugins/${plugin}/${src}`;
         }
 
-        // Theme-Assets: /themes/default/assets/{type}/{src}
-        return `/themes/default/assets/${type}/${src}`;
+        // Theme-Assets: aktives Theme aus ThemeManager ermitteln (Child → Parent Fallback)
+        const themeManager = ServiceManager.get('themeManager');
+        if (themeManager && typeof themeManager.resolveAssetUrl === 'function') {
+            return themeManager.resolveAssetUrl(`${type}/${src}`);
+        }
+
+        // Fallback: default Theme
+        const activeTheme = themeManager?.activeTheme || 'default';
+        return `/themes/${activeTheme}/assets/${type}/${src}`;
     }
 
     /**
@@ -421,6 +433,32 @@ class AssetManager {
         this.styles.clear();
         this.enqueuedScripts.clear();
         this.enqueuedStyles.clear();
+    }
+
+    /**
+     * Nur die Enqueue-Sets zurücksetzen, Registrierungen bleiben erhalten.
+     * Wird pro Request aufgerufen, damit keine Assets aus vorherigen Requests durchsickern.
+     */
+    resetEnqueued() {
+        this.enqueuedScripts.clear();
+        this.enqueuedStyles.clear();
+    }
+
+    /**
+     * Fügt Inline-JavaScript nach einem registrierten Script ein (wie wp_add_inline_script).
+     *
+     * @param {string} handle - Handle des Eltern-Scripts
+     * @param {string} code   - JavaScript-Code (ohne <script>-Tags)
+     * @returns {boolean}
+     */
+    addInlineScript(handle, code) {
+        if (!this.scripts.has(handle)) {
+            this.logger.warn(`[AssetManager] addInlineScript: Handle '${handle}' nicht registriert`);
+            return false;
+        }
+        const asset = this.scripts.get(handle);
+        asset.inlineCode = (asset.inlineCode || '') + '\n' + code;
+        return true;
     }
 }
 

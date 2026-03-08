@@ -557,7 +557,7 @@ class PluginManager extends BasePluginManager {
             try {
                 // Administrator-Gruppe finden (KORREKTUR: guild_groups statt permission_groups)
                 const adminGroups = await dbService.query(
-                    'SELECT id FROM guild_groups WHERE guild_id = ? AND slug = ?',
+                    'SELECT id, permissions FROM guild_groups WHERE guild_id = ? AND slug = ?',
                     [guildId, 'administrator']
                 );
                 
@@ -567,6 +567,8 @@ class PluginManager extends BasePluginManager {
                     
                     // Alle Permission-Keys des Plugins aus permissions.json holen
                     const permissionsData = JSON.parse(fs.readFileSync(permissionsFile, 'utf8'));
+                    // Lade aktuelle Permissions (JSON)
+                    const currentPerms = adminGroup.permissions ? JSON.parse(adminGroup.permissions) : {};
                     let addedCount = 0;
                     
                     for (const perm of permissionsData.permissions) {
@@ -574,38 +576,28 @@ class PluginManager extends BasePluginManager {
                         const permKey = perm.key; // z.B. "GAMESERVER.VIEW" (nicht "gameserver:GAMESERVER.VIEW")
                         
                         try {
-                            // 1. Finde permission_id in permission_definitions
-                            const permDefs = await dbService.query(
-                                'SELECT id FROM permission_definitions WHERE guild_id = ? AND permission_key = ? LIMIT 1',
-                                [guildId, permKey]
-                            );
-                            
-                            if (!permDefs || permDefs.length === 0) {
-                                Logger.warn(`  ⚠️  Permission ${permKey} nicht in permission_definitions gefunden - Skip`);
+                            // Prüfe ob Permission bereits existiert
+                            if (currentPerms[permKey] === true) {
+                                Logger.debug(`  ℹ️  Permission ${permKey} bereits in Administrator-Gruppe vorhanden`);
                                 continue;
                             }
                             
-                            const permissionId = permDefs[0].id;
-                            
-                            // 2. INSERT IGNORE in group_permissions (relational!)
-                            const insertResult = await dbService.query(
-                                `INSERT IGNORE INTO group_permissions 
-                                 (group_id, permission_id, assigned_at, assigned_by, is_inherited, grant_option) 
-                                 VALUES (?, ?, NOW(), 'system', 0, 0)`,
-                                [adminGroup.id, permissionId]
-                            );
-                            
-                            // INSERT IGNORE gibt affectedRows = 0 wenn bereits existiert
-                            if (insertResult.affectedRows > 0) {
-                                addedCount++;
-                                Logger.debug(`  ✅ Permission ${permKey} zu Administrator-Gruppe hinzugefügt (permission_id: ${permissionId})`);
-                            } else {
-                                Logger.debug(`  ℹ️  Permission ${permKey} bereits in Administrator-Gruppe vorhanden`);
-                            }
+                            // Füge Permission zum JSON hinzu
+                            currentPerms[permKey] = true;
+                            addedCount++;
+                            Logger.debug(`  ✅ Permission ${permKey} zu Administrator-Gruppe hinzugefügt`);
                             
                         } catch (permError) {
                             Logger.error(`  ❌ Fehler bei Permission ${permKey}:`, permError.message);
                         }
+                    }
+                    
+                    // Schreibe aktualisiertes JSON zurück in DB
+                    if (addedCount > 0) {
+                        await dbService.query(
+                            'UPDATE guild_groups SET permissions = ?, updated_at = NOW() WHERE id = ?',
+                            [JSON.stringify(currentPerms), adminGroup.id]
+                        );
                     }
                     
                     if (addedCount > 0) {
@@ -1004,6 +996,13 @@ class PluginManager extends BasePluginManager {
 
             // ✅ NEU: Permissions für Guild registrieren
             Logger.info(`🔍 [DEBUG] Vor registerPluginPermissionsForGuild für ${pluginName} in Guild ${guildId}`);
+            // Kern-Permissions zuerst sicherstellen (idempotent via ON DUPLICATE KEY UPDATE)
+            const permissionManager = ServiceManager.get('permissionManager');
+            if (permissionManager) {
+                await permissionManager.loadKernelPermissions(guildId).catch(e =>
+                    Logger.warn(`[PluginManager] Kern-Permissions für ${guildId} nicht ladbar: ${e.message}`)
+                );
+            }
             await this.registerPluginPermissionsForGuild(plugin, guildId);
             Logger.info(`🔍 [DEBUG] Nach registerPluginPermissionsForGuild für ${pluginName} in Guild ${guildId}`);
 
@@ -1260,14 +1259,7 @@ class PluginManager extends BasePluginManager {
             if (semver.gt(githubVersion, currentVersion)) {
                 Logger.warn(`[PluginManager] Update verfügbar: ${pluginName} ${currentVersion} → ${githubVersion}`);
                 
-                // SuperAdmin Config: Grace Period
-                const [graceDaysRow] = await dbService.query(`
-                    SELECT config_value 
-                    FROM superadmin_config 
-                    WHERE config_key = 'plugin_update_grace_days'
-                `);
-                
-                const graceDays = parseInt(graceDaysRow?.config_value || '5');
+                const graceDays = parseInt(process.env.PLUGIN_UPDATE_GRACE_DAYS || '5');
                 
                 const updateAvailableAt = new Date();
                 const updateDeadlineAt = new Date();
@@ -1588,14 +1580,8 @@ class PluginManager extends BasePluginManager {
         const dbService = ServiceManager.get('dbService');
         
         try {
-            // SuperAdmin Config prüfen
-            const [autoUpdateRow] = await dbService.query(`
-                SELECT config_value 
-                FROM superadmin_config 
-                WHERE config_key = 'plugin_auto_update_enabled'
-            `);
-            
-            const autoUpdateEnabled = autoUpdateRow?.config_value === 'true';
+            // Auto-Update-Einstellung aus ENV
+            const autoUpdateEnabled = process.env.PLUGIN_AUTO_UPDATE_ENABLED === 'true';
             
             if (!autoUpdateEnabled) {
                 Logger.debug('[PluginManager] Auto-Update ist global deaktiviert');

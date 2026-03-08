@@ -1,0 +1,28 @@
+{
+    "name": "default",
+    "displayName": "DuneBot Default",
+    "version": "1.0.0",
+    "description": "Standard-Theme für das DuneBot-Dashboard",
+    "author": "DuneBot Team",
+    "screenshot": "screenshot.png",
+    "parent": null,
+    "tags": ["admin", "responsive"],
+    "requires": "1.0.0",
+    "supports": {
+        "darkMode": false,
+        "rtl": false,
+        "responsive": true
+    },
+    "config": {
+        "darkMode": true,
+        "primaryColor": "#3498db",
+        "accentColor": "#f39c12",
+        "logo": "images/dunebot-logo.png",
+        "favicon": "images/favicon.ico"
+    },
+    "layouts": {
+        "frontend": "layouts/frontend.ejs",
+        "guild": "layouts/guild.ejs",
+        "auth": "layouts/auth.ejs"
+    }
+}

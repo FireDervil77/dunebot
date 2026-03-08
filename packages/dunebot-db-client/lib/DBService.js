@@ -1,10 +1,11 @@
 const DBClient = require("./DBClient");
 const { ServiceManager } = require("dunebot-core");
+const models = require('../models');
 
 const path = require('path');
 const fs = require('fs');
-const configPath = path.join(__dirname, '../../../plugins/core/dashboard/config.json');
-const defaultConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+
+const SCHEMAS_DIR = path.join(__dirname, '../schemas');
 
 /**
  * Service für Datenbankoperationen mit nativen MySQL-Queries
@@ -21,20 +22,62 @@ class DBService extends DBClient {
     }
 
     /**
-     * Initialisiert die Datenbank und erstellt fehlende Tabellen
+     * Stellt Verbindung her, erstellt Kern-Tabellen und lädt Kern-Schemas.
+     * Überschreibt DBClient.connect() für vollständige Initialisierung.
+     * @returns {Promise<DBService>}
+     */
+    async connect() {
+        const Logger = ServiceManager.get('Logger');
+        await super.connect();
+        Logger.info("[DB] Erstelle Kern-Tabellen...");
+        await models.createTables(this);
+        Logger.info("[DB] Lade Kern-Schemas...");
+        await this.loadKernelSchemas();
+        Logger.success("[DB] Datenbank vollständig initialisiert");
+        return this;
+    }
+
+    /**
+     * Lädt alle Kern-Schemas aus packages/dunebot-db-client/schemas/ in sortierter Reihenfolge.
+     * SQL-Dateien: einzelne CREATE TABLE / VIEW Statements.
+     * JS-Dateien: module.exports = async (dbService) => { ... }
      * @returns {Promise<void>}
      */
-    async initialize() {
+    async loadKernelSchemas() {
         const Logger = ServiceManager.get('Logger');
-        try {
-            Logger.info("Initialisiere Datenbanktabellen...");
-            await models.createTables(this);
-            Logger.success("Datenbank erfolgreich initialisiert");
-            return true;
-        } catch (error) {
-            Logger.error("Fehler bei der Datenbankinitialisierung:", error);
-            throw error;
+        if (!fs.existsSync(SCHEMAS_DIR)) return;
+
+        const files = fs.readdirSync(SCHEMAS_DIR)
+            .filter(f => f.endsWith('.sql') || f.endsWith('.js'))
+            .sort();
+
+        for (const file of files) {
+            const filePath = path.join(SCHEMAS_DIR, file);
+            try {
+                if (file.endsWith('.sql')) {
+                    const sql = fs.readFileSync(filePath, 'utf8');
+                    await this.query(sql);
+                } else {
+                    delete require.cache[require.resolve(filePath)];
+                    const schema = require(filePath);
+                    if (typeof schema === 'function') await schema(this);
+                }
+                Logger.debug(`[DB] Schema geladen: ${file}`);
+            } catch (error) {
+                Logger.warn(`[DB] Schema-Warnung (${file}): ${error.message}`);
+            }
         }
+    }
+
+    /**
+     * Führt eine nicht-prepared SQL-Query aus (nötig für TRIGGER, VIEW, DDL-Compound-Statements).
+     * @param {string} sql SQL-Statement
+     * @param {Array} [params=[]]
+     * @returns {Promise<any>}
+     */
+    async rawQuery(sql, params = []) {
+        const [rows] = await this.pool.query(sql, params);
+        return rows;
     }
     
     /**

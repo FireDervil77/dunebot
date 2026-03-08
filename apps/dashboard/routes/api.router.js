@@ -80,11 +80,12 @@ router.get('/sessions/stats', CheckAuth, async (req, res) => {
     const sessionManager = ServiceManager.get('sessionManager');
     
     try {
-        // Nur für SuperAdmin
-        if (!req.session?.user?.info?.isSuperAdmin) {
+        // Nur für Admins (OWNER_IDS)
+        const { isAdminUser } = require('../middlewares/admin.middleware');
+        if (!isAdminUser(req.session?.user?.id || req.session?.user?.info?.id)) {
             return res.status(403).json({
                 success: false,
-                message: 'Nur für SuperAdmins'
+                message: 'Zugriff verweigert'
             });
         }
         
@@ -122,11 +123,12 @@ router.post('/sessions/cleanup', CheckAuth, async (req, res) => {
     const sessionManager = ServiceManager.get('sessionManager');
     
     try {
-        // Nur für SuperAdmin
-        if (!req.session?.user?.info?.isSuperAdmin) {
+        // Nur für Admins (OWNER_IDS)
+        const { isAdminUser } = require('../middlewares/admin.middleware');
+        if (!isAdminUser(req.session?.user?.id || req.session?.user?.info?.id)) {
             return res.status(403).json({
                 success: false,
-                message: 'Nur für SuperAdmins'
+                message: 'Zugriff verweigert'
             });
         }
         
@@ -148,6 +150,9 @@ router.post('/sessions/cleanup', CheckAuth, async (req, res) => {
         });
     }
 });
+
+// Kern-API-Endpunkte (Toast, Donations, Notifications)
+router.use('/core', CheckAuth, require('./api/kern.router'));
 
 // Plugin-spezifische API-Endpunkte (AM ENDE!)
 // HINWEIS: Plugins MÜSSEN CheckAuth selbst in ihren Routen verwenden!

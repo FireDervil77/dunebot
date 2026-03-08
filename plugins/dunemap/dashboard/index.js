@@ -915,7 +915,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 path: `/guild/${guildId}/plugins/dunemap/settings`,
                 icon: 'fa-solid fa-map',
                 order: null,  // Nach Core-Settings (21, 22, 23)
-                parent: `/guild/${guildId}/plugins/core/settings`,  // ← Parent ist Core-Settings!
+                parent: `/guild/${guildId}/settings`,  // ← Parent ist Core-Settings!
                 type: 'main',
                 visible: true,
                 capability: 'DUNEMAP.SETTINGS' // ✅ UPPERCASE! Settings-Bereich

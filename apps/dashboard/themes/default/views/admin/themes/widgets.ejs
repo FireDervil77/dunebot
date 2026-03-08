@@ -1,0 +1,132 @@
+<%#
+ * Admin: Widget-Area-Manager
+ * Zeigt alle registrierten Widget-Bereiche und die zugehörigen Widgets.
+ *
+ * @author FireDervil
+ * @context {Array} areas           - Registrierte Widget-Bereiche [{id, label, description}]
+ * @context {Array} registeredWidgets - Alle bekannten Widgets [{id, area, position, size, visible}]
+%>
+
+<div class="app-content">
+  <div class="container-fluid">
+
+    <!-- Page-Header -->
+    <div class="row mb-3">
+      <div class="col-12">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <h1 class="h3 mb-0"><i class="fa-solid fa-palette me-2 text-primary"></i>Widget-Bereiche</h1>
+            <p class="text-muted small mb-0">Verwalte welche Widgets in welchem Bereich des Dashboards angezeigt werden.</p>
+          </div>
+          <a href="/admin/themes" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Zurück zu Themes
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Widget-Bereiche -->
+    <% areas.forEach(area => { %>
+      <% const areaWidgets = registeredWidgets.filter(w => w.area === area.id).sort((a,b) => a.position - b.position); %>
+      <div class="card mb-4">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div>
+            <h5 class="card-title mb-0">
+              <i class="fa-solid fa-layer-group me-2 text-muted"></i>
+              <%= area.label %>
+            </h5>
+            <% if (area.description) { %>
+              <small class="text-muted"><%= area.description %></small>
+            <% } %>
+          </div>
+          <span class="badge bg-secondary"><%= areaWidgets.length %> Widgets</span>
+        </div>
+        <div class="card-body p-0">
+          <% if (areaWidgets.length === 0) { %>
+            <div class="text-muted small p-3">
+              <i class="bi bi-info-circle me-1"></i>
+              Keine Widgets in diesem Bereich registriert.
+            </div>
+          <% } else { %>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th class="ps-3">Widget ID</th>
+                    <th>Bereich</th>
+                    <th>Position</th>
+                    <th>Breite (col)</th>
+                    <th>Sichtbar (Standard)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% areaWidgets.forEach(widget => { %>
+                    <tr>
+                      <td class="ps-3">
+                        <code class="text-primary"><%= widget.id %></code>
+                      </td>
+                      <td><span class="badge bg-light text-dark border"><%= widget.area %></span></td>
+                      <td><%= widget.position %></td>
+                      <td><span class="badge bg-secondary">col-<%= widget.size %></span></td>
+                      <td>
+                        <% if (widget.visible) { %>
+                          <span class="badge bg-success"><i class="bi bi-eye me-1"></i>Ja</span>
+                        <% } else { %>
+                          <span class="badge bg-danger"><i class="bi bi-eye-slash me-1"></i>Nein</span>
+                        <% } %>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    <% }); %>
+
+    <!-- Widgets ohne Bereich -->
+    <% const unassigned = registeredWidgets.filter(w =>
+        !areas.some(a => a.id === w.area)
+    ); %>
+    <% if (unassigned.length > 0) { %>
+      <div class="card mb-4 border-warning">
+        <div class="card-header bg-warning bg-opacity-10">
+          <h5 class="card-title mb-0 text-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>Nicht zugewiesene Widgets
+          </h5>
+          <small class="text-muted">Diese Widgets haben einen unbekannten Bereich und erscheinen im Dashboard-Fallback.</small>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3">Widget ID</th>
+                  <th>Konfigurierter Bereich</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% unassigned.forEach(widget => { %>
+                  <tr>
+                    <td class="ps-3"><code><%= widget.id %></code></td>
+                    <td><span class="badge bg-warning text-dark"><%= widget.area || '(unbekannt)' %></span></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    <% } %>
+
+    <!-- Hinweis: Guild-spezifische Config -->
+    <div class="alert alert-info border-0">
+      <i class="bi bi-info-circle me-2"></i>
+      <strong>Guild-spezifische Anpassungen:</strong>
+      Widget-Sichtbarkeit und Reihenfolge können pro Guild in der Datenbank überschrieben werden.
+      Die Standard-Konfiguration (oben) gilt für alle Guilds ohne Override.
+    </div>
+
+  </div>
+</div>

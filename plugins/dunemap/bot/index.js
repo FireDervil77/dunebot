@@ -10,7 +10,7 @@ class DuneMapBotPlugin extends BotPlugin {
             version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireBot Team',
             displayName: 'DuneMap',
-            description: 'Interaktive Karte für Dune the Waakening',
+            description: 'Interaktive Karte für Dune the Awakening',
             version: '1.0.0',
             author: 'FireBot Team',
             icon: 'fa-solid fa-map',
@@ -66,7 +66,7 @@ class DuneMapBotPlugin extends BotPlugin {
         
         try {
             // Default Config aus der config.json laden
-            const defaultConfig = require('../config.json');
+            const defaultConfig = require('../dashboard/config.json');
             
             // Alle Konfigurationen für diese Guild initialisieren
             // ensureConfigs() erstellt nur fehlende Configs, überschreibt KEINE existierenden!

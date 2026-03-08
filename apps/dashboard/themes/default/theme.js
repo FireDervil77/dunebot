@@ -32,6 +32,38 @@ class DefaultTheme {
      * Theme initialisieren
      */
     async initialize() {
+        const { ServiceManager } = require('dunebot-core');
+        const assetManager = ServiceManager.get('assetManager');
+
+        if (assetManager) {
+            // ── Vendor Styles ──────────────────────────────────────────────
+            assetManager.registerVendorStyle('adminlte-css',
+                '/themes/default/assets/css/adminlte.min.css', { version: '3.2.0' });
+            assetManager.registerVendorStyle('fontawesome',
+                '/themes/default/assets/vendor/fontawesome-free/css/all.min.css', { version: '5.15.4' });
+
+            // ── App Styles ─────────────────────────────────────────────────
+            assetManager.registerStyle('theme-main-css',
+                '/themes/default/assets/css/main.css',
+                { deps: ['adminlte-css'], version: this.version });
+
+            // ── Vendor Scripts ─────────────────────────────────────────────
+            assetManager.registerVendorScript('jquery',
+                '/themes/default/assets/vendor/jquery/jquery.min.js',
+                { inFooter: false, version: '3.6.0' });
+            assetManager.registerVendorScript('bootstrap',
+                '/themes/default/assets/vendor/bootstrap/js/bootstrap.bundle.min.js',
+                { deps: ['jquery'], version: '4.6.2' });
+            assetManager.registerVendorScript('adminlte-js',
+                '/themes/default/assets/js/adminlte.min.js',
+                { deps: ['jquery', 'bootstrap'], version: '3.2.0' });
+
+            // ── App Scripts ────────────────────────────────────────────────
+            assetManager.registerScript('theme-main-js',
+                '/themes/default/assets/js/main.js',
+                { deps: ['adminlte-js'], version: this.version });
+        }
+
         // Entfernt: setupCoreNavigation(); (Core-Navigation jetzt rein DB)
         if (this.app.pluginManager?.hooks) {
             this.registerHooks();

@@ -124,10 +124,11 @@ class PermissionManager {
 
       this.logger.info(`[PermissionManager] Seeding default groups for guild ${guildId}`);
 
-      // 1. Administrator-Gruppe (Protected, explizite Permissions + Wildcard-Support)
+      // 1. Administrator-Gruppe (Protected, Kern-Permissions)
       const adminPerms = JSON.stringify({
-        wildcard: true,
-        // Explizite Permissions für bessere UI-Kompatibilität
+        'DASHBOARD.ACCESS': true,
+        'DASHBOARD.SETTINGS.VIEW': true,
+        'DASHBOARD.SETTINGS.EDIT': true,
         'PERMISSIONS.VIEW': true,
         'PERMISSIONS.USERS.VIEW': true,
         'PERMISSIONS.USERS.INVITE': true,
@@ -137,30 +138,15 @@ class PermissionManager {
         'PERMISSIONS.GROUPS.CREATE': true,
         'PERMISSIONS.GROUPS.EDIT': true,
         'PERMISSIONS.GROUPS.DELETE': true,
-        'PERMISSIONS.ASSIGN': true,  // ← WICHTIG für Matrix-Editing!
-        'GAMESERVER.VIEW': true,
-        'GAMESERVER.CREATE': true,
-        'GAMESERVER.EDIT': true,
-        'GAMESERVER.DELETE': true,
-        'GAMESERVER.START': true,
-        'GAMESERVER.STOP': true,
-        'GAMESERVER.RESTART': true,
-        'GAMESERVER.CONSOLE.VIEW': true,
-        'GAMESERVER.CONSOLE.EXECUTE': true,
-        'GAMESERVER.FILES.VIEW': true,
-        'GAMESERVER.FILES.UPLOAD': true,
-        'GAMESERVER.FILES.DOWNLOAD': true,
-        'GAMESERVER.FILES.DELETE': true,
-        'GAMESERVER.SETTINGS.EDIT': true,
-        'MODERATION.VIEW': true,
-        'MODERATION.BAN': true,
-        'MODERATION.KICK': true,
-        'MODERATION.WARN': true,
-        'MODERATION.MUTE': true,
-        'MODERATION.SETTINGS.EDIT': true,
+        'PERMISSIONS.ASSIGN': true,
         'CORE.SETTINGS.VIEW': true,
         'CORE.SETTINGS.EDIT': true,
-        'CORE.PLUGINS.MANAGE': true
+        'CORE.PLUGINS.VIEW': true,
+        'CORE.PLUGINS.MANAGE': true,
+        'SETTINGS.VIEW': true,
+        'SETTINGS.EDIT': true,
+        'PLUGINS.VIEW': true,
+        'PLUGINS.MANAGE': true
       });
       const [adminResult] = await this.dbService.query(
         `INSERT INTO guild_groups 
@@ -181,22 +167,11 @@ class PermissionManager {
         ]
       );
 
-      // 2. Moderatoren-Gruppe
+      // 2. Moderatoren-Gruppe (nur Kern-Permissions, Plugin-Permissions kommen via Plugin-Install)
       const modPerms = JSON.stringify({
-        'GAMESERVER.VIEW': true,
-        'GAMESERVER.START': true,
-        'GAMESERVER.STOP': true,
-        'GAMESERVER.RESTART': true,
-        'GAMESERVER.CONSOLE.VIEW': true,
-        'GAMESERVER.CONSOLE.EXECUTE': true,
-        'GAMESERVER.FILES.VIEW': true,
-        'GAMESERVER.FILES.UPLOAD': true,
-        'GAMESERVER.FILES.DOWNLOAD': true,
-        'MODERATION.VIEW': true,
-        'MODERATION.BAN': true,
-        'MODERATION.KICK': true,
-        'MODERATION.WARN': true,
-        'MODERATION.MUTE': true
+        'PERMISSIONS.VIEW': true,
+        'PERMISSIONS.USERS.VIEW': true,
+        'PERMISSIONS.GROUPS.VIEW': true
       });
       
       const [modResult] = await this.dbService.query(
@@ -218,13 +193,9 @@ class PermissionManager {
         ]
       );
 
-      // 3. Support-Gruppe
+      // 3. Support-Gruppe (minimale Kern-Permissions)
       const supportPerms = JSON.stringify({
-        'GAMESERVER.VIEW': true,
-        'GAMESERVER.CONSOLE.VIEW': true,
-        'GAMESERVER.FILES.VIEW': true,
-        'GAMESERVER.FILES.DOWNLOAD': true,
-        'MODERATION.VIEW': true
+        'PERMISSIONS.VIEW': true
       });
       
       const [supportResult] = await this.dbService.query(
@@ -246,11 +217,8 @@ class PermissionManager {
         ]
       );
 
-      // 4. Viewer-Gruppe (Default)
-      const viewerPerms = JSON.stringify({
-        'gameserver.view': true,
-        'moderation.view': true
-      });
+      // 4. Viewer-Gruppe (Default, minimaler Zugriff)
+      const viewerPerms = JSON.stringify({});
       
       const [viewerResult] = await this.dbService.query(
         `INSERT INTO guild_groups 
@@ -408,6 +376,41 @@ class PermissionManager {
    * @param {string[]} permissionKeys - Array von Permission Keys
    * @returns {Promise<boolean>}
    */
+  async hasAllPermissions(userId, guildId, permissionKeys) {
+    for (const key of permissionKeys) {
+      if (!(await this.hasPermission(userId, guildId, key))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Prüft ob User Guild-Owner ist
+   * 
+   * @param {string} userId - Discord User ID
+   * @param {string} guildId - Discord Guild ID
+   * @returns {Promise<boolean>}
+   */
+  async isGuildOwner(userId, guildId) {
+    this._ensureInitialized();
+    
+    try {
+      const [guild] = await this.dbService.query(
+        'SELECT owner_id FROM guilds WHERE _id = ?',
+        [guildId]
+      );
+      
+      if (!guild) {
+        return false;
+      }
+      
+      return guild.owner_id === userId;
+    } catch (error) {
+      this.logger.error(`[PermissionManager] Error checking guild owner ${userId} in guild ${guildId}:`, error);
+      return false;
+    }
+  }
   async hasAllPermissions(userId, guildId, permissionKeys) {
     for (const key of permissionKeys) {
       if (!(await this.hasPermission(userId, guildId, key))) {
@@ -829,10 +832,10 @@ class PermissionManager {
 
   /**
    * Aktualisiert eine Gruppe
-   * WICHTIG: Permissions werden über group_permissions Tabelle verwaltet, NICHT über JSON!
+   * WICHTIG: Permissions werden als JSON in guild_groups.permissions gespeichert!
    * 
    * @param {number} groupId - Group ID
-   * @param {Object} updates - Felder zum Aktualisieren (ohne permissions!)
+   * @param {Object} updates - Felder zum Aktualisieren (inkl. permissions)
    * @returns {Promise<boolean>}
    */
   async updateGroup(groupId, updates) {
@@ -857,10 +860,25 @@ class PermissionManager {
       }
     }
 
-    // Permissions separat behandeln (relational über group_permissions!)
+    // ✅ Permissions als JSON in guild_groups.permissions speichern (NEW SYSTEM!)
     if (updates.permissions) {
-      await this._updateGroupPermissionsRelational(groupId, group.guild_id, updates.permissions);
-      delete updates.permissions; // Nicht in UPDATE statement
+      // Filter: Nur true-Werte speichern
+      const truePermissions = {};
+      for (const [key, value] of Object.entries(updates.permissions)) {
+        if (value === true || value === 'true' || value === '1') {
+          truePermissions[key] = true;
+        }
+      }
+      
+      this.logger.info(`[PermissionManager] Aktualisiere Permissions für Gruppe ${groupId}: ${Object.keys(truePermissions).length} Permissions`);
+      
+      // Als JSON in guild_groups.permissions speichern
+      await this.dbService.query(
+        'UPDATE guild_groups SET permissions = ?, updated_at = NOW() WHERE id = ?',
+        [JSON.stringify(truePermissions), groupId]
+      );
+      
+      delete updates.permissions; // Nicht in zweitem UPDATE statement
     }
 
     // Nur Meta-Daten updaten (name, slug, description, color, icon, priority)
@@ -959,17 +977,17 @@ class PermissionManager {
     this._ensureInitialized();
     
     // Prüfe ob Gruppe protected ist
-    const [group] = await this.dbService.query(
+    const groups = await this.dbService.query(
       'SELECT is_protected, name FROM guild_groups WHERE id = ?',
       [groupId]
     );
 
-    if (!group || group.length === 0) {
+    if (!groups || groups.length === 0) {
       throw new Error('Group not found');
     }
 
-    if (group[0].is_protected) {
-      throw new Error(`Cannot delete protected group: ${group[0].name}`);
+    if (groups[0].is_protected) {
+      throw new Error(`Cannot delete protected group: ${groups[0].name}`);
     }
 
     // DELETE CASCADE entfernt automatisch guild_user_groups Einträge
@@ -1126,45 +1144,148 @@ class PermissionManager {
         return { permissionsDeleted: 0, groupAssignmentsDeleted: 0 };
       }
       
-      const permIds = permissions.map(p => p.id);
       const permKeys = permissions.map(p => p.permission_key);
       this.logger.debug(`[PermissionManager] Found ${permKeys.length} permissions to remove: ${permKeys.join(', ')}`);
       
-      // 2. Entferne aus group_permissions (CASCADE DELETE macht das automatisch!)
-      // Aber wir wollen die Anzahl wissen für Logging
-      let groupAssignmentsCount = 0;
-      
-      if (permIds.length > 0) {
-        // ✅ FIX: Erstelle richtige Anzahl Platzhalter für IN-Clause
-        const placeholders = permIds.map(() => '?').join(',');
-        const groupAssignments = await this.dbService.query(
-          `SELECT COUNT(*) as count FROM group_permissions WHERE permission_id IN (${placeholders})`,
-          permIds
-        );
-        
-        groupAssignmentsCount = groupAssignments[0]?.count || 0;
-      }
-      
-      // 3. DELETE aus permission_definitions (CASCADE löscht group_permissions automatisch!)
+      // 2. DELETE aus permission_definitions (UI-Registry-Cleanup)
       const result = await this.dbService.query(
         'DELETE FROM permission_definitions WHERE guild_id = ? AND plugin_name = ?',
         [guildId, pluginName]
       );
       
       const permissionsDeleted = result.affectedRows || 0;
+
+      // 3. Permissions aus allen Gruppen-JSONs der Guild entfernen
+      let groupAssignmentsDeleted = 0;
+      if (permKeys.length > 0) {
+        const groups = await this.dbService.query(
+          'SELECT id, permissions FROM guild_groups WHERE guild_id = ?',
+          [guildId]
+        );
+        for (const group of groups) {
+          const perms = typeof group.permissions === 'string'
+            ? JSON.parse(group.permissions || '{}')
+            : (group.permissions || {});
+          let changed = false;
+          for (const key of permKeys) {
+            if (Object.prototype.hasOwnProperty.call(perms, key)) {
+              delete perms[key];
+              changed = true;
+              groupAssignmentsDeleted++;
+            }
+          }
+          if (changed) {
+            await this.dbService.query(
+              'UPDATE guild_groups SET permissions = ?, updated_at = NOW() WHERE id = ?',
+              [JSON.stringify(perms), group.id]
+            );
+          }
+        }
+      }
       
       this.logger.success(
         `[PermissionManager] Unregistered plugin "${pluginName}": ` +
-        `${permissionsDeleted} permissions deleted, ${groupAssignmentsCount} group assignments CASCADE deleted`
+        `${permissionsDeleted} permissions deleted from registry, ` +
+        `${groupAssignmentsDeleted} group assignments cleaned up`
       );
       
-      return { permissionsDeleted, groupAssignmentsDeleted: groupAssignmentsCount };
+      return { permissionsDeleted, groupAssignmentsDeleted };
       
     } catch (error) {
       this.logger.error(`[PermissionManager] Failed to unregister plugin "${pluginName}":`, error);
       throw error;
     }
   }
+  /**
+   * Lädt und registriert Kern-Permissions aus packages/dunebot-core/config/permissions.json
+   * Wird beim Beitritt einer Guild und beim Dashboard-Start aufgerufen.
+   *
+   * @param {string} guildId - Discord Guild ID
+   * @returns {Promise<number>} Anzahl registrierter Permissions
+   */
+  async loadKernelPermissions(guildId) {
+    this._ensureInitialized();
+
+    const path = require('path');
+    const permissionsFile = path.join(__dirname, '../../dunebot-core/config/permissions.json');
+
+    let permissionsData;
+    try {
+      permissionsData = require(permissionsFile);
+    } catch (e) {
+      this.logger.warn(`[PermissionManager] Kern-permissions.json nicht gefunden: ${permissionsFile}`);
+      return 0;
+    }
+
+    if (!permissionsData || !Array.isArray(permissionsData.permissions)) {
+      this.logger.warn('[PermissionManager] Kern-permissions.json hat ungültiges Format');
+      return 0;
+    }
+
+    return this.registerPluginPermissions('kern', guildId, permissionsData.permissions);
+  }
+
+  // ============================================================================
+  // SYSTEM PERMISSION CHECKS (für /admin/ Bereich)
+  // ============================================================================
+
+  /**
+   * Prüft ob ein User eine SYSTEM.* Permission hat.
+   * 
+   * Logik:
+   *  - OWNER_IDS (ENV): Komma-getrennte User-IDs → haben alle SYSTEM.* Rechte
+   *  - CONTROL_GUILD_ID (ENV): Optional — prüft SYSTEM.* Permissions in dieser
+   *    speziellen Kontroll-Guild (ermöglicht granulare System-Rechte für Staff)
+   * 
+   * @param {string} userId            - Discord User ID
+   * @param {string} systemPermKey     - z.B. "SYSTEM.ACCESS", "SYSTEM.NEWS.EDIT"
+   * @returns {Promise<boolean>}
+   */
+  async hasSystemPermission(userId, systemPermKey) {
+    this._ensureInitialized();
+
+    try {
+      const normalizedKey = this._normalizeKey(systemPermKey);
+
+      // 1. OWNER_IDS direkt aus ENV → immer alle SYSTEM.* Rechte
+      const ownerIds = process.env.OWNER_IDS
+        ? process.env.OWNER_IDS.split(',').map(id => id.trim()).filter(Boolean)
+        : [];
+
+      if (ownerIds.includes(String(userId))) {
+        this.logger.debug(`[PermissionManager] ✅ SYSTEM User ${userId} ist in OWNER_IDS → ${normalizedKey} gewährt`);
+        return true;
+      }
+
+      // 2. CONTROL_GUILD_ID (optional): Granulare Staff-Rechte über Guild-Permissions
+      const controlGuildId = process.env.CONTROL_GUILD_ID;
+      if (controlGuildId) {
+        const hasGuildPerm = await this.hasPermission(userId, controlGuildId, normalizedKey);
+        if (hasGuildPerm) {
+          this.logger.debug(`[PermissionManager] ✅ User ${userId} hat ${normalizedKey} in Control-Guild ${controlGuildId}`);
+          return true;
+        }
+      }
+
+      this.logger.debug(`[PermissionManager] ❌ User ${userId} hat keine SYSTEM-Permission "${normalizedKey}"`);
+      return false;
+
+    } catch (error) {
+      this.logger.error(`[PermissionManager] Fehler bei hasSystemPermission für User ${userId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Prüft ob ein User überhaupt Zugriff auf den /admin/ Bereich hat (SYSTEM.ACCESS)
+   * 
+   * @param {string} userId - Discord User ID
+   * @returns {Promise<boolean>}
+   */
+  async isSystemUser(userId) {
+    return this.hasSystemPermission(userId, 'SYSTEM.ACCESS');
+  }
+
 }
 
 // Singleton-Instanz

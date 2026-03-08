@@ -145,7 +145,7 @@ class GreetingDashboardPlugin extends DashboardPlugin {
                 path: `/guild/${guildId}/plugins/greeting/settings`,
                 icon: 'fa-solid fa-hands',
                 order: 25,  // Nach Core-Settings und DuneMap
-                parent: `/guild/${guildId}/plugins/core/settings`,
+                parent: `/guild/${guildId}/settings`,
                 type: 'main',
                 visible: true,
                 capability: 'GREETING.SETTINGS'

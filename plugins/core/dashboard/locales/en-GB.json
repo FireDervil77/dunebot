@@ -104,6 +104,31 @@
         
         "SUPERADMIN_ALL": "SuperAdmin (All Rights)",
         "SUPERADMIN_ALL_DESC": "Complete access to all functions (VERY CRITICAL)",
+
+        "SYSTEM_ACCESS": "System Access",
+        "SYSTEM_ACCESS_DESC": "Allows basic access to the admin area",
+        "SYSTEM_NEWS_VIEW": "View News",
+        "SYSTEM_NEWS_VIEW_DESC": "Allows viewing system news",
+        "SYSTEM_NEWS_EDIT": "Edit News",
+        "SYSTEM_NEWS_EDIT_DESC": "Allows creating and editing system news",
+        "SYSTEM_NOTIFICATIONS_VIEW": "View Notifications",
+        "SYSTEM_NOTIFICATIONS_VIEW_DESC": "Allows viewing system notifications",
+        "SYSTEM_NOTIFICATIONS_SEND": "Send Notifications",
+        "SYSTEM_NOTIFICATIONS_SEND_DESC": "Allows sending system notifications to all guilds",
+        "SYSTEM_DONATIONS_VIEW": "View Donations (Admin)",
+        "SYSTEM_DONATIONS_VIEW_DESC": "Allows viewing all donations in the admin area",
+        "SYSTEM_DONATIONS_MANAGE": "Manage Donations",
+        "SYSTEM_DONATIONS_MANAGE_DESC": "Allows managing and editing donations",
+        "SYSTEM_STATS_VIEW": "View System Statistics",
+        "SYSTEM_STATS_VIEW_DESC": "Allows viewing global bot statistics",
+        "SYSTEM_FEEDBACK_VIEW": "View Feedback",
+        "SYSTEM_FEEDBACK_VIEW_DESC": "Allows viewing user feedback and bug reports",
+        "SYSTEM_FEEDBACK_MANAGE": "Manage Feedback",
+        "SYSTEM_FEEDBACK_MANAGE_DESC": "Allows editing and closing feedback entries",
+        "SYSTEM_ADDONS_VIEW": "View Addons",
+        "SYSTEM_ADDONS_VIEW_DESC": "Allows viewing the addon marketplace",
+        "SYSTEM_ADDONS_MANAGE": "Manage Addons",
+        "SYSTEM_ADDONS_MANAGE_DESC": "Allows installing and managing addons",
         
         "AUTOMOD_SETTINGS_VIEW": "View AutoMod Settings",
         "AUTOMOD_SETTINGS_VIEW_DESC": "Allows viewing AutoMod configuration",
@@ -323,6 +348,34 @@
             "LEVEL": "Level",
             "BOOSTS": "Boosts"
         }
+    },
+
+    "SYSTEM": {
+        "ACCESS": "System Access",
+        "ACCESS_DESC": "Allows basic access to the admin area",
+        "NEWS_VIEW": "View News",
+        "NEWS_VIEW_DESC": "Allows viewing system news",
+        "NEWS_EDIT": "Edit News",
+        "NEWS_EDIT_DESC": "Allows creating and editing system news",
+        "NOTIFICATIONS_VIEW": "View Notifications",
+        "NOTIFICATIONS_VIEW_DESC": "Allows viewing system notifications",
+        "NOTIFICATIONS_SEND": "Send Notifications",
+        "NOTIFICATIONS_SEND_DESC": "Allows sending system notifications to all guilds",
+        "DONATIONS_VIEW": "View Donations (Admin)",
+        "DONATIONS_VIEW_DESC": "Allows viewing all donations in the admin area",
+        "DONATIONS_MANAGE": "Manage Donations",
+        "DONATIONS_MANAGE_DESC": "Allows managing and editing donations",
+        "STATS_VIEW": "View System Statistics",
+        "STATS_VIEW_DESC": "Allows viewing global bot statistics",
+        "FEEDBACK_VIEW": "View Feedback",
+        "FEEDBACK_VIEW_DESC": "Allows viewing user feedback and bug reports",
+        "FEEDBACK_MANAGE": "Manage Feedback",
+        "FEEDBACK_MANAGE_DESC": "Allows editing and closing feedback entries",
+        "ADDONS_VIEW": "View Addons",
+        "ADDONS_VIEW_DESC": "Allows viewing the addon marketplace",
+        "ADDONS_MANAGE": "Manage Addons",
+        "ADDONS_MANAGE_DESC": "Allows installing and managing addons"
     }
 }
+
 

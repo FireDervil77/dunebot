@@ -271,7 +271,7 @@ class Config {
             const configs = await dbService.getConfigs(this.guildId || '', this.pluginName, context);
             
             if (!configs || Object.keys(configs).length === 0) {
-                Logger.warn(`Keine Konfiguration für ${this.pluginName} (${context}) gefunden`);
+                Logger.debug(`Keine Konfiguration für ${this.pluginName} (${context}) gefunden, lade lokale Config...`);
                 return this.#loadLocalConfig();
             }
 

@@ -97,13 +97,12 @@ module.exports.getIndex = async (req, res) => {
             const path = require('path');
             const pluginsDir = path.join(__dirname, '../../../plugins');
             
-            // Nur öffentliche Plugins (nicht superadmin)
+            // Nur Plugin-Ordner mit package.json
             const pluginFolders = fs.readdirSync(pluginsDir)
                 .filter(folder => {
                     const pluginPath = path.join(pluginsDir, folder);
                     return fs.statSync(pluginPath).isDirectory() && 
-                           fs.existsSync(path.join(pluginPath, 'package.json')) &&
-                           folder !== 'superadmin'; // Superadmin ausschließen
+                           fs.existsSync(path.join(pluginPath, 'package.json'));
                 });
             
             pluginsList = pluginFolders.map(folder => {

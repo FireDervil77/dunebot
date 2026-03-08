@@ -20,6 +20,10 @@ class ThemeManager {
         this.themeConfig = {};
         this.themeContext = {};
         this.currentLocals = {};
+        /** @type {string[]} Geordnete Theme-Kette: [activeTheme, ...parents] */
+        this._themeChain = ['default'];
+        /** @type {Map<string, string>} Guild → Theme In-Memory-Cache */
+        this._themeGuildCache = new Map();
         
         this.themesDir = this.PathConfig.getPath('dashboard').themes;
         this.viewPaths = {
@@ -49,6 +53,7 @@ class ThemeManager {
         try {
             // 1. Layout für den Bereich setzen
             const section = view.startsWith('guild/') ? 'guild' : 
+                          view.startsWith('admin/') ? 'guild' :
                           view.startsWith('frontend/') ? 'frontend' : 
                           'frontend'; // default
 
@@ -76,8 +81,21 @@ class ThemeManager {
                 hasEnabledPlugins: !!viewData.enabledPlugins
             });
 
-            // 6. View rendern (express-ejs-layouts nutzt jetzt res.locals)
-            res.render(view);
+            // 6. Template-Hierarchie auflösen und View rendern
+            const hierarchy = this.resolveTemplateHierarchy(view, viewData);
+            Logger.debug('[ThemeManager] Template-Hierarchie:', hierarchy);
+
+            const resolvedPath = hierarchy
+                .map(candidate => this.resolveViewPath(candidate))
+                .find(p => p !== null);
+
+            if (resolvedPath) {
+                Logger.debug(`[ThemeManager] Rendere: ${resolvedPath}`);
+                res.render(resolvedPath);
+            } else {
+                // Fallback: Express selbst suchen lassen (normales Verhalten)
+                res.render(view);
+            }
 
         } catch (error) {
             Logger.error('Fehler beim Rendern der View:', error);
@@ -246,6 +264,10 @@ class ThemeManager {
             
             // Theme-Konfiguration laden
             await this.loadThemeConfig();
+
+            // Parent-Chain aufbauen (für Fallback-Logik)
+            this._themeChain = await this._buildThemeChain(this.activeTheme);
+            Logger.debug(`[ThemeManager] Theme-Chain: ${this._themeChain.join(' → ')}`);
             
             // Theme-spezifische View-Engine konfigurieren
             this.setupViewEngine();
@@ -305,6 +327,322 @@ class ThemeManager {
     }
     
     /**
+     * Metadaten eines beliebigen installierten Themes laden.
+     * Liest theme.json (bevorzugt) oder extrahiert Infos aus theme.js.
+     *
+     * @param {string} name - Theme-Verzeichnisname
+     * @returns {object|null} Theme-Metadaten oder null wenn nicht gefunden
+     */
+    async loadTheme(name) {
+        const Logger = ServiceManager.get('Logger');
+        try {
+            const configPath = this.PathConfig.getPath('theme', name).config;
+            const jsModulePath = this.PathConfig.getPath('theme', name).module;
+
+            if (fs.existsSync(configPath)) {
+                const meta = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                Logger.debug(`[ThemeManager] theme.json für '${name}' geladen`);
+                return meta;
+            }
+
+            if (fs.existsSync(jsModulePath)) {
+                const ThemeModule = require(jsModulePath);
+                const instance = new ThemeModule(this.app);
+                return {
+                    name: instance.name || name,
+                    displayName: instance.name || name,
+                    version: instance.version || '1.0.0',
+                    description: instance.description || '',
+                    author: instance.author || 'System',
+                    parent: null,
+                    tags: [],
+                    supports: instance.info || { darkMode: false, rtl: false, responsive: true },
+                    config: instance.config || {},
+                    layouts: Object.fromEntries(
+                        Object.entries(instance.layouts || {}).map(([k, v]) => [k, v.path || v])
+                    )
+                };
+            }
+
+            Logger.warn(`[ThemeManager] Kein theme.json / theme.js für '${name}' gefunden`);
+            return null;
+        } catch (error) {
+            Logger.error(`[ThemeManager] Fehler beim Laden von Theme '${name}':`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Alle installierten Themes ermitteln.
+     * Ein Theme gilt als installiert wenn es ein theme.json oder theme.js besitzt.
+     *
+     * @returns {object[]} Array von Theme-Metadaten-Objekten (+ Feld `active`)
+     */
+    async getInstalledThemes() {
+        const Logger = ServiceManager.get('Logger');
+        const themes = [];
+
+        try {
+            const entries = fs.readdirSync(this.themesDir, { withFileTypes: true });
+
+            for (const entry of entries) {
+                if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
+
+                const meta = await this.loadTheme(entry.name);
+                if (meta) {
+                    themes.push({ ...meta, active: entry.name === this.activeTheme });
+                }
+            }
+        } catch (error) {
+            Logger.error('[ThemeManager] Fehler bei getInstalledThemes:', error);
+        }
+
+        return themes;
+    }
+
+    // ============================================================================
+    // PER-GUILD THEME SWITCHING
+    // ============================================================================
+
+    /**
+     * Aktives Theme für eine Guild aus DB laden (mit In-Memory-Cache).
+     * Fehlt ein Eintrag → globaler Fallback (ENV ACTIVE_THEME oder 'default').
+     *
+     * @param {string} guildId
+     * @returns {Promise<string>} Theme-Name
+     */
+    async getThemeForGuild(guildId) {
+        if (this._themeGuildCache.has(guildId)) {
+            return this._themeGuildCache.get(guildId);
+        }
+
+        try {
+            const dbService = ServiceManager.get('dbService');
+            const rows = await dbService.query(
+                'SELECT theme_name FROM guild_themes WHERE guild_id = ? LIMIT 1',
+                [guildId]
+            );
+
+            const themeName = (rows && rows.length > 0)
+                ? rows[0].theme_name
+                : (process.env.ACTIVE_THEME || 'default');
+
+            this._themeGuildCache.set(guildId, themeName);
+            return themeName;
+        } catch {
+            return process.env.ACTIVE_THEME || 'default';
+        }
+    }
+
+    /**
+     * Theme für eine Guild dauerhaft in DB speichern + Cache invalidieren.
+     *
+     * @param {string} guildId
+     * @param {string} themeName
+     * @returns {Promise<void>}
+     */
+    async setThemeForGuild(guildId, themeName) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+
+        await dbService.query(
+            `INSERT INTO guild_themes (guild_id, theme_name)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE theme_name = VALUES(theme_name)`,
+            [guildId, themeName]
+        );
+
+        this._themeGuildCache.delete(guildId);
+        Logger.info(`[ThemeManager] Theme für Guild ${guildId} auf '${themeName}' gesetzt`);
+    }
+
+    /**
+     * Theme-Name für den aktuellen Request ermitteln.
+     * Liest guildId aus res.locals oder req.params.
+     *
+     * @param {import('express').Request} req
+     * @param {import('express').Response} res
+     * @returns {Promise<string>} Theme-Name
+     */
+    async getThemeForRequest(req, res) {
+        const guildId = res?.locals?.guildId || req?.params?.guildId || null;
+
+        if (guildId) {
+            return this.getThemeForGuild(guildId);
+        }
+
+        return process.env.ACTIVE_THEME || this.activeTheme || 'default';
+    }
+
+    /**
+     * Shortcut: Theme-Asset registrieren UND sofort einreihen (register + enqueue in einem).
+     * Entspricht WordPress `wp_enqueue_script` mit impliziter Registrierung.
+     *
+     * @param {string} handle
+     * @param {string} src   - Relativer oder absoluter Pfad
+     * @param {object} [opts] - Optionen wie bei AssetManager.registerScript
+     * @returns {boolean}
+     */
+    enqueueScript(handle, src, opts = {}) {
+        const assetManager = ServiceManager.get('assetManager');
+        if (!assetManager) return false;
+        if (!assetManager.scripts.has(handle)) {
+            assetManager.registerScript(handle, src, opts);
+        }
+        return assetManager.enqueueScript(handle);
+    }
+
+    /**
+     * Shortcut: Theme-Style registrieren UND sofort einreihen.
+     *
+     * @param {string} handle
+     * @param {string} src   - Relativer oder absoluter Pfad
+     * @param {object} [opts] - Optionen wie bei AssetManager.registerStyle
+     * @returns {boolean}
+     */
+    enqueueStyle(handle, src, opts = {}) {
+        const assetManager = ServiceManager.get('assetManager');
+        if (!assetManager) return false;
+        if (!assetManager.styles.has(handle)) {
+            assetManager.registerStyle(handle, src, opts);
+        }
+        return assetManager.enqueueStyle(handle);
+    }
+
+    /**
+     * Geordnete Eltern-Kette für ein Theme aufbauen.
+     * Beispiel: 'firebot' (parent: 'default') → ['firebot', 'default']
+     *
+     * @param {string} themeName
+     * @returns {Promise<string[]>} Kette vom Kind zum ältesten Elternteil
+     */
+    async _buildThemeChain(themeName) {
+        const chain = [];
+        let current = themeName;
+        const visited = new Set();
+
+        while (current && !visited.has(current)) {
+            chain.push(current);
+            visited.add(current);
+
+            const meta = await this.loadTheme(current);
+            current = meta?.parent || null;
+        }
+
+        // Sicherstellen, dass 'default' immer am Ende steht
+        if (!chain.includes('default')) {
+            chain.push('default');
+        }
+
+        return chain;
+    }
+
+    /**
+     * Absoluten Dateipfad eines Partials auflösen — Child → Parent Fallback.
+     *
+     * @param {string} partial - Relativer Partial-Name ohne .ejs
+     * @param {string[]} [chain] - Theme-Chain (Standard: this._themeChain)
+     * @returns {string|null} Absoluter Pfad oder null
+     */
+    resolvePartialPath(partial, chain = this._themeChain) {
+        for (const themeName of chain) {
+            const themeRoot = this.PathConfig.getPath('theme', themeName);
+            const candidates = [
+                path.join(themeRoot.partials, partial + '.ejs'),
+                path.join(themeRoot.views, 'partials', partial + '.ejs'),
+                path.join(themeRoot.root, partial + '.ejs')
+            ];
+            const found = candidates.find(p => fs.existsSync(p));
+            if (found) return found;
+        }
+        return null;
+    }
+
+    /**
+     * Absoluten Dateipfad einer View auflösen — Plugin → Child → Parent Fallback.
+     *
+     * @param {string} view - Relativer View-Name ohne .ejs
+     * @param {string} [pluginName] - Optional: zuerst im Plugin suchen
+     * @param {string[]} [chain] - Theme-Chain (Standard: this._themeChain)
+     * @returns {string|null} Absoluter Pfad oder null
+     */
+    resolveViewPath(view, pluginName = null, chain = this._themeChain) {
+        // 1. Plugin-Views zuerst
+        if (pluginName) {
+            const pluginView = path.join(this.PathConfig.getPath('plugin', pluginName).views, view + '.ejs');
+            if (fs.existsSync(pluginView)) return pluginView;
+        }
+
+        // 2. Theme-Chain
+        for (const themeName of chain) {
+            const viewPath = path.join(this.PathConfig.getPath('theme', themeName).views, view + '.ejs');
+            if (fs.existsSync(viewPath)) return viewPath;
+        }
+
+        return null;
+    }
+
+    /**
+     * Browser-URL für ein Theme-Asset auflösen — Child → Parent Fallback.
+     * Prüft das Dateisystem; wenn im Child nicht vorhanden, zeigt URL auf Parent.
+     *
+     * @param {string} assetPath - Relativer Asset-Pfad (z.B. 'css/style.css')
+     * @param {string[]} [chain] - Theme-Chain (Standard: this._themeChain)
+     * @returns {string} Browser-URL
+     */
+    resolveAssetUrl(assetPath, chain = this._themeChain) {
+        for (const themeName of chain) {
+            const fsPath = path.join(this.PathConfig.getPath('theme', themeName).assets, assetPath);
+            if (fs.existsSync(fsPath)) {
+                return `/themes/${themeName}/assets/${assetPath}`;
+            }
+        }
+        // Fallback: URL des ersten Themes in der Kette (Default)
+        return `/themes/${chain[chain.length - 1] || 'default'}/assets/${assetPath}`;
+    }
+
+    /**
+     * Template-Hierarchie für eine View aufbauen (WordPress-Stil).
+     * Gibt geordnetes Array von View-Namen zurück (ohne .ejs) — vom Spezifischsten
+     * zum Generischsten.
+     *
+     * Beispiele:
+     *   ('guild/settings', { guildId: '123' }) → ['guild/settings-123', 'guild/settings', 'guild/index', 'index']
+     *   ('admin/news', {})                     → ['admin/news', 'admin/index', 'index']
+     *
+     * @param {string} view    - Basis-View-Name (z.B. 'guild/settings')
+     * @param {object} context - Kontext-Objekt (kann { guildId } enthalten)
+     * @returns {string[]} Kandidaten in Prioritätsreihenfolge
+     */
+    resolveTemplateHierarchy(view, context = {}) {
+        const candidates = [];
+        const parts = view.split('/');
+        const section = parts.length > 1 ? parts[0] : null;
+        const viewName = parts[parts.length - 1];
+
+        // 1. Guild-spezifisch (nur wenn guildId vorhanden)
+        if (context.guildId) {
+            const slug = section ? `${section}/${viewName}-${context.guildId}` : `${viewName}-${context.guildId}`;
+            candidates.push(slug);
+        }
+
+        // 2. Standard-View
+        candidates.push(view);
+
+        // 3. Section-Catch-All (z.B. guild/index)
+        if (section && viewName !== 'index') {
+            candidates.push(`${section}/index`);
+        }
+
+        // 4. Globaler Fallback
+        if (view !== 'index') {
+            candidates.push('index');
+        }
+
+        return candidates;
+    }
+
+    /**
      * Theme-spezifische View-Engine konfigurieren
      */
      setupViewEngine() {
@@ -352,8 +690,8 @@ class ThemeManager {
         // Views-Verzeichnisse aktualisieren
         const viewPaths = [
             ...pluginViewPaths,                                    // Plugin Views (höchste Priorität)
-            this.PathConfig.getPath('theme', this.activeTheme).views,   // Aktives Theme
-            this.PathConfig.getPath('theme', 'default').views,          // Default Theme
+            // Theme-Chain: Child → Parent(s) → Default
+            ...this._themeChain.map(t => this.PathConfig.getPath('theme', t).views),
             this.PathConfig.getPath('dashboard').views                  // Globale Views
         ];
         
@@ -381,6 +719,8 @@ class ThemeManager {
         
         // app.locals für Closure speichern (wichtig für includePartial)
         const appLocals = this.app.locals;
+        // ThemeManager-Instanz für Closures sichern
+        const themeManager = this;
         
         // ============================================================================
         // GLOBAL FUNCTION: includePartial (WordPress-Style!)
@@ -390,21 +730,12 @@ class ThemeManager {
         this.app.locals.includePartial = function(filename, data = {}) {
             try {                    
                 const ejs = require('ejs');
-                const PathConfig = require('./utils/PathConfig').getInstance();
-                const activeTheme = 'default'; // TODO: Dynamisch
-                
+
                 // DEBUG
                 Logger.debug(`[includePartial] ${filename} - Has guildId:`, typeof this.guildId !== 'undefined', this.guildId);
-                
-                const searchPaths = [
-                    path.join(PathConfig.getPath('theme', activeTheme).root, 'partials', filename + '.ejs'),
-                    path.join(PathConfig.getPath('theme', activeTheme).root, filename + '.ejs'),
-                    path.join(PathConfig.getPath('theme', activeTheme).views, 'partials', filename + '.ejs'),
-                    path.join(PathConfig.getPath('theme', 'default').root, 'partials', filename + '.ejs'),
-                    path.join(PathConfig.getPath('theme', 'default').views, 'partials', filename + '.ejs')
-                ];
-                
-                const filePath = searchPaths.find(p => fs.existsSync(p));
+
+                // Child → Parent Fallback via resolvePartialPath
+                const filePath = themeManager.resolvePartialPath(filename);
                 if (!filePath) {
                     Logger.warn(`Partial ${filename} nicht gefunden`);
                     return `<!-- Partial ${filename}.ejs nicht gefunden -->`;
@@ -715,11 +1046,12 @@ class ThemeManager {
                 });
             }
 
-            // 3. Theme-spezifische Widget-Pfade
-            searchPaths.push(
-                path.join(this.themesDir, this.activeTheme, 'views', 'widgets', widgetName + '.ejs'),
-                path.join(this.themesDir, 'default', 'views', 'widgets', widgetName + '.ejs')
-            );
+            // 3. Theme-Chain: Child → Parent → default (wie resolvePartialPath)
+            for (const themeName of this._themeChain) {
+                searchPaths.push(
+                    path.join(this.themesDir, themeName, 'views', 'widgets', widgetName + '.ejs')
+                );
+            }
 
             // Debug: Alle Suchpfade ausgeben
             Logger.debug('Widget-Suchpfade:', searchPaths);

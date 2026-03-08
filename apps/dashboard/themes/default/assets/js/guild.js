@@ -387,8 +387,7 @@ class GuildAjaxHandler {
             this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.NEWS_UPDATED || 'News erfolgreich gespeichert'));
             // Nach 1 Sekunde zur News-Übersicht weiterleiten
             setTimeout(() => {
-                const guildId = window.location.pathname.split('/')[2];
-                window.location.href = `/guild/${guildId}/plugins/superadmin/news`;
+                window.location.href = '/admin/news';
             }, 1000);
         } else {
             this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.NEWS_ERROR || 'Fehler beim Speichern der News'));
@@ -425,12 +424,7 @@ class GuildAjaxHandler {
             this.showToast('success', result.message || 'Notification erfolgreich gespeichert');
             // Nach 1,5s zur Notifications-Liste redirecten
             setTimeout(() => {
-                const guildId = form.querySelector('input[name="guildId"]')?.value;
-                if (guildId) {
-                    window.location.href = `/guild/${guildId}/plugins/superadmin/notifications`;
-                } else {
-                    window.location.reload();
-                }
+                window.location.href = '/admin/notifications';
             }, 1500);
         } else {
             this.showToast('error', result.message || 'Fehler beim Speichern der Notification');

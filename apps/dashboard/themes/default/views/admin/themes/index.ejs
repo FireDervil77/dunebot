@@ -1,0 +1,154 @@
+<%#
+ * Admin: Theme-Registry
+ * Liste aller installierten Themes mit Galerie-Darstellung
+%>
+
+<div class="app-content">
+    <div class="container-fluid">
+
+        <!-- Seiten-Header -->
+        <div class="row mb-4">
+            <div class="col-12 d-flex align-items-center justify-content-between">
+                <div>
+                    <h2 class="mb-0"><i class="fas fa-palette me-2"></i>Theme-Verwaltung</h2>
+                    <p class="text-muted mb-0">Installierte Themes verwalten und aktivieren</p>
+                </div>
+                <div>
+                    <span class="badge badge-info"><%= themes.length %> Theme<%= themes.length !== 1 ? 's' : '' %> installiert</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Theme-Cards -->
+        <div class="row">
+            <% themes.forEach(theme => { %>
+            <div class="col-xl-4 col-md-6 mb-4">
+                <div class="card shadow-sm h-100 <%= theme.active ? 'border-success' : '' %>">
+
+                    <!-- Screenshot / Placeholder -->
+                    <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center"
+                         style="height: 160px; overflow: hidden; position: relative;">
+                        <% const screenshotUrl = `/themes/${theme.name}/assets/${theme.screenshot || 'screenshot.png'}`; %>
+                        <img src="<%= screenshotUrl %>"
+                             alt="<%= theme.displayName %> Screenshot"
+                             style="width:100%; height:100%; object-fit:cover;"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div style="display:none; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; background:#343a40; color:#6c757d;">
+                            <i class="fas fa-image fa-3x mb-2"></i>
+                            <small>Kein Screenshot</small>
+                        </div>
+
+                        <!-- Badges -->
+                        <div style="position:absolute; top:8px; right:8px;">
+                            <% if (theme.active) { %>
+                                <span class="badge badge-success"><i class="fas fa-check me-1"></i>Aktiv</span>
+                            <% } %>
+                            <% if (theme.parent) { %>
+                                <span class="badge badge-secondary ml-1">Child</span>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <!-- Card Body -->
+                    <div class="card-body">
+                        <h5 class="card-title mb-1">
+                            <%= theme.displayName || theme.name %>
+                            <small class="text-muted ml-1">v<%= theme.version || '1.0.0' %></small>
+                        </h5>
+                        <% if (theme.parent) { %>
+                            <p class="text-muted small mb-1">
+                                <i class="fas fa-sitemap mr-1"></i>Child von <strong><%= theme.parent %></strong>
+                            </p>
+                        <% } %>
+                        <p class="card-text text-muted small">
+                            <%= theme.description || 'Keine Beschreibung' %>
+                        </p>
+
+                        <!-- Meta-Infos -->
+                        <div class="d-flex flex-wrap gap-1 mb-3">
+                            <% (theme.tags || []).forEach(tag => { %>
+                                <span class="badge badge-light border"><%= tag %></span>
+                            <% }); %>
+                        </div>
+
+                        <div class="small text-muted mb-2">
+                            <i class="fas fa-user mr-1"></i><%= theme.author || 'Unbekannt' %>
+                            &nbsp;·&nbsp;
+                            <i class="fas fa-server mr-1"></i><%= theme.guildCount || 0 %> Guild<%= (theme.guildCount || 0) !== 1 ? 's' : '' %>
+                        </div>
+                    </div>
+
+                    <!-- Card Footer -->
+                    <div class="card-footer d-flex justify-content-between">
+                        <% if (!theme.active) { %>
+                            <button class="btn btn-sm btn-success theme-activate-btn"
+                                    data-theme="<%= theme.name %>"
+                                    data-displayname="<%= theme.displayName || theme.name %>">
+                                <i class="fas fa-check mr-1"></i>Global aktivieren
+                            </button>
+                        <% } else { %>
+                            <span class="text-success small align-self-center">
+                                <i class="fas fa-check-circle mr-1"></i>Globales Standard-Theme
+                            </span>
+                        <% } %>
+                        <span class="text-muted small align-self-center">
+                            <%= theme.name %>
+                        </span>
+                    </div>
+
+                </div>
+            </div>
+            <% }); %>
+
+            <% if (themes.length === 0) { %>
+            <div class="col-12">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    Keine Themes gefunden. Lege Themes unter <code>apps/dashboard/themes/</code> an.
+                </div>
+            </div>
+            <% } %>
+        </div>
+
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.theme-activate-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const themeName = this.dataset.theme;
+        const displayName = this.dataset.displayname;
+
+        if (!confirm(`Theme "${displayName}" global aktivieren?\nAktiv erst nach Neustart dauerhaft.`)) return;
+
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Aktiviere...';
+
+        try {
+            const res = await fetch(`/admin/themes/${themeName}/activate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // Toast / Meldung
+                if (window.showToast) {
+                    window.showToast('success', data.message);
+                } else {
+                    alert(data.message);
+                }
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                alert('Fehler: ' + data.message);
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-check mr-1"></i>Global aktivieren';
+            }
+        } catch (e) {
+            alert('Netzwerkfehler');
+            this.disabled = false;
+            this.innerHTML = '<i class="fas fa-check mr-1"></i>Global aktivieren';
+        }
+    });
+});
+</script>

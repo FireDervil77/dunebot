@@ -1,0 +1,705 @@
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">
+                    <%= changelog && changelog.id ? tr('CHANGELOGS.EDIT_CHANGELOG') : tr('CHANGELOGS.NEW_CHANGELOG') %>
+                </h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="/admin">SuperAdmin</a></li>
+                    <li class="breadcrumb-item"><a href="/admin/changelogs"><%= tr('CHANGELOGS.TITLE') %></a></li>
+                    <li class="breadcrumb-item active"><%= changelog && changelog.id ? tr('CHANGELOGS.EDIT') : tr('CHANGELOGS.NEW') %></li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="content">
+    <div class="container-fluid">
+        <% if (locals.toast) { %>
+            <div class="alert alert-<%= toast.type %> alert-dismissible fade show">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <%= toast.message %>
+            </div>
+        <% } %>
+
+        <form action="/admin/changelogs/save" method="POST">
+            <input type="hidden" name="guildId" value="<%= guildId %>">
+            <% if (changelog && changelog.id) { %>
+                <input type="hidden" name="changelogId" value="<%= changelog.id %>">
+            <% } %>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><%= tr('CHANGELOGS.DETAILS') %></h3>
+                </div>
+                <div class="card-body">
+                    <!-- Version und Type -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="version"><%= tr('CHANGELOGS.FORM.VERSION') %> <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="version" 
+                                       name="version" 
+                                       value="<%= changelog?.version || '' %>"
+                                       placeholder="1.0.0"
+                                       required>
+                                <small class="form-text text-muted">Format: major.minor.patch (z.B. 2.1.0)</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="type"><%= tr('CHANGELOGS.FORM.TYPE') %> <span class="text-danger">*</span></label>
+                                <select class="form-control" id="type" name="type" required>
+                                    <option value="major" <%= changelog?.type === 'major' ? 'selected' : '' %>>
+                                        Major - Große Änderungen
+                                    </option>
+                                    <option value="minor" <%= changelog?.type === 'minor' ? 'selected' : '' %>>
+                                        Minor - Neue Features
+                                    </option>
+                                    <option value="patch" <%= changelog?.type === 'patch' ? 'selected' : '' %>>
+                                        Patch - Bugfixes
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sprach-Tabs mit Settings -->
+                    <ul class="nav nav-tabs mb-3" id="langTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="de-tab" data-toggle="tab" href="#de-content" role="tab">
+                                <i class="fas fa-flag mr-1"></i> Deutsch
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="en-tab" data-toggle="tab" href="#en-content" role="tab">
+                                <i class="fas fa-flag mr-1"></i> English
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="settings-tab" data-toggle="tab" href="#settings-content" role="tab">
+                                <i class="fas fa-cog mr-1"></i> Einstellungen
+                            </a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="langTabContent">
+                        <!-- Deutsch Tab -->
+                        <div class="tab-pane fade show active" id="de-content" role="tabpanel">
+                            <div class="form-group">
+                                <label for="title_de"><%= tr('CHANGELOGS.FORM.TITLE') %> (DE) <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="title_de" 
+                                       name="title_de" 
+                                       value="<%= changelog?.title_de || '' %>"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="description_de"><%= tr('CHANGELOGS.FORM.DESCRIPTION') %> (DE)</label>
+                                <textarea class="form-control" 
+                                          id="description_de" 
+                                          name="description_de" 
+                                          rows="3"><%= changelog?.description_de || '' %></textarea>
+                                <small class="form-text text-muted">Kurze Zusammenfassung der Version</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="changes_de"><%= tr('CHANGELOGS.FORM.CHANGES') %> (DE) <span class="text-danger">*</span></label>
+                                <textarea class="form-control font-monospace" 
+                                          id="changes_de" 
+                                          name="changes_de" 
+                                          rows="15" 
+                                          data-required="true"><%= changelog?.changes_de || '' %></textarea>
+                                <small class="form-text text-muted">
+                                    <strong>Hierarchische Struktur verwenden:</strong><br>
+                                    <code># Hauptgruppe</code> (z.B. "# PLUGINS" oder "# SYSTEM")<br>
+                                    <code>## Untergruppe</code> (z.B. "## DuneMap" oder "## Core")<br>
+                                    <code>! Fix</code> | <code>+ Feature</code> | <code>- Entfernt</code> | <code>* Verbesserung</code><br><br>
+                                    <strong>Beispiel:</strong><br>
+                                    <pre class="bg-light p-2 mb-0" style="font-size: 0.85em;"># PLUGINS
+## DuneMap
+! Fix: Map-Rendering bei großen Datenmengen verbessert
++ Feature: Neue Marker-Typen hinzugefügt
+* Change: Performance-Optimierung
+
+## Core
+! Fix: Memory Leak im Event-Handler behoben
+- Removed: Legacy-API-Support entfernt
+
+# DASHBOARD
+## SuperAdmin
++ Feature: Changelog-Editor mit hierarchischer Struktur
+* Change: UI-Verbesserungen</pre>
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- English Tab -->
+                        <div class="tab-pane fade" id="en-content" role="tabpanel">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                <strong>Optional:</strong> Englische Übersetzung kann leer gelassen werden. Der Changelog wird dann nur auf Deutsch angezeigt.
+                            </div>
+
+                            <div class="form-group">
+                                <label for="title_en"><%= tr('CHANGELOGS.FORM.TITLE') %> (EN)</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="title_en" 
+                                       name="title_en" 
+                                       value="<%= changelog?.title_en || '' %>"
+                                       placeholder="Optional - leave empty for German-only">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="description_en"><%= tr('CHANGELOGS.FORM.DESCRIPTION') %> (EN)</label>
+                                <textarea class="form-control" 
+                                          id="description_en" 
+                                          name="description_en" 
+                                          rows="3"
+                                          placeholder="Optional - leave empty for German-only"><%= changelog?.description_en || '' %></textarea>
+                                <small class="form-text text-muted">Short summary of the version</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="changes_en"><%= tr('CHANGELOGS.FORM.CHANGES') %> (EN)</label>
+                                <textarea class="form-control font-monospace" 
+                                          id="changes_en" 
+                                          name="changes_en" 
+                                          rows="15"
+                                          placeholder="Optional - leave empty for German-only"><%= changelog?.changes_en || '' %></textarea>
+                                <small class="form-text text-muted">
+                                    <strong>Use hierarchical structure:</strong><br>
+                                    <code># Main Group</code> (e.g. "# PLUGINS" or "# SYSTEM")<br>
+                                    <code>## Sub Group</code> (e.g. "## DuneMap" or "## Core")<br>
+                                    <code>! Fix</code> | <code>+ Feature</code> | <code>- Removed</code> | <code>* Change</code><br><br>
+                                    <strong>Example:</strong><br>
+                                    <pre class="bg-light p-2 mb-0" style="font-size: 0.85em;"># PLUGINS
+## DuneMap
+! Fix: Improved map rendering with large datasets
++ Feature: Added new marker types
+* Change: Performance optimization
+
+## Core
+! Fix: Fixed memory leak in event handler
+- Removed: Removed legacy API support
+
+# DASHBOARD
+## SuperAdmin
++ Feature: Changelog editor with hierarchical structure
+* Change: UI improvements</pre>
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Settings Tab (NEU!) -->
+                        <div class="tab-pane fade" id="settings-content" role="tabpanel">
+                            <h5 class="mb-3">Changelog-Einstellungen</h5>
+
+                            <!-- Status -->
+                            <div class="form-group">
+                                <label for="status">Status <span class="text-danger">*</span></label>
+                                <select class="form-control" id="status" name="status" required>
+                                    <option value="draft" <%= changelog?.status === 'draft' ? 'selected' : '' %>>
+                                        📝 Entwurf (nicht sichtbar)
+                                    </option>
+                                    <option value="published" <%= !changelog || changelog?.status === 'published' ? 'selected' : '' %>>
+                                        ✅ Veröffentlicht
+                                    </option>
+                                </select>
+                                <small class="form-text text-muted">
+                                    Entwürfe sind nur im SuperAdmin-Bereich sichtbar, nicht auf der Website
+                                </small>
+                            </div>
+
+                            <!-- Slug -->
+                            <div class="form-group">
+                                <label for="slug">Slug <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="slug" 
+                                       name="slug" 
+                                       value="<%= changelog?.slug || '' %>"
+                                       placeholder="z.B. v2-1-0"
+                                       required>
+                                <small class="form-text text-muted">
+                                    URL-freundlicher Name (wird automatisch aus Version generiert)
+                                </small>
+                            </div>
+
+                            <!-- Author -->
+                            <div class="form-group">
+                                <label for="author">Autor <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="author" 
+                                       name="author" 
+                                       value="<%= changelog?.author || user?.info?.username || 'FireBot Team' %>"
+                                       required>
+                                <small class="form-text text-muted">
+                                    Name des Autors (wird im Changelog angezeigt)
+                                </small>
+                            </div>
+
+                            <hr>
+
+                            <!-- Release Date (verschoben aus Hauptbereich) -->
+                            <div class="form-group">
+                                <label for="release_date"><%= tr('CHANGELOGS.FORM.RELEASED_AT') %> <span class="text-danger">*</span></label>
+                                <input type="datetime-local" 
+                                       class="form-control" 
+                                       id="release_date" 
+                                       name="release_date" 
+                                       value="<%= changelog?.release_date ? new Date(changelog.release_date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16) %>"
+                                       required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="mt-4">
+
+                    <!-- Release Date entfernt (jetzt in Settings-Tab) -->
+                </div>
+
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save mr-2"></i><%= tr('CHANGELOGS.FORM.SAVE') %>
+                    </button>
+                    <a href="/admin/changelogs" class="btn btn-secondary">
+                        <i class="fas fa-times mr-2"></i><%= tr('CHANGELOGS.FORM.CANCEL') %>
+                    </a>
+                    <button type="button" class="btn btn-info float-right" id="previewBtn">
+                        <i class="fas fa-eye mr-2"></i>Vorschau anzeigen
+                    </button>
+                </div>
+            </div>
+
+            <!-- Vorschau-Card (versteckt bis Button geklickt wird) -->
+            <div class="card mt-3" id="previewCard" style="display: none;">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-eye mr-2"></i>Vorschau der hierarchischen Struktur
+                    </h3>
+                    <button type="button" class="btn btn-sm btn-secondary float-right" id="closePreviewBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-toggle="tab" href="#preview-de">Deutsch</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#preview-en">English</a>
+                        </li>
+                    </ul>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="preview-de"></div>
+                        <div class="tab-pane fade" id="preview-en"></div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- TinyMCE WYSIWYG Editor -->
+<script src="/themes/default/assets/vendor/tinymce/tinymce.min.js"></script>
+<script>
+console.log('[TinyMCE] Script geladen, warte auf DOMContentLoaded...');
+
+// TinyMCE für Deutsch und English Textareas initialisieren
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[TinyMCE] DOM geladen, initialisiere Editor...');
+    
+    // Prüfe ob Textareas existieren
+    const textareas = document.querySelectorAll('#changes_de, #changes_en, #description_de, #description_en');
+    console.log('[TinyMCE] Gefundene Textareas:', textareas.length);
+    
+    if (textareas.length === 0) {
+        console.error('[TinyMCE] FEHLER: Keine Textareas gefunden!');
+        return;
+    }
+    
+    // Konfiguration für beide Sprachen
+    const tinymceConfig = {
+        selector: '#changes_de, #changes_en, #description_de, #description_en',
+        height: 500,
+        menubar: true,
+        plugins: [
+            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+            'insertdatetime', 'media', 'table', 'help', 'wordcount'
+        ],
+        toolbar: 'undo redo | blocks | ' +
+            'bold italic forecolor | alignleft aligncenter ' +
+            'alignright alignjustify | bullist numlist outdent indent | ' +
+            'removeformat | help',
+        content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
+        // language: 'de', // ❌ Deaktiviert - TinyMCE 7 benötigt separat heruntergeladene Language Packs
+        branding: false,
+        promotion: false,
+        license_key: 'gpl', // Open Source GPL Lizenz
+        
+        // Automatische Höhenanpassung
+        autoresize_bottom_margin: 50,
+        min_height: 400,
+        
+        // Basis-Formatierungen
+        block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Preformatted=pre',
+        
+        // ✅ FIX: URL-Handling für CSP-Compliance
+        relative_urls: true,        // Nutze relative URLs statt absolute
+        remove_script_host: true,   // Entferne Host aus URLs
+        convert_urls: false,        // Nicht automatisch URLs konvertieren
+        
+        // Setup-Callback für Custom-Logik
+        setup: function(editor) {
+            editor.on('init', function() {
+                console.log('[TinyMCE] ✅ Editor initialisiert für:', editor.targetElm.id);
+            });
+        }
+    };
+    
+    // TinyMCE initialisieren
+    console.log('[TinyMCE] Starte tinymce.init()...');
+    tinymce.init(tinymceConfig).then(function(editors) {
+        console.log('[TinyMCE] ✅ Erfolgreich initialisiert, Anzahl Editoren:', editors.length);
+    }).catch(function(error) {
+        console.error('[TinyMCE] ❌ FEHLER bei Initialisierung:', error);
+    });
+});
+</script>
+
+<script>
+// Hierarchisches Parsing für Vorschau (✅ MIT HTML-SUPPORT!)
+function parseHierarchicalChangelog(changesText) {
+    if (!changesText || typeof changesText !== 'string') return [];
+    
+    // ✅ HTML-Tags konvertieren (wie im Server-Parser)
+    let processedText = changesText;
+    
+    // ⚡ KRITISCH: <br> Tags in Newlines umwandeln (ZUERST!)
+    // TinyMCE speichert mehrere Items in EINEM <p>-Tag mit <br>-Trennung!
+    // <p>! Fix 1<br>! Fix 2<br>! Fix 3</p> → <p>! Fix 1</p>\n<p>! Fix 2</p>\n<p>! Fix 3</p>
+    processedText = processedText.replace(/<br\s*\/?>/gi, '\n');
+    
+    // <h2>Header</h2> → # Header
+    processedText = processedText.replace(/<h2[^>]*>(.*?)<\/h2>/gi, (match, content) => {
+        return '\n# ' + content.trim() + '\n';
+    });
+    
+    // <h3>Subheader</h3> → ## Subheader
+    processedText = processedText.replace(/<h3[^>]*>(.*?)<\/h3>/gi, (match, content) => {
+        return '\n## ' + content.trim() + '\n';
+    });
+    
+    // <p>! Bugfix...</p> → ! Bugfix... (BEHALTE HTML im Text!)
+    // ⚡ WICHTIG: Durch <br>→\n Konvertierung sind jetzt mehrere Zeilen getrennt!
+    processedText = processedText.replace(/<p[^>]*>([!+\-*])\s+(.*?)<\/p>/gi, (match, symbol, content) => {
+        return '\n' + symbol + ' ' + content.trim() + '\n';
+    });
+    
+    // ✅ Description-Support: <p>Normal text</p> → DESC: Normal text
+    processedText = processedText.replace(/<p[^>]*>((?![!+\-*]\s).*?)<\/p>/gi, (match, content) => {
+        const trimmed = content.trim();
+        if (trimmed.length > 0 && !/^[!+\-*]\s/.test(trimmed)) {
+            return '\nDESC: ' + trimmed + '\n';
+        }
+        return '';
+    });
+    
+    // <ul>/<li> Listen → * Items
+    processedText = processedText.replace(/<li[^>]*>(.*?)<\/li>/gi, (match, content) => {
+        const trimmed = content.trim();
+        if (/^[!+\-*]\s/.test(trimmed)) {
+            return '\n' + trimmed + '\n';
+        }
+        return '\n* ' + trimmed + '\n';
+    });
+    processedText = processedText.replace(/<\/?ul[^>]*>/gi, '');
+    processedText = processedText.replace(/<\/?ol[^>]*>/gi, '');
+    
+    // HTML-Entities dekodieren
+    processedText = processedText.replace(/&nbsp;/g, ' ');
+    processedText = processedText.replace(/&lt;/g, '<');
+    processedText = processedText.replace(/&gt;/g, '>');
+    processedText = processedText.replace(/&amp;/g, '&');
+    processedText = processedText.replace(/&quot;/g, '"');
+    processedText = processedText.replace(/&uuml;/g, 'ü');
+    processedText = processedText.replace(/&ouml;/g, 'ö');
+    processedText = processedText.replace(/&auml;/g, 'ä');
+    processedText = processedText.replace(/&Uuml;/g, 'Ü');
+    processedText = processedText.replace(/&Ouml;/g, 'Ö');
+    processedText = processedText.replace(/&Auml;/g, 'Ä');
+    processedText = processedText.replace(/&szlig;/g, 'ß');
+    
+    console.log('[Parser] 🔧 Processed Text (nach <br> → \\n):', processedText.substring(0, 500));
+    
+    const lines = processedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    const result = [];
+    let currentGroup = null;
+    let currentSubgroup = null;
+
+    const itemTypeMap = {
+        '!': { type: 'fix', icon: 'fa-bug', class: 'text-danger', category: 'Fixes' },
+        '+': { type: 'feature', icon: 'fa-plus', class: 'text-success', category: 'Features' },
+        '-': { type: 'removed', icon: 'fa-minus', class: 'text-warning', category: 'Removed' },
+        '*': { type: 'change', icon: 'fa-edit', class: 'text-info', category: 'Changes' }
+    };
+
+    for (const line of lines) {
+        if (line.startsWith('# ')) {
+            const title = line.substring(2).trim();
+            currentGroup = { type: 'group', title, level: 1, children: [] };
+            result.push(currentGroup);
+            currentSubgroup = null;
+            continue;
+        }
+
+        if (line.startsWith('## ')) {
+            const title = line.substring(3).trim();
+            currentSubgroup = { type: 'subgroup', title, level: 2, description: null, items: [] };
+            
+            if (!currentGroup) {
+                currentGroup = { type: 'group', title: 'Änderungen', level: 1, children: [] };
+                result.push(currentGroup);
+            }
+            
+            currentGroup.children.push(currentSubgroup);
+            continue;
+        }
+        
+        // ✅ Description-Zeilen
+        if (line.startsWith('DESC: ')) {
+            const descText = line.substring(6).trim();
+            
+            if (currentSubgroup) {
+                if (currentSubgroup.description) {
+                    currentSubgroup.description += '<br>' + descText;
+                } else {
+                    currentSubgroup.description = descText;
+                }
+            } else if (currentGroup) {
+                let generalSubgroup = currentGroup.children.find(sg => sg.title === 'Allgemein');
+                if (!generalSubgroup) {
+                    generalSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, description: descText, items: [] };
+                    currentGroup.children.push(generalSubgroup);
+                    currentSubgroup = generalSubgroup;
+                } else {
+                    if (generalSubgroup.description) {
+                        generalSubgroup.description += '<br>' + descText;
+                    } else {
+                        generalSubgroup.description = descText;
+                    }
+                }
+            }
+            continue;
+        }
+
+        const firstChar = line.charAt(0);
+        if (itemTypeMap[firstChar]) {
+            const itemMeta = itemTypeMap[firstChar];
+            const text = line.substring(1).trim(); // ✅ Text BEHÄLT HTML!
+            const item = {
+                type: itemMeta.type,
+                icon: itemMeta.icon,
+                class: itemMeta.class,
+                category: itemMeta.category,
+                text
+            };
+
+            if (currentSubgroup) {
+                currentSubgroup.items.push(item);
+            } else if (currentGroup) {
+                let generalSubgroup = currentGroup.children.find(sg => sg.title === 'Allgemein');
+                if (!generalSubgroup) {
+                    generalSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, description: null, items: [] };
+                    currentGroup.children.push(generalSubgroup);
+                }
+                generalSubgroup.items.push(item);
+                currentSubgroup = generalSubgroup;
+            } else {
+                currentGroup = { type: 'group', title: 'Änderungen', level: 1, children: [] };
+                currentSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, description: null, items: [] };
+                currentGroup.children.push(currentSubgroup);
+                result.push(currentGroup);
+                currentSubgroup.items.push(item);
+            }
+        }
+    }
+
+    return result;
+}
+
+// Render Hierarchie als HTML
+function renderHierarchicalHTML(hierarchicalData) {
+    if (!hierarchicalData || hierarchicalData.length === 0) {
+        return '<p class="text-muted"><em>Keine Änderungen dokumentiert</em></p>';
+    }
+
+    let html = '<div class="changelog-hierarchical">';
+    
+    hierarchicalData.forEach(group => {
+        if (group.type === 'group') {
+            html += `<div class="changelog-group mb-4">
+                <h4 class="border-bottom pb-2 mb-3">
+                    <i class="fas fa-layer-group mr-2 text-primary"></i>${group.title}
+                </h4>`;
+            
+            (group.children || []).forEach(subgroup => {
+                if (subgroup.type === 'subgroup') {
+                    html += `<div class="changelog-subgroup mb-3 ml-3">
+                        <h5 class="text-muted mb-2">
+                            <i class="fas fa-folder-open mr-2"></i>${subgroup.title}
+                        </h5>`;
+                    
+                    // ✅ Description anzeigen (falls vorhanden)
+                    if (subgroup.description) {
+                        html += `<div class="alert alert-info ml-4 mb-2" style="font-style: italic; font-size: 0.9rem;">
+                            ${subgroup.description}
+                        </div>`;
+                    }
+                    
+                    if (subgroup.items && subgroup.items.length > 0) {
+                        html += '<ul class="list-unstyled ml-4">';
+                        subgroup.items.forEach(item => {
+                            html += `<li class="mb-2">
+                                <i class="fas ${item.icon} ${item.class} mr-2"></i>
+                                <strong class="${item.class}">${item.category}:</strong> ${item.text}
+                            </li>`;
+                        });
+                        html += '</ul>';
+                    } else {
+                        html += '<p class="text-muted ml-4"><em>Keine Änderungen</em></p>';
+                    }
+                    
+                    html += '</div>';
+                }
+            });
+            
+            html += '</div>';
+        }
+    });
+    
+    html += '</div>';
+    return html;
+}
+
+// Event-Listener für Vorschau
+document.addEventListener('DOMContentLoaded', function() {
+    const previewBtn = document.getElementById('previewBtn');
+    const closePreviewBtn = document.getElementById('closePreviewBtn');
+    const previewCard = document.getElementById('previewCard');
+    const changesDe = document.getElementById('changes_de');
+    const changesEn = document.getElementById('changes_en');
+    const previewDe = document.getElementById('preview-de');
+    const previewEn = document.getElementById('preview-en');
+
+    // Auto-generate slug from version
+    const versionInput = document.getElementById('version');
+    const slugInput = document.getElementById('slug');
+    const isNewChangelog = <%= changelog && changelog.id ? 'false' : 'true' %>;
+    
+    if (versionInput && slugInput) {
+        versionInput.addEventListener('input', function(e) {
+            if (!slugInput.value || isNewChangelog) {
+                // Version zu Slug: "2.1.0" → "v2-1-0"
+                const slug = 'v' + e.target.value
+                    .replace(/\./g, '-')
+                    .replace(/[^a-z0-9-]/gi, '')
+                    .toLowerCase();
+                slugInput.value = slug;
+            }
+        });
+    }
+
+    previewBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        // ✅ NEU: Content von TinyMCE-Editoren holen (nicht von Textarea!)
+        const changesDeContent = tinymce.get('changes_de') ? tinymce.get('changes_de').getContent() : changesDe.value;
+        const changesEnContent = tinymce.get('changes_en') ? tinymce.get('changes_en').getContent() : changesEn.value;
+        
+        console.log('[Preview] 🔍 DE RAW HTML (KOMPLETT):');
+        console.log(changesDeContent); // ✅ VOLLSTÄNDIGES HTML anzeigen
+        console.log('[Preview] 🔍 EN RAW HTML (KOMPLETT):');
+        console.log(changesEnContent);
+        
+        // Parse und rendere Deutsch
+        const hierarchyDe = parseHierarchicalChangelog(changesDeContent);
+        console.log('[Preview] ✅ DE Hierarchy (parsed):', hierarchyDe);
+        previewDe.innerHTML = renderHierarchicalHTML(hierarchyDe);
+        
+        // Parse und rendere English
+        const hierarchyEn = parseHierarchicalChangelog(changesEnContent);
+        console.log('[Preview] ✅ EN Hierarchy (parsed):', hierarchyEn);
+        previewEn.innerHTML = renderHierarchicalHTML(hierarchyEn);
+        
+        // Zeige Vorschau
+        previewCard.style.display = 'block';
+        previewCard.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    closePreviewBtn.addEventListener('click', function() {
+        previewCard.style.display = 'none';
+    });
+    
+    // ⚡ KRITISCH: Form-Submit-Handler für TinyMCE-Sync
+    const changelogForm = document.querySelector('form[action*="/changelogs/save"]');
+    if (changelogForm) {
+        changelogForm.addEventListener('submit', function(e) {
+            console.log('[ChangelogEdit] Form submit triggered, syncing TinyMCE...');
+            
+            // TinyMCE-Inhalte in Original-Textareas zurückschreiben
+            if (typeof tinymce !== 'undefined') {
+                tinymce.triggerSave(); // Synchronisiert ALLE Editoren
+                console.log('[ChangelogEdit] ✅ TinyMCE content synced');
+                
+                // ⚡ VALIDIERUNG: Prüfe required Felder
+                const requiredFields = ['changes_de', 'description_de', 'title_de'];
+                let hasErrors = false;
+                
+                requiredFields.forEach(fieldName => {
+                    const field = document.getElementById(fieldName);
+                    if (field) {
+                        const isEmpty = !field.value || field.value.trim() === '';
+                        console.log(`[ChangelogEdit] Field ${fieldName}: ${isEmpty ? '❌ LEER' : '✅ gefüllt'} (${field.value.length} chars)`);
+                        
+                        if (isEmpty) {
+                            // Markiere als invalid
+                            field.classList.add('is-invalid');
+                            hasErrors = true;
+                        } else {
+                            // Entferne is-invalid wenn jetzt gefüllt
+                            field.classList.remove('is-invalid');
+                        }
+                    }
+                });
+                
+                // Verhindere Submit wenn Fehler
+                if (hasErrors) {
+                    e.preventDefault();
+                    alert('Bitte fülle alle Pflichtfelder aus (Titel, Beschreibung, Änderungen auf Deutsch)');
+                    console.error('[ChangelogEdit] ❌ Validierung fehlgeschlagen - Submit abgebrochen');
+                    return false;
+                }
+            }
+            
+            // Form wird normal weiter abgesendet (keine e.preventDefault!)
+        });
+        console.log('[ChangelogEdit] ✅ Form submit handler registered');
+    }
+});
+</script>

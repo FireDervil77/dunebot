@@ -444,64 +444,24 @@ exports.getServerSelector = async (req, res) => {
         const userGuilds = req.session.user.guilds;
         const userId = req.session.user.info.id;
 
-        Logger.debug(`[SERVER-SELECTOR] Lade Custom Permissions für User-ID: ${userId}`);
+        Logger.debug(`[SERVER-SELECTOR] Lade Permissions für User-ID: ${userId}`);
         Logger.debug(`[SERVER-SELECTOR] OAuth2-Guilds: ${userGuilds.length}`);
 
-        // Custom Permissions aus DB laden (guild_staff - ALTE TABELLE)
         const dbService = ServiceManager.get('dbService');
-        let customPermissions = [];
-        try {
-            const result = await dbService.query(`
-                SELECT 
-                    guild_id,
-                    role,
-                    can_manage_settings,
-                    can_manage_plugins,
-                    can_view_logs
-                FROM guild_staff
-                WHERE user_id = ?
-                AND (expires_at IS NULL OR expires_at > NOW())
-            `, [userId]);
-            
-            // dbService.query gibt direkt die Row zurück wenn nur 1 Row!
-            // Bei 1 Row: result = [{guild_id: "...", role: "..."}, fields]
-            // Bei mehreren Rows: result = [{0: row1, 1: row2}, fields]
-            if (result && result[0]) {
-                const firstElement = result[0];
-                
-                // Check ob es direkt eine Row ist (hat guild_id key)
-                if (firstElement.guild_id) {
-                    customPermissions = [firstElement];
-                } 
-                // Oder ein Object mit numerischen Keys
-                else if (typeof firstElement === 'object' && !Array.isArray(firstElement)) {
-                    const numericKeys = Object.keys(firstElement).filter(key => !isNaN(key));
-                    customPermissions = numericKeys.map(key => firstElement[key]);
-                }
-                // Oder schon ein Array
-                else if (Array.isArray(firstElement)) {
-                    customPermissions = firstElement;
-                }
-            }
-            
-            Logger.debug(`[SERVER-SELECTOR] Custom Permissions Array:`, customPermissions);
-        } catch (err) {
-            Logger.warn('[SERVER-SELECTOR] Fehler beim Laden von guild_staff (Tabelle existiert noch nicht?):', err.message);
-        }
-        
-        const customPermsMap = new Map();
-        customPermissions.forEach(p => {
-            customPermsMap.set(p.guild_id, p);
-        });
-        
-        Logger.debug(`[SERVER-SELECTOR] User hat ${customPermissions.length} Custom Permissions in guild_staff`);
 
         // ========================================================================
-        // NEU: Guilds aus guild_users laden (NEUES PERMISSION-SYSTEM!)
-        // Diese Guilds sind explizit im Dashboard freigeschaltet, auch ohne Discord-Admin-Rechte!
+        // Guilds aus guild_users laden (NEUES PERMISSION-SYSTEM!)
+        // WICHTIG: User muss DASHBOARD.ACCESS Permission haben!
         // ========================================================================
         let guildUserGuilds = [];
         try {
+            // Lade PermissionManager für Permission-Check
+            const permissionManager = ServiceManager.get('permissionManager');
+            if (!permissionManager._initialized) {
+                await permissionManager.initialize();
+            }
+            
+            // Lade alle guild_users Einträge für diesen User
             const result = await dbService.query(`
                 SELECT gu.guild_id, g.guild_name, g.owner_id
                 FROM guild_users gu
@@ -511,36 +471,56 @@ exports.getServerSelector = async (req, res) => {
             `, [userId]);
             
             if (result && Array.isArray(result)) {
-                guildUserGuilds = result.map(row => ({
-                    id: row.guild_id,
-                    name: row.guild_name,
-                    owner: row.owner_id === userId, // Ist User der Discord-Owner?
-                    permissions: 0, // Keine Discord-Permissions (deshalb ist User in guild_users!)
-                    icon: null, // Kein Icon verfügbar (müsste vom Bot geholt werden)
-                    fromGuildUsers: true // Flag: Kommt aus DB, nicht von Discord!
-                }));
+                // Prüfe für jeden Eintrag ob User DASHBOARD.ACCESS Permission hat
+                for (const row of result) {
+                    const hasDashboardAccess = await permissionManager.hasPermission(
+                        userId,
+                        row.guild_id,
+                        'DASHBOARD.ACCESS'
+                    );
+                    
+                    if (hasDashboardAccess) {
+                        guildUserGuilds.push({
+                            id: row.guild_id,
+                            name: row.guild_name,
+                            owner: row.owner_id === userId,
+                            permissions: 0,
+                            icon: null,
+                            fromGuildUsers: true,
+                            hasDashboardAccess: true // ✅ WICHTIG: User hat DASHBOARD.ACCESS!
+                        });
+                        Logger.debug(`   ✅ ${row.guild_name} (${row.guild_id}) - User hat DASHBOARD.ACCESS`);
+                    } else {
+                        Logger.debug(`   ❌ ${row.guild_name} (${row.guild_id}) - User hat KEIN DASHBOARD.ACCESS (übersprungen)`);
+                    }
+                }
             }
             
-            Logger.debug(`[SERVER-SELECTOR] ${guildUserGuilds.length} zusätzliche Guilds aus guild_users geladen`);
-            guildUserGuilds.forEach(g => {
-                Logger.debug(`   - ${g.name} (${g.id}) [DB-Permission]`);
-            });
+            Logger.debug(`[SERVER-SELECTOR] ${guildUserGuilds.length} zusätzliche Guilds mit DASHBOARD.ACCESS geladen`);
         } catch (err) {
             Logger.warn('[SERVER-SELECTOR] Fehler beim Laden von guild_users:', err.message);
         }
 
-        // Merge OAuth2-Guilds und guild_users-Guilds (keine Duplikate!)
+        // Merge OAuth2-Guilds und guild_users-Guilds
+        // WICHTIG: Wenn Guild in BEIDEN Listen ist, MERGE die hasDashboardAccess Flag!
         const allGuilds = [...userGuilds];
-        const existingGuildIds = new Set(userGuilds.map(g => g.id));
+        const guildMap = new Map(userGuilds.map(g => [g.id, g]));
         
         guildUserGuilds.forEach(g => {
-            if (!existingGuildIds.has(g.id)) {
+            if (guildMap.has(g.id)) {
+                // Guild existiert bereits in OAuth2 → MERGE hasDashboardAccess Flag!
+                const existingGuild = guildMap.get(g.id);
+                existingGuild.hasDashboardAccess = true;
+                existingGuild.fromGuildUsers = true;
+                Logger.debug(`[SERVER-SELECTOR] 🔄 Guild "${g.name}" (${g.id}) - DASHBOARD.ACCESS via guild_users hinzugefügt (OAuth2-Merge)`);
+            } else {
+                // Guild existiert nur in guild_users → NEU hinzufügen
                 allGuilds.push(g);
-                Logger.debug(`[SERVER-SELECTOR] ➕ Guild "${g.name}" hinzugefügt (nur via guild_users)`);
+                Logger.debug(`[SERVER-SELECTOR] ➕ Guild "${g.name}" (${g.id}) - Neu hinzugefügt (nur via guild_users)`);
             }
         });
         
-        Logger.debug(`[SERVER-SELECTOR] Gesamt: ${allGuilds.length} Guilds (${userGuilds.length} OAuth2 + ${guildUserGuilds.length} DB-only)`);
+        Logger.debug(`[SERVER-SELECTOR] Gesamt: ${allGuilds.length} Guilds (${userGuilds.length} OAuth2, ${guildUserGuilds.length} mit DASHBOARD.ACCESS)`);
 
         const botGuildsResponse = await ipcServer.broadcast("dashboard:GET_BOT_GUILDS");
         const botGuildIds = botGuildsResponse
@@ -554,16 +534,12 @@ exports.getServerSelector = async (req, res) => {
             const isAdmin = (guild.permissions & 0x8) === 0x8;
             const isManager = (guild.permissions & 0x20) === 0x20;
             
-            // Custom Permissions aus DB prüfen (guild_staff - ALTE TABELLE)
-            const customPerm = customPermsMap.get(guild.id);
-            const hasCustomAccess = !!customPerm; // Wenn Eintrag in guild_staff existiert
-            
             // guild_users-Zugriff (NEUES SYSTEM!)
-            const hasGuildUserAccess = guild.fromGuildUsers === true;
-            const customRole = customPerm?.role || null;
+            // WICHTIG: Nur wenn User auch DASHBOARD.ACCESS Permission hat!
+            const hasGuildUserAccess = guild.fromGuildUsers === true && guild.hasDashboardAccess === true;
             
-            // canManage: Discord-Permissions ODER Custom DB-Permissions ODER guild_users
-            const canManage = isAdmin || isManager || guild.owner || hasCustomAccess || hasGuildUserAccess;
+            // canManage: Discord-Permissions ODER guild_users mit DASHBOARD.ACCESS
+            const canManage = isAdmin || isManager || guild.owner || hasGuildUserAccess;
             
             const botInGuild = botGuildIds.includes(guild.id);
 
@@ -579,8 +555,6 @@ exports.getServerSelector = async (req, res) => {
                 ...guild,
                 admin: isAdmin || guild.owner,
                 canManage,
-                customRole, // 'admin', 'manager', 'moderator', 'viewer' oder null
-                hasCustomAccess, // guild_staff (alte Tabelle)
                 hasGuildUserAccess, // guild_users (neues Permission-System)
                 fromGuildUsers: guild.fromGuildUsers || false,
                 botInGuild,
@@ -595,7 +569,7 @@ exports.getServerSelector = async (req, res) => {
         
         Logger.debug(`[SERVER-SELECTOR] User hat Zugriff auf ${accessibleGuilds.length} von ${guilds.length} Servern`);
         accessibleGuilds.forEach(g => {
-            Logger.debug(`  - ${g.name} (${g.id}): owner=${g.owner}, admin=${g.admin}, customRole=${g.customRole}, canManage=${g.canManage}, botInGuild=${g.botInGuild}`);
+            Logger.debug(`  - ${g.name} (${g.id}): owner=${g.owner}, admin=${g.admin}, hasGuildUserAccess=${g.hasGuildUserAccess}, hasDashboardAccess=${g.hasDashboardAccess}, canManage=${g.canManage}, botInGuild=${g.botInGuild}`);
         });
         
         return res.render("auth/server-selector", {

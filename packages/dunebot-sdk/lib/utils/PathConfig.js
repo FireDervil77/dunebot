@@ -48,7 +48,9 @@ class PathConfig {
                 config: path.join(this.ROOT_DIR, 'apps/dashboard/themes', themeName, 'theme.json'),
                 module: path.join(this.ROOT_DIR, 'apps/dashboard/themes', themeName, 'theme.js'),
                 views: path.join(this.ROOT_DIR, 'apps/dashboard/themes', themeName, 'views'),
-                widgets: path.join(this.ROOT_DIR, 'apps/dashboard/themes', themeName, 'views/widgets')
+                widgets: path.join(this.ROOT_DIR, 'apps/dashboard/themes', themeName, 'views/widgets'),
+                assets: path.join(this.ROOT_DIR, 'apps/dashboard/themes', themeName, 'assets'),
+                partials: path.join(this.ROOT_DIR, 'apps/dashboard/themes', themeName, 'partials')
             })
         };
 

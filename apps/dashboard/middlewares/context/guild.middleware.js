@@ -90,92 +90,60 @@ module.exports = async (req, res, next) => {
     const guildData = req.session.user.guilds.find((guild) => guild.id === guildId);   
 
     // User-Daten für Templates bereitstellen
-    res.locals.user = req.session?.user || null;
+    // WICHTIG: .info verwenden, damit isOwner/hasSystemAccess aus base.middleware.js erhalten bleibt!
+    res.locals.user = req.session?.user?.info || null;
 
-    // Navigation für diese Guild laden
+    // Navigation für diese Guild sicherstellen (nur erstellen wenn fehlt, NICHT überschreiben!)
 try {
     // Existierende Guild-Daten nicht überschreiben
     if (!res.locals.guild || !res.locals.guild._id) {
         const guildData = req.session.user.guilds.find(
-            (guild) => guild.id === req.params.guildId
+            (guild) => guild.id === guildId
         );
         
         if (guildData) {
             res.locals.guild = guildData;
-            res.locals.guildId = req.params.guildId;
+            res.locals.guildId = guildId;
         }
     }
 
-    // KORRIGIERT: sort_order statt order_num verwenden
-    const navigation = await dbService.query(
-        "SELECT * FROM nav_items WHERE guildId = ? ORDER BY plugin ASC, sort_order ASC",
-        [req.params.guildId || null]
+    // Prüfe ob Navigation in DB existiert (OHNE zu überschreiben!)
+    const navigationRaw = await dbService.query(
+        "SELECT COUNT(*) as count FROM nav_items WHERE guildId = ?",
+        [guildId]
     );
-    Logger.debug("Navigation query result:", navigation.length ? "Found items" : "No items");
 
-
-     // Wenn keine Navigation existiert, für Core-Plugin anlegen
-    if (!navigation || navigation.length === 0) {
-        Logger.debug("No navigation found, attempting to create core navigation");
+    // Wenn keine Navigation existiert, für Core-Plugin anlegen
+    if (navigationRaw[0].count === 0) {
+        Logger.debug(`[Guild Middleware] Keine Navigation gefunden für Guild ${guildId}, erstelle Core-Navigation`);
 
         const corePlugin = pluginManager.getPlugin("core");
-        Logger.debug("Core plugin:", corePlugin ? "Found" : "Not found");
-
-        if (corePlugin) {
-            Logger.debug("Navigation items defined:", 
-                        corePlugin.navigationItems ? "Yes" : "No");
-            if (corePlugin.navigationItems) {
-                await corePlugin.registerNavigation(dbService, req.params.guildId);
-                
-                // Neu laden - KORRIGIERT: sort_order statt order_num verwenden
-                const refreshedNav = await dbService.query(
-                    "SELECT * FROM nav_items WHERE guildId = ? ORDER BY plugin ASC, sort_order ASC",
-                    [req.params.guildId || null]
-                );
-                Logger.debug("Navigation after creation:", 
-                        refreshedNav.length ? "Items created" : "Still empty");
-                        
-                if (refreshedNav.length > 0) {
-                    res.locals.navigation = refreshedNav;
-                    return next();
-                }
+        
+        if (corePlugin && typeof corePlugin._registerNavigation === 'function') {
+            try {
+                await corePlugin._registerNavigation(guildId);
+                Logger.debug(`[Guild Middleware] Core-Navigation für Guild ${guildId} erfolgreich erstellt`);
+            } catch (error) {
+                Logger.error("[Guild Middleware] Fehler beim Erstellen der Core-Navigation:", error);
             }
         }
     }
-    res.locals.navigation = navigation;
+    
+    // ✅ WICHTIG: res.locals.guildNav wird von base.middleware.js gesetzt (mit Struktur + Filterung)!
+    // Wir überschreiben es hier NICHT!
+    
 } catch (error) {
-    Logger.error("Error loading navigation:", error);
-    res.locals.navigation = [];
+    Logger.error("[Guild Middleware] Error in navigation check:", error);
 }  
     res.locals.guilds = req.session.user;
     
-    // SuperAdmin Config-Variablen für alle Templates verfügbar machen
-    // WICHTIG: Diese Configs sind GLOBAL (guildId = null), da sie für alle Guilds gelten
-    
+    // Globale Konfigurations-Variablen für alle Templates (aus ENV)
     try {
-        Logger.debug('[Guild Middleware] Loading SuperAdmin global configs');
-        
-        // Globale Configs (ohne guildId) - gelten für alle Guilds
-        const supportUrl = await dbService.getConfig('superadmin', 'DISCORD_SUPPORT_SERVER_URL', 'shared', null);
-        const supportName = await dbService.getConfig('superadmin', 'DISCORD_SUPPORT_SERVER_NAME', 'shared', null);
-        const dashboardVersion = await dbService.getConfig('superadmin', 'DASHBOARD_VERSION', 'shared', null);
-        const botVersion = await dbService.getConfig('superadmin', 'BOT_VERSION', 'shared', null);
-        const buyMeCoffeeUrl = await dbService.getConfig('superadmin', 'BUYMEACOFFE_URL', 'shared', null);
-        
-        // IMMER setzen, mit Fallback wenn null/undefined
-        res.locals.supportUrl = supportUrl || '#';
-        res.locals.supportName = supportName || 'Discord Support';
-        res.locals.dashboardVersion = dashboardVersion || '1.0.0';
-        res.locals.botVersion = botVersion || '1.0.0';
-        res.locals.buyMeCoffeeUrl = buyMeCoffeeUrl || '#';
-        
-        Logger.debug('[Guild Middleware] SuperAdmin configs loaded:', {
-            supportUrl: res.locals.supportUrl,
-            supportName: res.locals.supportName,
-            dashboardVersion: res.locals.dashboardVersion,
-            botVersion: res.locals.botVersion,
-            hasValues: !!(supportUrl || dashboardVersion || botVersion)
-        });
+        res.locals.supportUrl = process.env.DISCORD_SUPPORT_SERVER_URL || '#';
+        res.locals.supportName = process.env.DISCORD_SUPPORT_SERVER_NAME || 'Discord Support';
+        res.locals.dashboardVersion = process.env.DASHBOARD_VERSION || '1.0.0';
+        res.locals.botVersion = process.env.BOT_VERSION || '1.0.0';
+        res.locals.buyMeCoffeeUrl = process.env.BUYMEACOFFE_URL || '#';
     } catch (error) {
         Logger.warn('[Guild Middleware] Error loading SuperAdmin configs:', error.message);
         // Fallback-Werte IMMER setzen
@@ -195,8 +163,9 @@ try {
         res.locals.pendingUpdatesCount = 0;
     }
     
-    // SuperAdmin-Status für Templates (für Reload-Button etc.)
-    res.locals.isSuperAdmin = req.session?.user?.isSuperAdmin || false;
+    // Admin-Status für Templates (OWNER_IDS aus ENV)
+    const { isAdminUser } = require('../admin.middleware');
+    res.locals.isAdmin = isAdminUser(req.session?.user?.id || req.session?.user?.info?.id);
     
     next();
 };

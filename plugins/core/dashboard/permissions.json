@@ -189,15 +189,6 @@
       "category": "core",
       "is_dangerous": 0,
       "requires": "DONATE.VIEW"
-    },
-    {
-      "key": "SUPERADMIN.*",
-      "name": "PERMISSIONS.SUPERADMIN_ALL",
-      "description": "PERMISSIONS.SUPERADMIN_ALL_DESC",
-      "category": "superadmin",
-      "is_dangerous": 1,
-      "sort_order": 1000,
-      "requires": null
     }
   ]
 }

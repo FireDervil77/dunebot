@@ -1,0 +1,408 @@
+<%# 
+  * News Editor - Multi-Language (DE/EN)
+  * Erstellen & Bearbeiten von News mit Übersetzungen
+  %>
+
+<div class="app-content">
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h2><%= news && news._id ? 'News bearbeiten' : 'Neue News erstellen' %></h2>
+            </div>
+            <div class="col-md-6 text-end">
+                <a href="/admin/news" class="btn btn-secondary">
+                    <i class="fa-solid fa-arrow-left me-2"></i>Zurück zur Übersicht
+                </a>
+            </div>
+        </div>
+
+        <!-- News Formular -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST" 
+                              action="/admin/news/save"
+                              class="guild-ajax-form"
+                              data-form-type="news">
+                            <!-- Verstecktes Feld für ID bei Bearbeitung -->
+                            <% if (news && news._id) { %>
+                                <input type="hidden" name="newsId" value="<%= news._id %>">
+                            <% } %>
+
+                            <!-- Language Tabs -->
+                            <ul class="nav nav-tabs mb-4" id="newsLanguageTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <a class="nav-link active" 
+                                       id="german-tab" 
+                                       data-bs-toggle="tab" 
+                                       data-bs-target="#german" 
+                                       href="#german"
+                                       role="tab"
+                                       aria-controls="german"
+                                       aria-selected="true">
+                                        🇩🇪 Deutsch
+                                    </a>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <a class="nav-link" 
+                                       id="english-tab" 
+                                       data-bs-toggle="tab" 
+                                       data-bs-target="#english"
+                                       href="#english" 
+                                       role="tab"
+                                       aria-controls="english"
+                                       aria-selected="false">
+                                        🇬🇧 English
+                                    </a>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <a class="nav-link" 
+                                       id="metadata-tab" 
+                                       data-bs-toggle="tab" 
+                                       data-bs-target="#metadata"
+                                       href="#metadata" 
+                                       role="tab"
+                                       aria-controls="metadata"
+                                       aria-selected="false">
+                                        ⚙️ Einstellungen
+                                    </a>
+                                </li>
+                            </ul>                            <!-- Tab Content -->
+                            <div class="tab-content" id="newsLanguageTabsContent">
+                                <!-- German Tab -->
+                                <div class="tab-pane fade show active" 
+                                     id="german" 
+                                     role="tabpanel" 
+                                     aria-labelledby="german-tab"
+                                     tabindex="0">
+                                    <h4 class="mb-3">Deutsche Übersetzung</h4>
+                                    
+                                    <div class="mb-3">
+                                        <label for="title_de" class="form-label">Titel (DE) *</label>
+                                        <input type="text" 
+                                               class="form-control" 
+                                               id="title_de" 
+                                               name="title_de" 
+                                               value="<%= news && news.title_de ? news.title_de : '' %>" 
+                                               required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="excerpt_de" class="form-label">Kurzbeschreibung (DE) *</label>
+                                        <textarea class="form-control" 
+                                                  id="excerpt_de" 
+                                                  name="excerpt_de" 
+                                                  rows="3" 
+                                                  required><%= news && news.excerpt_de ? news.excerpt_de : '' %></textarea>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="content_de" class="form-label">Inhalt (DE) *</label>
+                                        <textarea class="form-control" 
+                                                  id="content_de" 
+                                                  name="content_de" 
+                                                  rows="15" 
+                                                  required><%= news && news.content_de ? news.content_de : '' %></textarea>
+                                        <small class="form-text text-muted">
+                                            HTML-Tags werden unterstützt (z.B. &lt;p&gt;, &lt;h3&gt;, &lt;ul&gt;, &lt;strong&gt;)
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <!-- English Tab -->
+                                <div class="tab-pane fade" 
+                                     id="english" 
+                                     role="tabpanel"
+                                     aria-labelledby="english-tab"
+                                     tabindex="0">
+                                    <h4 class="mb-3">English Translation</h4>
+                                    
+                                    <div class="mb-3">
+                                        <label for="title_en" class="form-label">Title (EN) *</label>
+                                        <input type="text" 
+                                               class="form-control" 
+                                               id="title_en" 
+                                               name="title_en" 
+                                               value="<%= news && news.title_en ? news.title_en : '' %>" 
+                                               required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="excerpt_en" class="form-label">Excerpt (EN) *</label>
+                                        <textarea class="form-control" 
+                                                  id="excerpt_en" 
+                                                  name="excerpt_en" 
+                                                  rows="3" 
+                                                  required><%= news && news.excerpt_en ? news.excerpt_en : '' %></textarea>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="content_en" class="form-label">Content (EN) *</label>
+                                        <textarea class="form-control" 
+                                                  id="content_en" 
+                                                  name="content_en" 
+                                                  rows="15" 
+                                                  required><%= news && news.content_en ? news.content_en : '' %></textarea>
+                                        <small class="form-text text-muted">
+                                            HTML tags are supported (e.g. &lt;p&gt;, &lt;h3&gt;, &lt;ul&gt;, &lt;strong&gt;)
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <!-- Metadata Tab -->
+                                <div class="tab-pane fade" 
+                                     id="metadata" 
+                                     role="tabpanel"
+                                     aria-labelledby="metadata-tab"
+                                     tabindex="0">
+                                    <h4 class="mb-3">News-Einstellungen</h4>
+                                    
+                                    <!-- Slug -->
+                                    <div class="mb-3">
+                                        <label for="slug" class="form-label">Slug *</label>
+                                        <input type="text" 
+                                               class="form-control" 
+                                               id="slug" 
+                                               name="slug" 
+                                               value="<%= news && news.slug ? news.slug : '' %>" 
+                                               required>
+                                        <small class="form-text text-muted">
+                                            URL-freundlicher Name (z.B. "grosse-news-update")
+                                        </small>
+                                    </div>
+
+                                    <!-- Autor -->
+                                    <div class="mb-3">
+                                        <label for="author" class="form-label">Autor *</label>
+                                        <input type="text" 
+                                               class="form-control" 
+                                               id="author" 
+                                               name="author" 
+                                               value="<%= news && news.author ? news.author : (user && user.info && user.info.username ? user.info.username : 'Admin') %>" 
+                                               required>
+                                    </div>
+
+                                    <!-- Image URL -->
+                                    <div class="mb-3">
+                                        <label for="image_url" class="form-label">Bild URL / Pfad</label>
+                                        <input type="text" 
+                                               class="form-control" 
+                                               id="image_url" 
+                                               name="image_url" 
+                                               value="<%= news && news.image_url ? news.image_url : '' %>"
+                                               placeholder="/images/news/my-image.jpg oder https://example.com/image.jpg">
+                                        <small class="form-text text-muted">
+                                            Optional: URL oder relativer Pfad zu einem Bild
+                                        </small>
+                                    </div>
+
+                                    <!-- Status -->
+                                    <div class="mb-3">
+                                        <label for="status" class="form-label">Status *</label>
+                                        <select class="form-select" id="status" name="status" required>
+                                            <option value="draft" <%= news && news.status === 'draft' ? 'selected' : '' %>>
+                                                📝 Entwurf
+                                            </option>
+                                            <option value="published" <%= news && news.status === 'published' ? 'selected' : '' %>>
+                                                ✅ Veröffentlicht
+                                            </option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Datum -->
+                                    <div class="mb-3">
+                                        <label for="date" class="form-label">Veröffentlichungsdatum *</label>
+                                        <input type="datetime-local" 
+                                               class="form-control" 
+                                               id="date" 
+                                               name="date" 
+                                               value="<%= news && news.date ? new Date(news.date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16) %>" 
+                                               required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Submit Buttons -->
+                            <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                                <a href="/admin/news" class="btn btn-secondary">
+                                    Abbrechen
+                                </a>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fa-solid fa-save me-2"></i>Speichern
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TinyMCE WYSIWYG Editor -->
+<script src="/themes/default/assets/vendor/tinymce/tinymce.min.js"></script>
+<script>
+console.log('[TinyMCE News] Script geladen, warte auf DOMContentLoaded...');
+
+// TinyMCE für News-Editor
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[TinyMCE News] DOM geladen, initialisiere Editor...');
+    
+    // Prüfe ob Textareas existieren
+    const textareas = document.querySelectorAll('#content_de, #content_en, #excerpt_de, #excerpt_en');
+    console.log('[TinyMCE News] Gefundene Textareas:', textareas.length);
+    
+    if (textareas.length === 0) {
+        console.error('[TinyMCE News] FEHLER: Keine Textareas gefunden!');
+        return;
+    }
+    
+    console.log('[TinyMCE News] Starte tinymce.init()...');
+    tinymce.init({
+        selector: '#content_de, #content_en, #excerpt_de, #excerpt_en',
+        height: 500,
+        menubar: true,
+        plugins: [
+            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+            'insertdatetime', 'media', 'table', 'help', 'wordcount'
+        ],
+        toolbar: 'undo redo | blocks | ' +
+            'bold italic forecolor | alignleft aligncenter ' +
+            'alignright alignjustify | bullist numlist outdent indent | ' +
+            'link image | removeformat | help',
+        content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
+        // language: 'de', // ❌ Deaktiviert - TinyMCE 7 benötigt separat heruntergeladene Language Packs
+        branding: false,
+        promotion: false,
+        license_key: 'gpl',
+        
+        // Image-Upload (optional später konfigurieren)
+        images_upload_url: '/upload/image',
+        automatic_uploads: false,
+        
+        block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Blockquote=blockquote',
+        
+        setup: function(editor) {
+            editor.on('init', function() {
+                console.log('[TinyMCE News] ✅ Editor initialisiert für:', editor.targetElm.id);
+            });
+        }
+    }).then(function(editors) {
+        console.log('[TinyMCE News] ✅ Erfolgreich initialisiert, Anzahl Editoren:', editors.length);
+    }).catch(function(error) {
+        console.error('[TinyMCE News] ❌ FEHLER bei Initialisierung:', error);
+    });
+});
+</script>
+
+<script>
+// Pure JavaScript Tabs (Bootstrap 5.3 compatible with <a> links)
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[NewsEdit] Initializing tabs');
+    
+    // Get all tab links and panes
+    const tabLinks = document.querySelectorAll('#newsLanguageTabs a[data-bs-toggle="tab"]');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    
+    console.log('[NewsEdit] Found tab links:', tabLinks.length);
+    console.log('[NewsEdit] Found tab panes:', tabPanes.length);
+    
+    // Function to show a specific tab
+    function showTab(targetId, clickedLink) {
+        // Hide all tab panes
+        tabPanes.forEach(pane => {
+            pane.classList.remove('show', 'active');
+        });
+        
+        // Remove active class from all links
+        tabLinks.forEach(link => {
+            link.classList.remove('active');
+            link.setAttribute('aria-selected', 'false');
+        });
+        
+        // Show the target pane
+        const targetPane = document.querySelector(targetId);
+        if (targetPane) {
+            targetPane.classList.add('show', 'active');
+        }
+        
+        // Set clicked link as active
+        if (clickedLink) {
+            clickedLink.classList.add('active');
+            clickedLink.setAttribute('aria-selected', 'true');
+        }
+        
+        console.log('[NewsEdit] Showing tab:', targetId);
+    }
+    
+    // Add click event to each tab link
+    tabLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const targetId = this.getAttribute('data-bs-target') || this.getAttribute('href');
+            console.log('[NewsEdit] Tab clicked:', this.id, '-> Target:', targetId);
+            
+            showTab(targetId, this);
+        });
+    });
+    
+    console.log('[NewsEdit] Tabs initialized successfully');
+
+    // Auto-generate slug from German title
+    const titleDeInput = document.getElementById('title_de');
+    const slugInput = document.getElementById('slug');
+    const isNewNews = <%= news && news._id ? 'false' : 'true' %>;
+    
+    if (titleDeInput && slugInput) {
+        titleDeInput.addEventListener('input', function(e) {
+            if (!slugInput.value || isNewNews) {
+                const slug = e.target.value
+                    .toLowerCase()
+                    .replace(/ä/g, 'ae')
+                    .replace(/ö/g, 'oe')
+                    .replace(/ü/g, 'ue')
+                    .replace(/ß/g, 'ss')
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-+|-+$/g, '');
+                slugInput.value = slug;
+            }
+        });
+        console.log('[NewsEdit] Slug auto-generation initialized');
+    }
+    
+    // ⚡ KRITISCH: Form-Submit-Handler für TinyMCE-Sync
+    const newsForm = document.querySelector('form[data-form-type="news"]');
+    if (newsForm) {
+        newsForm.addEventListener('submit', function(e) {
+            console.log('[NewsEdit] Form submit triggered, syncing TinyMCE...');
+            
+            // TinyMCE-Inhalte in Original-Textareas zurückschreiben
+            if (typeof tinymce !== 'undefined') {
+                tinymce.triggerSave(); // Synchronisiert ALLE Editoren
+                console.log('[NewsEdit] ✅ TinyMCE content synced');
+                
+                // Debug: Prüfe ob Felder jetzt gefüllt sind
+                const requiredFields = ['title_de', 'excerpt_de', 'content_de', 'title_en', 'excerpt_en', 'content_en'];
+                requiredFields.forEach(fieldName => {
+                    const field = document.getElementById(fieldName);
+                    if (field) {
+                        const isEmpty = !field.value || field.value.trim() === '';
+                        console.log(`[NewsEdit] Field ${fieldName}: ${isEmpty ? '❌ LEER' : '✅ gefüllt'} (${field.value.length} chars)`);
+                        
+                        // Entferne is-invalid wenn jetzt gefüllt
+                        if (!isEmpty) {
+                            field.classList.remove('is-invalid');
+                        }
+                    }
+                });
+            }
+            
+            // Form wird normal weiter abgesendet (keine e.preventDefault!)
+        });
+        console.log('[NewsEdit] ✅ Form submit handler registered');
+    }
+});
+</script>

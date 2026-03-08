@@ -104,6 +104,31 @@
         
         "SUPERADMIN_ALL": "SuperAdmin (Alle Rechte)",
         "SUPERADMIN_ALL_DESC": "Vollständiger Zugriff auf alle Funktionen (SEHR KRITISCH)",
+
+        "SYSTEM_ACCESS": "System-Zugriff",
+        "SYSTEM_ACCESS_DESC": "Erlaubt den grundlegenden Zugriff auf den Admin-Bereich",
+        "SYSTEM_NEWS_VIEW": "News ansehen",
+        "SYSTEM_NEWS_VIEW_DESC": "Erlaubt das Ansehen der System-News",
+        "SYSTEM_NEWS_EDIT": "News bearbeiten",
+        "SYSTEM_NEWS_EDIT_DESC": "Erlaubt das Erstellen und Bearbeiten von System-News",
+        "SYSTEM_NOTIFICATIONS_VIEW": "Benachrichtigungen ansehen",
+        "SYSTEM_NOTIFICATIONS_VIEW_DESC": "Erlaubt das Ansehen der System-Benachrichtigungen",
+        "SYSTEM_NOTIFICATIONS_SEND": "Benachrichtigungen senden",
+        "SYSTEM_NOTIFICATIONS_SEND_DESC": "Erlaubt das Senden von System-Benachrichtigungen an alle Guilds",
+        "SYSTEM_DONATIONS_VIEW": "Spenden ansehen (Admin)",
+        "SYSTEM_DONATIONS_VIEW_DESC": "Erlaubt das Ansehen aller Spenden im Admin-Bereich",
+        "SYSTEM_DONATIONS_MANAGE": "Spenden verwalten",
+        "SYSTEM_DONATIONS_MANAGE_DESC": "Erlaubt das Verwalten und Bearbeiten von Spenden",
+        "SYSTEM_STATS_VIEW": "System-Statistiken ansehen",
+        "SYSTEM_STATS_VIEW_DESC": "Erlaubt das Ansehen der globalen Bot-Statistiken",
+        "SYSTEM_FEEDBACK_VIEW": "Feedback ansehen",
+        "SYSTEM_FEEDBACK_VIEW_DESC": "Erlaubt das Ansehen von User-Feedback und Bug-Reports",
+        "SYSTEM_FEEDBACK_MANAGE": "Feedback verwalten",
+        "SYSTEM_FEEDBACK_MANAGE_DESC": "Erlaubt das Bearbeiten und Schließen von Feedback-Einträgen",
+        "SYSTEM_ADDONS_VIEW": "Addons ansehen",
+        "SYSTEM_ADDONS_VIEW_DESC": "Erlaubt das Ansehen des Addon-Marketplace",
+        "SYSTEM_ADDONS_MANAGE": "Addons verwalten",
+        "SYSTEM_ADDONS_MANAGE_DESC": "Erlaubt das Installieren und Verwalten von Addons",
         
         "AUTOMOD_SETTINGS_VIEW": "AutoMod-Einstellungen ansehen",
         "AUTOMOD_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der AutoMod-Konfiguration",
@@ -323,7 +348,34 @@
             "LEVEL": "Level",
             "BOOSTS": "Boosts"
         }
-    } 
-    
+    },
+
+    "SYSTEM": {
+        "ACCESS": "System-Zugriff",
+        "ACCESS_DESC": "Erlaubt den grundlegenden Zugriff auf den Admin-Bereich",
+        "NEWS_VIEW": "News ansehen",
+        "NEWS_VIEW_DESC": "Erlaubt das Ansehen der System-News",
+        "NEWS_EDIT": "News bearbeiten",
+        "NEWS_EDIT_DESC": "Erlaubt das Erstellen und Bearbeiten von System-News",
+        "NOTIFICATIONS_VIEW": "Benachrichtigungen ansehen",
+        "NOTIFICATIONS_VIEW_DESC": "Erlaubt das Ansehen der System-Benachrichtigungen",
+        "NOTIFICATIONS_SEND": "Benachrichtigungen senden",
+        "NOTIFICATIONS_SEND_DESC": "Erlaubt das Senden von System-Benachrichtigungen an alle Guilds",
+        "DONATIONS_VIEW": "Spenden ansehen (Admin)",
+        "DONATIONS_VIEW_DESC": "Erlaubt das Ansehen aller Spenden im Admin-Bereich",
+        "DONATIONS_MANAGE": "Spenden verwalten",
+        "DONATIONS_MANAGE_DESC": "Erlaubt das Verwalten und Bearbeiten von Spenden",
+        "STATS_VIEW": "System-Statistiken ansehen",
+        "STATS_VIEW_DESC": "Erlaubt das Ansehen der globalen Bot-Statistiken",
+        "FEEDBACK_VIEW": "Feedback ansehen",
+        "FEEDBACK_VIEW_DESC": "Erlaubt das Ansehen von User-Feedback und Bug-Reports",
+        "FEEDBACK_MANAGE": "Feedback verwalten",
+        "FEEDBACK_MANAGE_DESC": "Erlaubt das Bearbeiten und Schließen von Feedback-Einträgen",
+        "ADDONS_VIEW": "Addons ansehen",
+        "ADDONS_VIEW_DESC": "Erlaubt das Ansehen des Addon-Marketplace",
+        "ADDONS_MANAGE": "Addons verwalten",
+        "ADDONS_MANAGE_DESC": "Erlaubt das Installieren und Verwalten von Addons"
+    }
+
 }
 

@@ -156,6 +156,13 @@ class IPCClient {
         this.logger.info("[IPC] Initialisiere IPC-Client...");
         this._initialized = true;
         this.discordClient = client;
+
+        // Kern-IPC-Handler aus apps/bot/ipc/ laden
+        if (typeof client.loadCoreIpcHandlers === 'function') {
+            this.kernIpcHandlers = client.loadCoreIpcHandlers();
+        } else {
+            this.kernIpcHandlers = new Map();
+        }
         
         // Event-Handler für Nachrichten registrieren
         if (this.node) {
@@ -312,13 +319,25 @@ class IPCClient {
                     
                 case "BOT_HEALTH_CHECK":
                     return await this.#handleBotHealthCheck(message);
-                    
-                default:
+
+                default: {
+                    // Kern-IPC-Handler aus apps/bot/ipc/ als Fallback
+                    if (this.kernIpcHandlers?.has(eventName)) {
+                        const handler = this.kernIpcHandlers.get(eventName);
+                        try {
+                            const data = await handler(payload, this.discordClient);
+                            return message.reply({ success: true, data });
+                        } catch (err) {
+                            this.logger.error(`[IPC] Kern-Handler ${eventName} Fehler:`, err);
+                            return message.reply({ success: false, error: err.message });
+                        }
+                    }
                     this.logger.warn(`[IPC] Unbekanntes Dashboard-Event: ${eventName}`);
                     return message.reply({
                         success: false,
                         error: `Unbekanntes Event: ${eventName}`
                     });
+                }
             }
         } catch (error) {
             this.logger.error(`[IPC] Fehler bei der Verarbeitung von Dashboard-Event ${eventName}:`, error);

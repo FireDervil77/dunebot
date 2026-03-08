@@ -1,0 +1,276 @@
+{
+  "plugin": "kern",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "DASHBOARD.ACCESS",
+      "name": "PERMISSIONS.DASHBOARD_ACCESS",
+      "description": "PERMISSIONS.DASHBOARD_ACCESS_DESC",
+      "category": "dashboard",
+      "is_dangerous": 0,
+      "sort_order": 9,
+      "requires": null
+    },
+    {
+      "key": "DASHBOARD.SETTINGS.VIEW",
+      "name": "PERMISSIONS.DASHBOARD_SETTINGS_VIEW",
+      "description": "PERMISSIONS.DASHBOARD_SETTINGS_VIEW_DESC",
+      "category": "dashboard",
+      "is_dangerous": 0,
+      "sort_order": 11,
+      "requires": null
+    },
+    {
+      "key": "DASHBOARD.SETTINGS.EDIT",
+      "name": "PERMISSIONS.DASHBOARD_SETTINGS_EDIT",
+      "description": "PERMISSIONS.DASHBOARD_SETTINGS_EDIT_DESC",
+      "category": "dashboard",
+      "is_dangerous": 1,
+      "sort_order": 10,
+      "requires": "DASHBOARD.SETTINGS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.USERS.VIEW",
+      "name": "PERMISSIONS.USERS_VIEW",
+      "description": "PERMISSIONS.USERS_VIEW_DESC",
+      "category": "permissions",
+      "is_dangerous": 0,
+      "sort_order": 20,
+      "requires": null
+    },
+    {
+      "key": "PERMISSIONS.USERS.INVITE",
+      "name": "PERMISSIONS.USERS_INVITE",
+      "description": "PERMISSIONS.USERS_INVITE_DESC",
+      "category": "permissions",
+      "is_dangerous": 0,
+      "sort_order": 21,
+      "requires": "PERMISSIONS.USERS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.USERS.EDIT",
+      "name": "PERMISSIONS.USERS_EDIT",
+      "description": "PERMISSIONS.USERS_EDIT_DESC",
+      "category": "permissions",
+      "is_dangerous": 1,
+      "sort_order": 22,
+      "requires": "PERMISSIONS.USERS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.USERS.REMOVE",
+      "name": "PERMISSIONS.USERS_REMOVE",
+      "description": "PERMISSIONS.USERS_REMOVE_DESC",
+      "category": "permissions",
+      "is_dangerous": 1,
+      "sort_order": 23,
+      "requires": "PERMISSIONS.USERS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.GROUPS.VIEW",
+      "name": "PERMISSIONS.GROUPS_VIEW",
+      "description": "PERMISSIONS.GROUPS_VIEW_DESC",
+      "category": "permissions",
+      "is_dangerous": 0,
+      "sort_order": 30,
+      "requires": null
+    },
+    {
+      "key": "PERMISSIONS.GROUPS.CREATE",
+      "name": "PERMISSIONS.GROUPS_CREATE",
+      "description": "PERMISSIONS.GROUPS_CREATE_DESC",
+      "category": "permissions",
+      "is_dangerous": 0,
+      "sort_order": 31,
+      "requires": "PERMISSIONS.GROUPS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.GROUPS.EDIT",
+      "name": "PERMISSIONS.GROUPS_EDIT",
+      "description": "PERMISSIONS.GROUPS_EDIT_DESC",
+      "category": "permissions",
+      "is_dangerous": 1,
+      "sort_order": 32,
+      "requires": "PERMISSIONS.GROUPS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.GROUPS.DELETE",
+      "name": "PERMISSIONS.GROUPS_DELETE",
+      "description": "PERMISSIONS.GROUPS_DELETE_DESC",
+      "category": "permissions",
+      "is_dangerous": 1,
+      "sort_order": 33,
+      "requires": "PERMISSIONS.GROUPS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.ASSIGN",
+      "name": "PERMISSIONS.ASSIGN",
+      "description": "PERMISSIONS.ASSIGN_DESC",
+      "category": "permissions",
+      "is_dangerous": 1,
+      "sort_order": 40,
+      "requires": null
+    },
+    {
+      "key": "CORE.SETTINGS.VIEW",
+      "name": "CORE.PERM_SETTINGS_VIEW",
+      "description": "CORE.PERM_SETTINGS_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 50,
+      "requires": null
+    },
+    {
+      "key": "CORE.SETTINGS.EDIT",
+      "name": "CORE.PERM_SETTINGS_EDIT",
+      "description": "CORE.PERM_SETTINGS_EDIT_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 51,
+      "requires": "CORE.SETTINGS.VIEW"
+    },
+    {
+      "key": "CORE.PLUGINS.VIEW",
+      "name": "CORE.PERM_PLUGINS_VIEW",
+      "description": "CORE.PERM_PLUGINS_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 52,
+      "requires": null
+    },
+    {
+      "key": "CORE.PLUGINS.MANAGE",
+      "name": "CORE.PERM_PLUGINS_MANAGE",
+      "description": "CORE.PERM_PLUGINS_MANAGE_DESC",
+      "category": "core",
+      "is_dangerous": 1,
+      "sort_order": 53,
+      "requires": "CORE.PLUGINS.VIEW"
+    },
+    {
+      "key": "PERMISSIONS.VIEW",
+      "name": "PERMISSIONS.VIEW",
+      "description": "PERMISSIONS.VIEW_DESC",
+      "category": "permissions",
+      "is_dangerous": 0,
+      "sort_order": 15,
+      "requires": null
+    },
+    {
+      "key": "PERMISSIONS.MATRIX.VIEW",
+      "name": "PERMISSIONS.MATRIX_VIEW",
+      "description": "PERMISSIONS.MATRIX_VIEW_DESC",
+      "category": "permissions",
+      "is_dangerous": 0,
+      "sort_order": 45,
+      "requires": "PERMISSIONS.VIEW"
+    },
+    {
+      "key": "SYSTEM.ACCESS",
+      "name": "SYSTEM.ACCESS",
+      "description": "SYSTEM.ACCESS_DESC",
+      "category": "system",
+      "is_dangerous": 1,
+      "sort_order": 1000,
+      "requires": null
+    },
+    {
+      "key": "SYSTEM.NEWS.VIEW",
+      "name": "SYSTEM.NEWS_VIEW",
+      "description": "SYSTEM.NEWS_VIEW_DESC",
+      "category": "system",
+      "is_dangerous": 0,
+      "sort_order": 1010,
+      "requires": "SYSTEM.ACCESS"
+    },
+    {
+      "key": "SYSTEM.NEWS.EDIT",
+      "name": "SYSTEM.NEWS_EDIT",
+      "description": "SYSTEM.NEWS_EDIT_DESC",
+      "category": "system",
+      "is_dangerous": 1,
+      "sort_order": 1011,
+      "requires": "SYSTEM.NEWS.VIEW"
+    },
+    {
+      "key": "SYSTEM.NOTIFICATIONS.VIEW",
+      "name": "SYSTEM.NOTIFICATIONS_VIEW",
+      "description": "SYSTEM.NOTIFICATIONS_VIEW_DESC",
+      "category": "system",
+      "is_dangerous": 0,
+      "sort_order": 1020,
+      "requires": "SYSTEM.ACCESS"
+    },
+    {
+      "key": "SYSTEM.NOTIFICATIONS.SEND",
+      "name": "SYSTEM.NOTIFICATIONS_SEND",
+      "description": "SYSTEM.NOTIFICATIONS_SEND_DESC",
+      "category": "system",
+      "is_dangerous": 1,
+      "sort_order": 1021,
+      "requires": "SYSTEM.NOTIFICATIONS.VIEW"
+    },
+    {
+      "key": "SYSTEM.DONATIONS.VIEW",
+      "name": "SYSTEM.DONATIONS_VIEW",
+      "description": "SYSTEM.DONATIONS_VIEW_DESC",
+      "category": "system",
+      "is_dangerous": 0,
+      "sort_order": 1030,
+      "requires": "SYSTEM.ACCESS"
+    },
+    {
+      "key": "SYSTEM.DONATIONS.MANAGE",
+      "name": "SYSTEM.DONATIONS_MANAGE",
+      "description": "SYSTEM.DONATIONS_MANAGE_DESC",
+      "category": "system",
+      "is_dangerous": 1,
+      "sort_order": 1031,
+      "requires": "SYSTEM.DONATIONS.VIEW"
+    },
+    {
+      "key": "SYSTEM.STATS.VIEW",
+      "name": "SYSTEM.STATS_VIEW",
+      "description": "SYSTEM.STATS_VIEW_DESC",
+      "category": "system",
+      "is_dangerous": 0,
+      "sort_order": 1040,
+      "requires": "SYSTEM.ACCESS"
+    },
+    {
+      "key": "SYSTEM.FEEDBACK.VIEW",
+      "name": "SYSTEM.FEEDBACK_VIEW",
+      "description": "SYSTEM.FEEDBACK_VIEW_DESC",
+      "category": "system",
+      "is_dangerous": 0,
+      "sort_order": 1050,
+      "requires": "SYSTEM.ACCESS"
+    },
+    {
+      "key": "SYSTEM.FEEDBACK.MANAGE",
+      "name": "SYSTEM.FEEDBACK_MANAGE",
+      "description": "SYSTEM.FEEDBACK_MANAGE_DESC",
+      "category": "system",
+      "is_dangerous": 1,
+      "sort_order": 1051,
+      "requires": "SYSTEM.FEEDBACK.VIEW"
+    },
+    {
+      "key": "SYSTEM.ADDONS.VIEW",
+      "name": "SYSTEM.ADDONS_VIEW",
+      "description": "SYSTEM.ADDONS_VIEW_DESC",
+      "category": "system",
+      "is_dangerous": 0,
+      "sort_order": 1060,
+      "requires": "SYSTEM.ACCESS"
+    },
+    {
+      "key": "SYSTEM.ADDONS.MANAGE",
+      "name": "SYSTEM.ADDONS_MANAGE",
+      "description": "SYSTEM.ADDONS_MANAGE_DESC",
+      "category": "system",
+      "is_dangerous": 1,
+      "sort_order": 1061,
+      "requires": "SYSTEM.ADDONS.VIEW"
+    }
+  ]
+}

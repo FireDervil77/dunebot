@@ -1,7 +1,8 @@
 <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
   <div class="sidebar-brand">
-    <a href="/guild/<%= guildId %>" class="brand-link">
-      <img src="/themes/default/assets/images/DuneBot.png" alt="DuneBot" class="brand-image opacity-75 shadow">
+    <% const _brandUrl = (typeof guildId !== 'undefined' && guildId) ? '/guild/' + guildId : '/guild'; %>
+    <a href="<%= _brandUrl %>" class="brand-link">
+      <img src="<%= typeof resolveAssetUrl === 'function' ? resolveAssetUrl('images/DuneBot.png') : '/themes/default/assets/images/DuneBot.png' %>" alt="DuneBot" class="brand-image opacity-75 shadow">
       <span class="brand-text fw-light">DuneBot</span>
     </a>
   </div>
@@ -10,14 +11,10 @@
     <nav class="mt-2">
         <%
            const navItems = (guildNav && guildNav.length) ? guildNav : [];
-            %>
+        %>
         <% if (navItems.length === 0) { %>
           <div class="text-muted small px-3 py-2">
             <i class="bi bi-info-circle me-1"></i> <%= tr('DASHBOARD_COMMON.NO_NAVIGATION') %>
-          </div>
-          <!-- Debug-Info anzeigen -->
-          <div class="text-muted small px-3 py-2">
-            <small>Debug: guildId=<%= guildId || 'N/A' %>, NavItems=<%= navItems.length %></small>
           </div>
         <% } else { %>
           <ul class="nav nav-pills nav-sidebar flex-column" role="menu" data-accordion="false">
@@ -73,5 +70,129 @@
           </ul>
         <% } %>
     </nav>
+
+    <%# ============================================================ %>
+    <%# SYSTEM / ADMIN BEREICH — nur für Owner & System-Admins       %>
+    <%# ============================================================ %>
+    <% 
+      const _u = (typeof locals !== 'undefined' && locals.user) ? locals.user : (typeof user !== 'undefined' ? user : null);
+      const _isSystemUser = _u && (_u.isOwner === true || _u.hasSystemAccess === true);
+      const _adminPath = (typeof activeMenu === 'string' && activeMenu.startsWith('/admin')) ? activeMenu : '';
+    %>
+
+    <%# DEBUG — bitte danach entfernen %>
+    <!-- DEBUG: user=<%= _u ? JSON.stringify({id:_u.id,isOwner:_u.isOwner,hasSystemAccess:_u.hasSystemAccess}) : 'null' %> | _isSystemUser=<%= _isSystemUser %> -->
+
+    <% if (_isSystemUser) { %>
+    <nav class="mt-3 sidebar-admin-section">
+      <ul class="nav nav-pills nav-sidebar flex-column" role="menu" data-accordion="false">
+        <li class="nav-header" style="color:#e67e22;">
+          <i class="fa-solid fa-shield-halved me-1"></i> System
+        </li>
+
+        <!-- Dashboard -->
+        <li class="nav-item">
+          <a href="/admin" class="nav-link <%= _adminPath === '/admin' || _adminPath === '/admin/' ? 'active' : '' %>">
+            <i class="nav-icon fa-solid fa-gauge-high"></i>
+            <p>Übersicht</p>
+          </a>
+        </li>
+
+        <!-- News & Changelogs -->
+        <li class="nav-item <%= _adminPath.startsWith('/admin/news') || _adminPath.startsWith('/admin/changelogs') ? 'menu-open' : '' %>">
+          <a href="#" class="nav-link <%= _adminPath.startsWith('/admin/news') || _adminPath.startsWith('/admin/changelogs') ? 'active' : '' %>">
+            <i class="nav-icon fa-solid fa-newspaper"></i>
+            <p>News & Changelogs <i class="bi bi-chevron-right right"></i></p>
+          </a>
+          <ul class="nav nav-treeview">
+            <li class="nav-item">
+              <a href="/admin/news" class="nav-link <%= _adminPath.startsWith('/admin/news') ? 'active' : '' %>">
+                <i class="nav-icon fa-regular fa-dot-circle"></i>
+                <p>News</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="/admin/changelogs" class="nav-link <%= _adminPath.startsWith('/admin/changelogs') ? 'active' : '' %>">
+                <i class="nav-icon fa-regular fa-dot-circle"></i>
+                <p>Changelogs</p>
+              </a>
+            </li>
+          </ul>
+        </li>
+
+        <!-- Benachrichtigungen -->
+        <li class="nav-item">
+          <a href="/admin/notifications" class="nav-link <%= _adminPath.startsWith('/admin/notifications') ? 'active' : '' %>">
+            <i class="nav-icon fa-solid fa-bell"></i>
+            <p>Benachrichtigungen</p>
+          </a>
+        </li>
+
+        <!-- Statistiken -->
+        <li class="nav-item">
+          <a href="/admin/stats" class="nav-link <%= _adminPath === '/admin/stats' ? 'active' : '' %>">
+            <i class="nav-icon fa-solid fa-chart-bar"></i>
+            <p>Statistiken</p>
+          </a>
+        </li>
+
+        <!-- Feedback -->
+        <li class="nav-item">
+          <a href="/admin/feedback" class="nav-link <%= _adminPath.startsWith('/admin/feedback') ? 'active' : '' %>">
+            <i class="nav-icon fa-solid fa-comments"></i>
+            <p>Feedback</p>
+          </a>
+        </li>
+
+        <!-- Spenden -->
+        <li class="nav-item">
+          <a href="/admin/donations" class="nav-link <%= _adminPath.startsWith('/admin/donations') ? 'active' : '' %>">
+            <i class="nav-icon fa-solid fa-hand-holding-heart"></i>
+            <p>Spenden</p>
+          </a>
+        </li>
+
+        <!-- Addons -->
+        <li class="nav-item">
+          <a href="/admin/addons" class="nav-link <%= _adminPath.startsWith('/admin/addons') ? 'active' : '' %>">
+            <i class="nav-icon fa-solid fa-puzzle-piece"></i>
+            <p>Addon-Marketplace</p>
+          </a>
+        </li>
+
+        <!-- Plugin Badges -->
+        <li class="nav-item">
+          <a href="/admin/plugin-badges" class="nav-link <%= _adminPath.startsWith('/admin/plugin-badges') ? 'active' : '' %>">
+            <i class="nav-icon fa-solid fa-tags"></i>
+            <p>Plugin Badges</p>
+          </a>
+        </li>
+
+        <!-- Themes -->
+        <li class="nav-item <%= _adminPath.startsWith('/admin/themes') ? 'menu-open' : '' %>">
+          <a href="#" class="nav-link <%= _adminPath.startsWith('/admin/themes') ? 'active' : '' %>">
+            <i class="nav-icon fa-solid fa-palette"></i>
+            <p>Themes <i class="bi bi-chevron-right right"></i></p>
+          </a>
+          <ul class="nav nav-treeview">
+            <li class="nav-item">
+              <a href="/admin/themes" class="nav-link <%= _adminPath === '/admin/themes' || _adminPath === '/admin/themes/' ? 'active' : '' %>">
+                <i class="nav-icon fa-regular fa-dot-circle"></i>
+                <p>Übersicht</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="/admin/themes/widgets" class="nav-link <%= _adminPath.startsWith('/admin/themes/widgets') ? 'active' : '' %>">
+                <i class="nav-icon fa-regular fa-dot-circle"></i>
+                <p>Widget-Bereiche</p>
+              </a>
+            </li>
+          </ul>
+        </li>
+
+      </ul>
+    </nav>
+    <% } %>
+
   </div>
 </aside>

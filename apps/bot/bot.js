@@ -97,16 +97,15 @@ ServiceManager.register("bootHooks", bootHooks);
         // Phase 5: Events registrieren
         await bootHooks.doAction('before_register_events', { client });
 
-        // 'ready'-Event separat behandeln
-        if (client.pluginManager.listeningEvents.has("ready")) {
-            client.on("ready", async () => { // Änderung von once zu on
-                Logger.info('Bot logged in successfully');
-                
-                // IPC nur einmal initialisieren wenn noch nicht vorhanden
-                if (!ServiceManager.has("ipcClient")) {
-                    ipcClient.initialize(client);
-                    ServiceManager.register("ipcClient", ipcClient);
-                }
+        // 'ready'-Event: immer registrieren (IPC-Init + Guild-Plugin-Loading)
+        client.on("ready", async () => { // Änderung von once zu on
+            Logger.info('Bot logged in successfully');
+            
+            // IPC nur einmal initialisieren wenn noch nicht vorhanden
+            if (!ServiceManager.has("ipcClient")) {
+                ipcClient.initialize(client);
+                ServiceManager.register("ipcClient", ipcClient);
+            }
 
                 // Guild-spezifische Plugins laden
                 try {
@@ -148,7 +147,6 @@ ServiceManager.register("bootHooks", bootHooks);
                     Logger.error('Error loading guild-specific plugins:', error);
                 }
             });
-        }
 
         // WICHTIG: Alle anderen Events registrieren
         client.pluginManager.listeningEvents.forEach((event) => {

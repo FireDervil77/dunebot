@@ -1,9 +1,15 @@
 const { Client, GatewayIntentBits, Partials } = require("discord.js");
 const PluginManager = require("../helpers/PluginManager");
 const CommandManager = require("../helpers/CommandManager");
-const { ServiceManager, I18nManager } = require("dunebot-core");
+const { ServiceManager, I18nManager, GuildManager } = require("dunebot-core");
 
+const fs = require("fs");
 const path = require("path");
+
+// Kern-Verzeichnisse (unabhängig vom Plugin-System)
+const CORE_EVENTS_DIR   = path.join(__dirname, "..", "events");
+const CORE_COMMANDS_DIR = path.join(__dirname, "..", "commands");
+const CORE_IPC_DIR      = path.join(__dirname, "..", "ipc");
 
 class BotClient extends Client {
    constructor() {
@@ -54,6 +60,12 @@ class BotClient extends Client {
         this.dbService = dbService;
         this.logger = Logger;
 
+        // GuildManager initialisieren und im ServiceManager registrieren
+        const guildManager = new GuildManager({
+            getPluginManager: () => this.pluginManager,
+        });
+        ServiceManager.register("guildManager", guildManager);
+
         // Initialize managers that need dbService          
         this.commandManager = new CommandManager(this);
         
@@ -62,6 +74,12 @@ class BotClient extends Client {
             process.env.REGISTRY_PATH,
             process.env.PLUGINS_DIR
         );
+
+        // Kern-Events aus apps/bot/events/ laden
+        this._loadCoreEvents();
+
+        // Kern-Commands aus apps/bot/commands/ laden
+        await this._loadCoreCommands();
 
         // Initialize i18n
         const baseDir = path.join(__dirname, "..", "locales");
@@ -221,6 +239,94 @@ class BotClient extends Client {
                 "ViewAuditLog",
             ],
         });
+    }
+
+    /**
+     * Lädt alle Kern-Events aus apps/bot/events/ und registriert sie am Discord-Client.
+     * Diese Events laufen direkt im Bot-Kern, unabhängig vom Plugin-System.
+     */
+    _loadCoreEvents() {
+        const Logger = ServiceManager.get("Logger");
+
+        if (!fs.existsSync(CORE_EVENTS_DIR)) {
+            Logger.debug("Kein apps/bot/events/ Verzeichnis gefunden – überspringe Kern-Events");
+            return;
+        }
+
+        const eventFiles = fs.readdirSync(CORE_EVENTS_DIR).filter(f => f.endsWith(".js"));
+
+        for (const file of eventFiles) {
+            const eventName = file.replace(".js", "");
+            const handler = require(path.join(CORE_EVENTS_DIR, file));
+            this.on(eventName, handler);
+            Logger.debug(`Kern-Event registriert: ${eventName}`);
+        }
+
+        Logger.info(`${eventFiles.length} Kern-Event(s) aus apps/bot/events/ geladen`);
+    }
+
+    /**
+     * Lädt alle Kern-Commands aus apps/bot/commands/ und registriert sie im CommandManager.
+     * Synthetisches "kern"-Plugin mit allen Commands als Set.
+     */
+    async _loadCoreCommands() {
+        const Logger = ServiceManager.get("Logger");
+
+        if (!fs.existsSync(CORE_COMMANDS_DIR)) {
+            Logger.debug("Kein apps/bot/commands/ Verzeichnis – überspringe Kern-Commands");
+            return;
+        }
+
+        const commandFiles = fs.readdirSync(CORE_COMMANDS_DIR).filter(f => f.endsWith(".js") && !f.startsWith("_"));
+        if (commandFiles.length === 0) return;
+
+        // Synthetisches Plugin-Objekt für CommandManager.registerPlugin()
+        const commands = new Set();
+        for (const file of commandFiles) {
+            try {
+                const cmd = require(path.join(CORE_COMMANDS_DIR, file));
+                commands.add(cmd);
+            } catch (err) {
+                Logger.warn(`Kern-Command ${file} konnte nicht geladen werden: ${err.message}`);
+            }
+        }
+
+        const kernPlugin = {
+            name: 'kern',
+            commands,
+            prefixCount: commands.size,
+            slashCount: commands.size,
+        };
+
+        await this.commandManager.registerPlugin(kernPlugin);
+        Logger.info(`${commands.size} Kern-Command(s) aus apps/bot/commands/ geladen`);
+    }
+
+    /**
+     * Gibt die Kern-IPC-Handler aus apps/bot/ipc/ als Map zurück.
+     * Wird von IPCClient genutzt, um Kern-Handler vor Plugin-Handlern zu prüfen.
+     * @returns {Map<string, Function>}
+     */
+    loadCoreIpcHandlers() {
+        const Logger = ServiceManager.get("Logger");
+        const handlers = new Map();
+
+        if (!fs.existsSync(CORE_IPC_DIR)) return handlers;
+
+        const files = fs.readdirSync(CORE_IPC_DIR).filter(f => f.endsWith(".js") && !f.startsWith("_"));
+        for (const file of files) {
+            const eventName = file.replace(".js", ""); // z.B. GET_USERS_DATA
+            try {
+                const handler = require(path.join(CORE_IPC_DIR, file));
+                handlers.set(eventName, handler);
+                Logger.debug(`Kern-IPC-Handler registriert: ${eventName}`);
+            } catch (err) {
+                Logger.warn(`Kern-IPC-Handler ${file} konnte nicht geladen werden: ${err.message}`);
+            }
+        }
+
+        Logger.info(`${handlers.size} Kern-IPC-Handler aus apps/bot/ipc/ geladen`);
+        return handlers;
     }
 }
 

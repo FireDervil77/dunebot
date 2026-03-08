@@ -249,7 +249,7 @@ class ModerationPlugin extends DashboardPlugin {
             path: `/guild/${guildId}/plugins/moderation`,
             icon: 'fa-solid fa-shield-halved',
             order: null,
-            parent: `/guild/${guildId}/plugins/core/settings`,
+            parent: `/guild/${guildId}/settings`,
             type: 'main',
             visible: true,
             capability: 'MODERATION.VIEW'

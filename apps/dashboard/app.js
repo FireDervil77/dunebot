@@ -6,7 +6,7 @@ require("dotenv").config();
 // ServiceManager aus SDK holen
 const PluginManager = require("./helpers/PluginManager");
 const { SessionManager, BotHealthMonitor } = require("dunebot-sdk");
-const { ServiceManager, I18nManager } = require("dunebot-core");
+const { ServiceManager, I18nManager, SiteConfig } = require("dunebot-core");
 const { parseJsonArray } = require("dunebot-sdk/utils");
 const { ThemeManager, AssetManager } = require('dunebot-sdk');
 const ShortcodeParser = require("dunebot-sdk/lib/utils/ShortcodeParser");
@@ -21,7 +21,8 @@ const expressLayouts = require("express-ejs-layouts");
 const sessionMiddleware = require("./middlewares/session.middleware");
 const baseMiddleware = require("./middlewares/context/base.middleware");
 const userConfigMiddleware = require("./middlewares/context/user-config.middleware");
-const { CheckAuth, CheckAdmin } = require("./middlewares/auth.middleware");
+const { CheckAuth } = require("./middlewares/auth.middleware");
+const { CheckAdmin } = require("./middlewares/admin.middleware");
 const errorMiddleware = require("./middlewares/error.middleware");
 const authMiddleware = require("./middlewares/auth.middleware");
 const guildMiddleware = require("./middlewares/context/guild.middleware");
@@ -32,6 +33,7 @@ const frontendRouter = require("./routes/frontend.router");
 const authRouter = require("./routes/auth.router");
 const guildRouter = require("./routes/guild.router");
 const apiRouter = require("./routes/api.router");
+const adminRouter = require("./routes/admin.router");
 
 
 module.exports = class App {
@@ -50,6 +52,10 @@ module.exports = class App {
         this.app.set('trust proxy', 1);
         
         const Logger = ServiceManager.get("Logger");
+
+        // SiteConfig ZUERST registrieren — cached alle statischen ENV-Variablen einmalig
+        this.app.siteConfig = new SiteConfig();
+        ServiceManager.register('siteConfig', this.app.siteConfig);
 
         // RouterManager ZUERST initialisieren
         this.routerManager = new RouterManager(this.app);
@@ -148,6 +154,9 @@ module.exports = class App {
                     middlewares: [guildMiddleware]  // Zusätzliche Middleware
                 })
                 .register('/api', this.routers.api); // FIXED: Keine automatische Auth - wird in Routes selbst gehandhabt
+
+            // Admin-Bereich (nur Bot-Owner)
+            this.app.use('/admin', CheckAuth, CheckAdmin, adminRouter);
             
             // Theme initialisieren - übernimmt bereits die View-Engine-Initialisierung
             await this.app.themeManager.initialize(this.config.THEME || 'default');
@@ -402,7 +411,7 @@ module.exports = class App {
                 for (const pluginName of enabledPlugins) {
                     if (pluginName === 'core') continue;
                     
-                    // WICHTIG: Owner-only Plugins (wie superadmin) nur für Control-Guild aktivieren
+                    // WICHTIG: Owner-only Plugins nur für Control-Guild aktivieren
                     const pluginInfo = await pluginManager.getPluginInfo(pluginName);
                     const controlGuildId = process.env.CONTROL_GUILD_ID;
                     
@@ -528,9 +537,9 @@ module.exports = class App {
         // === WICHTIG: Stripe Webhook Route VOR express.json() ===
         // Webhook benötigt raw body für Signature Verification!
         this.app.use(
-            '/api/superadmin/webhooks/stripe', 
+            '/api/stripe/webhooks', 
             express.raw({ type: 'application/json' }), 
-            require('../../plugins/superadmin/dashboard/routes/api/stripe-webhook')
+            require('./routes/admin/stripe-webhook.router')
         );
         
         // =====================================================
@@ -600,7 +609,7 @@ module.exports = class App {
         this.app.use(exploitBlocker);
         
         // 3. Block Sensitive Files (.env, .git, node_modules, etc.)
-        const blockSensitiveFiles = require('./middleware/blockSensitiveFiles');
+        const blockSensitiveFiles = require('./middlewares/blockSensitiveFiles');
         this.app.use(blockSensitiveFiles);
         
         // 4. Rate Limiting - Allgemeines Limit
@@ -634,8 +643,10 @@ module.exports = class App {
         
         // Rest of the middlewares
         this.app.use(hookMiddleware);
-        this.app.use(guildMiddleware);
+        // ✅ WICHTIG: baseMiddleware VOR guildMiddleware! 
+        // baseMiddleware lädt ungefilterte Navigation, guildMiddleware filtert und überschreibt
         this.app.use(baseMiddleware);
+        this.app.use(guildMiddleware);  // NACH base - überschreibt res.locals.guildNav mit gefilterten Items
         this.app.use(userConfigMiddleware); // User-Config nach baseMiddleware (braucht req.session.user)
     }
 

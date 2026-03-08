@@ -1,0 +1,335 @@
+<%# Admin: Addon Marketplace Management - Hauptseite %>
+<div class="content-wrapper">
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fa-solid fa-puzzle-piece"></i>
+                        Addon Marketplace Management
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <div class="float-sm-right">
+                        <a href="/admin/addons/import" class="btn btn-primary">
+                            <i class="fa-solid fa-download"></i> Pterodactyl Import
+                        </a>
+                        <a href="#" class="btn btn-success disabled" title="Nur aus Guild-Kontext verfügbar">
+                            <i class="fa-solid fa-plus"></i> Manuell erstellen
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="container-fluid">
+            
+            <%# Stats-Cards %>
+            <div class="row">
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-info">
+                        <div class="inner">
+                            <h3><%= stats.total %></h3>
+                            <p>Total Addons</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fa-solid fa-puzzle-piece"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-success">
+                        <div class="inner">
+                            <h3><%= stats.official %></h3>
+                            <p>Official</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fa-solid fa-crown"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-warning">
+                        <div class="inner">
+                            <h3><%= stats.pending %></h3>
+                            <p>Pending Review</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fa-solid fa-clock"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-primary">
+                        <div class="inner">
+                            <h3><%= stats.native %></h3>
+                            <p>Native Linux</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fa-brands fa-linux"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <%# Addon-Tabelle %>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fa-solid fa-list"></i>
+                        Alle Addons
+                    </h3>
+                    <div class="card-tools">
+                        <div class="input-group input-group-sm" style="width: 300px;">
+                            <input type="text" id="addonSearch" class="form-control float-right" placeholder="Suchen...">
+                            <div class="input-group-append">
+                                <button type="button" class="btn btn-default">
+                                    <i class="fa-solid fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body table-responsive p-0">
+                    <table class="table table-hover text-nowrap" id="addonsTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Runtime</th>
+                                <th>Source</th>
+                                <th>Status</th>
+                                <th>Trust Level</th>
+                                <th>Visibility</th>
+                                <th>Last Tested</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (addons && addons.length > 0) { %>
+                                <% addons.forEach(addon => { %>
+                                    <tr>
+                                        <td><%= addon.id %></td>
+                                        <td>
+                                            <strong><%= addon.name %></strong><br>
+                                            <small class="text-muted"><%= addon.slug %></small>
+                                        </td>
+                                        <td>
+                                            <% if (addon.runtime_type === 'native') { %>
+                                                <span class="badge badge-success">
+                                                    <i class="fa-brands fa-linux"></i> Native
+                                                </span>
+                                            <% } else if (addon.runtime_type === 'proton') { %>
+                                                <span class="badge badge-primary">
+                                                    <i class="fa-solid fa-wine-glass"></i> Proton
+                                                </span>
+                                            <% } else if (addon.runtime_type === 'wine') { %>
+                                                <span class="badge badge-info">
+                                                    <i class="fa-solid fa-wine-bottle"></i> Wine
+                                                </span>
+                                            <% } else if (addon.runtime_type === 'java') { %>
+                                                <span class="badge badge-warning">
+                                                    <i class="fa-brands fa-java"></i> Java
+                                                </span>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (addon.source_type === 'pterodactyl') { %>
+                                                <i class="fa-solid fa-egg"></i> Pterodactyl
+                                            <% } else if (addon.source_type === 'original') { %>
+                                                <i class="fa-solid fa-sparkles"></i> Original
+                                            <% } else { %>
+                                                <i class="fa-solid fa-users"></i> Community
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (addon.status === 'approved') { %>
+                                                <span class="badge badge-success">
+                                                    <i class="fa-solid fa-check"></i> Approved
+                                                </span>
+                                            <% } else if (addon.status === 'pending_review') { %>
+                                                <span class="badge badge-warning">
+                                                    <i class="fa-solid fa-clock"></i> Pending
+                                                </span>
+                                            <% } else if (addon.status === 'rejected') { %>
+                                                <span class="badge badge-danger">
+                                                    <i class="fa-solid fa-times"></i> Rejected
+                                                </span>
+                                            <% } else if (addon.status === 'draft') { %>
+                                                <span class="badge badge-secondary">
+                                                    <i class="fa-solid fa-file"></i> Draft
+                                                </span>
+                                            <% } else { %>
+                                                <span class="badge badge-secondary">
+                                                    <i class="fa-solid fa-question"></i> <%= addon.status || 'Unknown' %>
+                                                </span>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (addon.trust_level === 'official') { %>
+                                                <span class="badge badge-success">
+                                                    <i class="fa-solid fa-crown"></i> Official
+                                                </span>
+                                            <% } else if (addon.trust_level === 'trusted') { %>
+                                                <span class="badge badge-primary">
+                                                    <i class="fa-solid fa-shield-check"></i> Trusted
+                                                </span>
+                                            <% } else if (addon.trust_level === 'verified') { %>
+                                                <span class="badge badge-info">
+                                                    <i class="fa-solid fa-check-circle"></i> Verified
+                                                </span>
+                                            <% } else { %>
+                                                <span class="badge badge-secondary">
+                                                    <i class="fa-solid fa-question-circle"></i> Unverified
+                                                </span>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (addon.visibility === 'official') { %>
+                                                <span class="badge badge-danger">
+                                                    <i class="fa-solid fa-crown"></i> Official
+                                                </span>
+                                            <% } else if (addon.visibility === 'public') { %>
+                                                <span class="badge badge-success">
+                                                    <i class="fa-solid fa-eye"></i> Public
+                                                </span>
+                                            <% } else if (addon.visibility === 'unlisted') { %>
+                                                <span class="badge badge-info">
+                                                    <i class="fa-solid fa-link"></i> Unlisted
+                                                </span>
+                                            <% } else if (addon.visibility === 'private') { %>
+                                                <span class="badge badge-secondary">
+                                                    <i class="fa-solid fa-eye-slash"></i> Private
+                                                </span>
+                                            <% } else { %>
+                                                <span class="badge badge-warning">
+                                                    <i class="fa-solid fa-question"></i> <%= addon.visibility || 'Unknown' %>
+                                                </span>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (addon.last_tested_at) { %>
+                                                <small><%= new Date(addon.last_tested_at).toLocaleDateString('de-DE') %></small>
+                                            <% } else { %>
+                                                <small class="text-muted">Nie</small>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="/admin/addons/<%= addon.id %>" 
+                                                   class="btn btn-info" title="Edit">
+                                                    <i class="fa-solid fa-edit"></i>
+                                                </a>
+                                                <button class="btn btn-success btn-test-addon" 
+                                                        data-addon-id="<%= addon.id %>" title="Test Installation">
+                                                    <i class="fa-solid fa-flask"></i>
+                                                </button>
+                                                <button class="btn btn-danger btn-delete-addon" 
+                                                        data-addon-id="<%= addon.id %>" 
+                                                        data-addon-name="<%= addon.name %>" 
+                                                        title="Delete">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted">
+                                        <i class="fa-solid fa-inbox"></i><br>
+                                        Keine Addons vorhanden<br>
+                                        <a href="/admin/addons/import" class="btn btn-primary btn-sm mt-2">
+                                            <i class="fa-solid fa-download"></i> Pterodactyl Import starten
+                                        </a>
+                                    </td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    
+    // Search-Funktionalität
+    document.getElementById('addonSearch').addEventListener('keyup', function() {
+        const searchTerm = this.value.toLowerCase();
+        const rows = document.querySelectorAll('#addonsTable tbody tr');
+        
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(searchTerm) ? '' : 'none';
+        });
+    });
+    
+    // Test-Installation
+    document.querySelectorAll('.btn-test-addon').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const addonId = this.dataset.addonId;
+            
+            if (!confirm('Test-Installation für dieses Addon starten?')) return;
+            
+            try {
+                const response = await fetch(`/admin/addons/${addonId}/test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('✅ ' + result.message);
+                } else {
+                    alert('❌ ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Fehler beim Starten des Tests');
+            }
+        });
+    });
+    
+    // Delete-Addon
+    document.querySelectorAll('.btn-delete-addon').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const addonId = this.dataset.addonId;
+            const addonName = this.dataset.addonName || 'dieses Addon';
+            
+            // ✅ Erste Bestätigung bleibt
+            if (!confirm(`Addon "${addonName}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden!`)) return;
+            
+            try {
+                const response = await fetch(`/admin/addons/${addonId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                // ✅ Zweite Bestätigung durch Toast ersetzt
+                if (result.success) {
+                    toastr.success(result.message || 'Addon erfolgreich gelöscht');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    toastr.error(result.message || 'Fehler beim Löschen');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                toastr.error('Netzwerkfehler beim Löschen des Addons');
+            }
+        });
+    });
+});
+</script>

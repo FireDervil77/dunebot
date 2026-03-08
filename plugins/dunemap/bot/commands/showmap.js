@@ -1,5 +1,5 @@
 const { ServiceManager } = require('dunebot-core');
-const { getNextStormTiming } = require('../../shared/coriolisStormConfig');
+const { getNextStormTiming } = require('../../dashboard/assets/js/coriolisStormConfig');
 const {
     ActionRowBuilder,
     StringSelectMenuBuilder,
@@ -153,7 +153,7 @@ module.exports = {
     },
 
     async updateMap(channel) {
-        const MapGenerator = require('../../shared/MapGenerator');
+        const MapGenerator = require('../../dashboard/assets/js/MapGenerator');
         const mapGen = new MapGenerator();
         const dbService = ServiceManager.get('dbService');
         const Logger = ServiceManager.get('Logger');
@@ -226,7 +226,7 @@ module.exports = {
     },
 
     // Command Handler
-    async messageRun(message, args) {
+    async messageRun({ message, args }) {
         const dbService = ServiceManager.get('dbService');
         const Logger = ServiceManager.get('Logger');
         
@@ -247,7 +247,8 @@ module.exports = {
                     const coord = args[1]?.toUpperCase();
                     const type = args[2]?.toLowerCase();
 
-                    if (!coord || !type) {
+                    // Wenn Koordinate fehlt
+                    if (!coord) {
                         return message.replyT('dunemap:MAP.USAGE_SET');
                     }
 
@@ -255,6 +256,91 @@ module.exports = {
                         return message.replyT('dunemap:MAP.INVALID_COORD');
                     }
 
+                    // Wenn Typ fehlt: Zeige Auswahl-Menu
+                    if (!type) {
+                        const markerTypes = [
+                            { label: '� Titan', value: 'titan' },
+                            { label: '⭐ Spice', value: 'spice' },
+                            { label: '🟣 Stravidium', value: 'stravidium' },
+                            { label: '🔵 Basis', value: 'base' },
+                            { label: '🚢 Wrack', value: 'wrack' },
+                            { label: '⚪ Aluminium', value: 'aluminium' },
+                            { label: '⚫ Basalt', value: 'basalt' },
+                            { label: '🔩 Eisen', value: 'eisen' },
+                            { label: '⬛ Karbon', value: 'karbon' },
+                            { label: '🟤 Höhle', value: 'hoele' },
+                            { label: '🕳️ Loch', value: 'hole' },
+                            { label: '🟢 Kontrollpunkt', value: 'kontrollpunkt' },
+                            { label: '🚕 Taxi', value: 'taxi' },
+                            { label: '🧪 Test', value: 'test' }
+                        ];
+
+                        const row = new ActionRowBuilder()
+                            .addComponents(
+                                new StringSelectMenuBuilder()
+                                    .setCustomId(`dunemap_marker_${coord}`)
+                                    .setPlaceholder('Wähle einen Marker-Typ')
+                                    .addOptions(markerTypes)
+                            );
+
+                        const reply = await message.reply({
+                            content: `📍 Wähle den Marker-Typ für **${coord}**:`,
+                            components: [row]
+                        });
+
+                        // Collector für Select-Menu
+                        const collector = reply.createMessageComponentCollector({
+                            componentType: ComponentType.StringSelect,
+                            time: 60000
+                        });
+
+                        collector.on('collect', async interaction => {
+                            if (interaction.user.id !== message.author.id) {
+                                return interaction.reply({
+                                    content: '❌ Nur der Befehlsausführer kann auswählen!',
+                                    ephemeral: true
+                                });
+                            }
+
+                            // Interaction sofort bestätigen (Discord 3s Limit!)
+                            await interaction.deferUpdate();
+
+                            const selectedType = interaction.values[0];
+
+                            await dbService.query(`
+                                INSERT INTO dunemap_markers 
+                                (guild_id, sector_x, sector_y, marker_type, placed_by)
+                                VALUES (?, ?, ?, ?, ?)
+                            `, [
+                                message.guild.id,
+                                coord.charAt(0),
+                                parseInt(coord.slice(1)),
+                                selectedType,
+                                message.author.id
+                            ]);
+
+                            await this.updateMap(mapChannel);
+                            const successMsg = message.guild.getT('dunemap:MAP.SET_SUCCESS').replace('{coord}', coord);
+                            
+                            await interaction.editReply({
+                                content: successMsg,
+                                components: []
+                            });
+                        });
+
+                        collector.on('end', collected => {
+                            if (collected.size === 0) {
+                                reply.edit({
+                                    content: '⏱️ Auswahl-Zeit abgelaufen.',
+                                    components: []
+                                }).catch(() => {});
+                            }
+                        });
+
+                        return;
+                    }
+
+                    // Direkter Typ angegeben
                     await dbService.query(`
                         INSERT INTO dunemap_markers 
                         (guild_id, sector_x, sector_y, marker_type, placed_by)
@@ -268,7 +354,10 @@ module.exports = {
                     ]);
 
                     await this.updateMap(mapChannel);
-                    return message.replyT(`dunemap:MAP.SET_SUCCESS`);
+                    Logger.debug('[DuneMap] Set marker success, coord:', coord);
+                    const successMsg = message.guild.getT('dunemap:MAP.SET_SUCCESS').replace('{coord}', coord);
+                    Logger.debug('[DuneMap] Translated message:', successMsg);
+                    return message.reply(successMsg);
                 }
 
                 case 'remove': {
@@ -296,7 +385,8 @@ module.exports = {
                     ]);
 
                     await this.updateMap(mapChannel);
-                    return message.replyT(`dunemap:MAP.REMOVE_SUCCESS`);
+                    const removeMsg = message.guild.getT('dunemap:MAP.REMOVE_SUCCESS').replace('{coord}', coord);
+                    return message.reply(removeMsg);
                 }
 
                 default:
@@ -374,7 +464,7 @@ module.exports = {
                     }
                     
                     return interaction.editReply({
-                        content: getT('dunemap:MAP.SET_SUCCESS', { coord })
+                        content: getT('dunemap:MAP.SET_SUCCESS').replace('{coord}', coord)
                     });
                 }
 
@@ -413,7 +503,7 @@ module.exports = {
                     }
                     
                     return interaction.editReply({
-                        content: getT('dunemap:MAP.REMOVE_SUCCESS', { coord })
+                        content: getT('dunemap:MAP.REMOVE_SUCCESS').replace('{coord}', coord)
                     });
                 }
             }

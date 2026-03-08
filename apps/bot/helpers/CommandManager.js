@@ -470,6 +470,10 @@ class CommandManager {
 
                     // Check if the plugin is globally enabled AND enabled for this guild
                     const plugin = cmd.plugin;
+
+                    // Kern-Commands ('kern') sind immer registriert – unabhängig vom Plugin-System
+                    if (plugin.name === 'kern') return true;
+
                     const isGloballyEnabled = this.client.pluginManager.isPluginEnabled(
                         plugin.name,
                     );
@@ -514,6 +518,10 @@ class CommandManager {
                 .filter((ctx) => {
                     // Check if the plugin is globally enabled AND enabled for this guild
                     const plugin = ctx.plugin;
+
+                    // Kern-Commands sind immer aktiviert
+                    if (plugin.name === 'kern') return true;
+
                     const isGloballyEnabled = this.client.pluginManager.isPluginEnabled(
                         plugin.name,
                     );

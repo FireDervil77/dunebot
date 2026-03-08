@@ -41,7 +41,7 @@
         "AVAILABLE_COMMANDS": "Verfügbare Befehle: show, set, remove",
         "ERROR": "❌ Ein Fehler ist aufgetreten!",
         "UPDATED": "✅ Map wurde aktualisiert!",
-        "USAGE_SET": "Benutzung: !map set <coord> <type>",
+        "USAGE_SET": "Benutzung: `!map set <coord> [type]`\nTyp ist optional - ohne Angabe öffnet sich ein Auswahl-Menü.",
         "USAGE_REMOVE": "Benutzung: !map remove <coord>"
     },
     "TUTORIAL": {

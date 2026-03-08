@@ -1,5 +1,5 @@
 const { ServiceManager } = require('dunebot-core');
-const { getNextStormTiming, STORM_TIMINGS } = require('../../shared/coriolisStormConfig');
+const { getNextStormTiming, STORM_TIMINGS } = require('../../dashboard/assets/js/coriolisStormConfig');
 
 const {
     ActionRowBuilder,
@@ -141,7 +141,7 @@ module.exports = {
     },
 
     // Command Handler (Prefix-Command)
-    async messageRun(message, args) {
+    async messageRun({ message, args }) {
         await this.showStormTimer(message, message.guild);
     },
 

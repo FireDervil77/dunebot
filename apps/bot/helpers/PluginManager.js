@@ -105,7 +105,7 @@ class PluginManager extends BasePluginManager {
                 }
             }
             
-            Logger.success(`Loaded ${this.getPlugins().length} plugins.`);
+            Logger.success(`Loaded ${this.getPlugins().size} plugins.`);
             
             // "after_init" Hook ausführen
             if (this.#hooks) {

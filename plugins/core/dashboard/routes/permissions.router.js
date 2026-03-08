@@ -706,25 +706,23 @@ router.get('/groups', requirePermission('PERMISSIONS.GROUPS.VIEW'), async (req, 
         // Hole alle Gruppen mit member_count
         const groups = await permissionManager.getGuildGroups(guildId);
         
-        // Lade Permissions RELATIONAL aus group_permissions (NICHT aus JSON!)
+        // ✅ Parse JSON-Permissions aus guild_groups.permissions (NEW SYSTEM!)
         for (const group of groups) {
-            const groupPerms = await dbService.query(`
-                SELECT pd.permission_key
-                FROM group_permissions gp
-                JOIN permission_definitions pd ON gp.permission_id = pd.id
-                WHERE gp.group_id = ?
-            `, [group.id]);
-            
-            // Baue Permissions-Object { KEY: true }
-            group.permissions = {};
-            groupPerms.forEach(p => {
-                group.permissions[p.permission_key] = true;
-            });
-            
-            Logger.info(`[Permissions GET /groups] Gruppe ${group.name} (ID: ${group.id}): ${groupPerms.length} Permissions geladen`);
-            if (group.name === 'Administrator' && groupPerms.length > 0) {
-                Logger.debug('[Permissions GET /groups] Administrator Permissions:', Object.keys(group.permissions).slice(0, 10));
+            // permissions kommt als JSON-String aus der View
+            if (group.permissions && typeof group.permissions === 'string') {
+                try {
+                    group.permissions = JSON.parse(group.permissions);
+                } catch (parseError) {
+                    Logger.warn(`[Permissions GET /groups] Konnte permissions für Gruppe ${group.name} nicht parsen:`, parseError.message);
+                    group.permissions = {};
+                }
+            } else if (!group.permissions) {
+                // Fallback: Leeres Object falls null/undefined
+                group.permissions = {};
             }
+            
+            const permCount = Object.keys(group.permissions).length;
+            Logger.info(`[Permissions GET /groups] Gruppe ${group.name} (ID: ${group.id}): ${permCount} Permissions geladen`);
         }
         
         // Hole alle verfügbaren Permissions für Checkboxes (NUR guild-spezifische!)

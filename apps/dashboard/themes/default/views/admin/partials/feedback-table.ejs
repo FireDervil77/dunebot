@@ -1,0 +1,78 @@
+<% if (feedback && feedback.length > 0) { %>
+<div class="table-responsive">
+    <table class="table table-hover table-sm">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Typ</th>
+                <th>Titel</th>
+                <th>Guild</th>
+                <th>User</th>
+                <th>Priorität</th>
+                <th>Status</th>
+                <th>Datum</th>
+                <th>Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% feedback.forEach(f => { %>
+            <tr>
+                <td><%= f.id %></td>
+                <td>
+                    <% if (f.type === 'bug') { %>
+                        <span class="badge badge-danger"><i class="fa-solid fa-bug me-1"></i>Bug</span>
+                    <% } else { %>
+                        <span class="badge badge-info"><i class="fa-solid fa-lightbulb me-1"></i>Feature</span>
+                    <% } %>
+                </td>
+                <td><%= f.title %></td>
+                <td><small class="text-muted"><%= f.guild_id %></small></td>
+                <td><small class="text-muted"><%= f.user_id %></small></td>
+                <td>
+                    <% if (f.priority === 'critical') { %>
+                        <span class="badge badge-danger">Kritisch</span>
+                    <% } else if (f.priority === 'high') { %>
+                        <span class="badge badge-warning">Hoch</span>
+                    <% } else if (f.priority === 'medium') { %>
+                        <span class="badge badge-info">Mittel</span>
+                    <% } else { %>
+                        <span class="badge badge-secondary">Niedrig</span>
+                    <% } %>
+                </td>
+                <td>
+                    <% if (f.status === 'open') { %>
+                        <span class="badge badge-warning">Offen</span>
+                    <% } else if (f.status === 'in_progress') { %>
+                        <span class="badge badge-primary">In Arbeit</span>
+                    <% } else if (f.status === 'resolved') { %>
+                        <span class="badge badge-success">Gelöst</span>
+                    <% } else if (f.status === 'closed') { %>
+                        <span class="badge badge-secondary">Geschlossen</span>
+                    <% } else if (f.status === 'planned') { %>
+                        <span class="badge badge-info">Geplant</span>
+                    <% } else if (f.status === 'implemented') { %>
+                        <span class="badge badge-success">Umgesetzt</span>
+                    <% } else if (f.status === 'rejected') { %>
+                        <span class="badge badge-danger">Abgelehnt</span>
+                    <% } else { %>
+                        <span class="badge badge-dark"><%= f.status %></span>
+                    <% } %>
+                </td>
+                <td><small><%= new Date(f.created_at).toLocaleDateString('de-DE') %></small></td>
+                <td>
+                    <button class="btn btn-xs btn-outline-primary" 
+                            onclick="editFeedback('<%= f.id %>', '<%= f.status %>', '<%= f.priority %>', `<%= (f.admin_notes || '').replace(/`/g, "'") %>`, `<%= (f.admin_response || '').replace(/`/g, "'") %>`)">
+                        <i class="fa-solid fa-edit"></i>
+                    </button>
+                </td>
+            </tr>
+            <% }); %>
+        </tbody>
+    </table>
+</div>
+<% } else { %>
+<div class="text-center text-muted py-4">
+    <i class="fa-solid fa-inbox fa-2x mb-2"></i>
+    <p>Kein Feedback vorhanden</p>
+</div>
+<% } %>

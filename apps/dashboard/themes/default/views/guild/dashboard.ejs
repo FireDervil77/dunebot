@@ -2,91 +2,169 @@
   * Server-Dashboard-View
   * Zeigt die Hauptübersicht für einen Discord-Server an
   * 
+  * Widget-Bereiche (WordPress-Stil):
+  *  - dashboard-top       — Vollbreite, Benachrichtigungen
+  *  - dashboard-primary   — 3-spaltig, Hauptkennzahlen
+  *  - dashboard-secondary — 2-spaltig, Analyse
+  *  - dashboard-bottom    — Vollbreite, Support
+  *
   * @author FireDervil
   * @context {Object} guild - Discord Guild-Objekt
-  * @context {Array} widgets - Dashboard-Widgets
+  * @context {Array} widgets - Dashboard-Widgets (mit area/position-Metadaten)
+  * @context {Function} renderWidgetArea - Helper: Widgets eines Bereichs rendern
   * @context {Array} enabledPlugins - Aktivierte Plugins für diese Guild
   * @context {Object} stats - Server-Statistiken
   %>
+
+<%
+/**
+ * Rendert alle Widgets eines Bereichs als Bootstrap-Grid-HTML.
+ * Fallback: Falls renderWidgetArea aus dem Controller nicht übergeben wurde,
+ * wird hier ein lokaler Inline-Renderer verwendet.
+ *
+ * @param {string} areaId - Widget-Bereich ID
+ * @returns {string} HTML
+ */
+function _renderArea(areaId) {
+    if (typeof renderWidgetArea === 'function') {
+        return renderWidgetArea(areaId);
+    }
+    // Inline-Fallback: Widgets nach area filtern (kein WidgetManager nötig)
+    const areaWidgets = (locals.widgets || [])
+        .filter(w => (w.area || 'dashboard-main') === areaId && w.visible !== false)
+        .sort((a, b) => (a.position || 999) - (b.position || 999));
+    return areaWidgets;
+}
+
+const _topWidgets        = _renderArea('dashboard-top');
+const _primaryWidgets    = _renderArea('dashboard-primary');
+const _secondaryWidgets  = _renderArea('dashboard-secondary');
+const _bottomWidgets     = _renderArea('dashboard-bottom');
+%>
 
 <!--begin::App Content-->
 <div class="app-content">
     <!--begin::Container-->
     <div class="container-fluid">
-        <!--begin::Row-->
-        <div class="row">
-          
-    <!-- Hook: before_guild_dashboard -->
-    <% if (locals.hooks && hooks.getViewHooks) { %>
-      <% const beforeHooks = hooks.getViewHooks('before_guild_dashboard'); %>
-      <% if (beforeHooks && beforeHooks.length > 0) { %>
-        <% beforeHooks.forEach(hook => { %>
-          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {}, guild, guildId }) %>
-        <% }); %>
-      <% } %>
-    <% } %>
 
+        <!-- Hook: before_guild_dashboard -->
+        <% if (locals.hooks && hooks.getViewHooks) { %>
+          <% const beforeHooks = hooks.getViewHooks('before_guild_dashboard'); %>
+          <% if (beforeHooks && beforeHooks.length > 0) { %>
+            <% beforeHooks.forEach(hook => { %>
+              <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {}, guild, guildId }) %>
+            <% }); %>
+          <% } %>
+        <% } %>
 
-     <!-- Dashboard Widgets -->
-        <% if (locals.widgets && widgets.length > 0) { %>
-          <div class="row">
-            <% 
-              let currentRowSize = 0;
-              widgets.forEach((widget, index) => { 
-                const widgetSize = widget.size || 12;
-                currentRowSize += widgetSize;
-                
-                // Wenn die aktuelle Row voll ist (>=12), nach diesem Widget einen Spacer einfügen
-                const isRowFull = currentRowSize >= 12;
-            %>
-              <div class="col-md-<%= widgetSize %>">
-                <div class="card <%= widget.cardClass || '' %>" style="min-height: 350px;">
-                  <div class="card-header">
-                    <h3 class="card-title"><%= widget.title || 'Widget' %></h3>
-                    <% if (widget.actions && widget.actions.length > 0) { %>
-                      <div class="card-tools">
-                        <% widget.actions.forEach(action => { %>
-                          <button type="button" class="btn btn-tool" data-action="<%= action.id %>"
-                                  <% if (action.attributes) { Object.keys(action.attributes).forEach(attr => { %>
-                                    <%= attr %>="<%= action.attributes[attr] %>"
-                                  <% }); } %>>
-                            <i class="<%= action.icon || 'fas fa-wrench' %>"></i>
-                          </button>
-                        <% }); %>
-                      </div>
-                    <% } %>
-                  </div>
-                  <div class="card-body">
-                    <%- widget.content %>
-                  </div>
-                </div>
+        <!-- =====================================================
+             WIDGET-BEREICH: dashboard-top (Vollbreite)
+             ===================================================== -->
+        <% if (Array.isArray(_topWidgets) && _topWidgets.length > 0) { %>
+          <div class="row g-3 mb-3">
+            <% _topWidgets.forEach(widget => { %>
+              <div class="col-md-<%= widget.size || 12 %>">
+                <%- _widgetCard(widget) %>
               </div>
-              
-              <% if (isRowFull && index < widgets.length - 1) { %>
-                <!-- Spacer nach voller Row -->
-                <div class="w-100" style="height: 1.5rem;"></div>
-                <% currentRowSize = 0; // Reset für nächste Row %>
-              <% } %>
             <% }); %>
           </div>
         <% } %>
-      </div>
-    </div>       
 
-    <!-- Hook: after_guild_dashboard -->
-    <% if (locals.hooks && hooks.getViewHooks) { %>
-      <% const afterHooks = hooks.getViewHooks('after_guild_dashboard'); %>
-      <% if (afterHooks && afterHooks.length > 0) { %>
-        <% afterHooks.forEach(hook => { %>
-          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {}, guild, guildId }) %>
-        <% }); %>
-      <% } %>
-    <% } %>
+        <!-- =====================================================
+             WIDGET-BEREICH: dashboard-primary (3-spaltig)
+             ===================================================== -->
+        <% if (Array.isArray(_primaryWidgets) && _primaryWidgets.length > 0) { %>
+          <div class="row g-3 mb-3">
+            <% _primaryWidgets.forEach(widget => { %>
+              <div class="col-md-<%= widget.size || 4 %>">
+                <%- _widgetCard(widget) %>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
 
-          
-        </div>
-        <!--end::Row-->
+        <!-- =====================================================
+             WIDGET-BEREICH: dashboard-secondary (2-spaltig)
+             ===================================================== -->
+        <% if (Array.isArray(_secondaryWidgets) && _secondaryWidgets.length > 0) { %>
+          <div class="row g-3 mb-3">
+            <% _secondaryWidgets.forEach(widget => { %>
+              <div class="col-md-<%= widget.size || 6 %>">
+                <%- _widgetCard(widget) %>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+
+        <!-- =====================================================
+             WIDGET-BEREICH: dashboard-bottom (Vollbreite)
+             ===================================================== -->
+        <% if (Array.isArray(_bottomWidgets) && _bottomWidgets.length > 0) { %>
+          <div class="row g-3 mb-3">
+            <% _bottomWidgets.forEach(widget => { %>
+              <div class="col-md-<%= widget.size || 12 %>">
+                <%- _widgetCard(widget) %>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+
+        <!-- Fallback: Widgets ohne area oder unbekannte area -->
+        <% const _legacyWidgets = (locals.widgets || []).filter(w =>
+              !['dashboard-top','dashboard-primary','dashboard-secondary','dashboard-bottom'].includes(w.area || 'dashboard-main')
+              && w.area !== 'dashboard-main'
+              && w.visible !== false
+           ); %>
+        <% if (_legacyWidgets.length > 0) { %>
+          <div class="row g-3 mb-3">
+            <% _legacyWidgets.forEach(widget => { %>
+              <div class="col-md-<%= widget.size || 12 %>">
+                <%- _widgetCard(widget) %>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+
+        <!-- Hook: after_guild_dashboard -->
+        <% if (locals.hooks && hooks.getViewHooks) { %>
+          <% const afterHooks = hooks.getViewHooks('after_guild_dashboard'); %>
+          <% if (afterHooks && afterHooks.length > 0) { %>
+            <% afterHooks.forEach(hook => { %>
+              <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {}, guild, guildId }) %>
+            <% }); %>
+          <% } %>
+        <% } %>
+
     </div>
     <!--end::Container-->
 </div>
 <!--end::App Content-->
+
+<%#
+ * Lokale Hilfsfunktion: Widget-Card HTML generieren
+ * Ausgelagert um DRY durch alle 4 Bereiche zu halten
+%>
+<%
+function _widgetCard(widget) {
+    const actionsHtml = (widget.actions || []).map(action => {
+        const attrs = Object.entries(action.attributes || {})
+            .map(([k, v]) => `${k}="${v}"`).join(' ');
+        return `<button type="button" class="btn btn-tool" data-action="${action.id}" ${attrs}>
+                  <i class="${action.icon || 'fas fa-wrench'}"></i>
+                </button>`;
+    }).join('');
+
+    return `<div class="card ${widget.cardClass || ''}" data-widget-id="${widget.id}">
+      <div class="card-header">
+        <h3 class="card-title">
+          ${widget.icon ? `<i class="${widget.icon} me-2"></i>` : ''}
+          ${widget.title || 'Widget'}
+        </h3>
+        ${actionsHtml ? `<div class="card-tools">${actionsHtml}</div>` : ''}
+      </div>
+      <div class="card-body">
+        ${widget.content || ''}
+      </div>
+    </div>`;
+}
+%>

@@ -53,6 +53,22 @@ const IPMServer = require('./helpers/IPMServer');
         ServiceManager.register("permissionManager", permissionManager);
         Logger.success("PermissionManager initialisiert");
 
+        // Kern-Permissions für alle bekannten Guilds registrieren
+        try {
+            const guilds = await dbService.query('SELECT _id FROM guilds');
+            if (guilds && guilds.length > 0) {
+                Logger.info(`Lade Kern-Permissions für ${guilds.length} Guild(s)...`);
+                for (const row of guilds) {
+                    await permissionManager.loadKernelPermissions(row._id).catch(e => {
+                        Logger.warn(`Kern-Permissions für Guild ${row._id} fehlgeschlagen: ${e.message}`);
+                    });
+                }
+                Logger.success('Kern-Permissions geladen');
+            }
+        } catch (e) {
+            Logger.warn('Kern-Permissions konnten nicht geladen werden:', e.message);
+        }
+
         // IPC-Server initialisieren
         Logger.info("Initialisiere IPC-Server...");
         const ipcServer = new IPCServer();
@@ -89,6 +105,14 @@ const IPMServer = require('./helpers/IPMServer');
         // Die neue initialize()-Methode ruft loadTranslations() und loadPlugins() intern auf
         await app.initialize();
         Logger.success("Dashboard-App erfolgreich initialisiert");
+
+        // Kern-Widgets direkt beim Start registrieren (außerhalb des Plugin-Systems)
+        const { registerKernWidgets } = require('./helpers/KernWidgets');
+        registerKernWidgets(
+            ServiceManager.get('pluginManager'),
+            ServiceManager.get('themeManager')
+        );
+        Logger.success('Kern-Widgets registriert');
 
         // Post-Deployment: Plugin-Update-Check (SOFORT nach Start)
         Logger.info("🚀 Post-Deployment: Prüfe auf verfügbare Plugin-Updates...");

@@ -1,0 +1,319 @@
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">
+                    <%= notification && notification.id ? tr('NOTIFICATIONS.EDIT_NOTIFICATION') : tr('NOTIFICATIONS.NEW_NOTIFICATION') %>
+                </h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="/admin">SuperAdmin</a></li>
+                    <li class="breadcrumb-item"><a href="/admin/notifications"><%= tr('NOTIFICATIONS.TITLE') %></a></li>
+                    <li class="breadcrumb-item active"><%= notification && notification.id ? tr('NOTIFICATIONS.EDIT') : tr('NOTIFICATIONS.NEW') %></li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Delivery Method Toggle
+document.addEventListener('DOMContentLoaded', async function() {
+    const deliveryMethodSelect = document.getElementById('delivery_method');
+    const discordChannelGroup = document.getElementById('discord-channel-group');
+    const targetGuildsSelect = document.getElementById('target_guild_ids');
+    
+    function toggleDiscordChannelField() {
+        const method = deliveryMethodSelect.value;
+        if (method === 'discord_channel' || method === 'all') {
+            discordChannelGroup.style.display = 'block';
+        } else {
+            discordChannelGroup.style.display = 'none';
+        }
+    }
+    
+    deliveryMethodSelect.addEventListener('change', toggleDiscordChannelField);
+    toggleDiscordChannelField(); // Initial check
+    
+    // Lade Bot-Guilds via AJAX (IPC-Call zum Bot)
+    try {
+        const response = await fetch('/api/bot-guilds');
+        const data = await response.json();
+        
+        if (data.success && data.guilds) {
+            // Leere das Select (entferne "Lade Server-Liste...")
+            targetGuildsSelect.innerHTML = '';
+            
+            // Sortiere Guilds alphabetisch
+            const sortedGuilds = data.guilds.sort((a, b) => a.name.localeCompare(b.name));
+            
+            // Befülle Select mit Guilds
+            sortedGuilds.forEach(guild => {
+                const option = document.createElement('option');
+                option.value = guild.id;
+                option.textContent = `${guild.name} (${guild.memberCount} Members)`;
+                
+                // Pre-Select wenn in notification.target_guild_ids
+                <% if (notification?.target_guild_ids) { %>
+                    try {
+                        const targetIds = typeof '<%= notification.target_guild_ids %>' === 'string' 
+                            ? JSON.parse('<%= notification.target_guild_ids %>') 
+                            : [];
+                        if (Array.isArray(targetIds) && targetIds.includes(guild.id)) {
+                            option.selected = true;
+                        }
+                    } catch (e) {
+                        console.warn('Fehler beim Parsen von target_guild_ids:', e);
+                    }
+                <% } %>
+                
+                targetGuildsSelect.appendChild(option);
+            });
+            
+            console.log(`${sortedGuilds.length} Server geladen`);
+        } else {
+            targetGuildsSelect.innerHTML = '<option value="" disabled>Fehler beim Laden der Server</option>';
+            console.error('Fehler beim Laden der Bot-Guilds:', data.error);
+        }
+    } catch (error) {
+        targetGuildsSelect.innerHTML = '<option value="" disabled>Fehler beim Laden der Server</option>';
+        console.error('Fehler beim Laden der Bot-Guilds:', error);
+    }
+});
+
+// Form-Submit: Konvertiere Select2-Array zu JSON-String für Backend
+document.querySelector('form').addEventListener('submit', function(e) {
+    const targetGuildsSelect = document.getElementById('target_guild_ids');
+    const selectedValues = Array.from(targetGuildsSelect.selectedOptions).map(opt => opt.value);
+    
+    // Erstelle Hidden Input mit JSON-String
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.name = 'target_guild_ids';
+    hiddenInput.value = selectedValues.length > 0 ? JSON.stringify(selectedValues) : '';
+    
+    // Entferne Original-Select aus Form-Submission
+    targetGuildsSelect.name = '';
+    this.appendChild(hiddenInput);
+});
+</script>
+
+<div class="content">
+    <div class="container-fluid">
+        <% if (locals.toast) { %>
+            <div class="alert alert-<%= toast.type %> alert-dismissible fade show">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <%= toast.message %>
+            </div>
+        <% } %>
+
+        <form class="guild-ajax-form" 
+              data-form-type="notification-save" 
+              data-method="POST"
+              action="/admin/notifications/save" 
+              method="POST">
+            <input type="hidden" name="guildId" value="<%= guildId %>">
+            <% if (notification && notification.id) { %>
+                <input type="hidden" name="notificationId" value="<%= notification.id %>">
+            <% } %>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><%= tr('NOTIFICATIONS.DETAILS') %></h3>
+                </div>
+                <div class="card-body">
+                    <!-- Sprach-Tabs -->
+                    <ul class="nav nav-tabs mb-3" id="langTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="de-tab" data-toggle="tab" href="#de-content" role="tab">
+                                <i class="fas fa-flag mr-1"></i> Deutsch
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="en-tab" data-toggle="tab" href="#en-content" role="tab">
+                                <i class="fas fa-flag mr-1"></i> English
+                            </a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="langTabContent">
+                        <!-- Deutsch Tab -->
+                        <div class="tab-pane fade show active" id="de-content" role="tabpanel">
+                            <div class="form-group">
+                                <label for="title_de"><%= tr('NOTIFICATIONS.FORM.TITLE') %> (DE) <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="title_de" 
+                                       name="title_de" 
+                                       value="<%= notification?.title_de || '' %>"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="message_de"><%= tr('NOTIFICATIONS.FORM.MESSAGE') %> (DE) <span class="text-danger">*</span></label>
+                                <textarea class="form-control" 
+                                          id="message_de" 
+                                          name="message_de" 
+                                          rows="4" 
+                                          required><%= notification?.message_de || '' %></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="action_text_de"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT') %> (DE)</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="action_text_de" 
+                                       name="action_text_de" 
+                                       value="<%= notification?.action_text_de || '' %>">
+                                <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT_HELP') %></small>
+                            </div>
+                        </div>
+
+                        <!-- English Tab -->
+                        <div class="tab-pane fade" id="en-content" role="tabpanel">
+                            <div class="form-group">
+                                <label for="title_en"><%= tr('NOTIFICATIONS.FORM.TITLE') %> (EN) <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="title_en" 
+                                       name="title_en" 
+                                       value="<%= notification?.title_en || '' %>">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="message_en"><%= tr('NOTIFICATIONS.FORM.MESSAGE') %> (EN) <span class="text-danger">*</span></label>
+                                <textarea class="form-control" 
+                                          id="message_en" 
+                                          name="message_en" 
+                                          rows="4"><%= notification?.message_en || '' %></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="action_text_en"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT') %> (EN)</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="action_text_en" 
+                                       name="action_text_en" 
+                                       value="<%= notification?.action_text_en || '' %>">
+                                <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT_HELP') %></small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Gemeinsame Felder -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="type"><%= tr('NOTIFICATIONS.FORM.TYPE') %> <span class="text-danger">*</span></label>
+                                <select class="form-control" id="type" name="type" required>
+                                    <option value="info" <%= notification?.type === 'info' ? 'selected' : '' %>>
+                                        <i class="fas fa-info-circle"></i> Info
+                                    </option>
+                                    <option value="warning" <%= notification?.type === 'warning' ? 'selected' : '' %>>
+                                        <i class="fas fa-exclamation-triangle"></i> Warning
+                                    </option>
+                                    <option value="error" <%= notification?.type === 'error' ? 'selected' : '' %>>
+                                        <i class="fas fa-exclamation-circle"></i> Error
+                                    </option>
+                                    <option value="success" <%= notification?.type === 'success' ? 'selected' : '' %>>
+                                        <i class="fas fa-check-circle"></i> Success
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="action_url"><%= tr('NOTIFICATIONS.FORM.ACTION_URL') %></label>
+                                <input type="url" 
+                                       class="form-control" 
+                                       id="action_url" 
+                                       name="action_url" 
+                                       value="<%= notification?.action_url || '' %>">
+                                <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.ACTION_URL_HELP') %></small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="expiry"><%= tr('NOTIFICATIONS.FORM.EXPIRES_AT') %></label>
+                        <input type="datetime-local" 
+                               class="form-control" 
+                               id="expiry" 
+                               name="expiry" 
+                               value="<%= notification?.expiry ? new Date(notification.expiry).toISOString().slice(0, 16) : '' %>">
+                        <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.EXPIRES_AT_HELP') %></small>
+                    </div>
+
+                    <hr>
+
+                    <!-- Delivery Options -->
+                    <h5 class="mb-3"><i class="fas fa-paper-plane mr-2"></i> Zustellungs-Optionen</h5>
+                    
+                    <div class="form-group">
+                        <label for="delivery_method">Wie soll die Benachrichtigung zugestellt werden? <span class="text-danger">*</span></label>
+                        <select class="form-control" id="delivery_method" name="delivery_method" required>
+                            <option value="dashboard" <%= !notification || notification.delivery_method === 'dashboard' ? 'selected' : '' %>>
+                                📊 Nur im Dashboard anzeigen
+                            </option>
+                            <option value="discord_channel" <%= notification?.delivery_method === 'discord_channel' ? 'selected' : '' %>>
+                                💬 In Discord System-Channel senden
+                            </option>
+                            <option value="discord_dm" <%= notification?.delivery_method === 'discord_dm' ? 'selected' : '' %>>
+                                ✉️  Als DM an Server-Admins senden
+                            </option>
+                            <option value="all" <%= notification?.delivery_method === 'all' ? 'selected' : '' %>>
+                                🚀 Dashboard + Discord (Channel + DM)
+                            </option>
+                        </select>
+                        <small class="form-text text-muted">
+                            Wähle aus, wo die Notification angezeigt werden soll
+                        </small>
+                    </div>
+
+                    <div class="form-group" id="discord-channel-group" style="display: none;">
+                        <label for="discord_channel_id">Discord Channel ID (optional)</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="discord_channel_id" 
+                               name="discord_channel_id" 
+                               value="<%= notification?.discord_channel_id || '' %>"
+                               placeholder="123456789012345678">
+                        <small class="form-text text-muted">
+                            Lass das Feld leer, um den Standard System-Channel zu verwenden
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="target_guild_ids">Ziel-Server (optional)</label>
+                        <select class="form-control" 
+                                id="target_guild_ids" 
+                                name="target_guild_ids" 
+                                multiple
+                                size="8"
+                                style="height: auto;">
+                            <option value="" disabled>Lade Server-Liste...</option>
+                        </select>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-info-circle"></i> Halte <kbd>Strg</kbd> (Windows) oder <kbd>Cmd</kbd> (Mac) gedrückt, um mehrere Server auszuwählen. Leer lassen = an alle Server senden.
+                        </small>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save mr-2"></i><%= tr('NOTIFICATIONS.FORM.SAVE') %>
+                    </button>
+                    <a href="/admin/notifications" class="btn btn-secondary">
+                        <i class="fas fa-times mr-2"></i><%= tr('NOTIFICATIONS.FORM.CANCEL') %>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

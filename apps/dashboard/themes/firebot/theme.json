@@ -1,0 +1,28 @@
+{
+    "name": "firebot",
+    "displayName": "FireBot Theme",
+    "version": "1.0.0",
+    "description": "Child-Theme basierend auf DuneBot Default",
+    "author": "firedervil",
+    "screenshot": "screenshot.png",
+    "parent": "default",
+    "tags": ["admin", "responsive"],
+    "requires": "1.0.0",
+    "supports": {
+        "darkMode": true,
+        "rtl": false,
+        "responsive": true
+    },
+    "config": {
+        "darkMode": true,
+        "primaryColor": "#e74c3c",
+        "accentColor": "#f39c12",
+        "logo": "images/firebot-logo.png",
+        "favicon": "images/favicon.ico"
+    },
+    "layouts": {
+        "frontend": "layouts/frontend.ejs",
+        "guild": "layouts/guild.ejs",
+        "auth": "layouts/auth.ejs"
+    }
+}

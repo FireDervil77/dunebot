@@ -28,7 +28,8 @@ exports.getDashboard = async (req, res) => {
         res.locals.layout = themeManager.getLayout('guild');
         
         // User-Daten für das Template bereitstellen
-        res.locals.user = req.session?.user || null;
+        // WICHTIG: .info verwenden, damit isOwner/hasSystemAccess korrekt gesetzt ist!
+        res.locals.user = req.session?.user?.info || null;
         
         const guildId = res.locals.guildId;
         const guild = res.locals.guild;
@@ -107,11 +108,36 @@ exports.getDashboard = async (req, res) => {
         // SuperAdmin Configs sind jetzt in res.locals verfügbar (aus guild.middleware)
         // supportUrl, supportName, dashboardVersion, botVersion
 
-        // Template rendern
-        res.render("guild/dashboard", {
+        // Widget-Config aus DB (guild-spezifische Overrides laden)
+        let guildWidgetOverrides = [];
+        try {
+            const { getInstance: getWidgetManager } = require('dunebot-sdk/lib/WidgetManager');
+            const wm = getWidgetManager();
+            guildWidgetOverrides = await wm.getGuildWidgetConfig(guildId);
+        } catch (_) { /* Tabelle noch nicht vorhanden → kein Problem */ }
+
+        // renderWidgetArea-Helper für EJS: Widgets eines Bereichs als Array zurückgeben
+        const _widgetOverrideMap = new Map(guildWidgetOverrides.map(o => [o.widget_id, o]));
+        res.locals.renderWidgetArea = (areaId) => {
+            return widgets
+                .map(w => {
+                    const ov = _widgetOverrideMap.get(w.id);
+                    return {
+                        ...w,
+                        area:     ov?.area     ?? w.area     ?? 'dashboard-main',
+                        position: ov?.position ?? w.position ?? 999,
+                        visible:  ov?.visible  !== undefined ? Boolean(ov.visible) : (w.visible !== false),
+                    };
+                })
+                .filter(w => w.area === areaId && w.visible)
+                .sort((a, b) => a.position - b.position);
+        };
+
+        // Template rendern (Theme-Hierarchy: guild/dashboard → ggf. Child-Theme-Override)
+        const viewData = {
             title: `Dashboard: ${guild.guild_name}`,
             activeMenu: `/guild/${guildId}`,
-            user: req.session?.user || null,
+            user: req.session?.user?.info || null,
             guild,
             guildId,
             stats,
@@ -125,7 +151,12 @@ exports.getDashboard = async (req, res) => {
                 objectId: guildId,
                 capabilities: ['manage_server'],
             }
-        });
+        };
+        if (themeManager?.renderView) {
+            await themeManager.renderView(res, 'guild/dashboard', viewData);
+        } else {
+            res.render('guild/dashboard', viewData);
+        }
     } catch (error) {
         Logger.error(`Fehler beim Rendern des Server-Dashboards für ${req.params.guildId}:`, error);
         res.status(500).render("error", {
@@ -386,8 +417,8 @@ exports.getPlugins = async (req, res) => {
                     }
                 }
 
-                // Sortieren: Core & SuperAdmin immer zuerst, dann alphabetisch
-                const priorityPlugins = ['core', 'superadmin'];
+                // Sortieren: Core immer zuerst, dann alphabetisch
+                const priorityPlugins = ['core'];
                 enabledPlugins.sort((a, b) => {
                     const aPriority = priorityPlugins.indexOf(a.name);
                     const bPriority = priorityPlugins.indexOf(b.name);

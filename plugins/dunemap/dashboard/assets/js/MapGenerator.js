@@ -17,8 +17,8 @@ class MapGenerator {
             maxMarkersPerCell: 6       // Maximale Marker pro Zelle
         };
 
-        // Assets Pfad
-        this.assetsPath = path.join(__dirname, '../assets/icons');
+        // Assets Pfad - Korrigiert: icons liegen in images/icons/
+        this.assetsPath = path.join(__dirname, '../images/icons');
     }
 
     /**

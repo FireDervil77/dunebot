@@ -9,6 +9,13 @@ const guildController = require("../controllers/guild.controller");
 const pluginMiddleware = require("../middlewares/context/plugin.middleware");
 const { CheckAuth, CheckGuildAccess } = require("../middlewares/auth.middleware");
 
+// Kern-Routen
+const permissionsRouter = require("./permissions.router");
+const settingsRouter = require("./guild/settings.router");
+const feedbackRouter = require("./guild/feedback.router");
+const { donateRouter, hallOfFameRouter } = require('./guild/donations.router');
+const pluginReloadRouter = require("./guild/plugin-reload.router");
+
 // NEU: /guild (Index) → immer zuerst Server-Selector anzeigen
 router.get("/", (req, res) => {
     return res.redirect("/auth/server-selector");
@@ -18,16 +25,15 @@ router.get("/", (req, res) => {
 // Dashboard der gewählten Guild
 router.get("/:guildId", CheckGuildAccess, guildController.getDashboard); 
 
-// Settings Route - Weiterleitung zum Core-Plugin
-router.get("/:guildId/settings", CheckGuildAccess, (req, res) => {
-    // Redirect zu Core Plugin Settings
-    res.redirect(`/guild/${req.params.guildId}/plugins/core/settings`);
-});
+// Kern-Settings-Routes (direkt, nicht über Plugin-System)
+router.use("/:guildId/settings", CheckAuth, CheckGuildAccess, settingsRouter);
 
-// Settings Subnav - Weiterleitung zum Core-Plugin
-router.get("/:guildId/settings/:section", CheckGuildAccess, (req, res) => {
-    res.redirect(`/guild/${req.params.guildId}/plugins/core/settings/${req.params.section}`);
-});
+// Kern-Feedback-Routes (Bug Report, Feature Request, Toast History, My Feedback)
+router.use("/:guildId/feedback", CheckAuth, CheckGuildAccess, feedbackRouter);
+
+// Kern-Donations-Routes (Donate, Hall of Fame)
+router.use("/:guildId/donate", CheckAuth, CheckGuildAccess, donateRouter);
+router.use("/:guildId/hall-of-fame", CheckAuth, CheckGuildAccess, hallOfFameRouter);
 
 // Plugin Guild Routen
 router.get("/:guildId/plugins", CheckGuildAccess, guildController.getPlugins);
@@ -38,6 +44,13 @@ router.post("/:guildId/plugins/:pluginName/update", CheckGuildAccess, guildContr
 
 // Guild locales
 router.get("/:guildId/locales", CheckGuildAccess, guildController.getLocales);
+
+// Kern-Permissions-Routes (direkt, nicht über Plugin-System)
+router.use("/:guildId/permissions", CheckAuth, CheckGuildAccess, permissionsRouter);
+
+// Kern-Plugin-Reload Route
+router.use("/:guildId/plugin-reload", CheckAuth, CheckGuildAccess, pluginReloadRouter);
+
 
 // Plugin-spezifische Routen (MIT Auth-Check!)
 router.use("/:guildId/plugins/:pluginName", CheckAuth, CheckGuildAccess, pluginMiddleware.loadPlugin, (req, res, next) => {

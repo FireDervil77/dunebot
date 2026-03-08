@@ -95,7 +95,10 @@ module.exports = {
                 guildId: message.guild.id
             });
 
-            return message.replyT('dunemap:CHANNELS.CHANNEL_SET_SUCCESS', { channel: channel.toString() });
+            const successMessage = message.guild.getT('dunemap:CHANNELS.CHANNEL_SET_SUCCESS', { 
+                channel: channel.toString() 
+            });
+            return message.reply(successMessage);
         } catch (err) {
             Logger.error('[DuneMap] Fehler beim Speichern des Channels:', err);
             return message.replyT('dunemap:CHANNEL.CHANNEL_SET_ERROR');

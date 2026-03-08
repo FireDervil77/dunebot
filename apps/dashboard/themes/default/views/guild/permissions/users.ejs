@@ -1,0 +1,903 @@
+<!-- 
+  Benutzer-Verwaltung - Permission System
+  Liste aller Benutzer mit Gruppen-Zuweisungen und Direct Permissions
+-->
+
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h2 class="mb-1">
+          <i class="fa-solid fa-users text-primary me-2"></i>
+          Benutzer-Verwaltung
+        </h2>
+        <p class="text-muted mb-0">
+          Verwalte Zugriffsberechtigungen für Dashboard-Benutzer
+        </p>
+      </div>
+      
+      <% if (userPermissions.permissions['PERMISSIONS.USERS.INVITE']) { %>
+      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addGuildMemberModal">
+        <i class="fa-solid fa-user-plus me-2"></i>
+        Mitglied hinzufügen
+      </button>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Info Alert -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="alert alert-info">
+      <i class="fa-solid fa-circle-info me-2"></i>
+      <strong>Tipp:</strong> 
+      Benutzer können mehreren Gruppen zugewiesen werden. Direct Permissions überschreiben Gruppen-Berechtigungen.
+    </div>
+  </div>
+</div>
+
+<!-- User-Liste -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-list me-2"></i>
+          Aktive Benutzer (<%= users.length %>)
+        </h3>
+        <div class="card-tools">
+          <div class="input-group input-group-sm" style="width: 250px;">
+            <input type="text" id="userSearchInput" class="form-control" placeholder="Benutzer suchen...">
+            <div class="input-group-append">
+              <span class="input-group-text">
+                <i class="fa-solid fa-search"></i>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card-body p-0">
+        <% if (users.length === 0) { %>
+        <div class="text-center py-5">
+          <i class="fa-solid fa-users text-muted" style="font-size: 4rem;"></i>
+          <h4 class="mt-3">Keine Benutzer vorhanden</h4>
+          <p class="text-muted">Lade den ersten Benutzer ein, um zu beginnen.</p>
+          
+          <% if (userPermissions.permissions['PERMISSIONS.USERS.INVITE']) { %>
+          <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#inviteUserModal">
+            <i class="fa-solid fa-user-plus me-2"></i>
+            Ersten Benutzer einladen
+          </button>
+          <% } %>
+        </div>
+        <% } else { %>
+        
+        <div class="table-responsive">
+          <table class="table table-hover table-striped mb-0" id="usersTable">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 60px;">Avatar</th>
+                <th>Name</th>
+                <th style="width: 30%;">Gruppen</th>
+                <th style="width: 120px;">Status</th>
+                <th style="width: 150px; text-align: center;">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% users.forEach(user => { %>
+              <tr data-user-id="<%= user.user_id %>">
+                <!-- Avatar -->
+                <td class="text-center">
+                  <% 
+                    // Discord Avatar URL - Bot sendet komplette URL via IPC
+                    let avatarUrl;
+                    if (user.avatar && user.avatar.startsWith('http')) {
+                      // Bot sendet komplette URL (displayAvatarURL)
+                      avatarUrl = user.avatar;
+                    } else if (user.avatar) {
+                      // Fallback: Avatar-Hash → URL konstruieren
+                      avatarUrl = `https://cdn.discordapp.com/avatars/${user.user_id}/${user.avatar}.png?size=64`;
+                    } else {
+                      // Discord Default-Avatar: discriminator % 5 (0-4)
+                      const defaultAvatar = user.discriminator ? (parseInt(user.discriminator) % 5) : 0;
+                      avatarUrl = `https://cdn.discordapp.com/embed/avatars/${defaultAvatar}.png`;
+                    }
+                  %>
+                  <img src="<%= avatarUrl %>" 
+                       class="rounded-circle" 
+                       width="40" 
+                       height="40"
+                       alt="<%= user.username %>"
+                       data-toggle="tooltip"
+                       title="<%= user.username %>"
+                       onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+                </td>
+                
+                <!-- Name -->
+                <td>
+                  <div class="d-flex align-items-center">
+                    <div>
+                      <strong class="d-block"><%= user.username || 'Unknown User' %></strong>
+                      <small class="text-muted">ID: <%= user.user_id %></small>
+                      <% if (user.is_owner) { %>
+                      <span class="badge bg-danger ms-2">
+                        <i class="fa-solid fa-crown"></i> Owner
+                      </span>
+                      <% } %>
+                    </div>
+                  </div>
+                </td>
+                
+                <!-- Gruppen -->
+                <td>
+                  <% if (user.group_names && user.group_names.length > 0) { 
+                    const groups = user.group_names;
+                    const colors = user.group_colors || [];
+                    groups.forEach((groupName, index) => { 
+                      const color = colors[index] || '#6c757d';
+                  %>
+                    <span class="badge me-1 mb-1" style="background-color: <%= color %>;">
+                      <%= groupName %>
+                    </span>
+                  <% }); 
+                  } else { %>
+                    <span class="text-muted"><i>Keine Gruppen</i></span>
+                  <% } %>
+                  
+                  <% if (user.direct_permissions && Object.keys(user.direct_permissions).length > 0) { %>
+                    <br>
+                    <span class="badge bg-warning text-dark mt-1">
+                      <i class="fa-solid fa-key"></i>
+                      <%= Object.keys(user.direct_permissions).length %> Custom
+                    </span>
+                  <% } %>
+                </td>
+                
+                <!-- Status -->
+                <td>
+                  <% if (user.status === 'active') { %>
+                  <span class="badge bg-success">
+                    <i class="fa-solid fa-check-circle"></i> Aktiv
+                  </span>
+                  <% } else if (user.status === 'invited') { %>
+                  <span class="badge bg-info">
+                    <i class="fa-solid fa-envelope"></i> Eingeladen
+                  </span>
+                  <% } else if (user.status === 'suspended') { %>
+                  <span class="badge bg-warning">
+                    <i class="fa-solid fa-ban"></i> Suspendiert
+                  </span>
+                  <% } else { %>
+                  <span class="badge bg-secondary"><%= user.status %></span>
+                  <% } %>
+                </td>
+                
+                <!-- Aktionen -->
+                <td class="text-center">
+                  <div class="btn-group btn-group-sm" role="group">
+                    <% if (userPermissions.permissions['PERMISSIONS.USERS.EDIT'] && !user.is_owner) { %>
+                    <button type="button" 
+                            class="btn btn-primary btn-edit-user" 
+                            data-user-id="<%= user.user_id %>"
+                            data-toggle="tooltip"
+                            title="Bearbeiten">
+                      <i class="fa-solid fa-edit"></i>
+                    </button>
+                    <% } %>
+                    
+                    <% if (userPermissions.permissions['PERMISSIONS.USERS.REMOVE'] && !user.is_owner) { %>
+                    <button type="button" 
+                            class="btn btn-danger btn-remove-user" 
+                            data-user-id="<%= user.user_id %>"
+                            data-username="<%= user.username %>"
+                            data-toggle="tooltip"
+                            title="Entfernen">
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                    <% } else if (user.is_owner) { %>
+                    <button type="button" 
+                            class="btn btn-secondary" 
+                            disabled
+                            data-toggle="tooltip"
+                            title="Owner kann nicht entfernt werden">
+                      <i class="fa-solid fa-lock"></i>
+                    </button>
+                    <% } %>
+                  </div>
+                </td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Guild Member Modal -->
+<div class="modal fade" id="addGuildMemberModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fa-brands fa-discord me-2"></i>
+          Guild-Mitglied hinzufügen
+        </h5>
+        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <div class="modal-body">
+        <!-- Search Bar -->
+        <div class="mb-3">
+          <div class="input-group">
+            <span class="input-group-text">
+              <i class="fa-solid fa-search"></i>
+            </span>
+            <input type="text" 
+                   class="form-control" 
+                   id="guildMemberSearch" 
+                   placeholder="Mitglied suchen (Name, Tag, ID)...">
+          </div>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="guildMembersLoading" class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Lade Mitglieder...</span>
+          </div>
+          <p class="mt-3 text-muted">Lade Discord-Mitglieder...</p>
+        </div>
+        
+        <!-- Error State -->
+        <div id="guildMembersError" class="alert alert-danger d-none">
+          <i class="fa-solid fa-exclamation-triangle me-2"></i>
+          <span id="guildMembersErrorMessage"></span>
+        </div>
+        
+        <!-- Member List -->
+        <div id="guildMembersList" class="d-none" style="max-height: 500px; overflow-y: auto;">
+          <div class="list-group">
+            <!-- Wird via JS befüllt -->
+          </div>
+        </div>
+        
+        <!-- Empty State -->
+        <div id="guildMembersEmpty" class="text-center py-5 d-none">
+          <i class="fa-solid fa-users-slash fa-3x text-muted mb-3"></i>
+          <p class="text-muted">Keine Mitglieder gefunden</p>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">
+          Schließen
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-user-edit me-2"></i>
+          Benutzer bearbeiten
+        </h5>
+        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <form id="editUserForm" class="guild-ajax-form"
+            data-form-type="edit-user"
+            data-method="PUT">
+        <input type="hidden" id="edit_user_id" name="user_id">
+        
+        <div class="modal-body">
+          <!-- User-Info -->
+          <div class="alert alert-light border">
+            <div class="d-flex align-items-center">
+              <div id="edit_user_avatar" class="me-3">
+                <!-- Avatar wird via JS eingefügt -->
+              </div>
+              <div>
+                <strong id="edit_user_display_name"></strong><br>
+                <small class="text-muted" id="edit_user_id_display"></small>
+              </div>
+            </div>
+          </div>
+          
+          <hr>
+          
+          <!-- Gruppen-Zuweisungen -->
+          <h6 class="mb-3">
+            <i class="fa-solid fa-user-group me-2"></i>
+            Gruppen
+          </h6>
+          
+          <div id="edit_groups_container">
+            <% if (typeof availableGroups !== 'undefined' && availableGroups) { 
+              availableGroups.forEach(group => { %>
+              <div class="form-check mb-2">
+                <input class="form-check-input edit-group-checkbox" 
+                       type="checkbox" 
+                       name="group_ids[]"
+                       value="<%= group.id %>"
+                       id="edit_group_<%= group.id %>"
+                       data-group-id="<%= group.id %>">
+                <label class="form-check-label" for="edit_group_<%= group.id %>">
+                  <span class="badge me-2" style="background-color: <%= group.color %>;">
+                    <%= group.name %>
+                  </span>
+                  <small class="text-muted"><%= group.description || '' %></small>
+                </label>
+              </div>
+            <% }); 
+            } else { %>
+              <p class="text-muted">Keine Gruppen verfügbar</p>
+            <% } %>
+          </div>
+          
+          <hr>
+          
+          <!-- Status -->
+          <h6 class="mb-3">
+            <i class="fa-solid fa-circle-info me-2"></i>
+            Status
+          </h6>
+          
+          <div class="mb-3">
+            <label for="edit_status" class="form-label">Benutzer-Status</label>
+            <select class="form-select" id="edit_status" name="status">
+              <option value="active">Aktiv</option>
+              <option value="invited">Eingeladen</option>
+              <option value="suspended">Suspendiert</option>
+            </select>
+            <div class="form-text">
+              Suspendierte Benutzer können sich nicht einloggen.
+            </div>
+          </div>
+          
+          <hr>
+          
+          <!-- Direct Permissions (Experten-Modus) -->
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">
+                <i class="fa-solid fa-key me-2"></i>
+                Direkte Berechtigungen
+                <span class="badge bg-warning text-dark">Experte</span>
+              </h6>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleDirectPerms">
+                <i class="fa-solid fa-chevron-down"></i>
+              </button>
+            </div>
+            
+            <div id="direct_permissions_container" style="display: none;">
+              <div class="alert alert-warning">
+                <i class="fa-solid fa-exclamation-triangle me-2"></i>
+                <strong>Achtung:</strong> Direkte Berechtigungen überschreiben Gruppen-Berechtigungen!
+              </div>
+              
+              <div id="edit_direct_permissions">
+                <% if (typeof permissions !== 'undefined' && permissions) { 
+                  Object.keys(permissions).forEach(category => { %>
+                  <div class="permission-category mb-3">
+                    <h6 class="text-uppercase text-muted mb-2">
+                      <i class="fa-solid fa-folder-open me-2"></i>
+                      <%= category %>
+                    </h6>
+                    <div class="ps-3">
+                      <% permissions[category].forEach(perm => { %>
+                      <div class="form-check mb-2">
+                        <input class="form-check-input edit-direct-perm-checkbox" 
+                               type="checkbox" 
+                               name="direct_permissions[<%= perm.permission_key %>]"
+                               id="edit_direct_perm_<%= perm.permission_key.replace(/\./g, '_') %>"
+                               value="true"
+                               data-permission-key="<%= perm.permission_key %>">
+                        <label class="form-check-label" 
+                               for="edit_direct_perm_<%= perm.permission_key.replace(/\./g, '_') %>">
+                          <strong><%= tr(perm.name_translation_key) %></strong>
+                          <% if (perm.is_dangerous) { %>
+                          <span class="badge bg-danger ms-2">Kritisch</span>
+                          <% } %>
+                        </label>
+                      </div>
+                      <% }); %>
+                    </div>
+                  </div>
+                <% }); 
+                } %>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">
+            Abbrechen
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-save me-2"></i>
+            Speichern
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Remove User Modal -->
+<div class="modal fade" id="removeUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-exclamation-triangle me-2"></i>
+          Benutzer entfernen
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <form id="removeUserForm" class="guild-ajax-form"
+            data-form-type="remove-user"
+            data-method="DELETE">
+        <input type="hidden" id="remove_user_id" name="user_id">
+        
+        <div class="modal-body">
+          <p>Möchtest du den Benutzer <strong id="remove_username"></strong> wirklich entfernen?</p>
+          <p class="text-muted mb-0">Der Benutzer verliert sofort alle Zugriffsrechte auf das Dashboard.</p>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">
+            Abbrechen
+          </button>
+          <button type="submit" class="btn btn-danger">
+            <i class="fa-solid fa-trash me-2"></i>
+            Entfernen
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript für AJAX-Handling -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const guildId = '<%= guildId %>';
+  
+  // Search functionality
+  const searchInput = document.getElementById('userSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const search = e.target.value.toLowerCase();
+      const rows = document.querySelectorAll('#usersTable tbody tr');
+      
+      rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(search) ? '' : 'none';
+      });
+    });
+  }
+  
+  // ==================================
+  // Guild Member Modal Handling
+  // ==================================
+  
+  let guildMembers = [];
+  let filteredMembers = [];
+  let modalInstance = null; // Speichere Instanz global
+  
+  // Bootstrap Modal initialisieren
+  const addMemberButton = document.querySelector('[data-target="#addGuildMemberModal"]');
+  const addMemberModalElement = document.getElementById('addGuildMemberModal');
+  
+  if (addMemberButton && addMemberModalElement) {
+    // Erstelle Modal-Instanz (nur einmal)
+    modalInstance = new bootstrap.Modal(addMemberModalElement, {
+      backdrop: true,
+      keyboard: true,
+      focus: true
+    });
+    
+    // Button-Click Event
+    addMemberButton.addEventListener('click', async (e) => {
+      e.preventDefault();
+      console.log('[Modal] Opening addGuildMemberModal...');
+      modalInstance.show();
+      // Load members direkt nach show() (Bootstrap event ist unreliable)
+      console.log('[Modal] Calling loadGuildMembers()...');
+      await loadGuildMembers();
+    });
+    
+    // Cleanup on close
+    addMemberModalElement.addEventListener('hidden.bs.modal', () => {
+      console.log('[Modal] Modal closed');
+    });
+  }
+  
+  // Load Guild Members from IPC
+  async function loadGuildMembers() {
+    const loadingDiv = document.getElementById('guildMembersLoading');
+    const errorDiv = document.getElementById('guildMembersError');
+    const listDiv = document.getElementById('guildMembersList');
+    const emptyDiv = document.getElementById('guildMembersEmpty');
+    
+    console.log('[LoadMembers] Starting fetch...');
+    
+    // Show loading
+    loadingDiv.classList.remove('d-none');
+    errorDiv.classList.add('d-none');
+    listDiv.classList.add('d-none');
+    emptyDiv.classList.add('d-none');
+    
+    try {
+      const url = `/guild/${guildId}/plugins/core/permissions/users/guild-members`;
+      console.log('[LoadMembers] Fetching from:', url);
+      
+      const response = await fetch(url);
+      console.log('[LoadMembers] Response status:', response.status);
+      
+      const result = await response.json();
+      console.log('[LoadMembers] Result:', result);
+      
+      if (result.success) {
+        guildMembers = result.members;
+        filteredMembers = [...guildMembers];
+        
+        console.log('[LoadMembers] Loaded', guildMembers.length, 'members');
+        
+        // Hide loading
+        loadingDiv.classList.add('d-none');
+        
+        if (guildMembers.length === 0) {
+          console.log('[LoadMembers] No members, showing empty state');
+          emptyDiv.classList.remove('d-none');
+        } else {
+          console.log('[LoadMembers] Rendering members...');
+          renderGuildMembers(filteredMembers);
+          listDiv.classList.remove('d-none');
+          console.log('[LoadMembers] Members rendered!');
+        }
+      } else {
+        throw new Error(result.message || 'Fehler beim Laden der Mitglieder');
+      }
+    } catch (error) {
+      console.error('[LoadMembers] ERROR:', error);
+      loadingDiv.classList.add('d-none');
+      errorDiv.classList.remove('d-none');
+      document.getElementById('guildMembersErrorMessage').textContent = error.message;
+    }
+  }
+  
+  // Render Guild Members List
+  function renderGuildMembers(members) {
+    const listContainer = document.querySelector('#guildMembersList .list-group');
+    const existingUserIds = [<%- users.map(u => "'" + u.user_id + "'").join(', ') %>];
+    
+    listContainer.innerHTML = members.map(member => {
+      const isBot = member.user?.bot || false;
+      const isAlreadyAdded = existingUserIds.includes(member.user.id);
+      // Nutze avatarURL (vollständige URL) vom Bot, nicht avatar (nur Hash)!
+      const avatarUrl = member.user.avatarURL || 
+        `https://cdn.discordapp.com/embed/avatars/${parseInt(member.user.discriminator) % 5}.png`;
+      
+      return `
+        <div class="list-group-item d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center">
+            <img src="${avatarUrl}" 
+                 alt="${member.user.username}" 
+                 class="rounded-circle me-3"
+                 style="width: 40px; height: 40px;">
+            <div>
+              <strong>${member.user.username}</strong>
+              ${member.nick ? `<span class="text-muted">(${member.nick})</span>` : ''}
+              <br>
+              <small class="text-muted">ID: ${member.user.id}</small>
+              ${isBot ? '<span class="badge bg-info ms-2">BOT</span>' : ''}
+            </div>
+          </div>
+          <div>
+            ${isAlreadyAdded 
+              ? '<span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Bereits hinzugefügt</span>'
+              : isBot 
+                ? '<button class="btn btn-sm btn-secondary" disabled>Bot</button>'
+                : `<button class="btn btn-sm btn-primary btn-add-member" data-user-id="${member.user.id}" data-username="${member.user.username}">
+                     <i class="fa-solid fa-plus me-1"></i>Hinzufügen
+                   </button>`
+            }
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    // Add event listeners to "Add" buttons
+    document.querySelectorAll('.btn-add-member').forEach(btn => {
+      btn.addEventListener('click', () => addGuildMember(btn.dataset.userId, btn.dataset.username));
+    });
+  }
+  
+  // Search Guild Members
+  const memberSearch = document.getElementById('guildMemberSearch');
+  if (memberSearch) {
+    memberSearch.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      
+      if (!query) {
+        filteredMembers = [...guildMembers];
+      } else {
+        filteredMembers = guildMembers.filter(member => {
+          const username = member.user.username.toLowerCase();
+          const nick = member.nick?.toLowerCase() || '';
+          const id = member.user.id;
+          
+          return username.includes(query) || nick.includes(query) || id.includes(query);
+        });
+      }
+      
+      renderGuildMembers(filteredMembers);
+      
+      // Show empty state if no results
+      const emptyDiv = document.getElementById('guildMembersEmpty');
+      const listDiv = document.getElementById('guildMembersList');
+      
+      if (filteredMembers.length === 0) {
+        listDiv.classList.add('d-none');
+        emptyDiv.classList.remove('d-none');
+      } else {
+        emptyDiv.classList.add('d-none');
+        listDiv.classList.remove('d-none');
+      }
+    });
+  }
+  
+  // Add Guild Member
+  async function addGuildMember(userId, username) {
+    try {
+      const response = await fetch(`/guild/${guildId}/plugins/core/permissions/users/add-guild-member`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        showToast('success', `${username} wurde erfolgreich hinzugefügt!`);
+        
+        // Update UI
+        const btn = document.querySelector(`.btn-add-member[data-user-id="${userId}"]`);
+        if (btn) {
+          btn.closest('.list-group-item').querySelector('div:last-child').innerHTML = 
+            '<span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Bereits hinzugefügt</span>';
+        }
+        
+        // Reload page after short delay
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        showToast('error', result.message || 'Fehler beim Hinzufügen');
+      }
+    } catch (error) {
+      console.error('Error adding guild member:', error);
+      showToast('error', 'Fehler beim Hinzufügen des Mitglieds');
+    }
+  }
+  
+  // ==================================
+  // Invite User Form (Legacy)
+  // ==================================
+  const inviteForm = document.getElementById('inviteUserForm');
+  if (inviteForm) {
+    inviteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(inviteForm);
+      const data = Object.fromEntries(formData);
+      
+      try {
+        const response = await fetch(`/guild/${guildId}/plugins/core/permissions/users/invite`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // Toast anzeigen
+          showToast('success', result.message);
+          
+          // Modal schließen (Bootstrap 4 Syntax mit jQuery!)
+          $('#inviteUserModal').modal('hide');
+          
+          // Seite neu laden
+          setTimeout(() => window.location.reload(), 1500);
+        } else {
+          showToast('error', result.message);
+        }
+      } catch (error) {
+        console.error('Error inviting user:', error);
+        showToast('error', 'Fehler beim Einladen des Benutzers');
+      }
+    });
+  }
+  
+  // Edit User Buttons
+  document.querySelectorAll('.btn-edit-user').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const userId = btn.dataset.userId;
+      const form = document.getElementById('editUserForm');
+      
+      // Setze User ID
+      document.getElementById('edit_user_id').value = userId;
+      
+      // Setze Action URL
+      form.action = `/guild/${guildId}/plugins/core/permissions/users/${userId}`;
+      
+      // Lade User-Daten via AJAX
+      try {
+        const response = await fetch(`/guild/${guildId}/plugins/core/permissions/users/${userId}`);
+        const userData = await response.json();
+        
+        if (userData.success) {
+          const user = userData.user;
+          
+          // Display User-Info
+          document.getElementById('edit_user_display_name').textContent = user.displayName || user.username;
+          document.getElementById('edit_user_id_display').textContent = `ID: ${user.user_id}`;
+          
+          // Avatar (mit Discord Default-Avatar Fallback)
+          const avatarContainer = document.getElementById('edit_user_avatar');
+          let avatarUrl;
+          if (user.avatar && user.avatar.startsWith('http')) {
+            // Bot sendet komplette URL (displayAvatarURL)
+            avatarUrl = user.avatar;
+          } else if (user.avatar) {
+            // Fallback: Avatar-Hash → URL konstruieren
+            avatarUrl = `https://cdn.discordapp.com/avatars/${user.user_id}/${user.avatar}.png?size=64`;
+          } else {
+            // Discord Default-Avatar basierend auf Discriminator
+            const defaultAvatar = user.discriminator ? (parseInt(user.discriminator) % 5) : 0;
+            avatarUrl = `https://cdn.discordapp.com/embed/avatars/${defaultAvatar}.png`;
+          }
+          avatarContainer.innerHTML = `
+            <img src="${avatarUrl}" 
+                 class="rounded-circle" 
+                 width="48" 
+                 height="48"
+                 onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+          `;
+          
+          // Status
+          document.getElementById('edit_status').value = user.status || 'active';
+          
+          // Gruppen (Checkboxen)
+          const userGroupIds = user.group_ids || [];
+          document.querySelectorAll('.edit-group-checkbox').forEach(checkbox => {
+            checkbox.checked = userGroupIds.includes(parseInt(checkbox.value));
+          });
+          
+          // Direct Permissions
+          const directPerms = user.direct_permissions || {};
+          document.querySelectorAll('.edit-direct-perm-checkbox').forEach(checkbox => {
+            const permKey = checkbox.dataset.permissionKey;
+            checkbox.checked = directPerms[permKey] === true;
+          });
+          
+          // Modal öffnen und Instanz speichern
+          const modalElement = document.getElementById('editUserModal');
+          const modal = new bootstrap.Modal(modalElement, { focus: false });
+          modal.show();
+          
+          // Instanz am Element speichern für späteren Zugriff
+          modalElement._bsModalInstance = modal;
+        } else {
+          showToast('error', 'Fehler beim Laden der Benutzerdaten');
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+        showToast('error', 'Fehler beim Laden der Benutzerdaten');
+      }
+    });
+  });
+  
+  // Toggle Direct Permissions
+  const toggleDirectPermsBtn = document.getElementById('toggleDirectPerms');
+  const directPermsContainer = document.getElementById('direct_permissions_container');
+  
+  if (toggleDirectPermsBtn && directPermsContainer) {
+    toggleDirectPermsBtn.addEventListener('click', () => {
+      const isVisible = directPermsContainer.style.display !== 'none';
+      directPermsContainer.style.display = isVisible ? 'none' : 'block';
+      toggleDirectPermsBtn.innerHTML = isVisible 
+        ? '<i class="fa-solid fa-chevron-down"></i>' 
+        : '<i class="fa-solid fa-chevron-up"></i>';
+    });
+  }
+  
+  // Remove User Buttons
+  document.querySelectorAll('.btn-remove-user').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const userId = btn.dataset.userId;
+      const username = btn.dataset.username;
+      
+      document.getElementById('remove_user_id').value = userId;
+      document.getElementById('remove_username').textContent = username;
+      
+      // Form-Action setzen für DELETE-Request
+      const form = document.getElementById('removeUserForm');
+      form.action = `/guild/${guildId}/plugins/core/permissions/users/${userId}`;
+      
+      // WICHTIG: Wiederverwendung bestehender Instanz oder neue erstellen
+      // Modal öffnen (Bootstrap 4 Syntax mit jQuery!)
+      $('#removeUserModal').modal('show');
+    });
+  });
+  
+  // Remove User Form - Nutzt guild.js AJAX-System (kein manueller Handler mehr)
+  
+  // Toast Helper - Nutzt globales Toast-System aus global-toast.js
+  // (window.showToast ist bereits verfügbar)
+  
+  // Initialize Bootstrap tooltips (Bootstrap 4 Syntax mit jQuery!)
+  $('[data-toggle="tooltip"]').tooltip();
+});
+</script>
+
+<style>
+.icon-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hover-shadow:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+#usersTable tbody tr {
+  transition: background-color 0.2s;
+}
+
+#usersTable tbody tr:hover {
+  background-color: rgba(0, 123, 255, 0.05) !important;
+}
+
+#usersTable thead th {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #dee2e6;
+}
+
+#usersTable td {
+  vertical-align: middle;
+  padding: 0.75rem;
+}
+
+#usersTable .badge {
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.35em 0.65em;
+}
+
+/* Kompaktere Buttons */
+.btn-group-sm .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+</style>
