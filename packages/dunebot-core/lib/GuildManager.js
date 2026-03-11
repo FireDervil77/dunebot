@@ -69,9 +69,11 @@ class GuildManager {
         if (!existing || existing[0].count === 0) {
             Logger.info(`Neue Guild – initialisiere Config für ${guild.id}`);
             await this.initGuildConfigs(guild.id);
+            await this._seedDefaultGroups(guild.id);
             await this.ensureGuildPlugins(guild.id, guild.client);
         } else {
-            Logger.info(`Guild ${guild.id} war bereits konfiguriert (Re-Join)`);
+            Logger.info(`Guild ${guild.id} war bereits konfiguriert (Re-Join) – prüfe Gruppen...`);
+            await this._seedDefaultGroups(guild.id);
         }
 
         // 3. IPC-Event an Dashboard senden
@@ -112,6 +114,9 @@ class GuildManager {
         } else {
             Logger.debug(`Guild "${guild.name}" (${guild.id}) bereits konfiguriert`);
         }
+
+        // Gruppen immer sicherstellen (idempotent)
+        await this._seedDefaultGroups(guild.id);
     }
 
     /**
@@ -182,6 +187,130 @@ class GuildManager {
     // ─────────────────────────────────────────────
     // Private Helpers
     // ─────────────────────────────────────────────
+
+    /**
+     * Erstellt Standard-Gruppen für eine neue Guild (idempotent).
+     *
+     * Administrator-Gruppe bekommt dynamisch ALLE Einträge aus permission_definitions
+     * (Kern-Permissions + aktivierte Plugin-Permissions). So hat jede neue Guild
+     * sofort den vollen Satz — weitere Plugin-Permissions werden via
+     * registerPluginPermissionsForGuild ergänzt wenn Plugins aktiviert werden.
+     *
+     * Moderator / Support / User starten leer. Ihre Rechte werden über das
+     * default_groups-Feld in der permissions.json jedes Plugins gefüllt, sobald
+     * ein Plugin für die Guild aktiviert wird.
+     *
+     * @param {string} guildId
+     */
+    async _seedDefaultGroups(guildId) {
+        const Logger = ServiceManager.get("Logger");
+        const dbService = ServiceManager.get("dbService");
+
+        // ── 1. Alle aktiven Permissions aus der globalen Tabelle laden ─────────
+        let adminPermissions = {};
+        try {
+            const permDefs = await dbService.query(
+                'SELECT permission_key FROM permission_definitions WHERE is_active = 1'
+            );
+            for (const p of (permDefs || [])) {
+                adminPermissions[p.permission_key] = true;
+            }
+        } catch (err) {
+            Logger.warn(`_seedDefaultGroups: permission_definitions nicht lesbar – ${err.message}`);
+        }
+
+        // Fallback: minimales Set falls Tabelle noch leer ist (Fresh-Install)
+        if (Object.keys(adminPermissions).length === 0) {
+            Logger.warn(`_seedDefaultGroups Guild ${guildId}: permission_definitions leer, nutze Minimal-Fallback`);
+            adminPermissions = {
+                'DASHBOARD.ACCESS': true,
+                'PERMISSIONS.VIEW': true,
+                'PERMISSIONS.USERS.VIEW': true,
+                'PERMISSIONS.GROUPS.VIEW': true,
+            };
+        }
+
+        // ── 2. Struktur der Standard-Gruppen ─────────────────────────────────
+        // Moderator/Support/User starten leer – Befüllung erfolgt durch
+        // registerPluginPermissionsForGuild → default_groups in permissions.json
+        const subGroups = [
+            {
+                name: 'Moderator', slug: 'moderator',
+                description: 'Moderations-Berechtigungen (werden durch Plugins befüllt)',
+                color: '#007bff', icon: 'fa-solid fa-user-shield',
+                is_protected: false, is_default: false, priority: 50,
+            },
+            {
+                name: 'Support', slug: 'support',
+                description: 'Support-Berechtigungen (werden durch Plugins befüllt)',
+                color: '#28a745', icon: 'fa-solid fa-headset',
+                is_protected: false, is_default: false, priority: 25,
+            },
+            {
+                name: 'User', slug: 'user',
+                description: 'Basis-Zugriff auf Dashboard',
+                color: '#6c757d', icon: 'fa-solid fa-user',
+                is_protected: false, is_default: true, priority: 1,
+            }
+        ];
+
+        // ── 3. Administrator: erstellen ODER bestehende Permissions mergen ────
+        let created = 0;
+        const [existingAdmin] = await dbService.query(
+            'SELECT id, permissions FROM guild_groups WHERE guild_id = ? AND slug = ?',
+            [guildId, 'administrator']
+        ).catch(() => []);
+
+        if (existingAdmin) {
+            // Merge: neue Permissions aus permission_definitions ergänzen
+            const currentPerms = existingAdmin.permissions
+                ? JSON.parse(existingAdmin.permissions) : {};
+            let merged = 0;
+            for (const key of Object.keys(adminPermissions)) {
+                if (!currentPerms[key]) { currentPerms[key] = true; merged++; }
+            }
+            if (merged > 0) {
+                await dbService.query(
+                    'UPDATE guild_groups SET permissions = ?, updated_at = NOW() WHERE id = ?',
+                    [JSON.stringify(currentPerms), existingAdmin.id]
+                );
+                Logger.info(`Administrator-Gruppe Guild ${guildId}: ${merged} neue Permissions gemergt`);
+            }
+        } else {
+            await dbService.query(`
+                INSERT INTO guild_groups
+                    (guild_id, name, slug, description, color, icon, is_protected, is_default, priority, permissions)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [guildId, 'Administrator', 'administrator',
+                'Vollzugriff auf alle Dashboard-Funktionen',
+                '#dc3545', 'fa-solid fa-shield-halved',
+                1, 0, 100, JSON.stringify(adminPermissions)]);
+            created++;
+        }
+
+        // ── 4. Untergruppen: nur erstellen wenn noch nicht vorhanden ──────────
+        for (const g of subGroups) {
+            const [existing] = await dbService.query(
+                'SELECT id FROM guild_groups WHERE guild_id = ? AND slug = ?',
+                [guildId, g.slug]
+            ).catch(() => []);
+            if (existing) continue;
+
+            await dbService.query(`
+                INSERT INTO guild_groups
+                    (guild_id, name, slug, description, color, icon, is_protected, is_default, priority, permissions)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [guildId, g.name, g.slug, g.description, g.color, g.icon,
+                0, g.is_default ? 1 : 0, g.priority, '{}']);
+            created++;
+        }
+
+        if (created > 0) {
+            Logger.info(`Standard-Gruppen für Guild ${guildId}: ${created} erstellt`);
+        } else {
+            Logger.debug(`Standard-Gruppen für Guild ${guildId}: alle bereits vorhanden`);
+        }
+    }
 
     /**
      * Sendet ein IPC-Event an das Dashboard, wenn eine Guild beitritt

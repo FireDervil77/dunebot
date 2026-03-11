@@ -103,38 +103,23 @@ class BotClient extends Client {
 
     async coreConfig() {
         try {
-            const corePlugin = this.pluginManager.getPlugin("core");
-            if (!corePlugin) {
-                throw new Error("Core plugin not found");
-            }
-            
-            const config = await corePlugin.getConfig();
-            if (!config) {
-                this.logger.error("Core config is empty, using defaults");
-                return {
-                    "LOCALE":  "de-DE",
-                    "THEME_ENABLED": true,
-                    "THEME": "default",
-                    "THEME_PATH": "./themes",
-                    "DASHBOARD_ENABLED": true,
-                    "DASHBOARD_ENCRYPT": true,
-                    "DASHBOARD_LOGO_NAME": "DuneBot",
-                    "DASHBOARD_LOGO_URL": "/images/logo.png",
-                    "PREFIX_COMMANDS_ENABLED": true,
-                    "PREFIX_COMMANDS_PREFIX": "!",
-                    "INTERACTIONS_SLASH": true,
-                    "INTERACTIONS_CONTEXT": false, 
-                };
+            const dbService = ServiceManager.get("dbService");
+            const rows = await dbService.query(
+                "SELECT config_key, config_value FROM configs WHERE plugin_name = 'core' AND guild_id IS NULL AND context = 'shared'"
+            );
+
+            const config = {};
+            for (const row of (rows || [])) {
+                config[row.config_key] = row.config_value;
             }
 
-            // Config aus DB umwandeln in die richtige Struktur
-            const structuredConfig = {
+            return {
                 INTERACTIONS: {
-                    SLASH: config["INTERACTIONS_SLASH"] === "true",
-                    CONTEXT: config["INTERACTIONS_CONTEXT"] === "true"  
+                    SLASH: config["INTERACTIONS_SLASH"] !== "false",
+                    CONTEXT: config["INTERACTIONS_CONTEXT"] === "true"
                 },
                 PREFIX_COMMANDS: {
-                    ENABLED: config["PREFIX_COMMANDS_ENABLED"] === "true",
+                    ENABLED: config["PREFIX_COMMANDS_ENABLED"] !== "false",
                     DEFAULT_PREFIX: config["PREFIX_COMMANDS_PREFIX"] || "!"
                 },
                 LOCALE: {
@@ -142,11 +127,13 @@ class BotClient extends Client {
                 }
             };
 
-            return structuredConfig;
-
         } catch (error) {
-            this.logger.error("Failed to load core config:", error);
-            throw error; 
+            this.logger.error("Failed to load core config, using defaults:", error);
+            return {
+                INTERACTIONS: { SLASH: true, CONTEXT: false },
+                PREFIX_COMMANDS: { ENABLED: true, DEFAULT_PREFIX: "!" },
+                LOCALE: { DEFAULT: "de-DE" }
+            };
         }
     }
 

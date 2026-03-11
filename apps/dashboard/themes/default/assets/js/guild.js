@@ -44,6 +44,12 @@ class GuildAjaxHandler {
     static async handleForm(form) {
         console.log('[GuildAjax] handleForm called for:', form.dataset.formType);
         
+        // TinyMCE Inhalte in Textareas zurückschreiben BEVOR FormData erstellt wird
+        if (typeof tinymce !== 'undefined' && tinymce.editors && tinymce.editors.length > 0) {
+            tinymce.triggerSave();
+            console.log('[GuildAjax] TinyMCE triggerSave() aufgerufen');
+        }
+        
         // Submit-Button finden und Loading-State setzen
         const submitBtn = ButtonLoader.findSubmitButton(form);
         const loadingText = form.dataset.loadingText || 'Bitte warten...';

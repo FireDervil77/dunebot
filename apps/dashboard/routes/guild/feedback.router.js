@@ -20,7 +20,8 @@ router.get('/bug-report', async (req, res) => {
 
     const bugs = await dbService.query(`
         SELECT * FROM user_feedback
-        WHERE guild_id = ? AND type = 'bug'
+        WHERE type = 'bug'
+          AND (guild_only = 0 OR guild_id = ?)
         ORDER BY created_at DESC
     `, [guildId]).catch(err => {
         Logger.error('[KernFeedback] Fehler beim Laden der Bug Reports:', err);
@@ -44,7 +45,8 @@ router.get('/feature-request', async (req, res) => {
 
     const features = await dbService.query(`
         SELECT * FROM user_feedback
-        WHERE guild_id = ? AND type = 'feature'
+        WHERE type = 'feature'
+          AND (guild_only = 0 OR guild_id = ?)
         ORDER BY upvotes DESC, created_at DESC
     `, [guildId]).catch(err => {
         Logger.error('[KernFeedback] Fehler beim Laden der Feature Requests:', err);
@@ -105,7 +107,7 @@ router.post('/bug-report', async (req, res) => {
     const guildId = res.locals.guildId;
     const userId = req.session.user.info.id;
     const userTag = req.session.user.info.username || 'Unknown';
-    const { title, description, category } = req.body;
+    const { title, description, category, guild_only } = req.body;
 
     if (!title || !description) {
         return res.status(400).json({ success: false, message: 'Titel und Beschreibung erforderlich' });
@@ -113,9 +115,9 @@ router.post('/bug-report', async (req, res) => {
 
     try {
         await dbService.query(`
-            INSERT INTO user_feedback (guild_id, user_id, user_tag, type, title, description, category, status)
-            VALUES (?, ?, ?, 'bug', ?, ?, ?, 'open')
-        `, [guildId, userId, userTag, title, description, category || null]);
+            INSERT INTO user_feedback (guild_id, user_id, user_tag, type, title, description, category, status, guild_only)
+            VALUES (?, ?, ?, 'bug', ?, ?, ?, 'open', ?)
+        `, [guildId, userId, userTag, title, description, category || null, guild_only === 'on' || guild_only === '1' || guild_only === true ? 1 : 0]);
 
         res.json({ success: true, message: 'Bug Report erfolgreich erstellt!' });
     } catch (error) {
@@ -131,7 +133,7 @@ router.post('/feature-request', async (req, res) => {
     const guildId = res.locals.guildId;
     const userId = req.session.user.info.id;
     const userTag = req.session.user.info.username || 'Unknown';
-    const { title, description, category } = req.body;
+    const { title, description, category, guild_only } = req.body;
 
     if (!title || !description) {
         return res.status(400).json({ success: false, message: 'Titel und Beschreibung erforderlich' });
@@ -139,9 +141,9 @@ router.post('/feature-request', async (req, res) => {
 
     try {
         await dbService.query(`
-            INSERT INTO user_feedback (guild_id, user_id, user_tag, type, title, description, category, status)
-            VALUES (?, ?, ?, 'feature', ?, ?, ?, 'open')
-        `, [guildId, userId, userTag, title, description, category || null]);
+            INSERT INTO user_feedback (guild_id, user_id, user_tag, type, title, description, category, status, guild_only)
+            VALUES (?, ?, ?, 'feature', ?, ?, ?, 'open', ?)
+        `, [guildId, userId, userTag, title, description, category || null, guild_only === 'on' || guild_only === '1' || guild_only === true ? 1 : 0]);
 
         res.json({ success: true, message: 'Feature Request erfolgreich erstellt!' });
     } catch (error) {

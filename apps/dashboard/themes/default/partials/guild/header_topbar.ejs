@@ -166,28 +166,30 @@
                   // WordPress-Stil: Variablen sind direkt verfügbar (user, nicht locals.user)
                   // Fallback auf locals.user für Backward Compatibility
                   const currentUser = typeof user !== 'undefined' ? user : (typeof locals !== 'undefined' ? locals.user : null);
+                  // Normalisierung: unterstützt sowohl { info: {...} } als auch flaches { id, username, ... }
+                  const currentUserInfo = (currentUser && currentUser.info) ? currentUser.info : currentUser;
                 %>
-                <% if (currentUser && currentUser.info) { %>
+                <% if (currentUserInfo && (currentUserInfo.id || currentUserInfo.username)) { %>
                 <img
                   src="<%= getUserAvatar(currentUser, 128) %>"
                   class="user-image rounded-circle shadow"
                   alt="User Image"
                 />
-                <span class="d-none d-md-inline"><%= currentUser.info.username || currentUser.username %></span>
+                <span class="d-none d-md-inline"><%= currentUserInfo.username %></span>
                 <% } else { %>
                 <span class="d-none d-md-inline">Guest</span>
                 <% } %>
               </a>
               <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
-                <% if (currentUser && currentUser.info) { %>
+                <% if (currentUserInfo && (currentUserInfo.id || currentUserInfo.username)) { %>
                 <li class="user-header text-bg-primary">
                   <img src="<%= getUserAvatar(currentUser, 256) %>"
                     class="rounded-circle shadow" alt="User Image" />
                   <p>
-                    <%= currentUser.info.username || currentUser.username %>
+                    <%= currentUserInfo.username %>
                     <% 
                       // Letzter Login anstatt Mitglied seit X Tagen
-                      let lastLogin = currentUser.lastLogin;
+                      let lastLogin = currentUserInfo.lastLogin;
                       let lastLoginText = '-';
                       if (lastLogin) {
                         let dateObj = typeof lastLogin === 'string' ? new Date(lastLogin) : lastLogin;

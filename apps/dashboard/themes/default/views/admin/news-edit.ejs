@@ -93,8 +93,7 @@
                                         <textarea class="form-control" 
                                                   id="excerpt_de" 
                                                   name="excerpt_de" 
-                                                  rows="3" 
-                                                  required><%= news && news.excerpt_de ? news.excerpt_de : '' %></textarea>
+                                                  rows="3"><%= news && news.excerpt_de ? news.excerpt_de : '' %></textarea>
                                     </div>
 
                                     <div class="mb-3">
@@ -102,8 +101,7 @@
                                         <textarea class="form-control" 
                                                   id="content_de" 
                                                   name="content_de" 
-                                                  rows="15" 
-                                                  required><%= news && news.content_de ? news.content_de : '' %></textarea>
+                                                  rows="15"><%= news && news.content_de ? news.content_de : '' %></textarea>
                                         <small class="form-text text-muted">
                                             HTML-Tags werden unterstützt (z.B. &lt;p&gt;, &lt;h3&gt;, &lt;ul&gt;, &lt;strong&gt;)
                                         </small>
@@ -133,8 +131,7 @@
                                         <textarea class="form-control" 
                                                   id="excerpt_en" 
                                                   name="excerpt_en" 
-                                                  rows="3" 
-                                                  required><%= news && news.excerpt_en ? news.excerpt_en : '' %></textarea>
+                                                  rows="3"><%= news && news.excerpt_en ? news.excerpt_en : '' %></textarea>
                                     </div>
 
                                     <div class="mb-3">
@@ -142,8 +139,7 @@
                                         <textarea class="form-control" 
                                                   id="content_en" 
                                                   name="content_en" 
-                                                  rows="15" 
-                                                  required><%= news && news.content_en ? news.content_en : '' %></textarea>
+                                                  rows="15"><%= news && news.content_en ? news.content_en : '' %></textarea>
                                         <small class="form-text text-muted">
                                             HTML tags are supported (e.g. &lt;p&gt;, &lt;h3&gt;, &lt;ul&gt;, &lt;strong&gt;)
                                         </small>
@@ -179,7 +175,7 @@
                                                class="form-control" 
                                                id="author" 
                                                name="author" 
-                                               value="<%= news && news.author ? news.author : (user && user.info && user.info.username ? user.info.username : 'Admin') %>" 
+                                               value="<%= news && news.author ? news.author : (user && (user.username || (user.info && user.info.username)) ? (user.username || user.info.username) : 'Admin') %>" 
                                                required>
                                     </div>
 
@@ -190,8 +186,8 @@
                                                class="form-control" 
                                                id="image_url" 
                                                name="image_url" 
-                                               value="<%= news && news.image_url ? news.image_url : '' %>"
-                                               placeholder="/images/news/my-image.jpg oder https://example.com/image.jpg">
+                                               value="<%= news && news.image_url ? news.image_url : '/images/dunebot-news.gif' %>"
+                                               placeholder="/images/dunebot-news.gif oder https://example.com/image.jpg">
                                         <small class="form-text text-muted">
                                             Optional: URL oder relativer Pfad zu einem Bild
                                         </small>
@@ -373,34 +369,46 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('[NewsEdit] Slug auto-generation initialized');
     }
     
-    // ⚡ KRITISCH: Form-Submit-Handler für TinyMCE-Sync
+    // ⚡ Form-Submit-Handler: TinyMCE sync + manuelle Validierung
     const newsForm = document.querySelector('form[data-form-type="news"]');
     if (newsForm) {
         newsForm.addEventListener('submit', function(e) {
-            console.log('[NewsEdit] Form submit triggered, syncing TinyMCE...');
-            
-            // TinyMCE-Inhalte in Original-Textareas zurückschreiben
+            // TinyMCE-Inhalte zuerst in Original-Textareas zurückschreiben
             if (typeof tinymce !== 'undefined') {
-                tinymce.triggerSave(); // Synchronisiert ALLE Editoren
-                console.log('[NewsEdit] ✅ TinyMCE content synced');
-                
-                // Debug: Prüfe ob Felder jetzt gefüllt sind
-                const requiredFields = ['title_de', 'excerpt_de', 'content_de', 'title_en', 'excerpt_en', 'content_en'];
-                requiredFields.forEach(fieldName => {
-                    const field = document.getElementById(fieldName);
-                    if (field) {
-                        const isEmpty = !field.value || field.value.trim() === '';
-                        console.log(`[NewsEdit] Field ${fieldName}: ${isEmpty ? '❌ LEER' : '✅ gefüllt'} (${field.value.length} chars)`);
-                        
-                        // Entferne is-invalid wenn jetzt gefüllt
-                        if (!isEmpty) {
-                            field.classList.remove('is-invalid');
-                        }
-                    }
-                });
+                tinymce.triggerSave();
             }
-            
-            // Form wird normal weiter abgesendet (keine e.preventDefault!)
+
+            // Manuelle Pflichtfeld-Validierung für TinyMCE-Felder
+            const tinymceFields = ['excerpt_de', 'content_de', 'excerpt_en', 'content_en'];
+            let hasError = false;
+            tinymceFields.forEach(function(fieldName) {
+                const field = document.getElementById(fieldName);
+                if (field) {
+                    const isEmpty = !field.value || field.value.trim() === '' || field.value.trim() === '<p></p>';
+                    if (isEmpty) {
+                        field.classList.add('is-invalid');
+                        hasError = true;
+                    } else {
+                        field.classList.remove('is-invalid');
+                    }
+                }
+            });
+
+            if (hasError) {
+                e.preventDefault();
+                e.stopPropagation();
+                // Ersten Tab mit Fehler anzeigen
+                const firstErrorField = tinymceFields.find(f => {
+                    const el = document.getElementById(f);
+                    return el && (!el.value || el.value.trim() === '' || el.value.trim() === '<p></p>');
+                });
+                if (firstErrorField) {
+                    const tab = (firstErrorField.includes('_en')) ? '#english-tab' : '#german-tab';
+                    const tabLink = document.querySelector(tab);
+                    if (tabLink) tabLink.click();
+                }
+                alert('Bitte alle Pflichtfelder (Kurzbeschreibung und Inhalt) in beiden Sprachen ausfüllen.');
+            }
         });
         console.log('[NewsEdit] ✅ Form submit handler registered');
     }

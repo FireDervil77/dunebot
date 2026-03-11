@@ -75,8 +75,8 @@ module.exports = async (message, plugin) => {
             const cmd = guild.client.commandManager.findPrefixCommand(invoke);
             
             if (cmd) {
-                // Prüfen, ob das Plugin aktiviert ist
-                if (!enabledPlugins.includes(cmd.plugin.name)) {
+                // Prüfen, ob das Plugin aktiviert ist (kern-Commands sind immer aktiv)
+                if (cmd.plugin.name !== 'kern' && !enabledPlugins.includes(cmd.plugin.name)) {
                     Logger.debug(`Command ${cmd.name} ignoriert - Plugin ${cmd.plugin.name} nicht aktiviert`);
                     return;
                 }
@@ -88,7 +88,7 @@ module.exports = async (message, plugin) => {
                 }
 
                 message.isCommand = true;
-                handlePrefixCommand(message, cmd, prefix);
+                await handlePrefixCommand(message, cmd, prefix);
             }
         }
     } catch (error) {

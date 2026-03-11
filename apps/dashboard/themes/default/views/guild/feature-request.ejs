@@ -130,6 +130,11 @@
                                             </span>
                                             
                                             <small class="text-muted ms-auto">
+                                                <% if (feature.guild_only) { %>
+                                                    <span class="badge bg-secondary me-1"><i class="fas fa-lock me-1"></i>Diese Guild</span>
+                                                <% } else { %>
+                                                    <span class="badge bg-info me-1"><i class="fas fa-globe me-1"></i>Alle Guilds</span>
+                                                <% } %>
                                                 <i class="fas fa-user me-1"></i><%= feature.user_tag || feature.user_id || 'Unbekannt' %>
                                                 <i class="fas fa-calendar ms-2 me-1"></i><%= new Date(feature.created_at).toLocaleDateString('de-DE') %>
                                             </small>
@@ -182,6 +187,7 @@
                             <option value="">Allgemein</option>
                             <option value="commands">Commands</option>
                             <option value="dashboard">Dashboard</option>
+                            <option value="plugins">Plugins</option>
                             <option value="integration">Integration</option>
                             <option value="ui">Benutzeroberfläche</option>
                             <option value="other">Sonstiges</option>
@@ -191,6 +197,15 @@
                         <label class="form-label"><%= tr('FEATURE_REQUEST.DESCRIPTION_LABEL', 'Beschreibung') %></label>
                         <textarea class="form-control" name="description" rows="6" required></textarea>
                         <small class="text-muted"><%= tr('FEATURE_REQUEST.DESCRIPTION_HINT', 'Beschreibe das Feature so detailliert wie möglich') %></small>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="guild_only" id="featureGuildOnly" value="on">
+                            <label class="form-check-label" for="featureGuildOnly">
+                                <i class="fas fa-lock me-1"></i>Nur in dieser Guild anzeigen
+                            </label>
+                            <small class="d-block text-muted">Wenn nicht gesetzt, können alle Guilds diesen Feature Request sehen.</small>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

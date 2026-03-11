@@ -90,7 +90,7 @@
                                            class="form-control form-control-lg" 
                                            min="1" 
                                            step="0.01"
-                                           value="5"
+                                           value="5.00"
                                            placeholder="Betrag eingeben">
                                     <span class="input-group-text">EUR</span>
                                 </div>
@@ -200,7 +200,7 @@
                         
                         <p class="mb-2">
                             <strong>Gesamt gespendet:</strong><br>
-                            <span class="h3 text-success">€<%= userBadge.total_donated.toFixed(2) %></span>
+                            <span class="h3 text-success">€<%= parseFloat(userBadge.total_donated || 0).toFixed(2) %></span>
                         </p>
                         
                         <p class="mb-2">
@@ -373,7 +373,7 @@ async function createDonation() {
     
     try {
         // API-Call zum Erstellen der Stripe Checkout Session
-        const response = await fetch('/api/core/create-donation', {
+        const response = await fetch('/api/core/donate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 

@@ -480,7 +480,7 @@ exports.getPlugins = async (req, res) => {
         res.render("guild/plugins", {
             title: `Plugins für ${guildName || 'Unbekannter Server'}`, // NEU: Fallback hinzugefügt
             activeMenu: `/guild/${guildId}/plugins`,
-            user: req.session?.user || null,
+            user: res.locals.user || req.session?.user?.info || null,
             guild: {
                 ...guild,
                 name: guildName // NEU: Sicherstellen dass Name verfügbar ist
@@ -689,7 +689,7 @@ exports.getLocales = async (req, res) => {
         res.render("guild/locales", {
             title: `Lokalisierung: ${guild.name}`,
             activeMenu: `/guild/${guildId}/locales`,
-            user: req.session?.user || null,
+            user: res.locals.user || req.session?.user?.info || null,
             guild,
             guildId,
             availableLanguages,

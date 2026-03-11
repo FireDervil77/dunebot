@@ -21,6 +21,8 @@ module.exports.CheckAuth = async (req, res, next) => {
             return res.status(500).send("Internal Server Error");
         }
     }
+    // User für alle Routen verfügbar machen (admin + guild)
+    res.locals.user = req.session.user?.info || null;
     return next();
 };
 

@@ -123,6 +123,54 @@ router.put('/general', requirePermission('CORE.SETTINGS.EDIT'), async (req, res)
     }
 });
 
+// GET /settings/theme
+router.get('/theme', requirePermission('CORE.SETTINGS.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+    const guildId = res.locals.guildId;
+
+    try {
+        const themes = await themeManager.getInstalledThemes();
+        const activeThemeName = await themeManager.getThemeForGuild(guildId);
+
+        return themeManager.renderView(res, 'guild/settings/theme', {
+            title: 'Theme-Auswahl',
+            activeMenu: `/guild/${guildId}/settings/theme`,
+            guildId,
+            themes,
+            activeThemeName
+        });
+    } catch (error) {
+        Logger.error('[KernSettings] Fehler beim Laden der Themes:', error);
+        res.status(500).send('Fehler beim Laden der Themes');
+    }
+});
+
+// POST /settings/theme
+router.post('/theme', requirePermission('CORE.SETTINGS.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+    const guildId = res.locals.guildId;
+    const { themeName } = req.body;
+
+    try {
+        const installed = await themeManager.getInstalledThemes();
+        const theme = installed.find(t => t.name === themeName);
+
+        if (!theme) {
+            return res.status(404).json({ success: false, message: `Theme '${themeName}' nicht gefunden` });
+        }
+
+        await themeManager.setThemeForGuild(guildId, themeName);
+        Logger.info(`[KernSettings] Theme für Guild ${guildId} auf '${themeName}' gesetzt`);
+
+        return res.json({ success: true, message: `Theme '${theme.displayName || themeName}' aktiviert` });
+    } catch (error) {
+        Logger.error('[KernSettings] Fehler beim Setzen des Themes:', error);
+        res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
 // GET /settings/integrations
 router.get('/integrations', requirePermission('CORE.SETTINGS.EDIT'), async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');

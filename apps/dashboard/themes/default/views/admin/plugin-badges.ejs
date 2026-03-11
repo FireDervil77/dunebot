@@ -197,7 +197,7 @@ document.querySelectorAll('.delete-badge').forEach(btn => {
             const result = await response.json();
             
             if (result.success) {
-                GuildAjax.showToast('success', result.message);
+                GuildAjaxHandler.showToast('success', result.message);
                 
                 // Zeile mit Animation entfernen statt Page-Reload
                 row.style.transition = 'opacity 0.3s';
@@ -218,13 +218,13 @@ document.querySelectorAll('.delete-badge').forEach(btn => {
                     }
                 }, 300);
             } else {
-                GuildAjax.showToast('error', result.message || 'Fehler beim Entfernen');
+                GuildAjaxHandler.showToast('error', result.message || 'Fehler beim Entfernen');
                 button.disabled = false;
                 button.innerHTML = originalHtml;
             }
         } catch (error) {
             console.error('Delete Badge Error:', error);
-            GuildAjax.showToast('error', 'Netzwerkfehler beim Entfernen');
+            GuildAjaxHandler.showToast('error', 'Netzwerkfehler beim Entfernen');
             button.disabled = false;
             button.innerHTML = originalHtml;
         }

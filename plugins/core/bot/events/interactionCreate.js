@@ -77,8 +77,8 @@ module.exports = async (interaction) => {
             const enabledPlugins = await dbService.getEnabledPlugins(guild.id);
             const disabledSlash = parseJsonArray(settings.disabled_slash, []);
             
-            // check if the plugin is disabled
-            if (!enabledPlugins.includes(cmd.plugin.name)) {
+            // check if the plugin is disabled (kern-Commands sind immer aktiv)
+            if (cmd.plugin.name !== 'kern' && !enabledPlugins.includes(cmd.plugin.name)) {
                 return interaction
                     .reply({
                         content: guild.getT("core:HANDLER.PLUGIN_DISABLED"),

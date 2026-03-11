@@ -32,7 +32,7 @@
             <div class="col-lg-3 col-6">
                 <div class="small-box bg-success">
                     <div class="inner">
-                        <h3>€<%= (communityStats.total_amount || 0).toFixed(2) %></h3>
+                        <h3>€<%= parseFloat(communityStats.total_amount || 0).toFixed(2) %></h3>
                         <p>Gesamt gespendet</p>
                     </div>
                     <div class="icon">
@@ -68,7 +68,7 @@
             <div class="col-lg-3 col-6">
                 <div class="small-box bg-danger">
                     <div class="inner">
-                        <h3>€<%= (communityStats.avg_donation || 0).toFixed(2) %></h3>
+                        <h3>€<%= parseFloat(communityStats.avg_donation || 0).toFixed(2) %></h3>
                         <p>Ø Spende</p>
                     </div>
                     <div class="icon">
@@ -91,7 +91,7 @@
                         Du bist ein <strong class="text-uppercase"><%= userBadge.badge_level %> Supporter</strong>!
                     </h5>
                     <p class="mb-0">
-                        Gespendet: <strong>€<%= (userBadge.total_donated || 0).toFixed(2) %></strong> 
+                        Gespendet: <strong>€<%= parseFloat(userBadge.total_donated || 0).toFixed(2) %></strong>
                         in <%= userBadge.donation_count || 0 %> Spende(n)
                         <% if (userRank) { %>
                             • Dein Rang: <strong>#<%= userRank %></strong>
@@ -99,7 +99,7 @@
                     </p>
                 </div>
                 <div class="col-auto">
-                    <a href="/guild/<%= guildId %>/plugins/core/donate" class="btn btn-success">
+                    <a href="/guild/<%= guildId %>/donate" class="btn btn-success">
                         <i class="fas fa-heart me-1"></i>Erneut spenden
                     </a>
                 </div>
@@ -121,7 +121,7 @@
                     </p>
                 </div>
                 <div class="col-auto">
-                    <a href="/guild/<%= guildId %>/plugins/core/donate" class="btn btn-primary">
+                    <a href="/guild/<%= guildId %>/donate" class="btn btn-primary">
                         <i class="fas fa-heart me-1"></i>Jetzt spenden
                     </a>
                 </div>
@@ -154,7 +154,8 @@
                         <tbody>
                             <% topDonators.forEach((donator, index) => { 
                                 const rank = index + 1;
-                                const isCurrentUser = userId && donator.user_id === userId;
+                                const _currentUserId = (typeof userId !== 'undefined') ? userId : null;
+                                const isCurrentUser = _currentUserId && donator.user_id === _currentUserId;
                                 
                                 // Badge-Farben
                                 const badgeColors = {
@@ -197,7 +198,7 @@
                                     <% } %>
                                 </td>
                                 <td class="text-end">
-                                    <strong class="text-success">€<%= (donator.total_donated || 0).toFixed(2) %></strong>
+                                    <strong class="text-success">€<%= parseFloat(donator.total_donated || 0).toFixed(2) %></strong>
                                 </td>
                                 <td class="text-center">
                                     <span class="badge badge-info"><%= donator.donation_count || 0 %>×</span>

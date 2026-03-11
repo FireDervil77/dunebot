@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS `user_feedback` (
   `priority` ENUM('low', 'medium', 'high', 'critical') DEFAULT 'medium',
   `status` ENUM('open', 'in_progress', 'resolved', 'closed', 'wontfix') DEFAULT 'open',
   `upvotes` INT UNSIGNED DEFAULT 0,
+  `guild_only` TINYINT(1) NOT NULL DEFAULT 0,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

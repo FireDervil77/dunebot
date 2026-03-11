@@ -66,5 +66,6 @@
       "is_dangerous": 0,
       "requires": "MODERATION.VIEW"
     }
-  ]
+  ],
+  "default_groups": 1006
 }

@@ -448,7 +448,7 @@ class PluginManager extends BasePluginManager {
                             is_dangerous = VALUES(is_dangerous),
                             requires_permissions = VALUES(requires_permissions),
                             plugin_name = VALUES(plugin_name)
-                    `, [key, name, description, category, is_dangerous, requiresJson, plugin.name]);
+                    `, [key, name, description, category, is_dangerous, requiresJson, plugin.name]); // global, kein guild_id
                     
                     registeredCount++;
                     Logger.debug(`  ✅ Permission registriert: ${key}`);
@@ -527,11 +527,11 @@ class PluginManager extends BasePluginManager {
                 }
                 
                 try {
-                    // INSERT mit guild_id
+                    // INSERT global, kein guild_id
                     await dbService.query(`
                         INSERT INTO permission_definitions 
-                        (guild_id, permission_key, name_translation_key, description_translation_key, category, is_dangerous, requires_permissions, plugin_name)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        (permission_key, name_translation_key, description_translation_key, category, is_dangerous, requires_permissions, plugin_name)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
                         ON DUPLICATE KEY UPDATE
                             name_translation_key = VALUES(name_translation_key),
                             description_translation_key = VALUES(description_translation_key),
@@ -539,17 +539,17 @@ class PluginManager extends BasePluginManager {
                             is_dangerous = VALUES(is_dangerous),
                             requires_permissions = VALUES(requires_permissions),
                             plugin_name = VALUES(plugin_name)
-                    `, [guildId, key, name, description, category, is_dangerous, requiresJson, plugin.name]);
+                    `, [key, name, description, category, is_dangerous, requiresJson, plugin.name]);
                     
                     registeredCount++;
-                    Logger.debug(`  ✅ Permission registriert: ${key} (Guild: ${guildId})`);
+                    Logger.debug(`  ✅ Permission registriert: ${key}`);
                     
                 } catch (err) {
-                    Logger.error(`Fehler beim Registrieren von Permission ${key} für Guild ${guildId}:`, err);
+                    Logger.error(`Fehler beim Registrieren von Permission ${key}:`, err);
                 }
             }
             
-            Logger.success(`✅ ${registeredCount} Permissions für Plugin ${plugin.name} in Guild ${guildId} registriert`);
+            Logger.success(`✅ ${registeredCount} Permissions für Plugin ${plugin.name} registriert`);
             
             // ════════════════════════════════════════════════════════════
             // NEU: Administrator-Gruppe automatisch alle Permissions geben
@@ -612,6 +612,42 @@ class PluginManager extends BasePluginManager {
                 Logger.error(`Fehler beim automatischen Zuweisen der Permissions zur Administrator-Gruppe:`, adminError);
             }
             
+            // ════════════════════════════════════════════════════════════
+            // Default-Gruppen-Permissions aus permissions.json verarbeiten
+            // Jedes Plugin kann via "default_groups": { "moderator": [...] }
+            // festlegen, welche Permissions Moderator/Support/User erhalten.
+            // ════════════════════════════════════════════════════════════
+            try {
+                const permissionsData = JSON.parse(fs.readFileSync(permissionsFile, 'utf8'));
+                const defaultGroupsMap = permissionsData.default_groups || {};
+
+                for (const [groupSlug, permKeys] of Object.entries(defaultGroupsMap)) {
+                    if (!Array.isArray(permKeys) || permKeys.length === 0) continue;
+
+                    const groupRows = await dbService.query(
+                        'SELECT id, permissions FROM guild_groups WHERE guild_id = ? AND slug = ?',
+                        [guildId, groupSlug]
+                    );
+                    if (!groupRows || groupRows.length === 0) continue;
+
+                    const group = groupRows[0];
+                    const currentPerms = group.permissions ? JSON.parse(group.permissions) : {};
+                    let addedCount = 0;
+                    for (const permKey of permKeys) {
+                        if (!currentPerms[permKey]) { currentPerms[permKey] = true; addedCount++; }
+                    }
+                    if (addedCount > 0) {
+                        await dbService.query(
+                            'UPDATE guild_groups SET permissions = ?, updated_at = NOW() WHERE id = ?',
+                            [JSON.stringify(currentPerms), group.id]
+                        );
+                        Logger.debug(`  ✅ ${addedCount} Default-Permissions für Gruppe '${groupSlug}' in Guild ${guildId}`);
+                    }
+                }
+            } catch (defaultGroupsError) {
+                Logger.error(`Fehler beim Verarbeiten der default_groups für ${plugin.name}:`, defaultGroupsError);
+            }
+
             // ════════════════════════════════════════════════════════════
             // NEU: Guild-Owner automatisch zur Administrator-Gruppe hinzufügen
             // ════════════════════════════════════════════════════════════

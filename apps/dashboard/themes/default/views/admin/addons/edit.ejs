@@ -92,7 +92,7 @@
                                 <div class="form-group">
                                     <label>Tags (comma-separated)</label>
                                     <input type="text" class="form-control" name="tags" 
-                                           value="<%= addon.tags ? JSON.parse(addon.tags).join(', ') : '' %>">
+                                           value="<%= addon.tags ? (() => { try { return JSON.parse(addon.tags).join(', '); } catch(e) { return addon.tags; } })() : '' %>">
                                 </div>
                                 
                                 <button type="submit" class="btn btn-primary">

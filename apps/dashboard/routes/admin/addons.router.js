@@ -126,21 +126,39 @@ router.get('/:id', async (req, res) => {
         // JSON-Felder parsen
         const addonData = addon[0];
         
-        // game_data enthält die PTDL_v2-Struktur mit variables, ports, scripts etc.
+        // game_data enthält die PTDL_v2/FIREBOT_v1-Struktur mit variables, ports, scripts etc.
         if (addonData.game_data) {
             const gameData = JSON.parse(addonData.game_data);
             addonData.variables = gameData.variables || [];
             addonData.ports = gameData.ports || [];
-            addonData.scripts = gameData.scripts || {};
             addonData.meta = gameData.meta || {};
             addonData.install = gameData.install || {};
+            addonData.installation = gameData.installation || {};
             addonData.startup = gameData.startup || {};
             addonData.config = gameData.config || {};
+
+            // scripts.installation.script normalisieren:
+            // PTDL_v2: gameData.scripts.installation.script
+            // FIREBOT_v1: gameData.installation.script_content
+            const legacyScript = gameData.scripts?.installation?.script || null;
+            const modernScript = gameData.installation?.script_content  || null;
+            addonData.scripts = gameData.scripts || {};
+            if (!legacyScript && modernScript) {
+                addonData.scripts = {
+                    ...addonData.scripts,
+                    installation: { script: modernScript },
+                };
+            }
         }
         
-        // Tags ist separate Spalte
+        // Tags ist separate Spalte (kann JSON-Array oder plain CSV-String sein)
         if (addonData.tags) {
-            addonData.tags = JSON.parse(addonData.tags);
+            try {
+                addonData.tags = JSON.parse(addonData.tags);
+            } catch {
+                // plain CSV → Array
+                addonData.tags = addonData.tags.split(',').map(t => t.trim()).filter(Boolean);
+            }
         }
         
         res.render('admin/addons/edit', {
@@ -267,7 +285,7 @@ router.post('/', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     
-    const userId = res.locals.user?.info?.id;  // ✅ KORREKTUR: user.info.id statt user.id!
+    const userId = res.locals.user?.id;  // res.locals.user = req.session.user.info (gesetzt von CheckAuth)
     
     try {
         const {
@@ -310,39 +328,74 @@ router.post('/', async (req, res) => {
             });
         }
         
-        // PTDL_v2 game_data strukturieren
-        const gameData = {
-            meta: {
-                version: 'PTDL_v2',
-                name: name || 'Imported Egg',
-                author: 'Pterodactyl Community',
-                description: description || '',
-                category: category || 'imported'
-            },
-            install: install || {},
-            installation: installation || {},  // ✅ NEU: installation für Daemon
-            startup: startup || {},
-            config: config || {},
-            scripts: scripts || {},
-            // ✅ variables kann jetzt Object (Map) oder Array sein
-            variables: typeof variables === 'object' && variables !== null 
-                ? variables 
-                : (typeof variables === 'string' ? JSON.parse(variables) : []),
-            // ✅ ports kann Object oder Array sein
-            ports: typeof ports === 'object' && ports !== null
-                ? ports
-                : (typeof ports === 'string' ? JSON.parse(ports) : [])
-        };
-        
-        // ✅ Steam App ID extrahieren (aus variables Map)
+        // FIREBOT_v1: game_data kommt bereits fertig konvertiert vom Frontend
+        // (PterodactylImporter.convertToOurFormat() läuft im Frontend-Request)
+        // Wir bauen hier nur noch die DB-Felder daraus ab.
+        let gameData;
+        if (meta && meta.version === 'FIREBOT_v1') {
+            // Neues Format: alles bereits korrekt strukturiert
+            gameData = {
+                meta,
+                installation: installation || {},
+                startup:      startup      || {},
+                variables:    variables    || [],
+                ports:        ports        || {},
+            };
+        } else {
+            // Legacy-Fallback für ältere Importe (PTDL_v2)
+            const installationData = installation && typeof installation === 'object' ? installation : {};
+            if (!installationData.script_content && scripts?.installation?.script) {
+                installationData.script_content = scripts.installation.script
+                    .replace(/\/mnt\/server/g, '${INSTALL_DIR}');
+            }
+            gameData = {
+                meta: {
+                    version: 'PTDL_v2',
+                    name: name || 'Imported Egg',
+                    author: 'Pterodactyl Community',
+                    description: description || '',
+                    category: category || 'imported'
+                },
+                install: install || {},
+                installation: installationData,
+                startup: startup || {},
+                config: config || {},
+                scripts: scripts || {},
+                variables: typeof variables === 'object' && variables !== null
+                    ? variables
+                    : (typeof variables === 'string' ? JSON.parse(variables) : []),
+                ports: typeof ports === 'object' && ports !== null
+                    ? ports
+                    : (typeof ports === 'string' ? JSON.parse(ports) : [])
+            };
+        }
+
+        // needs_review aus Meta → status bestimmen
+        const needsReview = meta?.needs_review === true;
+        const addonStatus = needsReview ? 'draft' : 'pending_review';
+
+        // runtime_type aus Meta ableiten
+        const isSteamcmd = gameData.installation?.script_content?.includes('${STEAMCMD}') ||
+                           (typeof variables === 'object' && (variables.SRCDS_APPID || variables.STEAM_APPID));
+        const finalRuntimeType = runtime_type ||
+            (isSteamcmd ? 'native_steamcmd' : 'custom');
+
+        // SteamCMD AppID aus variables oder script_content
         let steamAppId = null;
-        if (typeof variables === 'object' && variables !== null) {
-            // Suche nach SRCDS_APPID, STEAM_APPID, APP_ID etc.
-            steamAppId = variables.SRCDS_APPID || variables.STEAM_APPID || 
-                         variables.APP_ID || variables.STEAM_APP_ID || null;
+        const vars = gameData.variables;
+        if (Array.isArray(vars)) {
+            const appIdVar = vars.find(v => v.key === 'SRCDS_APPID' || v.key === 'STEAM_APPID');
+            if (appIdVar?.default) steamAppId = appIdVar.default;
+        } else if (typeof vars === 'object' && vars !== null) {
+            steamAppId = vars.SRCDS_APPID || vars.STEAM_APPID || null;
+        }
+        // Aus Script extrahieren als Fallback
+        if (!steamAppId) {
+            const scriptMatch = (gameData.installation?.script_content || '').match(/app_update\s+(\d+)/i);
+            if (scriptMatch) steamAppId = scriptMatch[1];
         }
         
-        // INSERT in addon_marketplace (Spalten-Reihenfolge entspricht SQL-Schema!)
+        // INSERT in addon_marketplace
         const result = await dbService.query(`
             INSERT INTO addon_marketplace (
                 name, slug, description, author_user_id,
@@ -351,26 +404,30 @@ router.post('/', async (req, res) => {
                 steam_app_id
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            name || 'Unnamed Addon',                                    // name
-            finalSlug,                                                  // slug
-            description || '',                                          // description
-            userId,                                                     // author_user_id (validiert oben, NOT NULL!)
-            'unlisted',                                                 // visibility (ENUM: official, public, unlisted, private) - unlisted bis approved
-            'pending_review',                                           // status (ENUM: draft, pending_review, approved, rejected)
-            'unverified',                                               // trust_level (ENUM: unverified, verified, trusted, official)
-            JSON.stringify(gameData),                                   // game_data (JSON)
-            category || 'other',                                        // category (ENUM: fps, survival, sandbox, mmorpg, racing, strategy, horror, scifi, other)
-            runtime_type || 'native_steamcmd',                          // runtime_type (ENUM: native_steamcmd, proton, wine, java, nodejs, python, custom)
-            source_type || 'pterodactyl',                               // source_type (ENUM: native, pterodactyl, custom)
-            steamAppId                                                  // steam_app_id (INT NULL)
+            name || 'Unnamed Addon',
+            finalSlug,
+            description || '',
+            userId,
+            'unlisted',
+            addonStatus,               // 'draft' (needs_review) oder 'pending_review'
+            'unverified',
+            JSON.stringify(gameData),
+            category || 'other',
+            finalRuntimeType,          // 'native_steamcmd' oder 'custom'
+            source_type || 'pterodactyl',
+            steamAppId
         ]);
         
-        Logger.info(`[SuperAdmin Addons] Pterodactyl-Egg importiert: ${name} (ID: ${result.insertId}) von User ${userId}`);
+        Logger.info(`[SuperAdmin Addons] Pterodactyl-Egg importiert: ${name} (ID: ${result.insertId}) von User ${userId} [status: ${addonStatus}]`);
         
         res.json({
             success: true,
-            message: 'Addon erfolgreich als Draft gespeichert',
-            id: result.insertId
+            message: needsReview
+                ? 'Addon als Entwurf gespeichert – Install-Script muss manuell geprüft werden.'
+                : 'Addon erfolgreich importiert und zur Prüfung eingereicht.',
+            id: result.insertId,
+            needs_review: needsReview,
+            status: addonStatus,
         });
         
     } catch (error) {
@@ -445,7 +502,7 @@ router.get('/pterodactyl/categories', async (req, res) => {
     const path = require('path');
     
     try {
-        const importerPath = path.join(__dirname, '../../../gameserver/dashboard/helpers/PterodactylImporter');
+        const importerPath = path.join(__dirname, '../../../../plugins/gameserver/dashboard/helpers/PterodactylImporter');
         const PterodactylImporter = require(importerPath);
         const importer = new PterodactylImporter();
         const categories = importer.getCategories();
@@ -476,7 +533,7 @@ router.get('/pterodactyl/eggs/:category', async (req, res) => {
     const { category } = req.params;
     
     try {
-        const importerPath = path.join(__dirname, '../../../gameserver/dashboard/helpers/PterodactylImporter');
+        const importerPath = path.join(__dirname, '../../../../plugins/gameserver/dashboard/helpers/PterodactylImporter');
         const PterodactylImporter = require(importerPath);
         const importer = new PterodactylImporter();
         const eggs = await importer.fetchEggsList(category);
@@ -525,7 +582,7 @@ router.get('/pterodactyl/fetch/:category', async (req, res) => {
     try {
         Logger.info(`[SuperAdmin Addons] Importing Pterodactyl egg: ${category}/${eggName}`);
         
-        const importerPath = path.join(__dirname, '../../../gameserver/dashboard/helpers/PterodactylImporter');
+        const importerPath = path.join(__dirname, '../../../../plugins/gameserver/dashboard/helpers/PterodactylImporter');
         const PterodactylImporter = require(importerPath);
         
         // 1. Prüfe ob wir die URL aus dem Cache haben
@@ -561,13 +618,17 @@ router.get('/pterodactyl/fetch/:category', async (req, res) => {
         }
         
         const importer = new PterodactylImporter();
-        const convertedEgg = importer.convertToOurFormat(pterodactylEgg);
+        const { gameData, isSteamcmd, needsReview, steamAppId } = importer.convertToOurFormat(pterodactylEgg);
         
         res.json({
             success: true,
             category,
             eggName,
-            data: convertedEgg  // ← Konsistente Response-Struktur!
+            data: {
+                ...gameData,
+                // Zusätzliche Metadaten für das Frontend (import.ejs)
+                _import_meta: { isSteamcmd, needsReview, steamAppId }
+            }
         });
         
     } catch (error) {
@@ -576,6 +637,71 @@ router.get('/pterodactyl/fetch/:category', async (req, res) => {
             success: false,
             message: error?.message || 'Fehler beim Importieren des Eggs'
         });
+    }
+});
+
+// ============================================================================
+// LGSM IMPORT API
+// ============================================================================
+
+/**
+ * GET /admin/addons/lgsm/games
+ * Liste aller verfügbaren LGSM-Spiele (aus lgsm/data/*.cfg auf GitHub)
+ */
+router.get('/lgsm/games', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const path = require('path');
+
+    try {
+        const importerPath = path.join(__dirname, '../../../../plugins/gameserver/dashboard/helpers/LGSMImporter');
+        const LGSMImporter = require(importerPath);
+        const importer = new LGSMImporter();
+        const games = await importer.fetchGamesList();
+
+        res.json({ success: true, games });
+    } catch (error) {
+        Logger.error('[SuperAdmin Addons] LGSM: Fehler beim Laden der Spieleliste:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * GET /admin/addons/lgsm/fetch?game=vhserver
+ * Einzelnes LGSM-Spiel laden, parsen und in FIREBOT_v1-Format konvertieren.
+ */
+router.get('/lgsm/fetch', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const path = require('path');
+
+    const { game: shortname } = req.query;
+
+    if (!shortname) {
+        return res.status(400).json({
+            success: false,
+            message: 'Parameter ?game= fehlt. Beispiel: /lgsm/fetch?game=vhserver'
+        });
+    }
+
+    try {
+        const importerPath = path.join(__dirname, '../../../../plugins/gameserver/dashboard/helpers/LGSMImporter');
+        const LGSMImporter = require(importerPath);
+        const importer = new LGSMImporter();
+
+        const { gameData, isSteam, needsReview, steamAppId, category } = await importer.fetchAndConvert(shortname);
+
+        Logger.info(`[SuperAdmin Addons] LGSM: ${shortname} konvertiert – isSteam=${isSteam}, appId=${steamAppId}`);
+
+        res.json({
+            success: true,
+            shortname,
+            data: {
+                ...gameData,
+                _import_meta: { isSteam, needsReview, steamAppId, category }
+            }
+        });
+    } catch (error) {
+        Logger.error(`[SuperAdmin Addons] LGSM: Fehler beim Konvertieren von '${shortname}':`, error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 

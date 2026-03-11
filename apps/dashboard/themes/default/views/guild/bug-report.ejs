@@ -94,6 +94,7 @@
                                 <th><%= tr('BUG_REPORT.STATUS_COL', 'Status') %></th>
                                 <th><%= tr('BUG_REPORT.PRIORITY_COL', 'Priorität') %></th>
                                 <th><%= tr('BUG_REPORT.REPORTER_COL', 'Gemeldet von') %></th>
+                                <th>Sichtbarkeit</th>
                                 <th><%= tr('BUG_REPORT.DATE_COL', 'Datum') %></th>
                             </tr>
                         </thead>
@@ -117,6 +118,13 @@
                                         <% } %>
                                     </td>
                                     <td><span class="badge bg-secondary"><%= bug.category || 'Allgemein' %></span></td>
+                                    <td>
+                                        <% if (bug.guild_only) { %>
+                                            <span class="badge bg-secondary"><i class="fas fa-lock me-1"></i>Diese Guild</span>
+                                        <% } else { %>
+                                            <span class="badge bg-info"><i class="fas fa-globe me-1"></i>Alle Guilds</span>
+                                        <% } %>
+                                    </td>
                                     <td>
                                         <% 
                                         const statusClass = {
@@ -203,6 +211,15 @@
                         <label class="form-label"><%= tr('BUG_REPORT.DESCRIPTION_LABEL', 'Beschreibung') %></label>
                         <textarea class="form-control" name="description" rows="6" required></textarea>
                         <small class="text-muted"><%= tr('BUG_REPORT.DESCRIPTION_HINT', 'Beschreibe den Bug so detailliert wie möglich') %></small>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="guild_only" id="bugGuildOnly" value="on">
+                            <label class="form-check-label" for="bugGuildOnly">
+                                <i class="fas fa-lock me-1"></i>Nur in dieser Guild anzeigen
+                            </label>
+                            <small class="d-block text-muted">Wenn nicht gesetzt, können alle Guilds diesen Bug Report sehen.</small>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

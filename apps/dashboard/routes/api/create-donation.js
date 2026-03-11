@@ -81,17 +81,8 @@ router.post('/', async (req, res) => {
         const stripeClient = getStripe();
         
         // Stripe Checkout Session erstellen
+        // Keine payment_method_types → Stripe nutzt automatisch die im Dashboard konfigurierten Methoden
         const session = await stripeClient.checkout.sessions.create({
-            // Zahlungsmethoden für Deutschland/Europa
-            payment_method_types: [
-                'card',         // Kreditkarten (Visa, Mastercard, Amex)
-                'sepa_debit',   // SEPA-Lastschrift
-                'giropay',      // Giropay
-                'sofort',       // Sofortüberweisung
-                'klarna',       // Klarna (Rechnung/Ratenkauf)
-                'eps',          // EPS (Österreich)
-                'ideal'         // iDEAL (Niederlande)
-            ],
             line_items: [{
                 price_data: {
                     currency: 'eur',
@@ -105,8 +96,8 @@ router.post('/', async (req, res) => {
                 quantity: 1
             }],
             mode: 'payment',
-            success_url: `${process.env.DASHBOARD_BASE_URL}/guild/${guild_id}/plugins/core/donate?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.DASHBOARD_BASE_URL}/guild/${guild_id}/plugins/core/donate?payment=cancelled`,
+            success_url: `${process.env.DASHBOARD_BASE_URL}/guild/${guild_id}/donate?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.DASHBOARD_BASE_URL}/guild/${guild_id}/donate?payment=cancelled`,
             
             // WICHTIG: User-Daten als Metadata speichern
             metadata: {

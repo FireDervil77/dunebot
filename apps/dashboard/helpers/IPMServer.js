@@ -572,7 +572,13 @@ class IPMServer {
      * @private
      */
     async _updateServerRegistry(daemonId, servers) {
+        // Status-Mapping: Daemon-States → MySQL ENUM (online,offline,starting,stopping,error)
+        const registryStatusMap = { running: 'online', crashed: 'error' };
+
         for (const server of servers) {
+            const rawStatus = server.status || 'offline';
+            const dbStatus = registryStatusMap[rawStatus] ?? rawStatus;
+
             await this.dbService.query(
                 `UPDATE server_registry 
                  SET status = ?, 
@@ -580,7 +586,7 @@ class IPMServer {
                      last_heartbeat = NOW()
                  WHERE daemon_id = ? AND server_id = ?`,
                 [
-                    server.status || 'unknown', 
+                    dbStatus,
                     server.players ?? null,  // undefined → null für MySQL
                     daemonId, 
                     server.server_id
@@ -710,8 +716,11 @@ class IPMServer {
         this.Logger.info(`[IPMServer] 🔄 Gameserver ${server_id} Status-Änderung: ${status} (von Daemon ${daemonId})`);
 
         try {
-            // ✅ Status-Mapping: Daemon 'crashed' → MySQL 'error'
-            const dbStatus = status === 'crashed' ? 'error' : status;
+            // ✅ Status-Mapping: Daemon-States → MySQL ENUM
+            // Daemon-States: offline, starting, running, stopping, crashed, installing
+            // MySQL ENUM:    offline, starting, online,  stopping, error,   installing, installed, updating
+            const statusMap = { running: 'online', crashed: 'error' };
+            const dbStatus = statusMap[status] ?? status;
 
             // Server-Status in MySQL aktualisieren
             const result = await this.dbService.query(

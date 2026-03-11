@@ -143,7 +143,8 @@ hallOfFameRouter.get('/', async (req, res) => {
             topDonators: topDonators || [],
             communityStats: stats,
             userBadge,
-            userRank
+            userRank,
+            userId: userId || null
         });
     } catch (error) {
         Logger.error('[KernDonations] Fehler beim Laden der Hall of Fame:', error);

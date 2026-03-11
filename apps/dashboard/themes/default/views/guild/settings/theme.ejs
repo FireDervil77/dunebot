@@ -1,0 +1,132 @@
+<%# Guild Theme-Auswahl — /guild/:guildId/settings/theme %>
+
+<div class="row mb-4">
+  <div class="col-12 d-flex align-items-center justify-content-between">
+    <div>
+      <h4 class="mb-1"><i class="fa-solid fa-palette me-2"></i>Theme-Auswahl</h4>
+      <p class="text-muted mb-0">Wähle das Aussehen deines Guild-Dashboards. Die Änderung gilt nur für diesen Server.</p>
+    </div>
+    <span class="badge badge-info"><%= themes.length %> Theme<%= themes.length !== 1 ? 's' : '' %> verfügbar</span>
+  </div>
+</div>
+
+<div class="row">
+  <% themes.forEach(theme => { %>
+  <% const isActive = theme.name === activeThemeName; %>
+  <div class="col-xl-4 col-md-6 mb-4">
+    <div class="card shadow-sm h-100 <%= isActive ? 'border-success' : '' %>">
+
+      <!-- Screenshot -->
+      <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center"
+           style="height: 150px; overflow: hidden; position: relative;">
+        <% const screenshotUrl = `/themes/${theme.name}/assets/${theme.screenshot || 'screenshot.png'}`; %>
+        <img src="<%= screenshotUrl %>"
+             alt="<%= theme.displayName %> Screenshot"
+             style="width:100%; height:100%; object-fit:cover;"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div style="display:none; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; background:#343a40; color:#6c757d;">
+          <i class="fas fa-image fa-3x mb-2"></i>
+          <small>Kein Screenshot</small>
+        </div>
+
+        <!-- Status-Badge -->
+        <div style="position:absolute; top:8px; right:8px;">
+          <% if (isActive) { %>
+            <span class="badge badge-success"><i class="fas fa-check me-1"></i>Aktiv</span>
+          <% } %>
+          <% if (theme.parent) { %>
+            <span class="badge badge-secondary ml-1">Child</span>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Card Body -->
+      <div class="card-body">
+        <h5 class="card-title mb-1">
+          <%= theme.displayName || theme.name %>
+          <small class="text-muted ml-1">v<%= theme.version || '1.0.0' %></small>
+        </h5>
+        <% if (theme.parent) { %>
+          <p class="text-muted small mb-1">
+            <i class="fas fa-sitemap mr-1"></i>Child von <strong><%= theme.parent %></strong>
+          </p>
+        <% } %>
+        <p class="card-text text-muted small">
+          <%= theme.description || 'Keine Beschreibung verfügbar' %>
+        </p>
+
+        <div class="small text-muted mb-3">
+          <i class="fas fa-user mr-1"></i><%= theme.author || 'Unbekannt' %>
+          <% if (theme.tags && theme.tags.length > 0) { %>
+            &nbsp;·&nbsp;
+            <% theme.tags.slice(0, 3).forEach(tag => { %>
+              <span class="badge badge-light border mr-1"><%= tag %></span>
+            <% }); %>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Card Footer -->
+      <div class="card-footer bg-transparent">
+        <% if (isActive) { %>
+          <button class="btn btn-success btn-sm w-100" disabled>
+            <i class="fas fa-check me-1"></i>Aktuell aktiv
+          </button>
+        <% } else { %>
+          <button class="btn btn-primary btn-sm w-100 theme-activate-btn"
+                  data-theme="<%= theme.name %>"
+                  data-displayname="<%= theme.displayName || theme.name %>">
+            <i class="fas fa-paint-brush me-1"></i>Aktivieren
+          </button>
+        <% } %>
+      </div>
+
+    </div>
+  </div>
+  <% }); %>
+
+  <% if (themes.length === 0) { %>
+  <div class="col-12">
+    <div class="alert alert-warning">
+      <i class="fas fa-exclamation-triangle me-2"></i>
+      Keine Themes gefunden. Bitte überprüfe das Themes-Verzeichnis.
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<script>
+document.querySelectorAll('.theme-activate-btn').forEach(btn => {
+    btn.addEventListener('click', async function () {
+        const themeName = this.dataset.theme;
+        const displayName = this.dataset.displayname;
+        const guildId = '<%= guildId %>';
+
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Wird aktiviert...';
+
+        try {
+            const res = await fetch(`/guild/${guildId}/settings/theme`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ themeName })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                // Seite neu laden damit das neue Theme sofort greift
+                window.location.reload();
+            } else {
+                alert('Fehler: ' + (data.message || 'Unbekannter Fehler'));
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-paint-brush me-1"></i>Aktivieren';
+            }
+        } catch (err) {
+            alert('Netzwerkfehler beim Aktivieren des Themes.');
+            this.disabled = false;
+            this.innerHTML = '<i class="fas fa-paint-brush me-1"></i>Aktivieren';
+        }
+    });
+});
+</script>

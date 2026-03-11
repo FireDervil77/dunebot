@@ -903,22 +903,22 @@ class ThemeManager {
          * @returns {string} - Avatar-URL
          */
         this.app.locals.getUserAvatar = function(user, size = 128) {
-            if (!user || !user.info || !user.info.id) {
+            // Unterstützt sowohl full { info: {...} } als auch flaches { id, avatar, ... } Objekt
+            const info = (user && user.info) ? user.info : user;
+            if (!info || !info.id) {
                 return '/themes/default/assets/images/default-avatar.png';
             }
             
             // User hat eigenen Avatar
-            if (user.info.avatar) {
-                const extension = user.info.avatar.startsWith('a_') ? 'gif' : 'png';
-                return `https://cdn.discordapp.com/avatars/${user.info.id}/${user.info.avatar}.${extension}?size=${size}`;
+            if (info.avatar) {
+                const extension = info.avatar.startsWith('a_') ? 'gif' : 'png';
+                return `https://cdn.discordapp.com/avatars/${info.id}/${info.avatar}.${extension}?size=${size}`;
             }
             
             // Fallback: Discord Default Avatar
-            // Discord nutzt (discriminator % 5) für Default Avatars
-            // Seit Discord's neue Username-System: User-ID Modulo verwenden
-            const defaultAvatarIndex = user.info.discriminator 
-                ? parseInt(user.info.discriminator) % 5 
-                : (BigInt(user.info.id) >> BigInt(22)) % BigInt(5);
+            const defaultAvatarIndex = info.discriminator 
+                ? parseInt(info.discriminator) % 5 
+                : Number((BigInt(info.id) >> BigInt(22)) % BigInt(5));
             
             return `https://cdn.discordapp.com/embed/avatars/${defaultAvatarIndex}.png`;
         };
@@ -1220,9 +1220,11 @@ class ThemeManager {
     }
 
     /**
-     * Theme laden und initialisieren
+     * Theme-Modul laden und initialisieren (theme.js Klasse).
+     * Hinweis: Umbenannt von loadTheme() → _loadThemeModule() um
+     * Shadowing der loadTheme(name)-Methode (getInstalledThemes) zu verhindern.
      */
-    async loadTheme() {
+    async _loadThemeModule() {
         const Logger = ServiceManager.get('Logger');
         const PathConfig = require('./utils/PathConfig').getInstance();
         

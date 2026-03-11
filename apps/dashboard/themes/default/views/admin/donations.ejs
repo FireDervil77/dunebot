@@ -1,17 +1,17 @@
-<!-- SuperAdmin Donations Management Page -->
+<!-- Admin Donations Management Page -->
 
 <div class="content-header">
     <div class="container-fluid">
         <div class="row mb-2">
             <div class="col-sm-6">
                 <h1 class="m-0">
-                    <i class="fas fa-heart me-2"></i><%= Donations Management %>
+                    <i class="fas fa-heart me-2"></i>Donations Management
                 </h1>
             </div>
             <div class="col-sm-6">
                 <ol class="breadcrumb float-sm-right">
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>">Dashboard</a></li>
-                    <li class="breadcrumb-item active"><%= Donations %></li>
+                    <li class="breadcrumb-item"><a href="/admin">Admin</a></li>
+                    <li class="breadcrumb-item active">Donations</li>
                 </ol>
             </div>
         </div>
@@ -26,8 +26,8 @@
             <div class="col-lg-3 col-6">
                 <div class="small-box bg-success">
                     <div class="inner">
-                        <h3>€<%= stats.total_amount ? stats.total_amount.toFixed(2) : '0.00' %></h3>
-                        <p><%= Gesamtbetrag %></p>
+                        <h3>€<%= stats.total_amount ? parseFloat(stats.total_amount).toFixed(2) : '0.00' %></h3>
+                        <p>Gesamtbetrag</p>
                     </div>
                     <div class="icon">
                         <i class="fas fa-euro-sign"></i>
@@ -39,7 +39,7 @@
                 <div class="small-box bg-info">
                     <div class="inner">
                         <h3><%= stats.total_donations || 0 %></h3>
-                        <p><%= Donations insgesamt %></p>
+                        <p>Donations insgesamt</p>
                     </div>
                     <div class="icon">
                         <i class="fas fa-hand-holding-heart"></i>
@@ -50,8 +50,8 @@
             <div class="col-lg-3 col-6">
                 <div class="small-box bg-warning">
                     <div class="inner">
-                        <h3>€<%= stats.average_donation ? stats.average_donation.toFixed(2) : '0.00' %></h3>
-                        <p><%= Durchschnitt %></p>
+                        <h3>€<%= stats.average_donation ? parseFloat(stats.average_donation).toFixed(2) : '0.00' %></h3>
+                        <p>Durchschnitt</p>
                     </div>
                     <div class="icon">
                         <i class="fas fa-chart-line"></i>
@@ -63,7 +63,7 @@
                 <div class="small-box bg-primary">
                     <div class="inner">
                         <h3><%= stats.unique_supporters || 0 %></h3>
-                        <p><%= Einzigartige Supporter %></p>
+                        <p>Einzigartige Supporter</p>
                     </div>
                     <div class="icon">
                         <i class="fas fa-users"></i>
@@ -78,11 +78,11 @@
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">
-                            <i class="fas fa-list me-2"></i><%= Alle Donations %>
+                            <i class="fas fa-list me-2"></i>Alle Donations
                         </h3>
                         <div class="card-tools">
                             <button type="button" class="btn btn-sm btn-success" data-toggle="modal" data-target="#createDonationModal">
-                                <i class="fas fa-plus me-1"></i><%= Manuelle Donation %>
+                                <i class="fas fa-plus me-1"></i>Manuelle Donation
                             </button>
                         </div>
                     </div>
@@ -90,13 +90,13 @@
                         <table class="table table-hover table-striped" id="donationsTable">
                             <thead>
                                 <tr>
-                                    <th><%= ID %></th>
-                                    <th><%= User %></th>
-                                    <th><%= Betrag %></th>
-                                    <th><%= Status %></th>
-                                    <th><%= Provider %></th>
-                                    <th><%= Datum %></th>
-                                    <th><%= Aktionen %></th>
+                                    <th>ID</th>
+                                    <th>User</th>
+                                    <th>Betrag</th>
+                                    <th>Status</th>
+                                    <th>Provider</th>
+                                    <th>Datum</th>
+                                    <th>Aktionen</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -113,25 +113,25 @@
                                             <% } %>
                                             <%= donation.full_username || donation.user_id %>
                                         </td>
-                                        <td class="text-success font-weight-bold">€<%= donation.amount.toFixed(2) %></td>
+                                        <td class="text-success font-weight-bold">€<%= parseFloat(donation.amount || 0).toFixed(2) %></td>
                                         <td>
                                             <% if (donation.payment_status === 'completed') { %>
-                                                <span class="badge badge-success"><%= Erfolgreich %></span>
+                                                <span class="badge badge-success">Erfolgreich</span>
                                             <% } else if (donation.payment_status === 'pending') { %>
-                                                <span class="badge badge-warning"><%= Ausstehend %></span>
+                                                <span class="badge badge-warning">Ausstehend</span>
                                             <% } else if (donation.payment_status === 'refunded') { %>
-                                                <span class="badge badge-danger"><%= Erstattet %></span>
+                                                <span class="badge badge-danger">Erstattet</span>
                                             <% } else if (donation.payment_status === 'expired') { %>
-                                                <span class="badge badge-secondary"><%= Abgelaufen %></span>
+                                                <span class="badge badge-secondary">Abgelaufen</span>
                                             <% } else { %>
                                                 <span class="badge badge-dark"><%= donation.payment_status %></span>
                                             <% } %>
                                         </td>
                                         <td>
                                             <% if (donation.payment_provider === 'stripe') { %>
-                                                <i class="fab fa-stripe text-primary"></i> <%= Stripe %>
+                                                <i class="fab fa-stripe text-primary"></i> Stripe
                                             <% } else if (donation.payment_provider === 'manual') { %>
-                                                <i class="fas fa-hand-paper text-info"></i> <%= Manuell %>
+                                                <i class="fas fa-hand-paper text-info"></i> Manuell
                                             <% } else { %>
                                                 <%= donation.payment_provider %>
                                             <% } %>
@@ -149,7 +149,7 @@
                                 <% } else { %>
                                     <tr>
                                         <td colspan="7" class="text-center text-muted">
-                                            <i class="fas fa-info-circle me-2"></i><%= Keine Donations vorhanden %>
+                                            <i class="fas fa-info-circle me-2"></i>Keine Donations vorhanden
                                         </td>
                                     </tr>
                                 <% } %>
@@ -164,7 +164,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">
-                            <i class="fas fa-trophy me-2"></i><%= Top Donors %>
+                            <i class="fas fa-trophy me-2"></i>Top Donors
                         </h3>
                     </div>
                     <div class="card-body p-0">
@@ -196,7 +196,7 @@
                                         <% } %>
                                     </span>
                                     <span class="product-description">
-                                        <strong class="text-success">€<%= donor.total_donated.toFixed(2) %></strong>
+                                        <strong class="text-success">€<%= parseFloat(donor.total_donated || 0).toFixed(2) %></strong>
                                         <small class="text-muted">(<%= donor.donation_count %> Donations)</small>
                                     </span>
                                 </div>
@@ -210,34 +210,34 @@
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">
-                            <i class="fas fa-chart-pie me-2"></i><%= Badge-Verteilung %>
+                            <i class="fas fa-chart-pie me-2"></i>Badge-Verteilung
                         </h3>
                     </div>
                     <div class="card-body">
                         <% const badgeCounts = {}; badgeDistribution.forEach(b => badgeCounts[b.badge_level] = b.count); %>
                         <div class="progress-group">
-                            <i class="fas fa-crown text-info me-2"></i> <%= Platinum %>
+                            <i class="fas fa-crown text-info me-2"></i> Platinum
                             <span class="float-right"><%= badgeCounts.platinum || 0 %></span>
                             <div class="progress progress-sm">
                                 <div class="progress-bar bg-info" style="width: <%= (badgeCounts.platinum || 0) * 10 %>%"></div>
                             </div>
                         </div>
                         <div class="progress-group">
-                            <i class="fas fa-trophy text-warning me-2"></i> <%= Gold %>
+                            <i class="fas fa-trophy text-warning me-2"></i> Gold
                             <span class="float-right"><%= badgeCounts.gold || 0 %></span>
                             <div class="progress progress-sm">
                                 <div class="progress-bar bg-warning" style="width: <%= (badgeCounts.gold || 0) * 10 %>%"></div>
                             </div>
                         </div>
                         <div class="progress-group">
-                            <i class="fas fa-medal text-secondary me-2"></i> <%= Silver %>
+                            <i class="fas fa-medal text-secondary me-2"></i> Silver
                             <span class="float-right"><%= badgeCounts.silver || 0 %></span>
                             <div class="progress progress-sm">
                                 <div class="progress-bar bg-secondary" style="width: <%= (badgeCounts.silver || 0) * 10 %>%"></div>
                             </div>
                         </div>
                         <div class="progress-group">
-                            <i class="fas fa-award text-danger me-2"></i> <%= Bronze %>
+                            <i class="fas fa-award text-danger me-2"></i> Bronze
                             <span class="float-right"><%= badgeCounts.bronze || 0 %></span>
                             <div class="progress progress-sm">
                                 <div class="progress-bar bg-danger" style="width: <%= (badgeCounts.bronze || 0) * 10 %>%"></div>
@@ -256,7 +256,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><%= Manuelle Donation erstellen %></h5>
+                <h5 class="modal-title">Manuelle Donation erstellen</h5>
                 <button type="button" class="close" data-dismiss="modal">
                     <span>&times;</span>
                 </button>
@@ -264,11 +264,11 @@
             <form id="createDonationForm">
                 <div class="modal-body">
                     <div class="form-group">
-                        <label><%= User ID %> <span class="text-danger">*</span></label>
+                        <label>User ID <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="user_id" required 
                                placeholder="Discord User ID">
                         <small class="form-text text-muted">
-                            <%= Die Discord User-ID des Spenders %>
+                            Die Discord User-ID des Spenders
                         </small>
                     </div>
                     <div class="form-group">
@@ -277,23 +277,23 @@
                                min="0.01" step="0.01" placeholder="10.00">
                     </div>
                     <div class="form-group">
-                        <label><%= Zahlungsart %></label>
+                        <label>Zahlungsart</label>
                         <select class="form-control" name="payment_provider">
-                            <option value="manual"><%= Manuell %></option>
-                            <option value="bank_transfer"><%= Überweisung %></option>
-                            <option value="cash"><%= Bargeld %></option>
-                            <option value="other"><%= Sonstiges %></option>
+                            <option value="manual">Manuell</option>
+                            <option value="bank_transfer">Überweisung</option>
+                            <option value="cash">Bargeld</option>
+                            <option value="other">Sonstiges</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label><%= Notiz %></label>
+                        <label>Notiz</label>
                         <textarea class="form-control" name="note" rows="3" 
-                                  placeholder="<%= Zusätzliche Informationen... %>"></textarea>
+                                  placeholder="Zusätzliche Informationen..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= Abbrechen %></button>
-                    <button type="submit" class="btn btn-success"><%= Erstellen %></button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-success">Erstellen</button>
                 </div>
             </form>
         </div>

@@ -164,12 +164,12 @@ router.get('/users', requirePermission('PERMISSIONS.USERS.VIEW'), async (req, re
         // Hole alle Gruppen für Dropdowns/Modals
         const availableGroups = await permissionManager.getGuildGroups(guildId);
         
-        // Hole alle Permissions für Direct-Permission-Editor (NUR guild-spezifische!)
+        // Hole alle verfügbaren Permissions (global, kein guild_id-Filter)
         const allPermissions = await dbService.query(`
             SELECT * FROM permission_definitions
-            WHERE guild_id = ?
+            WHERE is_active = 1
             ORDER BY category, sort_order, permission_key
-        `, [guildId]);
+        `);
         
         // Gruppiere Permissions nach Kategorie
         const permissionsByCategory = {};
@@ -725,12 +725,12 @@ router.get('/groups', requirePermission('PERMISSIONS.GROUPS.VIEW'), async (req, 
             Logger.info(`[Permissions GET /groups] Gruppe ${group.name} (ID: ${group.id}): ${permCount} Permissions geladen`);
         }
         
-        // Hole alle verfügbaren Permissions für Checkboxes (NUR guild-spezifische!)
+        // Hole alle verfügbaren Permissions (global, kein guild_id-Filter)
         const permissions = await dbService.query(`
             SELECT * FROM permission_definitions
-            WHERE guild_id = ?
+            WHERE is_active = 1
             ORDER BY category, sort_order, permission_key
-        `, [guildId]);
+        `);
         
         // Gruppiere Permissions nach Kategorie
         const permissionsByCategory = {};

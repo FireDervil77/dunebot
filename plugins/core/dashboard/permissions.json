@@ -190,5 +190,15 @@
       "is_dangerous": 0,
       "requires": "DONATE.VIEW"
     }
-  ]
+  ],
+  "default_groups": {
+    "moderator": [
+      "PERMISSIONS.VIEW",
+      "PERMISSIONS.USERS.VIEW",
+      "PERMISSIONS.GROUPS.VIEW"
+    ],
+    "support": [
+      "PERMISSIONS.VIEW"
+    ]
+  }
 }

@@ -114,13 +114,13 @@ async function handleCheckoutCompleted(session) {
             return;
         }
         
-        // Prüfen ob Donation bereits existiert
-        const [existing] = await dbService.query(
-            'SELECT id FROM donations WHERE stripe_session_id = ?',
+        // Prüfen ob Donation bereits existiert (payment_id = session.id)
+        const existing = await dbService.query(
+            'SELECT id FROM donations WHERE payment_id = ?',
             [session.id]
         );
         
-        if (existing.length > 0) {
+        if (existing && existing.length > 0) {
             Logger.warn('[Stripe Webhook] Donation already exists for session:', session.id);
             return;
         }
@@ -133,20 +133,22 @@ async function handleCheckoutCompleted(session) {
                 amount,
                 payment_provider,
                 payment_status,
-                stripe_payment_intent,
-                stripe_session_id,
+                payment_id,
+                stripe_customer_id,
+                message,
                 metadata,
                 created_at
-            ) VALUES (?, ?, ?, 'stripe', 'completed', ?, ?, ?, NOW())
+            ) VALUES (?, ?, ?, 'stripe', 'completed', ?, ?, ?, ?, NOW())
         `, [
             user_id,
-            guild_id,
+            guild_id || null,
             amount,
-            paymentIntent,
             session.id,
+            session.customer || null,
+            message || null,
             JSON.stringify({
                 username,
-                message: message || null,
+                payment_intent: paymentIntent,
                 customer_email: session.customer_details?.email || null
             })
         ]);
@@ -187,13 +189,13 @@ async function handleCheckoutExpired(session) {
                 amount,
                 payment_provider,
                 payment_status,
-                stripe_session_id,
+                payment_id,
                 metadata,
                 created_at
-            ) VALUES (?, ?, ?, 'stripe', 'expired', ?, ?, NOW())
+            ) VALUES (?, ?, ?, 'stripe', 'cancelled', ?, ?, NOW())
         `, [
             user_id,
-            session.metadata.guild_id,
+            session.metadata.guild_id || null,
             session.amount_total / 100,
             session.id,
             JSON.stringify({ username, reason: 'Session expired' })
@@ -216,13 +218,13 @@ async function handleChargeRefunded(charge) {
     try {
         const paymentIntent = charge.payment_intent;
         
-        // Donation finden
-        const [donations] = await dbService.query(
-            'SELECT * FROM donations WHERE stripe_payment_intent = ? AND payment_status = "completed"',
+        // Donation finden via payment_id oder metadata.payment_intent
+        const donations = await dbService.query(
+            'SELECT * FROM donations WHERE JSON_EXTRACT(metadata, "$.payment_intent") = ? AND payment_status = "completed"',
             [paymentIntent]
         );
         
-        if (donations.length === 0) {
+        if (!donations || donations.length === 0) {
             Logger.warn('[Stripe Webhook] No donation found for refunded charge:', charge.id);
             return;
         }

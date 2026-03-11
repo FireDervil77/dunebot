@@ -180,7 +180,6 @@ async function getHelpMenu({ client, guild }) {
     );
 
     let buttonsRow = new ActionRowBuilder().addComponents(components);
-    const config = await client.pluginManager.getPlugin("core").getConfig();
     const embed = EmbedUtils.embed()
         .setThumbnail(client.user.displayAvatarURL())
         .setDescription(

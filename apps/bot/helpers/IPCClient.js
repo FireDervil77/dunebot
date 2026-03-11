@@ -1,6 +1,6 @@
 const veza = require("veza");
 const { Logger } = require("dunebot-sdk/utils");
-const { languagesMeta } = require("dunebot-core");
+const { languagesMeta, ServiceManager } = require("dunebot-core");
 const { ChannelType } = require("discord.js");
 
 class IPCClient {
@@ -888,35 +888,18 @@ class IPCClient {
                 else channels.other++;
             });
             
-            // Plugins zählen - KORRIGIERT
+            // Plugins zählen - direkt aus DB
             const pluginManager = this.discordClient.pluginManager;
             let enabledPlugins = [];
-            
-            // Korrekte Methode zum Ermitteln der aktivierten Plugins für eine Guild
+
             if (pluginManager) {
                 try {
-                    // Über Core-Plugin die Guild-Einstellungen abrufen
-                    const corePlugin = pluginManager.getPlugin("core");
-                    if (corePlugin && corePlugin.dbService) {
-                        const settings = await corePlugin.dbService.getConfigs(guild.id);
-                        
-                        if (settings && settings.enabled_plugins) {
-                            try {
-                                if (typeof settings.enabled_plugins === 'string') {
-                                    if (settings.enabled_plugins.startsWith('[')) {
-                                        enabledPlugins = JSON.parse(settings.enabled_plugins);
-                                    } else {
-                                        enabledPlugins = settings.enabled_plugins.split(',').map(p => p.trim());
-                                    }
-                                } else if (Array.isArray(settings.enabled_plugins)) {
-                                    enabledPlugins = settings.enabled_plugins;
-                                }
-                            } catch (e) {
-                                this.logger.warn(`[IPC] Fehler beim Parsen der aktivierten Plugins für Guild ${guild.id}:`, e);
-                                enabledPlugins = ['core']; // Fallback
-                            }
-                        }
-                    }
+                    const dbService = this.discordClient.dbService || ServiceManager.get('dbService');
+                    const rows = await dbService.query(
+                        'SELECT plugin_name FROM guild_plugins WHERE guild_id = ? AND is_enabled = 1',
+                        [guild.id]
+                    );
+                    enabledPlugins = rows.map(r => r.plugin_name);
                 } catch (error) {
                     this.logger.error(`[IPC] Fehler beim Ermitteln der aktivierten Plugins für Guild ${guild.id}:`, error);
                 }

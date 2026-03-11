@@ -248,7 +248,8 @@
         "BUG_REPORT": "Bug Report",
         "FEATURE_REQUEST": "Feature Request",
         "SUPPORT_DUNEBOT": "DuneBot unterstützen",
-        "HALL_OF_FAME": "Hall of Fame"
+        "HALL_OF_FAME": "Hall of Fame",
+        "THEME": "Theme"
     },
 
     "BREADCRUMB": {

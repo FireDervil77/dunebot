@@ -379,6 +379,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }).catch(function(error) {
         console.error('[TinyMCE] ❌ FEHLER bei Initialisierung:', error);
     });
+
+    // TinyMCE Inhalte vor Form-Submit in Textareas zurückschreiben
+    const changelogForm = document.querySelector('form[action="/admin/changelogs/save"]');
+    if (changelogForm) {
+        changelogForm.addEventListener('submit', function() {
+            if (typeof tinymce !== 'undefined') {
+                tinymce.triggerSave();
+                console.log('[TinyMCE] triggerSave() für Changelog-Form aufgerufen');
+            }
+        });
+    }
 });
 </script>
 

@@ -590,8 +590,8 @@ class PermissionManager {
         // ✅ FIX: Owner bekommt ALLE registrierten Permissions explizit
         // Das ist wichtig für die UI (z.B. Permissions-Seite zeigt alle verfügbaren Rechte)
         const allPermissions = await this.dbService.query(
-          'SELECT permission_key FROM permission_definitions WHERE guild_id = ?',
-          [guildId]
+          'SELECT permission_key FROM permission_definitions WHERE is_active = 1',
+          []
         );
         
         if (allPermissions && allPermissions.length > 0) {
@@ -939,12 +939,12 @@ class PermissionManager {
       return;
     }
 
-    // 3. Permission-IDs aus permission_definitions holen
+    // 3. Permission-IDs aus permission_definitions holen (global)
     const placeholders = truePermissions.map(() => '?').join(',');
     const permissionRecords = await this.dbService.query(
       `SELECT id, permission_key FROM permission_definitions 
-       WHERE guild_id = ? AND permission_key IN (${placeholders})`,
-      [guildId, ...truePermissions]
+       WHERE permission_key IN (${placeholders})`,
+      [...truePermissions]
     );
 
     if (permissionRecords.length === 0) {
@@ -1075,12 +1075,12 @@ class PermissionManager {
           }
         }
         
-        // INSERT or UPDATE (ON DUPLICATE KEY UPDATE)
+        // INSERT or UPDATE (ON DUPLICATE KEY UPDATE) — global, kein guild_id
         await this.dbService.query(`
           INSERT INTO permission_definitions 
-          (guild_id, permission_key, category, name_translation_key, description_translation_key, 
+          (permission_key, category, name_translation_key, description_translation_key, 
            is_dangerous, requires_permissions, plugin_name, sort_order, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, true)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, true)
           ON DUPLICATE KEY UPDATE
             category = VALUES(category),
             name_translation_key = VALUES(name_translation_key),
@@ -1090,10 +1090,9 @@ class PermissionManager {
             sort_order = VALUES(sort_order),
             is_active = true
         `, [
-          guildId,
           perm.key,
           perm.category,
-          perm.name || perm.key,  // Fallback wenn name fehlt
+          perm.name || perm.key,
           perm.description || null,
           perm.is_dangerous || 0,
           requiresJson,
@@ -1133,24 +1132,24 @@ class PermissionManager {
     this.logger.info(`[PermissionManager] Unregistering permissions for plugin "${pluginName}" in guild ${guildId}...`);
     
     try {
-      // 1. Hole alle Permission-IDs dieses Plugins
+      // 1. Hole alle Permission-Keys dieses Plugins (global)
       const permissions = await this.dbService.query(
-        'SELECT id, permission_key FROM permission_definitions WHERE guild_id = ? AND plugin_name = ?',
-        [guildId, pluginName]
+        'SELECT id, permission_key FROM permission_definitions WHERE plugin_name = ?',
+        [pluginName]
       );
       
       if (!permissions || permissions.length === 0) {
-        this.logger.warn(`[PermissionManager] No permissions found for plugin "${pluginName}" in guild ${guildId}`);
+        this.logger.warn(`[PermissionManager] No permissions found for plugin "${pluginName}"`);
         return { permissionsDeleted: 0, groupAssignmentsDeleted: 0 };
       }
       
       const permKeys = permissions.map(p => p.permission_key);
       this.logger.debug(`[PermissionManager] Found ${permKeys.length} permissions to remove: ${permKeys.join(', ')}`);
       
-      // 2. DELETE aus permission_definitions (UI-Registry-Cleanup)
+      // 2. DELETE aus permission_definitions (UI-Registry-Cleanup, global)
       const result = await this.dbService.query(
-        'DELETE FROM permission_definitions WHERE guild_id = ? AND plugin_name = ?',
-        [guildId, pluginName]
+        'DELETE FROM permission_definitions WHERE plugin_name = ?',
+        [pluginName]
       );
       
       const permissionsDeleted = result.affectedRows || 0;

@@ -50,5 +50,6 @@
       "is_dangerous": 0,
       "requires": "GREETING.VIEW"
     }
-  ]
+  ],
+  "default_groups": 1006
 }

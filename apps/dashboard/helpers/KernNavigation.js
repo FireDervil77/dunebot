@@ -134,6 +134,17 @@ async function registerKernNavigation(guildId) {
                 parent: `/guild/${guildId}/settings`
             },
             {
+                title: 'NAV.THEME',
+                url: `/guild/${guildId}/settings/theme`,
+                icon: 'fa-solid fa-palette',
+                order: 20,
+                type: navigationManager.menuTypes.MAIN,
+                capability: 'CORE.SETTINGS.EDIT',
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}/settings`
+            },
+            {
                 title: 'NAV.INTEGRATIONS',
                 url: `/guild/${guildId}/settings/integrations`,
                 icon: 'fa-solid fa-plug',

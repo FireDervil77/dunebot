@@ -82,5 +82,6 @@
       "is_dangerous": 0,
       "requires": "DUNEMAP.VIEW"
     }
-  ]
+  ],
+  "default_groups": 1006
 }

@@ -26,13 +26,19 @@ module.exports = async (client) => {
         guild.locale = settings?.locale || client.defaultLanguage;
     }
 
-    // Alle Guilds synchronisieren
+    // Alle Guilds synchronisieren + Slash-Commands registrieren
     Logger.info(`Synchronisiere ${client.guilds.cache.size} Guilds...`);
     for (const guild of client.guilds.cache.values()) {
         try {
             await guildManager.syncGuild(guild);
         } catch (error) {
             Logger.error(`Fehler beim Sync der Guild ${guild.name}:`, error);
+        }
+
+        try {
+            await client.commandManager.registerInteractions(guild.id);
+        } catch (error) {
+            Logger.error(`Fehler beim Registrieren der Slash-Commands für Guild ${guild.name}:`, error);
         }
     }
 

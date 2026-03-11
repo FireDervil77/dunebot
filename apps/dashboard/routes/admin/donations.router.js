@@ -20,7 +20,13 @@ router.get('/', async (req, res) => {
 
     try {
         const donations = await dbService.query(`
-            SELECT d.*, g.owner_name as guild_owner_name
+            SELECT d.*,
+                COALESCE(
+                    JSON_UNQUOTE(JSON_EXTRACT(d.metadata, '$.username')),
+                    g.owner_name,
+                    d.user_id
+                ) as full_username,
+                g.owner_name as guild_owner_name
             FROM donations d
             LEFT JOIN guilds g ON d.user_id = g.owner_id
             ORDER BY d.created_at DESC LIMIT 100
@@ -35,7 +41,14 @@ router.get('/', async (req, res) => {
         `);
         const stats = statsRows[0] || {};
         const topDonors = await dbService.query(`
-            SELECT sb.user_id, sb.badge_level, sb.total_donated, sb.donation_count, g.owner_name as username
+            SELECT sb.user_id, sb.badge_level, sb.total_donated, sb.donation_count,
+                COALESCE(
+                    JSON_UNQUOTE(JSON_EXTRACT((
+                        SELECT metadata FROM donations WHERE user_id = sb.user_id ORDER BY created_at DESC LIMIT 1
+                    ), '$.username')),
+                    g.owner_name,
+                    sb.user_id
+                ) as full_username
             FROM supporter_badges sb LEFT JOIN guilds g ON sb.user_id = g.owner_id
             ORDER BY sb.total_donated DESC LIMIT 10
         `);
