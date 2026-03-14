@@ -444,10 +444,10 @@ setup_sudoers() {
 create_data_directories() {
     log_info "Erstelle Daten-Verzeichnisse..."
 
-    local base_dir="/data/firebot"
+    local base_dir="/var/lib/firebot-daemon"
 
     # Server-Volumes: {base_dir}/{serverID}/serverfiles/ → /home/container (Docker Bind-Mount)
-    mkdir -p "$base_dir"/daemon-logs    # Daemon-Logs
+    mkdir -p "$base_dir"/logs           # Daemon-Logs
     mkdir -p "$base_dir"/volumes        # Gameserver-Volumes (per Server-ID)
 
     # Docker-Network 'firebot' sicherstellen (falls install_docker nicht aufgerufen wurde)
@@ -457,11 +457,11 @@ create_data_directories() {
 
     chown -R root:root "$base_dir"
     chmod 755 "$base_dir"
-    chmod 755 "$base_dir"/daemon-logs
+    chmod 755 "$base_dir"/logs
     chmod 755 "$base_dir"/volumes
 
     log_success "Daten-Verzeichnisse erstellt: $base_dir"
-    log_info "  - $base_dir/daemon-logs/  (Daemon-System-Logs)"
+    log_info "  - $base_dir/logs/         (Daemon-System-Logs)"
     log_info "  - $base_dir/volumes/      (Gameserver-Volumes, per Server-ID)"
     log_info "  Container-Pfad im Volume: /home/container (Runtime) / /mnt/server (Install)"
 }
@@ -656,7 +656,7 @@ show_post_install_info() {
     echo -e "${CYAN}� Docker:${NC}"
     echo -e "   Docker Version: $(docker --version 2>/dev/null || echo 'N/A')"
     echo -e "   Network:        firebot (Bridge)"
-    echo -e "   Volumes:        /data/firebot/volumes/{serverID}/serverfiles/"
+    echo -e "   Volumes:        /var/lib/firebot-daemon/volumes/{serverID}/serverfiles/"
     echo -e "   Socket:         /var/run/docker.sock"
     echo ""
     echo -e "${CYAN}🔒 Security:${NC}"
@@ -751,12 +751,23 @@ uninstall() {
         log_warn "Config-Datei nicht gefunden: $CONFIG_PATH"
     fi
     
-    # Remove /data/firebot (falls verwendet und nicht schon entfernt)
+    # Remove /var/lib/firebot-daemon (Docker-Daten)
+    if [[ -d "/var/lib/firebot-daemon" ]]; then
+        echo ""
+        if prompt_yes_no "Docker-Datenverzeichnis /var/lib/firebot-daemon löschen? (Gameserver-Volumes!)" "n"; then
+            log_info "Entferne /var/lib/firebot-daemon..."
+            rm -rf "/var/lib/firebot-daemon"
+            log_success "/var/lib/firebot-daemon entfernt"
+        else
+            log_info "/var/lib/firebot-daemon behalten"
+        fi
+    fi
+    # Rückwärtskompatibilität: altes /data/firebot aufräumen
     if [[ -d "/data/firebot" ]]; then
         echo ""
-        if prompt_yes_no "Standard-Datenverzeichnis /data/firebot löschen?" "n"; then
-            log_info "Entferne /data/firebot mit sudo..."
-            sudo rm -rf "/data/firebot"
+        if prompt_yes_no "Altes Datenverzeichnis /data/firebot löschen?" "n"; then
+            log_info "Entferne /data/firebot..."
+            rm -rf "/data/firebot"
             log_success "/data/firebot entfernt"
         else
             log_info "/data/firebot behalten"
@@ -909,7 +920,7 @@ main() {
     echo ""
     echo -e "   ${YELLOW}ℹ️  Hinweis:${NC} Der Daemon läuft als root für Docker-Operationen"
     echo -e "   Gameserver laufen als isolierte Docker-Container (kein gs-User mehr)"
-    echo -e "   Docker-Network: firebot | Volumes: /data/firebot/volumes/"
+    echo -e "   Docker-Network: firebot | Volumes: /var/lib/firebot-daemon/volumes/"
     echo ""
     echo -e "${CYAN}📊 Dashboard:${NC} ${BLUE}https://dev.firenetworks.de${NC}"
     echo -e "${CYAN}📋 Logs:${NC} journalctl -u ${SERVICE_NAME} -f"
