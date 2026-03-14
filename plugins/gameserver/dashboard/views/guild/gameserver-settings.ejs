@@ -1,0 +1,191 @@
+<!-- Gameserver Settings -->
+<div class="content-wrapper">
+    <!-- Content Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fa-solid fa-cog"></i> 
+                        <%= tr('gameserver:SETTINGS.TITLE') %>
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a></li>
+                        <li class="breadcrumb-item active"><%= tr('gameserver:SETTINGS.TITLE') %></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-sliders"></i>
+                                <%= tr('gameserver:SETTINGS.PLUGIN_SETTINGS') %>
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <form class="guild-ajax-form"
+                                  data-form-type="gameserver-settings"
+                                  data-method="PUT"
+                                  action="/guild/<%= guildId %>/plugins/gameserver/settings"
+                                  method="POST">
+
+                                <!-- Auto Start Servers -->
+                                <div class="form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" 
+                                               class="custom-control-input" 
+                                               id="auto_start_servers" 
+                                               name="auto_start_servers"
+                                               value="1"
+                                               <%= settings.auto_start_servers ? 'checked' : '' %>>
+                                        <label class="custom-control-label" for="auto_start_servers">
+                                            <%= tr('gameserver:SETTINGS.AUTO_START_SERVERS') %>
+                                        </label>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SETTINGS.AUTO_START_SERVERS_DESC') %>
+                                    </small>
+                                </div>
+
+                                <!-- Auto Update Addons -->
+                                <div class="form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" 
+                                               class="custom-control-input" 
+                                               id="auto_update_addons" 
+                                               name="auto_update_addons"
+                                               value="1"
+                                               <%= settings.auto_update_addons ? 'checked' : '' %>>
+                                        <label class="custom-control-label" for="auto_update_addons">
+                                            <%= tr('gameserver:SETTINGS.AUTO_UPDATE_ADDONS') %>
+                                        </label>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SETTINGS.AUTO_UPDATE_ADDONS_DESC') %>
+                                    </small>
+                                </div>
+
+                                <!-- Max Servers Per Guild -->
+                                <div class="form-group">
+                                    <label for="max_servers_per_guild">
+                                        <%= tr('gameserver:SETTINGS.MAX_SERVERS') %>
+                                    </label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="max_servers_per_guild" 
+                                           name="max_servers_per_guild"
+                                           value="<%= settings.max_servers_per_guild %>"
+                                           min="1"
+                                           max="100"
+                                           required>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SETTINGS.MAX_SERVERS_DESC') %>
+                                    </small>
+                                </div>
+
+                                <!-- Default Backup Enabled -->
+                                <div class="form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" 
+                                               class="custom-control-input" 
+                                               id="default_backup_enabled" 
+                                               name="default_backup_enabled"
+                                               value="1"
+                                               <%= settings.default_backup_enabled ? 'checked' : '' %>>
+                                        <label class="custom-control-label" for="default_backup_enabled">
+                                            <%= tr('gameserver:SETTINGS.DEFAULT_BACKUP') %>
+                                        </label>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SETTINGS.DEFAULT_BACKUP_DESC') %>
+                                    </small>
+                                </div>
+
+                                <!-- Backup Interval -->
+                                <div class="form-group">
+                                    <label for="backup_interval_hours">
+                                        <%= tr('gameserver:SETTINGS.BACKUP_INTERVAL') %>
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="number" 
+                                               class="form-control" 
+                                               id="backup_interval_hours" 
+                                               name="backup_interval_hours"
+                                               value="<%= settings.backup_interval_hours %>"
+                                               min="1"
+                                               max="168"
+                                               required>
+                                        <div class="input-group-append">
+                                            <span class="input-group-text">
+                                                <%= tr('gameserver:SETTINGS.HOURS') %>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SETTINGS.BACKUP_INTERVAL_DESC') %>
+                                    </small>
+                                </div>
+
+                                <!-- Submit Button -->
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fa-solid fa-save"></i> <%= tr('gameserver:SETTINGS.SAVE') %>
+                                    </button>
+                                    <a href="/guild/<%= guildId %>/plugins/gameserver/dashboard" class="btn btn-secondary">
+                                        <i class="fa-solid fa-times"></i> <%= tr('gameserver:SETTINGS.CANCEL') %>
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Help Card -->
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-circle-info"></i>
+                                <%= tr('gameserver:SETTINGS.HELP') %>
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <h6><%= tr('gameserver:SETTINGS.AUTO_START_SERVERS') %></h6>
+                            <p class="small text-muted">
+                                <%= tr('gameserver:SETTINGS.AUTO_START_HELP') %>
+                            </p>
+
+                            <h6><%= tr('gameserver:SETTINGS.AUTO_UPDATE_ADDONS') %></h6>
+                            <p class="small text-muted">
+                                <%= tr('gameserver:SETTINGS.AUTO_UPDATE_HELP') %>
+                            </p>
+
+                            <h6><%= tr('gameserver:SETTINGS.MAX_SERVERS') %></h6>
+                            <p class="small text-muted">
+                                <%= tr('gameserver:SETTINGS.MAX_SERVERS_HELP') %>
+                            </p>
+
+                            <h6><%= tr('gameserver:SETTINGS.DEFAULT_BACKUP') %></h6>
+                            <p class="small text-muted mb-0">
+                                <%= tr('gameserver:SETTINGS.DEFAULT_BACKUP_HELP') %>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>

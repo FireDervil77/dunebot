@@ -1,0 +1,845 @@
+/**
+ * Addon Marketplace Route
+ * Zeigt verfügbare Game-Addons (wie Pterodactyl Eggs)
+ * @module routes/addons
+ * @author FireBot Team
+ */
+
+const express = require('express');
+const router = express.Router();
+const { ServiceManager } = require('dunebot-core');
+
+/**
+ * GET /guild/:guildId/plugins/gameserver/addons
+ * Addon Marketplace - Übersicht aller verfügbaren Game-Addons
+ */
+router.get('/', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const themeManager = ServiceManager.get('themeManager');
+    
+    try {
+        const guildId = res.locals.guildId; // ← Aus res.locals!
+        const user = res.locals.user; // ← User aus res.locals!
+        const { category, search, sort } = req.query;
+
+        Logger.debug(`[Gameserver] Addon Marketplace aufgerufen für Guild ${guildId}`);
+
+        // Query Builder für Filter
+        let query = `
+            SELECT 
+                id,
+                slug,
+                name,
+                description,
+                category,
+                tags,
+                steam_app_id,
+                author_user_id,
+                trust_level,
+                visibility,
+                status,
+                rating_avg,
+                rating_count,
+                install_count,
+                icon_url,
+                banner_url,
+                created_at,
+                updated_at
+            FROM addon_marketplace
+            WHERE status = 'approved'
+            AND (visibility = 'official' OR visibility = 'public')
+        `;
+        const params = [];
+
+        // Filter: Kategorie
+        if (category && category !== 'all') {
+            query += ' AND category = ?';
+            params.push(category);
+        }
+
+        // Filter: Suche
+        if (search) {
+            query += ' AND (name LIKE ? OR description LIKE ? OR tags LIKE ?)';
+            const searchTerm = `%${search}%`;
+            params.push(searchTerm, searchTerm, searchTerm);
+        }
+
+        // Sortierung
+        let orderBy = 'ORDER BY trust_level DESC, rating_avg DESC, install_count DESC';
+        if (sort === 'newest') {
+            orderBy = 'ORDER BY created_at DESC';
+        } else if (sort === 'popular') {
+            orderBy = 'ORDER BY install_count DESC';
+        } else if (sort === 'rating') {
+            orderBy = 'ORDER BY rating_avg DESC, rating_count DESC';
+        }
+        query += ` ${orderBy}`;
+
+        // Addons abrufen
+        const addons = await dbService.query(query, params);
+
+        // Kategorien für Filter
+        const categories = await dbService.query(`
+            SELECT DISTINCT category, COUNT(*) as count
+            FROM addon_marketplace
+            WHERE status = 'approved'
+            AND (visibility = 'official' OR visibility = 'public')
+            GROUP BY category
+            ORDER BY count DESC
+        `);
+
+        // View rendern
+        await themeManager.renderView(res, 'guild/gameserver-marketplace', {
+            title: 'Addon Marketplace',
+            activeMenu: `/guild/${guildId}/plugins/gameserver/addons`,
+            addons: addons || [],
+            categories: categories || [],
+            filters: { category: category || 'all', search: search || '', sort: sort || 'default' },
+            guildId,
+            user
+        });
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Laden des Addon Marketplace:', error);
+        res.status(500).render('error', {
+            message: 'Fehler beim Laden des Addon Marketplace',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+/**
+ * GET /guild/:guildId/plugins/gameserver/addons/my-eggs
+ * Meine Addons - Liste eigener Eggs (private + public pending)
+ * WICHTIG: MUSS VOR /:slug stehen!
+ */
+router.get('/my-eggs', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const themeManager = ServiceManager.get('themeManager');
+    
+    try {
+        const guildId = res.locals.guildId;
+        const user = res.locals.user;
+        
+        Logger.debug(`[Gameserver] Meine Addons aufgerufen für Guild ${guildId}`);
+        
+        // Eigene Eggs laden (guild_id = current guild ODER author_user_id = current user)
+        const myEggs = await dbService.query(`
+            SELECT 
+                id,
+                slug,
+                name,
+                description,
+                category,
+                visibility,
+                status,
+                trust_level,
+                version,
+                install_count,
+                icon_url,
+                created_at,
+                updated_at
+            FROM addon_marketplace
+            WHERE (guild_id = ? OR author_user_id = ?)
+            AND status != 'rejected'
+            ORDER BY updated_at DESC
+        `, [guildId, user.id]);
+        
+        // View rendern
+        await themeManager.renderView(res, 'guild/gameserver-my-eggs', {
+            title: 'Meine Addons',
+            activeMenu: `/guild/${guildId}/plugins/gameserver/addons/my-eggs`,
+            myEggs: myEggs || [],
+            guildId,
+            user
+        });
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Laden von Meine Addons:', error);
+        res.status(500).render('error', {
+            message: 'Fehler beim Laden deiner Addons',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+/**
+ * GET /guild/:guildId/plugins/gameserver/addons/create
+ * Egg Editor - Neues Egg erstellen (mit Template-Support)
+ * WICHTIG: MUSS VOR /:slug stehen!
+ */
+router.get('/create', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const themeManager = ServiceManager.get('themeManager');
+    
+    try {
+        const guildId = res.locals.guildId;
+        const user = res.locals.user;
+        const templateSource = req.query.template; // 'blank', 'pterodactyl-cs2', 'clone:123'
+        
+        Logger.debug(`[Gameserver] Egg Editor (Create) aufgerufen für Guild ${guildId}, Template: ${templateSource || 'blank'}`);
+        
+        let template = null;
+        let gameData = null;
+        
+        // Template laden falls angegeben
+        if (templateSource && templateSource !== 'blank') {
+            // Clone eigenes Egg
+            if (templateSource.startsWith('clone:')) {
+                const cloneId = templateSource.split(':')[1];
+                const [egg] = await dbService.query(
+                    'SELECT * FROM addon_marketplace WHERE id = ? AND (guild_id = ? OR author_user_id = ?)',
+                    [cloneId, guildId, user.id]
+                );
+                
+                if (egg) {
+                    template = egg;
+                    gameData = typeof egg.game_data === 'string' ? JSON.parse(egg.game_data) : egg.game_data;
+                }
+            }
+            // TODO: Pterodactyl-Template-Import (später)
+        }
+        
+        // View rendern
+        await themeManager.renderView(res, 'guild/gameserver-egg-editor', {
+            title: 'Neues Egg erstellen',
+            activeMenu: `/guild/${guildId}/plugins/gameserver/addons/my-eggs`,
+            mode: 'create',
+            template: template || null,
+            gameData: gameData || {},
+            guildId,
+            user
+        });
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Laden des Egg Editors (Create):', error);
+        res.status(500).render('error', {
+            message: 'Fehler beim Laden des Egg Editors',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+/**
+ * GET /guild/:guildId/plugins/gameserver/addons/edit/:id
+ * Egg Editor - Bestehendes Egg bearbeiten
+ * WICHTIG: MUSS VOR /:slug stehen!
+ */
+router.get('/edit/:id', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const themeManager = ServiceManager.get('themeManager');
+    
+    try {
+        const guildId = res.locals.guildId;
+        const user = res.locals.user;
+        const eggId = req.params.id;
+        
+        Logger.debug(`[Gameserver] Egg Editor (Edit) aufgerufen für Egg ${eggId}`);
+        
+        // Egg laden mit Permission-Check
+        const [egg] = await dbService.query(
+            'SELECT * FROM addon_marketplace WHERE id = ? AND (guild_id = ? OR author_user_id = ?)',
+            [eggId, guildId, user.id]
+        );
+        
+        if (!egg) {
+            return res.status(404).render('error', {
+                message: 'Egg nicht gefunden oder keine Berechtigung',
+                error: {}
+            });
+        }
+        
+        // game_data parsen
+        let gameData = {};
+        try {
+            gameData = typeof egg.game_data === 'string' ? JSON.parse(egg.game_data) : egg.game_data;
+        } catch (error) {
+            Logger.error('[Gameserver] Fehler beim Parsen von game_data:', error);
+            gameData = {};
+        }
+        
+        // View rendern
+        await themeManager.renderView(res, 'guild/gameserver-egg-editor', {
+            title: `Egg bearbeiten: ${egg.name}`,
+            activeMenu: `/guild/${guildId}/plugins/gameserver/addons/my-eggs`,
+            mode: 'edit',
+            egg,
+            gameData,
+            guildId,
+            user
+        });
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Laden des Egg Editors (Edit):', error);
+        res.status(500).render('error', {
+            message: 'Fehler beim Laden des Egg Editors',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+/**
+ * GET /guild/:guildId/plugins/gameserver/addons/:slug
+ * Addon Detail-Seite mit Templates, Ratings, Comments
+ * WICHTIG: MUSS NACH /my-eggs, /create, /edit/:id stehen!
+ */
+router.get('/:slug', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const themeManager = ServiceManager.get('themeManager');
+    
+    try {
+        const guildId = res.locals.guildId; // ← Aus res.locals!
+        const { slug } = req.params;
+        const user = res.locals.user; // ← User aus res.locals!
+
+        Logger.debug(`[Gameserver] Addon Detail aufgerufen: ${slug} für Guild ${guildId}`);
+
+        // Addon abrufen (mit vollem game_data JSON)
+        const addonResult = await dbService.query(`
+            SELECT 
+                id,
+                slug,
+                name,
+                description,
+                category,
+                tags,
+                steam_app_id,
+                steam_server_app_id,
+                author_user_id,
+                game_data,
+                trust_level,
+                visibility,
+                status,
+                rating_avg,
+                rating_count,
+                install_count,
+                icon_url,
+                banner_url,
+                screenshots,
+                created_at,
+                updated_at
+            FROM addon_marketplace
+            WHERE slug = ?
+            AND status = 'approved'
+        `, [slug]);
+        
+        const addon = addonResult && addonResult[0] ? addonResult[0] : null;
+
+        if (!addon) {
+            return res.status(404).render('error', {
+                message: 'Addon nicht gefunden',
+                error: {}
+            });
+        }
+
+        // game_data JSON parsen
+        let gameData = {};
+        try {
+            gameData = typeof addon.game_data === 'string' 
+                ? JSON.parse(addon.game_data) 
+                : addon.game_data;
+        } catch (error) {
+            Logger.error(`[Gameserver] Fehler beim Parsen von game_data für ${slug}:`, error);
+            gameData = { templates: [], variables: [] };
+        }
+
+        // Ratings abrufen (Top 5)
+        const ratings = await dbService.query(`
+            SELECT 
+                ar.rating,
+                ar.review,
+                ar.usage_hours,
+                ar.helpful_count,
+                ar.created_at,
+                ar.user_id
+            FROM addon_ratings ar
+            WHERE ar.addon_id = ?
+            ORDER BY ar.helpful_count DESC, ar.created_at DESC
+            LIMIT 5
+        `, [addon.id]);
+
+        // Kommentare abrufen (nur Top-Level, ohne Replies)
+        const comments = await dbService.query(`
+            SELECT 
+                ac.id,
+                ac.comment,
+                ac.created_at,
+                ac.user_id,
+                ac.is_deleted
+            FROM addon_comments ac
+            WHERE ac.addon_id = ?
+            AND ac.parent_id IS NULL
+            AND ac.is_deleted = 0
+            ORDER BY ac.created_at DESC
+            LIMIT 10
+        `, [addon.id]);
+
+        // Daemon Servers abrufen (für Server-Creation)
+        // TODO: Später über IPC vom Bot abrufen
+        const daemonServers = []; // Placeholder
+
+        // Install Count incrementieren (statt downloads)
+        await dbService.query(
+            'UPDATE addon_marketplace SET install_count = install_count + 1 WHERE id = ?',
+            [addon.id]
+        );
+
+        // View rendern
+        await themeManager.renderView(res, 'guild/gameserver-addon-detail', {
+            title: `${addon.name} - Addon Details`,
+            activeMenu: `/guild/${guildId}/plugins/gameserver/addons`,
+            addon,
+            gameData,
+            ratings: ratings || [],
+            comments: comments || [],
+            daemonServers: daemonServers || [],
+            guildId,
+            user
+        });
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Laden des Addon Details:', error);
+        res.status(500).render('error', {
+            message: 'Fehler beim Laden der Addon-Details',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+/**
+ * POST /addons - Create new Egg
+ */
+router.post('/', async (req, res) => {
+    const guildId = res.locals.guildId;
+    const user = res.locals.user;
+router.get('/create', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const themeManager = ServiceManager.get('themeManager');
+    
+    try {
+        const guildId = res.locals.guildId;
+        const user = res.locals.user;
+        const templateSource = req.query.template; // 'blank', 'pterodactyl-cs2', 'clone:123'
+        
+        Logger.debug(`[Gameserver] Egg Editor (Create) aufgerufen für Guild ${guildId}, Template: ${templateSource || 'blank'}`);
+        
+        let template = null;
+        let gameData = null;
+        
+        // Template laden falls angegeben
+        if (templateSource && templateSource !== 'blank') {
+            // Clone eigenes Egg
+            if (templateSource.startsWith('clone:')) {
+                const cloneId = templateSource.split(':')[1];
+                const [egg] = await dbService.query(
+                    'SELECT * FROM addon_marketplace WHERE id = ? AND (guild_id = ? OR author_user_id = ?)',
+                    [cloneId, guildId, user.id]
+                );
+                
+                if (egg) {
+                    template = egg;
+                    gameData = JSON.parse(egg.game_data);
+                    Logger.debug(`[Gameserver] Egg ${cloneId} wird geklont`);
+                }
+            }
+            // TODO: Pterodactyl External Template Support (später)
+        }
+        
+        // Eigene Eggs für Clone-Dropdown
+        const myEggs = await dbService.query(`
+            SELECT id, name, slug FROM addon_marketplace
+            WHERE (guild_id = ? OR author_user_id = ?)
+            AND status != 'rejected'
+            ORDER BY name ASC
+        `, [guildId, user.id]);
+        
+        // View rendern
+        await themeManager.renderView(res, 'guild/gameserver-egg-editor', {
+            title: 'Neues Egg erstellen',
+            activeMenu: `/guild/${guildId}/plugins/gameserver/addons/my-eggs`,
+            mode: 'create',
+            template,
+            gameData,
+            myEggs: myEggs || [],
+            guildId,
+            user
+        });
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Laden des Egg Editors (Create):', error);
+        res.status(500).render('error', {
+            message: 'Fehler beim Laden des Egg Editors',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+/**
+ * GET /guild/:guildId/plugins/gameserver/addons/edit/:id
+ * Egg Editor - Bestehendes Egg bearbeiten
+ */
+router.get('/edit/:id', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const themeManager = ServiceManager.get('themeManager');
+    
+    try {
+        const guildId = res.locals.guildId;
+        const user = res.locals.user;
+        const eggId = req.params.id;
+        
+        Logger.debug(`[Gameserver] Egg Editor (Edit) aufgerufen für Egg ${eggId}`);
+        
+        // Egg laden
+        const [egg] = await dbService.query(
+            'SELECT * FROM addon_marketplace WHERE id = ?',
+            [eggId]
+        );
+        
+        if (!egg) {
+            return res.status(404).render('error', {
+                message: 'Egg nicht gefunden',
+                error: {}
+            });
+        }
+        
+        // Permission-Check: Nur eigene Eggs bearbeiten
+        if (egg.guild_id !== guildId && egg.author_user_id !== user.id) {
+            return res.status(403).render('error', {
+                message: 'Keine Berechtigung zum Bearbeiten dieses Eggs',
+                error: {}
+            });
+        }
+        
+        // game_data parsen
+        const gameData = egg.game_data ? JSON.parse(egg.game_data) : null;
+        
+        // View rendern
+        await themeManager.renderView(res, 'guild/gameserver-egg-editor', {
+            title: `Egg bearbeiten: ${egg.name}`,
+            activeMenu: `/guild/${guildId}/plugins/gameserver/addons/my-eggs`,
+            mode: 'edit',
+            egg,
+            gameData,
+            myEggs: [], // Für Edit nicht benötigt
+            guildId,
+            user
+        });
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Laden des Egg Editors (Edit):', error);
+        res.status(500).render('error', {
+            message: 'Fehler beim Laden des Egg Editors',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+/**
+ * POST /addons - Create new Egg
+ */
+router.post('/', async (req, res) => {
+    const guildId = res.locals.guildId;
+    const user = res.locals.user;
+
+    try {
+        const { 
+            name, slug, description, category, tags, icon_url,
+            meta_author, install_method, 
+            steam_app_id, steam_validate,
+            git_repo, wget_url,
+            startup_command, startup_done, startup_stop,
+            ports_json, requirements_json, variables_json, templates_json,
+            visibility 
+        } = req.body;
+
+        // Validierung
+        if (!name || !slug || !description || !category) {
+            return res.status(400).json({
+                success: false,
+                message: 'Name, Slug, Beschreibung und Kategorie sind Pflichtfelder'
+            });
+        }
+
+        // Prüfe ob Slug bereits existiert
+        const existingSlug = await dbService.query(
+            'SELECT id FROM addon_marketplace WHERE slug = ?',
+            [slug]
+        );
+
+        if (existingSlug.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Ein Egg mit diesem Slug existiert bereits. Bitte wähle einen anderen Namen.'
+            });
+        }
+
+        // PTDL_v2 game_data bauen
+        const gameData = {
+            meta: {
+                version: 'PTDL_v2',
+                author: meta_author || user.username
+            },
+            install: {},
+            startup: {
+                command: startup_command || '',
+                done: startup_done || 'Server is ready',
+                stop: startup_stop || 'quit'
+            },
+            ports: JSON.parse(ports_json || '{}'),
+            requirements: JSON.parse(requirements_json || '{}'),
+            variables: JSON.parse(variables_json || '[]'),
+            templates: JSON.parse(templates_json || '[]')
+        };
+
+        // Install-Methode
+        if (install_method === 'steamcmd') {
+            gameData.install.steamcmd = {
+                app_id: parseInt(steam_app_id) || 0,
+                validate: steam_validate === '1'
+            };
+        } else if (install_method === 'git') {
+            gameData.install.git = {
+                repo: git_repo || ''
+            };
+        } else if (install_method === 'wget') {
+            gameData.install.wget = {
+                url: wget_url || ''
+            };
+        }
+
+        // Visibility-Handling
+        let status = 'draft';
+        let guildIdValue = null;
+        let trustLevel = 'unverified';
+
+        if (visibility === 'private') {
+            status = 'approved'; // Private Eggs auto-approved für Guild
+            guildIdValue = guildId;
+        } else if (visibility === 'public') {
+            status = 'pending_review'; // Public Eggs brauchen Moderation
+            trustLevel = 'unverified';
+        }
+
+        // INSERT in DB
+        const result = await dbService.query(`
+            INSERT INTO addon_marketplace (
+                name, slug, description, category, tags, icon_url,
+                visibility, status, trust_level,
+                guild_id, author_user_id,
+                game_data,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        `, [
+            name, slug, description, category, 
+            tags || null, icon_url || null,
+            visibility, status, trustLevel,
+            guildIdValue, user.id,
+            JSON.stringify(gameData)
+        ]);
+
+        Logger.info(`[Gameserver] Neues Egg erstellt: ${name} (ID: ${result.insertId}) von User ${user.id}`);
+
+        res.json({
+            success: true,
+            message: visibility === 'private' 
+                ? 'Egg erfolgreich erstellt und für deine Guild freigegeben!' 
+                : 'Egg erstellt! Es wird nun von Moderatoren geprüft.',
+            egg_id: result.insertId,
+            redirect: `/guild/${guildId}/plugins/gameserver/addons/my-eggs`
+        });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Erstellen des Eggs:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Serverfehler beim Erstellen des Eggs'
+        });
+    }
+});
+
+/**
+ * PUT /addons/:id - Update existing Egg
+ */
+router.put('/:id', async (req, res) => {
+    const guildId = res.locals.guildId;
+    const user = res.locals.user;
+    const eggId = req.params.id;
+
+    try {
+        // Permission Check
+        const egg = await dbService.query(
+            'SELECT * FROM addon_marketplace WHERE id = ?',
+            [eggId]
+        );
+
+        if (egg.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Egg nicht gefunden'
+            });
+        }
+
+        const eggData = egg[0];
+        const hasPermission = eggData.guild_id === guildId || eggData.author_user_id === user.id;
+
+        if (!hasPermission) {
+            return res.status(403).json({
+                success: false,
+                message: 'Keine Berechtigung dieses Egg zu bearbeiten'
+            });
+        }
+
+        const { 
+            name, description, category, tags, icon_url,
+            meta_author, install_method, 
+            steam_app_id, steam_validate,
+            git_repo, wget_url,
+            startup_command, startup_done, startup_stop,
+            ports_json, requirements_json, variables_json, templates_json,
+            visibility 
+        } = req.body;
+
+        // PTDL_v2 game_data bauen (wie bei POST)
+        const gameData = {
+            meta: {
+                version: 'PTDL_v2',
+                author: meta_author || user.username
+            },
+            install: {},
+            startup: {
+                command: startup_command || '',
+                done: startup_done || 'Server is ready',
+                stop: startup_stop || 'quit'
+            },
+            ports: JSON.parse(ports_json || '{}'),
+            requirements: JSON.parse(requirements_json || '{}'),
+            variables: JSON.parse(variables_json || '[]'),
+            templates: JSON.parse(templates_json || '[]')
+        };
+
+        if (install_method === 'steamcmd') {
+            gameData.install.steamcmd = {
+                app_id: parseInt(steam_app_id) || 0,
+                validate: steam_validate === '1'
+            };
+        } else if (install_method === 'git') {
+            gameData.install.git = { repo: git_repo || '' };
+        } else if (install_method === 'wget') {
+            gameData.install.wget = { url: wget_url || '' };
+        }
+
+        // Visibility-Update
+        let status = eggData.status;
+        let guildIdValue = eggData.guild_id;
+
+        // Wenn visibility geändert wird
+        if (visibility !== eggData.visibility) {
+            if (visibility === 'private') {
+                status = 'approved';
+                guildIdValue = guildId;
+            } else if (visibility === 'public') {
+                status = 'pending_review'; // Erneute Prüfung
+                guildIdValue = null;
+            }
+        }
+
+        // UPDATE in DB
+        await dbService.query(`
+            UPDATE addon_marketplace SET
+                name = ?, description = ?, category = ?, tags = ?, icon_url = ?,
+                visibility = ?, status = ?, guild_id = ?,
+                game_data = ?,
+                updated_at = NOW()
+            WHERE id = ?
+        `, [
+            name, description, category, tags || null, icon_url || null,
+            visibility, status, guildIdValue,
+            JSON.stringify(gameData),
+            eggId
+        ]);
+
+        Logger.info(`[Gameserver] Egg aktualisiert: ${name} (ID: ${eggId}) von User ${user.id}`);
+
+        res.json({
+            success: true,
+            message: 'Egg erfolgreich aktualisiert!',
+            redirect: `/guild/${guildId}/plugins/gameserver/addons/my-eggs`
+        });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Aktualisieren des Eggs:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Serverfehler beim Aktualisieren des Eggs'
+        });
+    }
+});
+
+/**
+ * DELETE /addons/:id - Delete Egg
+ */
+router.delete('/:id', async (req, res) => {
+    const guildId = res.locals.guildId;
+    const user = res.locals.user;
+    const eggId = req.params.id;
+
+    try {
+        // Permission Check
+        const egg = await dbService.query(
+            'SELECT * FROM addon_marketplace WHERE id = ?',
+            [eggId]
+        );
+
+        if (egg.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Egg nicht gefunden'
+            });
+        }
+
+        const eggData = egg[0];
+        const hasPermission = eggData.guild_id === guildId || eggData.author_user_id === user.id;
+
+        if (!hasPermission) {
+            return res.status(403).json({
+                success: false,
+                message: 'Keine Berechtigung dieses Egg zu löschen'
+            });
+        }
+
+        // Prüfe ob Egg von Gameservern genutzt wird
+        const usedByServers = await dbService.query(
+            'SELECT COUNT(*) as count FROM gameservers WHERE addon_marketplace_id = ?',
+            [eggId]
+        );
+
+        if (usedByServers[0].count > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Dieses Egg kann nicht gelöscht werden, da es von ${usedByServers[0].count} Server(n) verwendet wird.`
+            });
+        }
+
+        // DELETE
+        await dbService.query(
+            'DELETE FROM addon_marketplace WHERE id = ?',
+            [eggId]
+        );
+
+        Logger.info(`[Gameserver] Egg gelöscht: ${eggData.name} (ID: ${eggId}) von User ${user.id}`);
+
+        res.json({
+            success: true,
+            message: 'Egg erfolgreich gelöscht!'
+        });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Löschen des Eggs:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Serverfehler beim Löschen des Eggs'
+        });
+    }
+});
+
+module.exports = router;

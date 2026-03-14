@@ -1,0 +1,161 @@
+<%#
+ * Server-Detail Variablen-Tab
+ * Zeigt alle game_data.variables mit aktuellen Werten aus env_variables
+ * und erlaubt das Bearbeiten.
+ %>
+
+<%
+// Variablen-Array normalisieren (Array oder Object möglich)
+let variablesArray = [];
+if (gameData.variables) {
+    if (Array.isArray(gameData.variables)) {
+        variablesArray = gameData.variables;
+    } else if (typeof gameData.variables === 'object') {
+        variablesArray = Object.entries(gameData.variables).map(([key, value]) => ({
+            name: key,
+            display_name: key.replace(/_/g, ' '),
+            default_value: typeof value === 'object' ? (value.default || '') : value,
+            description: typeof value === 'object' ? (value.description || '') : '',
+            type: typeof value === 'object' ? (value.type || 'text') : 'text',
+            options: typeof value === 'object' ? (value.options || []) : [],
+            required: typeof value === 'object' ? (value.required || false) : false
+        }));
+    }
+}
+const envVars = server.env_variables_parsed || {};
+%>
+
+<% if (variablesArray.length === 0) { %>
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle mr-2"></i>
+        Dieses Addon hat keine konfigurierbaren Variablen.
+    </div>
+<% } else { %>
+
+<form id="variables-form">
+    <div class="row">
+        <% variablesArray.forEach(variable => {
+            const varName        = variable.name || '';
+            const varDisplayName = variable.display_name || varName;
+            const varDescription = variable.description || '';
+            const varType        = variable.type || 'text';
+            const varOptions     = variable.options || [];
+            const isRequired     = variable.required === true;
+            // Aktuellen Wert aus env_variables, sonst default
+            const currentValue   = envVars[varName] !== undefined
+                                    ? envVars[varName]
+                                    : (variable.default_value || '');
+        %>
+        <div class="col-md-6 col-lg-4">
+            <div class="form-group">
+                <label for="env_<%= varName %>">
+                    <strong><%= varDisplayName %></strong>
+                    <% if (isRequired) { %><span class="text-danger">*</span><% } %>
+                    <code class="ml-1 text-muted small">{{<%= varName %>}}</code>
+                </label>
+
+                <% if (varType === 'select' && varOptions.length > 0) { %>
+                    <select class="form-control form-control-sm"
+                            id="env_<%= varName %>"
+                            name="<%= varName %>"
+                            <%= isRequired ? 'required' : '' %>>
+                        <% varOptions.forEach(opt => {
+                            const optVal   = typeof opt === 'object' ? opt.value : opt;
+                            const optLabel = typeof opt === 'object' ? opt.label  : opt;
+                        %>
+                            <option value="<%= optVal %>" <%= optVal == currentValue ? 'selected' : '' %>><%= optLabel %></option>
+                        <% }); %>
+                    </select>
+
+                <% } else if (varType === 'boolean') { %>
+                    <select class="form-control form-control-sm"
+                            id="env_<%= varName %>"
+                            name="<%= varName %>"
+                            <%= isRequired ? 'required' : '' %>>
+                        <option value="true"  <%= currentValue === 'true'  || currentValue === true  ? 'selected' : '' %>>Ja</option>
+                        <option value="false" <%= currentValue === 'false' || currentValue === false ? 'selected' : '' %>>Nein</option>
+                    </select>
+
+                <% } else if (varType === 'number') { %>
+                    <input type="number"
+                           class="form-control form-control-sm"
+                           id="env_<%= varName %>"
+                           name="<%= varName %>"
+                           value="<%= currentValue %>"
+                           placeholder="<%= variable.default_value || '' %>"
+                           <%= isRequired ? 'required' : '' %>>
+
+                <% } else { %>
+                    <input type="text"
+                           class="form-control form-control-sm"
+                           id="env_<%= varName %>"
+                           name="<%= varName %>"
+                           value="<%= currentValue %>"
+                           placeholder="<%= variable.default_value || 'Optional' %>"
+                           <%= isRequired ? 'required' : '' %>>
+                <% } %>
+
+                <% if (varDescription) { %>
+                    <small class="form-text text-muted"><%= varDescription %></small>
+                <% } %>
+            </div>
+        </div>
+        <% }); %>
+    </div><!-- /.row -->
+
+    <div class="row mt-2">
+        <div class="col-12">
+            <button type="button" class="btn btn-primary" id="variables-save-btn" onclick="saveVariables()">
+                <i class="fas fa-save mr-1"></i>
+                Variablen speichern
+            </button>
+            <small class="text-muted ml-3">
+                <i class="fas fa-info-circle mr-1"></i>
+                Änderungen werden beim nächsten Server-Start wirksam.
+            </small>
+        </div>
+    </div>
+</form>
+
+<% } %>
+
+<script>
+async function saveVariables() {
+    const form = document.getElementById('variables-form');
+    const btn  = document.getElementById('variables-save-btn');
+    if (!form) return;
+
+    const data = {};
+    form.querySelectorAll('[name]').forEach(el => {
+        data[el.name] = el.value;
+    });
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Speichern...';
+
+    try {
+        const resp = await fetch(
+            `/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/variables`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(data)
+            }
+        );
+        const result = await resp.json();
+        if (result.success) {
+            toastr.success('Variablen erfolgreich gespeichert!');
+        } else {
+            toastr.error(result.message || 'Fehler beim Speichern.');
+        }
+    } catch (e) {
+        toastr.error('Netzwerkfehler beim Speichern der Variablen.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save mr-1"></i> Variablen speichern';
+    }
+}
+</script>

@@ -1,0 +1,277 @@
+{
+  "meta": {
+    "version": "PTDL_v2",
+    "author": "DuneBot Official",
+    "update_url": null
+  },
+  "exported_at": "2025-10-19T00:00:00+00:00",
+  "name": "Counter-Strike 2",
+  "slug": "cs2",
+  "description": "Counter-Strike 2 Dedicated Server mit Workshop-Support und vorkonfigurierten Templates für Competitive, Casual und Deathmatch.",
+  "category": "fps",
+  "tags": [
+    "steam",
+    "workshop",
+    "fps",
+    "valve",
+    "competitive"
+  ],
+  "visibility": "official",
+  "trust_level": "official",
+  "status": "approved",
+  "features": [
+    "steam_workshop",
+    "sourcemod",
+    "metamod"
+  ],
+  "steam": {
+    "app_id": 730,
+    "server_app_id": 730,
+    "install_dir": "csgo"
+  },
+  "installation": {
+    "method": "steamcmd",
+    "app_id": "730",
+    "validate": true,
+    "script": "#!/bin/bash\ncd \"${INSTALL_DIR}\"\n\"${STEAMCMD}\" +force_install_dir \"${INSTALL_DIR}\" +login anonymous +app_update 730 validate +quit"
+  },
+  "startup": {
+    "command": "./cs2 -game csgo -console -usercon +map {{MAP}} +maxplayers {{MAX_PLAYERS}} -port {{SERVER_PORT}} +rcon_password {{RCON_PASSWORD}}",
+    "done": "Server is listening",
+    "stop": "quit"
+  },
+  "config": {
+    "files": {
+      "csgo/cfg/server.cfg": {
+        "parser": "file",
+        "find": {
+          "hostname": "hostname \"{{SERVER_NAME}}\"",
+          "sv_password": "sv_password \"{{SERVER_PASSWORD}}\"",
+          "rcon_password": "rcon_password \"{{RCON_PASSWORD}}\"",
+          "sv_lan": "sv_lan {{SV_LAN}}",
+          "mp_maxplayers": "mp_maxplayers {{MAX_PLAYERS}}"
+        }
+      }
+    },
+    "startup": {
+      "done": "Server is listening on port"
+    },
+    "logs": {},
+    "stop": "quit",
+    "rcon": {
+      "protocol": "srcds",
+      "port_var": "rcon",
+      "password_var": "RCON_PASSWORD"
+    }
+  },
+  "variables": [
+    {
+      "name": "Server Name",
+      "description": "Der Name deines Servers (wird in der Serverliste angezeigt)",
+      "env_variable": "SERVER_NAME",
+      "default_value": "My CS2 Server",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Server Password",
+      "description": "Passwort zum Betreten des Servers (leer = kein Passwort)",
+      "env_variable": "SERVER_PASSWORD",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string|max:50",
+      "field_type": "text"
+    },
+    {
+      "name": "RCON Password",
+      "description": "Admin-Passwort für RCON (Remote Console)",
+      "env_variable": "RCON_PASSWORD",
+      "default_value": "AUTOGENERATE",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|min:8",
+      "field_type": "password"
+    },
+    {
+      "name": "Max Players",
+      "description": "Maximale Anzahl an Spielern",
+      "env_variable": "MAX_PLAYERS",
+      "default_value": "10",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:2|max:64",
+      "field_type": "number"
+    },
+    {
+      "name": "Start Map",
+      "description": "Map die beim Start geladen wird",
+      "env_variable": "MAP",
+      "default_value": "de_dust2",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "select",
+      "select_options": {
+        "de_dust2": "Dust 2",
+        "de_inferno": "Inferno",
+        "de_mirage": "Mirage",
+        "de_nuke": "Nuke",
+        "de_overpass": "Overpass",
+        "de_vertigo": "Vertigo",
+        "de_ancient": "Ancient",
+        "de_anubis": "Anubis"
+      }
+    },
+    {
+      "name": "Server Port",
+      "description": "Port auf dem der Server läuft",
+      "env_variable": "SERVER_PORT",
+      "default_value": "27015",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "LAN Mode",
+      "description": "Server nur im LAN sichtbar?",
+      "env_variable": "SV_LAN",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "boolean"
+    },
+    {
+      "name": "Workshop Collection",
+      "description": "Steam Workshop Collection URL (optional)",
+      "env_variable": "WORKSHOP_ID",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|url",
+      "field_type": "text"
+    }
+  ],
+  "templates": [
+    {
+      "name": "competitive",
+      "label": "Competitive 5v5",
+      "description": "Standard Competitive Mode (MR15, 1:92 Roundtime)",
+      "icon": "fa-trophy",
+      "variables": {
+        "MAX_PLAYERS": "10",
+        "MAP": "de_dust2"
+      },
+      "config_overrides": {
+        "csgo/cfg/server.cfg": {
+          "mp_roundtime": "1.92",
+          "mp_roundtime_defuse": "1.92",
+          "mp_maxrounds": "30",
+          "mp_overtime_enable": "1",
+          "mp_overtime_maxrounds": "6",
+          "mp_c4timer": "40",
+          "mp_freezetime": "15",
+          "mp_buytime": "20",
+          "mp_startmoney": "800"
+        }
+      }
+    },
+    {
+      "name": "casual",
+      "label": "Casual 10v10",
+      "description": "Casual Mode mit mehr Spielern und entspannten Regeln",
+      "icon": "fa-users",
+      "variables": {
+        "MAX_PLAYERS": "20",
+        "MAP": "de_dust2"
+      },
+      "config_overrides": {
+        "csgo/cfg/server.cfg": {
+          "mp_roundtime": "3",
+          "mp_maxrounds": "15",
+          "mp_c4timer": "45",
+          "mp_freezetime": "10",
+          "mp_buytime": "45",
+          "mp_startmoney": "1000",
+          "mp_free_armor": "1"
+        }
+      }
+    },
+    {
+      "name": "deathmatch",
+      "label": "Deathmatch FFA",
+      "description": "Deathmatch mit Instant Respawn",
+      "icon": "fa-crosshairs",
+      "variables": {
+        "MAX_PLAYERS": "16",
+        "MAP": "de_dust2"
+      },
+      "config_overrides": {
+        "csgo/cfg/server.cfg": {
+          "mp_roundtime": "10",
+          "mp_respawn_on_death_ct": "1",
+          "mp_respawn_on_death_t": "1",
+          "mp_free_armor": "2",
+          "mp_weapons_allow_map_placed": "0",
+          "mp_dm_bonus_length_max": "30",
+          "mp_dm_bonus_length_min": "20"
+        }
+      }
+    },
+    {
+      "name": "surf",
+      "label": "Surf Server",
+      "description": "Surf-Mode für Custom-Maps",
+      "icon": "fa-water",
+      "variables": {
+        "MAX_PLAYERS": "24",
+        "MAP": "surf_rookie"
+      },
+      "config_overrides": {
+        "csgo/cfg/server.cfg": {
+          "sv_airaccelerate": "150",
+          "sv_gravity": "800",
+          "mp_autoteambalance": "0",
+          "mp_limitteams": "0"
+        }
+      }
+    }
+  ],
+  "ports": {
+    "game": {
+      "default": 27015,
+      "protocol": "udp",
+      "description": "Game Port"
+    },
+    "query": {
+      "default": 27016,
+      "protocol": "udp",
+      "description": "Query Port"
+    },
+    "rcon": {
+      "default": 27017,
+      "protocol": "tcp",
+      "description": "RCON Port"
+    }
+  },
+  "requirements": {
+    "ram_min_mb": 2048,
+    "ram_recommended_mb": 4096,
+    "cpu_cores_min": 2,
+    "disk_min_gb": 35,
+    "disk_recommended_gb": 50
+  },
+  "assets": {
+    "icon_url": "https://cdn.akamai.steamstatic.com/steam/apps/730/header.jpg",
+    "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/730/library_hero.jpg",
+    "screenshots": [
+      "https://cdn.akamai.steamstatic.com/steam/apps/730/ss_1.jpg",
+      "https://cdn.akamai.steamstatic.com/steam/apps/730/ss_2.jpg"
+    ]
+  },
+  "changelog": "Initial release - CS2 with Workshop support and 4 templates"
+}

@@ -1,0 +1,363 @@
+<!-- Gameserver Server-Erstellungs-Wizard - Step 2: Addon Configuration (Variables) -->
+<div class="app-content">
+  <div class="container-fluid">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+          <a href="/guild/<%= guildId %>"><i class="fa-solid fa-home"></i> <%= tr('core:NAV.DASHBOARD') %></a>
+        </li>
+        <li class="breadcrumb-item">
+          <a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a>
+        </li>
+        <li class="breadcrumb-item">
+          <a href="/guild/<%= guildId %>/plugins/gameserver/servers"><%= tr('gameserver:NAV.SERVERS') %></a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page"><%= tr('gameserver:SERVER.CREATE') %></li>
+      </ol>
+    </nav>
+
+    <!-- Wizard Progress -->
+    <div class="row text-center mb-4">
+      <div class="col-md-4">
+        <div class="progress-step completed">
+          <div class="progress-circle bg-success text-white">
+            <i class="fa-solid fa-check"></i>
+          </div>
+          <div class="text-muted">1. Information</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="progress-step active">
+          <div class="progress-circle bg-primary text-white">
+            <strong>2</strong>
+          </div>
+          <div><strong>2. Addon Configuration</strong></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="progress-step">
+          <div class="progress-circle bg-secondary text-white">
+            <strong>3</strong>
+          </div>
+          <div class="text-muted">3. Resources</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row">
+      <div class="col-lg-8">
+        <!-- Startup Command (Read-Only) -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="fa-solid fa-terminal mr-2"></i>
+              <%= tr('gameserver:SERVER.STARTUP_COMMAND') || 'Startup Command' %>
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <textarea class="form-control font-monospace bg-dark text-white" 
+                        id="startupCommandPreview" 
+                        rows="3" 
+                        readonly 
+                        style="resize: none;"><% 
+                const startupCmd = gameData.startup && gameData.startup.command 
+                  ? gameData.startup.command 
+                  : './start.sh';
+              %><%= startupCmd %></textarea>
+              <small class="form-text text-muted">
+                <%= tr('gameserver:SERVER.STARTUP_COMMAND_HELP') || 'Dieser Command wird beim Serverstart ausgeführt' %>
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Variables Section -->
+        <div class="card mb-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+              <i class="fa-solid fa-sliders mr-2"></i>
+              <%= tr('gameserver:SERVER.VARIABLES') || 'Variables' %>
+            </h5>
+            <span class="badge badge-info">
+              <% 
+                // ✅ KONVERTIERUNG: Map/Object → Array
+                let variablesArray = [];
+                if (gameData.variables) {
+                  if (Array.isArray(gameData.variables)) {
+                    // Alte Struktur (Array) - direkt nutzen
+                    variablesArray = gameData.variables;
+                  } else if (typeof gameData.variables === 'object') {
+                    // Neue Struktur (Map/Object) - zu Array konvertieren
+                    variablesArray = Object.entries(gameData.variables).map(([key, value]) => ({
+                      name: key,
+                      display_name: key.replace(/_/g, ' '),
+                      default_value: value,
+                      type: 'text',
+                      required: false
+                    }));
+                  }
+                }
+              %>
+              <%= variablesArray.length %> <%= variablesArray.length === 1 ? 'Variable' : 'Variables' %>
+            </span>
+          </div>
+          <div class="card-body">
+            <% if (variablesArray && variablesArray.length > 0) { %>
+              <form id="variablesForm">
+                <% variablesArray.forEach((variable, index) => { 
+                  // FIREBOT_v1: {key, default, description, user_editable}
+                  // Legacy:     {name, display_name, default_value, type, required}
+                  const varName = variable.name || variable.key || `VAR_${index}`;
+                  const varDisplayName = variable.display_name || variable.name || variable.key || 'Variable';
+                  const varDescription = variable.description || '';
+                  const varDefaultValue = variable.default_value !== undefined ? variable.default_value : (variable.default !== undefined ? variable.default : '');
+                  const varType = variable.type || 'text';
+                  const varOptions = variable.options || [];
+                  const isRequired = variable.required === true; // NUR wenn explizit true!
+                %>
+                  <div class="form-group">
+                    <label for="var_<%= varName %>">
+                      <%= varDisplayName %> 
+                      <% if (isRequired) { %><span class="text-danger">*</span><% } %>
+                      <code class="ml-2 text-muted">{{<%= varName %>}}</code>
+                    </label>
+                    
+                    <% if (varType === 'select' && varOptions.length > 0) { %>
+                      <!-- Select Dropdown -->
+                      <select class="form-control variable-input" 
+                              id="var_<%= varName %>" 
+                              name="variable_<%= varName %>"
+                              data-var-name="<%= varName %>"
+                              <%= isRequired ? 'required' : '' %>>
+                        <% varOptions.forEach(option => { 
+                          const optValue = typeof option === 'object' ? option.value : option;
+                          const optLabel = typeof option === 'object' ? option.label : option;
+                          const isSelected = optValue === varDefaultValue;
+                        %>
+                          <option value="<%= optValue %>" <%= isSelected ? 'selected' : '' %>><%= optLabel %></option>
+                        <% }); %>
+                      </select>
+                    <% } else if (varType === 'number') { %>
+                      <!-- Number Input -->
+                      <input type="number" 
+                             class="form-control variable-input" 
+                             id="var_<%= varName %>" 
+                             name="variable_<%= varName %>"
+                             data-var-name="<%= varName %>"
+                             value="<%= isRequired ? varDefaultValue : '' %>"
+                             placeholder="<%= varDefaultValue || 'Optional' %>"
+                             <%= isRequired ? 'required' : '' %>>
+                    <% } else if (varType === 'boolean') { %>
+                      <!-- Boolean Toggle -->
+                      <select class="form-control variable-input" 
+                              id="var_<%= varName %>" 
+                              name="variable_<%= varName %>"
+                              data-var-name="<%= varName %>"
+                              <%= isRequired ? 'required' : '' %>>
+                        <option value="true" <%= varDefaultValue === 'true' || varDefaultValue === true ? 'selected' : '' %>>Yes</option>
+                        <option value="false" <%= varDefaultValue === 'false' || varDefaultValue === false ? 'selected' : '' %>>No</option>
+                      </select>
+                    <% } else { %>
+                      <!-- Text Input (Default) -->
+                      <input type="text" 
+                             class="form-control variable-input" 
+                             id="var_<%= varName %>" 
+                             name="variable_<%= varName %>"
+                             data-var-name="<%= varName %>"
+                             value="<%= isRequired ? varDefaultValue : '' %>"
+                             placeholder="<%= varDefaultValue || 'Optional' %>"
+                             <%= isRequired ? 'required' : '' %>>
+                    <% } %>
+                    
+                    <% if (varDescription) { %>
+                      <small class="form-text text-muted"><%= varDescription %></small>
+                    <% } %>
+                  </div>
+                <% }); %>
+              </form>
+            <% } else { %>
+              <div class="alert alert-info mb-0">
+                <i class="fa-solid fa-info-circle mr-2"></i>
+                <%= tr('gameserver:SERVER.NO_VARIABLES') || 'Dieses Addon benötigt keine konfigurierbaren Variablen' %>
+              </div>
+            <% } %>
+          </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <button type="button" id="btnBack" class="btn btn-secondary">
+                <i class="fa-solid fa-arrow-left mr-2"></i>
+                <%= tr('gameserver:SERVER.BACK') || 'Zurück' %>
+              </button>
+              <button type="button" id="btnNext" class="btn btn-primary">
+                <%= tr('gameserver:SERVER.NEXT') || 'Weiter' %>
+                <i class="fa-solid fa-arrow-right ml-2"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Sidebar: Live Preview -->
+      <div class="col-lg-4">
+        <div class="card sticky-top" style="top: 20px;">
+          <div class="card-header bg-info text-white">
+            <h6 class="mb-0">
+              <i class="fa-solid fa-eye mr-2"></i>
+              <%= tr('gameserver:SERVER.LIVE_PREVIEW') || 'Live Preview' %>
+            </h6>
+          </div>
+          <div class="card-body">
+            <h6 class="text-muted mb-2">Resolved Startup Command:</h6>
+            <pre class="bg-dark text-white p-3 rounded" style="font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word;"><code id="livePreview"><%= startupCmd %></code></pre>
+            <hr>
+            <h6 class="text-muted mb-2">Selected Addon:</h6>
+            <div class="d-flex align-items-center">
+              <% if (addon.icon_url) { %>
+                <img src="<%= addon.icon_url %>" alt="<%= addon.name %>" class="mr-2" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">
+              <% } %>
+              <div>
+                <strong><%= addon.name %></strong><br>
+                <small class="text-muted"><%= addon.description || 'No description' %></small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.progress-step {
+    padding: 20px 0;
+}
+
+.progress-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.progress-step.active .progress-circle {
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+}
+
+.progress-step.completed .progress-circle {
+    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const guildId = '<%= guildId %>';
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Original Startup Command
+    const originalCommand = `<%= (gameData.startup && gameData.startup.command) ? gameData.startup.command.replace(/`/g, '\\`').replace(/\$/g, '\\$') : './start.sh' %>`;
+    
+    // Variable-Value Map
+    const variableValues = new Map();
+    
+    // Initialize variable values from defaults
+    <% if (variablesArray && variablesArray.length > 0) { %>
+      <% variablesArray.forEach(variable => { 
+        const varName = variable.name || '';
+        const varDefault = variable.default_value || '';
+      %>
+        variableValues.set('<%= varName %>', '<%= varDefault %>');
+      <% }); %>
+    <% } %>
+    
+    // Helper: Decode HTML Entities
+    function decodeHtmlEntities(text) {
+        const textarea = document.createElement('textarea');
+        textarea.innerHTML = text;
+        return textarea.value;
+    }
+    
+    // Live Preview Update
+    function updateLivePreview() {
+        let resolvedCommand = originalCommand;
+        
+        // Decode HTML entities first (&#34; → ", &amp; → &, etc.)
+        resolvedCommand = decodeHtmlEntities(resolvedCommand);
+        
+        // Replace all {{VARIABLE_NAME}} with actual values
+        variableValues.forEach((value, name) => {
+            const placeholder = new RegExp(`\\{\\{${name}\\}\\}`, 'g');
+            resolvedCommand = resolvedCommand.replace(placeholder, value || `{{${name}}}`);
+        });
+        
+        document.getElementById('livePreview').textContent = resolvedCommand;
+        console.log('[Step2] Live Preview Updated:', resolvedCommand);
+    }
+    
+    // Variable Input Change Listeners
+    document.querySelectorAll('.variable-input').forEach(input => {
+        const varName = input.dataset.varName;
+        
+        input.addEventListener('input', function() {
+            variableValues.set(varName, this.value);
+            updateLivePreview();
+        });
+        
+        input.addEventListener('change', function() {
+            variableValues.set(varName, this.value);
+            updateLivePreview();
+        });
+    });
+    
+    // Back Button
+    document.getElementById('btnBack').addEventListener('click', function() {
+        const params = new URLSearchParams(window.location.search);
+        params.set('step', '1');
+        window.location.href = `/guild/${guildId}/plugins/gameserver/servers/create?${params.toString()}`;
+    });
+    
+    // Next Button → Step 3
+    document.getElementById('btnNext').addEventListener('click', function() {
+        const form = document.getElementById('variablesForm');
+        
+        // Validation (falls Form existiert)
+        if (form && !form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        
+        // Build URL with all params from Step 1 + Variables
+        const params = new URLSearchParams(window.location.search);
+        params.set('step', '3');
+        
+        // Add all variable values (NUR NICHT-LEERE!)
+        variableValues.forEach((value, name) => {
+            // Nur übertragen wenn Wert existiert (nicht leer, nicht undefined)
+            if (value && value.trim && value.trim() !== '') {
+                params.set(`variable_${name}`, value);
+            } else if (typeof value === 'number' || (value && !value.trim)) {
+                // Numbers und Non-Strings (booleans) immer übertragen
+                params.set(`variable_${name}`, value);
+            }
+            // Leere Strings werden NICHT übertragen → Backend nutzt dann default_value
+        });
+        
+        console.log('[Step2] Navigiere zu Step 3 mit Variablen:', Object.fromEntries(params));
+        window.location.href = `/guild/${guildId}/plugins/gameserver/servers/create?${params.toString()}`;
+    });
+    
+    // Initial Preview
+    updateLivePreview();
+});
+</script>

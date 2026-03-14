@@ -1,0 +1,337 @@
+{
+  "meta": {
+    "version": "PTDL_v2",
+    "author": "DuneBot Official",
+    "update_url": null
+  },
+  "exported_at": "2025-10-19T00:00:00+00:00",
+  "name": "ARK: Survival Evolved",
+  "slug": "ark",
+  "description": "ARK: Survival Evolved Dedicated Server mit umfangreichen Konfigurationsmöglichkeiten. Unterstützt alle Maps und Mods via Steam Workshop.",
+  "category": "survival",
+  "tags": [
+    "steam",
+    "survival",
+    "dinosaurs",
+    "pvp",
+    "pve",
+    "mods"
+  ],
+  "visibility": "official",
+  "trust_level": "official",
+  "status": "approved",
+  "features": [
+    "steam_workshop",
+    "mods",
+    "crossplay"
+  ],
+  "steam": {
+    "app_id": 346110,
+    "server_app_id": 376030,
+    "install_dir": "ark"
+  },
+  "installation": {
+    "method": "steamcmd",
+    "app_id": "376030",
+    "validate": true,
+    "script": "#!/bin/bash\ncd \"${INSTALL_DIR}\"\n\"${STEAMCMD}\" +force_install_dir \"${INSTALL_DIR}\" +login anonymous +app_update 376030 validate +quit\nmkdir -p ${INSTALL_DIR}/ShooterGame/Saved/Config/LinuxServer"
+  },
+  "startup": {
+    "command": "./ShooterGame/Binaries/Linux/ShooterGameServer {{MAP}}?listen?SessionName=\"{{SERVER_NAME}}\"?ServerPassword={{SERVER_PASSWORD}}?ServerAdminPassword={{ADMIN_PASSWORD}}?Port={{SERVER_PORT}}?QueryPort={{QUERY_PORT}}?MaxPlayers={{MAX_PLAYERS}} -server -log",
+    "done": "Setting breakpad minidump AppID",
+    "stop": "^C"
+  },
+  "config": {
+    "files": {
+      "ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini": {
+        "parser": "ini",
+        "find": {
+          "ServerSettings": {
+            "DifficultyOffset": "DifficultyOffset={{DIFFICULTY}}",
+            "TamingSpeedMultiplier": "TamingSpeedMultiplier={{TAMING_SPEED}}",
+            "HarvestAmountMultiplier": "HarvestAmountMultiplier={{HARVEST_MULTI}}",
+            "XPMultiplier": "XPMultiplier={{XP_MULTI}}",
+            "ShowMapPlayerLocation": "ShowMapPlayerLocation={{SHOW_PLAYER_MAP}}",
+            "AllowThirdPersonPlayer": "AllowThirdPersonPlayer={{ALLOW_THIRD_PERSON}}",
+            "ServerCrosshair": "ServerCrosshair={{CROSSHAIR}}",
+            "AllowFlyerCarryPvE": "AllowFlyerCarryPvE={{FLYER_CARRY_PVE}}"
+          }
+        }
+      }
+    },
+    "startup": {
+      "done": "Setting breakpad minidump AppID"
+    },
+    "logs": {},
+    "stop": "^C",
+    "rcon": {
+      "protocol": "srcds",
+      "port_var": "rcon",
+      "password_var": "ADMIN_PASSWORD"
+    }
+  },
+  "variables": [
+    {
+      "name": "Server Name",
+      "description": "Name deines ARK-Servers",
+      "env_variable": "SERVER_NAME",
+      "default_value": "My ARK Server",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Map",
+      "description": "Welche Map soll geladen werden?",
+      "env_variable": "MAP",
+      "default_value": "TheIsland",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "select",
+      "select_options": {
+        "TheIsland": "The Island (Standard)",
+        "TheCenter": "The Center",
+        "ScorchedEarth_P": "Scorched Earth (DLC)",
+        "Aberration_P": "Aberration (DLC)",
+        "Extinction": "Extinction (DLC)",
+        "Genesis": "Genesis Part 1 (DLC)",
+        "Gen2": "Genesis Part 2 (DLC)",
+        "Ragnarok": "Ragnarok (Free)",
+        "Valguero_P": "Valguero (Free)",
+        "CrystalIsles": "Crystal Isles (Free)",
+        "LostIsland": "Lost Island (Free)",
+        "Fjordur": "Fjordur (Free)"
+      }
+    },
+    {
+      "name": "Server Password",
+      "description": "Passwort zum Betreten (leer = kein Passwort)",
+      "env_variable": "SERVER_PASSWORD",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string|max:50",
+      "field_type": "text"
+    },
+    {
+      "name": "Admin Password",
+      "description": "Admin-Passwort für In-Game Commands",
+      "env_variable": "ADMIN_PASSWORD",
+      "default_value": "AUTOGENERATE",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|min:6",
+      "field_type": "password"
+    },
+    {
+      "name": "Max Players",
+      "description": "Maximale Spieleranzahl",
+      "env_variable": "MAX_PLAYERS",
+      "default_value": "20",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:1|max:100",
+      "field_type": "number"
+    },
+    {
+      "name": "Server Port",
+      "description": "Hauptport des Servers",
+      "env_variable": "SERVER_PORT",
+      "default_value": "7777",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "Query Port",
+      "description": "Query Port (normalerweise Server Port + 1)",
+      "env_variable": "QUERY_PORT",
+      "default_value": "27015",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "Difficulty",
+      "description": "Schwierigkeitsgrad (1.0 = Standard, höher = stärkere Dinos)",
+      "env_variable": "DIFFICULTY",
+      "default_value": "1.0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|min:0.1|max:10",
+      "field_type": "number"
+    },
+    {
+      "name": "Taming Speed",
+      "description": "Zähm-Geschwindigkeit Multiplikator",
+      "env_variable": "TAMING_SPEED",
+      "default_value": "1.0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|min:0.1|max:50",
+      "field_type": "number"
+    },
+    {
+      "name": "Harvest Multiplier",
+      "description": "Ressourcen-Multiplikator beim Abbauen",
+      "env_variable": "HARVEST_MULTI",
+      "default_value": "1.0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|min:0.1|max:50",
+      "field_type": "number"
+    },
+    {
+      "name": "XP Multiplier",
+      "description": "Erfahrungs-Multiplikator",
+      "env_variable": "XP_MULTI",
+      "default_value": "1.0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|min:0.1|max:50",
+      "field_type": "number"
+    },
+    {
+      "name": "Show Player on Map",
+      "description": "Spieler-Position auf der Karte anzeigen?",
+      "env_variable": "SHOW_PLAYER_MAP",
+      "default_value": "False",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:True,False",
+      "field_type": "select",
+      "select_options": {
+        "True": "Ja",
+        "False": "Nein"
+      }
+    },
+    {
+      "name": "Allow Third Person",
+      "description": "Third-Person-Ansicht erlauben?",
+      "env_variable": "ALLOW_THIRD_PERSON",
+      "default_value": "True",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:True,False",
+      "field_type": "select",
+      "select_options": {
+        "True": "Ja",
+        "False": "Nein"
+      }
+    },
+    {
+      "name": "Crosshair",
+      "description": "Fadenkreuz anzeigen?",
+      "env_variable": "CROSSHAIR",
+      "default_value": "True",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:True,False",
+      "field_type": "select",
+      "select_options": {
+        "True": "Ja",
+        "False": "Nein"
+      }
+    },
+    {
+      "name": "Flyer Carry PvE",
+      "description": "Flug-Dinos können Spieler/Dinos tragen (PvE)?",
+      "env_variable": "FLYER_CARRY_PVE",
+      "default_value": "True",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:True,False",
+      "field_type": "select",
+      "select_options": {
+        "True": "Ja",
+        "False": "Nein"
+      }
+    }
+  ],
+  "templates": [
+    {
+      "name": "pvp",
+      "label": "PvP Server",
+      "description": "Standard PvP mit erhöhten Rates",
+      "icon": "fa-sword",
+      "variables": {
+        "MAP": "TheIsland",
+        "MAX_PLAYERS": "50",
+        "DIFFICULTY": "5.0",
+        "TAMING_SPEED": "3.0",
+        "HARVEST_MULTI": "2.0",
+        "XP_MULTI": "2.0",
+        "SHOW_PLAYER_MAP": "False",
+        "ALLOW_THIRD_PERSON": "True",
+        "CROSSHAIR": "True"
+      }
+    },
+    {
+      "name": "pve",
+      "label": "PvE Server",
+      "description": "Kooperativer PvE-Server mit Vanilla-Rates",
+      "icon": "fa-handshake",
+      "variables": {
+        "MAP": "TheIsland",
+        "MAX_PLAYERS": "30",
+        "DIFFICULTY": "1.0",
+        "TAMING_SPEED": "1.0",
+        "HARVEST_MULTI": "1.0",
+        "XP_MULTI": "1.0",
+        "SHOW_PLAYER_MAP": "True",
+        "ALLOW_THIRD_PERSON": "True",
+        "FLYER_CARRY_PVE": "True"
+      }
+    },
+    {
+      "name": "boosted",
+      "label": "Boosted (10x)",
+      "description": "Stark erhöhte Rates für schnellen Fortschritt",
+      "icon": "fa-rocket",
+      "variables": {
+        "MAP": "Ragnarok",
+        "MAX_PLAYERS": "40",
+        "DIFFICULTY": "5.0",
+        "TAMING_SPEED": "10.0",
+        "HARVEST_MULTI": "10.0",
+        "XP_MULTI": "10.0",
+        "SHOW_PLAYER_MAP": "True",
+        "ALLOW_THIRD_PERSON": "True"
+      }
+    }
+  ],
+  "ports": {
+    "game": {
+      "default": 7777,
+      "protocol": "udp",
+      "description": "Game Port"
+    },
+    "query": {
+      "default": 27015,
+      "protocol": "udp",
+      "description": "Query Port"
+    },
+    "rcon": {
+      "default": 27020,
+      "protocol": "tcp",
+      "description": "RCON Port"
+    }
+  },
+  "requirements": {
+    "ram_min_mb": 6144,
+    "ram_recommended_mb": 8192,
+    "cpu_cores_min": 2,
+    "disk_min_gb": 30,
+    "disk_recommended_gb": 50
+  },
+  "assets": {
+    "icon_url": "https://cdn.akamai.steamstatic.com/steam/apps/346110/header.jpg",
+    "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/346110/library_hero.jpg",
+    "screenshots": []
+  },
+  "changelog": "Initial release - ARK with 12 Maps and 3 templates (PvP, PvE, Boosted)"
+}

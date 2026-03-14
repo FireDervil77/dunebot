@@ -1,0 +1,337 @@
+<!-- Addon Marketplace -->
+<div class="content-wrapper">
+    <!-- Content Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fa-solid fa-store"></i> 
+                        <%= tr('gameserver:MARKETPLACE.TITLE') %>
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a></li>
+                        <li class="breadcrumb-item active"><%= tr('gameserver:NAV.ADDONS') %></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+
+            <!-- Meine Addons Promo Card -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card card-primary card-outline">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h4 class="mb-2">
+                                        <i class="fa-solid fa-egg"></i>
+                                        <%= tr('gameserver:MY_ADDONS.PROMO_TITLE') || 'Erstelle deine eigenen Addons!' %>
+                                    </h4>
+                                    <p class="text-muted mb-0">
+                                        <%= tr('gameserver:MY_ADDONS.PROMO_TEXT') || 'Erstelle, bearbeite und teile deine eigenen Game-Server-Konfigurationen mit der Community. Nutze Templates oder starte von Grund auf!' %>
+                                    </p>
+                                </div>
+                                <div class="col-md-4 text-right">
+                                    <a href="/guild/<%= guildId %>/plugins/gameserver/addons/my-addons" class="btn btn-primary btn-lg">
+                                        <i class="fa-solid fa-egg"></i>
+                                        <%= tr('gameserver:MY_ADDONS.GO_TO_MY_ADDONS') || 'Zu meinen Addons' %>
+                                    </a>
+                                    <a href="/guild/<%= guildId %>/plugins/gameserver/addons/create" class="btn btn-success btn-lg">
+                                        <i class="fa-solid fa-plus"></i>
+                                        <%= tr('gameserver:MY_ADDONS.CREATE_NEW_ADDON') || 'Neues Addon erstellen' %>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Sidebar Filter -->
+                <div class="col-lg-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-filter"></i>
+                                <%= tr('gameserver:MARKETPLACE.FILTER') %>
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <form method="GET" action="/guild/<%= guildId %>/plugins/gameserver/addons">
+                                <!-- Search -->
+                                <div class="form-group">
+                                    <label><%= tr('gameserver:MARKETPLACE.SEARCH') %></label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           name="search" 
+                                           placeholder="<%= tr('gameserver:MARKETPLACE.SEARCH_PLACEHOLDER') %>"
+                                           value="<%= filters.search %>">
+                                </div>
+
+                                <!-- Category -->
+                                <div class="form-group">
+                                    <label><%= tr('gameserver:MARKETPLACE.CATEGORY') %></label>
+                                    <select class="form-control" name="category">
+                                        <option value="all" <%= filters.category === 'all' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:MARKETPLACE.ALL_CATEGORIES') %>
+                                        </option>
+                                        <% categories.forEach(cat => { %>
+                                            <option value="<%= cat.category %>" <%= filters.category === cat.category ? 'selected' : '' %>>
+                                                <%= cat.category.toUpperCase() %> (<%= cat.count %>)
+                                            </option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+
+                                <!-- Sort -->
+                                <div class="form-group">
+                                    <label><%= tr('gameserver:MARKETPLACE.SORT_BY') %></label>
+                                    <select class="form-control" name="sort">
+                                        <option value="default" <%= filters.sort === 'default' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:MARKETPLACE.SORT_DEFAULT') %>
+                                        </option>
+                                        <option value="newest" <%= filters.sort === 'newest' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:MARKETPLACE.SORT_NEWEST') %>
+                                        </option>
+                                        <option value="popular" <%= filters.sort === 'popular' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:MARKETPLACE.SORT_POPULAR') %>
+                                        </option>
+                                        <option value="rating" <%= filters.sort === 'rating' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:MARKETPLACE.SORT_RATING') %>
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary btn-block">
+                                    <i class="fa-solid fa-search"></i> <%= tr('gameserver:MARKETPLACE.APPLY_FILTER') %>
+                                </button>
+                                <a href="/guild/<%= guildId %>/plugins/gameserver/addons" class="btn btn-secondary btn-block">
+                                    <i class="fa-solid fa-times"></i> <%= tr('gameserver:MARKETPLACE.RESET_FILTER') %>
+                                </a>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-shield"></i>
+                                <%= tr('gameserver:MARKETPLACE.TRUST_LEVELS') %>
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <span class="badge badge-danger">
+                                    👑 OFFICIAL
+                                </span>
+                                <small class="d-block text-muted">
+                                    <%= tr('gameserver:MARKETPLACE.TRUST_OFFICIAL') %>
+                                </small>
+                            </div>
+                            <div class="mb-2">
+                                <span class="badge badge-success">
+                                    🛡️ TRUSTED
+                                </span>
+                                <small class="d-block text-muted">
+                                    <%= tr('gameserver:MARKETPLACE.TRUST_TRUSTED') %>
+                                </small>
+                            </div>
+                            <div class="mb-2">
+                                <span class="badge badge-primary">
+                                    ✓ VERIFIED
+                                </span>
+                                <small class="d-block text-muted">
+                                    <%= tr('gameserver:MARKETPLACE.TRUST_VERIFIED') %>
+                                </small>
+                            </div>
+                            <div>
+                                <span class="badge badge-secondary">
+                                    <i class="fa-solid fa-question-circle"></i> UNVERIFIED
+                                </span>
+                                <small class="d-block text-muted">
+                                    <%= tr('gameserver:MARKETPLACE.TRUST_UNVERIFIED') %>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Addon Grid -->
+                <div class="col-lg-9">
+                    <!-- Results Count -->
+                    <div class="mb-3">
+                        <h5>
+                            <%= addons.length %> <%= tr('gameserver:MARKETPLACE.RESULTS_FOUND') %>
+                            <% if (filters.search) { %>
+                                <%= tr('gameserver:MARKETPLACE.FOR') %> "<%= filters.search %>"
+                            <% } %>
+                        </h5>
+                    </div>
+
+                    <% if (addons && addons.length > 0) { %>
+                        <div class="row">
+                            <% addons.forEach(addon => { %>
+                                <div class="col-lg-4 col-md-6 mb-4">
+                                    <div class="card h-100">
+                                        <!-- Featured Badge -->
+                                        <% if (addon.featured) { %>
+                                            <div class="ribbon-wrapper ribbon-lg">
+                                                <div class="ribbon bg-warning">
+                                                    <i class="fa-solid fa-star"></i> Featured
+                                                </div>
+                                            </div>
+                                        <% } %>
+
+                                        <div class="card-body">
+                                            <!-- Trust Level Badge -->
+                                            <div class="mb-2">
+                                                <% if (addon.trust_level === 'official') { %>
+                                                    <span class="badge badge-danger">
+                                                        👑 OFFICIAL
+                                                    </span>
+                                                <% } else if (addon.trust_level === 'trusted') { %>
+                                                    <span class="badge badge-success">
+                                                        🛡️ TRUSTED
+                                                    </span>
+                                                <% } else if (addon.trust_level === 'verified') { %>
+                                                    <span class="badge badge-primary">
+                                                        ✓ VERIFIED
+                                                    </span>
+                                                <% } else { %>
+                                                    <span class="badge badge-secondary">
+                                                        <i class="fa-solid fa-question-circle"></i> UNVERIFIED
+                                                    </span>
+                                                <% } %>
+
+                                                <span class="badge badge-info ml-1">
+                                                    <%= addon.category.toUpperCase() %>
+                                                </span>
+
+                                                <% if (addon.runtime_type === 'docker_steam') { %>
+                                                    <span class="badge badge-dark ml-1">
+                                                        <i class="fa-brands fa-steam"></i> Steam
+                                                    </span>
+                                                <% } else if (addon.runtime_type === 'docker_standalone') { %>
+                                                    <span class="badge badge-dark ml-1">
+                                                        <i class="fa-brands fa-docker"></i> Docker
+                                                    </span>
+                                                <% } else if (addon.runtime_type === 'native_steamcmd') { %>
+                                                    <span class="badge badge-secondary ml-1">
+                                                        <i class="fa-brands fa-steam"></i> Native
+                                                    </span>
+                                                <% } %>
+                                            </div>
+
+                                            <!-- Addon Name -->
+                                            <h5 class="card-title">
+                                                <a href="/guild/<%= guildId %>/plugins/gameserver/addons/<%= addon.slug %>">
+                                                    <%= addon.name %>
+                                                </a>
+                                            </h5>
+
+                                            <!-- Description -->
+                                            <p class="card-text text-muted small">
+                                                <%= addon.description.substring(0, 100) %><%= addon.description.length > 100 ? '...' : '' %>
+                                            </p>
+
+                                            <!-- Stats -->
+                                            <div class="mb-3">
+                                                <!-- Rating -->
+                                                <% if (addon.rating_count > 0) { %>
+                                                    <div class="d-inline-block mr-3">
+                                                        <i class="fa-solid fa-star text-warning"></i>
+                                                        <%= addon.rating_avg ? addon.rating_avg.toFixed(1) : 0 %>
+                                                        <small class="text-muted">(<%= addon.rating_count %>)</small>
+                                                    </div>
+                                                <% } else { %>
+                                                    <div class="d-inline-block mr-3">
+                                                        <i class="fa-regular fa-star text-muted"></i>
+                                                        <small class="text-muted"><%= tr('gameserver:MARKETPLACE.NO_RATINGS') %></small>
+                                                    </div>
+                                                <% } %>
+
+                                                <!-- Downloads -->
+                                                <div class="d-inline-block">
+                                                    <i class="fa-solid fa-download text-info"></i>
+                                                    <%= addon.downloads || 0 %>
+                                                </div>
+                                            </div>
+
+                                            <!-- Author -->
+                                            <small class="text-muted">
+                                                <%= tr('gameserver:MARKETPLACE.BY') %> <%= addon.author_name || 'Unknown' %>
+                                            </small>
+                                        </div>
+
+                                        <div class="card-footer">
+                                            <a href="/guild/<%= guildId %>/plugins/gameserver/addons/<%= addon.slug %>" 
+                                               class="btn btn-primary btn-block">
+                                                <i class="fa-solid fa-eye"></i> <%= tr('gameserver:MARKETPLACE.VIEW_DETAILS') %>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <!-- No Results -->
+                        <div class="card">
+                            <div class="card-body text-center p-5">
+                                <i class="fa-solid fa-inbox fa-4x text-muted mb-4"></i>
+                                <h4><%= tr('gameserver:MARKETPLACE.NO_RESULTS') %></h4>
+                                <p class="text-muted">
+                                    <%= tr('gameserver:MARKETPLACE.NO_RESULTS_DESC') %>
+                                </p>
+                                <a href="/guild/<%= guildId %>/plugins/gameserver/addons" class="btn btn-primary">
+                                    <i class="fa-solid fa-refresh"></i> <%= tr('gameserver:MARKETPLACE.RESET_FILTER') %>
+                                </a>
+                            </div>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>
+
+<style>
+.ribbon-wrapper {
+    width: 85px;
+    height: 88px;
+    overflow: hidden;
+    position: absolute;
+    top: -3px;
+    right: -3px;
+}
+
+.ribbon-wrapper.ribbon-lg {
+    width: 120px;
+    height: 120px;
+}
+
+.ribbon {
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: #fff;
+    text-align: center;
+    padding: 7px 0;
+    position: relative;
+    top: 15px;
+    right: -30px;
+    width: 120px;
+    transform: rotate(45deg);
+    box-shadow: 0 0 3px rgba(0,0,0,.3);
+}
+</style>

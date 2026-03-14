@@ -1,0 +1,646 @@
+<%# 
+  * Gameserver File-Browser (WebFTP)
+  * Zeigt Dateisystem des Gameservers an
+  * @author FireBot Team
+  %>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-folder-open me-2"></i>
+                        File Manager - <%= server.name %>
+                    </h3>
+                    <div class="card-tools">
+                        <% if (!error) { %>
+                            <!-- Upload-Button -->
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                                <i class="fas fa-upload me-1"></i> Hochladen
+                            </button>
+                            <!-- Neuer Ordner -->
+                            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#mkdirModal">
+                                <i class="fas fa-folder-plus me-1"></i> Neuer Ordner
+                            </button>
+                            <!-- Zurück zur Server-Liste -->
+                            <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Zurück
+                            </a>
+                        <% } %>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- SFTP-Credentials Info-Box (immer anzeigen) -->
+                    <div class="alert alert-info mb-4">
+                        <h5 class="alert-heading">
+                            <i class="fas fa-lock me-2"></i>
+                            SFTP-Zugang
+                        </h5>
+                        <p class="mb-3">
+                            <small class="text-muted">
+                                Der Web File-Manager ist noch in Entwicklung. Nutze SFTP für vollständigen Dateizugriff.
+                            </small>
+                        </p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Host:</strong> <%= process.env.SFTP_HOST || 'dev.firenetworks.de' %><br>
+                                <strong>Port:</strong> <%= process.env.SFTP_PORT || '2222' %><br>
+                                <strong>User:</strong> <code id="sftp-username"><%= sftpCredentials?.username || 'N/A' %></code>
+                                <button class="btn btn-sm btn-outline-secondary ms-2" onclick="copyToClipboard('sftp-username')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Passwort:</strong> 
+                                <% if (sftpCredentials?.hasPassword) { %>
+                                    <span class="text-success">
+                                        <i class="fas fa-check-circle"></i> Gesetzt
+                                    </span>
+                                    <button class="btn btn-sm btn-warning ms-2" data-bs-toggle="modal" data-bs-target="#resetPasswordModal">
+                                        <i class="fas fa-rotate"></i> Zurücksetzen
+                                    </button>
+                                <% } else { %>
+                                    <span class="text-warning">
+                                        <i class="fas fa-exclamation-triangle"></i> Nicht gesetzt
+                                    </span>
+                                    <button class="btn btn-sm btn-primary ms-2" data-bs-toggle="modal" data-bs-target="#setPasswordModal">
+                                        <i class="fas fa-key"></i> Passwort setzen
+                                    </button>
+                                <% } %>
+                                <br>
+                                <strong>Pfad:</strong> <code id="sftp-path"><%= sftpCredentials?.path || '/' %></code>
+                                <button class="btn btn-sm btn-outline-secondary ms-2" onclick="copyToClipboard('sftp-path')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <hr>
+                        <p class="mb-2"><strong>Empfohlene SFTP-Clients:</strong></p>
+                        <div class="btn-group" role="group">
+                            <a href="https://filezilla-project.org/download.php?type=client" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-download me-1"></i> FileZilla
+                            </a>
+                            <a href="https://winscp.net/eng/download.php" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-download me-1"></i> WinSCP
+                            </a>
+                            <a href="https://cyberduck.io/download/" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-download me-1"></i> Cyberduck
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Error-Meldung -->
+                    <% if (error) { %>
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <%= error %>
+                        </div>
+                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Zurück zur Server-Liste
+                        </a>
+                    <% } else { %>
+                        <!-- Breadcrumbs (Pfad-Navigation) -->
+                        <nav aria-label="breadcrumb" class="mb-3">
+                            <ol class="breadcrumb">
+                                <li class="breadcrumb-item">
+                                    <a href="?path=/">
+                                        <i class="fas fa-home"></i> Root
+                                    </a>
+                                </li>
+                                <% if (currentPath !== '/') { %>
+                                    <% const parts = currentPath.split('/').filter(p => p); %>
+                                    <% parts.forEach((part, index) => { %>
+                                        <li class="breadcrumb-item <%= index === parts.length - 1 ? 'active' : '' %>">
+                                            <% if (index === parts.length - 1) { %>
+                                                <%= part %>
+                                            <% } else { %>
+                                                <a href="?path=/<%= parts.slice(0, index + 1).join('/') %>">
+                                                    <%= part %>
+                                                </a>
+                                            <% } %>
+                                        </li>
+                                    <% }); %>
+                                <% } %>
+                            </ol>
+                        </nav>
+
+                        <!-- Server-Info -->
+                        <div class="alert alert-info">
+                            <i class="bi bi-server me-2"></i>
+                            <strong>Server:</strong> <%= server.name %> 
+                            <span class="badge bg-<%= server.status === 'online' ? 'success' : 'secondary' %> ms-2">
+                                <%= server.status %>
+                            </span>
+                            <br>
+                            <small class="text-muted">
+                                <i class="bi bi-hdd me-1"></i>
+                                Install-Pfad: <%= server.install_path || 'N/A' %>
+                            </small>
+                        </div>
+
+                        <!-- File-Liste -->
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px;"></th>
+                                        <th>Name</th>
+                                        <th style="width: 120px;">Größe</th>
+                                        <th style="width: 180px;">Geändert</th>
+                                        <th style="width: 200px;">Aktionen</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Parent-Directory (..) -->
+                                    <% if (parentPath !== null) { %>
+                                        <tr>
+                                            <td><i class="fas fa-level-up-alt text-muted"></i></td>
+                                            <td>
+                                                <a href="?path=<%= parentPath || '/' %>">
+                                                    <strong>..</strong> (Übergeordneter Ordner)
+                                                </a>
+                                            </td>
+                                            <td colspan="3"></td>
+                                        </tr>
+                                    <% } %>
+                                    
+                                    <!-- File/Directory Liste -->
+                                    <% if (files && files.length > 0) { %>
+                                        <% files.forEach(file => { %>
+                                            <tr>
+                                                <td>
+                                                    <% if (file.is_directory) { %>
+                                                        <i class="fas fa-folder text-warning"></i>
+                                                    <% } else { %>
+                                                        <% const ext = file.name.split('.').pop().toLowerCase(); %>
+                                                        <% if (['txt', 'log', 'conf', 'cfg', 'ini', 'json', 'xml', 'yaml', 'yml'].includes(ext)) { %>
+                                                            <i class="fas fa-file-alt text-info"></i>
+                                                        <% } else if (['sh', 'bat', 'cmd'].includes(ext)) { %>
+                                                            <i class="fas fa-file-code text-success"></i>
+                                                        <% } else { %>
+                                                            <i class="fas fa-file text-muted"></i>
+                                                        <% } %>
+                                                    <% } %>
+                                                </td>
+                                                <td>
+                                                    <% const filePath = currentPath.endsWith('/') ? currentPath + file.name : currentPath + '/' + file.name; %>
+                                                    <% if (file.is_directory) { %>
+                                                        <a href="?path=<%= filePath %>">
+                                                            <strong><%= file.name %></strong>
+                                                        </a>
+                                                    <% } else { %>
+                                                        <%= file.name %>
+                                                    <% } %>
+                                                </td>
+                                                <td>
+                                                    <% if (!file.is_directory) { %>
+                                                        <%= file.size_human || (file.size ? (file.size / 1024 / 1024).toFixed(2) + ' MB' : '-') %>
+                                                    <% } else { %>
+                                                        <span class="text-muted">-</span>
+                                                    <% } %>
+                                                </td>
+                                                <td>
+                                                    <small class="text-muted">
+                                                        <%= file.modified_at ? new Date(file.modified_at).toLocaleString('de-DE') : '-' %>
+                                                    </small>
+                                                </td>
+                                                <td>
+                                                    <% const actionPath = currentPath.endsWith('/') ? currentPath + file.name : currentPath + '/' + file.name; %>
+                                                    
+                                                    <!-- Download (nur Dateien) -->
+                                                    <% if (!file.is_directory) { %>
+                                                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/files/download?path=<%= encodeURIComponent(actionPath) %>" 
+                                                           class="btn btn-sm btn-info" 
+                                                           title="Herunterladen">
+                                                            <i class="fas fa-download"></i>
+                                                        </a>
+                                                        
+                                                        <!-- Edit (nur Text-Dateien) -->
+                                                        <% const editableExts = ['txt', 'log', 'conf', 'cfg', 'ini', 'json', 'xml', 'yaml', 'yml', 'sh', 'bat', 'cmd', 'properties']; %>
+                                                        <% const fileExt = file.name.split('.').pop().toLowerCase(); %>
+                                                        <% if (editableExts.includes(fileExt)) { %>
+                                                            <a href="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/files/edit?path=<%= encodeURIComponent(actionPath) %>" 
+                                                               class="btn btn-sm btn-primary" 
+                                                               title="Bearbeiten">
+                                                                <i class="fas fa-edit"></i>
+                                                            </a>
+                                                        <% } %>
+                                                    <% } %>
+                                                    
+                                                    <!-- Umbenennen -->
+                                                    <button class="btn btn-sm btn-warning rename-btn" 
+                                                            data-path="<%= actionPath %>"
+                                                            data-name="<%= file.name %>"
+                                                            title="Umbenennen">
+                                                        <i class="fas fa-pen"></i>
+                                                    </button>
+                                                    
+                                                    <!-- Löschen -->
+                                                    <button class="btn btn-sm btn-danger delete-file-btn" 
+                                                            data-path="<%= actionPath %>"
+                                                            data-name="<%= file.name %>"
+                                                            title="Löschen">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        <% }); %>
+                                    <% } %>
+                                    
+                                    <!-- Empty State -->
+                                    <% if (!files || files.length === 0) { %>
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-5">
+                                                <i class="fas fa-folder-open fa-3x mb-3 d-block"></i>
+                                                <p>Verzeichnis ist leer</p>
+                                            </td>
+                                        </tr>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Datei hochladen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Datei wählen:</label>
+                        <input type="file" name="file" class="form-control" required>
+                        <input type="hidden" name="path" value="<%= currentPath %>">
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Max. 100 MB | Verboten: .exe, .bat, .cmd
+                        </div>
+                    </div>
+                    <div id="uploadProgress" class="progress" style="display: none;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary" id="uploadBtn">
+                        <i class="fas fa-upload me-1"></i> Hochladen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Mkdir Modal -->
+<div class="modal fade" id="mkdirModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Neues Verzeichnis erstellen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="mkdirForm">
+                <div class="modal-body">
+                    <label class="form-label">Verzeichnisname:</label>
+                    <input type="text" name="name" class="form-control" placeholder="z.B. config" required pattern="[a-zA-Z0-9_\-]+">
+                    <input type="hidden" name="path" value="<%= currentPath %>">
+                    <div class="form-text">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Nur Buchstaben, Zahlen, _ und - erlaubt
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-folder-plus me-1"></i> Erstellen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Rename Modal -->
+<div class="modal fade" id="renameModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Umbenennen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="renameForm">
+                <div class="modal-body">
+                    <label class="form-label">Neuer Name:</label>
+                    <input type="text" name="newName" id="renameInput" class="form-control" required>
+                    <input type="hidden" name="oldPath" id="renameOldPath">
+                    <div class="form-text">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Nur der Name, nicht der komplette Pfad
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-pen me-1"></i> Umbenennen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Toast-Helper
+function showToast(type, message) {
+    // Nutze das globale Toast-System (falls vorhanden)
+    if (typeof window.showToast === 'function') {
+        window.showToast(type, message);
+    } else {
+        alert(message);
+    }
+}
+
+// Upload-Handling (AJAX mit Progress)
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const uploadBtn = document.getElementById('uploadBtn');
+    const progressBar = document.querySelector('#uploadProgress .progress-bar');
+    const progressContainer = document.getElementById('uploadProgress');
+    
+    try {
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Lade hoch...';
+        progressContainer.style.display = 'block';
+        
+        const xhr = new XMLHttpRequest();
+        
+        // Progress-Event
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const percent = (e.loaded / e.total) * 100;
+                progressBar.style.width = percent + '%';
+            }
+        });
+        
+        // Completion-Event
+        xhr.addEventListener('load', () => {
+            if (xhr.status === 200) {
+                const result = JSON.parse(xhr.responseText);
+                showToast('success', result.message || 'Erfolgreich hochgeladen');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                const result = JSON.parse(xhr.responseText);
+                showToast('error', result.message || 'Fehler beim Hochladen');
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fas fa-upload me-1"></i> Hochladen';
+            }
+        });
+        
+        xhr.addEventListener('error', () => {
+            showToast('error', 'Netzwerkfehler beim Hochladen');
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<i class="fas fa-upload me-1"></i> Hochladen';
+        });
+        
+        xhr.open('POST', `/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/files/upload`);
+        xhr.send(formData);
+    } catch (error) {
+        console.error('Upload-Fehler:', error);
+        showToast('error', 'Fehler beim Hochladen');
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = '<i class="fas fa-upload me-1"></i> Hochladen';
+    }
+});
+
+// Mkdir-Handling (AJAX)
+document.getElementById('mkdirForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    try {
+        const response = await fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/files/mkdir`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                path: formData.get('path'),
+                name: formData.get('name')
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showToast('success', result.message);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('error', result.message);
+        }
+    } catch (error) {
+        console.error('Mkdir-Fehler:', error);
+        showToast('error', 'Netzwerkfehler beim Erstellen');
+    }
+});
+
+// Delete-Handling (Event-Delegation)
+document.addEventListener('click', async (e) => {
+    const deleteBtn = e.target.closest('.delete-file-btn');
+    if (!deleteBtn) return;
+    
+    const path = deleteBtn.getAttribute('data-path');
+    const name = deleteBtn.getAttribute('data-name');
+    
+    if (!confirm(`Wirklich löschen: "${name}"?\n\nDies kann nicht rückgängig gemacht werden!`)) return;
+    
+    try {
+        const response = await fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/files`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showToast('success', result.message);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('error', result.message);
+        }
+    } catch (error) {
+        console.error('Delete-Fehler:', error);
+        showToast('error', 'Netzwerkfehler beim Löschen');
+    }
+});
+
+// Rename-Handling (Modal öffnen)
+document.addEventListener('click', (e) => {
+    const renameBtn = e.target.closest('.rename-btn');
+    if (!renameBtn) return;
+    
+    const path = renameBtn.getAttribute('data-path');
+    const name = renameBtn.getAttribute('data-name');
+    
+    document.getElementById('renameInput').value = name;
+    document.getElementById('renameOldPath').value = path;
+    
+    const modal = new bootstrap.Modal(document.getElementById('renameModal'));
+    modal.show();
+});
+
+// Rename-Form Submit
+document.getElementById('renameForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    try {
+        const response = await fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/files/rename`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                oldPath: formData.get('oldPath'),
+                newName: formData.get('newName')
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showToast('success', result.message);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('error', result.message);
+        }
+    } catch (error) {
+        console.error('Rename-Fehler:', error);
+        showToast('error', 'Netzwerkfehler beim Umbenennen');
+    }
+});
+
+// Clipboard-Helper
+function copyToClipboard(elementId) {
+    const element = document.getElementById(elementId);
+    const text = element.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('success', 'In Zwischenablage kopiert!');
+    }).catch(err => {
+        showToast('error', 'Kopieren fehlgeschlagen');
+    });
+}
+</script>
+
+<!-- SFTP Passwort setzen Modal -->
+<div class="modal fade" id="setPasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-key me-2"></i>
+                    SFTP-Passwort setzen
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form class="guild-ajax-form" 
+                  data-form-type="sftp-set-password"
+                  data-method="POST"
+                  action="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/sftp/password"
+                  method="POST">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <small>
+                            Dieses Passwort wird für den SFTP-Zugang verwendet. 
+                            Speichere es sicher - es kann nicht wiederhergestellt werden!
+                        </small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Neues Passwort</label>
+                        <input type="password" 
+                               class="form-control" 
+                               id="password" 
+                               name="password" 
+                               required 
+                               minlength="8"
+                               placeholder="Mindestens 8 Zeichen">
+                        <small class="form-text text-muted">
+                            Empfehlung: Nutze einen Passwort-Manager!
+                        </small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password_confirm" class="form-label">Passwort bestätigen</label>
+                        <input type="password" 
+                               class="form-control" 
+                               id="password_confirm" 
+                               name="password_confirm" 
+                               required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Passwort setzen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- SFTP Passwort zurücksetzen Modal -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fas fa-rotate me-2"></i>
+                    SFTP-Passwort zurücksetzen
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form class="guild-ajax-form" 
+                  data-form-type="sftp-reset-password"
+                  data-method="PUT"
+                  action="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/sftp/password"
+                  method="POST">
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Achtung:</strong> Das alte Passwort wird überschrieben!
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Neues Passwort</label>
+                        <input type="password" 
+                               class="form-control" 
+                               id="new_password" 
+                               name="password" 
+                               required 
+                               minlength="8"
+                               placeholder="Mindestens 8 Zeichen">
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_password_confirm" class="form-label">Passwort bestätigen</label>
+                        <input type="password" 
+                               class="form-control" 
+                               id="new_password_confirm" 
+                               name="password_confirm" 
+                               required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-rotate me-1"></i> Zurücksetzen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+

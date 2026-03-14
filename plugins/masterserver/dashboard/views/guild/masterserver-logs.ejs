@@ -1,0 +1,364 @@
+<!-- Masterserver Daemon Logs -->
+<div class="container-fluid">
+  <div class="row">
+    <!-- Page Header -->
+    <div class="col-12 mb-3">
+      <h2>
+        <i class="fa-solid fa-file-lines text-primary me-2"></i>
+        <%= tr('masterserver:LOGS.TITLE') %>
+      </h2>
+      <p class="text-muted">Daemon-Logs zur Fehlersuche und Monitoring</p>
+    </div>
+  </div>
+
+  <!-- Filter & Actions Row -->
+  <div class="row mb-3">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body p-2">
+          <form method="GET" action="/guild/<%= guildId %>/plugins/masterserver/logs" class="form-inline">
+            <div class="form-group mr-3">
+              <label class="mr-2">Level:</label>
+              <select name="level" class="form-control form-control-sm" onchange="this.form.submit()">
+                <option value="">Alle</option>
+                <option value="debug" <%= level === 'debug' ? 'selected' : '' %>>Debug</option>
+                <option value="info" <%= level === 'info' ? 'selected' : '' %>>Info</option>
+                <option value="warn" <%= level === 'warn' ? 'selected' : '' %>>Warning</option>
+                <option value="error" <%= level === 'error' ? 'selected' : '' %>>Error</option>
+              </select>
+            </div>
+            <div class="form-group mr-3">
+              <label class="mr-2">Limit:</label>
+              <select name="limit" class="form-control form-control-sm" onchange="this.form.submit()">
+                <option value="50" <%= limit === 50 ? 'selected' : '' %>>50</option>
+                <option value="100" <%= limit === 100 ? 'selected' : '' %>>100</option>
+                <option value="200" <%= limit === 200 ? 'selected' : '' %>>200</option>
+                <option value="500" <%= limit === 500 ? 'selected' : '' %>>500</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">
+              <i class="fa-solid fa-filter me-1"></i> Filtern
+            </button>
+            <a href="/guild/<%= guildId %>/plugins/masterserver/logs" class="btn btn-sm btn-secondary ml-2">
+              <i class="fa-solid fa-refresh me-1"></i> Zurücksetzen
+            </a>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 text-right">
+      <button type="button" class="btn btn-success" onclick="window.location.reload()">
+        <i class="fa-solid fa-refresh me-1"></i> Aktualisieren
+      </button>
+      <button type="button" class="btn btn-warning" onclick="exportLogs()">
+        <i class="fa-solid fa-download me-1"></i> Exportieren
+      </button>
+      <% if (daemon && daemon.daemon_id) { %>
+        <button type="button" class="btn btn-danger" onclick="clearLogs()">
+          <i class="fa-solid fa-trash me-1"></i> Löschen
+        </button>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="row mb-3">
+    <div class="col-md-3 col-sm-6 col-12">
+      <div class="info-box">
+        <span class="info-box-icon bg-info"><i class="fa-solid fa-file-lines"></i></span>
+        <div class="info-box-content">
+          <span class="info-box-text">Gesamt Logs</span>
+          <span class="info-box-number"><%= stats.total %></span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 col-12">
+      <div class="info-box">
+        <span class="info-box-icon bg-danger"><i class="fa-solid fa-circle-exclamation"></i></span>
+        <div class="info-box-content">
+          <span class="info-box-text">Errors</span>
+          <span class="info-box-number"><%= stats.errors %></span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 col-12">
+      <div class="info-box">
+        <span class="info-box-icon bg-warning"><i class="fa-solid fa-triangle-exclamation"></i></span>
+        <div class="info-box-content">
+          <span class="info-box-text">Warnings</span>
+          <span class="info-box-number"><%= stats.warnings %></span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 col-12">
+      <div class="info-box">
+        <span class="info-box-icon bg-success"><i class="fa-solid fa-circle-info"></i></span>
+        <div class="info-box-content">
+          <span class="info-box-text">Info</span>
+          <span class="info-box-number"><%= stats.info %></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logs Table Card -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-list me-2"></i>
+            Log-Einträge 
+            <% if (level) { %>
+              <span class="badge badge-info"><%= level.toUpperCase() %></span>
+            <% } %>
+            (Zeige <%= logs.length %> von <%= stats.total %>)
+          </h3>
+        </div>
+        <div class="card-body p-0">
+          <% if (logs.length > 0) { %>
+            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+              <table class="table table-sm table-striped table-hover mb-0" style="font-size: 13px;">
+                <thead style="position: sticky; top: 0; background: #fff; z-index: 1;">
+                  <tr>
+                    <th width="5%">Level</th>
+                    <th width="15%">Timestamp</th>
+                    <th width="15%">Source</th>
+                    <th width="50%">Message</th>
+                    <th width="15%">Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% logs.forEach((log, index) => { 
+                    const levelColors = {
+                      'debug': 'secondary',
+                      'info': 'info',
+                      'warn': 'warning',
+                      'error': 'danger'
+                    };
+                    const levelColor = levelColors[log.level] || 'secondary';
+                    const levelIcons = {
+                      'debug': 'fa-bug',
+                      'info': 'fa-circle-info',
+                      'warn': 'fa-triangle-exclamation',
+                      'error': 'fa-circle-exclamation'
+                    };
+                    const levelIcon = levelIcons[log.level] || 'fa-circle';
+                  %>
+                    <tr class="log-row" data-log-index="<%= index %>">
+                      <td>
+                        <span class="badge badge-<%= levelColor %>">
+                          <i class="fa-solid <%= levelIcon %>"></i>
+                          <%= log.level.toUpperCase() %>
+                        </span>
+                      </td>
+                      <td>
+                        <small><%= new Date(log.timestamp).toLocaleString('de-DE', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        }) %></small>
+                      </td>
+                      <td>
+                        <code><%= log.source || 'daemon' %></code>
+                      </td>
+                      <td>
+                        <%= log.message %>
+                        <% if (log.metadata && Object.keys(log.metadata).length > 0) { %>
+                          <br><small class="text-muted">
+                            <% Object.entries(log.metadata).slice(0, 2).forEach(([key, value]) => { %>
+                              <strong><%= key %>:</strong> <%= typeof value === 'object' ? JSON.stringify(value).substring(0, 50) + '...' : value %> 
+                            <% }); %>
+                          </small>
+                        <% } %>
+                      </td>
+                      <td class="text-center">
+                        <% if (log.metadata && Object.keys(log.metadata).length > 0) { %>
+                          <button type="button" class="btn btn-xs btn-info" onclick="showLogDetails(<%= index %>)">
+                            <i class="fa-solid fa-info-circle"></i> Details
+                          </button>
+                        <% } else { %>
+                          <span class="text-muted">-</span>
+                        <% } %>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } else { %>
+            <div class="p-5 text-center text-muted">
+              <i class="fa-solid fa-file-circle-question fa-4x mb-3"></i>
+              <h5>Keine Logs gefunden</h5>
+              <% if (level) { %>
+                <p>Es gibt keine Logs mit Level: <strong><%= level %></strong></p>
+                <a href="/guild/<%= guildId %>/plugins/masterserver/logs" class="btn btn-primary">Filter zurücksetzen</a>
+              <% } else { %>
+                <p>Der Daemon hat noch keine Logs geschrieben.</p>
+              <% } %>
+            </div>
+          <% } %>
+        </div>
+        <% if (logs.length > 0) { %>
+          <div class="card-footer text-center">
+            <small class="text-muted">
+              Zeige die letzten <%= logs.length %> Einträge
+              <% if (level) { %>
+                (gefiltert nach <%= level %>)
+              <% } %>
+              • Auto-Cleanup nach <%= retentionDays %> Tagen
+            </small>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Log Details Modal -->
+<div class="modal fade" id="logDetailsModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-info">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-info-circle me-2"></i>
+          Log-Details
+        </h5>
+        <button type="button" class="close" data-dismiss="modal">
+          <span>&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="logDetailsContent">
+          <p class="text-center"><i class="fa-solid fa-spinner fa-spin"></i> Lädt...</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Schließen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script>
+const logsData = <%- JSON.stringify(logs) %>;
+
+function showLogDetails(index) {
+  const log = logsData[index];
+  
+  if (!log) {
+    GuildAjax.showToast('error', 'Log nicht gefunden');
+    return;
+  }
+  
+  const levelColors = {
+    'debug': 'secondary',
+    'info': 'info',
+    'warn': 'warning',
+    'error': 'danger'
+  };
+  const levelColor = levelColors[log.level] || 'secondary';
+  
+  const content = `
+    <table class="table table-sm">
+      <tbody>
+        <tr>
+          <th width="30%">Log-ID:</th>
+          <td><code>${log.log_id}</code></td>
+        </tr>
+        <tr>
+          <th>Level:</th>
+          <td><span class="badge badge-${levelColor}">${log.level.toUpperCase()}</span></td>
+        </tr>
+        <tr>
+          <th>Timestamp:</th>
+          <td>${new Date(log.timestamp).toLocaleString('de-DE')}</td>
+        </tr>
+        <tr>
+          <th>Source:</th>
+          <td><code>${log.source || 'daemon'}</code></td>
+        </tr>
+        <tr>
+          <th>Message:</th>
+          <td>${log.message}</td>
+        </tr>
+      </tbody>
+    </table>
+    
+    ${log.metadata && Object.keys(log.metadata).length > 0 ? `
+      <h6 class="mt-3">Metadata:</h6>
+      <pre class="bg-dark text-white p-3 rounded" style="max-height: 300px; overflow-y: auto;"><code>${JSON.stringify(log.metadata, null, 2)}</code></pre>
+    ` : ''}
+  `;
+  
+  document.getElementById('logDetailsContent').innerHTML = content;
+  $('#logDetailsModal').modal('show');
+}
+
+function exportLogs() {
+  const guildId = '<%= guildId %>';
+  const level = '<%= level || "" %>';
+  const limit = '<%= limit %>';
+  
+  const params = new URLSearchParams();
+  if (level) params.append('level', level);
+  params.append('limit', limit);
+  params.append('format', 'json');
+  
+  const url = `/guild/${guildId}/plugins/masterserver/logs/export?${params.toString()}`;
+  
+  // Erstelle unsichtbaren Download-Link
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `daemon-logs-${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  
+  GuildAjax.showToast('info', 'Export gestartet...');
+}
+
+function clearLogs() {
+  if (!confirm('Wirklich ALLE Logs löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) {
+    return;
+  }
+  
+  const guildId = '<%= guildId %>';
+  
+  fetch(`/guild/${guildId}/plugins/masterserver/logs`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(result => {
+    if (result.success) {
+      GuildAjax.showToast('success', result.message || 'Logs gelöscht');
+      setTimeout(() => window.location.reload(), 1500);
+    } else {
+      GuildAjax.showToast('error', result.message || 'Fehler beim Löschen');
+    }
+  })
+  .catch(error => {
+    console.error('Clear logs error:', error);
+    GuildAjax.showToast('error', 'Netzwerkfehler');
+  });
+}
+
+// Highlight log rows on hover
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.log-row').forEach(row => {
+    row.addEventListener('mouseenter', function() {
+      this.style.backgroundColor = '#f8f9fa';
+    });
+    row.addEventListener('mouseleave', function() {
+      this.style.backgroundColor = '';
+    });
+  });
+});
+</script>

@@ -1,0 +1,488 @@
+<!-- Addon Detail Page -->
+<div class="content-wrapper">
+    <!-- Content Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <%= addon.name %>
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver/addons"><%= tr('gameserver:NAV.ADDONS') %></a></li>
+                        <li class="breadcrumb-item active"><%= addon.name %></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+
+            <!-- Hero Section -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card card-primary card-outline">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <!-- Title & Badges -->
+                                    <div class="mb-3">
+                                        <% if (addon.trust_level === 'official') { %>
+                                            <span class="badge badge-danger badge-lg">
+                                                <i class="fa-solid fa-crown"></i> OFFICIAL
+                                            </span>
+                                        <% } else if (addon.trust_level === 'trusted') { %>
+                                            <span class="badge badge-success badge-lg">
+                                                <i class="fa-solid fa-shield-check"></i> TRUSTED
+                                            </span>
+                                        <% } else if (addon.trust_level === 'verified') { %>
+                                            <span class="badge badge-primary badge-lg">
+                                                <i class="fa-solid fa-check-circle"></i> VERIFIED
+                                            </span>
+                                        <% } %>
+
+                                        <span class="badge badge-info badge-lg ml-2">
+                                            <%= addon.category.toUpperCase() %>
+                                        </span>
+
+                                        <% if (addon.featured) { %>
+                                            <span class="badge badge-warning badge-lg ml-2">
+                                                <i class="fa-solid fa-star"></i> FEATURED
+                                            </span>
+                                        <% } %>
+                                    </div>
+
+                                    <!-- Description -->
+                                    <p class="lead"><%= addon.description %></p>
+
+                                    <!-- Tags -->
+                                    <% if (addon.tags) { %>
+                                        <div class="mb-3">
+                                            <% addon.tags.split(',').forEach(tag => { %>
+                                                <span class="badge badge-secondary mr-1">
+                                                    <i class="fa-solid fa-tag"></i> <%= tag.trim() %>
+                                                </span>
+                                            <% }) %>
+                                        </div>
+                                    <% } %>
+
+                                    <!-- Author -->
+                                    <p class="text-muted">
+                                        <i class="fa-solid fa-user"></i> 
+                                        <%= tr('gameserver:ADDON.BY') %> <strong><%= addon.author_name || 'Unknown' %></strong>
+                                    </p>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <!-- Stats -->
+                                    <div class="info-box bg-light">
+                                        <div class="info-box-content">
+                                            <div class="mb-3">
+                                                <h5><%= tr('gameserver:ADDON.RATING') %></h5>
+                                                <% if (addon.rating_count > 0) { %>
+                                                    <div class="h2 mb-0">
+                                                        <i class="fa-solid fa-star text-warning"></i>
+                                                        <%= addon.rating_avg ? addon.rating_avg.toFixed(1) : 0 %>/5
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        <%= addon.rating_count %> <%= tr('gameserver:ADDON.REVIEWS') %>
+                                                    </small>
+                                                <% } else { %>
+                                                    <p class="text-muted">
+                                                        <%= tr('gameserver:ADDON.NO_RATINGS_YET') %>
+                                                    </p>
+                                                <% } %>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <h5><%= tr('gameserver:ADDON.DOWNLOADS') %></h5>
+                                                <div class="h3 mb-0">
+                                                    <i class="fa-solid fa-download text-info"></i>
+                                                    <%= addon.downloads || 0 %>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <h5><%= tr('gameserver:ADDON.LAST_UPDATED') %></h5>
+                                                <p class="text-muted">
+                                                    <%= new Date(addon.updated_at).toLocaleDateString('de-DE') %>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- CTA Button -->
+                                    <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1&addon=<%= addon.slug %>" 
+                                       class="btn btn-success btn-lg btn-block">
+                                        <i class="fa-solid fa-plus"></i> <%= tr('gameserver:ADDON.CREATE_SERVER') %>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Left Column -->
+                <div class="col-lg-8">
+                    <!-- Templates -->
+                    <% if (gameData.templates && gameData.templates.length > 0) { %>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-layer-group"></i>
+                                    <%= tr('gameserver:ADDON.TEMPLATES') %>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <% gameData.templates.forEach(template => { %>
+                                        <div class="col-md-6 mb-3">
+                                            <div class="card">
+                                                <div class="card-body">
+                                                    <h5>
+                                                        <% if (template.icon) { %>
+                                                            <i class="<%= template.icon %>"></i>
+                                                        <% } %>
+                                                        <%= template.label || template.name %>
+                                                    </h5>
+                                                    <p class="text-muted small">
+                                                        <%= template.description %>
+                                                    </p>
+                                                    <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1&addon=<%= addon.slug %>&template=<%= template.name %>" 
+                                                       class="btn btn-primary btn-sm">
+                                                        <%= tr('gameserver:ADDON.USE_TEMPLATE') %>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <% }) %>
+                                </div>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <!-- Variables (FIREBOT_v2) -->
+                    <% if (gameData.variables && gameData.variables.length > 0) { %>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-sliders"></i>
+                                    <%= tr('gameserver:ADDON.CONFIGURATION_OPTIONS') %>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th><%= tr('gameserver:ADDON.VARIABLE_NAME') %></th>
+                                            <th><%= tr('gameserver:ADDON.DESCRIPTION') %></th>
+                                            <th><%= tr('gameserver:ADDON.DEFAULT') %></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% gameData.variables.forEach(variable => { %>
+                                            <tr>
+                                                <td>
+                                                    <code>{{<%= variable.env_variable || variable.name %>}}</code>
+                                                    <% if (variable.name && variable.name !== variable.env_variable) { %>
+                                                        <br><small class="text-muted"><%= variable.name %></small>
+                                                    <% } %>
+                                                </td>
+                                                <td><%= variable.description || '-' %></td>
+                                                <td>
+                                                    <% const defVal = variable.default_value !== undefined ? variable.default_value : variable.default; %>
+                                                    <% if (defVal === 'AUTOGENERATE' || defVal === 'changeme' || defVal === '') { %>
+                                                        <span class="badge badge-warning">
+                                                            <i class="fa-solid fa-exclamation-triangle"></i> <%= tr('gameserver:ADDON.CHANGE_REQUIRED') %>
+                                                        </span>
+                                                    <% } else { %>
+                                                        <code><%= defVal %></code>
+                                                    <% } %>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <!-- Startup Command (PTDL_v2) -->
+                    <% if (gameData.startup && gameData.startup.command) { %>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-terminal"></i>
+                                    <%= tr('gameserver:ADDON.STARTUP_COMMAND') %>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <pre class="bg-dark text-light p-3 rounded mb-3"><code><%= gameData.startup.command %></code></pre>
+                                
+                                <div class="row">
+                                    <% if (gameData.startup.done) { %>
+                                        <div class="col-md-6">
+                                            <strong><%= tr('gameserver:ADDON.DONE_INDICATOR') %>:</strong><br>
+                                            <code><%= gameData.startup.done %></code>
+                                        </div>
+                                    <% } %>
+                                    <% if (gameData.startup.stop) { %>
+                                        <div class="col-md-6">
+                                            <strong><%= tr('gameserver:ADDON.STOP_COMMAND') %>:</strong><br>
+                                            <code><%= gameData.startup.stop %></code>
+                                        </div>
+                                    <% } %>
+                                </div>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <!-- Technical Details Row (FIREBOT_v2) -->
+                    <div class="row mb-4">
+                        <!-- Docker Images -->
+                        <% if (gameData.docker_images && Object.keys(gameData.docker_images).length > 0) { %>
+                            <div class="col-md-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h3 class="card-title">
+                                            <i class="fa-brands fa-docker"></i>
+                                            Docker Images
+                                        </h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="list-unstyled mb-0">
+                                            <% Object.entries(gameData.docker_images).forEach(([img, label], i) => { %>
+                                                <li class="mb-2">
+                                                    <% if (i === 0) { %><span class="badge badge-primary mr-1">Default</span><% } %>
+                                                    <strong><%= label %></strong><br>
+                                                    <small class="font-monospace text-muted"><%= img %></small>
+                                                </li>
+                                            <% }) %>
+                                        </ul>
+                                        <% if (addon.runtime_type === 'docker_steam') { %>
+                                            <hr class="my-2">
+                                            <span class="badge badge-dark"><i class="fa-brands fa-steam"></i> Steam-basiert</span>
+                                        <% } else if (addon.runtime_type === 'docker_standalone') { %>
+                                            <hr class="my-2">
+                                            <span class="badge badge-dark"><i class="fa-brands fa-docker"></i> Standalone</span>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            </div>
+                        <% } %>
+
+                        <!-- Installation Script Info -->
+                        <% if (gameData.scripts && gameData.scripts.installation) { %>
+                            <div class="col-md-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h3 class="card-title">
+                                            <i class="fa-solid fa-file-code"></i>
+                                            <%= tr('gameserver:ADDON.INSTALLATION') %>
+                                        </h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="list-unstyled mb-0">
+                                            <% if (gameData.scripts.installation.container) { %>
+                                                <li class="mb-2">
+                                                    <strong>Container:</strong><br>
+                                                    <small class="font-monospace text-muted"><%= gameData.scripts.installation.container %></small>
+                                                </li>
+                                            <% } %>
+                                            <% if (gameData.scripts.installation.entrypoint) { %>
+                                                <li class="mb-2">
+                                                    <strong>Entrypoint:</strong><br>
+                                                    <code><%= gameData.scripts.installation.entrypoint %></code>
+                                                </li>
+                                            <% } %>
+                                            <% if (gameData.scripts.installation.script) { %>
+                                                <li>
+                                                    <span class="badge badge-success">
+                                                        <i class="fa-solid fa-check"></i> Install Script vorhanden
+                                                    </span>
+                                                </li>
+                                            <% } %>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        <% } %>
+
+                        <!-- Meta Info (FIREBOT_v2) -->
+                        <% if (gameData.meta) { %>
+                            <div class="col-md-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h3 class="card-title">
+                                            <i class="fa-solid fa-code"></i>
+                                            <%= tr('gameserver:ADDON.META_INFO') %>
+                                        </h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="list-unstyled mb-0">
+                                            <% if (gameData.meta.version) { %>
+                                                <li class="mb-2">
+                                                    <strong>Format:</strong><br>
+                                                    <span class="badge badge-primary"><%= gameData.meta.version %></span>
+                                                </li>
+                                            <% } %>
+                                            <% if (gameData.meta.author) { %>
+                                                <li class="mb-2">
+                                                    <strong><%= tr('gameserver:ADDON.AUTHOR') %>:</strong><br>
+                                                    <%= gameData.meta.author %>
+                                                </li>
+                                            <% } %>
+                                            <li class="mb-2">
+                                                <strong><%= tr('gameserver:ADDON.LAST_UPDATED') %>:</strong><br>
+                                                <small><%= new Date(addon.updated_at).toLocaleDateString('de-DE') %></small>
+                                            </li>
+                                            <li>
+                                                <strong>Source:</strong><br>
+                                                <span class="badge badge-<%= addon.source_type === 'pelican' ? 'info' : addon.source_type === 'custom' ? 'secondary' : 'dark' %>">
+                                                    <%= (addon.source_type || 'custom').toUpperCase() %>
+                                                </span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        <% } %>
+                    </div>
+
+                    <!-- Reviews -->
+                    <% if (ratings && ratings.length > 0) { %>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-star"></i>
+                                    <%= tr('gameserver:ADDON.REVIEWS') %>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <% ratings.forEach(rating => { %>
+                                    <div class="mb-3 pb-3 border-bottom">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div>
+                                                <% for (let i = 1; i <= 5; i++) { %>
+                                                    <% if (i <= rating.rating) { %>
+                                                        <i class="fa-solid fa-star text-warning"></i>
+                                                    <% } else { %>
+                                                        <i class="fa-regular fa-star text-muted"></i>
+                                                    <% } %>
+                                                <% } %>
+                                            </div>
+                                            <small class="text-muted">
+                                                <%= new Date(rating.created_at).toLocaleDateString('de-DE') %>
+                                            </small>
+                                        </div>
+                                        <% if (rating.review_text) { %>
+                                            <p><%= rating.review_text %></p>
+                                        <% } %>
+                                        <small class="text-muted">
+                                            <i class="fa-solid fa-clock"></i>
+                                            <%= rating.usage_hours %> <%= tr('gameserver:ADDON.HOURS_USED') %>
+                                            
+                                            <% if (rating.helpful_count > 0) { %>
+                                                | <i class="fa-solid fa-thumbs-up"></i> <%= rating.helpful_count %> <%= tr('gameserver:ADDON.HELPFUL') %>
+                                            <% } %>
+                                        </small>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        </div>
+                    <% } %>
+                </div>
+
+                <!-- Right Column -->
+                <div class="col-lg-4">
+                    <!-- Requirements -->
+                    <% if (gameData.requirements) { %>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-server"></i>
+                                    <%= tr('gameserver:ADDON.REQUIREMENTS') %>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-unstyled">
+                                    <% if (gameData.requirements.ram_min_mb) { %>
+                                        <li class="mb-2">
+                                            <strong><%= tr('gameserver:ADDON.RAM_MIN') %>:</strong><br>
+                                            <%= (gameData.requirements.ram_min_mb / 1024).toFixed(1) %> GB
+                                            <% if (gameData.requirements.ram_recommended_mb) { %>
+                                                <small class="text-muted">
+                                                    (<%= tr('gameserver:ADDON.RECOMMENDED') %>: <%= (gameData.requirements.ram_recommended_mb / 1024).toFixed(1) %> GB)
+                                                </small>
+                                            <% } %>
+                                        </li>
+                                    <% } %>
+
+                                    <% if (gameData.requirements.cpu_cores_min) { %>
+                                        <li class="mb-2">
+                                            <strong><%= tr('gameserver:ADDON.CPU_CORES') %>:</strong><br>
+                                            <%= gameData.requirements.cpu_cores_min %> <%= tr('gameserver:ADDON.CORES') %>
+                                        </li>
+                                    <% } %>
+
+                                    <% if (gameData.requirements.disk_min_gb) { %>
+                                        <li class="mb-2">
+                                            <strong><%= tr('gameserver:ADDON.DISK_MIN') %>:</strong><br>
+                                            <%= gameData.requirements.disk_min_gb %> GB
+                                            <% if (gameData.requirements.disk_recommended_gb) { %>
+                                                <small class="text-muted">
+                                                    (<%= tr('gameserver:ADDON.RECOMMENDED') %>: <%= gameData.requirements.disk_recommended_gb %> GB)
+                                                </small>
+                                            <% } %>
+                                        </li>
+                                    <% } %>
+                                </ul>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <!-- Steam Info -->
+                    <% if (addon.steam_app_id) { %>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-brands fa-steam"></i>
+                                    Steam
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-unstyled mb-0">
+                                    <li class="mb-2">
+                                        <strong><%= tr('gameserver:ADDON.APP_ID') %>:</strong><br>
+                                        <%= addon.steam_app_id %>
+                                    </li>
+                                    <% if (addon.steam_server_app_id) { %>
+                                        <li class="mb-2">
+                                            <strong><%= tr('gameserver:ADDON.SERVER_APP_ID') %>:</strong><br>
+                                            <%= addon.steam_server_app_id %>
+                                        </li>
+                                    <% } %>
+                                </ul>
+                                <a href="https://store.steampowered.com/app/<%= addon.steam_app_id %>" 
+                                   target="_blank" 
+                                   class="btn btn-dark btn-sm btn-block mt-3">
+                                    <i class="fa-brands fa-steam"></i> <%= tr('gameserver:ADDON.VIEW_ON_STEAM') %>
+                                </a>
+                            </div>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>

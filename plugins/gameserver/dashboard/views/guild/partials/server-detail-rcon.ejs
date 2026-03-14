@@ -1,0 +1,179 @@
+<%
+// server-detail-rcon.ejs
+// RCON-Konsole für Gameserver (CS2, Rust, ARK etc.)
+// Wird nur gerendert wenn server.rcon_available == true
+%>
+<div class="rcon-console-wrapper" data-server-id="<%= server.id %>" data-guild-id="<%= guildId %>">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center mb-3">
+        <div>
+            <h6 class="mb-0"><i class="fas fa-terminal text-success me-2"></i> RCON-Konsole</h6>
+            <small class="text-muted">Sendet Befehle direkt über das Source RCON-Protokoll an den Gameserver.</small>
+        </div>
+        <div class="ms-auto">
+            <span class="badge badge-secondary" id="rcon-status-badge">
+                <i class="fas fa-circle"></i> Bereit
+            </span>
+        </div>
+    </div>
+
+    <!-- Output-Bereich -->
+    <div class="card bg-dark mb-3" style="min-height: 300px;">
+        <div class="card-body p-0">
+            <pre id="rcon-output"
+                 style="
+                    background: #1a1a2e;
+                    color: #e2e2e2;
+                    font-family: 'Courier New', monospace;
+                    font-size: 0.8rem;
+                    padding: 1rem;
+                    margin: 0;
+                    min-height: 300px;
+                    max-height: 500px;
+                    overflow-y: auto;
+                    white-space: pre-wrap;
+                    word-break: break-all;
+                 ">&gt; RCON-Konsole bereit. Server muss laufen.
+</pre>
+        </div>
+    </div>
+
+    <!-- Eingabe -->
+    <div class="input-group">
+        <div class="input-group-prepend">
+            <span class="input-group-text bg-dark border-secondary text-success font-weight-bold">
+                <i class="fas fa-chevron-right"></i>
+            </span>
+        </div>
+        <input type="text"
+               id="rcon-input"
+               class="form-control bg-dark text-light border-secondary"
+               placeholder="Befehl eingeben… (z.B. status, say Hello oder mp_restartgame 1)"
+               maxlength="512"
+               autocomplete="off"
+               autocorrect="off"
+               spellcheck="false">
+        <div class="input-group-append">
+            <button class="btn btn-success" id="rcon-send-btn" type="button">
+                <i class="fas fa-paper-plane me-1"></i> Senden
+            </button>
+        </div>
+    </div>
+    <small class="text-muted mt-1 d-block">
+        <i class="fas fa-info-circle me-1"></i>
+        Der Server muss gestartet sein. RCON-Port und Passwort werden automatisch aus den Server-Variablen geladen.
+    </small>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    const serverId = '<%= server.id %>';
+    const guildId  = '<%= guildId %>';
+    const baseUrl  = `/guild/${guildId}/plugins/gameserver/servers`;
+
+    const outputEl  = document.getElementById('rcon-output');
+    const inputEl   = document.getElementById('rcon-input');
+    const sendBtn   = document.getElementById('rcon-send-btn');
+    const statusBadge = document.getElementById('rcon-status-badge');
+
+    let history = [];
+    let histIdx  = -1;
+
+    function appendOutput(text, type) {
+        const ts = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        let prefix, color;
+        switch (type) {
+            case 'cmd':   prefix = '> '; color = '#64b5f6'; break;
+            case 'ok':    prefix = '';   color = '#a5d6a7'; break;
+            case 'error': prefix = '❌ '; color = '#ef9a9a'; break;
+            default:      prefix = '';   color = '#e2e2e2';
+        }
+        const line = document.createElement('span');
+        line.style.color = color;
+        line.textContent = `[${ts}] ${prefix}${text}\n`;
+        outputEl.appendChild(line);
+        outputEl.scrollTop = outputEl.scrollHeight;
+    }
+
+    function setStatus(text, cls) {
+        statusBadge.className = `badge badge-${cls}`;
+        statusBadge.innerHTML = `<i class="fas fa-circle"></i> ${text}`;
+    }
+
+    async function sendCommand() {
+        const cmd = inputEl.value.trim();
+        if (!cmd) return;
+
+        // History
+        history.unshift(cmd);
+        if (history.length > 50) history.pop();
+        histIdx = -1;
+        inputEl.value = '';
+
+        appendOutput(cmd, 'cmd');
+        setStatus('Sende…', 'warning');
+        sendBtn.disabled = true;
+        inputEl.disabled = true;
+
+        try {
+            const resp = await fetch(`${baseUrl}/${serverId}/rcon`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: cmd })
+            });
+
+            const data = await resp.json();
+
+            if (data.success) {
+                const output = (data.output || '').trim();
+                appendOutput(output || '(keine Antwort)', 'ok');
+                setStatus('OK', 'success');
+            } else {
+                appendOutput(data.message || 'Unbekannter Fehler', 'error');
+                setStatus('Fehler', 'danger');
+            }
+        } catch (err) {
+            appendOutput('Netzwerkfehler: ' + err.message, 'error');
+            setStatus('Fehler', 'danger');
+        } finally {
+            sendBtn.disabled = false;
+            inputEl.disabled = false;
+            inputEl.focus();
+            // Status nach 3s zurücksetzen
+            setTimeout(() => setStatus('Bereit', 'secondary'), 3000);
+        }
+    }
+
+    // Send-Button
+    sendBtn.addEventListener('click', sendCommand);
+
+    // Enter-Taste
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            sendCommand();
+        }
+        // Befehls-History mit Pfeiltasten
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (histIdx < history.length - 1) {
+                histIdx++;
+                inputEl.value = history[histIdx];
+            }
+        }
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (histIdx > 0) {
+                histIdx--;
+                inputEl.value = history[histIdx];
+            } else if (histIdx === 0) {
+                histIdx = -1;
+                inputEl.value = '';
+            }
+        }
+    });
+})();
+</script>

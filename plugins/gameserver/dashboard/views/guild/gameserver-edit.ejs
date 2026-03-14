@@ -1,0 +1,188 @@
+<!-- Gameserver Edit View -->
+<div class="content-wrapper">
+    <!-- Content Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fa-solid fa-edit"></i> 
+                        <%= tr('gameserver:SERVER.EDIT') %>: <%= server.name %>
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver/servers"><%= tr('gameserver:NAV.SERVERS') %></a></li>
+                        <li class="breadcrumb-item active"><%= tr('gameserver:SERVER.EDIT') %></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+
+            <div class="row">
+                <div class="col-lg-8 offset-lg-2">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-cog"></i> 
+                                <%= tr('gameserver:SERVER.SERVER_SETTINGS') %>
+                            </h3>
+                        </div>
+                        <form class="guild-ajax-form"
+                              data-form-type="gameserver-edit"
+                              data-method="PUT"
+                              action="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>"
+                              method="POST">
+                            
+                            <div class="card-body">
+                                <!-- Server Name -->
+                                <div class="form-group">
+                                    <label for="name">
+                                        <%= tr('gameserver:SERVER.NAME') %> <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="name" 
+                                           name="name" 
+                                           value="<%= server.name %>"
+                                           required
+                                           maxlength="100">
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SERVER.NAME_DESC') %>
+                                    </small>
+                                </div>
+
+                                <!-- Game & Template (read-only) -->
+                                <div class="form-group">
+                                    <label><%= tr('gameserver:SERVER.GAME') %></label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           value="<%= server.game_name %>" 
+                                           disabled>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SERVER.GAME_READONLY') %>
+                                    </small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label><%= tr('gameserver:SERVER.TEMPLATE') %></label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           value="<%= server.template_name || '-' %>" 
+                                           disabled>
+                                </div>
+
+                                <!-- Auto Restart -->
+                                <div class="form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" 
+                                               class="custom-control-input" 
+                                               id="auto_restart"
+                                               name="auto_restart"
+                                               value="1"
+                                               <%= server.auto_restart ? 'checked' : '' %>>
+                                        <label class="custom-control-label" for="auto_restart">
+                                            <%= tr('gameserver:SERVER.AUTO_RESTART') %>
+                                        </label>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SERVER.AUTO_RESTART_DESC') %>
+                                    </small>
+                                </div>
+
+                                <!-- Auto Update -->
+                                <div class="form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" 
+                                               class="custom-control-input" 
+                                               id="auto_update"
+                                               name="auto_update"
+                                               value="1"
+                                               <%= server.auto_update ? 'checked' : '' %>>
+                                        <label class="custom-control-label" for="auto_update">
+                                            <%= tr('gameserver:SERVER.AUTO_UPDATE') %>
+                                        </label>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SERVER.AUTO_UPDATE_DESC') %>
+                                    </small>
+                                </div>
+
+                                <!-- Max Players -->
+                                <div class="form-group">
+                                    <label for="max_players">
+                                        <%= tr('gameserver:SERVER.MAX_PLAYERS') %>
+                                    </label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="max_players" 
+                                           name="max_players" 
+                                           value="<%= server.max_players %>"
+                                           min="1"
+                                           max="200">
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SERVER.MAX_PLAYERS_DESC') %>
+                                    </small>
+                                </div>
+
+                                <!-- Environment Variables (JSON Editor) -->
+                                <div class="form-group">
+                                    <label for="env_variables">
+                                        <%= tr('gameserver:SERVER.ENV_VARIABLES') %>
+                                    </label>
+                                    <textarea class="form-control" 
+                                              id="env_variables" 
+                                              name="env_variables" 
+                                              rows="10"
+                                              placeholder='{"KEY": "value"}'><%= JSON.stringify(server.env_variables, null, 2) %></textarea>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SERVER.ENV_VARIABLES_DESC') %>
+                                    </small>
+                                </div>
+
+                                <!-- Server Status Info -->
+                                <div class="alert alert-info">
+                                    <h5><i class="icon fas fa-info"></i> <%= tr('gameserver:SERVER.CURRENT_STATUS') %></h5>
+                                    <p>
+                                        <strong><%= tr('gameserver:SERVER.STATUS') %>:</strong>
+                                        <% if (server.status === 'online') { %>
+                                            <span class="badge badge-success">Online</span>
+                                        <% } else if (server.status === 'offline') { %>
+                                            <span class="badge badge-secondary">Offline</span>
+                                        <% } else if (server.status === 'installing') { %>
+                                            <span class="badge badge-info">Installing</span>
+                                        <% } else { %>
+                                            <span class="badge badge-warning"><%= server.status %></span>
+                                        <% } %>
+                                    </p>
+                                    <p class="mb-0">
+                                        <small>
+                                            <%= tr('gameserver:SERVER.RESTART_REQUIRED') %>
+                                        </small>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="card-footer">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa-solid fa-save"></i> <%= tr('gameserver:SERVER.SAVE_CHANGES') %>
+                                </button>
+                                <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="btn btn-secondary">
+                                    <i class="fa-solid fa-times"></i> <%= tr('gameserver:SERVER.CANCEL') %>
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>

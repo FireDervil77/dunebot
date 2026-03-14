@@ -1,0 +1,250 @@
+<!-- Masterserver Dashboard - Übersicht -->
+<div class="container-fluid">
+  <div class="row">
+    <!-- Page Header -->
+    <div class="col-12 mb-3">
+      <h2>
+        <i class="fa-solid fa-server text-primary me-2"></i>
+        <%= tr('masterserver:DASHBOARD.TITLE') %>
+      </h2>
+      <p class="text-muted">Übersicht über deinen Masterserver-Daemon und registrierte Server</p>
+    </div>
+  </div>
+
+  <!-- Status Cards Row -->
+  <div class="row">
+    <!-- Daemon Status Card -->
+    <div class="col-lg-3 col-md-6">
+      <div class="small-box <%= isOnline ? 'bg-success' : 'bg-danger' %>">
+        <div class="inner">
+          <h3><%= isOnline ? 'Online' : 'Offline' %></h3>
+          <p><%= tr('masterserver:DASHBOARD.STATS.DAEMON_STATUS') %></p>
+        </div>
+        <div class="icon">
+          <i class="fa-solid <%= isOnline ? 'fa-circle-check' : 'fa-circle-xmark' %>"></i>
+        </div>
+        <a href="/guild/<%= guildId %>/plugins/masterserver/daemon" class="small-box-footer">
+          Daemon verwalten <i class="fas fa-arrow-circle-right"></i>
+        </a>
+      </div>
+    </div>
+
+    <!-- Total Servers Card -->
+    <div class="col-lg-3 col-md-6">
+      <div class="small-box bg-info">
+        <div class="inner">
+          <h3><%= serverStats.total %></h3>
+          <p><%= tr('masterserver:DASHBOARD.STATS.TOTAL_SERVERS') %></p>
+        </div>
+        <div class="icon">
+          <i class="fa-solid fa-server"></i>
+        </div>
+        <a href="/guild/<%= guildId %>/plugins/masterserver/servers" class="small-box-footer">
+          Zur Server-Liste <i class="fas fa-arrow-circle-right"></i>
+        </a>
+      </div>
+    </div>
+
+    <!-- Active Servers Card -->
+    <div class="col-lg-3 col-md-6">
+      <div class="small-box bg-success">
+        <div class="inner">
+          <h3><%= serverStats.active %></h3>
+          <p>Aktive Server</p>
+        </div>
+        <div class="icon">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <a href="/guild/<%= guildId %>/plugins/masterserver/servers" class="small-box-footer">
+          Details anzeigen <i class="fas fa-arrow-circle-right"></i>
+        </a>
+      </div>
+    </div>
+
+    <!-- Total Gameservers Card -->
+    <div class="col-lg-3 col-md-6">
+      <div class="small-box bg-warning">
+        <div class="inner">
+          <h3><%= serverStats.totalGameservers %></h3>
+          <p>Gameserver gesamt</p>
+        </div>
+        <div class="icon">
+          <i class="fa-solid fa-gamepad"></i>
+        </div>
+        <a href="/guild/<%= guildId %>/plugins/masterserver/servers" class="small-box-footer">
+          Server-Details <i class="fas fa-arrow-circle-right"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spacer -->
+  <div class="row mb-3"></div>
+
+  <!-- Quick Links -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-bolt me-2"></i>
+            Schnellzugriff
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3 col-sm-6 mb-2">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/daemon" class="btn btn-outline-primary btn-block">
+                <i class="fa-solid fa-cog me-2"></i> Daemon-Setup
+              </a>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-2">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/tokens" class="btn btn-outline-success btn-block">
+                <i class="fa-solid fa-key me-2"></i> Token verwalten
+              </a>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-2">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/servers" class="btn btn-outline-info btn-block">
+                <i class="fa-solid fa-list me-2"></i> Server-Registry
+              </a>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-2">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/logs" class="btn btn-outline-warning btn-block">
+                <i class="fa-solid fa-file-lines me-2"></i> Daemon-Logs
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spacer -->
+  <div class="row mb-3"></div>
+
+  <div class="row">
+    <!-- Daemon Info Card -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-cog me-2"></i>
+            Daemon-Informationen
+          </h3>
+        </div>
+        <div class="card-body">
+          <% if (daemon) { %>
+            <table class="table table-sm">
+              <tbody>
+                <tr>
+                  <th width="40%">Daemon-ID:</th>
+                  <td><code><%= daemon.daemon_id %></code></td>
+                </tr>
+                <tr>
+                  <th>Anzeigename:</th>
+                  <td><%= daemon.display_name %></td>
+                </tr>
+                <tr>
+                  <th>Status:</th>
+                  <td>
+                    <span class="badge badge-<%= isOnline ? 'success' : 'danger' %>">
+                      <%= isOnline ? 'Online' : 'Offline' %>
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <th>Version:</th>
+                  <td><%= daemon.version || 'Unbekannt' %></td>
+                </tr>
+                <tr>
+                  <th>Erstellt am:</th>
+                  <td>
+                    <% if (daemon.registered_at) { %>
+                      <%= new Date(daemon.registered_at).toLocaleString('de-DE') %>
+                    <% } else { %>
+                      <span class="text-muted">Nicht verfügbar</span>
+                    <% } %>
+                  </td>
+                </tr>
+                <tr>
+                  <th>Zuletzt gesehen:</th>
+                  <td>
+                    <% if (daemon.last_heartbeat) { %>
+                      <%= new Date(daemon.last_heartbeat).toLocaleString('de-DE') %>
+                    <% } else { %>
+                      <span class="text-muted">Noch kein Heartbeat</span>
+                    <% } %>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="mt-3">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/daemon" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-cog me-1"></i> Daemon konfigurieren
+              </a>
+              <a href="/guild/<%= guildId %>/plugins/masterserver/logs" class="btn btn-info btn-sm">
+                <i class="fa-solid fa-file-lines me-1"></i> Logs anzeigen
+              </a>
+            </div>
+          <% } else { %>
+            <div class="alert alert-warning">
+              <i class="fa-solid fa-triangle-exclamation me-2"></i>
+              Kein Daemon konfiguriert. Starte den Setup-Wizard um loszulegen!
+            </div>
+            <a href="/guild/<%= guildId %>/plugins/masterserver/daemon" class="btn btn-success">
+              <i class="fa-solid fa-plus me-1"></i> Daemon erstellen
+            </a>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Token Stats Card -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-key me-2"></i>
+            Token-Statistiken
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="row text-center">
+            <div class="col-4">
+              <div class="border-right">
+                <h4 class="text-success"><%= tokenStats.active || 0 %></h4>
+                <small class="text-muted">Aktive Tokens</small>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="border-right">
+                <h4 class="text-danger"><%= tokenStats.expired || 0 %></h4>
+                <small class="text-muted">Abgelaufen</small>
+              </div>
+            </div>
+            <div class="col-4">
+              <h4 class="text-warning"><%= tokenStats.neverUsed || 0 %></h4>
+              <small class="text-muted">Nie genutzt</small>
+            </div>
+          </div>
+          <hr>
+          <div class="text-center">
+            <% if (daemon) { %>
+              <a href="/guild/<%= guildId %>/plugins/masterserver/tokens" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-key me-1"></i> Token verwalten
+              </a>
+            <% } else { %>
+              <div class="alert alert-info mb-2">
+                <i class="fa-solid fa-info-circle me-2"></i>
+                Erstelle zuerst einen Daemon um Tokens zu generieren.
+              </div>
+              <a href="/guild/<%= guildId %>/plugins/masterserver/daemon" class="btn btn-success btn-sm">
+                <i class="fa-solid fa-plus me-1"></i> Daemon erstellen
+              </a>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

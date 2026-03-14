@@ -1,0 +1,796 @@
+<!-- Addon Editor — FIREBOT_v2 -->
+<div class="content-wrapper">
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fa-solid fa-<%= mode === 'edit' ? 'edit' : 'plus' %>"></i>
+                        <%= mode === 'edit' ? tr('gameserver:ADDON_EDITOR.TITLE_EDIT') : tr('gameserver:ADDON_EDITOR.TITLE_CREATE') %>
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver/addons/my-addons"><%= tr('gameserver:NAV.MY_ADDONS') %></a></li>
+                        <li class="breadcrumb-item active"><%= mode === 'edit' ? tr('gameserver:ADDON_EDITOR.TITLE_EDIT') : tr('gameserver:ADDON_EDITOR.TITLE_CREATE') %></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <section class="content">
+        <div class="container-fluid">
+
+            <% if (mode === 'create') { %>
+            <!-- Template Selection (nur Create) -->
+            <div class="card card-info card-outline mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <%= tr('gameserver:ADDON_EDITOR.TEMPLATE_SECTION') %>
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted"><%= tr('gameserver:ADDON_EDITOR.TEMPLATE_DESCRIPTION') %></p>
+
+                    <div class="btn-group btn-group-toggle mb-3" data-toggle="buttons">
+                        <label class="btn btn-outline-secondary active" id="template-blank-btn">
+                            <input type="radio" name="template_source" value="blank" checked>
+                            <i class="fa-solid fa-file"></i> <%= tr('gameserver:ADDON_EDITOR.TEMPLATE_BLANK') %>
+                        </label>
+                        <% if (myAddons && myAddons.length > 0) { %>
+                        <label class="btn btn-outline-secondary" id="template-clone-btn">
+                            <input type="radio" name="template_source" value="clone">
+                            <i class="fa-solid fa-copy"></i> <%= tr('gameserver:ADDON_EDITOR.TEMPLATE_CLONE') %>
+                        </label>
+                        <% } %>
+                        <label class="btn btn-outline-secondary" id="template-json-btn">
+                            <input type="radio" name="template_source" value="json">
+                            <i class="fa-solid fa-code"></i> <%= tr('gameserver:ADDON_EDITOR.TEMPLATE_IMPORT') %>
+                        </label>
+                    </div>
+
+                    <% if (myAddons && myAddons.length > 0) { %>
+                    <div id="template-clone-area" class="template-area" style="display: none;">
+                        <div class="form-group">
+                            <label><%= tr('gameserver:ADDON_EDITOR.TEMPLATE_CLONE_SELECT') %></label>
+                            <select class="form-control" id="clone-addon-select">
+                                <option value="">-- <%= tr('gameserver:ADDON_EDITOR.TEMPLATE_CLONE_SELECT_PLACEHOLDER') %> --</option>
+                                <% myAddons.forEach(myAddon => { %>
+                                <option value="<%= myAddon.id %>" data-gamedata='<%- JSON.stringify(myAddon.game_data || {}) %>'>
+                                    <%= myAddon.name %><% if (myAddon.category) { %> (<%= myAddon.category %>)<% } %>
+                                </option>
+                                <% }); %>
+                            </select>
+                        </div>
+                    </div>
+                    <% } %>
+
+                    <div id="template-json-area" class="template-area" style="display: none;">
+                        <div class="form-group">
+                            <label><%= tr('gameserver:ADDON_EDITOR.TEMPLATE_JSON_LABEL') %></label>
+                            <textarea class="form-control font-monospace" id="json-import-textarea" rows="12"
+                                placeholder='<%= tr("gameserver:ADDON_EDITOR.TEMPLATE_JSON_PLACEHOLDER") %>'></textarea>
+                            <small class="form-text text-muted"><%= tr('gameserver:ADDON_EDITOR.TEMPLATE_JSON_HELP') %> — Erwartet FIREBOT_v2 Format.</small>
+                        </div>
+                        <button type="button" class="btn btn-primary" id="json-import-btn">
+                            <i class="fa-solid fa-file-import"></i> <%= tr('gameserver:ADDON_EDITOR.TEMPLATE_JSON_IMPORT') %>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <% } %>
+
+            <form id="addon-editor-form" class="guild-ajax-form"
+                  data-form-type="addon-editor"
+                  data-method="<%= mode === 'edit' ? 'PUT' : 'POST' %>"
+                  action="/guild/<%= guildId %>/plugins/gameserver/addons<%= mode === 'edit' ? '/' + addon.id : '' %>"
+                  method="POST">
+
+                <!-- Serialisiertes FIREBOT_v2 game_data — wird vor Submit befüllt -->
+                <input type="hidden" id="game-data-json" name="game_data" value="">
+
+                <div class="row">
+                    <!-- Linke Spalte -->
+                    <div class="col-lg-8">
+
+                        <!-- Basic Info -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-info-circle"></i>
+                                    <%= tr('gameserver:ADDON_EDITOR.BASIC_INFO') %>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label for="addon-name">Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="addon-name" name="name"
+                                           value="<%= mode === 'edit' ? addon.name : (template ? template.name + ' (Copy)' : '') %>" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="addon-slug">Slug <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="addon-slug" name="slug"
+                                           value="<%= mode === 'edit' ? addon.slug : '' %>"
+                                           <%= mode === 'edit' ? 'readonly' : '' %> required>
+                                    <small class="form-text text-muted">Kleinbuchstaben, Bindestriche (z.B. valheim-server). Kann nach dem Erstellen nicht geändert werden.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="addon-description"><%= tr('gameserver:ADDON_EDITOR.DESCRIPTION') %> <span class="text-danger">*</span></label>
+                                    <textarea class="form-control" id="addon-description" name="description" rows="3" required><%= mode === 'edit' ? addon.description : (template ? template.description : '') %></textarea>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="addon-category"><%= tr('gameserver:ADDON_EDITOR.CATEGORY') %> <span class="text-danger">*</span></label>
+                                            <select class="form-control" id="addon-category" name="category" required>
+                                                <option value="fps"      <%= (mode === 'edit' && addon.category === 'fps')      || (template && template.category === 'fps')      ? 'selected' : '' %>>FPS</option>
+                                                <option value="survival" <%= (mode === 'edit' && addon.category === 'survival') || (template && template.category === 'survival') ? 'selected' : '' %>>Survival</option>
+                                                <option value="mmo"      <%= (mode === 'edit' && addon.category === 'mmo')      || (template && template.category === 'mmo')      ? 'selected' : '' %>>MMO</option>
+                                                <option value="sandbox"  <%= (mode === 'edit' && addon.category === 'sandbox')  || (template && template.category === 'sandbox')  ? 'selected' : '' %>>Sandbox</option>
+                                                <option value="strategy" <%= (mode === 'edit' && addon.category === 'strategy') || (template && template.category === 'strategy') ? 'selected' : '' %>>Strategy</option>
+                                                <option value="rpg"      <%= (mode === 'edit' && addon.category === 'rpg')      || (template && template.category === 'rpg')      ? 'selected' : '' %>>RPG</option>
+                                                <option value="other"    <%= (mode === 'edit' && addon.category === 'other')    || (template && template.category === 'other')    ? 'selected' : '' %>>Other</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="addon-tags"><%= tr('gameserver:ADDON_EDITOR.TAGS') %></label>
+                                            <input type="text" class="form-control" id="addon-tags" name="tags"
+                                                   value="<%= mode === 'edit' ? addon.tags || '' : (template ? template.tags || '' : '') %>"
+                                                   placeholder="fps, multiplayer, competitive">
+                                            <small class="form-text text-muted"><%= tr('gameserver:ADDON_EDITOR.TAGS_HELP') %></small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="addon-icon-url"><%= tr('gameserver:ADDON_EDITOR.ICON_URL') %></label>
+                                    <input type="url" class="form-control" id="addon-icon-url" name="icon_url"
+                                           value="<%= mode === 'edit' ? addon.icon_url || '' : (template ? template.icon_url || '' : '') %>"
+                                           placeholder="https://...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Author / Meta -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-user"></i>
+                                    <%= tr('gameserver:ADDON_EDITOR.META_SECTION') %>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <div class="form-group mb-0">
+                                            <label for="meta-author"><%= tr('gameserver:ADDON_EDITOR.AUTHOR') %> <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="meta-author"
+                                                   value="<%= (mode === 'edit' && gameData && gameData.meta) ? gameData.meta.author : (user ? user.info.username : 'Unknown') %>" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-0">
+                                            <label>Format</label>
+                                            <input type="text" class="form-control" value="FIREBOT_v2" readonly>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Docker Images -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-brands fa-docker"></i>
+                                    Docker Images <span class="text-danger">*</span>
+                                </h3>
+                                <div class="card-tools">
+                                    <button type="button" class="btn btn-success btn-sm" id="add-docker-image-btn">
+                                        <i class="fa-solid fa-plus"></i> Image hinzufügen
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted mb-3">Docker-Images die für diesen Server verwendet werden können. Das erste Image ist das Standard-Image.</p>
+                                <div class="row mb-1">
+                                    <div class="col-md-7"><small class="text-muted font-weight-bold">Image (Registry:Tag)</small></div>
+                                    <div class="col-md-4"><small class="text-muted font-weight-bold">Anzeigename</small></div>
+                                </div>
+                                <div id="docker-images-container"></div>
+                                <div id="no-docker-images-msg" class="alert alert-warning" style="display: none;">
+                                    <i class="fa-solid fa-exclamation-triangle"></i> Mindestens ein Docker Image ist erforderlich.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Startup -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-terminal"></i>
+                                    <%= tr('gameserver:ADDON_EDITOR.STARTUP_SECTION') %>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label for="startup-command"><%= tr('gameserver:ADDON_EDITOR.STARTUP_COMMAND') %> <span class="text-danger">*</span></label>
+                                    <textarea class="form-control font-monospace" id="startup-command" rows="3" required><%= (gameData && gameData.startup) ? gameData.startup.command : '' %></textarea>
+                                    <small class="form-text text-muted"><%= tr('gameserver:ADDON_EDITOR.STARTUP_COMMAND_HELP') %></small>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="startup-done"><%= tr('gameserver:ADDON_EDITOR.DONE_INDICATOR') %> <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="startup-done"
+                                                   value="<%= (gameData && gameData.startup) ? gameData.startup.done : '' %>"
+                                                   placeholder="Server is listening" required>
+                                            <small class="form-text text-muted"><%= tr('gameserver:ADDON_EDITOR.DONE_INDICATOR_HELP') %></small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="startup-stop"><%= tr('gameserver:ADDON_EDITOR.STOP_COMMAND') %> <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="startup-stop"
+                                                   value="<%= (gameData && gameData.startup) ? gameData.startup.stop : '' %>"
+                                                   placeholder="quit" required>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Variables Builder -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-sliders"></i>
+                                    <%= tr('gameserver:ADDON_EDITOR.VARIABLES_SECTION') %>
+                                </h3>
+                                <div class="card-tools">
+                                    <button type="button" class="btn btn-success btn-sm" id="add-variable-btn">
+                                        <i class="fa-solid fa-plus"></i> <%= tr('gameserver:ADDON_EDITOR.ADD_VARIABLE') %>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted"><%= tr('gameserver:ADDON_EDITOR.VARIABLES_HELP') || 'Variablen werden beim Server-Start als Umgebungsvariablen gesetzt. Nutze {{VARIABLE}} im Startup-Command.' %></p>
+                                <div id="variables-container"></div>
+                                <div id="no-variables-message" class="alert alert-info" style="display: none;">
+                                    <i class="fa-solid fa-info-circle"></i> <%= tr('gameserver:ADDON_EDITOR.NO_VARIABLES') || 'Keine Variablen definiert. Klicke "Variable hinzufügen" um zu starten.' %>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Installation Script -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-file-code"></i>
+                                    <%= tr('gameserver:ADDON_EDITOR.INSTALLATION_SECTION') %>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted"><%= tr('gameserver:ADDON_EDITOR.INSTALLATION_HELP') || 'Bash-Script für die Installation des Gameservers. Wird einmalig beim Setup ausgeführt.' %></p>
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <div class="form-group mb-0">
+                                            <label for="install-container">Install Container Image</label>
+                                            <input type="text" class="form-control font-monospace" id="install-container"
+                                                   value="<%= (gameData && gameData.scripts && gameData.scripts.installation) ? gameData.scripts.installation.container : '' %>"
+                                                   placeholder="ghcr.io/parkervcp/yolks:installer">
+                                            <small class="form-text text-muted">Docker Image das für den Installations-Schritt verwendet wird</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-0">
+                                            <label for="install-entrypoint">Entrypoint</label>
+                                            <input type="text" class="form-control font-monospace" id="install-entrypoint"
+                                                   value="<%= (gameData && gameData.scripts && gameData.scripts.installation && gameData.scripts.installation.entrypoint) ? gameData.scripts.installation.entrypoint : '/bin/bash' %>"
+                                                   placeholder="/bin/bash">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="install-script"><%= tr('gameserver:ADDON_EDITOR.INSTALL_SCRIPT') %></label>
+                                    <textarea class="form-control font-monospace" id="install-script" rows="20"
+                                              placeholder="#!/bin/bash&#10;# Installation Script&#10;cd ${INSTALL_DIR}&#10;echo Installing server..."><%= (gameData && gameData.scripts && gameData.scripts.installation) ? gameData.scripts.installation.script : '' %></textarea>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:ADDON_EDITOR.INSTALL_SCRIPT_HELP') || 'Bash-Script für die Server-Installation. Umgebungsvariablen aus dem Variables-Builder sind verfügbar.' %>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visibility -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-eye"></i>
+                                    <%= tr('gameserver:ADDON_EDITOR.VISIBILITY_SECTION') %>
+                                </h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label><%= tr('gameserver:ADDON_EDITOR.VISIBILITY') %> <span class="text-danger">*</span></label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="visibility"
+                                               id="visibility-private" value="private"
+                                               <%= (mode === 'edit' && addon.visibility === 'private') || mode === 'create' ? 'checked' : '' %>>
+                                        <label class="form-check-label" for="visibility-private">
+                                            <strong><%= tr('gameserver:ADDON_EDITOR.PRIVATE') %></strong>
+                                            <br><small class="text-muted">Nur für deine Guild sichtbar</small>
+                                        </label>
+                                    </div>
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="radio" name="visibility"
+                                               id="visibility-public" value="public"
+                                               <%= (mode === 'edit' && addon.visibility === 'public') ? 'checked' : '' %>>
+                                        <label class="form-check-label" for="visibility-public">
+                                            <strong><%= tr('gameserver:ADDON_EDITOR.PUBLIC') %></strong>
+                                            <br><small class="text-muted">Wird zur Freigabe eingereicht (Moderation erforderlich)</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="card">
+                            <div class="card-footer">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa-solid fa-save"></i> <%= tr('gameserver:ADDON_EDITOR.SAVE') %>
+                                </button>
+                                <a href="/guild/<%= guildId %>/plugins/gameserver/addons/my-addons" class="btn btn-secondary ml-2">
+                                    <i class="fa-solid fa-times"></i> <%= tr('gameserver:ADDON_EDITOR.CANCEL') %>
+                                </a>
+                            </div>
+                        </div>
+
+                    </div><!-- /col-lg-8 -->
+
+                    <!-- Rechte Spalte: FIREBOT_v2 Preview -->
+                    <div class="col-lg-4">
+                        <div class="card sticky-top" style="top: 70px;">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-code"></i>
+                                    FIREBOT_v2 Preview
+                                </h3>
+                            </div>
+                            <div class="card-body p-0">
+                                <pre id="json-preview" class="bg-dark text-light p-3 m-0"
+                                     style="max-height: 600px; overflow-y: auto; font-size: 0.78rem;">{}</pre>
+                            </div>
+                            <div class="card-footer">
+                                <button type="button" class="btn btn-sm btn-secondary btn-block" onclick="copyJSON()">
+                                    <i class="fa-solid fa-copy"></i> <%= tr('gameserver:ADDON_EDITOR.COPY_JSON') %>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div><!-- /row -->
+            </form>
+        </div>
+    </section>
+</div>
+
+<script>
+// ── Initiale Daten vom Server ──────────────────────────────────────────────────
+const INITIAL_GAME_DATA = <%- JSON.stringify(gameData || {}) %>;
+const EDITOR_MODE = '<%= mode %>';
+
+// ── HTML-Escape Helper ─────────────────────────────────────────────────────────
+function escHtml(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Auto-Slug im Create-Modus ──────────────────────────────────────────────────
+document.getElementById('addon-name').addEventListener('input', function () {
+    if (EDITOR_MODE === 'create') {
+        document.getElementById('addon-slug').value = this.value.toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+    updateJSONPreview();
+});
+
+// ── FIREBOT_v2 game_data zusammenbauen ─────────────────────────────────────────
+function buildGameData() {
+    return {
+        meta: {
+            version:     'FIREBOT_v2',
+            name:        document.getElementById('addon-name').value        || '',
+            author:      document.getElementById('meta-author').value       || 'Unknown',
+            description: document.getElementById('addon-description').value || ''
+        },
+        docker_images: serializeDockerImages(),
+        startup: {
+            command: document.getElementById('startup-command').value || '',
+            done:    document.getElementById('startup-done').value    || '',
+            stop:    document.getElementById('startup-stop').value    || ''
+        },
+        config: { files: {}, logs: [] },
+        scripts: {
+            installation: {
+                container:  document.getElementById('install-container').value.trim()  || '',
+                entrypoint: document.getElementById('install-entrypoint').value.trim() || '/bin/bash',
+                script:     document.getElementById('install-script').value            || ''
+            }
+        },
+        variables: serializeVariables(),
+        templates: []
+    };
+}
+
+// ── JSON Preview ───────────────────────────────────────────────────────────────
+function updateJSONPreview() {
+    document.getElementById('json-preview').textContent = JSON.stringify(buildGameData(), null, 2);
+}
+
+function copyJSON() {
+    navigator.clipboard.writeText(document.getElementById('json-preview').textContent)
+        .then(() => toastr.success('JSON in Zwischenablage kopiert!'));
+}
+
+// ── Form Submit: game_data serialisieren ──────────────────────────────────────
+document.getElementById('addon-editor-form').addEventListener('submit', function (e) {
+    const gd = buildGameData();
+    if (!gd.docker_images || Object.keys(gd.docker_images).length === 0) {
+        e.preventDefault();
+        toastr.error('Mindestens ein Docker Image ist erforderlich!');
+        return;
+    }
+    if (!gd.startup.command.trim()) {
+        e.preventDefault();
+        toastr.error('Startup Command ist erforderlich!');
+        return;
+    }
+    document.getElementById('game-data-json').value = JSON.stringify(gd);
+});
+
+// Live-Preview
+document.getElementById('addon-editor-form').addEventListener('input',  updateJSONPreview);
+document.getElementById('addon-editor-form').addEventListener('change', updateJSONPreview);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// DOCKER IMAGES BUILDER
+// ──────────────────────────────────────────────────────────────────────────────
+let dockerImageCounter = 0;
+
+function createDockerImageRow(imageKey, imageLabel) {
+    imageKey   = imageKey   || '';
+    imageLabel = imageLabel || '';
+    const row  = document.createElement('div');
+    row.className = 'docker-image-row input-group mb-2';
+    row.innerHTML = `
+        <input type="text" class="form-control font-monospace docker-image-key"
+               placeholder="ghcr.io/parkervcp/yolks:debian"
+               value="${escHtml(imageKey)}" required>
+        <input type="text" class="form-control docker-image-label"
+               placeholder="Debian"
+               value="${escHtml(imageLabel)}">
+        <div class="input-group-append">
+            <button type="button" class="btn btn-danger remove-docker-image-btn" title="Entfernen">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </div>
+    `;
+    row.querySelector('.remove-docker-image-btn').addEventListener('click', () => {
+        row.remove();
+        updateDockerImagesMessage();
+        updateJSONPreview();
+    });
+    row.querySelectorAll('input').forEach(inp => inp.addEventListener('input', updateJSONPreview));
+    return row;
+}
+
+document.getElementById('add-docker-image-btn').addEventListener('click', () => {
+    document.getElementById('docker-images-container').appendChild(createDockerImageRow());
+    updateDockerImagesMessage();
+    updateJSONPreview();
+});
+
+function serializeDockerImages() {
+    const result = {};
+    document.querySelectorAll('.docker-image-row').forEach(row => {
+        const key   = row.querySelector('.docker-image-key').value.trim();
+        const label = row.querySelector('.docker-image-label').value.trim();
+        if (key) result[key] = label || key;
+    });
+    return result;
+}
+
+function loadDockerImagesIntoBuilder(dockerImages) {
+    const container = document.getElementById('docker-images-container');
+    container.innerHTML = '';
+    if (dockerImages && typeof dockerImages === 'object') {
+        Object.entries(dockerImages).forEach(([key, label]) => {
+            container.appendChild(createDockerImageRow(key, label));
+        });
+    }
+    updateDockerImagesMessage();
+}
+
+function updateDockerImagesMessage() {
+    const count = document.querySelectorAll('.docker-image-row').length;
+    document.getElementById('no-docker-images-msg').style.display = count === 0 ? 'block' : 'none';
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// VARIABLES BUILDER
+// ──────────────────────────────────────────────────────────────────────────────
+let variableCounter = 0;
+
+function createVariableRow(varData, index) {
+    varData = varData || {};
+    const id  = index !== undefined ? index : variableCounter++;
+    const row = document.createElement('div');
+    row.className          = 'variable-row card mb-3';
+    row.dataset.variableId = id;
+    row.innerHTML = `
+        <div class="card-header bg-light">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <strong class="variable-name-display">${escHtml(varData.name) || 'Neue Variable'}</strong>
+                    <code class="ml-2 text-muted">{{${escHtml(varData.env_variable) || 'VAR_NAME'}}}</code>
+                </div>
+                <div class="col-md-6 text-right">
+                    <button type="button" class="btn btn-sm btn-danger remove-variable-btn">
+                        <i class="fa-solid fa-trash"></i> Entfernen
+                    </button>
+                    <button type="button" class="btn btn-sm btn-secondary toggle-variable-details">
+                        <i class="fa-solid fa-chevron-down"></i> Details
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body variable-details" style="display: none;">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control var-name"
+                               value="${escHtml(varData.name)}" placeholder="Server Name" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Umgebungsvariable <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control var-env"
+                               value="${escHtml(varData.env_variable)}" placeholder="SERVER_NAME" required>
+                        <small class="text-muted">Großbuchstaben + Unterstriche</small>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Beschreibung</label>
+                <textarea class="form-control var-description" rows="2"
+                          placeholder="Name des Servers im Server-Browser">${escHtml(varData.description)}</textarea>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Standard-Wert</label>
+                        <input type="text" class="form-control var-default"
+                               value="${escHtml(varData.default_value)}" placeholder="My Server">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Feld-Typ</label>
+                        <select class="form-control var-field-type">
+                            <option value="text"    ${!varData.field_type || varData.field_type === 'text'    ? 'selected' : ''}>Text</option>
+                            <option value="boolean" ${varData.field_type === 'boolean' ? 'selected' : ''}>Boolean (0/1)</option>
+                            <option value="integer" ${varData.field_type === 'integer' ? 'selected' : ''}>Zahl (Integer)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Validierungs-Regeln</label>
+                <input type="text" class="form-control var-rules"
+                       value="${escHtml(varData.rules)}" placeholder="required|string|max:60">
+                <small class="text-muted">Laravel-Syntax (z.B. "required|string|max:60")</small>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input var-user-viewable"
+                               ${varData.user_viewable !== false ? 'checked' : ''}>
+                        <label class="form-check-label">Sichtbar für Benutzer</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input var-user-editable"
+                               ${varData.user_editable !== false ? 'checked' : ''}>
+                        <label class="form-check-label">Bearbeitbar für Benutzer</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    row.querySelector('.remove-variable-btn').addEventListener('click', () => {
+        if (confirm('Variable wirklich entfernen?')) {
+            row.remove();
+            updateNoVariablesMessage();
+            updateJSONPreview();
+        }
+    });
+
+    row.querySelector('.toggle-variable-details').addEventListener('click', function () {
+        const details = row.querySelector('.variable-details');
+        const open    = details.style.display === 'none';
+        details.style.display             = open ? 'block' : 'none';
+        this.querySelector('i').className = open ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down';
+    });
+
+    row.querySelector('.var-name').addEventListener('input', function () {
+        row.querySelector('.variable-name-display').textContent = this.value || 'Neue Variable';
+        updateJSONPreview();
+    });
+
+    row.querySelector('.var-env').addEventListener('input', function () {
+        row.querySelector('code').textContent = '{{' + (this.value || 'VAR_NAME') + '}}';
+        updateJSONPreview();
+    });
+
+    row.querySelectorAll('input, textarea, select').forEach(inp => {
+        inp.addEventListener('input',  updateJSONPreview);
+        inp.addEventListener('change', updateJSONPreview);
+    });
+
+    return row;
+}
+
+document.getElementById('add-variable-btn').addEventListener('click', () => {
+    const row = createVariableRow();
+    document.getElementById('variables-container').appendChild(row);
+    row.querySelector('.toggle-variable-details').click();
+    updateNoVariablesMessage();
+    updateJSONPreview();
+});
+
+function serializeVariables() {
+    const variables = [];
+    document.querySelectorAll('.variable-row').forEach(row => {
+        variables.push({
+            name:          row.querySelector('.var-name').value,
+            description:   row.querySelector('.var-description').value,
+            env_variable:  row.querySelector('.var-env').value,
+            default_value: row.querySelector('.var-default').value,
+            user_viewable: row.querySelector('.var-user-viewable').checked,
+            user_editable: row.querySelector('.var-user-editable').checked,
+            rules:         row.querySelector('.var-rules').value,
+            field_type:    row.querySelector('.var-field-type').value
+        });
+    });
+    return variables;
+}
+
+function loadVariablesIntoBuilder(variables) {
+    if (!Array.isArray(variables)) return;
+    const container = document.getElementById('variables-container');
+    container.innerHTML = '';
+    variables.forEach((v, i) => container.appendChild(createVariableRow(v, i)));
+    updateNoVariablesMessage();
+}
+
+function updateNoVariablesMessage() {
+    const count = document.querySelectorAll('.variable-row').length;
+    document.getElementById('no-variables-message').style.display = count === 0 ? 'block' : 'none';
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Form aus FIREBOT_v2 game_data befüllen
+// ──────────────────────────────────────────────────────────────────────────────
+function populateFormFromGameData(gd) {
+    if (!gd || gd.meta?.version !== 'FIREBOT_v2') {
+        toastr.error('Nur FIREBOT_v2 Format wird unterstützt!');
+        return;
+    }
+
+    if (gd.meta?.author) document.getElementById('meta-author').value = gd.meta.author;
+    if (EDITOR_MODE === 'create') {
+        if (gd.meta?.name) {
+            document.getElementById('addon-name').value = gd.meta.name;
+            document.getElementById('addon-slug').value = gd.meta.name.toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        }
+        if (gd.meta?.description) document.getElementById('addon-description').value = gd.meta.description;
+    }
+
+    if (gd.docker_images) loadDockerImagesIntoBuilder(gd.docker_images);
+
+    if (gd.startup) {
+        if (gd.startup.command !== undefined) document.getElementById('startup-command').value = gd.startup.command;
+        if (gd.startup.done    !== undefined) document.getElementById('startup-done').value    = gd.startup.done;
+        if (gd.startup.stop    !== undefined) document.getElementById('startup-stop').value    = gd.startup.stop;
+    }
+
+    if (gd.scripts?.installation) {
+        const inst = gd.scripts.installation;
+        if (inst.container  !== undefined) document.getElementById('install-container').value  = inst.container;
+        if (inst.entrypoint !== undefined) document.getElementById('install-entrypoint').value = inst.entrypoint;
+        if (inst.script     !== undefined) document.getElementById('install-script').value     = inst.script;
+    }
+
+    if (gd.variables) loadVariablesIntoBuilder(gd.variables);
+
+    updateJSONPreview();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// TEMPLATE SYSTEM
+// ──────────────────────────────────────────────────────────────────────────────
+const templateBtns  = {
+    blank: document.getElementById('template-blank-btn'),
+    clone: document.getElementById('template-clone-btn'),
+    json:  document.getElementById('template-json-btn')
+};
+const templateAreas = {
+    clone: document.getElementById('template-clone-area'),
+    json:  document.getElementById('template-json-area')
+};
+
+if (templateBtns.blank) templateBtns.blank.addEventListener('click', () => switchTemplate('blank'));
+if (templateBtns.clone) templateBtns.clone.addEventListener('click', () => switchTemplate('clone'));
+if (templateBtns.json)  templateBtns.json.addEventListener('click',  () => switchTemplate('json'));
+
+function switchTemplate(type) {
+    Object.values(templateAreas).forEach(area => { if (area) area.style.display = 'none'; });
+    if (type !== 'blank' && templateAreas[type]) templateAreas[type].style.display = 'block';
+}
+
+const cloneSelect = document.getElementById('clone-addon-select');
+if (cloneSelect) {
+    cloneSelect.addEventListener('change', function () {
+        if (!this.value) return;
+        try {
+            populateFormFromGameData(JSON.parse(this.options[this.selectedIndex].dataset.gamedata || '{}'));
+            toastr.success('Template geladen! Du kannst jetzt Änderungen vornehmen.');
+        } catch (e) {
+            toastr.error('Fehler beim Laden des Templates: ' + e.message);
+        }
+    });
+}
+
+const jsonImportBtn = document.getElementById('json-import-btn');
+if (jsonImportBtn) {
+    jsonImportBtn.addEventListener('click', () => {
+        const text = document.getElementById('json-import-textarea').value.trim();
+        if (!text) { toastr.error('Bitte füge ein JSON ein!'); return; }
+        try {
+            const gd = JSON.parse(text);
+            if (gd?.meta?.version !== 'FIREBOT_v2') { toastr.error('Nur FIREBOT_v2 Format wird unterstützt!'); return; }
+            populateFormFromGameData(gd);
+            toastr.success('JSON importiert!');
+        } catch (e) {
+            toastr.error('Ungültiges JSON: ' + e.message);
+        }
+    });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Initialisierung
+// ──────────────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    if (INITIAL_GAME_DATA && Object.keys(INITIAL_GAME_DATA).length > 0) {
+        if (INITIAL_GAME_DATA.docker_images) loadDockerImagesIntoBuilder(INITIAL_GAME_DATA.docker_images);
+        if (INITIAL_GAME_DATA.variables)     loadVariablesIntoBuilder(INITIAL_GAME_DATA.variables);
+    } else {
+        updateDockerImagesMessage();
+        updateNoVariablesMessage();
+    }
+    updateJSONPreview();
+});
+</script>

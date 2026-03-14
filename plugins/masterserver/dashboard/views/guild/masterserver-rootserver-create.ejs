@@ -1,0 +1,373 @@
+<!-- RootServer erstellen – Wizard -->
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">
+                    <i class="fa-solid fa-server mr-2"></i>
+                    RootServer hinzufügen
+                </h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver">Masterserver</a></li>
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver/rootservers">RootServer</a></li>
+                    <li class="breadcrumb-item active">Erstellen</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+
+        <div class="row mb-3">
+            <div class="col-12">
+                <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-secondary">
+                    <i class="fa-solid fa-arrow-left mr-2"></i>Zurück
+                </a>
+            </div>
+        </div>
+
+        <!-- Info-Banner -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="callout callout-info">
+                    <h5><i class="fa-solid fa-circle-info mr-2"></i>Was ist ein RootServer?</h5>
+                    <p class="mb-0">
+                        Ein RootServer repräsentiert eine physische oder virtuelle Maschine, auf der der 
+                        <strong>FireBot-Daemon</strong> läuft. Auf einem RootServer können mehrere Gameserver 
+                        betrieben werden. Nach dem Erstellen bekommst du einen <strong>API-Key</strong>, 
+                        den du in der <code>daemon.yaml</code> auf deinem Server einträgst.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <form class="guild-ajax-form"
+              data-form-type="rootserver-create"
+              data-method="POST"
+              action="/guild/<%= guildId %>/plugins/masterserver/rootservers"
+              method="POST"
+              data-loading-text="RootServer wird erstellt..."
+              data-loading-toast="true"
+              data-loading-toast-message="⚙️ RootServer wird angelegt...">
+
+            <!-- Basis-Informationen -->
+            <div class="card card-primary card-outline">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fa-solid fa-tag mr-2"></i>Basis-Informationen
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="name">Name <span class="text-danger">*</span></label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="name"
+                                       name="name"
+                                       placeholder="z.B. Hetzner-Node-1"
+                                       minlength="3" maxlength="100"
+                                       required>
+                                <small class="form-text text-muted">Eindeutiger Name für diesen RootServer</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="hostname">Hostname (optional)</label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="hostname"
+                                       name="hostname"
+                                       placeholder="z.B. node1.example.com">
+                                <small class="form-text text-muted">Öffentlicher FQDN (nur zur Anzeige)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Beschreibung (optional)</label>
+                        <textarea class="form-control" id="description" name="description" rows="2"
+                                  placeholder="z.B. Hetzner AX41, Frankfurt, 64 GB RAM"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Netzwerk -->
+            <div class="card card-primary card-outline mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fa-solid fa-network-wired mr-2"></i>Netzwerk
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label for="host">IP-Adresse / Host <span class="text-danger">*</span></label>
+                                <% if (daemonHardware && daemonHardware.network && daemonHardware.network.interfaces) { %>
+                                    <select class="form-control" id="host" name="host">
+                                        <option value="">Automatisch (erste verfügbare)</option>
+                                        <% daemonHardware.network.interfaces.forEach(iface => { %>
+                                            <% if (!iface.is_loopback && iface.addresses) { %>
+                                                <% iface.addresses.forEach(addr => { %>
+                                                    <% if (addr.indexOf(':') === -1 && addr !== '127.0.0.1') { %>
+                                                        <option value="<%= addr %>"><%= iface.name %>: <%= addr %></option>
+                                                    <% } %>
+                                                <% }); %>
+                                            <% } %>
+                                        <% }); %>
+                                    </select>
+                                <% } else { %>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="host"
+                                           name="host"
+                                           placeholder="z.B. 192.168.1.100"
+                                           required>
+                                <% } %>
+                                <small class="form-text text-muted">IP-Adresse, auf der der Daemon lauscht</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="daemonPort">Daemon-Port</label>
+                                <input type="number"
+                                       class="form-control"
+                                       id="daemonPort"
+                                       name="daemonPort"
+                                       value="9340"
+                                       min="1024" max="65535">
+                                <small class="form-text text-muted">Standard: 9340 (WebSocket)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hardware -->
+            <div class="card card-primary card-outline mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fa-solid fa-microchip mr-2"></i>Hardware-Limits
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="cpuCores">CPU-Kerne</label>
+                                <input type="number" class="form-control" id="cpuCores" name="cpuCores"
+                                       min="0" step="1" value="4" placeholder="z.B. 8">
+                                <small class="form-text text-muted">0 = automatisch ermitteln</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="ramTotal">RAM-Limit (GB) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="ramTotal" name="ramTotal"
+                                       min="1" step="1" value="16" placeholder="z.B. 32" required>
+                                <small class="form-text text-muted">Maximaler RAM für Gameserver</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="diskTotal">Disk-Limit (GB) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="diskTotal" name="diskTotal"
+                                       min="1" step="1" value="100" placeholder="z.B. 500" required>
+                                <small class="form-text text-muted">Maximaler Speicherplatz</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Standort (optional) -->
+            <div class="card card-primary card-outline mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fa-solid fa-location-dot mr-2"></i>Standort (optional)
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="datacenter">Rechenzentrum</label>
+                                <input type="text" class="form-control" id="datacenter" name="datacenter"
+                                       placeholder="z.B. Hetzner Falkenstein">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="countryCode">Ländercode</label>
+                                <input type="text" class="form-control" id="countryCode" name="countryCode"
+                                       placeholder="z.B. DE" maxlength="2">
+                                <small class="form-text text-muted">2-stelliger ISO-Code</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit -->
+            <div class="row mt-4 mb-4">
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fa-solid fa-plus mr-2"></i>RootServer erstellen
+                    </button>
+                    <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-secondary btn-lg ml-2">
+                        <i class="fa-solid fa-times mr-2"></i>Abbrechen
+                    </a>
+                </div>
+            </div>
+
+        </form>
+    </div>
+</section>
+
+<!-- ============================================================
+     SETUP-MODAL – wird nach erfolgreicher Erstellung befüllt
+     (backdrop: static → User muss aktiv bestätigen)
+     ============================================================ -->
+<div class="modal fade" id="rootserverSetupModal" tabindex="-1" role="dialog" aria-labelledby="setupModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="setupModalLabel">
+                    <i class="fa-solid fa-circle-check mr-2"></i>
+                    RootServer erstellt – jetzt Daemon einrichten
+                </h5>
+            </div>
+
+            <div class="modal-body">
+
+                <div class="alert alert-danger">
+                    <i class="fa-solid fa-triangle-exclamation mr-2"></i>
+                    <strong>WICHTIG:</strong> Der API-Key wird nur <strong>einmal</strong> angezeigt! 
+                    Kopiere ihn jetzt in deine <code>daemon.yaml</code>.
+                </div>
+
+                <div class="alert alert-warning border border-warning" style="font-size:1.05rem;">
+                    <h5 class="alert-heading">
+                        <i class="fa-solid fa-window-restore mr-2"></i>
+                        <strong>⚠️ Dieses Fenster NICHT schließen!</strong>
+                    </h5>
+                    <hr>
+                    <p class="mb-0">
+                        Lass dieses Modal <strong>unbedingt geöffnet</strong>, bis du den Daemon vollständig 
+                        eingerichtet und gestartet hast.<br>
+                        Sobald du auf <em>"Zur RootServer-Übersicht"</em> klickst, ist der API-Key 
+                        <strong>unwiderruflich verschwunden</strong> – er wird in der Datenbank nur als 
+                        Hash gespeichert und kann nicht wiederhergestellt werden.<br><br>
+                        <strong>Reihenfolge:</strong>
+                        <ol class="mb-0 mt-1">
+                            <li>Daemon-ID und API-Key kopieren</li>
+                            <li><code>daemon.yaml</code> auf dem Server speichern</li>
+                            <li>Daemon installieren &amp; starten</li>
+                            <li>Warten bis der Status im Dashboard auf <span class="badge badge-success">Online</span> wechselt</li>
+                            <li><strong>Erst dann</strong> auf "Zur RootServer-Übersicht" klicken</li>
+                        </ol>
+                    </p>
+                </div>
+
+                <!-- Daemon-ID + API-Key -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-fingerprint mr-1"></i>Daemon-ID</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control font-monospace" id="setup-daemon-id" readonly>
+                                <div class="input-group-append">
+                                    <button class="btn btn-outline-secondary" type="button"
+                                            onclick="copyFieldValue('setup-daemon-id')">
+                                        <i class="fa-solid fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <small class="text-muted">Zur Identifikation im Dashboard</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-key mr-1"></i>API-Key <span class="badge badge-danger">Nur einmal sichtbar!</span></label>
+                            <div class="input-group">
+                                <input type="text" class="form-control font-monospace" id="setup-api-key" readonly>
+                                <div class="input-group-append">
+                                    <button class="btn btn-outline-secondary" type="button"
+                                            onclick="copyFieldValue('setup-api-key')">
+                                        <i class="fa-solid fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <small class="text-muted">Trägt in <code>daemon.yaml</code> unter <code>daemon.token</code> ein</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- daemon.yaml -->
+                <div class="form-group mt-2">
+                    <label>
+                        <i class="fa-solid fa-file-code mr-1"></i>
+                        Fertige <code>daemon.yaml</code>
+                        <button class="btn btn-xs btn-outline-secondary ml-2" type="button"
+                                onclick="copyFieldValue('setup-daemon-yaml')">
+                            <i class="fa-solid fa-copy mr-1"></i>Kopieren
+                        </button>
+                    </label>
+                    <textarea class="form-control font-monospace" id="setup-daemon-yaml" rows="18" readonly
+                              style="font-size:0.82rem;"></textarea>
+                </div>
+
+                <!-- Installations-Anleitung -->
+                <div class="callout callout-info mt-3">
+                    <h6><i class="fa-solid fa-list-ol mr-1"></i><strong>Kurzanleitung</strong></h6>
+                    <ol class="mb-0 pl-3">
+                        <li>Daemon auf deinem Server installieren:<br>
+                            <pre class="bg-dark text-white p-2 rounded mt-1 mb-2" style="font-size:0.8rem;"><code>curl -fsSL <%= process.env.DASHBOARD_BASE_URL || '' %>/downloads/daemon/install.sh | sudo bash</code></pre>
+                        </li>
+                        <li>Config-Datei speichern unter <code>/opt/firebot-daemon/daemon.yaml</code> (Inhalt aus dem Feld oben kopieren)</li>
+                        <li>Daemon starten:<br>
+                            <pre class="bg-dark text-white p-2 rounded mt-1 mb-0" style="font-size:0.8rem;"><code>sudo systemctl start firebot-daemon
+sudo systemctl enable firebot-daemon</code></pre>
+                        </li>
+                        <li>Im Dashboard erscheint der RootServer als <span class="badge badge-success">Online</span>, sobald der Daemon verbunden ist.</li>
+                    </ol>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <span class="text-muted mr-auto">
+                    <i class="fa-solid fa-circle-info mr-1"></i>
+                    API-Key ist in der Datenbank gehasht – nicht wiederherstellbar.
+                </span>
+                <button type="button" class="btn btn-success" id="setup-continue-btn"
+                        onclick="window.location.href = this.getAttribute('data-redirect') || window.location.href.replace('/create','')">
+                    <i class="fa-solid fa-arrow-right mr-1"></i>
+                    Zur RootServer-Übersicht
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+function copyFieldValue(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.select();
+    document.execCommand('copy');
+    window.getSelection && window.getSelection().removeAllRanges();
+    // Kurzes visuelles Feedback
+    const orig = el.style.borderColor;
+    el.style.borderColor = '#28a745';
+    setTimeout(() => { el.style.borderColor = orig; }, 800);
+}
+</script>

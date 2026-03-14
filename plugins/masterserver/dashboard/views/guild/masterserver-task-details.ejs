@@ -1,0 +1,128 @@
+<!-- Task-Details-Seite -->
+<div class="container-fluid">
+  <div class="row">
+    <!-- Page Header -->
+    <div class="col-12 mb-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2>
+            <i class="fa-solid fa-tasks text-primary me-2"></i>
+            Task-Details
+          </h2>
+          <p class="text-muted">Detaillierte Informationen über den Task</p>
+        </div>
+        <a href="/guild/<%= guildId %>/plugins/masterserver/servers" class="btn btn-secondary">
+          <i class="fa-solid fa-arrow-left me-2"></i>
+          Zurück
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task Status Widget -->
+  <div class="row">
+    <div class="col-lg-8">
+      <%- include('../partials/task-status-widget', { 
+        taskId: taskId,
+        inline: false
+      }) %>
+    </div>
+    
+    <div class="col-lg-4">
+      <!-- Quick Actions Card -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fas fa-bolt me-2"></i>
+            Schnellaktionen
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="d-grid gap-2">
+            <button class="btn btn-info" id="btnRefreshTask">
+              <i class="fas fa-sync-alt me-2"></i>
+              Task aktualisieren
+            </button>
+            <button class="btn btn-danger" id="btnCancelTask">
+              <i class="fas fa-times me-2"></i>
+              Task abbrechen
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Task Info Card -->
+      <div class="card mt-3">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fas fa-info-circle me-2"></i>
+            Informationen
+          </h3>
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-5">Task-ID:</dt>
+            <dd class="col-sm-7">
+              <code><%= taskId %></code>
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const taskId = '<%= taskId %>';
+  const guildId = '<%= guildId %>';
+
+  // Refresh Button
+  document.getElementById('btnRefreshTask')?.addEventListener('click', () => {
+    window.location.reload();
+  });
+
+  // Cancel Button
+  document.getElementById('btnCancelTask')?.addEventListener('click', async () => {
+    if (!confirm('Möchten Sie diesen Task wirklich abbrechen?')) return;
+
+    try {
+      const response = await fetch(`/guild/${guildId}/plugins/masterserver/api/tasks/${taskId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        $(document).Toasts('create', {
+          class: 'bg-success',
+          title: 'Erfolg',
+          body: 'Task wurde abgebrochen',
+          autohide: true,
+          delay: 2000
+        });
+        
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        $(document).Toasts('create', {
+          class: 'bg-danger',
+          title: 'Fehler',
+          body: data.error || 'Task-Abbruch fehlgeschlagen',
+          autohide: true,
+          delay: 5000
+        });
+      }
+    } catch (error) {
+      console.error('Task-Abbruch fehlgeschlagen:', error);
+      $(document).Toasts('create', {
+        class: 'bg-danger',
+        title: 'Fehler',
+        body: 'Fehler beim Abbrechen des Tasks',
+        autohide: true,
+        delay: 5000
+      });
+    }
+  });
+});
+</script>

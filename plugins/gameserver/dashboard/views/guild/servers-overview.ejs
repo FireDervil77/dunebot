@@ -1,0 +1,156 @@
+<%
+/**
+ * Gameserver Overview - Card-Grid mit Live-Status
+ * 
+ * Zeigt alle Server der Guild als Cards an mit:
+ * - Filter-Bar (Status, Game, Search)
+ * - Status-Badges mit Live-Updates (SSE)
+ * - Resource-Display (CPU, RAM, Players)
+ * - Quick-Actions (Start, Stop, Restart, Details)
+ * 
+ * @requires userPermissions (aus loadUserPermissions Middleware)
+ * @requires servers, gameTypes, statusCounts, filters (aus Route)
+ */
+%>
+
+<!-- Gameserver Plugin Styles -->
+<link rel="stylesheet" href="/assets/plugins/gameserver/css/gameserver.css">
+
+<div class="content-wrapper">
+    <!-- Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="bi bi-server"></i> Gameserver
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <div class="float-right">
+                        <% if (userPermissions.permissions['GAMESERVER.CREATE']) { %>
+                            <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1" 
+                               class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Neuer Server
+                            </a>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+        <div class="container-fluid">
+            
+            <!-- Filter-Bar -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        
+                        <!-- Status-Filter -->
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select" onchange="this.form.submit()">
+                                <option value="all" <%= filters.status === 'all' ? 'selected' : '' %>>
+                                    Alle (<%= statusCounts.all %>)
+                                </option>
+                                <option value="online" <%= filters.status === 'online' ? 'selected' : '' %>>
+                                    🟢 Online (<%= statusCounts.online %>)
+                                </option>
+                                <option value="offline" <%= filters.status === 'offline' ? 'selected' : '' %>>
+                                    ⚫ Offline (<%= statusCounts.offline %>)
+                                </option>
+                                <option value="starting" <%= filters.status === 'starting' ? 'selected' : '' %>>
+                                    🟡 Startet (<%= statusCounts.starting %>)
+                                </option>
+                                <option value="stopping" <%= filters.status === 'stopping' ? 'selected' : '' %>>
+                                    🟠 Stoppt (<%= statusCounts.stopping %>)
+                                </option>
+                                <option value="installing" <%= filters.status === 'installing' ? 'selected' : '' %>>
+                                    🔵 Installiert (<%= statusCounts.installing %>)
+                                </option>
+                                <option value="error" <%= filters.status === 'error' ? 'selected' : '' %>>
+                                    🔴 Fehler (<%= statusCounts.error %>)
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Game-Filter -->
+                        <div class="col-md-3">
+                            <label class="form-label">Spiel</label>
+                            <select name="game" class="form-select" onchange="this.form.submit()">
+                                <option value="all" <%= filters.game === 'all' ? 'selected' : '' %>>
+                                    Alle Spiele
+                                </option>
+                                <% gameTypes.forEach(game => { %>
+                                    <option value="<%= game.game_slug %>" 
+                                            <%= filters.game === game.game_slug ? 'selected' : '' %>>
+                                        <%= game.display_name %> (<%= game.count %>)
+                                    </option>
+                                <% }); %>
+                            </select>
+                        </div>
+
+                        <!-- Suche -->
+                        <div class="col-md-6">
+                            <label class="form-label">Suche</label>
+                            <div class="input-group">
+                                <input type="text" name="search" class="form-control" 
+                                       placeholder="Server-Name..." 
+                                       value="<%= filters.search %>">
+                                <button type="submit" class="btn btn-secondary">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                                <% if (filters.search) { %>
+                                    <a href="?" class="btn btn-outline-secondary">
+                                        <i class="bi bi-x"></i>
+                                    </a>
+                                <% } %>
+                            </div>
+                        </div>
+                        
+                    </form>
+                </div>
+            </div>
+
+            <!-- Server-Cards Grid -->
+            <% if (servers.length === 0) { %>
+                <!-- Empty-State -->
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 
+                    <% if (filters.status !== 'all' || filters.game !== 'all' || filters.search) { %>
+                        Keine Server gefunden, die deinen Filterkriterien entsprechen.
+                        <a href="?">Filter zurücksetzen</a>
+                    <% } else { %>
+                        Noch keine Server erstellt. 
+                        <% if (userPermissions.permissions['GAMESERVER.CREATE']) { %>
+                            <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1">
+                                Erstelle deinen ersten Server!
+                            </a>
+                        <% } else { %>
+                            Du benötigst die <code>GAMESERVER.CREATE</code> Permission, um Server zu erstellen.
+                        <% } %>
+                    <% } %>
+                </div>
+            <% } else { %>
+                <!-- Cards Grid -->
+                <div class="row" id="server-cards-grid">
+                    <% servers.forEach(server => { %>
+                        <div class="col-lg-4 col-md-6 mb-4">
+                            <%- include('./partials/server-card', { server, userPermissions, guildId }) %>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } %>
+
+        </div>
+        </div>
+</div>
+
+<!-- ✅ Scripts werden über AssetManager geladen (gameserver-sse, gameserver-actions, gameserver-overview) -->
+<script>
+// Guild-ID für Auto-Initialisierung bereitstellen
+window.gameserverGuildId = '<%= guildId %>';
+</script>

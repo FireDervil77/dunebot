@@ -1,0 +1,515 @@
+<!-- Gameserver Dashboard -->
+<div class="content-wrapper">
+    <!-- Content Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fa-solid fa-server"></i> 
+                        <%= tr('gameserver:DASHBOARD.TITLE') %>
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
+                        <li class="breadcrumb-item active"><%= tr('gameserver:NAV.GAMESERVER') %></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+            
+            <!-- Quick Action Buttons -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1" class="btn btn-primary btn-lg">
+                        <i class="fa-solid fa-plus"></i> <%= tr('gameserver:DASHBOARD.CREATE_SERVER') %>
+                    </a>
+                    <a href="/guild/<%= guildId %>/plugins/gameserver/addons" class="btn btn-secondary btn-lg">
+                        <i class="fa-solid fa-store"></i> <%= tr('gameserver:DASHBOARD.BROWSE_ADDONS') %>
+                    </a>
+                    <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="btn btn-outline-secondary btn-lg">
+                        <i class="fa-solid fa-list"></i> <%= tr('gameserver:DASHBOARD.VIEW_ALL_SERVERS') %>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="row">
+                <!-- Total Servers -->
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-info">
+                        <div class="inner">
+                            <h3><%= serverStats.total_servers || 0 %></h3>
+                            <p><%= tr('gameserver:DASHBOARD.TOTAL_SERVERS') %></p>
+                        </div>
+                        <div class="icon">
+                            <i class="fa-solid fa-server"></i>
+                        </div>
+                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="small-box-footer">
+                            <%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Online Servers -->
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-success">
+                        <div class="inner">
+                            <h3><%= serverStats.online_servers || 0 %></h3>
+                            <p><%= tr('gameserver:DASHBOARD.ONLINE_SERVERS') %></p>
+                        </div>
+                        <div class="icon">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers?status=online" class="small-box-footer">
+                            <%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Offline Servers -->
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-warning">
+                        <div class="inner">
+                            <h3><%= serverStats.offline_servers || 0 %></h3>
+                            <p><%= tr('gameserver:DASHBOARD.OFFLINE_SERVERS') %></p>
+                        </div>
+                        <div class="icon">
+                            <i class="fa-solid fa-circle-xmark"></i>
+                        </div>
+                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers?status=offline" class="small-box-footer">
+                            <%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Total Players -->
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-danger">
+                        <div class="inner">
+                            <h3><%= serverStats.total_players || 0 %></h3>
+                            <p><%= tr('gameserver:DASHBOARD.TOTAL_PLAYERS') %></p>
+                        </div>
+                        <div class="icon">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="small-box-footer">
+                            <%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Row -->
+            <div class="row">
+                <!-- Recent Servers -->
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                                <%= tr('gameserver:DASHBOARD.RECENT_SERVERS') %>
+                            </h3>
+                        </div>
+                        <div class="card-body p-0">
+                            <% if (recentServers && recentServers.length > 0) { %>
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th><%= tr('gameserver:DASHBOARD.SERVER_NAME') %></th>
+                                            <th><%= tr('gameserver:DASHBOARD.GAME') %></th>
+                                            <th><%= tr('gameserver:DASHBOARD.STATUS') %></th>
+                                            <th><%= tr('gameserver:DASHBOARD.PLAYERS') %></th>
+                                            <th><%= tr('gameserver:DASHBOARD.CREATED') %></th>
+                                            <th><%= tr('gameserver:DASHBOARD.ACTIONS') %></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% recentServers.forEach(server => { %>
+                                            <tr data-server-id="<%= server.id %>">
+                                                <td><%= server.name %></td>
+                                                <td>
+                                                    <span class="badge badge-info">
+                                                        <%= server.game_name || 'Unknown' %>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <% if (server.status === 'online') { %>
+                                                        <span class="badge badge-success server-status-badge" data-status="online">
+                                                            <i class="fa-solid fa-circle"></i> Online
+                                                        </span>
+                                                    <% } else if (server.status === 'offline') { %>
+                                                        <span class="badge badge-secondary server-status-badge" data-status="offline">
+                                                            <i class="fa-solid fa-circle"></i> Offline
+                                                        </span>
+                                                    <% } else if (server.status === 'starting') { %>
+                                                        <span class="badge badge-warning server-status-badge" data-status="starting">
+                                                            <i class="fa-solid fa-spinner fa-spin"></i> Starting
+                                                        </span>
+                                                    <% } else if (server.status === 'error') { %>
+                                                        <span class="badge badge-danger server-status-badge" data-status="error">
+                                                            <i class="fa-solid fa-exclamation-triangle"></i> Error
+                                                        </span>
+                                                    <% } else { %>
+                                                        <span class="badge badge-secondary server-status-badge" data-status="<%= server.status %>">
+                                                            <%= server.status %>
+                                                        </span>
+                                                    <% } %>
+                                                </td>
+                                                <td>
+                                                    <%= server.current_players || 0 %>/<%= server.max_players || 0 %>
+                                                </td>
+                                                <td>
+                                                    <small><%= new Date(server.created_at).toLocaleDateString('de-DE') %></small>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <!-- Start Button (immer gerendert, Display via CSS) -->
+                                                        <button class="btn btn-success btn-sm server-start-btn" 
+                                                                data-server-id="<%= server.id %>"
+                                                                data-server-name="<%= server.name %>"
+                                                                style="display: <%= server.status === 'offline' ? 'inline-block' : 'none' %>;">
+                                                            <i class="fa-solid fa-play"></i>
+                                                        </button>
+                                                        
+                                                        <!-- Stop Button (immer gerendert, Display via CSS) -->
+                                                        <button class="btn btn-warning btn-sm server-stop-btn" 
+                                                                data-server-id="<%= server.id %>"
+                                                                data-server-name="<%= server.name %>"
+                                                                style="display: <%= server.status === 'online' ? 'inline-block' : 'none' %>;">
+                                                            <i class="fa-solid fa-stop"></i>
+                                                        </button>
+                                                        
+                                                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>" class="btn btn-info btn-sm">
+                                                            <i class="fa-solid fa-eye"></i>
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            <% } else { %>
+                                <div class="p-4 text-center text-muted">
+                                    <i class="fa-solid fa-inbox fa-3x mb-3"></i>
+                                    <p><%= tr('gameserver:DASHBOARD.NO_SERVERS') %></p>
+                                    <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1" class="btn btn-primary">
+                                        <i class="fa-solid fa-plus"></i> <%= tr('gameserver:DASHBOARD.CREATE_FIRST_SERVER') %>
+                                    </a>
+                                </div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Games -->
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-trophy"></i>
+                                <%= tr('gameserver:DASHBOARD.TOP_GAMES') %>
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <% if (addonStats && addonStats.length > 0) { %>
+                                <ul class="list-unstyled">
+                                    <% addonStats.forEach((addon, index) => { %>
+                                        <li class="mb-3">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>#<%= index + 1 %></strong>
+                                                    <%= addon.game_name || 'Unknown' %>
+                                                </div>
+                                                <span class="badge badge-primary badge-pill">
+                                                    <%= addon.server_count %> Server
+                                                </span>
+                                            </div>
+                                            <div class="progress mt-1" style="height: 5px;">
+                                                <div class="progress-bar bg-primary" 
+                                                     role="progressbar" 
+                                                     style="width: <%= (addon.server_count / serverStats.total_servers * 100) %>%"
+                                                     aria-valuenow="<%= addon.server_count %>" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="<%= serverStats.total_servers %>">
+                                                </div>
+                                            </div>
+                                        </li>
+                                    <% }) %>
+                                </ul>
+                            <% } else { %>
+                                <p class="text-muted text-center">
+                                    <%= tr('gameserver:DASHBOARD.NO_GAME_STATS') %>
+                                </p>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <!-- Quick Links -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-link"></i>
+                                <%= tr('gameserver:DASHBOARD.QUICK_LINKS') %>
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <a href="/guild/<%= guildId %>/plugins/gameserver/addons">
+                                        <i class="fa-solid fa-store"></i> <%= tr('gameserver:DASHBOARD.ADDON_MARKETPLACE') %>
+                                    </a>
+                                </li>
+                                <li class="mb-2">
+                                    <a href="/guild/<%= guildId %>/plugins/gameserver/servers">
+                                        <i class="fa-solid fa-list"></i> <%= tr('gameserver:DASHBOARD.ALL_SERVERS') %>
+                                    </a>
+                                </li>
+                                <li class="mb-2">
+                                    <a href="/guild/<%= guildId %>/plugins/gameserver/settings">
+                                        <i class="fa-solid fa-cog"></i> <%= tr('gameserver:DASHBOARD.SETTINGS') %>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>
+
+<!-- ✅ SSE-Script wird über AssetManager geladen (enqueueScript in Route) -->
+<script>
+// ========================================
+// SSE Live-Updates für Dashboard-Übersicht
+// ========================================
+document.addEventListener('DOMContentLoaded', () => {
+    // Event-Listener für Start/Stop Buttons registrieren
+    registerButtonHandlers();
+    
+    // SSE initialisieren
+    initSSE();
+});
+
+function registerButtonHandlers() {
+    // Start-Buttons
+    document.querySelectorAll('.server-start-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const serverId = btn.dataset.serverId;
+            const serverName = btn.dataset.serverName;
+            startServer(serverId, serverName);
+        });
+    });
+    
+    // Stop-Buttons
+    document.querySelectorAll('.server-stop-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const serverId = btn.dataset.serverId;
+            const serverName = btn.dataset.serverName;
+            stopServer(serverId, serverName);
+        });
+    });
+}
+
+function initSSE() {
+    // ✅ SSE-Client manuell erstellen (gameserver-sse.js ist geladen)
+    if (typeof GameserverSSEClient === 'undefined') {
+        console.error('[SSE] GameserverSSEClient nicht geladen! Fallback: kein Live-Update');
+        return;
+    }
+    
+    const guildId = '<%= guildId %>';
+    window.gameserverSSE = new GameserverSSEClient(guildId);
+    
+    // SSE-Client starten
+    window.gameserverSSE.connect();
+    console.log('[SSE] Client gestartet für Dashboard-Übersicht');
+    
+    // Event-Handler registrieren
+    window.gameserverSSE.on('status_changed', (data) => {
+        console.log('[SSE] Status changed:', data);
+        
+        // ✅ Status-Mapping: Daemon → Dashboard
+        let uiStatus = data.status;
+        if (uiStatus === 'running') uiStatus = 'online';
+        if (uiStatus === 'stopped') uiStatus = 'offline';
+        
+        // Status-Badge aktualisieren
+        if (data.server_id) {
+            updateServerUI(data.server_id, uiStatus);
+        }
+        
+        // TODO: Stats-Boxen aktualisieren (benötigt API-Route)
+        // updateStatsBoxes();
+    });
+    
+    window.gameserverSSE.on('crashed', (data) => {
+        console.log('[SSE] Server crashed:', data);
+        if (data.server_id) {
+            updateServerUI(data.server_id, 'error');
+        }
+        // TODO: Stats-Boxen aktualisieren (benötigt API-Route)
+        // updateStatsBoxes();
+    });
+    
+    // Cleanup bei Page-Leave
+    window.addEventListener('beforeunload', () => {
+        if (window.gameserverSSE) {
+            window.gameserverSSE.disconnect();
+        }
+    });
+}
+
+function updateServerUI(serverId, newStatus) {
+    const row = document.querySelector(`tr[data-server-id="${serverId}"]`);
+    if (!row) return;
+    
+    const statusBadge = row.querySelector('.server-status-badge');
+    if (!statusBadge) return;
+    
+    const currentStatus = statusBadge.dataset.status;
+    if (currentStatus === newStatus) return;
+    
+    console.log(`[Dashboard] Server ${serverId}: ${currentStatus} → ${newStatus}`);
+    
+    // Badge aktualisieren
+    statusBadge.classList.remove('badge-success', 'badge-warning', 'badge-danger', 'badge-secondary', 'badge-info');
+    
+    switch(newStatus) {
+        case 'online':
+            statusBadge.classList.add('badge-success');
+            statusBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Online';
+            break;
+        case 'starting':
+            statusBadge.classList.add('badge-info');
+            statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting';
+            break;
+        case 'stopping':
+            statusBadge.classList.add('badge-warning');
+            statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Stopping';
+            break;
+        case 'offline':
+            statusBadge.classList.add('badge-secondary');
+            statusBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Offline';
+            break;
+        case 'error':
+            statusBadge.classList.add('badge-danger');
+            statusBadge.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Error';
+            break;
+        default:
+            statusBadge.classList.add('badge-secondary');
+            statusBadge.innerHTML = '<i class="fa-solid fa-circle"></i> ' + newStatus;
+    }
+    
+    statusBadge.dataset.status = newStatus;
+    
+    // Buttons aktualisieren
+    updateActionButtons(row, newStatus);
+}
+
+function updateActionButtons(row, status) {
+    const startBtn = row.querySelector('.server-start-btn');
+    const stopBtn = row.querySelector('.server-stop-btn');
+    
+    if (!startBtn || !stopBtn) return;
+    
+    // Start-Button: Nur bei offline/error
+    if (status === 'offline' || status === 'error') {
+        startBtn.style.display = 'inline-block';
+    } else {
+        startBtn.style.display = 'none';
+    }
+    
+    // Stop-Button: Nur bei online
+    if (status === 'online') {
+        stopBtn.style.display = 'inline-block';
+    } else {
+        stopBtn.style.display = 'none';
+    }
+}
+
+// TODO: Stats-Boxen-Update-Funktion (benötigt API-Route /api/stats)
+// function updateStatsBoxes() { ... }
+
+// ========================================
+// Server Start/Stop via AJAX
+// ========================================
+function startServer(serverId) {
+    // ❌ KEIN CONFIRM mehr - direkt starten!
+    
+    fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/${serverId}/start`, {
+        method: 'POST',  // ✅ POST statt PUT!
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            // ✅ Kein Reload - SSE aktualisiert Status live
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(err => {
+        console.error('Error starting server:', err);
+        showToast('error', 'Fehler beim Starten des Servers');
+    });
+}
+
+function stopServer(serverId) {
+    // ❌ KEIN CONFIRM mehr - direkt stoppen!
+    
+    fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/${serverId}/stop`, {
+        method: 'POST',  // ✅ POST statt PUT!
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            // ✅ Kein Reload - SSE aktualisiert Status live
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(err => {
+        console.error('Error stopping server:', err);
+        showToast('error', 'Fehler beim Stoppen des Servers');
+    });
+}
+
+// ========================================
+// Toast Helper (nutzt globales Toast-System)
+// ========================================
+function showToast(type, message) {
+    // Nutze globales Toast-System (window.showToast aus global-toast.js)
+    // ⚠️ WICHTIG: Prüfe ob es NICHT diese Funktion selbst ist!
+    const globalToast = window.showToast;
+    if (globalToast && globalToast !== showToast) {
+        globalToast(type, message);
+        return;
+    }
+    
+    // Fallback: toastr direkt (falls global-toast.js nicht geladen)
+    if (typeof toastr !== 'undefined') {
+        toastr[type](message);
+        return;
+    }
+    
+    // Fallback: Browser-Alert
+    console.warn('[Dashboard] Toast-System nicht verfügbar, verwende alert()');
+    alert(message);
+}
+</script>

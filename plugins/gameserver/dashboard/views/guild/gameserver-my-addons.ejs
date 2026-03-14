@@ -1,0 +1,199 @@
+<!-- Meine Addons Page -->
+<div class="content-wrapper">
+    <!-- Content Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fa-solid fa-folder-user"></i>
+                        <%= tr('gameserver:MY_ADDONS.TITLE') %>
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver/addons"><%= tr('gameserver:NAV.ADDONS') %></a></li>
+                        <li class="breadcrumb-item active"><%= tr('gameserver:MY_ADDONS.TITLE') %></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+
+            <!-- Create New Egg Button -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <a href="/guild/<%= guildId %>/plugins/gameserver/addons/create" class="btn btn-primary">
+                        <i class="fa-solid fa-plus"></i> <%= tr('gameserver:MY_ADDONS.CREATE_NEW') %>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Addons List -->
+            <% if (myAddons && myAddons.length > 0) { %>
+                <div class="row">
+                    <% myAddons.forEach(addon => { %>
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="card h-100">
+                                <% if (addon.icon_url) { %>
+                                    <img src="<%= addon.icon_url %>" class="card-img-top" alt="<%= addon.name %>" style="height: 200px; object-fit: cover;">
+                                <% } else { %>
+                                    <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" style="height: 200px;">
+                                        <i class="fa-solid fa-puzzle-piece fa-4x text-white-50"></i>
+                                    </div>
+                                <% } %>
+                                
+                                <div class="card-body">
+                                    <!-- Title & Badges -->
+                                    <h5 class="card-title">
+                                        <%= addon.name %>
+                                    </h5>
+                                    
+                                    <div class="mb-2">
+                                        <!-- Status Badge -->
+                                        <% if (addon.status === 'draft') { %>
+                                            <span class="badge badge-secondary">
+                                                <i class="fa-solid fa-pen"></i> <%= tr('gameserver:MY_ADDONS.STATUS_DRAFT') %>
+                                            </span>
+                                        <% } else if (addon.status === 'pending_review') { %>
+                                            <span class="badge badge-warning">
+                                                <i class="fa-solid fa-clock"></i> <%= tr('gameserver:MY_ADDONS.STATUS_PENDING') %>
+                                            </span>
+                                        <% } else if (addon.status === 'approved') { %>
+                                            <span class="badge badge-success">
+                                                <i class="fa-solid fa-check"></i> <%= tr('gameserver:MY_ADDONS.STATUS_APPROVED') %>
+                                            </span>
+                                        <% } %>
+                                        
+                                        <!-- Runtime Type Badge -->
+                                        <% if (addon.runtime_type === 'docker_steam') { %>
+                                            <span class="badge badge-dark ml-1">
+                                                <i class="fa-brands fa-steam"></i> Steam
+                                            </span>
+                                        <% } else if (addon.runtime_type === 'docker_standalone') { %>
+                                            <span class="badge badge-dark ml-1">
+                                                <i class="fa-brands fa-docker"></i> Docker
+                                            </span>
+                                        <% } else if (addon.runtime_type === 'native_steamcmd') { %>
+                                            <span class="badge badge-secondary ml-1">
+                                                <i class="fa-brands fa-steam"></i> Native
+                                            </span>
+                                        <% } %>
+
+                                        <!-- Visibility Badge -->
+                                        <% if (addon.visibility === 'private') { %>
+                                            <span class="badge badge-info ml-1">
+                                                <i class="fa-solid fa-lock"></i> <%= tr('gameserver:MY_ADDONS.VISIBILITY_PRIVATE') %>
+                                            </span>
+                                        <% } else if (addon.visibility === 'public') { %>
+                                            <span class="badge badge-primary ml-1">
+                                                <i class="fa-solid fa-globe"></i> <%= tr('gameserver:MY_ADDONS.VISIBILITY_PUBLIC') %>
+                                            </span>
+                                        <% } else if (addon.visibility === 'unlisted') { %>
+                                            <span class="badge badge-secondary ml-1">
+                                                <i class="fa-solid fa-eye-slash"></i> <%= tr('gameserver:MY_ADDONS.VISIBILITY_UNLISTED') %>
+                                            </span>
+                                        <% } %>
+                                    </div>
+                                    
+                                    <p class="card-text text-muted small">
+                                        <%= addon.description ? addon.description.substring(0, 100) + '...' : 'Keine Beschreibung' %>
+                                    </p>
+                                    
+                                    <!-- Meta Info -->
+                                    <p class="card-text">
+                                        <small class="text-muted">
+                                            <i class="fa-solid fa-tag"></i> <%= addon.category || 'Keine Kategorie' %><br>
+                                            <i class="fa-solid fa-download"></i> <%= addon.install_count || 0 %> Installationen<br>
+                                            <i class="fa-solid fa-clock"></i> <%= tr('gameserver:MY_ADDONS.LAST_EDITED') %>: <%= new Date(addon.updated_at).toLocaleDateString('de-DE') %>
+                                        </small>
+                                    </p>
+                                </div>
+                                
+                                <div class="card-footer">
+                                    <div class="btn-group btn-block" role="group">
+                                        <a href="/guild/<%= guildId %>/plugins/gameserver/addons/edit/<%= addon.id %>" 
+                                           class="btn btn-sm btn-primary">
+                                            <i class="fa-solid fa-edit"></i> <%= tr('gameserver:MY_ADDONS.EDIT') %>
+                                        </a>
+                                        <a href="/guild/<%= guildId %>/plugins/gameserver/addons/create?template=clone:<%= addon.id %>" 
+                                           class="btn btn-sm btn-secondary">
+                                            <i class="fa-solid fa-copy"></i> <%= tr('gameserver:MY_ADDONS.CLONE') %>
+                                        </a>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-danger" 
+                                                onclick="deleteAddon('<%= addon.id %>', '<%= addon.name %>')">
+                                            <i class="fa-solid fa-trash"></i> <%= tr('gameserver:MY_ADDONS.DELETE') %>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
+                </div>
+            <% } else { %>
+                <!-- Empty State -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body text-center py-5">
+                                <i class="fa-solid fa-puzzle-piece fa-5x text-muted mb-3"></i>
+                                <h3><%= tr('gameserver:MY_ADDONS.NO_EGGS') %></h3>
+                                <p class="text-muted">
+                                    <%= tr('gameserver:MY_ADDONS.NO_EGGS_DESC') %>
+                                </p>
+                                <a href="/guild/<%= guildId %>/plugins/gameserver/addons/create" class="btn btn-primary btn-lg">
+                                    <i class="fa-solid fa-plus"></i> <%= tr('gameserver:MY_ADDONS.CREATE_NEW') %>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <% } %>
+
+        </div>
+    </section>
+</div>
+
+<script>
+/**
+ * Addon löschen (mit Bestätigung)
+ */
+async function deleteAddon(addonId, addonName) {
+    if (!confirm(`Möchtest du das Addon "${addonName}" wirklich löschen?\n\nDieser Vorgang kann nicht rückgängig gemacht werden!`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/guild/<%= guildId %>/plugins/gameserver/addons/${addonId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Toast anzeigen
+            toastr.success(result.message || 'Addon erfolgreich gelöscht');
+            
+            // Seite neu laden nach 1s
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            toastr.error(result.message || 'Fehler beim Löschen des Addons');
+        }
+    } catch (error) {
+        console.error('[My Addons] Fehler beim Löschen:', error);
+        toastr.error('Fehler beim Löschen des Addons');
+    }
+}
+</script>

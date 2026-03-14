@@ -1,0 +1,431 @@
+<!-- Server Creation Wizard - Step 1: Select Addon -->
+<div class="content-wrapper">
+    <!-- Content Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fa-solid fa-plus"></i> 
+                        <%= tr('gameserver:SERVER.CREATE_WIZARD') %>
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver/servers"><%= tr('gameserver:NAV.SERVERS') %></a></li>
+                        <li class="breadcrumb-item active"><%= tr('gameserver:SERVER.CREATE') %></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+
+            <!-- Progress Steps -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 text-center">
+                                    <div class="progress-step active">
+                                        <div class="progress-circle bg-primary text-white">1</div>
+                                        <strong><%= tr('gameserver:SERVER.STEP1_TITLE') %></strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="progress-step">
+                                        <div class="progress-circle bg-secondary text-white">2</div>
+                                        <%= tr('gameserver:SERVER.STEP2_TITLE') %>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="progress-step">
+                                        <div class="progress-circle bg-secondary text-white">3</div>
+                                        <%= tr('gameserver:SERVER.STEP3_TITLE') %>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 1: Basic Information -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fa-solid fa-info-circle"></i>
+                                <%= tr('gameserver:SERVER.BASIC_INFO') || 'Basic Information' %>
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="step1Form">
+                                <!-- Server Name -->
+                                <div class="form-group">
+                                    <label for="server_name">
+                                        <%= tr('gameserver:SERVER.NAME') %> <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="server_name" 
+                                           name="server_name" 
+                                           placeholder="<%= tr('gameserver:SERVER.NAME_PLACEHOLDER') || 'Mein Gameserver' %>" 
+                                           required 
+                                           maxlength="100">
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SERVER.NAME_HELP') || 'Ein eindeutiger Name für deinen Server' %>
+                                    </small>
+                                </div>
+
+                                <!-- Addon Selection -->
+                                <div class="form-group">
+                                    <label for="addon_select">
+                                        <%= tr('gameserver:SERVER.SELECT_ADDON') %> <span class="text-danger">*</span>
+                                    </label>
+                                    <select class="form-control select2" 
+                                            id="addon_select" 
+                                            name="addon_slug" 
+                                            required 
+                                            data-placeholder="<%= tr('gameserver:SERVER.SELECT_ADDON_PLACEHOLDER') || 'Wähle ein Spiel/Addon aus' %>">
+                                        <option value=""></option>
+                                        
+                                        <!-- Eigene Addons -->
+                                        <% if (guildAddons && guildAddons.length > 0) { %>
+                                            <optgroup label="<%= tr('gameserver:SERVER.MY_ADDONS') || 'Meine Addons' %>">
+                                                <% guildAddons.forEach(addon => { %>
+                                                    <option value="<%= addon.slug %>" 
+                                                            data-addon='<%= JSON.stringify(addon) %>'>
+                                                        <i class="fa-solid fa-user-shield"></i> <%= addon.name %>
+                                                    </option>
+                                                <% }) %>
+                                            </optgroup>
+                                        <% } %>
+                                        
+                                        <!-- Öffentliche Addons -->
+                                        <% if (publicAddons && publicAddons.length > 0) { %>
+                                            <optgroup label="<%= tr('gameserver:SERVER.PUBLIC_ADDONS') || 'Öffentliche Addons' %>">
+                                                <% publicAddons.forEach(addon => { %>
+                                                    <option value="<%= addon.slug %>" 
+                                                            data-addon='<%= JSON.stringify(addon) %>'>
+                                                        <% if (addon.trust_level === 'official') { %>
+                                                            👑 <%= addon.name %>
+                                                        <% } else if (addon.trust_level === 'trusted') { %>
+                                                            🛡️ <%= addon.name %>
+                                                        <% } else if (addon.trust_level === 'verified') { %>
+                                                            ✓ <%= addon.name %>
+                                                        <% } else { %>
+                                                            <%= addon.name %>
+                                                        <% } %>
+                                                    </option>
+                                                <% }) %>
+                                            </optgroup>
+                                        <% } %>
+                                    </select>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SERVER.ADDON_HELP') || 'Das Spiel/Template für deinen Server' %>
+                                    </small>
+                                </div>
+
+                                <!-- Addon Info Card (dynamisch) -->
+                                <div id="addonInfoCard" class="alert alert-info" style="display: none;">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fa-solid fa-gamepad fa-2x mr-3"></i>
+                                        <div>
+                                            <strong id="addonInfoName">-</strong><br>
+                                            <small id="addonInfoDesc" class="text-muted">-</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Rootserver Selection -->
+                                <div class="form-group">
+                                    <label for="rootserver_select">
+                                        <%= tr('gameserver:SERVER.SELECT_ROOTSERVER') || 'Server/Node auswählen' %> <span class="text-danger">*</span>
+                                    </label>
+                                    <select class="form-control" 
+                                            id="rootserver_select" 
+                                            name="rootserver_id" 
+                                            required>
+                                        <option value=""><%= tr('gameserver:SERVER.SELECT_ROOTSERVER_PLACEHOLDER') || 'Wähle einen Server aus' %></option>
+                                        <% if (rootservers && rootservers.length > 0) { %>
+                                            <% rootservers.forEach(server => { %>
+                                                <option value="<%= server.id %>" 
+                                                        data-cpu="<%= server.cpu_usage_percent || 0 %>"
+                                                        data-ram="<%= server.ram_usage_gb || 0 %>"
+                                                        data-ram-total="<%= server.ram_total_gb || 0 %>"
+                                                        data-disk="<%= server.disk_usage_gb || 0 %>"
+                                                        data-disk-total="<%= server.disk_total_gb || 0 %>">
+                                                    <%= server.name %> 
+                                                    <% if (server.hostname) { %>(<%= server.hostname %>)<% } %>
+                                                </option>
+                                            <% }) %>
+                                        <% } else { %>
+                                            <option value="" disabled>
+                                                <%= tr('gameserver:SERVER.NO_ROOTSERVERS') || 'Keine Server verfügbar' %>
+                                            </option>
+                                        <% } %>
+                                    </select>
+                                    <small class="form-text text-muted">
+                                        <%= tr('gameserver:SERVER.ROOTSERVER_HELP') || 'Der physische Server auf dem dein Gameserver laufen wird' %>
+                                    </small>
+                                </div>
+
+                                <!-- Rootserver Stats (dynamisch) -->
+                                <div id="rootserverStats" style="display: none;">
+                                    <div class="row text-center mb-3">
+                                        <div class="col-md-4">
+                                            <div class="small text-muted">CPU</div>
+                                            <div class="progress" style="height: 25px;">
+                                                <div id="statCpu" class="progress-bar" role="progressbar" style="width: 0%">0%</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="small text-muted">RAM</div>
+                                            <div class="progress" style="height: 25px;">
+                                                <div id="statRam" class="progress-bar bg-info" role="progressbar" style="width: 0%">0 GB</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="small text-muted">Disk</div>
+                                            <div class="progress" style="height: 25px;">
+                                                <div id="statDisk" class="progress-bar bg-warning" role="progressbar" style="width: 0%">0 GB</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Installation Options -->
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label><%= tr('gameserver:SERVER.RUN_INSTALL_SCRIPT') || 'Install-Script ausführen?' %> <span class="text-danger">*</span></label>
+                                            <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons">
+                                                <label class="btn btn-outline-success active">
+                                                    <input type="radio" name="run_install_script" value="true" checked> 
+                                                    <i class="fa-solid fa-code"></i> Yes
+                                                </label>
+                                                <label class="btn btn-outline-danger">
+                                                    <input type="radio" name="run_install_script" value="false"> 
+                                                    <i class="fa-solid fa-forward"></i> Skip
+                                                </label>
+                                            </div>
+                                            <small class="form-text text-muted">
+                                                <%= tr('gameserver:SERVER.INSTALL_SCRIPT_HELP') || 'Empfohlen: Lädt und installiert das Spiel automatisch' %>
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label><%= tr('gameserver:SERVER.START_AFTER_INSTALL') || 'Nach Installation starten?' %> <span class="text-danger">*</span></label>
+                                            <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons">
+                                                <label class="btn btn-outline-success active">
+                                                    <input type="radio" name="start_after_install" value="true" checked> 
+                                                    <i class="fa-solid fa-play"></i> Yes
+                                                </label>
+                                                <label class="btn btn-outline-danger">
+                                                    <input type="radio" name="start_after_install" value="false"> 
+                                                    <i class="fa-solid fa-stop"></i> No
+                                                </label>
+                                            </div>
+                                            <small class="form-text text-muted">
+                                                <%= tr('gameserver:SERVER.START_AFTER_HELP') || 'Server automatisch starten nach erfolgreicher Installation' %>
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="card-footer">
+                            <div class="d-flex justify-content-between">
+                                <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="btn btn-secondary">
+                                    <i class="fa-solid fa-times"></i> <%= tr('gameserver:SERVER.CANCEL') || 'Abbrechen' %>
+                                </a>
+                                <button type="button" id="btnNextStep1" class="btn btn-primary" disabled>
+                                    <%= tr('gameserver:SERVER.NEXT') || 'Weiter' %> <i class="fa-solid fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ALTE CARDS KOMPLETT ENTFERNT - Jetzt alles im Dropdown oben! -->
+
+        </div>
+    </section>
+</div>
+
+
+<style>
+.progress-step {
+    padding: 20px 0;
+}
+
+.progress-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.progress-step.active .progress-circle {
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const guildId = '<%= guildId %>';
+    
+    // Form-Validierung & Navigation
+    const form = document.getElementById('step1Form');
+    const btnNext = document.getElementById('btnNextStep1');
+    const addonSelect = document.getElementById('addon_select');
+    const rootserverSelect = document.getElementById('rootserver_select');
+    const serverNameInput = document.getElementById('server_name');
+    
+    // ✅ Query-Parameter auslesen und Addon vorauswählen
+    const urlParams = new URLSearchParams(window.location.search);
+    const preselectedAddon = urlParams.get('addon');
+    const preselectedTemplate = urlParams.get('template');
+    
+    if (preselectedAddon) {
+        console.log('[Step1] Vorausgewähltes Addon:', preselectedAddon);
+        
+        // Addon in Select vorauswählen
+        addonSelect.value = preselectedAddon;
+        
+        // Change-Event triggern für Info-Card & Validation
+        addonSelect.dispatchEvent(new Event('change'));
+        
+        // Optional: Template-Info anzeigen wenn vorhanden
+        if (preselectedTemplate) {
+            console.log('[Step1] Vorausgewähltes Template:', preselectedTemplate);
+            // Template wird in Step 2 verwendet
+        }
+    }
+    
+    // Validation-Check
+    function validateForm() {
+        const serverName = serverNameInput.value.trim();
+        const addonSlug = addonSelect.value;
+        const rootserverId = rootserverSelect.value;
+        
+        const isValid = serverName.length > 0 && addonSlug && rootserverId;
+        
+        btnNext.disabled = !isValid;
+        
+        if (isValid) {
+            btnNext.classList.remove('btn-secondary');
+            btnNext.classList.add('btn-primary');
+        } else {
+            btnNext.classList.remove('btn-primary');
+            btnNext.classList.add('btn-secondary');
+        }
+    }
+    
+    // Event-Listeners
+    serverNameInput.addEventListener('input', validateForm);
+    addonSelect.addEventListener('change', validateForm);
+    rootserverSelect.addEventListener('change', validateForm);
+    
+    // Addon-Auswahl → Info anzeigen
+    addonSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        if (!selectedOption.value) {
+            document.getElementById('addonInfoCard').style.display = 'none';
+            return;
+        }
+        
+        try {
+            const addonData = JSON.parse(selectedOption.dataset.addon);
+            document.getElementById('addonInfoName').textContent = addonData.name;
+            document.getElementById('addonInfoDesc').textContent = addonData.description || 'Keine Beschreibung verfügbar';
+            document.getElementById('addonInfoCard').style.display = 'block';
+        } catch (e) {
+            console.error('[Step1] Fehler beim Parsen von Addon-Daten:', e);
+        }
+    });
+    
+    // Rootserver-Auswahl → Stats anzeigen
+    rootserverSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        if (!selectedOption.value) {
+            document.getElementById('rootserverStats').style.display = 'none';
+            return;
+        }
+        
+        const cpu = parseFloat(selectedOption.dataset.cpu) || 0;
+        const ramUsed = parseFloat(selectedOption.dataset.ram) || 0;
+        const ramTotal = parseFloat(selectedOption.dataset.ramTotal) || 1;
+        const diskUsed = parseFloat(selectedOption.dataset.disk) || 0;
+        const diskTotal = parseFloat(selectedOption.dataset.diskTotal) || 1;
+        
+        const ramPercent = ((ramUsed / ramTotal) * 100).toFixed(1);
+        const diskPercent = ((diskUsed / diskTotal) * 100).toFixed(1);
+        
+        // CPU
+        document.getElementById('statCpu').style.width = cpu + '%';
+        document.getElementById('statCpu').textContent = cpu.toFixed(1) + '%';
+        document.getElementById('statCpu').classList.remove('bg-success', 'bg-warning', 'bg-danger');
+        if (cpu < 50) document.getElementById('statCpu').classList.add('bg-success');
+        else if (cpu < 80) document.getElementById('statCpu').classList.add('bg-warning');
+        else document.getElementById('statCpu').classList.add('bg-danger');
+        
+        // RAM
+        document.getElementById('statRam').style.width = ramPercent + '%';
+        document.getElementById('statRam').textContent = ramUsed.toFixed(1) + ' / ' + ramTotal.toFixed(1) + ' GB';
+        
+        // Disk
+        document.getElementById('statDisk').style.width = diskPercent + '%';
+        document.getElementById('statDisk').textContent = diskUsed.toFixed(1) + ' / ' + diskTotal.toFixed(1) + ' GB';
+        
+        document.getElementById('rootserverStats').style.display = 'block';
+    });
+    
+    // Next Button → Step 2
+    btnNext.addEventListener('click', function() {
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        
+        const formData = new FormData(form);
+        const params = new URLSearchParams();
+        
+        params.set('step', '2');
+        params.set('addon', formData.get('addon_slug'));
+        params.set('rootserver', formData.get('rootserver_id'));
+        params.set('server_name', formData.get('server_name'));
+        params.set('run_install', formData.get('run_install_script'));
+        params.set('start_after', formData.get('start_after_install'));
+        
+        console.log('[Step1] Navigiere zu Step 2:', Object.fromEntries(params));
+        window.location.href = `/guild/${guildId}/plugins/gameserver/servers/create?${params.toString()}`;
+    });
+    
+    // Initial Validation
+    validateForm();
+    
+    // Select2 Init (falls verfügbar)
+    if (typeof $.fn.select2 !== 'undefined') {
+        $('#addon_select').select2({
+            theme: 'bootstrap4',
+            width: '100%'
+        });
+    }
+});
+</script>

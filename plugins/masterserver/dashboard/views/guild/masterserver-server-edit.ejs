@@ -1,0 +1,396 @@
+<!-- Content Header (Breadcrumb) -->
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">Server bearbeiten</h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item">
+                        <a href="/guild/<%= guildId %>/dashboard">Dashboard</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a href="/guild/<%= guildId %>/plugins/masterserver/servers">Masterserver</a>
+                    </li>
+                    <li class="breadcrumb-item active">Server bearbeiten</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main content -->
+<section class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Server Edit Card -->
+                <div class="card card-primary">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-edit mr-2"></i>
+                            Server-Einstellungen: <strong><%= server.name %></strong>
+                        </h3>
+                    </div>
+
+                    <form class="guild-ajax-form"
+                          data-form-type="update-server"
+                          data-method="PUT"
+                          action="/guild/<%= guildId %>/plugins/masterserver/servers/<%= server.id %>"
+                          method="POST">
+
+                        <div class="card-body">
+                            <!-- Server Name -->
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="serverName">
+                                            <i class="fas fa-server text-primary mr-1"></i>
+                                            Server-Name <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text"
+                                               class="form-control"
+                                               id="serverName"
+                                               name="serverName"
+                                               value="<%= server.name %>"
+                                               placeholder="rootserver0001"
+                                               required
+                                               maxlength="100">
+                                        <small class="form-text text-muted">
+                                            Eindeutiger Name zur Identifikation dieses Servers
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="hostname">
+                                            <i class="fas fa-globe text-info mr-1"></i>
+                                            Hostname / FQDN
+                                        </label>
+                                        <input type="text"
+                                               class="form-control"
+                                               id="hostname"
+                                               name="hostname"
+                                               value="<%= server.hostname || '' %>"
+                                               placeholder="server01.example.com">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Beschreibung -->
+                            <div class="form-group">
+                                <label for="description">
+                                    <i class="fas fa-info-circle text-muted mr-1"></i>
+                                    Beschreibung (optional)
+                                </label>
+                                <textarea class="form-control"
+                                          id="description"
+                                          name="description"
+                                          rows="2"
+                                          placeholder="Optionale Beschreibung..."><%= server.description || '' %></textarea>
+                            </div>
+
+                            <!-- Resource-Limits -->
+                            <h6 class="mb-3 mt-4">
+                                <i class="fas fa-sliders-h text-primary mr-2"></i>
+                                Resource-Limits
+                                <small class="text-muted">(Kann später über Quota-System verwaltet werden)</small>
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="ramLimitGb">
+                                            <i class="fas fa-memory text-info mr-1"></i>
+                                            RAM-Limit (GB)
+                                        </label>
+                                        <input type="number"
+                                               class="form-control"
+                                               id="ramLimitGb"
+                                               name="ramLimitGb"
+                                               value="<%= server.ram_total_gb || '' %>"
+                                               step="0.5"
+                                               placeholder="Leer = unlimitiert">
+                                        <small class="form-text text-muted">
+                                            Maximaler RAM für Gameserver auf diesem Root-Server
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="diskLimitGb">
+                                            <i class="fas fa-hdd text-warning mr-1"></i>
+                                            Disk-Limit (GB)
+                                        </label>
+                                        <input type="number"
+                                               class="form-control"
+                                               id="diskLimitGb"
+                                               name="diskLimitGb"
+                                               value="<%= server.disk_total_gb || '' %>"
+                                               step="1"
+                                               placeholder="Leer = unlimitiert">
+                                        <small class="form-text text-muted">
+                                            Maximaler Disk-Space für Gameserver auf diesem Root-Server
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Netzwerk -->
+                            <h6 class="mb-3 mt-4">
+                                <i class="fas fa-network-wired text-success mr-2"></i>
+                                Netzwerk
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="ipAddress">
+                                            <i class="fas fa-network-wired text-success mr-1"></i>
+                                            IP-Adresse <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text"
+                                               class="form-control"
+                                               id="ipAddress"
+                                               name="ipAddress"
+                                               value="<%= server.host || '' %>"
+                                               placeholder="192.168.1.100"
+                                               required>
+                                        <small class="form-text text-muted">
+                                            Öffentliche IP für Gameserver
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="portRangeStart">Port-Range Start</label>
+                                        <input type="number"
+                                               class="form-control"
+                                               id="portRangeStart"
+                                               name="portRangeStart"
+                                               value="<%= server.port_range_start || '' %>"
+                                               placeholder="25565">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="portRangeEnd">Port-Range Ende</label>
+                                        <input type="number"
+                                               class="form-control"
+                                               id="portRangeEnd"
+                                               name="portRangeEnd"
+                                               value="<%= server.port_range_end || '' %>"
+                                               placeholder="25665">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Standort -->
+                            <h6 class="mb-3 mt-4">
+                                <i class="fas fa-location-dot text-danger mr-2"></i>
+                                Standort
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="form-group">
+                                        <label for="datacenter">Datacenter</label>
+                                        <input type="text"
+                                               class="form-control"
+                                               id="datacenter"
+                                               name="datacenter"
+                                               value="<%= server.datacenter || '' %>"
+                                               placeholder="Hetzner Falkenstein">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="countryCode">Land</label>
+                                        <input type="text"
+                                               class="form-control"
+                                               id="countryCode"
+                                               name="countryCode"
+                                               value="<%= server.country_code || '' %>"
+                                               maxlength="2"
+                                               placeholder="DE">
+                                        <small class="form-text text-muted">2-stelliger Code (z.B. DE, US)</small>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+
+                        <div class="card-footer">
+                            <div class="row">
+                                <div class="col-6">
+                                    <a href="/guild/<%= guildId %>/plugins/masterserver/servers"
+                                       class="btn btn-secondary">
+                                        <i class="fas fa-times mr-1"></i>
+                                        Abbrechen
+                                    </a>
+                                </div>
+                                <div class="col-6 text-right">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save mr-1"></i>
+                                        Änderungen speichern
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Sidebar: Server-Info -->
+            <div class="col-lg-4">
+                <!-- Current Status Card -->
+                <div class="card card-outline card-info">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            Server-Informationen
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Server-ID:</dt>
+                            <dd class="col-sm-7">
+                                <code style="font-size: 0.75rem;"><%= server.id %></code>
+                            </dd>
+
+                            <dt class="col-sm-5">Daemon-Status:</dt>
+                            <dd class="col-sm-7">
+                                <% if (daemonOnline) { %>
+                                    <span class="badge badge-success">
+                                        <i class="fas fa-circle"></i> Online
+                                    </span>
+                                <% } else { %>
+                                    <span class="badge badge-danger">
+                                        <i class="fas fa-circle"></i> Offline
+                                    </span>
+                                <% } %>
+                            </dd>
+
+                            <dt class="col-sm-5">Erstellt am:</dt>
+                            <dd class="col-sm-7">
+                                <%= new Date(server.created_at).toLocaleString('de-DE') %>
+                            </dd>
+
+                            <% if (server.gameserver_count !== null) { %>
+                            <dt class="col-sm-5">Gameserver:</dt>
+                            <dd class="col-sm-7">
+                                <strong><%= server.gameserver_count || 0 %></strong> Server
+                                <% if (server.gameserver_running_count > 0) { %>
+                                    <br><small class="text-success">
+                                        <i class="fas fa-play-circle"></i> <%= server.gameserver_running_count %> läuft
+                                    </small>
+                                <% } %>
+                            </dd>
+                            <% } %>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- Hardware Stats (if available) -->
+                <% if (server.cpu_cores || server.ram_total_gb) { %>
+                <div class="card card-outline card-info">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-microchip mr-2"></i>
+                            Tatsächliche Hardware
+                        </h3>
+                        <div class="card-tools">
+                            <span class="badge badge-info">
+                                <i class="fas fa-sync-alt"></i> Vom Daemon
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <small class="text-muted d-block mb-3">
+                            <i class="fas fa-info-circle"></i>
+                            Diese Daten werden automatisch vom Daemon gemeldet und zeigen die tatsächlich verfügbaren Ressourcen des Root-Servers.
+                        </small>
+                        <dl class="row mb-0">
+                            <% if (server.cpu_cores) { %>
+                            <dt class="col-sm-5">CPU:</dt>
+                            <dd class="col-sm-7">
+                                <%= server.cpu_cores %> Cores<% if (server.cpu_threads) { %> / <%= server.cpu_threads %> Threads<% } %>
+                                <% if (server.cpu_model) { %>
+                                    <br><small class="text-muted"><%= server.cpu_model %></small>
+                                <% } %>
+                                <% if (server.cpu_usage_percent !== null && !isNaN(parseFloat(server.cpu_usage_percent))) { %>
+                                    <br><small class="text-info">
+                                        <i class="fas fa-chart-line"></i> Auslastung: <%= parseFloat(server.cpu_usage_percent).toFixed(1) %>%
+                                    </small>
+                                <% } %>
+                            </dd>
+                            <% } %>
+
+                            <% if (server.ram_total_gb && !isNaN(parseFloat(server.ram_total_gb))) { %>
+                            <dt class="col-sm-5">RAM:</dt>
+                            <dd class="col-sm-7">
+                                <strong><%= parseFloat(server.ram_total_gb).toFixed(1) %> GB</strong> gesamt
+                                <% if (server.ram_usage_gb && !isNaN(parseFloat(server.ram_usage_gb))) { %>
+                                    <br><small class="text-info">
+                                        <i class="fas fa-chart-bar"></i>
+                                        <%= parseFloat(server.ram_usage_gb).toFixed(1) %> GB genutzt
+                                        (<%= ((parseFloat(server.ram_usage_gb) / parseFloat(server.ram_total_gb)) * 100).toFixed(1) %>%)
+                                    </small>
+                                <% } %>
+                            </dd>
+                            <% } %>
+
+                            <% if (server.disk_total_gb && !isNaN(parseFloat(server.disk_total_gb))) { %>
+                            <dt class="col-sm-5">Disk:</dt>
+                            <dd class="col-sm-7">
+                                <strong><%= parseFloat(server.disk_total_gb).toFixed(0) %> GB</strong> gesamt
+                                <% if (server.disk_usage_gb && !isNaN(parseFloat(server.disk_usage_gb))) { %>
+                                    <br><small class="text-info">
+                                        <i class="fas fa-chart-bar"></i>
+                                        <%= parseFloat(server.disk_usage_gb).toFixed(0) %> GB genutzt
+                                        (<%= ((parseFloat(server.disk_usage_gb) / parseFloat(server.disk_total_gb)) * 100).toFixed(1) %>%)
+                                    </small>
+                                <% } %>
+                            </dd>
+                            <% } %>
+
+                            <% if (server.last_stats_update) { %>
+                            <dt class="col-sm-12">
+                                <small class="text-muted">
+                                    <i class="fas fa-clock mr-1"></i>
+                                    Aktualisiert: <%= new Date(server.last_stats_update).toLocaleString('de-DE') %>
+                                </small>
+                            </dt>
+                            <% } %>
+                        </dl>
+                    </div>
+                </div>
+                <% } %>
+
+                <!-- Warning Card -->
+                <div class="card card-outline card-warning">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Wichtige Hinweise
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <ul class="mb-0 pl-3">
+                            <li class="mb-2">
+                                <strong>Resource-Limits:</strong> Limits gelten für alle Gameserver auf diesem Server zusammen.
+                            </li>
+                            <li class="mb-2">
+                                <strong>Port-Range:</strong> Definiert welche Ports für Gameserver verfügbar sind.
+                            </li>
+                            <li class="mb-2">
+                                <strong>Status-Änderung:</strong> "Wartung" verhindert das Starten neuer Gameserver.
+                            </li>
+                            <li>
+                                <strong>Name-Duplikate:</strong> Der Server-Name muss eindeutig sein.
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

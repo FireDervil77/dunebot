@@ -1,0 +1,94 @@
+{
+  "plugin": "masterserver",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "MASTERSERVER.VIEW",
+      "name": "MasterServer anzeigen",
+      "description": "Berechtigung um MasterServer-Panel zu sehen",
+      "category": "masterserver",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "MASTERSERVER.DAEMON.MANAGE",
+      "name": "Daemon verwalten",
+      "description": "Berechtigung um Daemon-Instanzen zu konfigurieren und zu verbinden",
+      "category": "masterserver",
+      "is_dangerous": 1,
+      "requires": "MASTERSERVER.VIEW"
+    },
+    {
+      "key": "MASTERSERVER.ROOTSERVER.VIEW",
+      "name": "RootServer anzeigen",
+      "description": "Berechtigung um RootServer-Liste und Details zu sehen",
+      "category": "masterserver",
+      "is_dangerous": 0,
+      "requires": "MASTERSERVER.VIEW"
+    },
+    {
+      "key": "MASTERSERVER.ROOTSERVER.CREATE",
+      "name": "RootServer erstellen",
+      "description": "Berechtigung um neue RootServer anzulegen (kritisch - kostet Ressourcen)",
+      "category": "masterserver",
+      "is_dangerous": 1,
+      "requires": "MASTERSERVER.ROOTSERVER.VIEW"
+    },
+    {
+      "key": "MASTERSERVER.ROOTSERVER.EDIT",
+      "name": "RootServer bearbeiten",
+      "description": "Berechtigung um RootServer-Einstellungen zu ändern",
+      "category": "masterserver",
+      "is_dangerous": 0,
+      "requires": "MASTERSERVER.ROOTSERVER.VIEW"
+    },
+    {
+      "key": "MASTERSERVER.ROOTSERVER.DELETE",
+      "name": "RootServer löschen",
+      "description": "Berechtigung um RootServer zu entfernen (KRITISCH - löscht alle Gameserver!)",
+      "category": "masterserver",
+      "is_dangerous": 1,
+      "requires": "MASTERSERVER.ROOTSERVER.VIEW"
+    },
+    {
+      "key": "MASTERSERVER.RESOURCES.VIEW",
+      "name": "Ressourcen anzeigen",
+      "description": "Berechtigung um Ressourcen-Übersicht und Quota-Profile zu sehen",
+      "category": "masterserver",
+      "is_dangerous": 0,
+      "requires": "MASTERSERVER.VIEW"
+    },
+    {
+      "key": "MASTERSERVER.RESOURCES.MANAGE",
+      "name": "Ressourcen verwalten",
+      "description": "Berechtigung um Quota-Profile zu erstellen und zu bearbeiten",
+      "category": "masterserver",
+      "is_dangerous": 0,
+      "requires": "MASTERSERVER.RESOURCES.VIEW"
+    },
+    {
+      "key": "MASTERSERVER.TOKENS.VIEW",
+      "name": "Tokens anzeigen",
+      "description": "Berechtigung um API-Tokens zu sehen",
+      "category": "masterserver",
+      "is_dangerous": 0,
+      "requires": "MASTERSERVER.VIEW"
+    },
+    {
+      "key": "MASTERSERVER.TOKENS.MANAGE",
+      "name": "Tokens verwalten",
+      "description": "Berechtigung um API-Tokens zu erstellen, bearbeiten und löschen (kritisch)",
+      "category": "masterserver",
+      "is_dangerous": 1,
+      "requires": "MASTERSERVER.TOKENS.VIEW"
+    },
+    {
+      "key": "MASTERSERVER.LOGS.VIEW",
+      "name": "Daemon-Logs anzeigen",
+      "description": "Berechtigung um Daemon-System-Logs zu sehen",
+      "category": "masterserver",
+      "is_dangerous": 0,
+      "requires": "MASTERSERVER.VIEW"
+    }
+  ]
+}

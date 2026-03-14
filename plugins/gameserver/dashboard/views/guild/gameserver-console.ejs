@@ -1,0 +1,521 @@
+<%
+/**
+ * Gameserver Live Console
+ * 
+ * Features:
+ * - xterm.js Terminal-Emulation
+ * - Tab-basiertes Auto-Connect/Disconnect (Page Visibility API)
+ * - SSE für Live-Output-Streaming
+ * - RCON für Command-Sending
+ * - Command-History (Pfeiltasten)
+ * - Auto-Scroll mit Toggle
+ * 
+ * @author FireBot Team
+ */
+
+const server = locals.server; // Server-Daten vom Backend
+const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, etc.)
+%>
+
+<div class="content-wrapper">
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fas fa-terminal"></i> 
+                        Live Console - <%= server.name %>
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <div class="float-right">
+                        <!-- Status Badge -->
+                        <span class="badge badge-<%= server.status === 'online' ? 'success' : server.status === 'starting' ? 'warning' : 'secondary' %> mr-2">
+                            <i class="fas fa-circle"></i> 
+                            <%= server.status.toUpperCase() %>
+                        </span>
+                        
+                        <!-- Connection Status -->
+                        <span id="connection-status" class="badge badge-secondary">
+                            <i class="fas fa-plug"></i> Disconnected
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="container-fluid">
+            
+            <!-- Console Card -->
+            <div class="card card-dark card-outline">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-terminal"></i> Terminal Output
+                    </h3>
+                    
+                    <div class="card-tools">
+                        <!-- Auto-Scroll Toggle -->
+                        <div class="custom-control custom-switch d-inline-block mr-2">
+                            <input type="checkbox" class="custom-control-input" id="autoscroll-toggle" checked>
+                            <label class="custom-control-label" for="autoscroll-toggle">
+                                <i class="fas fa-arrow-down"></i> Auto-Scroll
+                            </label>
+                        </div>
+                        
+                        <!-- Clear Button -->
+                        <button type="button" class="btn btn-tool" id="clear-console" title="Console leeren">
+                            <i class="fas fa-eraser"></i>
+                        </button>
+                        
+                        <!-- Fullscreen Button -->
+                        <button type="button" class="btn btn-tool" data-card-widget="maximize">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="card-body p-0" style="background: #1e1e1e;">
+                    <!-- xterm.js Terminal -->
+                    <div id="terminal-container" style="height: 500px; padding: 10px;"></div>
+                </div>
+                
+                <% if (serverConfig.rconSupported !== false) { %>
+                <!-- Command Input Footer (nur wenn RCON supported) -->
+                <div class="card-footer">
+                    <form id="command-form" class="input-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">
+                                <i class="fas fa-chevron-right"></i>
+                            </span>
+                        </div>
+                        <input 
+                            type="text" 
+                            id="command-input" 
+                            class="form-control" 
+                            placeholder="Enter command... (e.g. say Hello World)"
+                            autocomplete="off"
+                            disabled
+                        >
+                        <div class="input-group-append">
+                            <button type="submit" class="btn btn-primary" disabled>
+                                <i class="fas fa-paper-plane"></i> Send
+                            </button>
+                        </div>
+                    </form>
+                    <small class="text-muted mt-1 d-block">
+                        <i class="fas fa-info-circle"></i> 
+                        Use <kbd>↑</kbd> <kbd>↓</kbd> for command history
+                        | Commands remaining: <span id="rate-limit-remaining">-</span>
+                    </small>
+                </div>
+                <% } else { %>
+                <!-- Info: Commands not available -->
+                <div class="card-footer bg-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Commands nicht verfügbar:</strong> 
+                    Dieses Spiel unterstützt keine Remote-Commands (kein RCON).
+                    Du kannst nur den Server-Output sehen.
+                </div>
+                <% } %>
+            </div>
+            
+            <!-- Info Card -->
+            <div class="card card-info collapsed-card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-info-circle"></i> Console Info
+                    </h3>
+                    <div class="card-tools">
+                        <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-3">Server ID:</dt>
+                        <dd class="col-sm-9"><code><%= server.id %></code></dd>
+                        
+                        <dt class="col-sm-3">Game:</dt>
+                        <dd class="col-sm-9"><%= server.addon_name %></dd>
+                        
+                        <dt class="col-sm-3">RCON Support:</dt>
+                        <dd class="col-sm-9">
+                            <% if (serverConfig.rconSupported !== false) { %>
+                                <span class="badge badge-success">
+                                    <i class="fas fa-check"></i> Ja
+                                </span>
+                            <% } else { %>
+                                <span class="badge badge-secondary">
+                                    <i class="fas fa-times"></i> Nein
+                                </span>
+                            <% } %>
+                        </dd>
+                        
+                        <dt class="col-sm-3">Auto-Connect:</dt>
+                        <dd class="col-sm-9">
+                            <span class="badge badge-info">
+                                <i class="fas fa-eye"></i> Tab-basiert
+                            </span>
+                            <small class="text-muted d-block">
+                                Console verbindet automatisch wenn Tab sichtbar ist und trennt bei Tab-Wechsel
+                            </small>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<!-- xterm.js CSS + JS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+
+<script>
+(function() {
+    'use strict';
+    
+    // ════════════════════════════════════════════════════════════════════════════
+    // Configuration
+    // ════════════════════════════════════════════════════════════════════════════
+    const CONFIG = {
+        serverId: '<%= server.id %>',
+        guildId: '<%= locals.guildId %>',
+        rconSupported: <%= serverConfig.rconSupported !== false ? 'true' : 'false' %>,
+        maxHistoryLines: 1000,
+        reconnectDelay: 2000,
+        maxReconnectDelay: 30000
+    };
+    
+    // ════════════════════════════════════════════════════════════════════════════
+    // xterm.js Terminal Setup
+    // ════════════════════════════════════════════════════════════════════════════
+    const term = new Terminal({
+        cursorBlink: false,
+        fontSize: 13,
+        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        theme: {
+            background: '#1e1e1e',
+            foreground: '#d4d4d4',
+            cursor: '#aeafad',
+            black: '#000000',
+            red: '#cd3131',
+            green: '#0dbc79',
+            yellow: '#e5e510',
+            blue: '#2472c8',
+            magenta: '#bc3fbc',
+            cyan: '#11a8cd',
+            white: '#e5e5e5',
+            brightBlack: '#666666',
+            brightRed: '#f14c4c',
+            brightGreen: '#23d18b',
+            brightYellow: '#f5f543',
+            brightBlue: '#3b8eea',
+            brightMagenta: '#d670d6',
+            brightCyan: '#29b8db',
+            brightWhite: '#e5e5e5'
+        },
+        scrollback: CONFIG.maxHistoryLines,
+        convertEol: true
+    });
+    
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal-container'));
+    fitAddon.fit();
+    
+    // Resize handler
+    window.addEventListener('resize', () => fitAddon.fit());
+    
+    // ════════════════════════════════════════════════════════════════════════════
+    // State Management
+    // ════════════════════════════════════════════════════════════════════════════
+    let state = {
+        connected: false,
+        clientId: null,
+        sseClient: null,
+        autoScroll: true,
+        reconnectAttempt: 0,
+        reconnectTimeout: null,
+        commandHistory: [],
+        historyIndex: -1
+    };
+    
+    // ════════════════════════════════════════════════════════════════════════════
+    // SSE Client für Console-Output
+    // ════════════════════════════════════════════════════════════════════════════
+    function connect() {
+        if (state.connected) {
+            console.log('[Console] Already connected, skipping...');
+            return;
+        }
+        
+        console.log('[Console] Connecting...');
+        updateConnectionStatus('connecting', 'Connecting...');
+        
+        // 1. Attach zu Server (bekommt client_id + history)
+        fetch(`/guild/${CONFIG.guildId}/plugins/gameserver/console/${CONFIG.serverId}/attach`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.message || 'Attach failed');
+            }
+            
+            state.clientId = data.client_id;
+            console.log(`[Console] Attached, client_id: ${state.clientId}`);
+            
+            // History anzeigen (letzte N Zeilen)
+            if (data.history && data.history.length > 0) {
+                term.writeln('\x1b[90m═══ Console History (last ' + data.line_count + ' lines) ═══\x1b[0m');
+                data.history.forEach(line => term.writeln(line));
+                term.writeln('\x1b[90m═══ Live Output ═══\x1b[0m');
+            } else {
+                term.writeln('\x1b[90m[Console] Waiting for output...\x1b[0m');
+            }
+            
+            // 2. SSE-Stream starten
+            startSSE();
+            
+            state.connected = true;
+            state.reconnectAttempt = 0;
+            updateConnectionStatus('connected', 'Connected');
+            enableCommandInput();
+            
+        })
+        .catch(err => {
+            console.error('[Console] Attach failed:', err);
+            term.writeln(`\x1b[31m✖ Connection failed: ${err.message}\x1b[0m`);
+            updateConnectionStatus('error', 'Connection failed');
+            
+            // Auto-Reconnect
+            scheduleReconnect();
+        });
+    }
+    
+    function startSSE() {
+        const url = `/guild/${CONFIG.guildId}/plugins/gameserver/console/${CONFIG.serverId}/stream?client_id=${state.clientId}`;
+        state.sseClient = new EventSource(url);
+        
+        state.sseClient.addEventListener('console', (e) => {
+            const data = JSON.parse(e.data);
+            term.write(data.line + '\r\n');
+            
+            if (state.autoScroll) {
+                term.scrollToBottom();
+            }
+        });
+        
+        state.sseClient.addEventListener('status', (e) => {
+            const data = JSON.parse(e.data);
+            term.writeln(`\x1b[33m[Status] ${data.message}\x1b[0m`);
+        });
+        
+        state.sseClient.onerror = (e) => {
+            console.error('[Console] SSE error:', e);
+            disconnect(true); // Auto-reconnect
+        };
+        
+        console.log('[Console] SSE stream started');
+    }
+    
+    function disconnect(autoReconnect = false) {
+        if (!state.connected) return;
+        
+        console.log('[Console] Disconnecting...');
+        state.connected = false;
+        
+        // SSE schließen
+        if (state.sseClient) {
+            state.sseClient.close();
+            state.sseClient = null;
+        }
+        
+        // Detach vom Server
+        if (state.clientId) {
+            fetch(`/guild/${CONFIG.guildId}/plugins/gameserver/console/${CONFIG.serverId}/detach`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ client_id: state.clientId })
+            }).catch(err => console.error('[Console] Detach failed:', err));
+            
+            state.clientId = null;
+        }
+        
+        updateConnectionStatus('disconnected', 'Disconnected');
+        disableCommandInput();
+        
+        if (autoReconnect) {
+            scheduleReconnect();
+        }
+    }
+    
+    function scheduleReconnect() {
+        if (state.reconnectTimeout) return;
+        
+        state.reconnectAttempt++;
+        const delay = Math.min(
+            CONFIG.reconnectDelay * Math.pow(2, state.reconnectAttempt - 1),
+            CONFIG.maxReconnectDelay
+        );
+        
+        console.log(`[Console] Reconnect in ${delay}ms (attempt ${state.reconnectAttempt})`);
+        term.writeln(`\x1b[33m⟳ Reconnecting in ${delay/1000}s...\x1b[0m`);
+        
+        state.reconnectTimeout = setTimeout(() => {
+            state.reconnectTimeout = null;
+            connect();
+        }, delay);
+    }
+    
+    // ════════════════════════════════════════════════════════════════════════════
+    // Page Visibility API - Auto Connect/Disconnect
+    // ════════════════════════════════════════════════════════════════════════════
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            console.log('[Console] Tab hidden → Disconnecting');
+            term.writeln('\x1b[90m[Console] Tab inactive, disconnecting...\x1b[0m');
+            disconnect(false);
+        } else {
+            console.log('[Console] Tab visible → Connecting');
+            term.writeln('\x1b[90m[Console] Tab active, reconnecting...\x1b[0m');
+            connect();
+        }
+    });
+    
+    // Cleanup bei Page Unload
+    window.addEventListener('beforeunload', () => {
+        disconnect(false);
+    });
+    
+    // ════════════════════════════════════════════════════════════════════════════
+    // Command Input (RCON)
+    // ════════════════════════════════════════════════════════════════════════════
+    <% if (serverConfig.rconSupported !== false) { %>
+    const commandForm = document.getElementById('command-form');
+    const commandInput = document.getElementById('command-input');
+    
+    commandForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const command = commandInput.value.trim();
+        if (!command) return;
+        
+        // Command zur History hinzufügen
+        state.commandHistory.push(command);
+        state.historyIndex = state.commandHistory.length;
+        
+        // Command anzeigen (lokales Echo)
+        term.writeln(`\x1b[36m> ${command}\x1b[0m`);
+        
+        // Command senden
+        try {
+            const res = await fetch(`/guild/${CONFIG.guildId}/plugins/gameserver/console/${CONFIG.serverId}/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command })
+            });
+            
+            const data = await res.json();
+            
+            if (!data.success) {
+                term.writeln(`\x1b[31m✖ ${data.message}\x1b[0m`);
+                
+                if (data.rate_limit) {
+                    document.getElementById('rate-limit-remaining').textContent = data.rate_limit.remaining;
+                }
+            } else {
+                // Update rate limit counter
+                if (data.rate_limit) {
+                    document.getElementById('rate-limit-remaining').textContent = data.rate_limit.remaining;
+                }
+            }
+            
+        } catch (err) {
+            term.writeln(`\x1b[31m✖ Failed to send command: ${err.message}\x1b[0m`);
+        }
+        
+        commandInput.value = '';
+    });
+    
+    // Command History (Pfeiltasten)
+    commandInput.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (state.historyIndex > 0) {
+                state.historyIndex--;
+                commandInput.value = state.commandHistory[state.historyIndex];
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (state.historyIndex < state.commandHistory.length - 1) {
+                state.historyIndex++;
+                commandInput.value = state.commandHistory[state.historyIndex];
+            } else {
+                state.historyIndex = state.commandHistory.length;
+                commandInput.value = '';
+            }
+        }
+    });
+    
+    function enableCommandInput() {
+        commandInput.disabled = false;
+        commandForm.querySelector('button[type="submit"]').disabled = false;
+    }
+    
+    function disableCommandInput() {
+        commandInput.disabled = true;
+        commandForm.querySelector('button[type="submit"]').disabled = true;
+    }
+    <% } %>
+    
+    // ════════════════════════════════════════════════════════════════════════════
+    // UI Controls
+    // ════════════════════════════════════════════════════════════════════════════
+    document.getElementById('autoscroll-toggle').addEventListener('change', (e) => {
+        state.autoScroll = e.target.checked;
+        if (state.autoScroll) {
+            term.scrollToBottom();
+        }
+    });
+    
+    document.getElementById('clear-console').addEventListener('click', () => {
+        term.clear();
+        term.writeln('\x1b[90m[Console] Cleared\x1b[0m');
+    });
+    
+    function updateConnectionStatus(status, text) {
+        const badge = document.getElementById('connection-status');
+        badge.className = 'badge badge-' + 
+            (status === 'connected' ? 'success' : 
+             status === 'connecting' ? 'warning' : 
+             status === 'error' ? 'danger' : 'secondary');
+        badge.innerHTML = '<i class="fas fa-' + 
+            (status === 'connected' ? 'check-circle' : 
+             status === 'connecting' ? 'spinner fa-spin' : 
+             status === 'error' ? 'exclamation-triangle' : 'plug') + 
+            '"></i> ' + text;
+    }
+    
+    // ════════════════════════════════════════════════════════════════════════════
+    // Auto-Connect on Page Load
+    // ════════════════════════════════════════════════════════════════════════════
+    if (!document.hidden) {
+        term.writeln('\x1b[36m╔═══════════════════════════════════════════════════════════════╗\x1b[0m');
+        term.writeln('\x1b[36m║  FireBot Live Console - <%= server.name %>\x1b[0m');
+        term.writeln('\x1b[36m╚═══════════════════════════════════════════════════════════════╝\x1b[0m');
+        term.writeln('');
+        connect();
+    } else {
+        term.writeln('\x1b[90m[Console] Tab not visible, waiting for activation...\x1b[0m');
+    }
+    
+})();
+</script>

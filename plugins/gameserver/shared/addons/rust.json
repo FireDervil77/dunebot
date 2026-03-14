@@ -1,0 +1,291 @@
+{
+  "meta": {
+    "version": "PTDL_v2",
+    "author": "DuneBot Official",
+    "update_url": null
+  },
+  "exported_at": "2025-10-19T00:00:00+00:00",
+  "name": "Rust",
+  "slug": "rust",
+  "description": "Rust Dedicated Server mit Oxide/uMod-Support für Plugins. Hardcore-Survival-PvP mit umfangreichen Konfigurationsmöglichkeiten.",
+  "category": "survival",
+  "tags": [
+    "steam",
+    "survival",
+    "pvp",
+    "hardcore",
+    "oxide",
+    "plugins"
+  ],
+  "visibility": "official",
+  "trust_level": "official",
+  "status": "approved",
+  "features": [
+    "oxide",
+    "plugins",
+    "rcon"
+  ],
+  "steam": {
+    "app_id": 252490,
+    "server_app_id": 258550,
+    "install_dir": "rust"
+  },
+  "installation": {
+    "method": "steamcmd",
+    "app_id": "258550",
+    "validate": true,
+    "script": "#!/bin/bash\ncd \"${INSTALL_DIR}\"\n\"${STEAMCMD}\" +force_install_dir \"${INSTALL_DIR}\" +login anonymous +app_update 258550 validate +quit\n\n# Oxide Installation (optional)\nif [ \"{{INSTALL_OXIDE}}\" == \"1\" ]; then\n  wget -O oxide.zip https://umod.org/games/rust/download\n  unzip -o oxide.zip -d /mnt/server\n  rm oxide.zip\nfi"
+  },
+  "startup": {
+    "command": "./RustDedicated -batchmode +server.hostname \"{{SERVER_NAME}}\" +server.port {{SERVER_PORT}} +server.maxplayers {{MAX_PLAYERS}} +server.worldsize {{WORLD_SIZE}} +server.seed {{WORLD_SEED}} +rcon.port {{RCON_PORT}} +rcon.password {{RCON_PASSWORD}} +rcon.web 1 +server.headerimage {{HEADER_IMAGE}} +server.url {{SERVER_URL}} +server.description \"{{SERVER_DESCRIPTION}}\" +server.saveinterval {{SAVE_INTERVAL}}",
+    "done": "Server startup complete",
+    "stop": "quit"
+  },
+  "config": {
+    "files": {
+      "server/{{SERVER_IDENTITY}}/cfg/server.cfg": {
+        "parser": "file",
+        "find": {
+          "server.hostname": "server.hostname \"{{SERVER_NAME}}\"",
+          "server.maxplayers": "server.maxplayers {{MAX_PLAYERS}}",
+          "server.worldsize": "server.worldsize {{WORLD_SIZE}}",
+          "server.seed": "server.seed {{WORLD_SEED}}",
+          "server.pve": "server.pve {{PVE_MODE}}",
+          "decay.scale": "decay.scale {{DECAY_SCALE}}"
+        }
+      }
+    },
+    "startup": {
+      "done": "Server startup complete"
+    },
+    "logs": {},
+    "stop": "quit",
+    "rcon": {
+      "protocol": "srcds",
+      "port_var": "RCON_PORT",
+      "password_var": "RCON_PASSWORD"
+    }
+  },
+  "variables": [
+    {
+      "name": "Server Name",
+      "description": "Name deines Rust-Servers",
+      "env_variable": "SERVER_NAME",
+      "default_value": "My Rust Server",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Server Description",
+      "description": "Beschreibung für die Serverliste",
+      "env_variable": "SERVER_DESCRIPTION",
+      "default_value": "Welcome to my Rust server!",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string|max:500",
+      "field_type": "textarea"
+    },
+    {
+      "name": "Server Identity",
+      "description": "Eindeutiger Identifier für Savegame (nur a-z, 0-9, -)",
+      "env_variable": "SERVER_IDENTITY",
+      "default_value": "rustserver",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|alpha_dash|max:30",
+      "field_type": "text"
+    },
+    {
+      "name": "Max Players",
+      "description": "Maximale Spieleranzahl",
+      "env_variable": "MAX_PLAYERS",
+      "default_value": "50",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:1|max:500",
+      "field_type": "number"
+    },
+    {
+      "name": "World Size",
+      "description": "Weltgröße in Metern (Standard: 3000-5000)",
+      "env_variable": "WORLD_SIZE",
+      "default_value": "4000",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:1000|max:8000",
+      "field_type": "number"
+    },
+    {
+      "name": "World Seed",
+      "description": "Map-Seed (Zahl für immer gleiche Map, 0 = Random)",
+      "env_variable": "WORLD_SEED",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:0",
+      "field_type": "number"
+    },
+    {
+      "name": "Server Port",
+      "description": "Hauptport des Servers",
+      "env_variable": "SERVER_PORT",
+      "default_value": "28015",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "RCON Port",
+      "description": "RCON Port für Remote-Administration",
+      "env_variable": "RCON_PORT",
+      "default_value": "28016",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "RCON Password",
+      "description": "RCON Passwort",
+      "env_variable": "RCON_PASSWORD",
+      "default_value": "AUTOGENERATE",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|min:8",
+      "field_type": "password"
+    },
+    {
+      "name": "Save Interval",
+      "description": "Autosave Interval in Sekunden",
+      "env_variable": "SAVE_INTERVAL",
+      "default_value": "300",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:60|max:3600",
+      "field_type": "number"
+    },
+    {
+      "name": "Header Image URL",
+      "description": "Banner-Bild URL (512x256 empfohlen)",
+      "env_variable": "HEADER_IMAGE",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|url",
+      "field_type": "text"
+    },
+    {
+      "name": "Server URL",
+      "description": "Website-URL deines Servers",
+      "env_variable": "SERVER_URL",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|url",
+      "field_type": "text"
+    },
+    {
+      "name": "PvE Mode",
+      "description": "PvE-Modus aktivieren? (true/false)",
+      "env_variable": "PVE_MODE",
+      "default_value": "false",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:true,false",
+      "field_type": "select",
+      "select_options": {
+        "false": "PvP (Standard)",
+        "true": "PvE (kein Spieler-Schaden)"
+      }
+    },
+    {
+      "name": "Decay Scale",
+      "description": "Zerfalls-Multiplikator für Gebäude (0 = kein Zerfall)",
+      "env_variable": "DECAY_SCALE",
+      "default_value": "1.0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|min:0|max:10",
+      "field_type": "number"
+    },
+    {
+      "name": "Install Oxide/uMod",
+      "description": "Oxide/uMod für Plugins installieren?",
+      "env_variable": "INSTALL_OXIDE",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "boolean"
+    }
+  ],
+  "templates": [
+    {
+      "name": "vanilla",
+      "label": "Vanilla PvP",
+      "description": "Standard Rust-PvP ohne Mods (Oxide optional)",
+      "icon": "fa-fire",
+      "variables": {
+        "MAX_PLAYERS": "100",
+        "WORLD_SIZE": "4000",
+        "PVE_MODE": "false",
+        "DECAY_SCALE": "1.0",
+        "INSTALL_OXIDE": "0"
+      }
+    },
+    {
+      "name": "modded",
+      "label": "Modded (Oxide)",
+      "description": "Mit Oxide/uMod für Plugins (z.B. Kits, TP, Clans)",
+      "icon": "fa-puzzle-piece",
+      "variables": {
+        "MAX_PLAYERS": "100",
+        "WORLD_SIZE": "4000",
+        "PVE_MODE": "false",
+        "DECAY_SCALE": "0.5",
+        "INSTALL_OXIDE": "1"
+      }
+    },
+    {
+      "name": "pve",
+      "label": "PvE Server",
+      "description": "Kooperativer PvE-Server mit reduziertem Zerfall",
+      "icon": "fa-handshake",
+      "variables": {
+        "MAX_PLAYERS": "50",
+        "WORLD_SIZE": "3500",
+        "PVE_MODE": "true",
+        "DECAY_SCALE": "0.2",
+        "INSTALL_OXIDE": "1"
+      }
+    }
+  ],
+  "ports": {
+    "game": {
+      "default": 28015,
+      "protocol": "udp",
+      "description": "Game Port"
+    },
+    "rcon": {
+      "default": 28016,
+      "protocol": "tcp",
+      "description": "RCON Port"
+    }
+  },
+  "requirements": {
+    "ram_min_mb": 8192,
+    "ram_recommended_mb": 12288,
+    "cpu_cores_min": 2,
+    "disk_min_gb": 20,
+    "disk_recommended_gb": 30
+  },
+  "assets": {
+    "icon_url": "https://cdn.akamai.steamstatic.com/steam/apps/252490/header.jpg",
+    "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/252490/library_hero.jpg",
+    "screenshots": []
+  },
+  "changelog": "Initial release - Rust with Oxide support and 3 templates"
+}

@@ -1,0 +1,325 @@
+<!-- RootServer Detail-Seite -->
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">
+                    <i class="fa-solid fa-server mr-2"></i>
+                    <%= rootserver.name %>
+                    <% if (isOnline) { %>
+                        <span class="badge badge-success ml-2" style="font-size:0.6em;">
+                            <i class="fa-solid fa-circle mr-1"></i>Online
+                        </span>
+                    <% } else { %>
+                        <span class="badge badge-secondary ml-2" style="font-size:0.6em;">
+                            <i class="fa-solid fa-circle mr-1"></i>Offline
+                        </span>
+                    <% } %>
+                </h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver">Masterserver</a></li>
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver/rootservers">RootServer</a></li>
+                    <li class="breadcrumb-item active"><%= rootserver.name %></li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+
+        <div class="row mb-3">
+            <div class="col-12">
+                <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-secondary btn-sm">
+                    <i class="fa-solid fa-arrow-left mr-1"></i>Zurück zur Übersicht
+                </a>
+            </div>
+        </div>
+
+        <!-- Status-Karten -->
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <div class="info-box">
+                    <span class="info-box-icon <%= isOnline ? 'bg-success' : 'bg-secondary' %>">
+                        <i class="fa-solid fa-plug"></i>
+                    </span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Daemon-Status</span>
+                        <span class="info-box-number"><%= isOnline ? 'Online' : 'Offline' %></span>
+                        <% if (rootserver.daemon_version) { %>
+                            <span class="progress-description">v<%= rootserver.daemon_version %></span>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="info-box">
+                    <span class="info-box-icon bg-info">
+                        <i class="fa-solid fa-microchip"></i>
+                    </span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">CPU</span>
+                        <span class="info-box-number">
+                            <%= rootserver.cpu_cores ? rootserver.cpu_cores + ' Cores' : '–' %>
+                        </span>
+                        <% if (rootserver.cpu_model) { %>
+                            <span class="progress-description text-truncate" style="max-width:160px;" title="<%= rootserver.cpu_model %>"><%= rootserver.cpu_model %></span>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="info-box">
+                    <span class="info-box-icon bg-warning">
+                        <i class="fa-solid fa-memory"></i>
+                    </span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">RAM</span>
+                        <span class="info-box-number">
+                            <%= rootserver.ram_total_gb ? rootserver.ram_total_gb + ' GB' : '–' %>
+                        </span>
+                        <% if (rootserver.ram_usage_gb && rootserver.ram_total_gb) { %>
+                            <span class="progress-description"><%= parseFloat(rootserver.ram_usage_gb).toFixed(1) %> GB belegt</span>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="info-box">
+                    <span class="info-box-icon bg-primary">
+                        <i class="fa-solid fa-gamepad"></i>
+                    </span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Gameserver</span>
+                        <span class="info-box-number"><%= gameserverStats.total || 0 %></span>
+                        <% if (gameserverStats.running > 0) { %>
+                            <span class="progress-description"><%= gameserverStats.running %> laufend</span>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="card card-primary card-outline">
+            <div class="card-header p-0 pt-1">
+                <ul class="nav nav-tabs" id="rootserverTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-toggle="tab" href="#tab-overview">
+                            <i class="fa-solid fa-chart-line mr-1"></i>Übersicht
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="tab" href="#tab-settings">
+                            <i class="fa-solid fa-sliders mr-1"></i>Einstellungen
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="tab" href="#tab-daemon">
+                            <i class="fa-solid fa-terminal mr-1"></i>Daemon-Info
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content">
+
+                    <!-- Tab: Übersicht -->
+                    <div class="tab-pane fade show active" id="tab-overview">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <table class="table table-sm table-borderless">
+                                    <tbody>
+                                        <tr>
+                                            <td class="text-muted" width="40%">Name</td>
+                                            <td><strong><%= rootserver.name %></strong></td>
+                                        </tr>
+                                        <% if (rootserver.description) { %>
+                                        <tr>
+                                            <td class="text-muted">Beschreibung</td>
+                                            <td><%= rootserver.description %></td>
+                                        </tr>
+                                        <% } %>
+                                        <tr>
+                                            <td class="text-muted">Host / IP</td>
+                                            <td><code><%= rootserver.host || '–' %></code></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Hostname</td>
+                                            <td><%= rootserver.hostname || '–' %></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Daemon-Port</td>
+                                            <td><code><%= rootserver.daemon_port || 9340 %></code></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Standort</td>
+                                            <td>
+                                                <%= rootserver.datacenter || '–' %>
+                                                <% if (rootserver.country_code) { %>
+                                                    <span class="badge badge-light ml-1"><%= rootserver.country_code %></span>
+                                                <% } %>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Disk</td>
+                                            <td><%= rootserver.disk_total_gb ? rootserver.disk_total_gb + ' GB' : '–' %></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Erstellt</td>
+                                            <td><%= rootserver.created_at ? new Date(rootserver.created_at).toLocaleString('de-DE') : '–' %></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Zuletzt gesehen</td>
+                                            <td><%= rootserver.last_seen ? new Date(rootserver.last_seen).toLocaleString('de-DE') : 'Noch nie verbunden' %></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <% if (!isOnline) { %>
+                                    <div class="callout callout-warning">
+                                        <h6><i class="fa-solid fa-triangle-exclamation mr-1"></i>Daemon offline</h6>
+                                        <p class="mb-2">Der Daemon ist nicht verbunden. Prüfe ob der Service auf dem Server läuft:</p>
+                                        <pre class="bg-dark text-white p-2 rounded" style="font-size:0.8rem;"><code>sudo systemctl status firebot-daemon
+sudo journalctl -u firebot-daemon -n 50</code></pre>
+                                    </div>
+                                <% } else { %>
+                                    <div class="callout callout-success">
+                                        <h6><i class="fa-solid fa-circle-check mr-1"></i>Daemon verbunden</h6>
+                                        <p class="mb-0">Der Daemon ist online und bereit. Gameserver können erstellt werden.</p>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Einstellungen -->
+                    <div class="tab-pane fade" id="tab-settings">
+                        <form class="guild-ajax-form"
+                              data-form-type="update-rootserver"
+                              data-method="PUT"
+                              action="/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>"
+                              method="POST">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Name</label>
+                                        <input type="text" class="form-control" name="name" value="<%= rootserver.name %>" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Hostname / FQDN</label>
+                                        <input type="text" class="form-control" name="hostname" value="<%= rootserver.hostname || '' %>" placeholder="server01.example.com">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Host / IP</label>
+                                        <input type="text" class="form-control" name="host" value="<%= rootserver.host || '' %>" placeholder="91.200.102.182">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>Daemon-Port</label>
+                                        <input type="number" class="form-control" name="daemon_port" value="<%= rootserver.daemon_port || 9340 %>">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>Ländercode</label>
+                                        <input type="text" class="form-control" name="country_code" value="<%= rootserver.country_code || '' %>" maxlength="2" placeholder="DE">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Rechenzentrum</label>
+                                        <input type="text" class="form-control" name="datacenter" value="<%= rootserver.datacenter || '' %>" placeholder="Hetzner Falkenstein">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>RAM gesamt (GB)</label>
+                                        <input type="number" class="form-control" name="ram_total_gb" value="<%= rootserver.ram_total_gb || '' %>" step="0.5">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>Disk gesamt (GB)</label>
+                                        <input type="number" class="form-control" name="disk_total_gb" value="<%= rootserver.disk_total_gb || '' %>" step="1">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Beschreibung</label>
+                                <textarea class="form-control" name="description" rows="2"><%= rootserver.description || '' %></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa-solid fa-save mr-1"></i>Speichern
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Tab: Daemon-Info -->
+                    <div class="tab-pane fade" id="tab-daemon">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <table class="table table-sm table-borderless">
+                                    <tbody>
+                                        <tr>
+                                            <td class="text-muted" width="40%">Daemon-ID</td>
+                                            <td><code style="font-size:0.8rem;"><%= rootserver.daemon_id %></code></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Version</td>
+                                            <td><%= rootserver.daemon_version || '–' %></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Install-Status</td>
+                                            <td>
+                                                <span class="badge badge-<%= rootserver.install_status === 'completed' ? 'success' : rootserver.install_status === 'pending' ? 'warning' : 'danger' %>">
+                                                    <%= rootserver.install_status || 'unknown' %>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Letzter Ping</td>
+                                            <td><%= rootserver.last_ping_ms != null ? rootserver.last_ping_ms + ' ms' : '–' %></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Verpasste Heartbeats</td>
+                                            <td><%= rootserver.missed_heartbeats || 0 %></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Basis-Verzeichnis</td>
+                                            <td><code><%= rootserver.base_directory || '/opt/firebot' %></code></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="callout callout-info">
+                                    <h6><i class="fa-solid fa-circle-info mr-1"></i>Service-Befehle</h6>
+                                    <pre class="bg-dark text-white p-2 rounded mb-0" style="font-size:0.8rem;"><code>sudo systemctl status firebot-daemon
+sudo systemctl restart firebot-daemon
+sudo journalctl -u firebot-daemon -f</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>

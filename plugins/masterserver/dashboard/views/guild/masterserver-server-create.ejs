@@ -1,0 +1,296 @@
+<!-- Server-Erstellung (Eigenständige Seite) -->
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0"><i class="fas fa-server mr-2"></i>Neuen Server erstellen</h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver">Masterserver</a></li>
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver/servers">Server</a></li>
+                    <li class="breadcrumb-item active">Erstellen</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+        
+        <!-- Zurück-Button -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <a href="/guild/<%= guildId %>/plugins/masterserver/servers" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left mr-2"></i>Zurück zur Server-Liste
+                </a>
+            </div>
+        </div>
+
+        <!-- Server-Erstellungs-Formular -->
+        <form class="guild-ajax-form" 
+              data-form-type="create-server"
+              data-method="POST"
+              action="/guild/<%= guildId %>/plugins/masterserver/servers/create"
+              method="POST"
+              data-loading-text="Server wird erstellt..."
+              data-loading-toast="true"
+              data-loading-toast-message="🔧 Virtual Server wird eingerichtet... (Bitte warten, ca. 20 Sekunden)">
+
+            <!-- Basis-Informationen -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-info-circle mr-2"></i>Basis-Informationen</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="serverName">Server-Name <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="serverName" 
+                                       name="serverName" 
+                                       placeholder="z.B. server001" 
+                                       required>
+                                <small class="form-text text-muted">Eindeutiger Name für diesen physischen Server</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="hostname">Hostname</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="hostname" 
+                                       name="hostname" 
+                                       placeholder="z.B. server001.example.com">
+                                <small class="form-text text-muted">Öffentlicher Hostname (optional)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Beschreibung</label>
+                        <textarea class="form-control" 
+                                  id="description" 
+                                  name="description" 
+                                  rows="3" 
+                                  placeholder="Optionale Beschreibung für diesen Server"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spacer -->
+            <div class="row mb-3"></div>
+
+            <!-- Ressourcen-Limits -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-sliders-h mr-2"></i>Ressourcen-Limits</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="cpuCores">CPU Cores</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="cpuCores" 
+                                       name="cpuCores" 
+                                       min="0" 
+                                       step="0.5" 
+                                       value="1" 
+                                       placeholder="z.B. 2">
+                                <small class="form-text text-muted">Anzahl der CPU-Kerne (0 = Unbegrenzt)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="ramTotal">RAM-Limit (GB)</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="ramTotal" 
+                                       name="ramTotal" 
+                                       min="0" 
+                                       step="0.5" 
+                                       value="8" 
+                                       placeholder="z.B. 8">
+                                <small class="form-text text-muted">0 = Unbegrenzt</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="diskTotal">Disk-Limit (GB)</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="diskTotal" 
+                                       name="diskTotal" 
+                                       min="0" 
+                                       step="1" 
+                                       value="10" 
+                                       placeholder="z.B. 100">
+                                <small class="form-text text-muted">0 = Unbegrenzt</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spacer -->
+            <div class="row mb-3"></div>
+
+            <!-- Features & Limits -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-star mr-2"></i>Features & Limits</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="backupLimit">Backup Limit</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="backupLimit" 
+                                       name="backupLimit" 
+                                       min="0" 
+                                       max="50" 
+                                       value="3">
+                                <small class="form-text text-muted">Anzahl erlaubter Backups pro Gameserver</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="mysqlEnabled">MySQL Datenbanken</label>
+                                <select class="form-control" id="mysqlEnabled" name="mysqlEnabled">
+                                    <option value="false">Deaktiviert</option>
+                                    <option value="true">Aktiviert</option>
+                                </select>
+                                <small class="form-text text-muted">Erlaubt Gameservern eigene Datenbanken</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="mysqlDbLimit">MySQL DB Limit</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="mysqlDbLimit" 
+                                       name="mysqlDbLimit" 
+                                       min="0" 
+                                       value="0">
+                                <small class="form-text text-muted">Max. Anzahl DBs (0 = Unbegrenzt)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="webDomain">Webhosting Domain (Optional)</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="webDomain" 
+                                       name="webDomain" 
+                                       placeholder="z.B. user.hosting.com">
+                                <small class="form-text text-muted">Domain für Webinterface/FastDL (wird als VHost angelegt)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spacer -->
+            <div class="row mb-3"></div>
+
+            <!-- Netzwerk-Konfiguration -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-network-wired mr-2"></i>Netzwerk-Konfiguration</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="host">IP-Adresse / Host</label>
+                                <select class="form-control" id="host" name="host">
+                                    <option value="">Automatisch (erste verfügbare)</option>
+                                    <% if (daemonHardware && daemonHardware.network && daemonHardware.network.interfaces) { %>
+                                        <% daemonHardware.network.interfaces.forEach(iface => { %>
+                                            <% if (!iface.is_loopback && iface.addresses && iface.addresses.length > 0) { %>
+                                                <% iface.addresses.forEach(addr => { %>
+                                                    <% // Filter: Nur IPv4 (kein ':' = kein IPv6) %>
+                                                    <% if (addr.indexOf(':') === -1 && addr !== '127.0.0.1') { %>
+                                                        <option value="<%= addr %>"><%= iface.name %>: <%= addr %></option>
+                                                    <% } %>
+                                                <% }); %>
+                                            <% } %>
+                                        <% }); %>
+                                    <% } else { %>
+                                        <option value="" disabled>Keine Netzwerk-Interfaces verfügbar</option>
+                                    <% } %>
+                                </select>
+                                <small class="form-text text-muted">IP-Adresse für Gameserver-Bindings</small>
+                            </div>
+                        </div>
+                        <!-- Port-Range entfernt: Wird jetzt automatisch verwaltet -->
+                        <input type="hidden" name="daemonPort" value="9340">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spacer -->
+            <div class="row mb-3"></div>
+
+            <!-- Standort -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-map-marker-alt mr-2"></i>Standort</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="datacenter">Rechenzentrum</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="datacenter" 
+                                       name="datacenter" 
+                                       placeholder="z.B. Hetzner Falkenstein">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="countryCode">Ländercode</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="countryCode" 
+                                       name="countryCode" 
+                                       placeholder="z.B. DE" 
+                                       maxlength="2">
+                                <small class="form-text text-muted">2-stelliger ISO-Code (z.B. DE, US, GB)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spacer -->
+            <div class="row mb-4"></div>
+
+            <!-- Submit-Buttons -->
+            <div class="row">
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus mr-2"></i>Server erstellen
+                    </button>
+                    <a href="/guild/<%= guildId %>/plugins/masterserver/servers" class="btn btn-secondary btn-lg ml-2">
+                        <i class="fas fa-times mr-2"></i>Abbrechen
+                    </a>
+                </div>
+            </div>
+
+        </form>
+
+    </div>
+</section>

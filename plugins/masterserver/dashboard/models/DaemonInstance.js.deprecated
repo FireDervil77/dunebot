@@ -1,0 +1,197 @@
+/**
+ * DaemonInstance Model
+ * 
+ * Verwaltet Daemon-Instanzen pro Guild
+ * - CRUD-Operationen
+ * - Status-Management
+ * - 1:1 Guild-Beziehung
+ * 
+ * @module DaemonInstance
+ * @author FireBot Team
+ */
+
+const { ServiceManager } = require('dunebot-core');
+const crypto = require('crypto');
+
+class DaemonInstance {
+    /**
+     * Neue Daemon-Instanz erstellen
+     * 
+     * @param {string} guildId - Guild ID
+     * @param {string} displayName - Anzeigename (optional, z.B. "Production Server")
+     * @returns {Promise<string>} daemon_id
+     */
+    static async create(guildId, displayName = null) {
+        const dbService = ServiceManager.get('dbService');
+        const daemonId = crypto.randomBytes(16).toString('hex');
+
+        await dbService.query(
+            `INSERT INTO daemon_instances 
+             (daemon_id, guild_id, display_name, status, registered_at, updated_at)
+             VALUES (?, ?, ?, 'offline', NOW(), NOW())`,
+            [daemonId, guildId, displayName]
+        );
+
+        return daemonId;
+    }
+
+    /**
+     * Daemon-Instanz für Guild abrufen
+     * 
+     * @param {string} guildId - Guild ID
+     * @returns {Promise<object|null>} Daemon-Daten oder null
+     */
+    static async getByGuild(guildId) {
+        const dbService = ServiceManager.get('dbService');
+        const [daemon] = await dbService.query(
+            'SELECT * FROM daemon_instances WHERE guild_id = ? LIMIT 1',
+            [guildId]
+        );
+
+        if (!daemon) return null;
+
+        // JSON-Config parsen
+        daemon.config = JSON.parse(daemon.config || '{}');
+        return daemon;
+    }
+
+    /**
+     * Daemon-Instanz nach ID abrufen
+     * 
+     * @param {string} daemonId - Daemon ID
+     * @returns {Promise<object|null>} Daemon-Daten oder null
+     */
+    static async getById(daemonId) {
+        const dbService = ServiceManager.get('dbService');
+        const [daemon] = await dbService.query(
+            'SELECT * FROM daemon_instances WHERE daemon_id = ? LIMIT 1',
+            [daemonId]
+        );
+
+        if (!daemon) return null;
+
+        daemon.config = JSON.parse(daemon.config || '{}');
+        return daemon;
+    }
+
+    /**
+     * Alle Daemon-Instanzen abrufen
+     * 
+     * @returns {Promise<Array>} Array von Daemon-Daten
+     */
+    static async getAll() {
+        const dbService = ServiceManager.get('dbService');
+        const daemons = await dbService.query('SELECT * FROM daemon_instances ORDER BY created_at DESC');
+
+        return daemons.map(daemon => ({
+            ...daemon,
+            config: JSON.parse(daemon.config || '{}')
+        }));
+    }
+
+    /**
+     * Daemon-Status aktualisieren
+     * 
+     * @param {string} daemonId - Daemon ID
+     * @param {string} status - Status (online|offline|error)
+     * @param {string} version - Optional: Daemon-Version
+     */
+    static async updateStatus(daemonId, status, version = null) {
+        const dbService = ServiceManager.get('dbService');
+        
+        const updateFields = ['status = ?', 'last_seen = NOW()'];
+        const values = [status];
+
+        if (version) {
+            updateFields.push('version = ?');
+            values.push(version);
+        }
+
+        values.push(daemonId);
+
+        await dbService.query(
+            `UPDATE daemon_instances SET ${updateFields.join(', ')} WHERE daemon_id = ?`,
+            values
+        );
+    }
+
+    /**
+     * Daemon-Konfiguration aktualisieren
+     * 
+     * @param {string} daemonId - Daemon ID
+     * @param {object} config - Neue Konfiguration
+     */
+    static async updateConfig(daemonId, config) {
+        const dbService = ServiceManager.get('dbService');
+        
+        await dbService.query(
+            'UPDATE daemon_instances SET config = ? WHERE daemon_id = ?',
+            [JSON.stringify(config), daemonId]
+        );
+    }
+
+    /**
+     * Session-Token aktualisieren
+     * 
+     * @param {string} daemonId - Daemon ID
+     * @param {string} sessionToken - Session-Token
+     */
+    static async updateSessionToken(daemonId, sessionToken) {
+        const dbService = ServiceManager.get('dbService');
+        
+        await dbService.query(
+            'UPDATE daemon_instances SET session_token = ? WHERE daemon_id = ?',
+            [sessionToken, daemonId]
+        );
+    }
+
+    /**
+     * Daemon-Instanz löschen
+     * 
+     * @param {string} daemonId - Daemon ID
+     */
+    static async delete(daemonId) {
+        const dbService = ServiceManager.get('dbService');
+        
+        // Cascade-Delete kümmert sich um Tokens und Server-Registry
+        await dbService.query(
+            'DELETE FROM daemon_instances WHERE daemon_id = ?',
+            [daemonId]
+        );
+    }
+
+    /**
+     * Prüfen ob Guild bereits einen Daemon hat
+     * 
+     * @param {string} guildId - Guild ID
+     * @returns {Promise<boolean>}
+     */
+    static async guildHasDaemon(guildId) {
+        const daemon = await this.getByGuild(guildId);
+        return daemon !== null;
+    }
+
+    /**
+     * Online-Status aller Daemons
+     * 
+     * @returns {Promise<{online: number, offline: number, error: number}>}
+     */
+    static async getStatusSummary() {
+        const dbService = ServiceManager.get('dbService');
+        const [result] = await dbService.query(
+            `SELECT 
+                SUM(CASE WHEN status = 'online' THEN 1 ELSE 0 END) as online,
+                SUM(CASE WHEN status = 'offline' THEN 1 ELSE 0 END) as offline,
+                SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error
+             FROM daemon_instances`
+        );
+
+        return {
+            online: parseInt(result.online || 0),
+            offline: parseInt(result.offline || 0),
+            error: parseInt(result.error || 0)
+        };
+    }
+}
+
+module.exports = DaemonInstance;

@@ -1,0 +1,198 @@
+<%
+/**
+ * Server-Card Component
+ * 
+ * Zeigt einen einzelnen Gameserver als Card an mit:
+ * - Game-Icon
+ * - Server-Name + Status-Badge
+ * - Resource-Display (CPU, RAM, Players)
+ * - Connection-Info (IP:Port)
+ * - Action-Buttons (Permission-gesteuert)
+ * 
+ * @param {Object} server - Server-Daten aus MySQL
+ * @param {Object} userPermissions - User-Permissions (aus Middleware)
+ * @param {String} guildId - Guild-ID
+ */
+
+// Status-Mapping: running → online, stopped → offline
+let displayStatus = server.status;
+if (displayStatus === 'running') {
+    displayStatus = 'online';
+} else if (displayStatus === 'stopped') {
+    displayStatus = 'offline';
+}
+
+// Status-Badge-Farben
+const statusColors = {
+    online: 'success',
+    offline: 'secondary',
+    starting: 'warning',
+    stopping: 'warning',
+    error: 'danger',
+    installing: 'info',
+    installed: 'success'
+};
+
+const statusIcons = {
+    online: 'bi-play-circle-fill',
+    offline: 'bi-stop-circle',
+    starting: 'bi-arrow-repeat',
+    stopping: 'bi-arrow-repeat',
+    error: 'bi-exclamation-triangle-fill',
+    installing: 'bi-download',
+    installed: 'bi-check-circle-fill'
+};
+
+const statusColor = statusColors[displayStatus] || 'secondary';
+const statusIcon = statusIcons[displayStatus] || 'bi-question-circle';
+
+// Connection-String
+const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/A'}`;
+%>
+
+<a href="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>" 
+   class="card-link text-decoration-none">
+    <div class="card h-100 server-card shadow-sm" data-server-id="<%= server.id %>">
+        <!-- Game-Icon Header -->
+    <div class="card-img-top bg-gradient text-center py-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <% if (server.game_icon) { %>
+            <img src="<%= server.game_icon %>" 
+                 alt="<%= server.game_name %>" 
+                 class="game-icon"
+                 style="max-height: 70px; max-width: 100%; object-fit: contain;">
+        <% } else { %>
+            <i class="bi bi-controller" style="font-size: 3rem; color: rgba(255,255,255,0.8);"></i>
+        <% } %>
+    </div>
+    
+    <div class="card-body d-flex flex-column">
+        <!-- Server-Name -->
+        <h5 class="card-title mb-2">
+            <%= server.name %>
+        </h5>
+        
+        <!-- Game-Name -->
+        <p class="text-muted mb-3">
+            <small><%= server.game_name || server.game_slug %></small>
+        </p>
+        
+        <!-- Status-Badge -->
+        <div class="mb-3">
+            <span class="badge bg-<%= statusColor %> server-status-badge">
+                <i class="<%= statusIcon %>"></i>
+                <span class="status-text"><%= displayStatus %></span>
+            </span>
+        </div>
+        
+        <!-- Resource-Usage (nur bei online) -->
+        <% if (displayStatus === 'online') { %>
+            <div class="mb-3 server-resources">
+                <!-- CPU -->
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-muted">CPU</small>
+                        <small class="server-cpu text-muted">--</small>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-info server-cpu-bar" 
+                             role="progressbar" 
+                             style="width: 0%"
+                             aria-valuenow="0" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100"></div>
+                    </div>
+                </div>
+                
+                <!-- RAM -->
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-muted">RAM</small>
+                        <small class="server-ram text-muted">--</small>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-warning server-ram-bar" 
+                             role="progressbar" 
+                             style="width: 0%"
+                             aria-valuenow="0" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100"></div>
+                    </div>
+                </div>
+                
+                <!-- Players (falls vorhanden) -->
+                <% if (server.current_players !== undefined && server.current_players !== null) { %>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">
+                            <i class="bi bi-people-fill me-1"></i>Spieler
+                        </small>
+                        <small class="server-players">
+                            <%= server.current_players %> / <%= server.max_players || '?' %>
+                        </small>
+                    </div>
+                <% } %>
+            </div>
+        <% } %>
+        
+        <!-- Connection-Info -->
+        <div class="mb-3 mt-auto">
+            <small class="text-muted d-block mb-1">Verbindung</small>
+            <div class="d-flex align-items-center">
+                <code class="server-connection flex-grow-1" style="font-size: 0.85rem;">
+                    <%= connectionString %>
+                </code>
+                <button class="btn btn-sm btn-outline-secondary ms-2" 
+                        onclick="event.stopPropagation(); event.preventDefault(); copyToClipboard('<%= connectionString %>')"
+                        title="In Zwischenablage kopieren">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card-Footer: Actions -->
+    <div class="card-footer bg-transparent border-top">
+        <div class="btn-group w-100" role="group" aria-label="Server-Aktionen">
+            
+            <!-- Start Button (immer rendern, Sichtbarkeit via JS) -->
+            <% if (userPermissions.permissions['GAMESERVER.START']) { %>
+                <button class="btn btn-sm btn-success" 
+                        onclick="event.stopPropagation(); event.preventDefault(); serverAction('<%= server.id %>', 'start')"
+                        title="Server starten"
+                        style="display: <%= (displayStatus === 'offline' || displayStatus === 'error' || displayStatus === 'installed') ? '' : 'none' %>;">
+                    <i class="bi bi-play-fill"></i>
+                </button>
+            <% } %>
+            
+            <!-- Stop Button (immer rendern, Sichtbarkeit via JS) -->
+            <% if (userPermissions.permissions['GAMESERVER.STOP']) { %>
+                <button class="btn btn-sm btn-warning" 
+                        onclick="event.stopPropagation(); event.preventDefault(); serverAction('<%= server.id %>', 'stop')"
+                        title="Server stoppen"
+                        style="display: <%= (displayStatus === 'online' || displayStatus === 'starting') ? '' : 'none' %>;">
+                    <i class="bi bi-stop-fill"></i>
+                </button>
+            <% } %>
+            
+            <!-- Restart Button (immer rendern, Sichtbarkeit via JS) -->
+            <% if (userPermissions.permissions['GAMESERVER.RESTART']) { %>
+                <button class="btn btn-sm btn-info" 
+                        onclick="event.stopPropagation(); event.preventDefault(); serverAction('<%= server.id %>', 'restart')"
+                        title="Server neu starten"
+                        style="display: <%= displayStatus === 'online' ? '' : 'none' %>;">
+                    <i class="bi bi-arrow-repeat"></i>
+                </button>
+            <% } %>
+            
+            <!-- Delete Button (immer rendern, Sichtbarkeit via JS) -->
+            <% if (userPermissions.permissions['GAMESERVER.DELETE']) { %>
+                <button class="btn btn-sm btn-danger" 
+                        onclick="event.stopPropagation(); event.preventDefault(); deleteServer('<%= server.id %>', '<%= server.name %>')"
+                        title="Server deinstallieren"
+                        style="display: <%= (displayStatus === 'offline' || displayStatus === 'error' || displayStatus === 'installed') ? '' : 'none' %>;">
+                    <i class="bi bi-trash-fill"></i>
+                </button>
+            <% } %>
+        </div>
+    </div>
+</div>
+</a>

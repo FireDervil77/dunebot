@@ -1,0 +1,385 @@
+{
+    "meta": {
+        "version": "PTDL_v2",
+        "author": "DuneBot Official",
+        "update_url": null
+    },
+    "exported_at": "2025-10-19T00:00:00+00:00",
+    "name": "7 Days to Die",
+    "slug": "7days",
+    "description": "7 Days to Die Dedicated Server - Zombie-Survival mit Crafting, Base-Building und Horden-Angriffen. Umfangreiche XML-Konfiguration möglich.",
+    "category": "survival",
+    "tags": [
+        "steam",
+        "survival",
+        "zombies",
+        "crafting",
+        "pve",
+        "pvp"
+    ],
+    "visibility": "official",
+    "trust_level": "official",
+    "status": "approved",
+    "features": [
+        "mods",
+        "xml_config"
+    ],
+    "steam": {
+        "app_id": 251570,
+        "server_app_id": 294420,
+        "install_dir": "7dtd"
+    },
+    "installation": {
+        "method": "steamcmd",
+        "app_id": "294420",
+        "validate": true,
+        "script": "#!/bin/bash\ncd \"${INSTALL_DIR}\"\n\"${STEAMCMD}\" +force_install_dir \"${INSTALL_DIR}\" +login anonymous +app_update 294420 validate +quit"
+    },
+    "startup": {
+        "command": "./7DaysToDieServer.x86_64 -configfile=serverconfig.xml -logfile /mnt/server/logs/output.log -quit -batchmode -nographics -dedicated",
+        "done": "GameServer.Init successful",
+        "stop": "shutdown"
+    },
+    "config": {
+        "files": {
+            "serverconfig.xml": {
+                "parser": "xml",
+                "find": {
+                    "ServerSettings": {
+                        "ServerName": "<property name=\"ServerName\" value=\"{{SERVER_NAME}}\"/>",
+                        "ServerDescription": "<property name=\"ServerDescription\" value=\"{{SERVER_DESCRIPTION}}\"/>",
+                        "ServerWebsiteURL": "<property name=\"ServerWebsiteURL\" value=\"{{SERVER_URL}}\"/>",
+                        "ServerPassword": "<property name=\"ServerPassword\" value=\"{{SERVER_PASSWORD}}\"/>",
+                        "ServerPort": "<property name=\"ServerPort\" value=\"{{SERVER_PORT}}\"/>",
+                        "ServerMaxPlayerCount": "<property name=\"ServerMaxPlayerCount\" value=\"{{MAX_PLAYERS}}\"/>",
+                        "ServerVisibility": "<property name=\"ServerVisibility\" value=\"{{VISIBILITY}}\"/>",
+                        "GameWorld": "<property name=\"GameWorld\" value=\"{{GAME_WORLD}}\"/>",
+                        "WorldGenSeed": "<property name=\"WorldGenSeed\" value=\"{{WORLD_SEED}}\"/>",
+                        "WorldGenSize": "<property name=\"WorldGenSize\" value=\"{{WORLD_SIZE}}\"/>",
+                        "GameMode": "<property name=\"GameMode\" value=\"{{GAME_MODE}}\"/>",
+                        "GameDifficulty": "<property name=\"GameDifficulty\" value=\"{{DIFFICULTY}}\"/>",
+                        "DayNightLength": "<property name=\"DayNightLength\" value=\"{{DAY_LENGTH}}\"/>",
+                        "ZombiesRun": "<property name=\"ZombiesRun\" value=\"{{ZOMBIE_RUN}}\"/>",
+                        "BloodMoonEnemyCount": "<property name=\"BloodMoonEnemyCount\" value=\"{{BLOOD_MOON_COUNT}}\"/>",
+                        "LootAbundance": "<property name=\"LootAbundance\" value=\"{{LOOT_ABUNDANCE}}\"/>",
+                        "LootRespawnDays": "<property name=\"LootRespawnDays\" value=\"{{LOOT_RESPAWN}}\"/>",
+                        "XPMultiplier": "<property name=\"XPMultiplier\" value=\"{{XP_MULTI}}\"/>",
+                        "PlayerKillingMode": "<property name=\"PlayerKillingMode\" value=\"{{PK_MODE}}\"/>"
+                    }
+                }
+            }
+        },
+        "startup": {
+            "done": "GameServer.Init successful"
+        },
+        "logs": {},
+        "stop": "shutdown"
+    },
+    "variables": [
+        {
+            "name": "Server Name",
+            "description": "Name deines 7 Days to Die Servers",
+            "env_variable": "SERVER_NAME",
+            "default_value": "My 7DTD Server",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "Server Description",
+            "description": "Beschreibung für die Serverliste",
+            "env_variable": "SERVER_DESCRIPTION",
+            "default_value": "A 7 Days to Die Server",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:500",
+            "field_type": "textarea"
+        },
+        {
+            "name": "Server Website URL",
+            "description": "Website oder Discord-Link",
+            "env_variable": "SERVER_URL",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|url",
+            "field_type": "text"
+        },
+        {
+            "name": "Server Password",
+            "description": "Passwort (leer = kein Passwort)",
+            "env_variable": "SERVER_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:50",
+            "field_type": "text"
+        },
+        {
+            "name": "Max Players",
+            "description": "Maximale Spieleranzahl",
+            "env_variable": "MAX_PLAYERS",
+            "default_value": "8",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:1|max:32",
+            "field_type": "number"
+        },
+        {
+            "name": "Server Port",
+            "description": "Hauptport des Servers",
+            "env_variable": "SERVER_PORT",
+            "default_value": "26900",
+            "user_viewable": true,
+            "user_editable": false,
+            "rules": "required|integer",
+            "field_type": "text"
+        },
+        {
+            "name": "Server Visibility",
+            "description": "Sichtbarkeit in der Serverliste",
+            "env_variable": "VISIBILITY",
+            "default_value": "2",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|in:0,1,2",
+            "field_type": "select",
+            "select_options": {
+                "2": "Public (Öffentlich)",
+                "1": "Friends Only",
+                "0": "Hidden (Unsichtbar)"
+            }
+        },
+        {
+            "name": "Game World",
+            "description": "Welche Welt soll geladen werden?",
+            "env_variable": "GAME_WORLD",
+            "default_value": "Navezgane",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "select",
+            "select_options": {
+                "Navezgane": "Navezgane (Standard)",
+                "RWG": "Random Gen (Prozedural)"
+            }
+        },
+        {
+            "name": "World Seed",
+            "description": "Map-Seed für Random Gen (beliebiger Text)",
+            "env_variable": "WORLD_SEED",
+            "default_value": "DuneBot",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:50",
+            "field_type": "text"
+        },
+        {
+            "name": "World Size",
+            "description": "Weltgröße (nur für Random Gen)",
+            "env_variable": "WORLD_SIZE",
+            "default_value": "6144",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|in:4096,6144,8192,10240",
+            "field_type": "select",
+            "select_options": {
+                "4096": "Small (4K)",
+                "6144": "Medium (6K)",
+                "8192": "Large (8K)",
+                "10240": "XL (10K)"
+            }
+        },
+        {
+            "name": "Game Mode",
+            "description": "Spiel-Modus",
+            "env_variable": "GAME_MODE",
+            "default_value": "GameModeSurvival",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string",
+            "field_type": "select",
+            "select_options": {
+                "GameModeSurvival": "Survival"
+            }
+        },
+        {
+            "name": "Difficulty",
+            "description": "Schwierigkeitsgrad",
+            "env_variable": "DIFFICULTY",
+            "default_value": "2",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|in:0,1,2,3,4,5",
+            "field_type": "select",
+            "select_options": {
+                "0": "Scavenger (Sehr leicht)",
+                "1": "Adventurer (Leicht)",
+                "2": "Nomad (Normal)",
+                "3": "Warrior (Schwer)",
+                "4": "Survivalist (Sehr schwer)",
+                "5": "Insane (Albtraum)"
+            }
+        },
+        {
+            "name": "Day Length",
+            "description": "Tag/Nacht-Zyklus in Minuten (Echtzeit)",
+            "env_variable": "DAY_LENGTH",
+            "default_value": "60",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:10|max:240",
+            "field_type": "number"
+        },
+        {
+            "name": "Zombies Run",
+            "description": "Zombie-Verhalten",
+            "env_variable": "ZOMBIE_RUN",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|in:0,1,2",
+            "field_type": "select",
+            "select_options": {
+                "0": "Walk (Tag), Sprint (Nacht)",
+                "1": "Always Walk",
+                "2": "Always Sprint"
+            }
+        },
+        {
+            "name": "Blood Moon Enemy Count",
+            "description": "Zombie-Anzahl bei Blood Moon (0-64)",
+            "env_variable": "BLOOD_MOON_COUNT",
+            "default_value": "8",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:0|max:64",
+            "field_type": "number"
+        },
+        {
+            "name": "Loot Abundance",
+            "description": "Loot-Häufigkeit (Prozent)",
+            "env_variable": "LOOT_ABUNDANCE",
+            "default_value": "100",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:25|max:300",
+            "field_type": "number"
+        },
+        {
+            "name": "Loot Respawn Days",
+            "description": "Tage bis Loot-Respawn",
+            "env_variable": "LOOT_RESPAWN",
+            "default_value": "7",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:1|max:30",
+            "field_type": "number"
+        },
+        {
+            "name": "XP Multiplier",
+            "description": "Erfahrungs-Multiplikator (Prozent)",
+            "env_variable": "XP_MULTI",
+            "default_value": "100",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:50|max:500",
+            "field_type": "number"
+        },
+        {
+            "name": "Player Killing Mode",
+            "description": "PvP-Modus",
+            "env_variable": "PK_MODE",
+            "default_value": "3",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|in:0,1,2,3",
+            "field_type": "select",
+            "select_options": {
+                "0": "No Killing",
+                "1": "Kill Allies Only",
+                "2": "Kill Strangers Only",
+                "3": "Kill Everyone"
+            }
+        }
+    ],
+    "templates": [
+        {
+            "name": "pve",
+            "label": "PvE Co-Op",
+            "description": "Kooperativer PvE-Modus ohne PvP",
+            "icon": "fa-handshake",
+            "variables": {
+                "MAX_PLAYERS": "8",
+                "GAME_WORLD": "Navezgane",
+                "DIFFICULTY": "2",
+                "PK_MODE": "0",
+                "ZOMBIE_RUN": "0",
+                "BLOOD_MOON_COUNT": "8"
+            }
+        },
+        {
+            "name": "pvp",
+            "label": "PvP Server",
+            "description": "PvP mit erhöhter Schwierigkeit",
+            "icon": "fa-sword",
+            "variables": {
+                "MAX_PLAYERS": "16",
+                "GAME_WORLD": "RWG",
+                "WORLD_SIZE": "8192",
+                "DIFFICULTY": "3",
+                "PK_MODE": "3",
+                "ZOMBIE_RUN": "2",
+                "BLOOD_MOON_COUNT": "16"
+            }
+        },
+        {
+            "name": "hardcore",
+            "label": "Hardcore",
+            "description": "Maximum Difficulty für erfahrene Spieler",
+            "icon": "fa-skull",
+            "variables": {
+                "MAX_PLAYERS": "8",
+                "GAME_WORLD": "RWG",
+                "WORLD_SIZE": "10240",
+                "DIFFICULTY": "5",
+                "PK_MODE": "3",
+                "ZOMBIE_RUN": "2",
+                "BLOOD_MOON_COUNT": "32",
+                "LOOT_ABUNDANCE": "50",
+                "XP_MULTI": "75"
+            }
+        }
+    ],
+    "ports": {
+        "game": {
+            "default": 26900,
+            "protocol": "udp",
+            "description": "Game Port"
+        },
+        "telnet": {
+            "default": 8081,
+            "protocol": "tcp",
+            "description": "Telnet Port (Admin)"
+        },
+        "web": {
+            "default": 8082,
+            "protocol": "tcp",
+            "description": "Web Panel Port"
+        }
+    },
+    "requirements": {
+        "ram_min_mb": 4096,
+        "ram_recommended_mb": 8192,
+        "cpu_cores_min": 2,
+        "disk_min_gb": 15,
+        "disk_recommended_gb": 25
+    },
+    "assets": {
+        "icon_url": "https://cdn.akamai.steamstatic.com/steam/apps/251570/header.jpg",
+        "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/251570/library_hero.jpg",
+        "screenshots": []
+    },
+    "changelog": "Initial release - 7 Days to Die with 3 templates (PvE, PvP, Hardcore)"
+}

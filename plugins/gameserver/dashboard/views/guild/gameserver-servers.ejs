@@ -1,0 +1,774 @@
+<!-- Gameserver List -->
+<style>
+/* Copy-Connection Button Styling */
+.btn-xs {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1;
+}
+.copy-connection-btn {
+    border: 1px solid #ced4da;
+    background: white;
+    transition: all 0.2s;
+}
+.copy-connection-btn:hover {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+.copy-connection-btn:active {
+    transform: scale(0.95);
+}
+</style>
+
+<div class="content-wrapper">
+    <!-- Content Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fa-solid fa-list"></i> 
+                        <%= tr('gameserver:SERVER.TITLE') %>
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
+                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a></li>
+                        <li class="breadcrumb-item active"><%= tr('gameserver:NAV.SERVERS') %></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+
+            <!-- Action Bar -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1" class="btn btn-success">
+                        <i class="fa-solid fa-plus"></i> <%= tr('gameserver:SERVER.CREATE_NEW') %>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="row mb-3">
+                <div class="col-lg-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <form method="GET" action="/guild/<%= guildId %>/plugins/gameserver/servers" class="form-inline">
+                                <div class="form-group mr-3">
+                                    <label class="mr-2"><%= tr('gameserver:SERVER.FILTER_STATUS') %>:</label>
+                                    <select class="form-control" name="status">
+                                        <option value="all" <%= filters.status === 'all' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:SERVER.ALL_STATUS') %>
+                                        </option>
+                                        <option value="online" <%= filters.status === 'online' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:SERVER.STATUS_ONLINE') %>
+                                        </option>
+                                        <option value="offline" <%= filters.status === 'offline' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:SERVER.STATUS_OFFLINE') %>
+                                        </option>
+                                        <option value="starting" <%= filters.status === 'starting' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:SERVER.STATUS_STARTING') %>
+                                        </option>
+                                        <option value="stopping" <%= filters.status === 'stopping' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:SERVER.STATUS_STOPPING') %>
+                                        </option>
+                                        <option value="error" <%= filters.status === 'error' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:SERVER.STATUS_ERROR') %>
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group mr-3">
+                                    <label class="mr-2"><%= tr('gameserver:SERVER.FILTER_GAME') %>:</label>
+                                    <select class="form-control" name="game">
+                                        <option value="all" <%= filters.game === 'all' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:SERVER.ALL_GAMES') %>
+                                        </option>
+                                        <% games.forEach(game => { %>
+                                            <option value="<%= game.slug %>" <%= filters.game === game.slug ? 'selected' : '' %>>
+                                                <%= game.name %> (<%= game.server_count %>)
+                                            </option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa-solid fa-filter"></i> <%= tr('gameserver:SERVER.APPLY_FILTER') %>
+                                </button>
+                                <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="btn btn-secondary ml-2">
+                                    <i class="fa-solid fa-times"></i> <%= tr('gameserver:SERVER.RESET_FILTER') %>
+                                </a>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Server Table -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <%= servers.length %> <%= tr('gameserver:SERVER.SERVERS_FOUND') %>
+                            </h3>
+                        </div>
+                        <div class="card-body p-0">
+                            <% if (servers && servers.length > 0) { %>
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th><%= tr('gameserver:SERVER.NAME') %></th>
+                                            <th><%= tr('gameserver:SERVER.GAME') %></th>
+                                            <th><%= tr('gameserver:SERVER.TEMPLATE') %></th>
+                                            <th><%= tr('gameserver:SERVER.STATUS') %></th>
+                                            <th><%= tr('gameserver:SERVER.PLAYERS') %></th>
+                                            <th><%= tr('gameserver:SERVER.CONNECTION') || 'Connection' %></th>
+                                            <th><%= tr('gameserver:SERVER.VERSION') %></th>
+                                            <th><%= tr('gameserver:SERVER.ACTIONS') %></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% servers.forEach(server => { %>
+                                            <tr data-server-id="<%= server.id %>">
+                                                <td>
+                                                    <strong><%= server.name %></strong>
+                                                    <% if (server.update_available) { %>
+                                                        <span class="badge badge-warning badge-sm ml-1">
+                                                            <i class="fa-solid fa-arrow-up"></i> Update
+                                                        </span>
+                                                    <% } %>
+                                                </td>
+                                                <td>
+                                                    <span class="badge badge-info">
+                                                        <%= server.game_name || 'Unknown' %>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <% if (server.template_name) { %>
+                                                        <code><%= server.template_name %></code>
+                                                    <% } else { %>
+                                                        <span class="text-muted">-</span>
+                                                    <% } %>
+                                                </td>
+                                                <td>
+                                                    <% if (server.status === 'online') { %>
+                                                        <span class="badge badge-success server-status-badge" data-status="online">
+                                                            <i class="fa-solid fa-circle"></i> Online
+                                                        </span>
+                                                    <% } else if (server.status === 'offline') { %>
+                                                        <span class="badge badge-secondary server-status-badge" data-status="offline">
+                                                            <i class="fa-solid fa-circle"></i> Offline
+                                                        </span>
+                                                    <% } else if (server.status === 'starting') { %>
+                                                        <span class="badge badge-warning server-status-badge" data-status="starting">
+                                                            <i class="fa-solid fa-spinner fa-spin"></i> Starting
+                                                        </span>
+                                                    <% } else if (server.status === 'stopping') { %>
+                                                        <span class="badge badge-warning server-status-badge" data-status="stopping">
+                                                            <i class="fa-solid fa-spinner fa-spin"></i> Stopping
+                                                        </span>
+                                                    <% } else if (server.status === 'installing') { %>
+                                                        <span class="badge badge-info server-status-badge" data-status="installing">
+                                                            <i class="fa-solid fa-download"></i> Installing
+                                                        </span>
+                                                    <% } else if (server.status === 'installed') { %>
+                                                        <span class="badge badge-success server-status-badge" data-status="installed">
+                                                            <i class="fa-solid fa-check-circle"></i> Installed
+                                                        </span>
+                                                    <% } else if (server.status === 'error') { %>
+                                                        <span class="badge badge-danger server-status-badge" data-status="error">
+                                                            <i class="fa-solid fa-exclamation-triangle"></i> Error
+                                                        </span>
+                                                    <% } else { %>
+                                                        <span class="badge badge-secondary server-status-badge" data-status="<%= server.status %>">
+                                                            <%= server.status %>
+                                                        </span>
+                                                    <% } %>
+                                                </td>
+                                                <td>
+                                                    <% if (server.status === 'online') { %>
+                                                        <%= server.current_players || 0 %>/<%= server.max_players || 0 %>
+                                                    <% } else { %>
+                                                        <span class="text-muted">-</span>
+                                                    <% } %>
+                                                </td>
+                                                <td>
+                                                    <% if (server.server_ip && server.game_port) { %>
+                                                        <div class="d-flex align-items-center">
+                                                            <code class="mr-2"><%= server.server_ip %>:<%= server.game_port %></code>
+                                                            <div class="btn-group btn-group-sm">
+                                                                <button class="btn btn-xs btn-outline-secondary copy-connection-btn" 
+                                                                        data-connection="<%= server.server_ip %>:<%= server.game_port %>"
+                                                                        title="<%= tr('gameserver:SERVER.COPY_CONNECTION') || 'Connection kopieren' %>">
+                                                                    <i class="fa-solid fa-copy"></i>
+                                                                </button>
+                                                                <% if (server.game_slug === 'csgo' || server.game_slug === 'cs2' || server.game_slug === 'tf2' || server.game_slug === 'left4dead2' || server.game_slug === 'rust' || server.game_slug === 'gmod' || server.game_slug === 'ark') { %>
+                                                                    <a href="steam://connect/<%= server.server_ip %>:<%= server.game_port %>" 
+                                                                       class="btn btn-xs btn-success"
+                                                                       title="<%= tr('gameserver:SERVER.JOIN_STEAM') || 'Mit Steam beitreten' %>">
+                                                                        <i class="fa-brands fa-steam"></i>
+                                                                    </a>
+                                                                <% } %>
+                                                            </div>
+                                                        </div>
+                                                    <% } else if (server.game_port) { %>
+                                                        <code>Port: <%= server.game_port %></code>
+                                                    <% } else { %>
+                                                        <span class="text-muted">-</span>
+                                                    <% } %>
+                                                </td>
+                                                <td>
+                                                    <small><%= server.addon_version || '-' %></small>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <!-- Retry Installation Button (nur bei error) -->
+                                                        <button class="btn btn-warning server-retry-btn" 
+                                                                data-server-id="<%= server.id %>"
+                                                                data-server-name="<%= server.name %>"
+                                                                title="Installation erneut versuchen"
+                                                                style="display: <%= server.status === 'error' ? 'inline-block' : 'none' %>;">
+                                                            <i class="fa-solid fa-rotate"></i> Retry
+                                                        </button>
+                                                        
+                                                        <!-- Start Button (immer gerendert, Display via CSS) -->
+                                                        <button class="btn btn-success server-start-btn" 
+                                                                data-server-id="<%= server.id %>"
+                                                                data-server-name="<%= server.name %>"
+                                                                title="<%= tr('gameserver:SERVER.START') %>"
+                                                                style="display: <%= (server.status === 'offline' || server.status === 'error' || server.status === 'installed') ? 'inline-block' : 'none' %>;">
+                                                            <i class="fa-solid fa-play"></i>
+                                                        </button>
+
+                                                        <!-- Stop Button (immer gerendert, Display via CSS) -->
+                                                        <button class="btn btn-warning server-stop-btn" 
+                                                                data-server-id="<%= server.id %>"
+                                                                data-server-name="<%= server.name %>"
+                                                                title="<%= tr('gameserver:SERVER.STOP') %>"
+                                                                style="display: <%= server.status === 'online' ? 'inline-block' : 'none' %>;">
+                                                            <i class="fa-solid fa-stop"></i>
+                                                        </button>
+
+                                                        <!-- Restart Button (immer gerendert, Display via CSS) -->
+                                                        <button class="btn btn-info server-restart-btn" 
+                                                                data-server-id="<%= server.id %>"
+                                                                data-server-name="<%= server.name %>"
+                                                                title="<%= tr('gameserver:SERVER.RESTART') %>"
+                                                                style="display: <%= server.status === 'online' ? 'inline-block' : 'none' %>;">
+                                                            <i class="fa-solid fa-rotate"></i>
+                                                        </button>
+
+                                                        <!-- File Manager Button (immer verfügbar außer bei installing) -->
+                                                        <% if (server.status !== 'installing') { %>
+                                                            <a href="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/files" 
+                                                               class="btn btn-secondary" 
+                                                               title="<%= tr('gameserver:SERVER.FILES') || 'Dateien' %>">
+                                                                <i class="fa-solid fa-folder-open"></i>
+                                                            </a>
+                                                        <% } %>
+                                                        
+                                                        <!-- Edit Button (immer verfügbar außer bei installing) -->
+                                                        <% if (server.status !== 'installing') { %>
+                                                            <button class="btn btn-primary server-edit-btn" 
+                                                                    data-server-id="<%= server.id %>"
+                                                                    title="<%= tr('gameserver:SERVER.EDIT') %>">
+                                                                <i class="fa-solid fa-edit"></i>
+                                                            </button>
+                                                        <% } %>
+
+                                                        <!-- Delete Button -->
+                                                        <% if (server.status === 'offline' || server.status === 'error' || server.status === 'installed') { %>
+                                                            <button class="btn btn-danger server-delete-btn" 
+                                                                    data-server-id="<%= server.id %>"
+                                                                    data-server-name="<%= server.name %>"
+                                                                    title="<%= tr('gameserver:SERVER.DELETE') %>">
+                                                                <i class="fa-solid fa-trash"></i>
+                                                            </button>
+                                                        <% } %>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            <% } else { %>
+                                <div class="p-5 text-center">
+                                    <i class="fa-solid fa-inbox fa-4x text-muted mb-3"></i>
+                                    <h4><%= tr('gameserver:SERVER.NO_SERVERS') %></h4>
+                                    <p class="text-muted">
+                                        <%= tr('gameserver:SERVER.NO_SERVERS_DESC') %>
+                                    </p>
+                                    <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1" class="btn btn-success">
+                                        <i class="fa-solid fa-plus"></i> <%= tr('gameserver:SERVER.CREATE_FIRST') %>
+                                    </a>
+                                </div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>
+
+<script>
+// Event-Delegation für alle Server-Buttons (CSP-compliant)
+document.addEventListener('DOMContentLoaded', function() {
+    const guildId = '<%= guildId %>';
+
+    // Retry Installation
+    document.querySelectorAll('.server-retry-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serverId = this.dataset.serverId;
+            const serverName = this.dataset.serverName;
+            retryInstallation(serverId, serverName);
+        });
+    });
+
+    // Start Server
+    document.querySelectorAll('.server-start-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serverId = this.dataset.serverId;
+            const serverName = this.dataset.serverName;
+            startServer(serverId, serverName);
+        });
+    });
+
+    // Stop Server
+    document.querySelectorAll('.server-stop-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serverId = this.dataset.serverId;
+            const serverName = this.dataset.serverName;
+            stopServer(serverId, serverName);
+        });
+    });
+
+    // Restart Server
+    document.querySelectorAll('.server-restart-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serverId = this.dataset.serverId;
+            const serverName = this.dataset.serverName;
+            restartServer(serverId, serverName);
+        });
+    });
+
+    // Edit Server
+    document.querySelectorAll('.server-edit-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serverId = this.dataset.serverId;
+            editServer(serverId);
+        });
+    });
+
+    // Delete Server
+    document.querySelectorAll('.server-delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serverId = this.dataset.serverId;
+            const serverName = this.dataset.serverName;
+            deleteServer(serverId, serverName);
+        });
+    });
+
+    // Copy Connection String
+    document.querySelectorAll('.copy-connection-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const connection = this.dataset.connection;
+            copyToClipboard(connection);
+        });
+    });
+
+    // Helper-Funktionen
+    function retryInstallation(serverId, serverName) {
+        if (!confirm(`Installation für Server "${serverName}" erneut versuchen?`)) return;
+        
+        showToast('info', 'Installation wird erneut gestartet...');
+        
+        fetch(`/guild/${guildId}/plugins/gameserver/servers/${serverId}/retry-installation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', data.message);
+                // ✅ Kein Reload - SSE aktualisiert Status live
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showToast('error', 'Fehler beim Neustarten der Installation');
+        });
+    }
+
+    function startServer(serverId, serverName) {
+        if (!confirm(`Server "${serverName}" starten?`)) return;
+        
+        fetch(`/guild/${guildId}/plugins/gameserver/servers/${serverId}/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', data.message);
+                // ✅ Kein Reload - SSE zeigt "starting" → "online" live
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showToast('error', 'Fehler beim Starten des Servers');
+        });
+    }
+
+    function stopServer(serverId, serverName) {
+        if (!confirm(`Server "${serverName}" stoppen?`)) return;
+        
+        fetch(`/guild/${guildId}/plugins/gameserver/servers/${serverId}/stop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', data.message);
+                // ✅ Kein Reload - SSE zeigt "stopping" → "offline" live
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showToast('error', 'Fehler beim Stoppen des Servers');
+        });
+    }
+
+    function restartServer(serverId, serverName) {
+        if (!confirm(`Server "${serverName}" neustarten?`)) return;
+        
+        fetch(`/guild/${guildId}/plugins/gameserver/servers/${serverId}/restart`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', data.message);
+                // ✅ Kein Reload - SSE zeigt "stopping" → "starting" → "online" live
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showToast('error', 'Fehler beim Neustarten des Servers');
+        });
+    }
+
+    function editServer(serverId) {
+        window.location.href = `/guild/${guildId}/plugins/gameserver/servers/${serverId}/edit`;
+    }
+
+    function deleteServer(serverId, serverName) {
+        if (!confirm(`Server "${serverName}" WIRKLICH löschen? Diese Aktion kann nicht rückgängig gemacht werden!`)) return;
+        
+        fetch(`/guild/${guildId}/plugins/gameserver/servers/${serverId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', data.message);
+                // Delete braucht Reload (Server verschwindet aus Liste)
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast('error', data.message);
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showToast('error', 'Fehler beim Löschen des Servers');
+        });
+    }
+
+    function copyToClipboard(text) {
+        // Moderne Clipboard API nutzen
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    showToast('success', `Connection kopiert: ${text}`);
+                })
+                .catch(err => {
+                    console.error('Clipboard error:', err);
+                    fallbackCopyToClipboard(text);
+                });
+        } else {
+            fallbackCopyToClipboard(text);
+        }
+    }
+
+    function fallbackCopyToClipboard(text) {
+        // Fallback für ältere Browser
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                showToast('success', `Connection kopiert: ${text}`);
+            } else {
+                showToast('error', 'Fehler beim Kopieren');
+            }
+        } catch (err) {
+            console.error('Fallback copy error:', err);
+            showToast('error', 'Kopieren nicht unterstützt');
+        }
+        
+        document.body.removeChild(textArea);
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // 🔄 LIVE STATUS POLLING: Server-Status alle 5s aktualisieren
+    // ════════════════════════════════════════════════════════════
+    let statusPollInterval = null;
+
+    function startStatusPolling() {
+        // Initial Update
+        updateServerStatuses();
+        
+        // Poll alle 5 Sekunden
+        statusPollInterval = setInterval(() => {
+            updateServerStatuses();
+        }, 5000);
+        
+        console.log('[StatusPoll] Started polling every 5s');
+    }
+
+    function updateServerStatuses() {
+        fetch(`/guild/${guildId}/plugins/gameserver/servers/status`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.servers) {
+                    data.servers.forEach(server => {
+                        updateServerUI(server.id, server.status);
+                    });
+                }
+            })
+            .catch(err => {
+                console.error('[StatusPoll] Error:', err);
+            });
+    }
+
+    function updateServerUI(serverId, newStatus) {
+        // Status-Badge finden (robuster Selector - String UND Number unterstützen)
+        const row = document.querySelector(`tr[data-server-id="${serverId}"]`);
+        if (!row) {
+            console.warn(`[updateServerUI] Server-Row nicht gefunden: ${serverId}`);
+            return;
+        }
+        
+        const statusBadge = row.querySelector('.server-status-badge');
+        if (!statusBadge) return;
+        
+        const currentStatus = statusBadge.dataset.status;
+        if (currentStatus === newStatus) return; // Kein Update nötig
+        
+        console.log(`[StatusPoll] Server ${serverId}: ${currentStatus} → ${newStatus}`);
+        
+        // Badge-Klassen updaten
+        statusBadge.classList.remove('badge-success', 'badge-warning', 'badge-danger', 'badge-secondary', 'badge-info');
+        
+        // Status-Mapping (DB verwendet 'online' statt 'running')
+        switch(newStatus) {
+            case 'online':
+                statusBadge.classList.add('badge-success');
+                statusBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Online';
+                break;
+            case 'starting':
+                statusBadge.classList.add('badge-info');
+                statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting';
+                break;
+            case 'stopping':
+                statusBadge.classList.add('badge-warning');
+                statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Stopping';
+                break;
+            case 'installing':
+                statusBadge.classList.add('badge-info');
+                statusBadge.innerHTML = '<i class="fa-solid fa-download"></i> Installing';
+                break;
+            case 'installed':
+                statusBadge.classList.add('badge-success');
+                statusBadge.innerHTML = '<i class="fa-solid fa-check-circle"></i> Installed';
+                break;
+            case 'error':
+                statusBadge.classList.add('badge-danger');
+                statusBadge.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Error';
+                break;
+            case 'offline':
+            default:
+                statusBadge.classList.add('badge-secondary');
+                statusBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Offline';
+        }
+        
+        statusBadge.dataset.status = newStatus;
+        
+        // Action-Buttons updaten
+        updateActionButtons(row, newStatus);
+    }
+
+    function updateActionButtons(row, status) {
+        const startBtn = row.querySelector('.server-start-btn');
+        const stopBtn = row.querySelector('.server-stop-btn');
+        const restartBtn = row.querySelector('.server-restart-btn');
+        const deleteBtn = row.querySelector('.server-delete-btn');
+        const retryBtn = row.querySelector('.server-retry-btn');
+        
+        if (!startBtn || !stopBtn || !restartBtn) {
+            console.warn('[updateActionButtons] Buttons nicht gefunden:', { startBtn, stopBtn, restartBtn });
+            return;
+        }
+        
+        console.log(`[updateActionButtons] Status: ${status}, Buttons gefunden`);
+
+        
+        // Start-Button: Bei offline/error/installed
+        if (status === 'offline' || status === 'error' || status === 'installed') {
+            startBtn.style.display = 'inline-block';
+        } else {
+            startBtn.style.display = 'none';
+        }
+        
+        // Stop/Restart: Nur bei online (nicht 'running')
+        if (status === 'online') {
+            stopBtn.style.display = 'inline-block';
+            restartBtn.style.display = 'inline-block';
+        } else {
+            stopBtn.style.display = 'none';
+            restartBtn.style.display = 'none';
+        }
+        
+        // Delete-Button: Bei offline/error/installed (NICHT bei online/starting/stopping!)
+        if (deleteBtn) {
+            if (status === 'offline' || status === 'error' || status === 'installed') {
+                deleteBtn.style.display = 'inline-block';
+            } else {
+                deleteBtn.style.display = 'none';
+            }
+        }
+        
+        // Retry-Button: Nur bei error
+        if (retryBtn) {
+            if (status === 'error') {
+                retryBtn.style.display = 'inline-block';
+            } else {
+                retryBtn.style.display = 'none';
+            }
+        }
+    }
+
+    // ✅ WICHTIG: updateServerUI global verfügbar machen für SSE-Handler
+    window.updateServerUI = updateServerUI;
+
+    // Polling starten wenn Seite geladen
+    // DEPRECATED: Polling wird durch SSE ersetzt (Phase 3)
+    // startStatusPolling();
+    
+    // ✅ SSE-Client starten für Live-Updates
+    initSSE();
+    
+    // Cleanup bei Page-Leave
+    window.addEventListener('beforeunload', () => {
+        if (statusPollInterval) {
+            clearInterval(statusPollInterval);
+            console.log('[StatusPoll] Stopped');
+        }
+        
+        // SSE-Verbindung schließen
+        if (window.gameserverSSE) {
+            window.gameserverSSE.disconnect();
+            console.log('[SSE] Disconnected on page leave');
+        }
+    });
+});
+
+// ========================================
+// SSE (Server-Sent Events) für Live-Updates
+// ========================================
+function initSSE() {
+    console.log('[SSE] Initialisiere Server-Sent Events...');
+    
+    // SSE-Client aus gameserver-sse.js
+    if (typeof GameserverSSEClient === 'undefined') {
+        console.error('[SSE] GameserverSSEClient nicht geladen! Fallback auf Polling.');
+        startStatusPolling();
+        return;
+    }
+    
+    const guildId = '<%= guildId %>';
+    window.gameserverSSE = new GameserverSSEClient(guildId);
+    
+    // Event-Handler registrieren
+    window.gameserverSSE.on('status_changed', (data) => {
+        console.log('[SSE] Status changed:', data);
+        
+        // Status-Mapping: Dashboard verwendet 'online' statt 'running'
+        let uiStatus = data.status;
+        if (uiStatus === 'running') uiStatus = 'online';
+        if (uiStatus === 'stopped') uiStatus = 'offline';
+        
+        updateServerUI(data.server_id, uiStatus);
+    });
+    
+    window.gameserverSSE.on('resource_usage', (data) => {
+        console.log('[SSE] Resource usage:', data);
+        // TODO: Update CPU/RAM Anzeige
+        // updateServerResources(data.server_id, data.cpu, data.ram);
+    });
+    
+    window.gameserverSSE.on('crashed', (data) => {
+        console.error('[SSE] Server crashed:', data);
+        console.log('[SSE] Updating UI - server_id:', data.server_id, 'type:', typeof data.server_id);
+        updateServerUI(data.server_id, 'error');
+        
+        // Toast-Benachrichtigung
+        if (typeof GuildAjax !== 'undefined' && GuildAjax.showToast) {
+            GuildAjax.showToast('error', `Server ${data.server_name || data.server_id} ist abgestürzt! Fehler: ${data.error || 'Unbekannt'}`);
+        }
+    });
+    
+    window.gameserverSSE.on('install_completed', (data) => {
+        console.log('[SSE] Installation completed:', data);
+        updateServerUI(data.server_id, 'installed');  // ✅ Status: installed (zeigt Start-Button)
+        
+        // Toast-Benachrichtigung
+        if (typeof GuildAjax !== 'undefined' && GuildAjax.showToast) {
+            GuildAjax.showToast('success', `Server "${data.server_name}" ist bereit zum Starten!`);
+        }
+    });
+    
+    // Verbindung aufbauen
+    window.gameserverSSE.connect();
+    console.log('[SSE] Client gestartet');
+}
+</script>
+
+<!-- ✅ SSE-Script wird über AssetManager geladen (enqueueScript in Route) -->

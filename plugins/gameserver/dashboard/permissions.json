@@ -1,0 +1,166 @@
+{
+  "plugin": "gameserver",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "GAMESERVER.VIEW",
+      "name": "Gameserver anzeigen",
+      "description": "Berechtigung um Gameserver-Liste und Details zu sehen",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "GAMESERVER.CREATE",
+      "name": "Gameserver erstellen",
+      "description": "Berechtigung um neue Gameserver zu installieren",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.EDIT",
+      "name": "Gameserver bearbeiten",
+      "description": "Berechtigung um Gameserver-Einstellungen und Addons zu ändern",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.DELETE",
+      "name": "Gameserver löschen",
+      "description": "Berechtigung um Gameserver zu deinstallieren (kritisch)",
+      "category": "gameserver",
+      "is_dangerous": 1,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.START",
+      "name": "Gameserver starten",
+      "description": "Berechtigung um Gameserver zu starten",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.STOP",
+      "name": "Gameserver stoppen",
+      "description": "Berechtigung um Gameserver zu stoppen",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.RESTART",
+      "name": "Gameserver neu starten",
+      "description": "Berechtigung um Gameserver neu zu starten",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.CONSOLE.VIEW",
+      "name": "Console anzeigen",
+      "description": "Berechtigung um Server-Console zu sehen",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.CONSOLE.EXECUTE",
+      "name": "Console-Commands ausführen",
+      "description": "Berechtigung um Commands in der Console einzugeben (kritisch - voller Server-Zugriff)",
+      "category": "gameserver",
+      "is_dangerous": 1,
+      "requires": "GAMESERVER.CONSOLE.VIEW"
+    },
+    {
+      "key": "GAMESERVER.FILES.VIEW",
+      "name": "Dateien anzeigen",
+      "description": "Berechtigung um Server-Dateien anzusehen und herunterzuladen (Read-Only)",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.FILES.MANAGE",
+      "name": "Dateien verwalten",
+      "description": "Berechtigung um Dateien zu bearbeiten, hochzuladen und zu löschen (kritisch - voller Dateizugriff)",
+      "category": "gameserver",
+      "is_dangerous": 1,
+      "requires": "GAMESERVER.FILES.VIEW"
+    },
+    {
+      "key": "GAMESERVER.LOGS.VIEW",
+      "name": "Logs anzeigen",
+      "description": "Berechtigung um Server-Logs zu sehen",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.BACKUPS.CREATE",
+      "name": "Backups erstellen",
+      "description": "Berechtigung um Server-Backups anzulegen",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.BACKUPS.DOWNLOAD",
+      "name": "Backups herunterladen",
+      "description": "Berechtigung um Backups herunterzuladen",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.BACKUPS.RESTORE",
+      "name": "Backups wiederherstellen",
+      "description": "Berechtigung um Backups einzuspielen (kritisch - überschreibt aktuelle Daten)",
+      "category": "gameserver",
+      "is_dangerous": 1,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.BACKUPS.DELETE",
+      "name": "Backups löschen",
+      "description": "Berechtigung um Backups zu entfernen",
+      "category": "gameserver",
+      "is_dangerous": 1,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.ADDONS.VIEW",
+      "name": "Addons anzeigen",
+      "description": "Berechtigung um installierte Addons zu sehen",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.ADDONS.INSTALL",
+      "name": "Addons installieren",
+      "description": "Berechtigung um Addons aus dem Marketplace zu installieren",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.EDIT"
+    },
+    {
+      "key": "GAMESERVER.ADDONS.UNINSTALL",
+      "name": "Addons deinstallieren",
+      "description": "Berechtigung um Addons zu entfernen",
+      "category": "gameserver",
+      "is_dangerous": 1,
+      "requires": "GAMESERVER.EDIT"
+    },
+    {
+      "key": "GAMESERVER.RCON",
+      "name": "RCON-Konsole nutzen",
+      "description": "Berechtigung um RCON-Befehle an den Gameserver zu senden (kritisch - voller Admin-Zugriff über RCON)",
+      "category": "gameserver",
+      "is_dangerous": 1,
+      "requires": "GAMESERVER.VIEW"
+    }
+  ]
+}

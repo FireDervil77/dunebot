@@ -1,0 +1,407 @@
+<!-- Masterserver Daemon Setup - Wizard & Management -->
+<div class="container-fluid">
+  <div class="row">
+    <!-- Page Header -->
+    <div class="col-12 mb-3">
+      <h2>
+        <i class="fa-solid fa-cog text-primary me-2"></i>
+        <%= tr('masterserver:DAEMON.TITLE') %>
+      </h2>
+      <p class="text-muted">Konfiguriere deinen Masterserver-Daemon für die Guild</p>
+    </div>
+  </div>
+
+  <% if (!daemon) { %>
+    <!-- Setup Wizard - Schritt 1: Daemon erstellen -->
+    <div class="row">
+      <div class="col-lg-8 offset-lg-2">
+        <div class="card card-primary">
+          <div class="card-header">
+            <h3 class="card-title">
+              <i class="fa-solid fa-plus-circle me-2"></i>
+              Daemon erstellen
+            </h3>
+          </div>
+          <form class="guild-ajax-form" 
+                data-form-type="daemon-create" 
+                data-method="POST"
+                action="/guild/<%= guildId %>/plugins/masterserver/daemon/create"
+                method="POST">
+            <div class="card-body">
+              <div class="alert alert-info">
+                <i class="fa-solid fa-info-circle me-2"></i>
+                <strong>Hinweis:</strong> Pro Guild kann nur ein Daemon erstellt werden. 
+                Dieser verwaltet alle Gameserver und Voice-Server dieser Community.
+              </div>
+
+              <div class="form-group">
+                <label for="displayName">
+                  <%= tr('masterserver:DAEMON.DISPLAY_NAME') %>
+                  <span class="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="displayName"
+                  name="displayName"
+                  placeholder="z.B. Dune Gaming Server Daemon"
+                  minlength="3"
+                  maxlength="100"
+                  required
+                />
+                <small class="form-text text-muted">
+                  Dieser Name wird in Logs und der Übersicht angezeigt. Mindestens 3 Zeichen.
+                </small>
+              </div>
+
+              <div class="callout callout-warning">
+                <h5><i class="fa-solid fa-lightbulb me-2"></i> Was passiert als nächstes?</h5>
+                <ol class="mb-0">
+                  <li>Daemon-Instanz wird in der Datenbank angelegt</li>
+                  <li>Du bekommst einen Token um den Go-Daemon zu authentifizieren</li>
+                  <li>Installiere den Daemon auf deinem Server und starte ihn</li>
+                  <li>Nach erfolgreicher Verbindung kannst du Server registrieren</li>
+                </ol>
+              </div>
+            </div>
+            <div class="card-footer">
+              <button type="submit" class="btn btn-success">
+                <i class="fa-solid fa-plus me-1"></i>
+                Daemon erstellen
+              </button>
+              <a href="/guild/<%= guildId %>/plugins/masterserver/dashboard" class="btn btn-secondary">
+                <i class="fa-solid fa-arrow-left me-1"></i>
+                Zurück
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  <% } else { %>
+    <!-- Daemon existiert - Management View -->
+    <div class="row">
+      <!-- Daemon Info Card -->
+      <div class="col-lg-6">
+        <div class="card card-primary">
+          <div class="card-header">
+            <h3 class="card-title">
+              <i class="fa-solid fa-info-circle me-2"></i>
+              Daemon-Informationen
+            </h3>
+          </div>
+          <div class="card-body">
+            <dl class="row mb-0">
+              <dt class="col-sm-4"><%= tr('masterserver:DAEMON.DISPLAY_NAME') %>:</dt>
+              <dd class="col-sm-8"><strong><%= daemon.display_name %></strong></dd>
+
+              <dt class="col-sm-4">Daemon-ID:</dt>
+              <dd class="col-sm-8">
+                <code id="daemonId"><%= daemon.daemon_id %></code>
+                <button type="button" class="btn btn-xs btn-outline-secondary ms-2" onclick="copyToClipboard('daemonId')">
+                  <i class="fa-solid fa-copy"></i>
+                </button>
+              </dd>
+
+              <dt class="col-sm-4"><%= tr('masterserver:DAEMON.STATUS') %>:</dt>
+              <dd class="col-sm-8">
+                <span class="badge badge-<%= daemon.status === 'online' ? 'success' : 'danger' %>">
+                  <%= daemon.status === 'online' ? 'Online' : 'Offline' %>
+                </span>
+              </dd>
+
+              <dt class="col-sm-4"><%= tr('masterserver:DAEMON.VERSION') %>:</dt>
+              <dd class="col-sm-8" id="daemonVersionInfo">
+                <%= daemon.version || 'Unbekannt' %>
+                <span id="versionStatus"></span>
+              </dd>
+
+              <dt class="col-sm-4">Erstellt am:</dt>
+              <dd class="col-sm-8"><%= new Date(daemon.created_at).toLocaleString('de-DE') %></dd>
+
+              <dt class="col-sm-4"><%= tr('masterserver:DAEMON.LAST_SEEN') %>:</dt>
+              <dd class="col-sm-8">
+                <%= new Date(daemon.last_seen).toLocaleString('de-DE') %>
+                <small class="text-muted">(vor <%= Math.floor((Date.now() - new Date(daemon.last_seen)) / 60000) %> Min.)</small>
+              </dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      <!-- Token Generation Card -->
+      <div class="col-lg-6">
+        <div class="card card-success">
+          <div class="card-header">
+            <h3 class="card-title">
+              <i class="fa-solid fa-key me-2"></i>
+              Neuen Token generieren
+            </h3>
+          </div>
+          <form class="guild-ajax-form" 
+                data-form-type="token-generate" 
+                data-method="POST"
+                action="/guild/<%= guildId %>/plugins/masterserver/tokens/generate"
+                method="POST">
+            <div class="card-body">
+              <div class="form-group">
+                <label for="expiresInDays">
+                  Gültigkeit (Tage)
+                  <span class="text-danger">*</span>
+                </label>
+                <select class="form-control" id="expiresInDays" name="expiresInDays" required>
+                  <option value="30">30 Tage</option>
+                  <option value="90">90 Tage (3 Monate)</option>
+                  <option value="180">180 Tage (6 Monate)</option>
+                  <option value="365" selected>365 Tage (1 Jahr)</option>
+                  <option value="730">730 Tage (2 Jahre)</option>
+                </select>
+                <small class="form-text text-muted">
+                  Wähle wie lange der Token gültig sein soll.
+                </small>
+              </div>
+
+              <div class="form-group">
+                <label for="description">Beschreibung (optional)</label>
+                <textarea
+                  class="form-control"
+                  id="description"
+                  name="description"
+                  rows="2"
+                  placeholder="z.B. Produktions-Server Token"
+                ></textarea>
+                <small class="form-text text-muted">
+                  Hilft dir den Token später zu identifizieren.
+                </small>
+              </div>
+
+              <div class="alert alert-warning mb-0">
+                <i class="fa-solid fa-exclamation-triangle me-2"></i>
+                <strong>Wichtig:</strong> Der Token wird nur EINMAL angezeigt! 
+                Speichere ihn sicher ab.
+              </div>
+            </div>
+            <div class="card-footer">
+              <button type="submit" class="btn btn-success btn-block">
+                <i class="fa-solid fa-key me-1"></i>
+                Token generieren
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spacer -->
+    <div class="row mb-3"></div>
+
+    <!-- Installation Instructions (Moved from collapsed card) -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card card-info">
+          <div class="card-header">
+            <h3 class="card-title">
+              <i class="fa-solid fa-book me-2"></i>
+              Installations-Anleitung
+            </h3>
+          </div>
+          <div class="card-body">
+            <h6><strong>1. Installscript herunterladen und ausführen:</strong></h6>
+            <pre class="bg-dark text-white p-2 rounded"><code>curl -fsSL <%= process.env.DASHBOARD_BASE_URL %>/downloads/daemon/install.sh | sudo bash</code></pre>
+            <small class="text-muted">Das Installscript lädt automatisch die neueste Daemon-Version von GitHub herunter und richtet alles ein.</small>
+
+            <h6 class="mt-3"><strong>2. Setup-Wizard durchlaufen:</strong></h6>
+            <p>Nach der Installation startest du den Setup-Wizard:</p>
+            <pre class="bg-dark text-white p-2 rounded"><code>sudo /opt/firebot-daemon/firebot-daemon</code></pre>
+            <p>Der Wizard fragt dich nach folgenden Daten:</p>
+            <ul>
+              <li><strong>Dashboard-URL:</strong> <code><%= process.env.DASHBOARD_BASE_URL %></code></li>
+              <li><strong>Token:</strong> Nutze das Formular oben, um einen Token zu generieren</li>
+              <li><strong>Server-Pfade:</strong> Basis-Verzeichnis für deine Gameserver (z.B. <code>/home/gameserver</code>)</li>
+            </ul>
+            <small class="text-muted">Der Wizard erstellt automatisch die Config-Datei in <code>/opt/firebot-daemon/daemon.yaml</code>.</small>
+
+            <h6 class="mt-3"><strong>3. Daemon starten und aktivieren:</strong></h6>
+            <p>Nach erfolgreicher Konfiguration startest du den Daemon und aktivierst den Auto-Start:</p>
+            <pre class="bg-dark text-white p-2 rounded"><code>sudo systemctl start firebot-daemon
+sudo systemctl enable firebot-daemon
+sudo systemctl status firebot-daemon</code></pre>
+            <small class="text-muted">Der erste Befehl startet den Daemon, der zweite aktiviert den automatischen Start beim Systemstart.</small>
+
+            <h6 class="mt-3"><strong>4. Verbindung prüfen:</strong></h6>
+            <p><strong>Schau jetzt ins Dashboard!</strong> Der Status oben sollte auf <span class="badge badge-success">Online</span> wechseln.</p>
+            <pre class="bg-dark text-white p-2 rounded"><code># Service-Status prüfen:
+sudo systemctl status firebot-daemon
+
+# Live-Logs ansehen:
+sudo journalctl -u firebot-daemon -f</code></pre>
+            
+            <hr class="my-4">
+            
+            <div class="alert alert-success">
+              <h6><i class="fa-solid fa-circle-check me-2"></i> <strong>Daemon läuft bereits?</strong></h6>
+              <p class="mb-2">Wenn dein Daemon bereits läuft, kannst du:</p>
+              <ul class="mb-0">
+                <li><a href="/guild/<%= guildId %>/plugins/masterserver/servers">Server registrieren und verwalten</a></li>
+                <li><a href="/guild/<%= guildId %>/plugins/masterserver/logs">Daemon-Logs einsehen</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<!-- Token Display Modal -->
+<div class="modal fade" id="tokenModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-success">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-check-circle me-2"></i>
+          Token erfolgreich generiert!
+        </h5>
+        <button type="button" class="close" data-dismiss="modal">
+          <span>&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger">
+          <i class="fa-solid fa-exclamation-triangle me-2"></i>
+          <strong>WICHTIG:</strong> Dieser Token wird nur EINMAL angezeigt! 
+          Kopiere ihn jetzt und speichere ihn sicher.
+        </div>
+
+        <div class="form-group">
+          <label>Token-ID:</label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="modalTokenId" readonly>
+            <div class="input-group-append">
+              <button class="btn btn-outline-secondary" type="button" onclick="copyModalField('modalTokenId')">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Token (geheim!):</label>
+          <div class="input-group">
+            <textarea class="form-control" id="modalToken" rows="3" readonly></textarea>
+            <div class="input-group-append">
+              <button class="btn btn-success" type="button" onclick="copyModalField('modalToken')">
+                <i class="fa-solid fa-copy me-1"></i> Kopieren
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <h6><i class="fa-solid fa-info-circle me-2"></i>Nächste Schritte:</h6>
+          <ol class="mb-0">
+            <li>Kopiere den Token mit dem Button oben</li>
+            <li>Speichere ihn sicher (z.B. in einem Passwort-Manager)</li>
+            <li>Verwende ihn beim Starten deines Daemons: <code>--token YOUR_TOKEN</code></li>
+          </ol>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Schließen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Copy to Clipboard Script -->
+<script>
+function copyToClipboard(elementId) {
+  const text = document.getElementById(elementId).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    GuildAjax.showToast('success', 'In Zwischenablage kopiert!');
+  }).catch(err => {
+    GuildAjax.showToast('error', 'Fehler beim Kopieren');
+  });
+}
+
+// Modal-Feld kopieren
+function copyModalField(fieldId) {
+  const field = document.getElementById(fieldId);
+  field.select();
+  document.execCommand('copy');
+  GuildAjax.showToast('success', 'In Zwischenablage kopiert!');
+}
+
+// Update-Info alle 30 Sekunden abrufen
+<% if (daemon) { %>
+async function checkDaemonUpdate() {
+  try {
+    const response = await fetch('/guild/<%= guildId %>/plugins/masterserver/daemon/update-info');
+    const data = await response.json();
+    
+    if (data.success && data.updateInfo) {
+      const { currentVersion, latestVersion, available } = data.updateInfo;
+      const versionStatus = document.getElementById('versionStatus');
+      
+      if (available) {
+        versionStatus.innerHTML = `
+          <span class="badge badge-warning ml-2">
+            <i class="fa-solid fa-arrow-up"></i> Update verfügbar: v${latestVersion}
+          </span>
+          <button class="btn btn-sm btn-primary ml-2" onclick="triggerDaemonUpdate()">
+            <i class="fa-solid fa-download"></i> Jetzt aktualisieren
+          </button>
+        `;
+      } else {
+        versionStatus.innerHTML = `<span class="badge badge-success ml-2"><i class="fa-solid fa-check"></i> Aktuell</span>`;
+      }
+    } else if (!data.daemonOnline) {
+      document.getElementById('versionStatus').innerHTML = '<small class="text-muted">(Daemon offline)</small>';
+    }
+  } catch (error) {
+    console.error('Update-Check fehlgeschlagen:', error);
+  }
+}
+
+// Update triggern (via IPC)
+async function triggerDaemonUpdate() {
+  if (!confirm('Möchtest du das Daemon-Update jetzt durchführen? Der Daemon wird automatisch neu gestartet.')) {
+    return;
+  }
+  
+  try {
+    GuildAjax.showToast('info', 'Update wird gestartet...');
+    
+    const response = await fetch('/guild/<%= guildId %>/plugins/masterserver/daemon/trigger-update', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      GuildAjax.showToast('success', data.message || 'Update erfolgreich gestartet!');
+      
+      // Nach 10 Sekunden Seite neu laden (Daemon sollte dann neu gestartet sein)
+      setTimeout(() => {
+        GuildAjax.showToast('info', 'Lade Seite neu...');
+        setTimeout(() => window.location.reload(), 1500);
+      }, 10000);
+    } else {
+      GuildAjax.showToast('error', data.message || 'Update fehlgeschlagen');
+    }
+  } catch (error) {
+    console.error('Update-Trigger fehlgeschlagen:', error);
+    GuildAjax.showToast('error', 'Fehler beim Triggern des Updates');
+  }
+}
+
+// Initial check + Auto-Refresh
+checkDaemonUpdate();
+setInterval(checkDaemonUpdate, 30000); // Alle 30 Sekunden
+<% } %>
+
+</script>

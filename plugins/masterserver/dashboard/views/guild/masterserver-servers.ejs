@@ -1,0 +1,563 @@
+<!-- Masterserver Server-Verwaltung (Physische Server) -->
+<div class="container-fluid">
+  <div class="row">
+    <!-- Page Header -->
+    <div class="col-12 mb-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2>
+            <i class="fa-solid fa-server text-primary me-2"></i>
+            Server-Verwaltung
+          </h2>
+          <p class="text-muted">Physische/virtuelle Server die vom Daemon verwaltet werden</p>
+        </div>
+        <a href="/guild/<%= guildId %>/plugins/masterserver/servers/create" class="btn btn-primary">
+          <i class="fa-solid fa-plus me-2"></i>
+          Neuer Server
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Info Bar -->
+  <div class="row mb-3">
+    <div class="col-12">
+      <div class="alert <%= daemonOnline ? 'alert-success' : 'alert-warning' %>">
+        <i class="fa-solid <%= daemonOnline ? 'fa-circle-check' : 'fa-circle-exclamation' %> me-2"></i>
+        <strong>Daemon-Status:</strong> 
+        <%= daemonOnline ? 'Online - Hardware-Stats werden live aktualisiert' : 'Offline - Letzte bekannte Daten werden angezeigt' %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="row mb-3">
+    <div class="col-md-3">
+      <div class="info-box">
+        <span class="info-box-icon bg-primary"><i class="fa-solid fa-server"></i></span>
+        <div class="info-box-content">
+          <span class="info-box-text">Gesamt</span>
+          <span class="info-box-number"><%= serverStats.total %></span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="info-box">
+        <span class="info-box-icon bg-success"><i class="fa-solid fa-circle-check"></i></span>
+        <div class="info-box-content">
+          <span class="info-box-text">Aktiv</span>
+          <span class="info-box-number"><%= serverStats.active %></span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="info-box">
+        <span class="info-box-icon bg-warning"><i class="fa-solid fa-wrench"></i></span>
+        <div class="info-box-content">
+          <span class="info-box-text">Wartung</span>
+          <span class="info-box-number"><%= serverStats.maintenance %></span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="info-box">
+        <span class="info-box-icon bg-info"><i class="fa-solid fa-gamepad"></i></span>
+        <div class="info-box-content">
+          <span class="info-box-text">Gameserver</span>
+          <span class="info-box-number"><%= serverStats.totalGameservers %></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Servers Table Card -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-server me-2"></i>
+            Physische Server (<%= servers.length %>)
+          </h3>
+          <div class="card-tools">
+            <button type="button" class="btn btn-sm btn-primary" id="btnRefresh">
+              <i class="fa-solid fa-refresh me-1"></i> Aktualisieren
+            </button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <% if (servers.length > 0) { %>
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th width="5%">Status</th>
+                    <th width="15%">Server-Name</th>
+                    <th width="15%">Hardware</th>
+                    <th width="15%">Auslastung</th>
+                    <th width="10%" class="text-center">Gameserver</th>
+                    <th width="15%">Standort</th>
+                    <th width="10%" class="text-center">Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% servers.forEach(server => { 
+                    const statusColors = {
+                      'active': 'success',
+                      'maintenance': 'warning',
+                      'offline': 'secondary',
+                      'error': 'danger'
+                    };
+                    const statusColor = statusColors[server.status] || 'secondary';
+                    const cpuUsage = parseFloat(server.cpu_usage_percent || 0);
+                    const ramUsage = parseFloat(server.ram_usage_gb || 0);
+                    const ramTotal = parseFloat(server.ram_total_gb || 0);
+                    const ramPercent = ramTotal > 0 ? (ramUsage / ramTotal * 100) : 0;
+                  %>
+                    <tr>
+                      <td>
+                        <span class="badge badge-<%= statusColor %>">
+                          <i class="fa-solid fa-circle"></i>
+                        </span>
+                      </td>
+                      <td>
+                        <strong><%= server.name %></strong>
+                        <% if (server.hostname) { %>
+                          <br><small class="text-muted"><%= server.hostname %></small>
+                        <% } %>
+                      </td>
+                      <td>
+                        <% if (server.cpu_cores) { %>
+                          <i class="fa-solid fa-microchip text-muted"></i> <%= server.cpu_cores %> Cores
+                          <br>
+                          <i class="fa-solid fa-memory text-muted"></i> <%= ramTotal.toFixed(1) %> GB RAM
+                        <% } else { %>
+                          <span class="text-muted">Keine Daten</span>
+                        <% } %>
+                      </td>
+                      <td>
+                        <% if (server.cpu_usage_percent !== null) { %>
+                          <small>CPU: <%= cpuUsage.toFixed(1) %>%</small>
+                          <div class="progress mb-1" style="height: 8px;">
+                            <div class="progress-bar <%= cpuUsage > 80 ? 'bg-danger' : cpuUsage > 50 ? 'bg-warning' : 'bg-success' %>" 
+                                 style="width: <%= cpuUsage %>%"></div>
+                          </div>
+                          <small>RAM: <%= ramUsage.toFixed(1) %> / <%= ramTotal.toFixed(1) %> GB</small>
+                          <div class="progress" style="height: 8px;">
+                            <div class="progress-bar <%= ramPercent > 80 ? 'bg-danger' : ramPercent > 50 ? 'bg-warning' : 'bg-success' %>" 
+                                 style="width: <%= ramPercent %>%"></div>
+                          </div>
+                        <% } else { %>
+                          <span class="text-muted">-</span>
+                        <% } %>
+                      </td>
+                      <td class="text-center">
+                        <strong><%= server.gameserver_count || 0 %></strong>
+                        <% if (server.total_players) { %>
+                          <br><small class="text-muted"><%= server.total_players %> Spieler</small>
+                        <% } %>
+                      </td>
+                      <td>
+                        <% if (server.datacenter) { %>
+                          <%= server.datacenter %>
+                          <% if (server.country_code) { %>
+                            <br><small class="text-muted"><%= server.country_code %></small>
+                          <% } %>
+                        <% } else { %>
+                          <span class="text-muted">-</span>
+                        <% } %>
+                      </td>
+                      <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                          <button type="button" class="btn btn-info btn-server-details" 
+                                  data-server-id="<%= server.id %>" title="Details">
+                            <i class="fa-solid fa-info-circle"></i>
+                          </button>
+                          <button type="button" class="btn btn-primary btn-server-edit" 
+                                  data-server-id="<%= server.id %>" title="Bearbeiten">
+                            <i class="fa-solid fa-edit"></i>
+                          </button>
+                          <button type="button" class="btn btn-danger btn-server-delete" 
+                                  data-server-id="<%= server.id %>" 
+                                  data-server-name="<%= server.name %>" title="Löschen">
+                            <i class="fa-solid fa-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } else { %>
+            <div class="p-5 text-center text-muted">
+              <i class="fa-solid fa-server fa-4x mb-3"></i>
+              <h5>Keine Server erstellt</h5>
+              <p>Erstelle deinen ersten physischen Server um Gameserver darauf zu hosten.</p>
+              <a href="/guild/<%= guildId %>/plugins/masterserver/servers/create" class="btn btn-primary btn-lg">
+                <i class="fa-solid fa-plus me-2"></i>
+                Server erstellen
+              </a>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Server Modal -->
+<div class="modal fade" id="createServerModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-plus me-2"></i>
+          Neuen Server erstellen
+        </h5>
+        <button type="button" class="close text-white" data-dismiss="modal">
+          <span>&times;</span>
+        </button>
+      </div>
+      <form class="guild-ajax-form" data-form-type="create-server" data-method="POST" 
+            action="/guild/<%= guildId %>/plugins/masterserver/servers/create" method="POST"
+            data-loading-text="Server wird erstellt..."
+            data-loading-toast="true"
+            data-loading-toast-message="🔧 Virtual Server wird eingerichtet... (Bitte warten, ca. 20 Sekunden)">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Server-Name *</label>
+                <input type="text" class="form-control" name="name" required 
+                       placeholder="rootserver0001">
+                <small class="form-text text-muted">Eindeutiger Name für diesen Server</small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Hostname / FQDN</label>
+                <input type="text" class="form-control" name="hostname" 
+                       placeholder="server01.example.com">
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Beschreibung</label>
+            <textarea class="form-control" name="description" rows="2" 
+                      placeholder="Optionale Beschreibung..."></textarea>
+          </div>
+
+          <h6 class="mb-3 mt-4"><i class="fa-solid fa-sliders me-2"></i> Resource-Limits</h6>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="form-group">
+                <label>CPU-Limit (%)</label>
+                <input type="number" class="form-control" name="cpuLimitPercent" 
+                       value="100" min="1" max="100">
+                <small class="form-text text-muted">100 = unlimitiert</small>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-group">
+                <label>RAM-Limit (GB)</label>
+                <input type="number" class="form-control" name="ramLimitGb" step="0.5" 
+                       placeholder="Leer = unlimitiert">
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-group">
+                <label>Disk-Limit (GB)</label>
+                <input type="number" class="form-control" name="diskLimitGb" step="1" 
+                       placeholder="Leer = unlimitiert">
+              </div>
+            </div>
+          </div>
+
+          <h6 class="mb-3 mt-3"><i class="fa-solid fa-network-wired me-2"></i> Netzwerk</h6>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="form-group">
+                <label>IP-Adresse</label>
+                <% 
+                  // Debug: Hardware-Daten prüfen
+                  const hasHardware = daemonOnline && daemonHardware && daemonHardware.network;
+                  const hasInterfaces = hasHardware && Array.isArray(daemonHardware.network.interfaces) && daemonHardware.network.interfaces.length > 0;
+                  
+                  if (hasInterfaces) { 
+                    // Nur Loopback-Interfaces ausfiltern (isUp-Check entfernt, da das zu streng sein kann)
+                    const interfaces = daemonHardware.network.interfaces.filter(i => !i.isLoopback);
+                %>
+                  <% if (interfaces.length > 0) { %>
+                    <!-- Interfaces verfügbar -->
+                    <select class="form-control" name="ipAddress" id="ipAddressSelect">
+                      <option value="">-- Manuelle Eingabe --</option>
+                      <% interfaces.forEach(iface => { %>
+                        <% iface.addresses.forEach(addr => { %>
+                          <option value="<%= addr %>"><%= addr %> (<%= iface.name %>)</option>
+                        <% }); %>
+                      <% }); %>
+                    </select>
+                    <small class="form-text text-muted">
+                      <i class="fa-solid fa-circle-check text-success"></i>
+                      <%= interfaces.length %> Interface(s) verfügbar
+                    </small>
+                  <% } else { %>
+                    <!-- Nur Loopback-Interfaces gefunden -->
+                    <input type="text" class="form-control" name="ipAddress" 
+                           placeholder="192.168.1.100" id="ipAddressInput">
+                    <small class="form-text text-muted">
+                      <i class="fa-solid fa-circle-info text-info"></i>
+                      Keine nutzbaren Interfaces - 
+                      Gefunden: <%= daemonHardware.network.interfaces.map(i => i.name).join(', ') %>
+                      (alle Loopback)
+                    </small>
+                  <% } %>
+                <% } else { %>
+                  <!-- Keine Hardware-Daten oder Daemon offline -->
+                  <input type="text" class="form-control" name="ipAddress" 
+                         placeholder="192.168.1.100" id="ipAddressInput">
+                  <small class="form-text text-muted">
+                    <% if (!daemonOnline) { %>
+                      <i class="fa-solid fa-circle-exclamation text-warning"></i>
+                      Daemon offline - Manuelle Eingabe
+                    <% } else if (!hasHardware) { %>
+                      <i class="fa-solid fa-circle-info text-info"></i>
+                      Warte auf Hardware-Daten (Heartbeat)...
+                    <% } else { %>
+                      <i class="fa-solid fa-circle-info text-info"></i>
+                      Keine Netzwerk-Interfaces verfügbar
+                    <% } %>
+                  </small>
+                <% } %>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-group">
+                <label>Port-Range Start</label>
+                <input type="number" class="form-control" name="portRangeStart" 
+                       placeholder="25565">
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-group">
+                <label>Port-Range Ende</label>
+                <input type="number" class="form-control" name="portRangeEnd" 
+                       placeholder="25665">
+              </div>
+            </div>
+          </div>
+
+          <h6 class="mb-3 mt-3"><i class="fa-solid fa-location-dot me-2"></i> Standort</h6>
+          <div class="row">
+            <div class="col-md-8">
+              <div class="form-group">
+                <label>Datacenter</label>
+                <input type="text" class="form-control" name="datacenter" 
+                       placeholder="Hetzner Falkenstein">
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-group">
+                <label>Land</label>
+                <input type="text" class="form-control" name="countryCode" maxlength="2" 
+                       placeholder="DE">
+                <small class="form-text text-muted">2-stelliger Code (z.B. DE, US)</small>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-plus me-2"></i>
+            Server erstellen
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script>
+const servers = <%- JSON.stringify(servers) %>;
+const guildId = '<%= guildId %>';
+
+// Debug: Hardware-Daten in Console loggen
+<% if (daemonHardware) { %>
+console.log('[Masterserver] Hardware-Daten empfangen:', <%- JSON.stringify(daemonHardware) %>);
+<% } else { %>
+console.log('[Masterserver] Keine Hardware-Daten verfügbar');
+console.log('[Masterserver] Daemon online:', <%= daemonOnline %>);
+<% } %>
+
+// Event-Listener registrieren (CSP-compliant)
+document.addEventListener('DOMContentLoaded', function() {
+  // Refresh Button
+  const btnRefresh = document.getElementById('btnRefresh');
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', () => window.location.reload());
+  }
+
+  // Server Details Buttons
+  document.querySelectorAll('.btn-server-details').forEach(btn => {
+    btn.addEventListener('click', function() {
+      showServerDetails(this.dataset.serverId);
+    });
+  });
+
+  // Server Edit Buttons
+  document.querySelectorAll('.btn-server-edit').forEach(btn => {
+    btn.addEventListener('click', function() {
+      showEditServerModal(this.dataset.serverId);
+    });
+  });
+
+  // Server Delete Buttons
+  document.querySelectorAll('.btn-server-delete').forEach(btn => {
+    btn.addEventListener('click', function() {
+      deleteServer(this.dataset.serverId, this.dataset.serverName);
+    });
+  });
+
+  // IP-Adresse Select: Bei "--Manuelle Eingabe--" Input-Feld anzeigen
+  const ipSelect = document.getElementById('ipAddressSelect');
+  if (ipSelect) {
+    ipSelect.addEventListener('change', function() {
+      const parent = this.closest('.form-group');
+      const existingInput = parent.querySelector('#ipAddressManual');
+      
+      if (this.value === '') {
+        // Manuelle Eingabe gewählt → Input-Feld hinzufügen
+        if (!existingInput) {
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control mt-2';
+          input.name = 'ipAddress';
+          input.id = 'ipAddressManual';
+          input.placeholder = '192.168.1.100';
+          input.required = false;
+          parent.insertBefore(input, parent.querySelector('small'));
+        }
+        // Select-Name entfernen damit nur Input submitted wird
+        this.removeAttribute('name');
+      } else {
+        // IP aus Liste gewählt → Input entfernen falls vorhanden
+        if (existingInput) {
+          existingInput.remove();
+        }
+        // Select-Name wiederherstellen
+        this.setAttribute('name', 'ipAddress');
+      }
+    });
+  }
+});
+
+function showServerDetails(serverId) {
+  const server = servers.find(s => s.server_id === serverId);
+  if (!server) return GuildAjax.showToast('error', 'Server nicht gefunden');
+  
+  // Schönes Modal mit strukturierten Infos
+  const statusBadge = {
+    'active': '<span class="badge badge-success">Aktiv</span>',
+    'maintenance': '<span class="badge badge-warning">Wartung</span>',
+    'offline': '<span class="badge badge-secondary">Offline</span>',
+    'error': '<span class="badge badge-danger">Fehler</span>'
+  }[server.status] || '<span class="badge badge-secondary">Unbekannt</span>';
+  
+  const hardwareInfo = server.cpu_cores ? `
+    <tr><td><strong>CPU:</strong></td><td>${server.cpu_cores} Cores / ${server.cpu_threads || '?'} Threads</td></tr>
+    <tr><td><strong>CPU-Modell:</strong></td><td>${server.cpu_model || 'Unbekannt'}</td></tr>
+    <tr><td><strong>RAM:</strong></td><td>${parseFloat(server.ram_total_gb || 0).toFixed(1)} GB</td></tr>
+    <tr><td><strong>Disk:</strong></td><td>${parseFloat(server.disk_total_gb || 0).toFixed(1)} GB</td></tr>
+  ` : '<tr><td colspan="2" class="text-muted">Keine Hardware-Daten verfügbar</td></tr>';
+  
+  const usageInfo = server.cpu_usage_percent !== null ? `
+    <tr><td><strong>CPU-Auslastung:</strong></td><td>${parseFloat(server.cpu_usage_percent || 0).toFixed(1)}%</td></tr>
+    <tr><td><strong>RAM-Auslastung:</strong></td><td>${parseFloat(server.ram_usage_gb || 0).toFixed(1)} / ${parseFloat(server.ram_total_gb || 0).toFixed(1)} GB</td></tr>
+    <tr><td><strong>Disk-Auslastung:</strong></td><td>${parseFloat(server.disk_usage_gb || 0).toFixed(1)} / ${parseFloat(server.disk_total_gb || 0).toFixed(1)} GB</td></tr>
+  ` : '<tr><td colspan="2" class="text-muted">Keine Auslastungsdaten verfügbar</td></tr>';
+  
+  const networkInfo = server.ip_address ? `
+    <tr><td><strong>IP-Adresse:</strong></td><td>${server.ip_address}</td></tr>
+    <tr><td><strong>Port-Range:</strong></td><td>${server.port_range_start || '?'} - ${server.port_range_end || '?'}</td></tr>
+  ` : '<tr><td colspan="2" class="text-muted">Keine Netzwerk-Konfiguration</td></tr>';
+  
+  Swal.fire({
+    title: `<i class="fa-solid fa-server"></i> ${server.name}`,
+    html: `
+      <div class="text-left">
+        <h6 class="mb-2"><i class="fa-solid fa-circle-info text-primary"></i> Allgemein</h6>
+        <table class="table table-sm table-borderless mb-3">
+          <tr><td><strong>Server-ID:</strong></td><td><code>${server.id}</code></td></tr>
+          <tr><td><strong>Status:</strong></td><td>${statusBadge}</td></tr>
+          <tr><td><strong>Hostname:</strong></td><td>${server.hostname || '-'}</td></tr>
+          <tr><td><strong>Standort:</strong></td><td>${server.datacenter || '-'} ${server.country_code ? '(' + server.country_code + ')' : ''}</td></tr>
+        </table>
+        
+        <h6 class="mb-2"><i class="fa-solid fa-microchip text-info"></i> Hardware</h6>
+        <table class="table table-sm table-borderless mb-3">
+          ${hardwareInfo}
+        </table>
+        
+        <h6 class="mb-2"><i class="fa-solid fa-chart-line text-success"></i> Auslastung</h6>
+        <table class="table table-sm table-borderless mb-3">
+          ${usageInfo}
+        </table>
+        
+        <h6 class="mb-2"><i class="fa-solid fa-network-wired text-warning"></i> Netzwerk</h6>
+        <table class="table table-sm table-borderless mb-3">
+          ${networkInfo}
+        </table>
+        
+        <h6 class="mb-2"><i class="fa-solid fa-gamepad text-danger"></i> Gameserver</h6>
+        <table class="table table-sm table-borderless">
+          <tr><td><strong>Gameserver:</strong></td><td>${server.gameserver_count || 0}</td></tr>
+          <tr><td><strong>Spieler:</strong></td><td>${server.total_players || 0}</td></tr>
+        </table>
+      </div>
+    `,
+    icon: null,
+    width: '600px',
+    confirmButtonText: '<i class="fa-solid fa-edit"></i> Bearbeiten',
+    showCancelButton: true,
+    cancelButtonText: 'Schließen'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      showEditServerModal(serverId);
+    }
+  });
+}
+
+function showEditServerModal(serverId) {
+  // Direkt zur Edit-Seite navigieren
+  window.location.href = `/guild/${guildId}/plugins/masterserver/servers/${serverId}/edit`;
+}
+
+async function deleteServer(serverId, serverName) {
+  if (!confirm(`Server "${serverName}" wirklich löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden!`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/guild/${guildId}/plugins/masterserver/servers/${serverId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      GuildAjax.showToast('success', result.message || 'Server gelöscht');
+      setTimeout(() => window.location.reload(), 1500);
+    } else {
+      GuildAjax.showToast('error', result.message || 'Fehler beim Löschen');
+    }
+  } catch (error) {
+    console.error('Delete error:', error);
+    GuildAjax.showToast('error', 'Netzwerkfehler beim Löschen');
+  }
+}
+</script>

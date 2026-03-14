@@ -1,0 +1,94 @@
+/**
+ * Gameserver Plugin - Global Styles
+ * 
+ * Styles für Server-Cards, Hover-Effekte und UI-Komponenten
+ */
+
+/* ========================================
+   SERVER CARD HOVER EFFECTS
+   ======================================== */
+
+/* Card Link Wrapper */
+.card-link {
+    display: block;
+    color: inherit;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.card-link:hover {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* Card Base Styles */
+.server-card {
+    transition: all 0.3s ease;
+    border: 3px solid #e0e0e0 !important;
+    cursor: pointer;
+    position: relative;
+}
+
+/* Card Hover State */
+.card-link:hover .server-card {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 12px 30px rgba(102, 126, 234, 0.3) !important;
+    border-color: #667eea !important;
+}
+
+/* Header Gradient verstärken bei Hover */
+.card-link:hover .server-card .card-img-top {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    filter: brightness(1.1);
+}
+
+/* ========================================
+   STATUS BADGES
+   ======================================== */
+
+.server-status-badge {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    transition: all 0.3s ease;
+}
+
+/* ========================================
+   RESOURCE PROGRESS BARS
+   ======================================== */
+
+.progress-bar {
+    transition: width 1s ease;
+}
+
+/* ========================================
+   CONNECTION STRING
+   ======================================== */
+
+.server-connection {
+    background: #f8f9fa;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+/* ========================================
+   GAME ICON
+   ======================================== */
+
+.game-icon {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+/* ========================================
+   BUTTON GROUP
+   ======================================== */
+
+.btn-group .btn {
+    font-size: 0.875rem;
+}
+
+/* Action-Buttons in Card-Footer */
+.card-footer .btn-group {
+    gap: 0.25rem;
+}

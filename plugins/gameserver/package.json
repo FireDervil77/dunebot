@@ -1,0 +1,15 @@
+{
+    "name": "gameserver",
+    "displayName": "Gameserver",
+    "description": "The Gameserver Plugin - Choose your game. download the game addon for the game and setup the gameserver",
+    "version": "1.0.0",
+    "author": "FireBot Team",
+    "license": "none",
+    "type":"commonjs",
+    "peerDependencies": {
+        "discord.js": "^14.19.0",
+        "express": "^5.1.0",
+        "dunebot-core": "*",
+        "dunebot-sdk": "*"
+    }
+}
