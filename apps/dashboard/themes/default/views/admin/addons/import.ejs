@@ -1,13 +1,12 @@
-<%# Admin: Addon Import (Pterodactyl + LinuxGSM) %>
-
+<%# Admin: Egg Import (Pelican / FIREBOT_v2) %>
 <div class="content-wrapper">
     <div class="content-header">
         <div class="container-fluid">
             <div class="row mb-2">
                 <div class="col-sm-6">
                     <h1 class="m-0">
-                        <i class="fa-solid fa-download"></i>
-                        Addon Import
+                        <i class="fa-solid fa-egg"></i>
+                        Egg importieren
                     </h1>
                 </div>
                 <div class="col-sm-6">
@@ -23,452 +22,397 @@
 
     <div class="content">
         <div class="container-fluid">
-            
-            <%# Info-Alert %>
-            <div class="alert alert-info">
-                <h5><i class="icon fa-solid fa-info-circle"></i> SuperAdmin Import</h5>
-                <p>
-                    Importiere Addons aus Pterodactyl oder LinuxGSM und konvertiere sie automatisch ins DuneBot-Format.
-                    <strong>Dieser Bereich ist nur für dich als Bot-Owner sichtbar!</strong>
-                </p>
-                <ul>
-                    <li>✅ Automatische Konvertierung zu DuneBot-Format</li>
-                    <li>✅ SteamCMD-Spiele: direkt lauffähig (AppID wird extrahiert)</li>
-                    <li>✅ Variables & Ports werden extrahiert</li>
-                    <li>⚠️ Nach Import: Review, Testing und Approval nötig!</li>
-                </ul>
+
+            <div class="alert alert-info alert-dismissible">
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+                <h5><i class="icon fa-solid fa-info-circle"></i> Pelican Egg Import</h5>
+                Importiert Eggs aus dem offiziellen <strong>Pelican</strong>-Repository
+                (<a href="https://github.com/pelican-eggs" target="_blank" rel="noreferrer">github.com/pelican-eggs</a>)
+                und konvertiert sie automatisch ins <strong>FIREBOT_v2</strong>-Format.<br>
+                Nach dem Import muss das Addon noch bearbeitet, getestet und freigegeben werden.
             </div>
 
-            <%# Tab Navigation %>
-            <ul class="nav nav-tabs mb-0" id="importTabs" role="tablist">
-                <li class="nav-item">
-                    <a class="nav-link active" id="ptero-tab-link" data-toggle="tab" href="#ptero-tab" role="tab">
-                        <i class="fa-solid fa-egg"></i> Pterodactyl
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" id="lgsm-tab-link" data-toggle="tab" href="#lgsm-tab" role="tab">
-                        <i class="fa-solid fa-terminal"></i> LinuxGSM
-                    </a>
-                </li>
-            </ul>
+            <%# ── Schritt-Anzeige ─────────────────────────────────────────── %>
+            <div class="row mb-3" id="stepIndicator">
+                <div class="col-12">
+                    <div class="bs-stepper-header d-flex align-items-center">
+                        <div class="step" id="step1-indicator">
+                            <button class="step-trigger active-step font-weight-bold">
+                                <span class="bs-stepper-circle bg-primary text-white">1</span>
+                                <span class="bs-stepper-label">Repository</span>
+                            </button>
+                        </div>
+                        <div class="bs-stepper-line flex-fill mx-2" style="height:2px;background:#dee2e6;"></div>
+                        <div class="step" id="step2-indicator">
+                            <button class="step-trigger">
+                                <span class="bs-stepper-circle bg-secondary text-white">2</span>
+                                <span class="bs-stepper-label">Egg wählen</span>
+                            </button>
+                        </div>
+                        <div class="bs-stepper-line flex-fill mx-2" style="height:2px;background:#dee2e6;"></div>
+                        <div class="step" id="step3-indicator">
+                            <button class="step-trigger">
+                                <span class="bs-stepper-circle bg-secondary text-white">3</span>
+                                <span class="bs-stepper-label">Vorschau &amp; Speichern</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-            <div class="tab-content border border-top-0 rounded-bottom bg-white p-3 mb-3" id="importTabContent">
+            <%# ── Schritt 1: Repository wählen ──────────────────────────────── %>
+            <div id="step1" class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fa-solid fa-folder-open"></i> Schritt 1: Repository wählen</h5>
+                </div>
+                <div class="card-body">
+                    <div id="repoLoading" class="text-center p-4">
+                        <i class="fa-solid fa-spinner fa-spin fa-2x text-primary"></i>
+                        <p class="mt-2">Lade Repositories...</p>
+                    </div>
+                    <div id="repoList" class="row" style="display:none;"></div>
+                </div>
+            </div>
 
-                <%# ─── TAB 1: Pterodactyl ─────────────────────────────────────── %>
-                <div class="tab-pane fade show active" id="ptero-tab" role="tabpanel">
-                    <div class="pt-3">
-
-                    <%# Schritt 1: Kategorie wählen %>
+            <%# ── Schritt 2: Egg wählen ─────────────────────────────────────── %>
+            <div id="step2" class="card mt-3" style="display:none;">
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fa-solid fa-egg"></i> Schritt 2: Egg wählen</h5>
+                    <button class="btn btn-sm btn-outline-light" id="btnBackToStep1">
+                        <i class="fa-solid fa-arrow-left"></i> Anderes Repository
+                    </button>
+                </div>
+                <div class="card-body">
                     <div class="form-group">
-                        <label><i class="fa-solid fa-folder"></i> Kategorie</label>
-                        <select id="pterodactylCategory" class="form-control">
-                            <option value="">-- Kategorie wählen --</option>
-                            <option value="games-steamcmd">🎮 SteamCMD Games</option>
-                            <option value="minecraft">⛏️ Minecraft</option>
-                        </select>
-                        <small class="form-text text-muted">Voice-Server und Databases sind nicht verfügbar für Gameserver-Addons</small>
+                        <input type="text" id="eggSearch" class="form-control" placeholder="Egg suchen...">
                     </div>
-
-                    <%# Schritt 2: Egg wählen (dynamisch geladen) %>
-                    <div class="form-group" id="ptero-eggSelectGroup" style="display:none;">
-                        <label><i class="fa-solid fa-egg"></i> Egg</label>
-                        <select id="pterodactylEgg" class="form-control">
-                            <option value="">-- Erst Kategorie wählen --</option>
-                        </select>
+                    <div id="eggLoading" class="text-center p-4">
+                        <i class="fa-solid fa-spinner fa-spin fa-2x text-secondary"></i>
+                        <p class="mt-2">Lade Eggs...</p>
                     </div>
+                    <div id="eggList" class="list-group" style="display:none;"></div>
+                </div>
+            </div>
 
-                    <%# Loading Spinner %>
-                    <div id="ptero-loadingSpinner" style="display:none;" class="text-center my-3">
-                        <i class="fa-solid fa-spinner fa-spin fa-3x text-primary"></i>
-                        <p class="mt-2">Lade Pterodactyl Egg...</p>
+            <%# ── Schritt 3: Vorschau & Speichern ───────────────────────────── %>
+            <div id="step3" class="card mt-3" style="display:none;">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fa-solid fa-eye"></i> Schritt 3: Vorschau &amp; Speichern</h5>
+                    <button class="btn btn-sm btn-outline-light" id="btnBackToStep2">
+                        <i class="fa-solid fa-arrow-left"></i> Anderes Egg
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="previewLoading" class="text-center p-4" style="display:none;">
+                        <i class="fa-solid fa-spinner fa-spin fa-2x text-success"></i>
+                        <p class="mt-2">Egg wird konvertiert...</p>
                     </div>
-
-                    <%# Preview %>
-                    <div id="ptero-importPreview" style="display:none;">
-                        <hr>
-                        <h5><i class="fa-solid fa-eye"></i> Import-Preview</h5>
+                    <div id="previewContent" style="display:none;">
                         <div class="row">
                             <div class="col-md-6">
-                                <dl>
-                                    <dt>Name:</dt><dd id="ptero-previewName">-</dd>
-                                    <dt>Beschreibung:</dt><dd id="ptero-previewDescription">-</dd>
-                                    <dt>Runtime Type:</dt><dd id="ptero-previewRuntime">-</dd>
-                                </dl>
+                                <table class="table table-sm table-bordered">
+                                    <tbody>
+                                        <tr><th>Name</th><td id="prev-name">-</td></tr>
+                                        <tr><th>Beschreibung</th><td id="prev-desc">-</td></tr>
+                                        <tr><th>Runtime</th><td id="prev-runtime">-</td></tr>
+                                        <tr><th>Docker-Image</th><td id="prev-image">-</td></tr>
+                                        <tr><th>Variables</th><td id="prev-vars">-</td></tr>
+                                    </tbody>
+                                </table>
                             </div>
                             <div class="col-md-6">
-                                <dl>
-                                    <dt>Variables:</dt><dd id="ptero-previewVariables">-</dd>
-                                    <dt>Ports:</dt><dd id="ptero-previewPorts">-</dd>
-                                    <dt>Source:</dt><dd><span class="badge badge-info">Pterodactyl</span></dd>
-                                </dl>
+                                <label class="font-weight-bold">Startup-Kommando:</label>
+                                <code id="prev-startup" class="d-block bg-dark text-white p-2 small rounded mb-3"></code>
+                                <label class="font-weight-bold">Install-Container:</label>
+                                <code id="prev-install-container" class="d-block bg-dark text-white p-2 small rounded"></code>
                             </div>
                         </div>
+
+                        <div class="form-group mt-3">
+                            <label><i class="fa-solid fa-tag"></i> Name (editierbar)</label>
+                            <input type="text" id="saveAddonName" class="form-control" placeholder="Addon-Name">
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-align-left"></i> Beschreibung (optional)</label>
+                            <textarea id="saveAddonDesc" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-folder"></i> Kategorie</label>
+                            <select id="saveAddonCategory" class="form-control">
+                                <option value="other">Sonstiges</option>
+                                <option value="shooter">Shooter</option>
+                                <option value="survival">Survival</option>
+                                <option value="sandbox">Sandbox</option>
+                                <option value="racing">Racing</option>
+                                <option value="minecraft">Minecraft</option>
+                                <option value="database">Datenbank</option>
+                                <option value="software">Software</option>
+                            </select>
+                        </div>
+
                         <div class="alert alert-warning">
                             <i class="fa-solid fa-exclamation-triangle"></i>
-                            <strong>Wichtig:</strong> Nach dem Import musst du das Addon noch bearbeiten, testen und freigeben!
+                            <strong>Hinweis:</strong> Das Addon wird als <em>pending_review</em> gespeichert.
+                            Bitte nach dem Import prüfen, anpassen und freigeben.
                         </div>
-                        <div id="ptero-reviewHint" class="alert alert-danger" style="display:none;">
-                            <i class="fa-solid fa-triangle-exclamation"></i>
-                            <strong>Manuelle Prüfung erforderlich!</strong><br>
-                            Kein SteamCMD-Standard erkannt. Install-Script wurde übersetzt, muss aber vor der Aktivierung geprüft werden.
-                            Das Addon wird als <em>Entwurf</em> gespeichert.
-                        </div>
-                    </div>
 
-                    <div class="mt-3">
-                        <button id="ptero-btnImport" class="btn btn-primary" disabled>
-                            <i class="fa-solid fa-download"></i> Egg importieren
-                        </button>
-                        <button id="ptero-btnSave" class="btn btn-success ml-2" style="display:none;">
-                            <i class="fa-solid fa-save"></i> Als Addon speichern (Draft)
-                        </button>
-                    </div>
-
-                    </div><%# /pt-3 %>
-                </div><%# /ptero-tab %>
-
-
-                <%# ─── TAB 2: LinuxGSM ───────────────────────────────────────── %>
-                <div class="tab-pane fade" id="lgsm-tab" role="tabpanel">
-                    <div class="pt-3">
-
-                    <div class="alert alert-secondary mb-3">
-                        <i class="fa-solid fa-terminal"></i>
-                        Importiert Spiele direkt aus dem <strong>LinuxGSM</strong> GitHub-Repository.
-                        Alle Steam-Spiele werden automatisch mit korrekter AppID und Standard-Script importiert.
-                    </div>
-
-                    <%# Spiel-Auswahl %>
-                    <div class="form-group">
-                        <label><i class="fa-solid fa-gamepad"></i> Spiel auswählen</label>
-                        <div class="input-group">
-                            <input type="text" id="lgsm-search" class="form-control" placeholder="Suche (z.B. valheim, rust, csgo)...">
-                            <div class="input-group-append">
-                                <button id="lgsm-btnLoadList" class="btn btn-outline-secondary" type="button">
-                                    <i class="fa-solid fa-refresh"></i> Laden
-                                </button>
-                            </div>
-                        </div>
-                        <small class="form-text text-muted" id="lgsm-listInfo">Spieleliste wird beim ersten Tippen oder Klick auf "Laden" automatisch geladen.</small>
-                    </div>
-                    <div class="form-group" id="lgsm-gameSelectGroup" style="display:none;">
-                        <select id="lgsm-gameSelect" class="form-control" size="8" style="height:auto;">
-                            <option value="">-- Spieleliste wird geladen --</option>
-                        </select>
-                    </div>
-
-                    <%# Loading Spinner %>
-                    <div id="lgsm-loadingSpinner" style="display:none;" class="text-center my-3">
-                        <i class="fa-solid fa-spinner fa-spin fa-3x text-success"></i>
-                        <p class="mt-2">Lade LGSM-Daten von GitHub...</p>
-                    </div>
-
-                    <%# Preview %>
-                    <div id="lgsm-importPreview" style="display:none;">
-                        <hr>
-                        <h5><i class="fa-solid fa-eye"></i> Import-Preview</h5>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <dl>
-                                    <dt>Name:</dt><dd id="lgsm-previewName">-</dd>
-                                    <dt>Beschreibung:</dt><dd id="lgsm-previewDescription">-</dd>
-                                    <dt>Steam AppID:</dt><dd id="lgsm-previewAppId">-</dd>
-                                </dl>
-                            </div>
-                            <div class="col-md-6">
-                                <dl>
-                                    <dt>Variables:</dt><dd id="lgsm-previewVariables">-</dd>
-                                    <dt>Ports:</dt><dd id="lgsm-previewPorts">-</dd>
-                                    <dt>Source:</dt><dd><span class="badge badge-success">LinuxGSM</span></dd>
-                                </dl>
-                            </div>
-                        </div>
-                        <div id="lgsm-steamBadge" class="alert alert-success" style="display:none;">
-                            <i class="fa-brands fa-steam"></i>
-                            <strong>Steam-Spiel erkannt!</strong> Standard SteamCMD-Script wird generiert. Direkt lauffähig nach Approval.
-                        </div>
-                        <div id="lgsm-reviewHint" class="alert alert-warning" style="display:none;">
-                            <i class="fa-solid fa-triangle-exclamation"></i>
-                            <strong>Kein Steam-Game:</strong> Install-Script muss manuell erstellt werden.
-                            Das Addon wird als <em>Entwurf</em> gespeichert.
+                        <div class="d-flex gap-2">
+                            <button id="btnSaveAddon" class="btn btn-success">
+                                <i class="fa-solid fa-save"></i> Als Addon speichern
+                            </button>
+                            <details class="ml-3">
+                                <summary class="text-muted small" style="cursor:pointer;">game_data (raw JSON) anzeigen</summary>
+                                <pre id="rawJson" class="bg-dark text-white p-2 rounded mt-2 small" style="max-height:300px;overflow:auto;"></pre>
+                            </details>
                         </div>
                     </div>
-
-                    <div class="mt-3">
-                        <button id="lgsm-btnImport" class="btn btn-success" disabled>
-                            <i class="fa-solid fa-download"></i> LGSM-Game importieren
-                        </button>
-                        <button id="lgsm-btnSave" class="btn btn-primary ml-2" style="display:none;">
-                            <i class="fa-solid fa-save"></i> Als Addon speichern
-                        </button>
-                    </div>
-
-                    </div><%# /pt-3 %>
-                </div><%# /lgsm-tab %>
-
-            </div><%# /tab-content %>
+                </div>
+            </div>
 
         </div>
     </div>
 </div>
 
+<style>
+.bs-stepper-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    font-weight: 600;
+    margin-right: 0.4rem;
+}
+.repo-card { cursor: pointer; transition: transform .15s, box-shadow .15s; }
+.repo-card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ══════════════════════════════════════
-    // Gemeinsame Hilfsfunktion: Addon speichern
-    // ══════════════════════════════════════
-    async function saveAddon(importedData, sourceType, saveBtnEl) {
-        saveBtnEl.disabled = true;
-        saveBtnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Speichert...';
+    let currentRepo = null;
+    let currentEggs = [];
+    let currentGameData = null;
 
+    // ── Hilfsfunktionen ──────────────────────────────────────────────────────
+
+    function setStep(n) {
+        [1, 2, 3].forEach(i => {
+            const circle = document.querySelector(`#step${i}-indicator .bs-stepper-circle`);
+            document.getElementById(`step${i}`).style.display = (i === n) ? 'block' : 'none';
+            if (circle) {
+                circle.classList.toggle('bg-primary', i === n);
+                circle.classList.toggle('bg-success', i < n);
+                circle.classList.toggle('bg-secondary', i > n);
+            }
+        });
+    }
+
+    function filterEggs(search) {
+        const lc = search.toLowerCase();
+        const filtered = lc
+            ? currentEggs.filter(e => e.displayName.toLowerCase().includes(lc) || e.name.toLowerCase().includes(lc))
+            : currentEggs;
+        renderEggList(filtered);
+    }
+
+    function renderEggList(eggs) {
+        const list = document.getElementById('eggList');
+        list.innerHTML = eggs.length
+            ? eggs.map(e => `
+                <button type="button" class="list-group-item list-group-item-action egg-item"
+                        data-url="${e.downloadUrl}" data-name="${e.displayName}">
+                    <i class="fa-solid fa-egg mr-2 text-warning"></i>
+                    <strong>${e.displayName}</strong>
+                    <small class="text-muted ml-2">${e.name}</small>
+                </button>`).join('')
+            : '<p class="text-muted p-2">Keine Eggs gefunden.</p>';
+
+        list.querySelectorAll('.egg-item').forEach(el => {
+            el.addEventListener('click', function() {
+                loadEgg(this.dataset.url, this.dataset.name);
+            });
+        });
+    }
+
+    // ── Schritt 1: Repositories laden ────────────────────────────────────────
+
+    (async function loadRepos() {
+        setStep(1);
         try {
-            const importMeta = importedData._import_meta || {};
-            const isSteam    = importMeta.isSteamcmd || importMeta.isSteam;
+            const res  = await fetch('/admin/addons/repositories');
+            const data = await res.json();
 
-            const payload = {
-                name:         importedData.meta?.name        || 'Imported Addon',
-                slug:         (importedData.meta?.name || 'addon').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
-                description:  importedData.meta?.description || '',
-                category:     importMeta.category            || 'other',
-                runtime_type: isSteam ? 'native' : 'other',
-                source_type:  sourceType,
-                meta:         importedData.meta,
-                installation: importedData.installation,
-                startup:      importedData.startup,
-                variables:    importedData.variables || [],
-                ports:        importedData.ports     || {},
+            const icons = {
+                'games-steamcmd':  'fa-brands fa-steam',
+                'games-standalone': 'fa-solid fa-cube',
+                'minecraft':        'fa-solid fa-cube',
+                'database':         'fa-solid fa-database',
+                'software':         'fa-solid fa-terminal',
+            };
+            const colors = {
+                'games-steamcmd':   'info',
+                'games-standalone': 'secondary',
+                'minecraft':        'success',
+                'database':         'warning',
+                'software':         'dark',
             };
 
+            const repoList = document.getElementById('repoList');
+            repoList.innerHTML = data.repositories.map(r => `
+                <div class="col-md-4 col-sm-6 mb-3">
+                    <div class="card repo-card border-${colors[r.id] || 'primary'}" data-repo="${r.id}">
+                        <div class="card-body text-center">
+                            <i class="${icons[r.id] || 'fa-solid fa-folder'} fa-3x text-${colors[r.id] || 'primary'} mb-2"></i>
+                            <h5>${r.name}</h5>
+                            <small class="text-muted">${r.id}</small>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            repoList.querySelectorAll('.repo-card').forEach(card => {
+                card.addEventListener('click', function() { loadEggs(this.dataset.repo); });
+            });
+
+            document.getElementById('repoLoading').style.display = 'none';
+            repoList.style.display = 'flex';
+            repoList.classList.add('flex-wrap');
+
+        } catch (err) {
+            document.getElementById('repoLoading').innerHTML =
+                `<p class="text-danger"><i class="fa-solid fa-times-circle"></i> ${err.message}</p>`;
+        }
+    })();
+
+    document.getElementById('btnBackToStep1').addEventListener('click', () => setStep(1));
+    document.getElementById('btnBackToStep2').addEventListener('click', () => {
+        setStep(2);
+        currentGameData = null;
+    });
+
+    // ── Schritt 2: Eggs laden ─────────────────────────────────────────────────
+
+    async function loadEggs(repoId) {
+        currentRepo = repoId;
+        setStep(2);
+        document.getElementById('eggLoading').style.display = 'block';
+        document.getElementById('eggList').style.display    = 'none';
+        document.getElementById('eggSearch').value          = '';
+
+        try {
+            const res  = await fetch(`/admin/addons/repositories/${encodeURIComponent(repoId)}/eggs`);
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            currentEggs = data.eggs;
+            document.getElementById('eggLoading').style.display = 'none';
+            document.getElementById('eggList').style.display    = 'block';
+            filterEggs('');
+        } catch (err) {
+            document.getElementById('eggLoading').innerHTML =
+                `<p class="text-danger"><i class="fa-solid fa-times-circle"></i> ${err.message}</p>`;
+        }
+    }
+
+    document.getElementById('eggSearch').addEventListener('input', function() {
+        filterEggs(this.value);
+    });
+
+    // ── Schritt 3: Egg laden + Vorschau ──────────────────────────────────────
+
+    async function loadEgg(url, displayName) {
+        setStep(3);
+        document.getElementById('previewLoading').style.display  = 'block';
+        document.getElementById('previewContent').style.display  = 'none';
+        currentGameData = null;
+
+        try {
+            const res  = await fetch(`/admin/addons/repositories/${encodeURIComponent(currentRepo)}/eggs/fetch?url=${encodeURIComponent(url)}`);
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message);
+
+            currentGameData = data.gameData;
+            const gd = currentGameData;
+
+            const dockerImages  = gd.docker_images || {};
+            const firstImageKey = Object.keys(dockerImages)[0] || '–';
+            const firstImage    = dockerImages[firstImageKey] || firstImageKey;
+
+            const hasSteam = (gd.scripts?.installation?.script || '').toLowerCase().includes('steamcmd')
+                || (gd.variables || []).some(v => v.env_variable === 'SRCDS_APPID' || v.env_variable === 'STEAM_APPID');
+
+            document.getElementById('prev-name').textContent    = gd.meta?.name        || displayName;
+            document.getElementById('prev-desc').textContent    = gd.meta?.description || '–';
+            document.getElementById('prev-runtime').innerHTML   = hasSteam
+                ? '<span class="badge badge-primary"><i class="fa-brands fa-docker"></i> docker_steam</span>'
+                : '<span class="badge badge-info"><i class="fa-solid fa-cube"></i> docker_standalone</span>';
+            document.getElementById('prev-image').textContent    = firstImage;
+            document.getElementById('prev-vars').textContent     = (gd.variables || []).length;
+            document.getElementById('prev-startup').textContent  = gd.startup?.command || '–';
+            document.getElementById('prev-install-container').textContent = gd.scripts?.installation?.container || '–';
+
+            document.getElementById('saveAddonName').value = gd.meta?.name || displayName;
+            document.getElementById('saveAddonDesc').value = gd.meta?.description || '';
+            document.getElementById('rawJson').textContent = JSON.stringify(gd, null, 2);
+
+            document.getElementById('previewLoading').style.display = 'none';
+            document.getElementById('previewContent').style.display = 'block';
+
+        } catch (err) {
+            document.getElementById('previewLoading').innerHTML =
+                `<p class="text-danger"><i class="fa-solid fa-times-circle"></i> ${err.message}</p>`;
+        }
+    }
+
+    // ── Addon speichern ───────────────────────────────────────────────────────
+
+    document.getElementById('btnSaveAddon').addEventListener('click', async function() {
+        if (!currentGameData) return;
+
+        this.disabled = true;
+        this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Speichert...';
+
+        const name     = document.getElementById('saveAddonName').value.trim();
+        const desc     = document.getElementById('saveAddonDesc').value.trim();
+        const category = document.getElementById('saveAddonCategory').value;
+
+        if (!name) {
+            toastr.warning('Bitte einen Namen eingeben');
+            this.disabled = false;
+            this.innerHTML = '<i class="fa-solid fa-save"></i> Als Addon speichern';
+            return;
+        }
+
+        try {
             const response = await fetch('/admin/addons', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify(payload),
+                body:    JSON.stringify({
+                    name,
+                    description: desc,
+                    category,
+                    game_data: JSON.stringify(currentGameData),
+                }),
             });
 
             const result = await response.json();
 
             if (result.success) {
-                toastr.success(result.message || 'Addon erfolgreich importiert!');
+                toastr.success(result.message || 'Addon erfolgreich gespeichert!');
                 setTimeout(() => { window.location.href = `/admin/addons/${result.id}`; }, 1500);
             } else {
                 toastr.error(result.message || 'Fehler beim Speichern');
-                saveBtnEl.disabled = false;
-                saveBtnEl.innerHTML = '<i class="fa-solid fa-save"></i> Als Addon speichern';
+                this.disabled = false;
+                this.innerHTML = '<i class="fa-solid fa-save"></i> Als Addon speichern';
             }
         } catch (err) {
-            console.error('[Import] Save error:', err);
-            toastr.error('Netzwerkfehler beim Speichern');
-            saveBtnEl.disabled = false;
-            saveBtnEl.innerHTML = '<i class="fa-solid fa-save"></i> Als Addon speichern';
+            toastr.error(`Netzwerkfehler: ${err.message}`);
+            this.disabled = false;
+            this.innerHTML = '<i class="fa-solid fa-save"></i> Als Addon speichern';
         }
-    }
-
-    // ══════════════════════════════════════
-    // TAB 1: Pterodactyl
-    // ══════════════════════════════════════
-    (() => {
-        let importedData = null;
-
-        const categoryEl = document.getElementById('pterodactylCategory');
-        const eggEl      = document.getElementById('pterodactylEgg');
-        const eggGroup   = document.getElementById('ptero-eggSelectGroup');
-        const spinner    = document.getElementById('ptero-loadingSpinner');
-        const preview    = document.getElementById('ptero-importPreview');
-        const btnImport  = document.getElementById('ptero-btnImport');
-        const btnSave    = document.getElementById('ptero-btnSave');
-
-        categoryEl.addEventListener('change', async function() {
-            const category = this.value;
-            if (!category) { eggGroup.style.display = 'none'; return; }
-
-            try {
-                const res  = await fetch(`/admin/addons/pterodactyl/eggs/${category}`);
-                const data = await res.json();
-                const eggs = data.eggs || [];
-
-                eggEl.innerHTML = '<option value="">-- Egg wählen --</option>';
-                eggs.forEach(egg => {
-                    const opt = document.createElement('option');
-                    opt.value = opt.textContent = egg.name;
-                    eggEl.appendChild(opt);
-                });
-                eggGroup.style.display = 'block';
-            } catch (err) {
-                toastr.error('Fehler beim Laden der Eggs aus GitHub');
-            }
-        });
-
-        eggEl.addEventListener('change', () => { btnImport.disabled = !eggEl.value; });
-
-        btnImport.addEventListener('click', async () => {
-            const category = categoryEl.value;
-            const eggName  = eggEl.value;
-            if (!category || !eggName) return;
-
-            spinner.style.display = 'block';
-            preview.style.display = 'none';
-            btnSave.style.display = 'none';
-            importedData = null;
-
-            try {
-                const res  = await fetch(`/admin/addons/pterodactyl/fetch/${category}?egg=${encodeURIComponent(eggName)}`);
-                const data = await res.json();
-                if (!data.success) throw new Error(data.message || 'Import fehlgeschlagen');
-
-                importedData = data.data;
-                const meta = importedData._import_meta || {};
-
-                document.getElementById('ptero-previewName').textContent        = importedData.meta?.name        || '?';
-                document.getElementById('ptero-previewDescription').textContent  = importedData.meta?.description || '-';
-
-                let badge = meta.isSteamcmd
-                    ? '<span class="badge badge-success">SteamCMD – direkt lauffähig</span>'
-                    : '<span class="badge badge-warning">Manuell prüfen</span>';
-                if (meta.steamAppId) badge += ` <span class="badge badge-secondary">AppID: ${meta.steamAppId}</span>`;
-                document.getElementById('ptero-previewRuntime').innerHTML = badge;
-
-                const vars  = Array.isArray(importedData.variables) ? importedData.variables.length : Object.keys(importedData.variables || {}).length;
-                const ports = Object.keys(importedData.ports || {}).length;
-                document.getElementById('ptero-previewVariables').textContent = vars;
-                document.getElementById('ptero-previewPorts').textContent     = ports;
-
-                document.getElementById('ptero-reviewHint').style.display = meta.needsReview ? 'block' : 'none';
-
-                preview.style.display = 'block';
-                btnSave.style.display = 'inline-block';
-                btnSave.innerHTML = meta.needsReview
-                    ? '<i class="fa-solid fa-pen"></i> Als Entwurf speichern (Prüfung nötig)'
-                    : '<i class="fa-solid fa-save"></i> Als Addon speichern';
-            } catch (err) {
-                toastr.error(`Fehler: ${err.message}`);
-            } finally {
-                spinner.style.display = 'none';
-            }
-        });
-
-        btnSave.addEventListener('click', () => saveAddon(importedData, 'pterodactyl', btnSave));
-    })();
-
-    // ══════════════════════════════════════
-    // TAB 2: LinuxGSM
-    // ══════════════════════════════════════
-    (() => {
-        let importedData = null;
-        let allGames     = [];
-
-        const searchEl    = document.getElementById('lgsm-search');
-        const selectEl    = document.getElementById('lgsm-gameSelect');
-        const selectGroup = document.getElementById('lgsm-gameSelectGroup');
-        const spinner     = document.getElementById('lgsm-loadingSpinner');
-        const preview     = document.getElementById('lgsm-importPreview');
-        const listInfo    = document.getElementById('lgsm-listInfo');
-        const btnLoad     = document.getElementById('lgsm-btnLoadList');
-        const btnImport   = document.getElementById('lgsm-btnImport');
-        const btnSave     = document.getElementById('lgsm-btnSave');
-
-        function renderGameList(filter = '') {
-            const lc = filter.toLowerCase();
-            const filtered = allGames.filter(g =>
-                !lc || g.shortname.toLowerCase().includes(lc) || g.displayName.toLowerCase().includes(lc)
-            );
-            selectEl.innerHTML = filtered.length
-                ? filtered.map(g => `<option value="${g.shortname}">${g.displayName} (${g.shortname})</option>`).join('')
-                : '<option value="">Keine Treffer</option>';
-            btnImport.disabled = filtered.length === 0;
-        }
-
-        let listLoading = false;
-
-        async function loadGamesList() {
-            if (listLoading || allGames.length > 0) return;
-            listLoading = true;
-            btnLoad.disabled = true;
-            btnLoad.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            listInfo.textContent = 'Lade Spieleliste von GitHub...';
-
-            try {
-                const res  = await fetch('/admin/addons/lgsm/games');
-                const data = await res.json();
-                if (!data.success) throw new Error(data.message);
-
-                allGames = data.games || [];
-                renderGameList(searchEl.value);
-                selectGroup.style.display = 'block';
-                listInfo.textContent = `${allGames.length} LGSM-Spiele geladen`;
-                btnLoad.innerHTML = '<i class="fa-solid fa-check"></i> Geladen';
-                btnLoad.disabled = false;
-            } catch (err) {
-                listInfo.textContent = `Fehler: ${err.message}`;
-                toastr.error(`LGSM Spieleliste: ${err.message}`);
-                btnLoad.disabled = false;
-                btnLoad.innerHTML = '<i class="fa-solid fa-refresh"></i> Laden';
-                listLoading = false; // Retry erlauben
-            }
-        }
-
-        btnLoad.addEventListener('click', () => {
-            listLoading = false; // Neuladung auch wenn schon geladen
-            allGames = [];
-            loadGamesList();
-        });
-
-        // Auto-Load beim ersten Tippen ins Suchfeld
-        searchEl.addEventListener('focus', () => loadGamesList());
-        searchEl.addEventListener('input', () => {
-            loadGamesList();
-            renderGameList(searchEl.value);
-            btnImport.disabled = !selectEl.value;
-        });
-        selectEl.addEventListener('change', () => { btnImport.disabled = !selectEl.value; });
-
-        btnImport.addEventListener('click', async () => {
-            const shortname = selectEl.value;
-            if (!shortname) return;
-
-            spinner.style.display = 'block';
-            preview.style.display = 'none';
-            btnSave.style.display = 'none';
-            importedData = null;
-
-            try {
-                const res  = await fetch(`/admin/addons/lgsm/fetch?game=${encodeURIComponent(shortname)}`);
-                const data = await res.json();
-                if (!data.success) throw new Error(data.message || 'Import fehlgeschlagen');
-
-                importedData = data.data;
-                const meta   = importedData._import_meta || {};
-
-                document.getElementById('lgsm-previewName').textContent        = importedData.meta?.name        || shortname;
-                document.getElementById('lgsm-previewDescription').textContent  = importedData.meta?.description || '-';
-                document.getElementById('lgsm-previewAppId').innerHTML          = meta.steamAppId
-                    ? `<span class="badge badge-success">${meta.steamAppId}</span>`
-                    : '<span class="text-muted">–</span>';
-
-                const vars  = Array.isArray(importedData.variables) ? importedData.variables.length : 0;
-                const ports = Object.keys(importedData.ports || {}).length;
-                document.getElementById('lgsm-previewVariables').textContent = vars;
-                document.getElementById('lgsm-previewPorts').textContent     = ports;
-
-                document.getElementById('lgsm-steamBadge').style.display  = meta.isSteam     ? 'block' : 'none';
-                document.getElementById('lgsm-reviewHint').style.display   = meta.needsReview ? 'block' : 'none';
-
-                preview.style.display = 'block';
-                btnSave.style.display = 'inline-block';
-                btnSave.innerHTML = meta.needsReview
-                    ? '<i class="fa-solid fa-pen"></i> Als Entwurf speichern'
-                    : '<i class="fa-solid fa-save"></i> Als Addon speichern';
-            } catch (err) {
-                toastr.error(`Fehler: ${err.message}`);
-            } finally {
-                spinner.style.display = 'none';
-            }
-        });
-
-        btnSave.addEventListener('click', () => saveAddon(importedData, 'lgsm', btnSave));
-    })();
+    });
 
 });
 </script>
-

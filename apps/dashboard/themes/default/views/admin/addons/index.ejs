@@ -12,7 +12,7 @@
                 <div class="col-sm-6">
                     <div class="float-sm-right">
                         <a href="/admin/addons/import" class="btn btn-primary">
-                            <i class="fa-solid fa-download"></i> Pterodactyl Import
+                            <i class="fa-solid fa-download"></i> Egg importieren
                         </a>
                         <a href="#" class="btn btn-success disabled" title="Nur aus Guild-Kontext verfügbar">
                             <i class="fa-solid fa-plus"></i> Manuell erstellen
@@ -55,7 +55,7 @@
                 <div class="col-lg-3 col-6">
                     <div class="small-box bg-warning">
                         <div class="inner">
-                            <h3><%= stats.pending %></h3>
+                            <h3><%= stats.pending_review %></h3>
                             <p>Pending Review</p>
                         </div>
                         <div class="icon">
@@ -67,11 +67,23 @@
                 <div class="col-lg-3 col-6">
                     <div class="small-box bg-primary">
                         <div class="inner">
-                            <h3><%= stats.native %></h3>
-                            <p>Native Linux</p>
+                            <h3><%= stats.docker_steam %></h3>
+                            <p>Docker + SteamCMD</p>
                         </div>
                         <div class="icon">
-                            <i class="fa-brands fa-linux"></i>
+                            <i class="fa-brands fa-docker"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-secondary">
+                        <div class="inner">
+                            <h3><%= stats.docker_standalone %></h3>
+                            <p>Docker Standalone</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fa-solid fa-cube"></i>
                         </div>
                     </div>
                 </div>
@@ -120,29 +132,25 @@
                                             <small class="text-muted"><%= addon.slug %></small>
                                         </td>
                                         <td>
-                                            <% if (addon.runtime_type === 'native') { %>
-                                                <span class="badge badge-success">
-                                                    <i class="fa-brands fa-linux"></i> Native
-                                                </span>
-                                            <% } else if (addon.runtime_type === 'proton') { %>
+                                            <% if (addon.runtime_type === 'docker_steam') { %>
                                                 <span class="badge badge-primary">
-                                                    <i class="fa-solid fa-wine-glass"></i> Proton
+                                                    <i class="fa-brands fa-docker"></i> Docker + Steam
                                                 </span>
-                                            <% } else if (addon.runtime_type === 'wine') { %>
+                                            <% } else if (addon.runtime_type === 'docker_standalone') { %>
                                                 <span class="badge badge-info">
-                                                    <i class="fa-solid fa-wine-bottle"></i> Wine
+                                                    <i class="fa-solid fa-cube"></i> Docker Standalone
                                                 </span>
-                                            <% } else if (addon.runtime_type === 'java') { %>
-                                                <span class="badge badge-warning">
-                                                    <i class="fa-brands fa-java"></i> Java
+                                            <% } else { %>
+                                                <span class="badge badge-secondary">
+                                                    <i class="fa-solid fa-question"></i> <%= addon.runtime_type || 'Unbekannt' %>
                                                 </span>
                                             <% } %>
                                         </td>
                                         <td>
-                                            <% if (addon.source_type === 'pterodactyl') { %>
-                                                <i class="fa-solid fa-egg"></i> Pterodactyl
-                                            <% } else if (addon.source_type === 'original') { %>
-                                                <i class="fa-solid fa-sparkles"></i> Original
+                                            <% if (addon.source_type === 'pelican') { %>
+                                                <i class="fa-solid fa-egg"></i> Pelican
+                                            <% } else if (addon.source_type === 'native') { %>
+                                                <i class="fa-solid fa-crown"></i> Native
                                             <% } else { %>
                                                 <i class="fa-solid fa-users"></i> Community
                                             <% } %>
@@ -245,7 +253,7 @@
                                         <i class="fa-solid fa-inbox"></i><br>
                                         Keine Addons vorhanden<br>
                                         <a href="/admin/addons/import" class="btn btn-primary btn-sm mt-2">
-                                            <i class="fa-solid fa-download"></i> Pterodactyl Import starten
+                                            <i class="fa-solid fa-download"></i> Egg importieren
                                         </a>
                                     </td>
                                 </tr>

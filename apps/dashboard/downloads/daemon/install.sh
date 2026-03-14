@@ -188,115 +188,111 @@ check_dependencies() {
     else
         log_success "Alle Dependencies vorhanden"
     fi
-    
-    # SteamCMD Dependencies prüfen (32-Bit Libraries)
-    check_steamcmd_dependencies
+
+    # Docker prüfen / installieren (zwingend erforderlich)
+    check_docker
 }
 
-check_steamcmd_dependencies() {
-    log_info "Prüfe SteamCMD Dependencies (32-Bit Libraries)..."
-    
-    local arch=$(uname -m)
-    if [[ "$arch" != "x86_64" ]]; then
-        log_info "Keine 64-Bit Architektur - SteamCMD-Check übersprungen"
+# ============================================================================
+# DOCKER
+# ============================================================================
+
+check_docker() {
+    log_info "Prüfe Docker..."
+
+    if check_command docker; then
+        local docker_version
+        docker_version=$(docker --version 2>/dev/null | awk '{print $3}' | tr -d ',')
+        log_success "Docker bereits installiert: v${docker_version}"
+
+        # Docker-Daemon läuft?
+        if ! docker info &>/dev/null; then
+            log_warn "Docker ist installiert aber der Daemon läuft nicht!"
+            log_info "Starte Docker..."
+            systemctl start docker
+            sleep 2
+            if ! docker info &>/dev/null; then
+                log_error "Docker-Daemon konnte nicht gestartet werden!"
+                log_info "Bitte manuell prüfen: systemctl status docker"
+                exit 1
+            fi
+            log_success "Docker-Daemon gestartet"
+        fi
+
+        # Auto-Start sicherstellen
+        systemctl enable docker &>/dev/null
         return 0
     fi
-    
-    # Prüfe ob 32-Bit Libraries installiert sind
-    local needs_libs=false
-    
-    # Für Debian/Ubuntu
-    if check_command dpkg; then
-        # Prüfe ob i386 Architecture hinzugefügt ist
-        if ! dpkg --print-foreign-architectures | grep -q "i386"; then
-            log_warn "32-Bit Architecture (i386) nicht aktiviert"
-            needs_libs=true
-        fi
-        
-        # Prüfe ob lib32gcc-s1 installiert ist
-        if ! dpkg -l | grep -q "lib32gcc-s1"; then
-            log_warn "lib32gcc-s1 nicht installiert"
-            needs_libs=true
-        fi
-        
-        # Prüfe ob lib32stdc++6 installiert ist
-        if ! dpkg -l | grep -q "lib32stdc++6"; then
-            log_warn "lib32stdc++6 nicht installiert"
-            needs_libs=true
-        fi
-    fi
-    
-    if $needs_libs; then
-        log_warn "SteamCMD benötigt 32-Bit Libraries für korrekte Funktion!"
-        log_info "Betroffen: Steam-basierte Gameserver (CS2, Valheim, ARK, Rust, etc.)"
-        
-        if prompt_yes_no "SteamCMD Dependencies jetzt installieren?" "y"; then
-            install_steamcmd_dependencies
-        else
-            log_warn "Installation fortgesetzt ohne SteamCMD Dependencies"
-            log_warn "Steam-Gameserver werden NICHT funktionieren!"
-            log_info "Manuelle Installation später möglich mit:"
-            log_info "  sudo dpkg --add-architecture i386"
-            log_info "  sudo apt-get update"
-            log_info "  sudo apt-get install -y lib32gcc-s1 lib32stdc++6"
-        fi
+
+    log_warn "Docker nicht gefunden!"
+    if prompt_yes_no "Docker Engine jetzt installieren?" "y"; then
+        install_docker
     else
-        log_success "SteamCMD Dependencies vorhanden"
+        log_error "Docker ist zwingend erforderlich für den FireBot Daemon!"
+        log_info "Bitte Docker manuell installieren: https://docs.docker.com/engine/install/"
+        exit 1
     fi
 }
 
-install_steamcmd_dependencies() {
-    log_info "Installiere SteamCMD Dependencies..."
-    
-    if check_command apt-get; then
-        log_info "Aktiviere i386 Architecture..."
-        dpkg --add-architecture i386 2>&1 | grep -v "already added" || true
-        
-        log_info "Aktualisiere Paketlisten..."
-        apt-get update -qq
-        
-        log_info "Installiere 32-Bit Libraries..."
-        apt-get install -y -qq lib32gcc-s1 lib32stdc++6
-        
-        # Erstelle SteamCMD-Gruppe (für Shared Access)
-        if ! getent group steamcmd > /dev/null 2>&1; then
-            log_info "Erstelle steamcmd Gruppe für Shared Access..."
-            groupadd --system steamcmd
-            log_success "steamcmd Gruppe erstellt"
-        else
-            log_info "steamcmd Gruppe existiert bereits"
+install_docker() {
+    log_info "Installiere Docker Engine..."
+
+    # Prüfe OS
+    if [[ ! -f /etc/os-release ]]; then
+        log_error "Betriebssystem nicht erkennbar!"
+        exit 1
+    fi
+    source /etc/os-release
+
+    if check_command apt-get || check_command yum || check_command dnf; then
+        log_info "Nutze offizielles Docker-Install-Script (get.docker.com)..."
+
+        local tmp_script="/tmp/get-docker.sh"
+        if ! curl -fsSL https://get.docker.com -o "$tmp_script"; then
+            log_error "Docker-Install-Script konnte nicht heruntergeladen werden!"
+            log_info "Manuelle Installation: https://docs.docker.com/engine/install/"
+            exit 1
         fi
-        
-        log_success "SteamCMD Dependencies installiert"
-    elif check_command yum; then
-        log_info "Installiere 32-Bit Libraries (CentOS/RHEL)..."
-        yum install -y -q glibc.i686 libstdc++.i686
-        
-        # Erstelle SteamCMD-Gruppe
-        if ! getent group steamcmd > /dev/null 2>&1; then
-            groupadd --system steamcmd
-            log_success "steamcmd Gruppe erstellt"
-        fi
-        
-        log_success "SteamCMD Dependencies installiert"
-    elif check_command dnf; then
-        log_info "Installiere 32-Bit Libraries (Fedora)..."
-        dnf install -y -q glibc.i686 libstdc++.i686
-        
-        # Erstelle SteamCMD-Gruppe
-        if ! getent group steamcmd > /dev/null 2>&1; then
-            groupadd --system steamcmd
-            log_success "steamcmd Gruppe erstellt"
-        fi
-        
-        log_success "SteamCMD Dependencies installiert"
+
+        sh "$tmp_script"
+        rm -f "$tmp_script"
     else
-        log_error "Paketmanager nicht unterstützt!"
-        log_warn "Bitte manuell installieren:"
-        log_info "  Debian/Ubuntu: sudo apt-get install lib32gcc-s1 lib32stdc++6"
-        log_info "  CentOS/RHEL:   sudo yum install glibc.i686 libstdc++.i686"
-        log_info "  Fedora:        sudo dnf install glibc.i686 libstdc++.i686"
-        log_warn "Erstelle auch die steamcmd Gruppe: groupadd --system steamcmd"
+        log_error "Kein unterstützter Paketmanager gefunden (apt/yum/dnf)!"
+        log_info "Bitte Docker manuell installieren: https://docs.docker.com/engine/install/"
+        exit 1
+    fi
+
+    # Docker starten & aktivieren
+    systemctl enable --now docker
+    sleep 2
+
+    if ! docker info &>/dev/null; then
+        log_error "Docker-Installation fehlgeschlagen - Daemon antwortet nicht!"
+        exit 1
+    fi
+
+    log_success "Docker installiert: $(docker --version)"
+
+    # firebot Bridge-Network anlegen
+    setup_docker_network
+}
+
+setup_docker_network() {
+    log_info "Richte Docker-Network 'firebot' ein..."
+
+    if docker network inspect firebot &>/dev/null; then
+        log_info "Docker-Network 'firebot' existiert bereits"
+        return 0
+    fi
+
+    if docker network create \
+        --driver bridge \
+        --label "firebot.managed=true" \
+        firebot &>/dev/null; then
+        log_success "Docker-Network 'firebot' erstellt (Bridge)"
+    else
+        log_error "Docker-Network konnte nicht erstellt werden!"
+        exit 1
     fi
 }
 
@@ -422,21 +418,10 @@ download_binary() {
 
 create_firebot_user() {
     log_info "Prüfe System-Voraussetzungen..."
-    
-    # HINWEIS: Daemon läuft als root (wie Pterodactyl Wings)
-    # Gameserver-Prozesse laufen als gs-guild_XXXXX User
-    # Kein firebot User mehr nötig - vereinfacht sudo-Komplexität
-    
-    # steamcmd Gruppe erstellen (für SteamCMD Shared Access)
-    if ! getent group steamcmd &>/dev/null; then
-        log_info "Erstelle steamcmd Gruppe..."
-        groupadd --system steamcmd
-        log_success "steamcmd Gruppe erstellt"
-    else
-        log_info "steamcmd Gruppe existiert bereits"
-    fi
-    
-    log_success "System-Voraussetzungen geprüft (Daemon läuft als root)"
+
+    # Daemon läuft als root (wie Pterodactyl Wings)
+    # Gameserver laufen als isolierte Docker-Container – kein gs-User mehr nötig
+    log_success "System-Voraussetzungen geprüft (Daemon läuft als root, Gameserver in Docker)"
 }
 
 setup_sudoers() {
@@ -458,25 +443,27 @@ setup_sudoers() {
 
 create_data_directories() {
     log_info "Erstelle Daten-Verzeichnisse..."
-    
+
     local base_dir="/data/firebot"
-    
-    # Nur die minimal notwendigen Verzeichnisse erstellen
-    # HINWEIS: User-spezifische Ordner (gs-guild_*/) werden automatisch vom Daemon erstellt
+
+    # Server-Volumes: {base_dir}/{serverID}/serverfiles/ → /home/container (Docker Bind-Mount)
     mkdir -p "$base_dir"/daemon-logs    # Daemon-Logs
-    mkdir -p "$base_dir"/steamcmd       # Shared SteamCMD für alle Guilds
-    
-    # Ownership setzen auf root (Daemon läuft als root)
+    mkdir -p "$base_dir"/volumes        # Gameserver-Volumes (per Server-ID)
+
+    # Docker-Network 'firebot' sicherstellen (falls install_docker nicht aufgerufen wurde)
+    if docker info &>/dev/null && ! docker network inspect firebot &>/dev/null; then
+        setup_docker_network
+    fi
+
     chown -R root:root "$base_dir"
     chmod 755 "$base_dir"
     chmod 755 "$base_dir"/daemon-logs
-    chmod 755 "$base_dir"/steamcmd
-    
+    chmod 755 "$base_dir"/volumes
+
     log_success "Daten-Verzeichnisse erstellt: $base_dir"
-    log_info "  - $base_dir/daemon-logs/ (Daemon-System-Logs)"
-    log_info "  - $base_dir/steamcmd/ (Shared für alle Guilds)"
-    log_info "Verzeichnisse gehören root:root mit Permissions 755"
-    log_info "User-spezifische Ordner (gs-guild_*/) werden automatisch erstellt"
+    log_info "  - $base_dir/daemon-logs/  (Daemon-System-Logs)"
+    log_info "  - $base_dir/volumes/      (Gameserver-Volumes, per Server-ID)"
+    log_info "  Container-Pfad im Volume: /home/container (Runtime) / /mnt/server (Install)"
 }
 
 
@@ -533,8 +520,9 @@ create_systemd_service() {
 [Unit]
 Description=FireBot Daemon - Gameserver Management
 Documentation=https://github.com/FireDervil77/firebot-daemon
-After=network-online.target
+After=network-online.target docker.service
 Wants=network-online.target
+Requires=docker.service
 
 [Service]
 Type=simple
@@ -544,6 +532,9 @@ WorkingDirectory=/opt/firebot-daemon
 
 # Binary
 ExecStart=/opt/firebot-daemon/firebot-daemon
+
+# Docker Socket
+Environment="DOCKER_HOST=unix:///var/run/docker.sock"
 
 # Restart policy
 Restart=on-failure
@@ -662,10 +653,17 @@ show_post_install_info() {
     echo -e "   Neustarten:  systemctl restart ${SERVICE_NAME}"
     echo -e "   Logs:        ${GREEN}journalctl -u ${SERVICE_NAME} -f${NC}"
     echo ""
+    echo -e "${CYAN}� Docker:${NC}"
+    echo -e "   Docker Version: $(docker --version 2>/dev/null || echo 'N/A')"
+    echo -e "   Network:        firebot (Bridge)"
+    echo -e "   Volumes:        /data/firebot/volumes/{serverID}/serverfiles/"
+    echo -e "   Socket:         /var/run/docker.sock"
+    echo ""
     echo -e "${CYAN}🔒 Security:${NC}"
     echo -e "   - Daemon läuft als root (wie Pterodactyl Wings)"
-    echo -e "   - Gameserver-Prozesse laufen als gs-guild_XXXXX User"
-    echo -e "   - User-Isolation pro Guild/RootServer"
+    echo -e "   - Gameserver laufen als isolierte Docker-Container"
+    echo -e "   - Container-Isolation: Bridge-Network + Volume-Mount"
+    echo -e "   - Ressourcen-Limits via Docker (--memory / --cpus)"
     echo ""
     echo -e "${CYAN}�📊 Dashboard:${NC}"
     echo -e "   Öffne das Dashboard um den Daemon zu sehen:"
@@ -775,40 +773,54 @@ uninstall() {
         log_info "Installations-Verzeichnis behalten: $INSTALL_DIR"
     fi
     
-    # Remove Gameserver Users (gs-*)
+    # Docker-Container stoppen & entfernen (alle fb-* Container)
+    echo ""
+    FB_CONTAINERS=$(docker ps -a --filter "label=firebot.managed=true" --format "{{.Names}}" 2>/dev/null || true)
+    if [[ -n "$FB_CONTAINERS" ]]; then
+        FB_COUNT=$(echo "$FB_CONTAINERS" | wc -l)
+        log_warn "Gefundene FireBot Docker-Container: $FB_COUNT"
+        echo "$FB_CONTAINERS" | while IFS= read -r cname; do
+            echo "   - $cname"
+        done
+        echo ""
+
+        if prompt_yes_no "Alle FireBot Docker-Container stoppen & entfernen?" "y"; then
+            log_info "Stoppe & entferne Container..."
+            echo "$FB_CONTAINERS" | while IFS= read -r cname; do
+                log_info "  → $cname"
+                docker stop "$cname" &>/dev/null || true
+                docker rm "$cname" &>/dev/null || true
+            done
+            log_success "Docker-Container entfernt ($FB_COUNT Container)"
+        else
+            log_info "Docker-Container behalten ($FB_COUNT Container)"
+        fi
+    else
+        log_info "Keine FireBot Docker-Container gefunden"
+    fi
+
+    # Docker-Network entfernen
+    echo ""
+    if docker network inspect firebot &>/dev/null 2>&1; then
+        if prompt_yes_no "Docker-Network 'firebot' entfernen?" "y"; then
+            docker network rm firebot &>/dev/null || true
+            log_success "Docker-Network 'firebot' entfernt"
+        else
+            log_info "Docker-Network 'firebot' behalten"
+        fi
+    fi
+
+    # Legacy: Alte gs-User entfernen (Migration von PTY → Docker)
     echo ""
     GAMESERVER_USERS=$(getent passwd | grep "^gs-" | cut -d: -f1 || true)
     if [[ -n "$GAMESERVER_USERS" ]]; then
         GS_COUNT=$(echo "$GAMESERVER_USERS" | wc -l)
-        log_warn "Gefundene Gameserver-User: $GS_COUNT"
-        echo "$GAMESERVER_USERS" | while IFS= read -r gs_user; do
-            echo "   - $gs_user"
-        done
-        echo ""
-        
-        if prompt_yes_no "Alle Gameserver-User (gs-*) entfernen?" "y"; then
-            log_info "Entferne Gameserver-User..."
+        log_warn "Legacy Gameserver-User (gs-*) gefunden: $GS_COUNT (aus alter PTY-Architektur)"
+        if prompt_yes_no "Alte gs-* User entfernen?" "y"; then
             echo "$GAMESERVER_USERS" | while IFS= read -r gs_user; do
-                log_info "  → Entferne $gs_user..."
                 userdel -r "$gs_user" 2>/dev/null || userdel "$gs_user" 2>/dev/null || true
             done
-            log_success "Gameserver-User entfernt ($GS_COUNT User)"
-        else
-            log_info "Gameserver-User behalten ($GS_COUNT User)"
-        fi
-    else
-        log_info "Keine Gameserver-User gefunden"
-    fi
-    
-    # Remove steamcmd Group
-    echo ""
-    if getent group steamcmd >/dev/null 2>&1; then
-        if prompt_yes_no "steamcmd Gruppe entfernen?" "y"; then
-            log_info "Entferne steamcmd Gruppe..."
-            groupdel steamcmd 2>/dev/null || true
-            log_success "steamcmd Gruppe entfernt"
-        else
-            log_info "steamcmd Gruppe behalten"
+            log_success "Legacy gs-User entfernt"
         fi
     fi
     
@@ -828,9 +840,11 @@ uninstall() {
     echo -e "${CYAN}Folgende Komponenten wurden behandelt:${NC}"
     echo -e "   ${GREEN}✓${NC} Systemd Service gestoppt & entfernt"
     echo -e "   ${GREEN}✓${NC} Sudoers-Konfiguration entfernt"
+    echo -e "   ${GREEN}✓${NC} Docker-Container & Network behandelt"
     echo -e "   ${GREEN}✓${NC} Installations-Verzeichnis behandelt"
     echo -e "   ${GREEN}✓${NC} Daten-Verzeichnisse behandelt"
     echo -e "   ${GREEN}✓${NC} System-User behandelt"
+    echo -e "   ${YELLOW}ℹ${NC}  Docker Engine selbst wurde NICHT deinstalliert"
     echo ""
 }
 
@@ -893,8 +907,9 @@ main() {
     echo -e "${CYAN}Der Wizard führt dich durch die Konfiguration.${NC}"
     echo -e "${CYAN}Nach dem Setup läuft der Daemon automatisch als Service.${NC}"
     echo ""
-    echo -e "${YELLOW}ℹ️  Hinweis:${NC} Der Daemon läuft als root für direkte System-Operationen"
-    echo -e "   (User-Erstellung, chown, chmod, etc. ohne sudo-Komplexität)"
+    echo -e "   ${YELLOW}ℹ️  Hinweis:${NC} Der Daemon läuft als root für Docker-Operationen"
+    echo -e "   Gameserver laufen als isolierte Docker-Container (kein gs-User mehr)"
+    echo -e "   Docker-Network: firebot | Volumes: /data/firebot/volumes/"
     echo ""
     echo -e "${CYAN}📊 Dashboard:${NC} ${BLUE}https://dev.firenetworks.de${NC}"
     echo -e "${CYAN}📋 Logs:${NC} journalctl -u ${SERVICE_NAME} -f"

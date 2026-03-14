@@ -897,7 +897,6 @@ class DuneMapPlugin extends DashboardPlugin {
             },
             // Quest-Finder Navigation - TEMPORARILY DISABLED (Quest-Daten noch nicht vollständig)
             // TODO: Wieder aktivieren sobald vollständige Quest-Datenbank vorhanden
-            /*
              {
                 title: 'dunemap:NAV.QUEST_FINDER',
                 path: `/guild/${guildId}/plugins/dunemap/quests`,
@@ -908,7 +907,28 @@ class DuneMapPlugin extends DashboardPlugin {
                 visible: true,
                 capability: 'DUNEMAP.VIEW' // Quest-Finder für alle sichtbar
             }, 
-            */
+            // Haga Basin Map
+            {
+                title: 'dunemap:NAV.HAGGA_BASIN_MAP',
+                path: `/guild/${guildId}/plugins/dunemap/hagga_basin`,
+                icon: 'fa-solid fa-scroll',
+                order: 30,
+                parent: `/guild/${guildId}/plugins/dunemap`,
+                type: 'main',
+                visible: true,
+                capability: 'DUNEMAP.VIEW' // Haga Basin Map für alle sichtbar
+            }, 
+            // Landsrad Planer
+            {
+                title: 'dunemap:NAV.LANDRAD_PLANNER',
+                path: `/guild/${guildId}/plugins/dunemap/landrad_planner`,
+                icon: 'fa-solid fa-scroll',
+                order: 40,
+                parent: `/guild/${guildId}/plugins/dunemap`,
+                type: 'main',
+                visible: true,
+                capability: 'DUNEMAP.VIEW' // Landsrad Planer für alle sichtbar
+            }, 
             // Settings als Subnav UNTER CORE-EINSTELLUNGEN!
             {
                 title: 'dunemap:NAV.DUNEMAP',

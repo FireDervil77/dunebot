@@ -613,23 +613,68 @@ class GuildAjaxHandler {
         console.log('[GuildAjax] handleRootServerCreateResponse called:', result);
         if (result.success) {
             this.showToast('success', result.message || 'RootServer erfolgreich erstellt!');
-            
-            // Redirect zur Details-Seite (zeigt Token & Installations-Command)
-            if (result.data && result.data.redirectUrl) {
-                setTimeout(() => {
-                    window.location.href = result.data.redirectUrl;
-                }, 1500);
-            } else if (result.data && result.data.id) {
-                // Fallback: Direkt zur Details-Seite mit ID
-                const guildId = form.getAttribute('action').match(/\/guild\/(\d+)\//)[1];
-                setTimeout(() => {
-                    window.location.href = `/guild/${guildId}/plugins/masterserver/rootservers/${result.data.id}`;
-                }, 1500);
+
+            // Setup-Modal mit daemon_id + api_key befüllen und anzeigen
+            const modal = document.getElementById('rootserverSetupModal');
+            if (modal && result.data) {
+                const d = result.data;
+
+                // Felder befüllen
+                const elId   = document.getElementById('setup-daemon-id');
+                const elKey  = document.getElementById('setup-api-key');
+                const elYaml = document.getElementById('setup-daemon-yaml');
+
+                if (elId)  elId.value  = d.daemonId  || '';
+                if (elKey) elKey.value = d.apiKey     || '';
+
+                // daemon.yaml Template generieren
+                const dashUrl = window.location.origin.replace('http://', 'ws://').replace('https://', 'wss://');
+                const wsPort  = 9340;
+                if (elYaml) {
+                    elYaml.value = [
+                        '# FireBot Daemon Konfiguration',
+                        '# Generiert vom Dashboard – bitte auf deinen Server kopieren',
+                        '# Pfad: /opt/firebot-daemon/daemon.yaml',
+                        '',
+                        'daemon:',
+                        `  name: "rootserver-${d.daemonId ? d.daemonId.substring(0, 8) : 'neu'}"`,
+                        '',
+                        '  # Daemon-ID – Eindeutige ID aus dem Dashboard (NICHT ändern!)',
+                        `  daemon_id: "${d.daemonId || ''}"`,
+                        '',
+                        '  # Setup-Token vom Dashboard – NUR EINMAL SICHTBAR!',
+                        '  # Nach erster Verbindung wird automatisch ein JWT session_token gespeichert.',
+                        `  token: "${d.apiKey || ''}"`,
+                        '',
+                        'dashboard:',
+                        `  url: "${dashUrl.replace(/:\d+$/, '')}:${wsPort}"`,
+                        '',
+                        'logging:',
+                        '  level: "info"',
+                        '  file: "logs/daemon.log"',
+                        '',
+                        'docker:',
+                        '  socket: "/var/run/docker.sock"',
+                        '  network: "firebot"',
+                        '  dns:',
+                        '    - "1.1.1.1"',
+                        '    - "8.8.8.8"',
+                    ].join('\n');
+                }
+
+                // Weiter-Button mit redirectUrl vorbelegen
+                const btnContinue = document.getElementById('setup-continue-btn');
+                if (btnContinue && d.redirectUrl) {
+                    btnContinue.setAttribute('data-redirect', d.redirectUrl);
+                }
+
+                // Modal anzeigen
+                $(modal).modal({ backdrop: 'static', keyboard: false });
+                $(modal).modal('show');
             } else {
-                // Fallback: Zur Liste
-                setTimeout(() => {
-                    window.location.href = form.getAttribute('action').replace(/\/rootservers.*/, '/rootservers');
-                }, 2000);
+                // Kein Modal → direkt weiterleiten
+                const url = result.data?.redirectUrl;
+                if (url) setTimeout(() => { window.location.href = url; }, 1500);
             }
         } else {
             this.showToast('error', result.message || 'Fehler beim Erstellen des RootServers');

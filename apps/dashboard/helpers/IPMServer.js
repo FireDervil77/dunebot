@@ -298,7 +298,7 @@ class IPMServer {
                     
                     // Daemon aus DB laden
                     const [daemon] = await this.dbService.query(
-                        'SELECT * FROM daemon_instances WHERE daemon_id = ?',
+                        'SELECT * FROM rootserver WHERE daemon_id = ?',
                         [daemon_id]
                     );
                     
@@ -310,19 +310,19 @@ class IPMServer {
                     const newSessionToken = jwt.sign({
                         daemon_id: daemon.daemon_id,
                         guild_id: daemon.guild_id,
-                        version: version || daemon.version
+                        version: version || daemon.daemon_version
                     }, this.jwtSecret, { expiresIn: this.jwtExpiry });
                     
                     // Daemon-Status aktualisieren
                     await this.dbService.query(
-                        `UPDATE daemon_instances 
-                         SET status = 'online', 
-                             last_heartbeat = NOW(),
-                             version = ?,
+                        `UPDATE rootserver 
+                         SET daemon_status = 'online', 
+                             last_seen = NOW(),
+                             daemon_version = ?,
                              session_token = ?,
                              session_token_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
                          WHERE daemon_id = ?`,
-                        [version || daemon.version, newSessionToken, daemon_id]
+                        [version || daemon.daemon_version, newSessionToken, daemon_id]
                     );
                     
                     await this._logDaemonEvent(daemon_id, 'reconnected', { version });
@@ -338,19 +338,24 @@ class IPMServer {
                     ws.send(JSON.stringify({ 
                         type: 'registered', 
                         sessionToken: newSessionToken,
-                        rootserver: rootserver || null // ✅ RootServer-Info mitschicken
+                        rootserver: {
+                            id: daemon.id,
+                            name: daemon.name,
+                            base_directory: daemon.base_directory,
+                            system_user: daemon.system_user
+                        }
                     }));
                     
                     return { 
                         success: true, 
                         daemonId: daemon_id, 
                         sessionId: newSessionToken,
-                        isReconnect: true, // ✅ Flag für Re-Trigger
+                        isReconnect: true,
                         metadata: {
                             guild_id: daemon.guild_id,
-                            display_name: daemon.display_name,
-                            version: version || daemon.version,
-                            hardware: hardware || null // ✅ Hardware-Info für Connection
+                            display_name: daemon.name,
+                            version: version || daemon.daemon_version,
+                            hardware: hardware || null
                         }
                     };
                     
@@ -366,55 +371,34 @@ class IPMServer {
             }
             
             // ================================================
-            // FALL 2: Setup-Token (Erste Registrierung)
+            // FALL 2: Setup-Token / API-Key (Erste Registrierung)
             // ================================================
-            
-            // Setup-Token aus DB laden (Guild-basiert)
-            const [tokenData] = await this.dbService.query(
-                `SELECT dt.*, di.guild_id, di.display_name
-                 FROM daemon_tokens dt
-                 JOIN daemon_instances di ON dt.guild_id = di.guild_id
-                 WHERE di.daemon_id = ? AND dt.expires_at > NOW() AND dt.used = 0
-                 ORDER BY dt.created_at DESC
-                 LIMIT 1`,
-                [daemon_id]
+
+            // RootServer anhand daemon_id + api_key direkt aus rootserver-Tabelle laden
+            const [rootserverByToken] = await this.dbService.query(
+                `SELECT * FROM rootserver WHERE daemon_id = ? AND api_key = ? LIMIT 1`,
+                [daemon_id, token]
             );
 
-            if (!tokenData) {
+            if (!rootserverByToken) {
                 return { success: false, error: 'Invalid or expired token' };
             }
-
-            // Setup-Token validieren (bcrypt)
-            const bcrypt = require('bcrypt');
-            const isValid = await bcrypt.compare(token, tokenData.token_hash);
-
-            if (!isValid) {
-                return { success: false, error: 'Invalid token' };
-            }
-
-            // Token als verwendet markieren
-            await this.dbService.query(
-                `UPDATE daemon_tokens 
-                 SET used = 1, 
-                     used_at = NOW(), 
-                     used_by_daemon_id = ?
-                 WHERE id = ?`,
-                [daemon_id, tokenData.id]
-            );
 
             // JWT Session-Token generieren
             const sessionToken = jwt.sign({
                 daemon_id,
-                guild_id: tokenData.guild_id,
+                guild_id: rootserverByToken.guild_id,
                 version: version || 'unknown'
             }, this.jwtSecret, { expiresIn: this.jwtExpiry });
 
-            // Daemon-Status aktualisieren mit Session-Token
+            // Daemon-Status + Session-Token in rootserver aktualisieren
+            // install_status → 'completed' bei erster erfolgreicher Verbindung
             await this.dbService.query(
-                `UPDATE daemon_instances 
-                 SET status = 'online', 
-                     last_heartbeat = NOW(),
-                     version = ?,
+                `UPDATE rootserver 
+                 SET daemon_status = 'online', 
+                     install_status = 'completed',
+                     last_seen = NOW(),
+                     daemon_version = ?,
                      session_token = ?,
                      session_token_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
                  WHERE daemon_id = ?`,
@@ -424,18 +408,15 @@ class IPMServer {
             // Audit-Log
             await this._logDaemonEvent(daemon_id, 'first_registration', { version });
 
-            // ✅ RootServer-Info laden (kein serverRegistry mehr - 1:1 Beziehung!)
-            const [rootserver] = await this.dbService.query(
-                `SELECT id, name, base_directory, system_user
-                 FROM rootserver 
-                 WHERE daemon_id = ?`,
-                [daemon_id]
-            );
-
             ws.send(JSON.stringify({ 
                 type: 'registered', 
                 sessionToken,
-                rootserver: rootserver || null // ✅ RootServer-Info mitschicken
+                rootserver: {
+                    id: rootserverByToken.id,
+                    name: rootserverByToken.name,
+                    base_directory: rootserverByToken.base_directory,
+                    system_user: rootserverByToken.system_user
+                }
             }));
 
             return { 
@@ -443,10 +424,10 @@ class IPMServer {
                 daemonId: daemon_id, 
                 sessionId: sessionToken,
                 metadata: {
-                    guild_id: tokenData.guild_id,
-                    display_name: tokenData.display_name,
+                    guild_id: rootserverByToken.guild_id,
+                    display_name: rootserverByToken.name,
                     version,
-                    hardware: hardware || null // ✅ Hardware-Info für Connection
+                    hardware: hardware || null
                 }
             };
 
@@ -549,9 +530,9 @@ class IPMServer {
             this.Logger.debug(`[IPMServer] Update-Info: ${payload.updateInfo.currentVersion} → ${payload.updateInfo.latestVersion} (Available: ${payload.updateInfo.available})`);
         }
 
-        // DB-Update (last_heartbeat)
+        // DB-Update (last_seen)
         await this.dbService.query(
-            'UPDATE daemon_instances SET last_heartbeat = NOW() WHERE daemon_id = ?',
+            'UPDATE rootserver SET last_seen = NOW() WHERE daemon_id = ?',
             [daemonId]
         );
 
@@ -573,7 +554,7 @@ class IPMServer {
      */
     async _updateServerRegistry(daemonId, servers) {
         // Status-Mapping: Daemon-States → MySQL ENUM (online,offline,starting,stopping,error)
-        const registryStatusMap = { running: 'online', crashed: 'error' };
+        const registryStatusMap = { running: 'online', stopped: 'offline', crashed: 'error' };
 
         for (const server of servers) {
             const rawStatus = server.status || 'offline';
@@ -659,21 +640,20 @@ class IPMServer {
 
         // ✅ Install-Counter in addon_marketplace erhöhen
         try {
-            // Addon-Slug aus gameserver-Tabelle holen
-            const [server] = await this.dbService.query(
-                'SELECT addon_slug FROM gameservers WHERE id = ?',
+            // addon_marketplace_id aus gameservers holen, dann slug über JOIN
+            const [gsRow] = await this.dbService.query(
+                'SELECT am.slug FROM gameservers gs LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id WHERE gs.id = ?',
                 [server_id]
             );
             
-            if (server && server.addon_slug) {
+            if (gsRow && gsRow.slug) {
                 await this.dbService.query(
-                    'UPDATE addon_marketplace SET install_count = install_count + 1 WHERE addon_slug = ?',
-                    [server.addon_slug]
+                    'UPDATE addon_marketplace SET install_count = install_count + 1 WHERE slug = ?',
+                    [gsRow.slug]
                 );
-                
-                this.Logger.success(`[IPMServer] Install-Counter für Addon '${server.addon_slug}' erhöht`);
+                this.Logger.success(`[IPMServer] Install-Counter für Addon '${gsRow.slug}' erhöht`);
             } else {
-                this.Logger.warn(`[IPMServer] Server ${server_id} hat keinen addon_slug - Counter nicht erhöht`);
+                this.Logger.warn(`[IPMServer] Server ${server_id} hat kein Addon zugewiesen - Counter nicht erhöht`);
             }
         } catch (error) {
             this.Logger.error(`[IPMServer] Fehler beim Erhöhen des Install-Counters:`, error);
@@ -717,16 +697,24 @@ class IPMServer {
 
         try {
             // ✅ Status-Mapping: Daemon-States → MySQL ENUM
-            // Daemon-States: offline, starting, running, stopping, crashed, installing
-            // MySQL ENUM:    offline, starting, online,  stopping, error,   installing, installed, updating
-            const statusMap = { running: 'online', crashed: 'error' };
+            // Daemon-States: offline, starting, running, stopped, stopping, crashed, installing
+            // MySQL ENUM:    offline, starting, online,  offline,  stopping, error,   installing, installed, updating
+            const statusMap = { running: 'online', stopped: 'offline', crashed: 'error' };
             const dbStatus = statusMap[status] ?? status;
+
+            // Guard: ungültige Status-Werte abfangen
+            const validStatuses = ['installing', 'installed', 'starting', 'online', 'stopping', 'offline', 'error', 'updating'];
+            if (!dbStatus || !validStatuses.includes(dbStatus)) {
+                this.Logger.warn(`[IPMServer] ⚠️ Ungültiger Status '${status}' (mapped: '${dbStatus}') für Server ${server_id} – Update übersprungen`);
+                return;
+            }
 
             // Server-Status in MySQL aktualisieren
             const result = await this.dbService.query(
                 `UPDATE gameservers 
                  SET status = ?, 
-                     updated_at = NOW() 
+                     updated_at = NOW()
+                     ${dbStatus === 'online' ? ', last_started_at = NOW()' : ''} 
                  WHERE id = ?`,
                 [dbStatus, server_id]
             );
@@ -775,7 +763,7 @@ class IPMServer {
         try {
             // Guild-ID für Log-Eintrag holen
             const [daemon] = await this.dbService.query(
-                'SELECT guild_id FROM daemon_instances WHERE daemon_id = ?',
+                'SELECT guild_id FROM rootserver WHERE daemon_id = ?',
                 [daemonId]
             );
             
@@ -802,7 +790,7 @@ class IPMServer {
         try {
             // Guild-ID für Log-Eintrag holen
             const [daemon] = await this.dbService.query(
-                'SELECT guild_id FROM daemon_instances WHERE daemon_id = ?',
+                'SELECT guild_id FROM rootserver WHERE daemon_id = ?',
                 [daemonId]
             );
             
@@ -947,7 +935,7 @@ class IPMServer {
 
                     // Status in DB auf offline setzen
                     this.dbService.query(
-                        'UPDATE daemon_instances SET status = \'offline\' WHERE daemon_id = ?',
+                        'UPDATE rootserver SET daemon_status = \'offline\' WHERE daemon_id = ?',
                         [daemonId]
                     ).catch(err => this.Logger.error('[IPMServer] DB Update Error:', err));
                 }
@@ -1111,16 +1099,15 @@ class IPMServer {
 
                     const response = await this.sendCommand(daemonId, 'gameserver.install', {
                         server_id: server.server_id,
-                        rootserver_id: server.rootserver_id, // ✅ rootserver_id statt daemon_server_id
+                        rootserver_id: server.rootserver_id,
                         addon_slug: server.addon_slug,
                         addon_name: server.addon_name,
-                        template_name: null, // Template-Name nicht in DB gespeichert
+                        template_name: null,
                         steam_app_id: gameData.install?.steamcmd?.app_id,
                         startup_command: server.startup_command,
                         ports,
                         env_variables: envVariables,
-                        install_path: `/gameservers/${server.addon_slug}-${server.server_id}`,
-                        game_data: gameData // ✅ NEU: game_data aus frozen_game_data mitsenden
+                        game_data: gameData
                     }, 60000);
 
                     if (response.success) {
@@ -1191,7 +1178,94 @@ class IPMServer {
             }
         }, { priority: 1 });
         
-        this.Logger.info('[IPMServer] Event-Handler registriert (gameserver.status_changed, gameserver.crashed)');
+        // ✅ Handler für install.completed
+        eventRouter.register('install', 'completed', async (payload, message, context) => {
+            await this._handleGameserverInstallComplete(context.daemonId, payload);
+
+            // SSE-Broadcast an Browser-Clients
+            const [server] = await this.dbService.query(
+                'SELECT guild_id FROM gameservers WHERE id = ?',
+                [payload.server_id]
+            );
+            if (server) {
+                const sseManager = ServiceManager.get('sseManager');
+                if (sseManager) {
+                    sseManager.broadcast(server.guild_id, 'gameserver', {
+                        action: 'install_completed',
+                        server_id: payload.server_id,
+                        status: 'offline',
+                        timestamp: Date.now()
+                    });
+                }
+            }
+        }, { priority: 1 });
+
+        // ✅ Handler für install.failed
+        eventRouter.register('install', 'failed', async (payload, message, context) => {
+            await this._handleGameserverInstallFailed(context.daemonId, payload);
+
+            const [server] = await this.dbService.query(
+                'SELECT guild_id FROM gameservers WHERE id = ?',
+                [payload.server_id]
+            );
+            if (server) {
+                const sseManager = ServiceManager.get('sseManager');
+                if (sseManager) {
+                    sseManager.broadcast(server.guild_id, 'gameserver', {
+                        action: 'install_failed',
+                        server_id: payload.server_id,
+                        status: 'error',
+                        error: payload.error || 'Installation fehlgeschlagen',
+                        timestamp: Date.now()
+                    });
+                }
+            }
+        }, { priority: 1 });
+
+        // ✅ Handler für install.output (Console-Lines während Installation)
+        eventRouter.register('install', 'output', async (payload, message, context) => {
+            const [server] = await this.dbService.query(
+                'SELECT guild_id FROM gameservers WHERE id = ?',
+                [payload.server_id]
+            );
+            if (server) {
+                const sseManager = ServiceManager.get('sseManager');
+                if (sseManager) {
+                    sseManager.broadcast(server.guild_id, 'gameserver', {
+                        action: 'install_output',
+                        server_id: payload.server_id,
+                        line: payload.line,
+                        timestamp: Date.now()
+                    });
+                }
+            }
+        }, { priority: 1 });
+
+        this.Logger.info('[IPMServer] Event-Handler registriert (gameserver.*, install.*)');
+
+        // ✅ Handler für console.output → SSE broadcast an Browser-Console-Tab
+        eventRouter.register('console', 'output', async (payload, message, context) => {
+            const { server_id, line } = payload;
+            if (!server_id || !line) return;
+
+            const [server] = await this.dbService.query(
+                'SELECT guild_id FROM gameservers WHERE id = ?',
+                [server_id]
+            );
+            if (!server) return;
+
+            const sseManager = ServiceManager.get('sseManager');
+            if (sseManager) {
+                sseManager.broadcast(server.guild_id, 'console', {
+                    action: 'output',
+                    server_id: server_id,
+                    line: line,
+                    timestamp: Date.now()
+                });
+            }
+        }, { priority: 1 });
+
+        this.Logger.info('[IPMServer] Event-Handler registriert (gameserver.*, install.*, console.*)');
     }
 }
 
