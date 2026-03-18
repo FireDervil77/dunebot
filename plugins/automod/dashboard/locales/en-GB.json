@@ -164,6 +164,11 @@
             "FEATURE_3": "Lockdown Mode on raid detection",
             "FEATURE_4": "Automatic Actions (Kick/Ban new users)",
             "ETA": "Available in approx. 1-2 weeks"
+        },
+
+        "COMPOUND": {
+            "TITLE": "Compound Rules",
+            "SUBTITLE": "Create rules that combine multiple conditions"
         }
     },
 
@@ -204,5 +209,28 @@
     "MASSMENTION_THRES_TITLE": "Mass Mention Threshold",
     "MASSMENTION_THRES_DESC": "The amount of mentions a message must have to be considered a mass mention",
     "MAXLINES_TITLE": "Max Lines",
-    "MAXLINES_DESC": "Automatically delete messages with more than the specified amount of lines"
+    "MAXLINES_DESC": "Automatically delete messages with more than the specified amount of lines",
+
+    "COMPOUND": {
+        "ADD_TITLE": "New Compound Rule",
+        "NAME": "Rule Name",
+        "NAME_PLACEHOLDER": "e.g. New Account + Link",
+        "LOGIC": "Logic",
+        "LOGIC_AND": "AND (all conditions must match)",
+        "LOGIC_OR": "OR (any condition must match)",
+        "ACTION": "Action",
+        "DESCRIPTION": "Description",
+        "DESC_PLACEHOLDER": "Optional description of the rule...",
+        "DURATION": "Timeout Duration (Minutes)",
+        "CONDITIONS": "Conditions",
+        "ADD_CONDITION": "Add Condition",
+        "BTN_SAVE": "Save Rule",
+        "EMPTY": "No compound rules found. Create your first rule above.",
+        "TIP_TITLE": "Tip",
+        "TIP_TEXT": "Compound rules allow you to combine multiple conditions. E.g. 'Account younger than 7 days AND message contains link' → Timeout.",
+        "ENABLED": "Enabled",
+        "DISABLED": "Disabled",
+        "CONDITIONS_LABEL": "Conditions",
+        "CONFIRM_DELETE": "Do you really want to delete this compound rule?"
+    }
 }

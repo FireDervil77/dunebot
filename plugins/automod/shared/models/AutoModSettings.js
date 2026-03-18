@@ -57,6 +57,19 @@ class AutoModSettings {
             if (!Array.isArray(settings.raid_trusted_invites)) {
                 settings.raid_trusted_invites = [];
             }
+
+            // JSON-Felder parsen: active_keyword_lists
+            if (settings.active_keyword_lists && typeof settings.active_keyword_lists === 'string') {
+                try {
+                    settings.active_keyword_lists = JSON.parse(settings.active_keyword_lists);
+                } catch {
+                    settings.active_keyword_lists = [];
+                }
+            }
+
+            if (!Array.isArray(settings.active_keyword_lists)) {
+                settings.active_keyword_lists = [];
+            }
             
             return settings;
         } catch (error) {
@@ -109,6 +122,9 @@ class AutoModSettings {
             }
             if (updates.raid_trusted_invites !== undefined) {
                 updates.raid_trusted_invites = JSON.stringify(updates.raid_trusted_invites);
+            }
+            if (updates.active_keyword_lists !== undefined && Array.isArray(updates.active_keyword_lists)) {
+                updates.active_keyword_lists = JSON.stringify(updates.active_keyword_lists);
             }
 
             // Dynamisches UPDATE-Statement bauen

@@ -169,6 +169,11 @@
             "FEATURE_3": "Lockdown-Modus bei Raid-Erkennung",
             "FEATURE_4": "Automatische Actions (Kick/Ban neue User)",
             "ETA": "✅ JETZT VERFÜGBAR!"
+        },
+
+        "COMPOUND": {
+            "TITLE": "Kombinations-Regeln",
+            "SUBTITLE": "Erstelle Regeln, die mehrere Bedingungen kombinieren"
         }
     },
 
@@ -209,5 +214,28 @@
     "MASSMENTION_THRES_TITLE": "Mass-Mention Schwellenwert",
     "MASSMENTION_THRES_DESC": "Die Anzahl der Mentions, die eine Nachricht haben muss, um als Mass-Mention zu gelten",
     "MAXLINES_TITLE": "Max. Zeilen",
-    "MAXLINES_DESC": "Löscht automatisch Nachrichten mit mehr als der angegebenen Anzahl an Zeilen"
+    "MAXLINES_DESC": "Löscht automatisch Nachrichten mit mehr als der angegebenen Anzahl an Zeilen",
+
+    "COMPOUND": {
+        "ADD_TITLE": "Neue Kombinations-Regel",
+        "NAME": "Regelname",
+        "NAME_PLACEHOLDER": "z.B. Neues Konto + Link",
+        "LOGIC": "Verknüpfung",
+        "LOGIC_AND": "UND (alle Bedingungen müssen zutreffen)",
+        "LOGIC_OR": "ODER (eine Bedingung muss zutreffen)",
+        "ACTION": "Aktion",
+        "DESCRIPTION": "Beschreibung",
+        "DESC_PLACEHOLDER": "Optionale Beschreibung der Regel...",
+        "DURATION": "Timeout-Dauer (Minuten)",
+        "CONDITIONS": "Bedingungen",
+        "ADD_CONDITION": "Bedingung hinzufügen",
+        "BTN_SAVE": "Regel speichern",
+        "EMPTY": "Keine Kombinations-Regeln vorhanden. Erstelle deine erste Regel oben.",
+        "TIP_TITLE": "Tipp",
+        "TIP_TEXT": "Kombinations-Regeln ermöglichen es dir, mehrere Bedingungen zu verknüpfen. Z.B. 'Konto jünger als 7 Tage UND Nachricht enthält Link' → Timeout.",
+        "ENABLED": "Aktiv",
+        "DISABLED": "Deaktiviert",
+        "CONDITIONS_LABEL": "Bedingungen",
+        "CONFIRM_DELETE": "Möchtest du diese Kombinations-Regel wirklich löschen?"
+    }
 }

@@ -249,7 +249,12 @@
         "FEATURE_REQUEST": "Feature Request",
         "SUPPORT_DUNEBOT": "DuneBot unterstützen",
         "HALL_OF_FAME": "Hall of Fame",
-        "THEME": "Theme"
+        "THEME": "Theme",
+        "THEMES": "Themes",
+        "THEMES_OVERVIEW": "Übersicht",
+        "THEMES_WIDGETS": "Widget-Bereiche",
+        "MEDIA": "Medien",
+        "ROLES": "Rollen"
     },
 
     "BREADCRUMB": {

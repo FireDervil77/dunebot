@@ -109,7 +109,7 @@ try {
 
     // Prüfe ob Navigation in DB existiert (OHNE zu überschreiben!)
     const navigationRaw = await dbService.query(
-        "SELECT COUNT(*) as count FROM nav_items WHERE guildId = ?",
+        "SELECT COUNT(*) as count FROM guild_nav_items WHERE guildId = ?",
         [guildId]
     );
 
@@ -154,14 +154,8 @@ try {
         res.locals.buyMeCoffeeUrl = '#';
     }
     
-    // Plugin-Updates Anzahl laden für Badge in Navigation
-    try {
-        const pendingUpdates = await pluginManager.getAvailableUpdates(guildId);
-        res.locals.pendingUpdatesCount = pendingUpdates.length;
-    } catch (error) {
-        Logger.warn('[Guild Middleware] Error loading plugin updates count:', error.message);
-        res.locals.pendingUpdatesCount = 0;
-    }
+    // Plugin-Updates Badge (externes Update-System entfernt — nur noch PluginUpdater)
+    res.locals.pendingUpdatesCount = 0;
     
     // Admin-Status für Templates (OWNER_IDS aus ENV)
     const { isAdminUser } = require('../admin.middleware');

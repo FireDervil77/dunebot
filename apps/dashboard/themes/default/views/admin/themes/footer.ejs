@@ -1,0 +1,400 @@
+<%#
+ * Admin: Footer Editor (CMS)
+ * Verwaltet die Footer-Spalten und deren Links.
+ * Spalten-Typen: links, about, social, custom
+ *
+ * @author FireDervil
+ * @context {Array} columns - [{id, title, col_width, position, visible, column_type, content, links: [...]}]
+%>
+
+<style>
+  .col-card { transition: box-shadow .2s; }
+  .col-card.sortable-ghost { opacity: .3; }
+  .col-card .card-header { cursor: pointer; }
+  .link-item { background: #f8f9fa; border-radius: .375rem; padding: .5rem .75rem; margin-bottom: .25rem; }
+  .link-item.sortable-ghost { opacity: .3; }
+  .drag-handle { cursor: grab; color: #aaa; }
+  .drag-handle:hover { color: #333; }
+</style>
+
+<div class="app-content">
+  <div class="container-fluid">
+
+    <!-- Header -->
+    <div class="row mb-3">
+      <div class="col-12">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <h1 class="h3 mb-0"><i class="bi bi-layout-three-columns me-2 text-primary"></i>Footer</h1>
+            <p class="text-muted small mb-0">Verwalte die Spalten und Links im Website-Footer.</p>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#columnModal" onclick="resetColumnModal()">
+              <i class="bi bi-plus-lg me-1"></i> Neue Spalte
+            </button>
+            <a href="/admin/themes" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-arrow-left me-1"></i> Zurück
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="alert alert-info d-flex align-items-start mb-4">
+      <i class="bi bi-info-circle me-2 fs-5 mt-1"></i>
+      <div>
+        Spalten-Typen: <strong>Links</strong> (Link-Liste), <strong>About</strong> (Freitext), <strong>Social</strong> (Social Links), <strong>Custom</strong> (freier HTML) &middot;
+        Bootstrap Spaltenbreite konfigurierbar (z.B. col-lg-5) &middot;
+        Der <strong>Copyright-Bereich</strong> wird automatisch angehängt.
+      </div>
+    </div>
+
+    <!-- Columns -->
+    <div id="columnList" class="row g-3">
+      <% if (columns.length === 0) { %>
+        <div class="col-12">
+          <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Keine Footer-Spalten vorhanden.</div>
+        </div>
+      <% } %>
+
+      <% columns.forEach(col => { %>
+        <div class="col-md-6 col-lg-4 col-card-wrapper" data-id="<%= col.id %>">
+          <div class="card col-card h-100 <%= col.visible ? '' : 'border-danger' %>">
+            <div class="card-header d-flex align-items-center justify-content-between py-2">
+              <div class="d-flex align-items-center gap-2">
+                <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+                <strong><%= col.title %></strong>
+                <span class="badge bg-secondary"><%= col.column_type %></span>
+                <small class="text-muted"><%= col.col_width %></small>
+              </div>
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-primary btn-edit-col"
+                  data-col='<%- JSON.stringify({id:col.id, title:col.title, col_width:col.col_width, visible:col.visible, column_type:col.column_type, content:col.content||""}) %>'>
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger btn-delete-col" data-id="<%= col.id %>">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+            <div class="card-body py-2">
+
+              <% if (col.column_type === 'about' || col.column_type === 'custom') { %>
+                <!-- About / Custom: Freitext -->
+                <p class="small mb-0 text-muted"><%= (col.content || '').substring(0, 150) %><%= (col.content || '').length > 150 ? '...' : '' %></p>
+              <% } else { %>
+                <!-- Links / Social -->
+                <div class="link-list" data-column="<%= col.id %>">
+                  <% if (col.links && col.links.length > 0) { %>
+                    <% col.links.forEach(link => { %>
+                      <div class="link-item d-flex align-items-center gap-2" data-id="<%= link.id %>">
+                        <span class="drag-handle"><i class="fa-solid fa-grip-vertical small"></i></span>
+                        <div class="flex-grow-1">
+                          <% if (link.icon) { %><i class="<%= link.icon %> me-1"></i><% } %>
+                          <span><%= link.label %></span>
+                          <small class="text-muted ms-1"><%= link.url %></small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary btn-edit-link"
+                          data-link='<%- JSON.stringify({id:link.id, column_id:link.column_id, label:link.label, url:link.url, icon:link.icon||"", target:link.target||"_self", visible:link.visible}) %>'>
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger btn-delete-link" data-id="<%= link.id %>">
+                          <i class="bi bi-x"></i>
+                        </button>
+                      </div>
+                    <% }); %>
+                  <% } else { %>
+                    <p class="text-muted small mb-0">Keine Links</p>
+                  <% } %>
+                </div>
+                <button class="btn btn-sm btn-outline-success mt-2 btn-add-link" data-column="<%= col.id %>">
+                  <i class="bi bi-plus me-1"></i>Link hinzufügen
+                </button>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+  </div>
+</div>
+
+<!-- Column Modal -->
+<div class="modal fade" id="columnModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="colModalTitle"><i class="bi bi-plus-circle me-2"></i>Footer-Spalte</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="colId">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Titel</label>
+            <input type="text" class="form-control" id="colTitle" placeholder="About">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Breite</label>
+            <select class="form-select" id="colWidth">
+              <option value="col-lg-2">col-lg-2</option>
+              <option value="col-lg-3" selected>col-lg-3</option>
+              <option value="col-lg-4">col-lg-4</option>
+              <option value="col-lg-5">col-lg-5</option>
+              <option value="col-lg-6">col-lg-6</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Typ</label>
+            <select class="form-select" id="colType">
+              <option value="links">Links</option>
+              <option value="about">About</option>
+              <option value="social">Social</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="col-12" id="colContentGroup">
+            <label class="form-label fw-bold">Inhalt (About / Custom)</label>
+            <textarea class="form-control" id="colContent" rows="4" placeholder="Freitext oder HTML..."></textarea>
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="colVisible" checked>
+              <label class="form-check-label" for="colVisible">Sichtbar</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSaveColumn">
+          <i class="bi bi-check-lg me-1"></i> Speichern
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Link Modal -->
+<div class="modal fade" id="linkModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="linkModalTitle"><i class="bi bi-plus-circle me-2"></i>Link</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="linkId">
+        <input type="hidden" id="linkColumnId">
+        <div class="mb-2">
+          <label class="form-label fw-bold">Label</label>
+          <input type="text" class="form-control form-control-sm" id="linkLabel" placeholder="Home">
+        </div>
+        <div class="mb-2">
+          <label class="form-label fw-bold">URL</label>
+          <input type="text" class="form-control form-control-sm" id="linkUrl" placeholder="/">
+        </div>
+        <div class="mb-2">
+          <label class="form-label fw-bold">Icon (optional)</label>
+          <input type="text" class="form-control form-control-sm" id="linkIcon" placeholder="bi bi-house">
+        </div>
+        <div class="mb-2">
+          <label class="form-label fw-bold">Ziel</label>
+          <select class="form-select form-select-sm" id="linkTarget">
+            <option value="_self">Gleicher Tab</option>
+            <option value="_blank">Neuer Tab</option>
+          </select>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="linkVisible" checked>
+          <label class="form-check-label" for="linkVisible">Sichtbar</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSaveLink">
+          <i class="bi bi-check-lg me-1"></i> Speichern
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+  const API = '/admin/themes/footer';
+
+  // SortableJS — Column order
+  const colList = document.getElementById('columnList');
+  if (colList) {
+    Sortable.create(colList, {
+      handle: '.drag-handle',
+      animation: 200,
+      ghostClass: 'sortable-ghost',
+      draggable: '.col-card-wrapper',
+      onEnd: function() {
+        const order = [];
+        colList.querySelectorAll('.col-card-wrapper').forEach((el, idx) => {
+          order.push({ id: Number(el.dataset.id), position: idx + 1 });
+        });
+        fetch(API + '/column/reorder', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order })
+        }).then(r => r.json()).then(d => {
+          if (d.success) toastr.success('Reihenfolge gespeichert');
+        }).catch(() => toastr.error('Netzwerkfehler'));
+      }
+    });
+  }
+
+  // SortableJS — Link order inside columns
+  document.querySelectorAll('.link-list').forEach(ll => {
+    Sortable.create(ll, {
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      draggable: '.link-item',
+      onEnd: function() {
+        // Links reorder isn't critical — keep simple
+      }
+    });
+  });
+
+  // Show/hide content field based on type
+  document.getElementById('colType')?.addEventListener('change', function() {
+    document.getElementById('colContentGroup').style.display =
+      (this.value === 'about' || this.value === 'custom') ? 'block' : 'none';
+  });
+
+  // Edit Column
+  document.querySelectorAll('.btn-edit-col').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const d = JSON.parse(this.dataset.col);
+      document.getElementById('colId').value = d.id;
+      document.getElementById('colTitle').value = d.title;
+      document.getElementById('colWidth').value = d.col_width;
+      document.getElementById('colType').value = d.column_type;
+      document.getElementById('colContent').value = d.content;
+      document.getElementById('colVisible').checked = !!d.visible;
+      document.getElementById('colContentGroup').style.display =
+        (d.column_type === 'about' || d.column_type === 'custom') ? 'block' : 'none';
+      document.getElementById('colModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Spalte bearbeiten';
+      new bootstrap.Modal(document.getElementById('columnModal')).show();
+    });
+  });
+
+  // Delete Column
+  document.querySelectorAll('.btn-delete-col').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (!confirm('Spalte löschen? Alle Links dieser Spalte werden ebenfalls gelöscht.')) return;
+      fetch(API + '/column/' + this.dataset.id, { method: 'DELETE' }).then(r => r.json()).then(d => {
+        if (d.success) { toastr.success('Gelöscht'); setTimeout(() => location.reload(), 400); }
+        else toastr.error(d.message);
+      }).catch(() => toastr.error('Netzwerkfehler'));
+    });
+  });
+
+  // Save Column
+  document.getElementById('btnSaveColumn')?.addEventListener('click', function() {
+    const id = document.getElementById('colId').value;
+    const data = {
+      title: document.getElementById('colTitle').value.trim(),
+      col_width: document.getElementById('colWidth').value,
+      column_type: document.getElementById('colType').value,
+      content: document.getElementById('colContent').value,
+      visible: document.getElementById('colVisible').checked ? 1 : 0
+    };
+    if (!data.title) return toastr.warning('Titel erforderlich');
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? (API + '/column/' + id) : (API + '/column');
+    fetch(url, {
+      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+      if (d.success) { toastr.success('Gespeichert'); setTimeout(() => location.reload(), 400); }
+      else toastr.error(d.message);
+    }).catch(() => toastr.error('Netzwerkfehler'));
+  });
+
+  // Add Link
+  document.querySelectorAll('.btn-add-link').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.getElementById('linkId').value = '';
+      document.getElementById('linkColumnId').value = this.dataset.column;
+      document.getElementById('linkLabel').value = '';
+      document.getElementById('linkUrl').value = '';
+      document.getElementById('linkIcon').value = '';
+      document.getElementById('linkTarget').value = '_self';
+      document.getElementById('linkVisible').checked = true;
+      document.getElementById('linkModalTitle').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Neuer Link';
+      new bootstrap.Modal(document.getElementById('linkModal')).show();
+    });
+  });
+
+  // Edit Link
+  document.querySelectorAll('.btn-edit-link').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const d = JSON.parse(this.dataset.link);
+      document.getElementById('linkId').value = d.id;
+      document.getElementById('linkColumnId').value = d.column_id;
+      document.getElementById('linkLabel').value = d.label;
+      document.getElementById('linkUrl').value = d.url;
+      document.getElementById('linkIcon').value = d.icon;
+      document.getElementById('linkTarget').value = d.target;
+      document.getElementById('linkVisible').checked = !!d.visible;
+      document.getElementById('linkModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Link bearbeiten';
+      new bootstrap.Modal(document.getElementById('linkModal')).show();
+    });
+  });
+
+  // Delete Link
+  document.querySelectorAll('.btn-delete-link').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (!confirm('Link löschen?')) return;
+      fetch(API + '/link/' + this.dataset.id, { method: 'DELETE' }).then(r => r.json()).then(d => {
+        if (d.success) {
+          document.querySelector('.link-item[data-id="' + this.dataset.id + '"]')?.remove();
+          toastr.success('Gelöscht');
+        } else toastr.error(d.message);
+      }).catch(() => toastr.error('Netzwerkfehler'));
+    });
+  });
+
+  // Save Link
+  document.getElementById('btnSaveLink')?.addEventListener('click', function() {
+    const id = document.getElementById('linkId').value;
+    const data = {
+      column_id: Number(document.getElementById('linkColumnId').value),
+      label: document.getElementById('linkLabel').value.trim(),
+      url: document.getElementById('linkUrl').value.trim(),
+      icon: document.getElementById('linkIcon').value.trim() || null,
+      target: document.getElementById('linkTarget').value,
+      visible: document.getElementById('linkVisible').checked ? 1 : 0
+    };
+    if (!data.label) return toastr.warning('Label erforderlich');
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? (API + '/link/' + id) : (API + '/link');
+    fetch(url, {
+      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+      if (d.success) { toastr.success('Gespeichert'); setTimeout(() => location.reload(), 400); }
+      else toastr.error(d.message);
+    }).catch(() => toastr.error('Netzwerkfehler'));
+  });
+});
+
+function resetColumnModal() {
+  document.getElementById('colId').value = '';
+  document.getElementById('colTitle').value = '';
+  document.getElementById('colWidth').value = 'col-lg-3';
+  document.getElementById('colType').value = 'links';
+  document.getElementById('colContent').value = '';
+  document.getElementById('colVisible').checked = true;
+  document.getElementById('colContentGroup').style.display = 'none';
+  document.getElementById('colModalTitle').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Neue Spalte';
+}
+</script>

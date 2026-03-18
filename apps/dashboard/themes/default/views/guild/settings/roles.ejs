@@ -1,0 +1,646 @@
+<!-- Kern: Rollen-Verwaltung (Discord Roles Mirror) -->
+<style>
+    .role-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        border: 2px solid;
+        gap: 6px;
+    }
+    .role-badge .role-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .role-card {
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .role-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .role-card.managed {
+        opacity: 0.6;
+    }
+    .role-card.not-editable {
+        border-left: 3px solid #dc3545;
+    }
+    .role-card.editable-role {
+        border-left: 3px solid #28a745;
+    }
+    .perm-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 8px;
+    }
+    .perm-item {
+        display: flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: rgba(0,0,0,0.03);
+        font-size: 0.82rem;
+    }
+    .perm-item.dangerous {
+        background: rgba(220, 53, 69, 0.08);
+    }
+    .perm-category-title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+        font-weight: 600;
+        margin-top: 12px;
+        margin-bottom: 6px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .color-preview {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid #dee2e6;
+        display: inline-block;
+        vertical-align: middle;
+    }
+    #roleDetailPanel {
+        display: none;
+    }
+    .member-count-badge {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 10px;
+        background: rgba(0,0,0,0.08);
+    }
+</style>
+
+<div class="row">
+    <!-- Linke Spalte: Rollenliste -->
+    <div class="col-lg-5 col-xl-4">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fa-solid fa-shield-halved me-2"></i>
+                    <%= tr('core:ROLES.TITLE') %>
+                </h5>
+                <% if (botHasManageRoles) { %>
+                <button type="button" class="btn btn-sm btn-success" id="btnCreateRole">
+                    <i class="fa-solid fa-plus me-1"></i> <%= tr('core:ROLES.BTN_CREATE') %>
+                </button>
+                <% } %>
+            </div>
+            <div class="card-body p-0">
+                <% if (!botHasManageRoles) { %>
+                <div class="alert alert-warning m-3 mb-0">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                    <%= tr('core:ROLES.NO_MANAGE_ROLES_PERM') %>
+                </div>
+                <% } %>
+
+                <!-- Suchfeld -->
+                <div class="p-3 pb-0">
+                    <input type="text" class="form-control form-control-sm" id="roleSearch"
+                           placeholder="<%= tr('core:ROLES.SEARCH_PLACEHOLDER') %>">
+                </div>
+
+                <!-- Statistiken -->
+                <div class="px-3 py-2 d-flex gap-3 text-muted small">
+                    <span><i class="fa-solid fa-list me-1"></i> <%= roles.length %> <%= tr('core:ROLES.TOTAL') %></span>
+                    <span><i class="fa-solid fa-pen me-1 text-success"></i> <%= roles.filter(r => r.editable).length %> <%= tr('core:ROLES.EDITABLE') %></span>
+                    <span><i class="fa-solid fa-robot me-1 text-info"></i> <%= roles.filter(r => r.managed).length %> <%= tr('core:ROLES.MANAGED') %></span>
+                </div>
+
+                <!-- Rollenliste -->
+                <div class="list-group list-group-flush" id="roleList" style="max-height: 600px; overflow-y: auto;">
+                    <% roles.forEach((role, idx) => { %>
+                    <a href="#" class="list-group-item list-group-item-action role-card <%= role.managed ? 'managed' : (role.editable ? 'editable-role' : 'not-editable') %>"
+                       data-role-id="<%= role.id %>"
+                       data-role-index="<%= idx %>">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="role-dot me-1" style="background-color: <%= role.hexColor !== '#000000' ? role.hexColor : '#99aab5' %>;"></span>
+                                <strong><%= role.name %></strong>
+                                <% if (role.managed) { %>
+                                    <span class="badge bg-info ms-1" style="font-size:0.65rem">Bot/Boost</span>
+                                <% } %>
+                                <% if (role.hoist) { %>
+                                    <span class="badge bg-secondary ms-1" style="font-size:0.65rem">Hoist</span>
+                                <% } %>
+                            </div>
+                            <div>
+                                <span class="member-count-badge"><%= role.memberCount %> <i class="fa-solid fa-user"></i></span>
+                            </div>
+                        </div>
+                    </a>
+                    <% }); %>
+
+                    <% if (roles.length === 0) { %>
+                    <div class="text-center text-muted p-4">
+                        <i class="fa-solid fa-circle-info fa-2x mb-2"></i>
+                        <p><%= tr('core:ROLES.NO_ROLES') %></p>
+                    </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rechte Spalte: Rollen-Detail / Bearbeitung -->
+    <div class="col-lg-7 col-xl-8">
+        <!-- Leerzustand -->
+        <div id="roleEmptyState" class="card mb-4">
+            <div class="card-body text-center text-muted py-5">
+                <i class="fa-solid fa-hand-pointer fa-3x mb-3"></i>
+                <h5><%= tr('core:ROLES.SELECT_ROLE') %></h5>
+                <p><%= tr('core:ROLES.SELECT_ROLE_DESC') %></p>
+            </div>
+        </div>
+
+        <!-- Detail-Panel -->
+        <div id="roleDetailPanel">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <span class="color-preview me-2" id="detailColorPreview"></span>
+                        <span id="detailRoleName"></span>
+                    </h5>
+                    <div>
+                        <span class="badge bg-secondary" id="detailRoleId"></span>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <!-- Tab Navigation -->
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#tabRoleGeneral" role="tab">
+                                <i class="fa-solid fa-sliders me-1"></i> <%= tr('core:ROLES.TAB_GENERAL') %>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#tabRolePermissions" role="tab">
+                                <i class="fa-solid fa-key me-1"></i> <%= tr('core:ROLES.TAB_PERMISSIONS') %>
+                            </a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- Tab: Allgemein -->
+                        <div class="tab-pane fade show active" id="tabRoleGeneral" role="tabpanel">
+                            <form id="roleEditForm">
+                                <input type="hidden" id="editRoleId" name="roleId">
+
+                                <div class="row">
+                                    <div class="col-md-8 mb-3">
+                                        <label class="form-label fw-bold">
+                                            <i class="fa-solid fa-tag me-1 text-primary"></i>
+                                            <%= tr('core:ROLES.NAME') %>
+                                        </label>
+                                        <input type="text" class="form-control" id="editRoleName" name="name" maxlength="100" required>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label fw-bold">
+                                            <i class="fa-solid fa-palette me-1 text-warning"></i>
+                                            <%= tr('core:ROLES.COLOR') %>
+                                        </label>
+                                        <input type="color" class="form-control form-control-color w-100" id="editRoleColor" name="color" value="#99aab5">
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="editRoleHoist" name="hoist">
+                                            <label class="form-check-label" for="editRoleHoist">
+                                                <i class="fa-solid fa-arrow-up me-1"></i>
+                                                <%= tr('core:ROLES.HOIST') %>
+                                            </label>
+                                        </div>
+                                        <div class="form-text"><%= tr('core:ROLES.HOIST_HELP') %></div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="editRoleMentionable" name="mentionable">
+                                            <label class="form-check-label" for="editRoleMentionable">
+                                                <i class="fa-solid fa-at me-1"></i>
+                                                <%= tr('core:ROLES.MENTIONABLE') %>
+                                            </label>
+                                        </div>
+                                        <div class="form-text"><%= tr('core:ROLES.MENTIONABLE_HELP') %></div>
+                                    </div>
+                                </div>
+
+                                <!-- Info-Box -->
+                                <div class="alert alert-light border mb-3" id="roleInfoBox">
+                                    <div class="row text-center small">
+                                        <div class="col"><strong><%= tr('core:ROLES.POSITION') %>:</strong> <span id="infoPosition">-</span></div>
+                                        <div class="col"><strong><%= tr('core:ROLES.MEMBERS') %>:</strong> <span id="infoMembers">-</span></div>
+                                        <div class="col"><strong><%= tr('core:ROLES.CREATED') %>:</strong> <span id="infoCreated">-</span></div>
+                                    </div>
+                                </div>
+
+                                <div id="roleNotEditableAlert" class="alert alert-danger" style="display:none;">
+                                    <i class="fa-solid fa-lock me-2"></i>
+                                    <span id="roleNotEditableReason"></span>
+                                </div>
+
+                                <div class="d-flex gap-2" id="roleActionButtons">
+                                    <button type="submit" class="btn btn-primary" id="btnSaveRole">
+                                        <i class="fa-solid fa-save me-1"></i> <%= tr('BTN_SAVE') %>
+                                    </button>
+                                    <button type="button" class="btn btn-danger" id="btnDeleteRole">
+                                        <i class="fa-solid fa-trash me-1"></i> <%= tr('core:ROLES.BTN_DELETE') %>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Tab: Permissions -->
+                        <div class="tab-pane fade" id="tabRolePermissions" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <small class="text-muted"><%= tr('core:ROLES.PERM_HINT') %></small>
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPermSelectAll">
+                                        <i class="fa-solid fa-check-double me-1"></i> Alle
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPermDeselectAll">
+                                        <i class="fa-solid fa-times me-1"></i> Keine
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="permissionsContainer"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Neue Rolle erstellen -->
+<div class="modal fade" id="createRoleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-plus-circle me-2"></i> <%= tr('core:ROLES.CREATE_TITLE') %>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="createRoleForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold"><%= tr('core:ROLES.NAME') %></label>
+                        <input type="text" class="form-control" id="newRoleName" name="name" maxlength="100" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold"><%= tr('core:ROLES.COLOR') %></label>
+                        <input type="color" class="form-control form-control-color" id="newRoleColor" name="color" value="#99aab5">
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="newRoleHoist">
+                                <label class="form-check-label" for="newRoleHoist"><%= tr('core:ROLES.HOIST') %></label>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="newRoleMentionable">
+                                <label class="form-check-label" for="newRoleMentionable"><%= tr('core:ROLES.MENTIONABLE') %></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><%= tr('BTN_CANCEL') %></button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fa-solid fa-plus me-1"></i> <%= tr('BTN_CREATE') %>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Lösch-Bestätigung -->
+<div class="modal fade" id="deleteRoleModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fa-solid fa-trash me-2"></i> <%= tr('core:ROLES.DELETE_TITLE') %></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><%= tr('core:ROLES.DELETE_CONFIRM') %></p>
+                <p class="fw-bold text-danger" id="deleteRoleName"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><%= tr('BTN_CANCEL') %></button>
+                <button type="button" class="btn btn-danger" id="btnConfirmDelete">
+                    <i class="fa-solid fa-trash me-1"></i> <%= tr('core:ROLES.BTN_DELETE') %>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const guildId = '<%= guildId %>';
+    const baseUrl = `/guild/${guildId}/settings/roles`;
+
+    // Rollen-Daten (vom Server)
+    const rolesData = <%- JSON.stringify(roles) %>;
+    const permissionFlags = <%- JSON.stringify(permissionFlags) %>;
+    const botHasManageRoles = <%= botHasManageRoles ? 'true' : 'false' %>;
+
+    // Permission-Kategorien für übersichtliche Darstellung
+    const permCategories = {
+        'General': ['Administrator', 'ViewAuditLog', 'ViewGuildInsights', 'ManageGuild', 'ManageRoles', 'ManageChannels', 'ManageWebhooks', 'ManageGuildExpressions'],
+        'Membership': ['CreateInstantInvite', 'ChangeNickname', 'ManageNicknames', 'KickMembers', 'BanMembers', 'ModerateMembers'],
+        'Text': ['SendMessages', 'SendMessagesInThreads', 'CreatePublicThreads', 'CreatePrivateThreads', 'EmbedLinks', 'AttachFiles', 'AddReactions', 'UseExternalEmojis', 'UseExternalStickers', 'MentionEveryone', 'ManageMessages', 'ManageThreads', 'ReadMessageHistory', 'SendTTSMessages', 'UseApplicationCommands'],
+        'Voice': ['Connect', 'Speak', 'Stream', 'UseVAD', 'PrioritySpeaker', 'MuteMembers', 'DeafenMembers', 'MoveMembers', 'UseSoundboard', 'UseExternalSounds'],
+        'Stage': ['RequestToSpeak'],
+        'Events': ['CreateEvents', 'ManageEvents']
+    };
+
+    // Toast-Helper (kompatibel mit toastr)
+    function showToast(msg, type) {
+        if (window.toastr) {
+            toastr[type || 'success'](msg);
+        } else {
+            alert(msg);
+        }
+    }
+
+    let selectedRoleId = null;
+
+    // ====== Rollen-Suche ======
+    document.getElementById('roleSearch').addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        document.querySelectorAll('#roleList .role-card').forEach(card => {
+            const roleName = card.querySelector('strong').textContent.toLowerCase();
+            card.style.display = roleName.includes(query) ? '' : 'none';
+        });
+    });
+
+    // ====== Rolle auswählen ======
+    document.querySelectorAll('#roleList .role-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            e.preventDefault();
+            const roleId = this.dataset.roleId;
+            selectRole(roleId);
+        });
+    });
+
+    function selectRole(roleId) {
+        const role = rolesData.find(r => r.id === roleId);
+        if (!role) return;
+
+        selectedRoleId = roleId;
+
+        // Aktiv-Markierung
+        document.querySelectorAll('#roleList .role-card').forEach(c => c.classList.remove('active'));
+        document.querySelector(`[data-role-id="${roleId}"]`)?.classList.add('active');
+
+        // Panel anzeigen
+        document.getElementById('roleEmptyState').style.display = 'none';
+        document.getElementById('roleDetailPanel').style.display = 'block';
+
+        // Header
+        document.getElementById('detailRoleName').textContent = role.name;
+        document.getElementById('detailColorPreview').style.backgroundColor = role.hexColor !== '#000000' ? role.hexColor : '#99aab5';
+        document.getElementById('detailRoleId').textContent = role.id;
+
+        // Formular befüllen
+        document.getElementById('editRoleId').value = role.id;
+        document.getElementById('editRoleName').value = role.name;
+        document.getElementById('editRoleColor').value = role.hexColor !== '#000000' ? role.hexColor : '#99aab5';
+        document.getElementById('editRoleHoist').checked = role.hoist;
+        document.getElementById('editRoleMentionable').checked = role.mentionable;
+
+        // Info-Box
+        document.getElementById('infoPosition').textContent = role.position;
+        document.getElementById('infoMembers').textContent = role.memberCount;
+        document.getElementById('infoCreated').textContent = new Date(role.createdAt).toLocaleDateString('de-DE');
+
+        // Editierbarkeit prüfen
+        const notEditableAlert = document.getElementById('roleNotEditableAlert');
+        const actionButtons = document.getElementById('roleActionButtons');
+        const form = document.getElementById('roleEditForm');
+
+        if (!role.editable || !botHasManageRoles) {
+            notEditableAlert.style.display = 'block';
+            actionButtons.style.display = 'none';
+
+            let reason = '';
+            if (role.managed) reason = '<%= tr("core:ROLES.REASON_MANAGED") %>';
+            else if (!botHasManageRoles) reason = '<%= tr("core:ROLES.NO_MANAGE_ROLES_PERM") %>';
+            else reason = '<%= tr("core:ROLES.REASON_HIGHER") %>';
+            document.getElementById('roleNotEditableReason').textContent = reason;
+
+            // Felder disabled
+            form.querySelectorAll('input, select').forEach(el => el.disabled = true);
+        } else {
+            notEditableAlert.style.display = 'none';
+            actionButtons.style.display = 'flex';
+            form.querySelectorAll('input, select').forEach(el => el.disabled = false);
+            document.getElementById('editRoleId').disabled = true; // ID bleibt immer disabled
+        }
+
+        // Permissions befüllen
+        renderPermissions(role);
+    }
+
+    function renderPermissions(role) {
+        const container = document.getElementById('permissionsContainer');
+        container.innerHTML = '';
+
+        const isEditable = role.editable && botHasManageRoles;
+
+        for (const [category, flags] of Object.entries(permCategories)) {
+            const availableFlags = flags.filter(f => permissionFlags.includes(f));
+            if (availableFlags.length === 0) continue;
+
+            const title = document.createElement('div');
+            title.className = 'perm-category-title';
+            title.textContent = category;
+            container.appendChild(title);
+
+            const grid = document.createElement('div');
+            grid.className = 'perm-grid';
+
+            for (const flag of availableFlags) {
+                const isDangerous = ['Administrator', 'ManageGuild', 'ManageRoles', 'ManageChannels', 'BanMembers', 'KickMembers', 'ManageWebhooks', 'ManageMessages', 'MentionEveryone'].includes(flag);
+                const isEnabled = role.permissions && role.permissions[flag];
+
+                const item = document.createElement('div');
+                item.className = 'perm-item' + (isDangerous ? ' dangerous' : '');
+                item.innerHTML = `
+                    <div class="form-check form-switch mb-0 me-2">
+                        <input class="form-check-input perm-toggle" type="checkbox"
+                               data-flag="${flag}"
+                               ${isEnabled ? 'checked' : ''}
+                               ${!isEditable ? 'disabled' : ''}>
+                    </div>
+                    <span class="${isDangerous ? 'text-danger fw-bold' : ''}">${formatPermName(flag)}</span>
+                `;
+                grid.appendChild(item);
+            }
+            container.appendChild(grid);
+        }
+
+        // Nicht kategorisierte Flags
+        const allCategorized = Object.values(permCategories).flat();
+        const uncategorized = permissionFlags.filter(f => !allCategorized.includes(f));
+        if (uncategorized.length > 0) {
+            const title = document.createElement('div');
+            title.className = 'perm-category-title';
+            title.textContent = 'Other';
+            container.appendChild(title);
+
+            const grid = document.createElement('div');
+            grid.className = 'perm-grid';
+            for (const flag of uncategorized) {
+                const isEnabled = role.permissions && role.permissions[flag];
+                const item = document.createElement('div');
+                item.className = 'perm-item';
+                item.innerHTML = `
+                    <div class="form-check form-switch mb-0 me-2">
+                        <input class="form-check-input perm-toggle" type="checkbox"
+                               data-flag="${flag}"
+                               ${isEnabled ? 'checked' : ''}
+                               ${!isEditable ? 'disabled' : ''}>
+                    </div>
+                    <span>${formatPermName(flag)}</span>
+                `;
+                grid.appendChild(item);
+            }
+            container.appendChild(grid);
+        }
+    }
+
+    function formatPermName(flag) {
+        return flag.replace(/([A-Z])/g, ' $1').trim();
+    }
+
+    // ====== Alle Permissions selektieren/deselektieren ======
+    document.getElementById('btnPermSelectAll').addEventListener('click', function() {
+        document.querySelectorAll('.perm-toggle:not(:disabled)').forEach(cb => cb.checked = true);
+    });
+    document.getElementById('btnPermDeselectAll').addEventListener('click', function() {
+        document.querySelectorAll('.perm-toggle:not(:disabled)').forEach(cb => cb.checked = false);
+    });
+
+    // ====== Rolle speichern ======
+    document.getElementById('roleEditForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (!selectedRoleId) return;
+
+        const permissions = {};
+        document.querySelectorAll('.perm-toggle').forEach(cb => {
+            permissions[cb.dataset.flag] = cb.checked;
+        });
+
+        const colorHex = document.getElementById('editRoleColor').value;
+        const colorInt = parseInt(colorHex.replace('#', ''), 16);
+
+        const body = {
+            name: document.getElementById('editRoleName').value,
+            color: colorInt,
+            hoist: document.getElementById('editRoleHoist').checked,
+            mentionable: document.getElementById('editRoleMentionable').checked,
+            permissions
+        };
+
+        try {
+            const res = await fetch(`${baseUrl}/${selectedRoleId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('<%= tr("core:ROLES.TOAST_SAVED") %>', 'success');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showToast(data.message || '<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+            }
+        } catch (err) {
+            showToast('<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+        }
+    });
+
+    // ====== Rolle löschen ======
+    document.getElementById('btnDeleteRole').addEventListener('click', function() {
+        if (!selectedRoleId) return;
+        const role = rolesData.find(r => r.id === selectedRoleId);
+        document.getElementById('deleteRoleName').textContent = role ? role.name : selectedRoleId;
+        new bootstrap.Modal(document.getElementById('deleteRoleModal')).show();
+    });
+
+    document.getElementById('btnConfirmDelete').addEventListener('click', async function() {
+        if (!selectedRoleId) return;
+
+        try {
+            const res = await fetch(`${baseUrl}/${selectedRoleId}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('<%= tr("core:ROLES.TOAST_DELETED") %>', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('deleteRoleModal'))?.hide();
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showToast(data.message || '<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+            }
+        } catch (err) {
+            showToast('<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+        }
+    });
+
+    // ====== Neue Rolle erstellen ======
+    document.getElementById('btnCreateRole')?.addEventListener('click', function() {
+        new bootstrap.Modal(document.getElementById('createRoleModal')).show();
+    });
+
+    document.getElementById('createRoleForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const colorHex = document.getElementById('newRoleColor').value;
+        const colorInt = parseInt(colorHex.replace('#', ''), 16);
+
+        const body = {
+            name: document.getElementById('newRoleName').value,
+            color: colorInt,
+            hoist: document.getElementById('newRoleHoist').checked,
+            mentionable: document.getElementById('newRoleMentionable').checked
+        };
+
+        try {
+            const res = await fetch(baseUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('<%= tr("core:ROLES.TOAST_CREATED") %>', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('createRoleModal'))?.hide();
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showToast(data.message || '<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+            }
+        } catch (err) {
+            showToast('<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+        }
+    });
+})();
+</script>

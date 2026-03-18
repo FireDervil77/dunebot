@@ -177,8 +177,14 @@
                                                             <i class="fa-solid fa-spinner fa-spin"></i> Stopping
                                                         </span>
                                                     <% } else if (server.status === 'installing') { %>
-                                                        <span class="badge badge-info server-status-badge" data-status="installing">
-                                                            <i class="fa-solid fa-download"></i> Installing
+                                                        <span class="badge badge-info server-status-badge" data-status="installing" data-install-phase="<%= server.install_phase || '' %>">
+                                                            <% if (server.install_phase === 'pulling_image') { %>
+                                                                <i class="fa-solid fa-cloud-arrow-down fa-spin"></i> Image wird geladen...
+                                                            <% } else if (server.install_phase === 'installing_game') { %>
+                                                                <i class="fa-solid fa-gear fa-spin"></i> Spieldateien...
+                                                            <% } else { %>
+                                                                <i class="fa-solid fa-spinner fa-spin"></i> Installiere...
+                                                            <% } %>
                                                         </span>
                                                     <% } else if (server.status === 'installed') { %>
                                                         <span class="badge badge-success server-status-badge" data-status="installed">
@@ -611,10 +617,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusBadge.classList.add('badge-warning');
                 statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Stopping';
                 break;
-            case 'installing':
+            case 'installing': {
                 statusBadge.classList.add('badge-info');
-                statusBadge.innerHTML = '<i class="fa-solid fa-download"></i> Installing';
+                const phase = statusBadge.dataset.installPhase || '';
+                if (phase === 'pulling_image') {
+                    statusBadge.innerHTML = '<i class="fa-solid fa-cloud-arrow-down fa-spin"></i> Image wird geladen...';
+                } else if (phase === 'installing_game') {
+                    statusBadge.innerHTML = '<i class="fa-solid fa-gear fa-spin"></i> Spieldateien...';
+                } else {
+                    statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Installiere...';
+                }
                 break;
+            }
             case 'installed':
                 statusBadge.classList.add('badge-success');
                 statusBadge.innerHTML = '<i class="fa-solid fa-check-circle"></i> Installed';
@@ -757,11 +771,45 @@ function initSSE() {
     
     window.gameserverSSE.on('install_completed', (data) => {
         console.log('[SSE] Installation completed:', data);
-        updateServerUI(data.server_id, 'installed');  // ✅ Status: installed (zeigt Start-Button)
+        // Phase-Label entfernen, dann auf 'installed' setzen
+        const row = document.querySelector(`tr[data-server-id="${data.server_id}"]`);
+        if (row) {
+            const badge = row.querySelector('.server-status-badge');
+            if (badge) badge.dataset.installPhase = '';
+        }
+        updateServerUI(data.server_id, 'installed');
         
-        // Toast-Benachrichtigung
         if (typeof GuildAjax !== 'undefined' && GuildAjax.showToast) {
-            GuildAjax.showToast('success', `Server "${data.server_name}" ist bereit zum Starten!`);
+            GuildAjax.showToast('success', `Server "${data.server_name || data.server_id}" ist bereit zum Starten!`);
+        }
+    });
+
+    window.gameserverSSE.on('install_failed', (data) => {
+        console.error('[SSE] Installation fehlgeschlagen:', data);
+        updateServerUI(data.server_id, 'error');
+        
+        if (typeof GuildAjax !== 'undefined' && GuildAjax.showToast) {
+            GuildAjax.showToast('error', `Installation fehlgeschlagen: ${data.error || 'Unbekannter Fehler'}`);
+        }
+    });
+
+    window.gameserverSSE.on('install_status', (data) => {
+        console.log('[SSE] Install-Phase:', data.phase, data.message);
+        const row = document.querySelector(`tr[data-server-id="${data.server_id}"]`);
+        if (!row) return;
+        const badge = row.querySelector('.server-status-badge');
+        if (!badge || badge.dataset.status !== 'installing') return;
+
+        badge.dataset.installPhase = data.phase;
+        badge.classList.remove('badge-success', 'badge-warning', 'badge-danger', 'badge-secondary', 'badge-info');
+        badge.classList.add('badge-info');
+
+        if (data.phase === 'pulling_image') {
+            badge.innerHTML = '<i class="fa-solid fa-cloud-arrow-down fa-spin"></i> Image wird geladen...';
+        } else if (data.phase === 'installing_game') {
+            badge.innerHTML = '<i class="fa-solid fa-gear fa-spin"></i> Spieldateien...';
+        } else {
+            badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Installiere...';
         }
     });
     

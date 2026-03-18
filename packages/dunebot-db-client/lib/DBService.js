@@ -671,7 +671,7 @@ async getAllNews() {
  * @returns {Promise<Array>}
  */
 async getAllNavItems() {
-    return await this.query("SELECT * FROM nav_items ORDER BY order_num ASC");
+    return await this.query("SELECT * FROM guild_nav_items ORDER BY order_num ASC");
 }
 
 /**

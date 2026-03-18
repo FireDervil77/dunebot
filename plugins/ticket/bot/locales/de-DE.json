@@ -1,0 +1,166 @@
+{
+    "TITLE": "Ticket",
+    "DESCRIPTION": "Ticket-System verwalten",
+
+    "HANDLER": {
+        "TICKET_ID": "Ticket-ID",
+        "CATEGORY_LABEL": "Kategorie",
+        "SERVER_LABEL": "Server",
+        "OWNER_LABEL": "Erstellt von",
+        "NOT_TICKET": "Dies ist kein Ticket-Kanal!",
+
+        "CLOSE_PERMS": "Kann das Ticket nicht schließen, fehlende Berechtigungen. Kontaktiere einen Server-Admin!",
+        "CLOSE_LOG_EMBED_TITLE": "Ticket geschlossen",
+        "CLOSE_LOG_EMBED_REASON": "Grund",
+        "CLOSE_LOG_EMBED_OPENED": "Erstellt von",
+        "CLOSE_LOG_EMBED_CLOSED": "Geschlossen von",
+        "CLOSE_LOG_BTN": "Transkript",
+        "CLOSE_FAIL": "Ticket konnte nicht geschlossen werden, ein Fehler ist aufgetreten!",
+        "CLOSE_ALL_REASON": "Alle offenen Tickets erzwungen geschlossen",
+
+        "OPEN_PERMS": "Ticket-Kanal kann nicht erstellt werden, fehlende `Kanäle verwalten`-Berechtigung. Kontaktiere einen Server-Admin!",
+        "ALREADY_OPEN": "Du hast bereits ein offenes Ticket!",
+        "TOO_MANY": "Es gibt zu viele offene Tickets! Bitte versuche es später erneut.",
+        "OPEN_MENU_REPLY": "Bitte wähle eine Ticket-Kategorie aus dem Dropdown.",
+        "OPEN_MENU_PLACEHOLDER": "Wähle die Ticket-Kategorie",
+        "OPEN_MENU_TIMEOUT": "Ticket-Erstellung abgelaufen. Bitte versuche es erneut.",
+        "OPEN_MENU_PROCESS": "Ticket wird erstellt...",
+        "OPEN_EMBED_TITLE": "Ticket {ticket:number}",
+        "OPEN_EMBED_DESC": "Hallo {member:mention},\nDanke für deine Kontaktaufnahme! Bitte warte geduldig, ein Team-Mitglied wird sich um dich kümmern.",
+        "OPEN_EMBED_FOOTER": "Du kannst dein Ticket jederzeit über den Button unten schließen",
+        "OPEN_CLOSE_BTN": "Ticket schließen",
+        "OPEN_CREATE_FAIL": "Ticket-Kanal konnte nicht erstellt werden, ein Fehler ist aufgetreten!",
+        "OPEN_SUCCESS": "Ticket erstellt! 🔥",
+        "OPEN_FAILED": "Ticket-Kanal konnte nicht erstellt werden, ein Fehler ist aufgetreten!",
+        "OPEN_LOG_TITLE": "Ticket erstellt",
+        "OPEN_LOG_BTN": "Kanal anzeigen",
+
+        "CLAIM_BTN": "Ticket übernehmen",
+        "UNCLAIM_BTN": "Übernahme aufheben",
+        "CLAIM_LABEL": "Übernommen von",
+        "CLAIM_LOG_TITLE": "Ticket übernommen",
+        "CLAIM_SUCCESS": "Du hast dieses Ticket übernommen!",
+        "CLAIM_FAIL": "Ticket konnte nicht übernommen werden.",
+        "ALREADY_CLAIMED": "Dieses Ticket wurde bereits von {{user}} übernommen!",
+        "CLAIMED_MSG": "📥 {{user}} hat dieses Ticket übernommen und wird sich um dein Anliegen kümmern.",
+        "UNCLAIMED_MSG": "📤 {{user}} hat die Übernahme dieses Tickets aufgegeben.",
+        "UNCLAIM_SUCCESS": "Du hast die Übernahme aufgegeben.",
+        "UNCLAIM_NOT_OWNER": "Nur der aktuelle Bearbeiter kann die Übernahme aufheben.",
+
+        "REOPEN_BTN": "Ticket wiedereröffnen",
+        "REOPEN_LOG_TITLE": "Ticket wiedereröffnet",
+        "REOPEN_LABEL": "Wiedereröffnet von",
+        "REOPEN_MSG": "🔓 Dieses Ticket wurde von {{user}} wiedereröffnet.",
+        "REOPEN_DM": "Dein Ticket auf **{{server}}** wurde wiedereröffnet!",
+        "REOPEN_SUCCESS": "Ticket wurde erfolgreich wiedereröffnet!",
+        "REOPEN_FAIL": "Ticket konnte nicht wiedereröffnet werden.",
+        "REOPEN_NOT_FOUND": "Ticket nicht gefunden.",
+        "REOPEN_ALREADY_OPEN": "Dieses Ticket ist bereits geöffnet.",
+
+        "FORM_MODAL_TITLE": "Formular: {{category}}",
+        "FORM_TIMEOUT": "Formular-Eingabe abgelaufen. Bitte versuche es erneut.",
+        "FORM_RESPONSES_TITLE": "Formular-Antworten"
+    },
+
+    "CATEGORY": {
+        "DESCRIPTION": "Ticket-Kategorien verwalten",
+
+        "SUB_LIST_DESC": "alle Ticket-Kategorien auflisten",
+
+        "SUB_ADD_DESC": "eine neue Ticket-Kategorie hinzufügen",
+        "SUB_ADD_CAT_NAME": "der Kategoriename",
+        "SUB_ADD_CAT_DESC": "die Kategoriebeschreibung",
+
+        "SUB_REMOVE_DESC": "eine Ticket-Kategorie entfernen",
+        "SUB_REMOVE_CAT_NAME": "der Kategoriename",
+
+        "SUB_CONFIG_DESC": "Ticket-Kategorien konfigurieren",
+        "SUB_CONFIG_CAT_NAME": "der Kategoriename",
+
+        "LIST_EMPTY": "Keine Ticket-Kategorien gefunden.",
+        "LIST_EMBED_TITLE": "Ticket-Kategorien",
+
+        "ADD_NO_NAME": "Ungültige Verwendung! Kein Kategoriename angegeben.",
+        "ADD_EXISTS": "Eine Ticket-Kategorie mit dem Namen {{category}} existiert bereits.",
+        "ADD_SUCCESS": "Ticket-Kategorie `{{category}}` erfolgreich hinzugefügt.",
+
+        "REMOVE_NOT_EXISTS": "Eine Ticket-Kategorie mit dem Namen {{category}} existiert nicht.",
+        "REMOVE_SUCCESS": "Ticket-Kategorie `{{category}}` erfolgreich entfernt.",
+
+        "CONFIG_NOT_EXISTS": "Eine Ticket-Kategorie mit dem Namen {{category}} existiert nicht.",
+        "CONFIG_CONTENT": "Was möchtest du für die Kategorie `{{category}}` konfigurieren?",
+        "CONFIG_BTN_MEM_ROLE": "Mitglieder-Rolle",
+        "CONFIG_BTN_STAFF_ROLE": "Staff-Rolle",
+        "CONFIG_BTN_MSG": "Eröffnungsnachricht",
+        "CONFIG_MODAL_MEM_ROLE_TITLE": "Mitglieder-Rollen konfigurieren",
+        "CONFIG_MODAL_MEM_ROLE_ADD": "Neue Mitglieder-Rollen-ID hinzufügen",
+        "CONFIG_MODAL_MEM_ROLE_REMOVE": "Bestehende Mitglieder-Rollen-ID entfernen",
+        "CONFIG_MODAL_STAFF_ROLE_TITLE": "Staff-Rollen konfigurieren",
+        "CONFIG_MODAL_STAFF_ROLE_ADD": "Neue Staff-Rollen-ID hinzufügen",
+        "CONFIG_MODAL_STAFF_ROLE_REMOVE": "Bestehende Staff-Rollen-ID entfernen",
+        "CONFIG_MODAL_MSG_TITLE": "Eröffnungsnachricht konfigurieren",
+        "CONFIG_MODAL_MSG_EMBED_TITLE": "Embed-Titel",
+        "CONFIG_MODAL_MSG_EMBED_DESC": "Embed-Beschreibung",
+        "CONFIG_MODAL_MSG_EMBED_FOOTER": "Embed-Footer",
+        "CONFIG_ROLE_NOT_EXIST": "Eine Rolle mit der ID {{role}} existiert nicht.",
+        "CONFIG_MEM_ROLE_SUCCESS": "Mitglieder-Rollen-Konfiguration erfolgreich aktualisiert.",
+        "CONFIG_STAFF_ROLE_SUCCESS": "Staff-Rollen-Konfiguration erfolgreich aktualisiert.",
+        "CONFIG_MSG_SUCCESS": "Eröffnungsnachricht-Konfiguration erfolgreich aktualisiert."
+    },
+
+    "TICKET": {
+        "DESCRIPTION": "Verschiedene Ticket-Befehle",
+
+        "SUB_SETUP_DESC": "eine neue Ticket-Nachricht einrichten",
+        "SUB_SETUP_CHANNEL": "der Kanal für die Ticket-Erstell-Nachricht",
+
+        "SUB_LOG_DESC": "Log-Kanal für Tickets einrichten",
+        "SUB_LOG_CHANNEL": "der Kanal für Ticket-Logs",
+
+        "SUB_LIMIT_DESC": "maximale Anzahl gleichzeitig offener Tickets festlegen",
+        "SUB_LIMIT_AMOUNT": "maximale Anzahl Tickets",
+
+        "SUB_CLOSE_DESC": "schließt das Ticket [nur im Ticket-Kanal]",
+
+        "SUB_CLOSEALL_DESC": "schließt alle offenen Tickets",
+
+        "SUB_ADD_DESC": "einen Benutzer zum Ticket hinzufügen [nur im Ticket-Kanal]",
+        "SUB_ADD_USER": "der Benutzer, der hinzugefügt werden soll",
+
+        "SUB_REMOVE_DESC": "einen Benutzer aus dem Ticket entfernen [nur im Ticket-Kanal]",
+        "SUB_REMOVE_USER": "der Benutzer, der entfernt werden soll",
+
+        "SETUP_PERMS": "Mir fehlt die Berechtigung `Kanäle verwalten` um Ticket-Kanäle zu erstellen",
+        "SETUP_TIMEOUT": "Keine Antwort erhalten, Setup wird abgebrochen",
+        "SETUP_BTN": "Nachricht einrichten",
+        "SETUP_MSG_CONTENT": "Bitte nutze den Button unten, um die Ticket-Nachricht zu konfigurieren",
+        "SETUP_MODAL_TITLE": "Ticket-Setup",
+        "SETUP_MODAL_LABEL_TITLE": "Embed-Titel",
+        "SETUP_MODAL_LABEL_DESC": "Embed-Beschreibung",
+        "SETUP_MODAL_LABEL_FOOTER": "Embed-Footer",
+        "SETUP_EMBED_TITLE": "Support-Ticket",
+        "SETUP_EMBED_DESC": "Bitte nutze den Button unten, um ein Ticket zu erstellen",
+        "SETUP_EMBED_FOOTER": "Du kannst nur 1 offenes Ticket gleichzeitig haben!",
+        "SETUP_EMBED_BTN": "Ticket öffnen",
+        "SETUP_DONE": "Fertig! Ticket-Nachricht erstellt",
+
+        "NOT_TICKET_CHANNEL": "Dieser Befehl kann nur in einem Ticket-Kanal verwendet werden",
+
+        "LOG_CHANNEL_PERMS": "Ich habe keine Berechtigung, Embeds an {{channel}} zu senden",
+        "LOG_CHANNEL_SUCCESS": "Konfiguration gespeichert! Ticket-Logs werden an {{channel}} gesendet",
+
+        "LIMIT_TOO_LOW": "Das Limit muss mindestens 5 betragen",
+        "LIMIT_SUCCESS": "Konfiguration gespeichert. Du kannst jetzt maximal `{{limit}}` offene Tickets haben",
+
+        "CLOSE_REASON": "Von einem Moderator geschlossen",
+        "CLOSE_PERMS": "Ich habe keine Berechtigung, Tickets zu schließen",
+        "CLOSE_ERROR": "Beim Schließen des Tickets ist ein Fehler aufgetreten",
+
+        "CLOSE_ALL": "Fertig! Erfolgreich: `{{success}}` | Fehlgeschlagen: `{{failed}}`",
+
+        "DONE": "Fertig!",
+        "ADD_ERROR": "Benutzer konnte nicht zum Ticket hinzugefügt werden",
+        "INVALID_ID": "Du musst eine gültige Benutzer-ID/Rollen-ID eingeben",
+        "REMOVE_ERROR": "Benutzer konnte nicht aus dem Ticket entfernt werden"
+    }
+}

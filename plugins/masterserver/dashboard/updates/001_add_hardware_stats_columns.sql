@@ -1,8 +1,8 @@
 -- =====================================================
 -- Migration: Hardware Stats Spalten zu rootserver Tabelle
 -- Datum: 2025-10-26
--- =====================================================
--- Fügt Hardware-Stats-Spalten hinzu für Daemon-Monitoring
+-- @version 1.1.0
+-- @description Hardware-Stats Spalten für Daemon-Monitoring
 -- =====================================================
 
 -- Hardware-Informationen (vom Daemon erfasst)

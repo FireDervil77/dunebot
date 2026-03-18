@@ -1,177 +1,181 @@
 {
-    "meta": {
-        "version": "PTDL_v2",
-        "author": "DuneBot Official",
-        "update_url": null
-    },
-    "exported_at": "2025-10-19T00:00:00+00:00",
-    "name": "Valheim",
-    "slug": "valheim",
-    "description": "Valheim Dedicated Server - Survival-Koop für bis zu 10 Spieler. Einfache Einrichtung mit Vanilla und Modded Templates.",
-    "category": "survival",
-    "tags": [
-        "steam",
-        "survival",
-        "coop",
-        "viking",
-        "pve"
-    ],
-    "visibility": "official",
-    "trust_level": "official",
-    "status": "approved",
-    "features": [
-        "steam_workshop",
-        "mods"
-    ],
-    "steam": {
-        "app_id": 892970,
-        "server_app_id": 896660,
-        "install_dir": "valheim"
-    },
-    "installation": {
-        "method": "steamcmd",
-        "app_id": "896660",
-        "validate": true,
-        "script": "#!/bin/bash\ncd \"${INSTALL_DIR}\"\n\"${STEAMCMD}\" +force_install_dir \"${INSTALL_DIR}\" +login anonymous +app_update 896660 validate +quit"
-    },
+  "meta": {
+    "version": "FIREBOT_v2",
+    "author": "DuneBot Official",
+    "update_url": null
+  },
+  "exported_at": "2025-10-19T00:00:00+00:00",
+  "name": "Valheim",
+  "slug": "valheim",
+  "description": "Valheim Dedicated Server - Survival-Koop für bis zu 10 Spieler. Einfache Einrichtung mit Vanilla und Modded Templates.",
+  "category": "survival",
+  "tags": [
+    "steam",
+    "survival",
+    "coop",
+    "viking",
+    "pve"
+  ],
+  "visibility": "official",
+  "trust_level": "official",
+  "status": "approved",
+  "features": [
+    "steam_workshop",
+    "mods"
+  ],
+  "steam": {
+    "app_id": 892970,
+    "server_app_id": 896660,
+    "install_dir": "valheim"
+  },
+  "installation": {
+    "method": "steamcmd",
+    "app_id": "896660",
+    "validate": true,
+    "script": "#!/bin/bash\ncd \"${INSTALL_DIR}\"\n\"${STEAMCMD}\" +force_install_dir \"${INSTALL_DIR}\" +login anonymous +app_update 896660 validate +quit"
+  },
+  "startup": {
+    "command": "./valheim_server.x86_64 -name \"{{SERVER_NAME}}\" -port {{SERVER_PORT}} -world \"{{WORLD_NAME}}\" -password \"{{SERVER_PASSWORD}}\" -public {{PUBLIC}} -savedir /mnt/server/saves",
+    "done": "Game server connected",
+    "stop": "^C"
+  },
+  "config": {
+    "files": {},
     "startup": {
-        "command": "./valheim_server.x86_64 -name \"{{SERVER_NAME}}\" -port {{SERVER_PORT}} -world \"{{WORLD_NAME}}\" -password \"{{SERVER_PASSWORD}}\" -public {{PUBLIC}} -savedir /mnt/server/saves",
-        "done": "Game server connected",
-        "stop": "^C"
+      "done": "Game server connected"
     },
-    "config": {
-        "files": {},
-        "startup": {
-            "done": "Game server connected"
-        },
-        "logs": {},
-        "stop": "^C"
+    "logs": {},
+    "stop": "^C"
+  },
+  "variables": [
+    {
+      "name": "Server Name",
+      "description": "Der Name deines Valheim-Servers",
+      "env_variable": "SERVER_NAME",
+      "default_value": "My Valheim Server",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:50",
+      "field_type": "text"
     },
-    "variables": [
-        {
-            "name": "Server Name",
-            "description": "Der Name deines Valheim-Servers",
-            "env_variable": "SERVER_NAME",
-            "default_value": "My Valheim Server",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|string|max:50",
-            "field_type": "text"
-        },
-        {
-            "name": "World Name",
-            "description": "Name der Welt (Speicherstand-Identifier)",
-            "env_variable": "WORLD_NAME",
-            "default_value": "Dedicated",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|string|alpha_dash|max:30",
-            "field_type": "text"
-        },
-        {
-            "name": "Server Password",
-            "description": "Passwort zum Betreten des Servers (min. 5 Zeichen)",
-            "env_variable": "SERVER_PASSWORD",
-            "default_value": "AUTOGENERATE",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|string|min:5",
-            "field_type": "password"
-        },
-        {
-            "name": "Server Port",
-            "description": "Hauptport des Servers",
-            "env_variable": "SERVER_PORT",
-            "default_value": "2456",
-            "user_viewable": true,
-            "user_editable": false,
-            "rules": "required|integer",
-            "field_type": "text"
-        },
-        {
-            "name": "Public Server",
-            "description": "Server in der öffentlichen Serverliste anzeigen?",
-            "env_variable": "PUBLIC",
-            "default_value": "1",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|boolean",
-            "field_type": "boolean"
-        },
-        {
-            "name": "Crossplay",
-            "description": "Crossplay mit Xbox aktivieren?",
-            "env_variable": "CROSSPLAY",
-            "default_value": "0",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|boolean",
-            "field_type": "boolean"
-        },
-        {
-            "name": "LD Library Path",
-            "description": "Zusätzliche Bibliotheks-Suchpfade (relativ zum Server-Verzeichnis). Valheim benötigt ./linux64 für libsteam_api.so.",
-            "env_variable": "LD_LIBRARY_PATH",
-            "default_value": "./linux64",
-            "user_viewable": false,
-            "user_editable": false,
-            "rules": "nullable|string",
-            "field_type": "text"
-        }
-    ],
-    "templates": [
-        {
-            "name": "vanilla",
-            "label": "Vanilla Server",
-            "description": "Reiner Vanilla Valheim Server ohne Mods",
-            "icon": "fa-leaf",
-            "variables": {
-                "PUBLIC": "1",
-                "CROSSPLAY": "0"
-            },
-            "config_overrides": {}
-        },
-        {
-            "name": "modded",
-            "label": "Modded (Valheim Plus)",
-            "description": "Server mit Valheim Plus Mod (muss manuell installiert werden)",
-            "icon": "fa-plus-circle",
-            "variables": {
-                "PUBLIC": "0",
-                "CROSSPLAY": "0"
-            },
-            "config_overrides": {},
-            "post_install_info": "Achtung: Valheim Plus muss manuell über BepInEx installiert werden. Anleitung: https://valheim.thunderstore.io/package/ValheimModding/ValheimPlus/"
-        }
-    ],
-    "ports": {
-        "game": {
-            "default": 2456,
-            "protocol": "udp",
-            "description": "Game Port"
-        },
-        "game_plus_1": {
-            "default": 2457,
-            "protocol": "udp",
-            "description": "Game Port +1"
-        },
-        "game_plus_2": {
-            "default": 2458,
-            "protocol": "udp",
-            "description": "Game Port +2"
-        }
+    {
+      "name": "World Name",
+      "description": "Name der Welt (Speicherstand-Identifier)",
+      "env_variable": "WORLD_NAME",
+      "default_value": "Dedicated",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|alpha_dash|max:30",
+      "field_type": "text"
     },
-    "requirements": {
-        "ram_min_mb": 2048,
-        "ram_recommended_mb": 4096,
-        "cpu_cores_min": 2,
-        "disk_min_gb": 5,
-        "disk_recommended_gb": 10
+    {
+      "name": "Server Password",
+      "description": "Passwort zum Betreten des Servers (min. 5 Zeichen)",
+      "env_variable": "SERVER_PASSWORD",
+      "default_value": "AUTOGENERATE",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|min:5",
+      "field_type": "password"
     },
-    "assets": {
-        "icon_url": "https://cdn.akamai.steamstatic.com/steam/apps/892970/header.jpg",
-        "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/892970/library_hero.jpg",
-        "screenshots": []
+    {
+      "name": "Server Port",
+      "description": "Hauptport des Servers",
+      "env_variable": "SERVER_PORT",
+      "default_value": "2456",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer",
+      "field_type": "text"
     },
-    "changelog": "Initial release - Valheim with Vanilla and Modded templates"
+    {
+      "name": "Public Server",
+      "description": "Server in der öffentlichen Serverliste anzeigen?",
+      "env_variable": "PUBLIC",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "boolean"
+    },
+    {
+      "name": "Crossplay",
+      "description": "Crossplay mit Xbox aktivieren?",
+      "env_variable": "CROSSPLAY",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean",
+      "field_type": "boolean"
+    },
+    {
+      "name": "LD Library Path",
+      "description": "Zusätzliche Bibliotheks-Suchpfade (relativ zum Server-Verzeichnis). Valheim benötigt ./linux64 für libsteam_api.so.",
+      "env_variable": "LD_LIBRARY_PATH",
+      "default_value": "./linux64",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "nullable|string",
+      "field_type": "text"
+    }
+  ],
+  "templates": [
+    {
+      "name": "vanilla",
+      "label": "Vanilla Server",
+      "description": "Reiner Vanilla Valheim Server ohne Mods",
+      "icon": "fa-leaf",
+      "variables": {
+        "PUBLIC": "1",
+        "CROSSPLAY": "0"
+      },
+      "config_overrides": {}
+    },
+    {
+      "name": "modded",
+      "label": "Modded (Valheim Plus)",
+      "description": "Server mit Valheim Plus Mod (muss manuell installiert werden)",
+      "icon": "fa-plus-circle",
+      "variables": {
+        "PUBLIC": "0",
+        "CROSSPLAY": "0"
+      },
+      "config_overrides": {},
+      "post_install_info": "Achtung: Valheim Plus muss manuell über BepInEx installiert werden. Anleitung: https://valheim.thunderstore.io/package/ValheimModding/ValheimPlus/"
+    }
+  ],
+  "ports": {
+    "game": {
+      "default": 2456,
+      "protocol": "udp",
+      "description": "Game Port"
+    },
+    "game_plus_1": {
+      "default": 2457,
+      "protocol": "udp",
+      "description": "Game Port +1"
+    },
+    "game_plus_2": {
+      "default": 2458,
+      "protocol": "udp",
+      "description": "Game Port +2"
+    }
+  },
+  "query": {
+    "gamedig_type": "valheim",
+    "port_var": "game_plus_1"
+  },
+  "requirements": {
+    "ram_min_mb": 2048,
+    "ram_recommended_mb": 4096,
+    "cpu_cores_min": 2,
+    "disk_min_gb": 5,
+    "disk_recommended_gb": 10
+  },
+  "assets": {
+    "icon_url": "https://cdn.akamai.steamstatic.com/steam/apps/892970/header.jpg",
+    "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/892970/library_hero.jpg",
+    "screenshots": []
+  },
+  "changelog": "Initial release - Valheim with Vanilla and Modded templates"
 }

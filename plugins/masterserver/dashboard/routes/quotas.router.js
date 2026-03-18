@@ -1,279 +1,216 @@
 /**
- * @file quotas.js
- * @description Quota-Management Routes für Masterserver-Plugin
+ * @file quotas.router.js
+ * @description Quota-Management Routes (Pterodactyl-Style)
  * @module plugins/masterserver/dashboard/routes/quotas
- * @author FireBot Development Team
  */
 
 const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const RootServer = require('../models/RootServer');
-const QuotaProfile = require('../models/QuotaProfile');
 
-/**
- * GET /guild/:guildId/plugins/masterserver/quotas
- * Zeigt Quota-Übersicht für alle Rootserver der Guild
- */
-router.get('/', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const themeManager = ServiceManager.get('themeManager');
-    const dbService = ServiceManager.get('dbService');
-    
-    // Guild-ID aus res.locals (Guild-Middleware)
-    const guildId = res.locals.guildId || res.locals.guild?.id;
-    
-    if (!guildId) {
-        Logger.error('[Quotas Route] Keine Guild-ID gefunden!');
-        return res.status(400).render('error', {
-            message: 'Ungültige Guild-ID',
-            error: {}
-        });
-    }
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper: Quota für RootServer auto-initialisieren (aus Hardware-Daten)
+// ─────────────────────────────────────────────────────────────────────────────
+async function autoInitQuota(rootserver, dbService) {
+    const existing = await RootServer.getQuota(rootserver.id);
+    if (existing) return existing;
+
+    const ramMB    = rootserver.ram_total_gb  ? Math.round(rootserver.ram_total_gb  * 1024) : 4096;
+    const cpuCores = rootserver.cpu_cores     || 4;
+    const diskGB   = rootserver.disk_total_gb ? Math.round(rootserver.disk_total_gb)        : 100;
 
     try {
-        // 🔒 CHECK: Daemon muss registriert sein (egal ob online oder offline)
-        
-        const _rs = (await require("../models/RootServer").getByGuild(guildId))[0]; const daemon = _rs ? { ..._rs, status: _rs.daemon_status } : null;
-        
-        if (!daemon) {
-            Logger.warn(`[Quotas Route] Kein Daemon für Guild ${guildId} - Redirect zu Setup`);
+        await RootServer.initializeQuota(rootserver.id, {
+            customRamMB:    ramMB,
+            customCpuCores: cpuCores,
+            customDiskGB:   diskGB,
+            reservedRamMB:  1024,
+            reservedCpuCores: 0,
+            reservedDiskGB: 10
+        });
+        return await RootServer.getQuota(rootserver.id);
+    } catch (_) {
+        return await RootServer.getQuota(rootserver.id);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper: Allokierte Ressourcen aller Gameserver eines RootServers
+// ─────────────────────────────────────────────────────────────────────────────
+async function getAllocatedResources(rootserverId, dbService) {
+    try {
+        const [row] = await dbService.query(
+            `SELECT
+                COALESCE(SUM(gq.allocated_ram_mb),    0) AS allocated_ram_mb,
+                COALESCE(SUM(gq.allocated_cpu_cores), 0) AS allocated_cpu_cores,
+                COALESCE(SUM(gq.allocated_disk_gb),   0) AS allocated_disk_gb,
+                COUNT(gq.id)                             AS server_count
+             FROM gameserver_quotas gq WHERE gq.rootserver_id = ?`,
+            [rootserverId]
+        );
+        return row || { allocated_ram_mb: 0, allocated_cpu_cores: 0, allocated_disk_gb: 0, server_count: 0 };
+    } catch (_) {
+        return { allocated_ram_mb: 0, allocated_cpu_cores: 0, allocated_disk_gb: 0, server_count: 0 };
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper: Gameserver-Liste mit Quota-Daten
+// ─────────────────────────────────────────────────────────────────────────────
+async function getGameserversWithQuotas(daemonId, dbService) {
+    try {
+        return await dbService.query(
+            `SELECT sr.id, sr.server_id, sr.server_name, sr.server_type, sr.status,
+                    gq.allocated_ram_mb, gq.allocated_cpu_cores, gq.allocated_disk_gb,
+                    gq.current_ram_usage_mb, gq.current_cpu_usage_percent
+             FROM server_registry sr
+             LEFT JOIN gameserver_quotas gq ON sr.id = gq.gameserver_id
+             WHERE sr.daemon_id = ?
+             ORDER BY sr.server_name ASC`,
+            [daemonId]
+        );
+    } catch (_) {
+        return [];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /  – Quota-Übersicht (Pterodactyl Node-Style)
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/', async (req, res) => {
+    const Logger       = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+    const dbService    = ServiceManager.get('dbService');
+    const guildId      = res.locals.guildId;
+
+    try {
+        const allRootservers = await RootServer.getByGuild(guildId);
+        if (!allRootservers.length) {
             return res.redirect(`/guild/${guildId}/plugins/masterserver/daemon`);
         }
-        
-        // Lade alle Quota-Profile
-        const profiles = await QuotaProfile.getAll(true);
 
-        // Lade Ressourcen-Übersicht für alle Rootserver dieser Guild
-        const rootservers = await RootServer.getResourceSummaryByGuild(guildId);
+        const nodes = await Promise.all(allRootservers.map(async (rs) => {
+            const quota      = await autoInitQuota(rs, dbService);
+            const allocated  = await getAllocatedResources(rs.id, dbService);
+            const gameservers = await getGameserversWithQuotas(rs.daemon_id, dbService);
 
-        // Guild-Layout über ThemeManager laden
+            const overRam  = quota?.overallocate_ram_percent  ?? 0;
+            const overDisk = quota?.overallocate_disk_percent ?? 0;
+
+            const totalRamMB   = quota ? Math.round(quota.effective_ram_mb  * (1 + overRam  / 100)) : 0;
+            const totalCpuCores = quota?.effective_cpu_cores ?? 0;
+            const totalDiskGB  = quota ? Math.round(quota.effective_disk_gb * (1 + overDisk / 100)) : 0;
+
+            const reservedRamMB  = quota?.reserved_ram_mb  ?? 0;
+            const reservedDiskGB = quota?.reserved_disk_gb ?? 0;
+
+            const usableRamMB  = Math.max(0, totalRamMB  - reservedRamMB);
+            const usableDiskGB = Math.max(0, totalDiskGB - reservedDiskGB);
+
+            const ramPct  = usableRamMB  > 0 ? Math.min(100, Math.round((allocated.allocated_ram_mb  / usableRamMB)  * 100)) : 0;
+            const diskPct = usableDiskGB > 0 ? Math.min(100, Math.round((allocated.allocated_disk_gb / usableDiskGB) * 100)) : 0;
+            const cpuPct  = totalCpuCores > 0 ? Math.min(100, Math.round((allocated.allocated_cpu_cores / totalCpuCores) * 100)) : 0;
+
+            return {
+                ...rs,
+                quota,
+                allocated,
+                gameservers,
+                limits: { totalRamMB, usableRamMB, reservedRamMB, totalCpuCores, totalDiskGB, usableDiskGB, reservedDiskGB, overRam, overDisk },
+                usage:  { ramPct, diskPct, cpuPct }
+            };
+        }));
+
         res.locals.layout = themeManager.getLayout('guild');
+        res.render('guild/quotas', { nodes, guildId, pageTitle: 'Ressourcen-Management' });
 
-        res.render('guild/quotas', {
-            profiles,
-            rootservers,
-            pageTitle: 'Quota-Management',
-            breadcrumbs: [
-                { label: 'Masterserver', url: `/guild/${guildId}/plugins/masterserver` },
-                { label: 'Quota-Management', active: true }
-            ]
-        });
     } catch (error) {
-        Logger.error('[Quotas Route] Fehler beim Laden der Quota-Übersicht:', error);
+        Logger.error('[Quotas] Fehler:', error);
         res.status(500).render('error', {
-            message: 'Fehler beim Laden der Quota-Übersicht',
+            message: 'Fehler beim Laden des Ressourcen-Managements',
             error: process.env.NODE_ENV === 'development' ? error : {}
         });
     }
 });
 
-/**
- * GET /guild/:guildId/plugins/masterserver/quotas/rootserver/:rootserverId
- * Zeigt Detail-Ansicht für einen spezifischen Rootserver
- */
-router.get('/rootserver/:rootserverId', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const { guildId, rootserverId } = req.params;
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /rootserver/:id/overallocation
+// ─────────────────────────────────────────────────────────────────────────────
+router.put('/rootserver/:rootserverId/overallocation', async (req, res) => {
+    const Logger    = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const guildId   = res.locals.guildId;
+    const { rootserverId } = req.params;
+    const { overallocateRam, overallocateDisk } = req.body;
 
     try {
-        // Lade Rootserver
-        const rootserver = await RootServer.getById(rootserverId);
-        if (!rootserver || rootserver.guild_id !== guildId) {
-            return res.status(404).render('error', {
-                message: 'Rootserver nicht gefunden'
-            });
-        }
+        const rs = await RootServer.getById(rootserverId);
+        if (!rs || rs.guild_id !== guildId) return res.status(404).json({ success: false, message: 'Nicht gefunden' });
 
-        // Lade Quota-Daten
-        const quota = await RootServer.getQuota(rootserverId);
-        const resources = await RootServer.getAvailableResources(rootserverId);
-        const profiles = await QuotaProfile.getAll(true);
+        await autoInitQuota(rs, dbService);
 
-        res.render('plugins/masterserver/quota-detail', {
-            rootserver,
-            quota,
-            resources,
-            profiles,
-            pageTitle: `Quota: ${rootserver.name}`,
-            breadcrumbs: [
-                { label: 'Masterserver', url: `/guild/${guildId}/plugins/masterserver` },
-                { label: 'Quota-Management', url: `/guild/${guildId}/plugins/masterserver/quotas` },
-                { label: rootserver.name, active: true }
-            ]
-        });
+        const overRam  = Math.max(0, Math.min(300, parseInt(overallocateRam)  || 0));
+        const overDisk = Math.max(0, Math.min(300, parseInt(overallocateDisk) || 0));
+
+        await dbService.query(
+            `UPDATE rootserver_quotas SET overallocate_ram_percent = ?, overallocate_disk_percent = ? WHERE rootserver_id = ?`,
+            [overRam, overDisk, rootserverId]
+        );
+
+        Logger.info(`[Quotas] Overallocation: RS ${rootserverId} RAM=${overRam}% Disk=${overDisk}%`);
+        res.json({ success: true, overRam, overDisk });
     } catch (error) {
-        Logger.error('[Quotas Route] Fehler beim Laden der Rootserver-Quota:', error);
-        res.status(500).render('error', {
-            message: 'Fehler beim Laden der Rootserver-Quota',
-            error: process.env.NODE_ENV === 'development' ? error : {}
-        });
+        Logger.error('[Quotas] Overallocation Fehler:', error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
-/**
- * POST /guild/:guildId/plugins/masterserver/quotas/rootserver/:rootserverId/initialize
- * Initialisiert Quota für einen Rootserver
- */
-router.post('/rootserver/:rootserverId/initialize', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /rootserver/:id/reserved
+// ─────────────────────────────────────────────────────────────────────────────
+router.put('/rootserver/:rootserverId/reserved', async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const guildId   = res.locals.guildId;
+    const { rootserverId } = req.params;
+    const { reservedRamMB, reservedDiskGB } = req.body;
+
+    try {
+        const rs = await RootServer.getById(rootserverId);
+        if (!rs || rs.guild_id !== guildId) return res.status(404).json({ success: false, message: 'Nicht gefunden' });
+
+        await autoInitQuota(rs, dbService);
+
+        await dbService.query(
+            `UPDATE rootserver_quotas SET reserved_ram_mb = ?, reserved_disk_gb = ? WHERE rootserver_id = ?`,
+            [Math.max(0, parseInt(reservedRamMB) || 0), Math.max(0, parseInt(reservedDiskGB) || 0), rootserverId]
+        );
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /rootserver/:id/check  – Verfügbarkeit prüfen
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/rootserver/:rootserverId/check', async (req, res) => {
     const guildId = res.locals.guildId;
     const { rootserverId } = req.params;
-    const { profileId, customRamMB, customCpuCores, customDiskGB, reservedRamMB, reservedCpuCores, reservedDiskGB } = req.body;
-
-    try {
-        // Validierung: Rootserver gehört zur Guild
-        const rootserver = await RootServer.getById(rootserverId);
-        if (!rootserver || rootserver.guild_id !== guildId) {
-            return res.status(404).json({
-                success: false,
-                message: 'Rootserver nicht gefunden'
-            });
-        }
-
-        // Initialisiere Quota
-        const config = {
-            profileId: profileId || null,
-            customRamMB: customRamMB || null,
-            customCpuCores: customCpuCores || null,
-            customDiskGB: customDiskGB || null,
-            reservedRamMB: reservedRamMB || 2048,
-            reservedCpuCores: reservedCpuCores || 1,
-            reservedDiskGB: reservedDiskGB || 50
-        };
-
-        await RootServer.initializeQuota(rootserverId, config);
-
-        Logger.info(`[Quotas Route] Quota initialisiert für Rootserver ${rootserverId} (Guild: ${guildId})`);
-
-        res.json({
-            success: true,
-            message: 'Quota erfolgreich initialisiert'
-        });
-    } catch (error) {
-        Logger.error('[Quotas Route] Fehler beim Initialisieren der Quota:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || 'Fehler beim Initialisieren der Quota'
-        });
-    }
-});
-
-/**
- * PUT /guild/:guildId/plugins/masterserver/quotas/rootserver/:rootserverId
- * Aktualisiert Quota-Konfiguration eines Rootservers
- */
-router.put('/rootserver/:rootserverId', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const { guildId, rootserverId } = req.params;
-    const { profileId, customRamMB, customCpuCores, customDiskGB, reservedRamMB, reservedCpuCores, reservedDiskGB } = req.body;
-
-    try {
-        // Validierung: Rootserver gehört zur Guild
-        const rootserver = await RootServer.getById(rootserverId);
-        if (!rootserver || rootserver.guild_id !== guildId) {
-            return res.status(404).json({
-                success: false,
-                message: 'Rootserver nicht gefunden'
-            });
-        }
-
-        // Baue Updates-Objekt
-        const updates = {};
-        if (profileId !== undefined) updates.profile_id = profileId || null;
-        if (customRamMB !== undefined) updates.custom_ram_mb = customRamMB || null;
-        if (customCpuCores !== undefined) updates.custom_cpu_cores = customCpuCores || null;
-        if (customDiskGB !== undefined) updates.custom_disk_gb = customDiskGB || null;
-        if (reservedRamMB !== undefined) updates.reserved_ram_mb = reservedRamMB;
-        if (reservedCpuCores !== undefined) updates.reserved_cpu_cores = reservedCpuCores;
-        if (reservedDiskGB !== undefined) updates.reserved_disk_gb = reservedDiskGB;
-
-        // Aktualisiere Quota
-        await RootServer.updateQuota(rootserverId, updates);
-
-        Logger.info(`[Quotas Route] Quota aktualisiert für Rootserver ${rootserverId} (Guild: ${guildId})`);
-
-        res.json({
-            success: true,
-            message: 'Quota erfolgreich aktualisiert'
-        });
-    } catch (error) {
-        Logger.error('[Quotas Route] Fehler beim Aktualisieren der Quota:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || 'Fehler beim Aktualisieren der Quota'
-        });
-    }
-});
-
-/**
- * GET /guild/:guildId/plugins/masterserver/quotas/rootserver/:rootserverId/check
- * Prüft Ressourcen-Verfügbarkeit für einen geplanten Gameserver
- */
-router.get('/rootserver/:rootserverId/check', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const { guildId, rootserverId } = req.params;
     const { ramMB, cpuCores, diskGB } = req.query;
 
     try {
-        // Validierung: Rootserver gehört zur Guild
-        const rootserver = await RootServer.getById(rootserverId);
-        if (!rootserver || rootserver.guild_id !== guildId) {
-            return res.status(404).json({
-                success: false,
-                message: 'Rootserver nicht gefunden'
-            });
-        }
+        const rs = await RootServer.getById(rootserverId);
+        if (!rs || rs.guild_id !== guildId) return res.status(404).json({ success: false, message: 'Nicht gefunden' });
 
-        // Validierung: Ressourcen-Parameter
-        const required = {
-            ramMB: parseInt(ramMB) || 0,
+        const check = await RootServer.checkResourceAvailability(rootserverId, {
+            ramMB:    parseInt(ramMB)    || 0,
             cpuCores: parseInt(cpuCores) || 0,
-            diskGB: parseInt(diskGB) || 0
-        };
-
-        if (required.ramMB <= 0 || required.cpuCores <= 0 || required.diskGB <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Ungültige Ressourcen-Angaben'
-            });
-        }
-
-        // Prüfe Verfügbarkeit
-        const check = await RootServer.checkResourceAvailability(rootserverId, required);
-
-        res.json({
-            success: true,
-            ...check
+            diskGB:   parseInt(diskGB)   || 0
         });
+        res.json({ success: true, ...check });
     } catch (error) {
-        Logger.error('[Quotas Route] Fehler beim Prüfen der Ressourcen:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || 'Fehler beim Prüfen der Ressourcen'
-        });
-    }
-});
-
-/**
- * GET /guild/:guildId/plugins/masterserver/quotas/profiles
- * API-Endpoint: Liste aller Quota-Profile
- */
-router.get('/profiles', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-
-    try {
-        const profiles = await QuotaProfile.getAll(true);
-        res.json({
-            success: true,
-            profiles
-        });
-    } catch (error) {
-        Logger.error('[Quotas Route] Fehler beim Laden der Profile:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Fehler beim Laden der Profile'
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 

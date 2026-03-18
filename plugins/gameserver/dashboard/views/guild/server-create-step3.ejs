@@ -58,6 +58,43 @@
           <input type="hidden" id="hiddenStartAfter" name="start_after" value="">
           <input type="hidden" name="addon_slug" value="<%= addon.slug %>">
           
+          <!-- Port-Auswahl -->
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5 class="mb-0">
+                <i class="fa-solid fa-network-wired mr-2"></i>
+                Port-Konfiguration
+              </h5>
+            </div>
+            <div class="card-body">
+              <div class="form-group mb-0">
+                <label for="game_port">
+                  <i class="fa-solid fa-plug mr-1 text-primary"></i>Game-Port
+                </label>
+                <div class="input-group">
+                  <select class="form-control" id="game_port" name="game_port">
+                    <option value="auto">Automatisch zuweisen (nächster freier Port)</option>
+                  </select>
+                  <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary" id="toggleManualPort" title="Manuell eingeben">
+                      <i class="fa-solid fa-keyboard"></i>
+                    </button>
+                  </div>
+                </div>
+                <div id="manualPortInput" style="display:none;" class="mt-2">
+                  <div class="input-group">
+                    <input type="number" class="form-control" id="game_port_manual" min="1024" max="65535" placeholder="z.B. 27015">
+                    <div class="input-group-append">
+                      <button type="button" class="btn btn-outline-primary" id="useManualPort">Übernehmen</button>
+                    </div>
+                  </div>
+                  <small class="form-text text-muted">Port muss im Allocation-Pool des Rootservers frei sein (1024-65535)</small>
+                </div>
+                <small class="form-text text-muted" id="portPoolInfo"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Lade verfügbare Ports...</small>
+              </div>
+            </div>
+          </div>
+
           <!-- Resource Limits -->
           <div class="card mb-4">
             <div class="card-header">
@@ -242,6 +279,7 @@
             <!-- From Step 3 -->
             <h6 class="text-muted mb-2">Step 3: Resources</h6>
             <ul class="list-unstyled mb-0">
+              <li><strong>Port:</strong> <span id="summaryPort">Auto</span></li>
               <li><strong>RAM:</strong> <span id="summaryRam">Unlimited</span></li>
               <li><strong>CPU:</strong> <span id="summaryCpu">Unlimited</span></li>
               <li><strong>Disk:</strong> <span id="summaryDisk">Unlimited</span></li>
@@ -463,6 +501,95 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // ========================================
+    // PORT-AUSWAHL
+    // ========================================
+    const portSelect = document.getElementById('game_port');
+    const portInfo = document.getElementById('portPoolInfo');
+    const manualPortDiv = document.getElementById('manualPortInput');
+    const toggleManualBtn = document.getElementById('toggleManualPort');
+    const manualPortInput = document.getElementById('game_port_manual');
+    const useManualBtn = document.getElementById('useManualPort');
+
+    // Freie Ports vom Rootserver laden
+    async function loadFreePorts() {
+        const rsId = urlParams.get('rootserver');
+        if (!rsId) {
+            portInfo.innerHTML = '<span class="text-warning"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Kein Rootserver gewählt</span>';
+            return;
+        }
+        try {
+            const r = await fetch(`/guild/${guildId}/plugins/masterserver/rootservers/${rsId}/allocations`);
+            const { success, data, summary } = await r.json();
+            if (!success) {
+                portInfo.innerHTML = '<span class="text-danger">Fehler beim Laden der Ports</span>';
+                return;
+            }
+            const freePorts = data.filter(a => a.server_id === null).sort((a, b) => a.port - b.port);
+            if (freePorts.length === 0) {
+                portInfo.innerHTML = '<span class="text-danger"><i class="fa-solid fa-circle-xmark mr-1"></i>Keine freien Ports im Pool! Bitte zuerst Ports im Rootserver-Allocations-Tab anlegen.</span>';
+                return;
+            }
+            // Dropdown befüllen (max 200 einzeln anzeigen, danach gruppiert)
+            const showMax = 200;
+            const toShow = freePorts.slice(0, showMax);
+            toShow.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.port;
+                opt.textContent = a.ip + ':' + a.port;
+                portSelect.appendChild(opt);
+            });
+            if (freePorts.length > showMax) {
+                const opt = document.createElement('option');
+                opt.disabled = true;
+                opt.textContent = `... und ${freePorts.length - showMax} weitere freie Ports (nutze manuelle Eingabe)`;
+                portSelect.appendChild(opt);
+            }
+            portInfo.innerHTML = `<span class="text-success"><i class="fa-solid fa-circle-check mr-1"></i>${freePorts.length} freie Ports verfügbar (${summary.assigned} zugewiesen)</span>`;
+        } catch (_) {
+            portInfo.innerHTML = '<span class="text-danger">Netzwerkfehler beim Laden der Ports</span>';
+        }
+    }
+    loadFreePorts();
+
+    // Toggle: Dropdown ↔ Manuelle Eingabe
+    toggleManualBtn.addEventListener('click', () => {
+        const show = manualPortDiv.style.display === 'none';
+        manualPortDiv.style.display = show ? '' : 'none';
+        toggleManualBtn.classList.toggle('btn-outline-secondary', !show);
+        toggleManualBtn.classList.toggle('btn-secondary', show);
+    });
+
+    // Manuell eingegebenen Port als Custom-Option einfügen
+    useManualBtn.addEventListener('click', () => {
+        const port = parseInt(manualPortInput.value);
+        if (!port || port < 1024 || port > 65535) {
+            toastr.warning('Ungültiger Port (1024-65535)');
+            return;
+        }
+        // Prüfe ob Option schon existiert
+        const exists = Array.from(portSelect.options).some(o => o.value === String(port));
+        if (!exists) {
+            const opt = document.createElement('option');
+            opt.value = port;
+            opt.textContent = port + ' (manuell)';
+            portSelect.insertBefore(opt, portSelect.options[1]); // Nach "Auto"
+        }
+        portSelect.value = String(port);
+        manualPortDiv.style.display = 'none';
+        updateSummary();
+    });
+
+    portSelect.addEventListener('change', updateSummary);
+
+    // Summary Port-Info
+    const origUpdateSummary = updateSummary;
+    updateSummary = function() {
+        origUpdateSummary();
+        const sel = portSelect.value;
+        document.getElementById('summaryPort').textContent = sel === 'auto' ? 'Auto (nächster freier)' : sel;
+    };
+
     // Initial Summary
     updateSummary();
 });

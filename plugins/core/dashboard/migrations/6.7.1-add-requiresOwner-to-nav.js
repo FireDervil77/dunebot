@@ -1,7 +1,7 @@
 /**
- * Migration 6.7.1: Add requiresOwner to nav_items
+ * Migration 6.7.1: Add requiresOwner to guild_nav_items
  * 
- * Fügt requiresOwner Spalte zu nav_items hinzu für Bot-Owner-Only Navigation (SuperAdmin Plugin)
+ * Fügt requiresOwner Spalte zu guild_nav_items hinzu für Bot-Owner-Only Navigation (SuperAdmin Plugin)
  * 
  * @author FireDervil
  * @version 6.7.1
@@ -9,7 +9,7 @@
 
 module.exports = {
     version: '6.7.1',
-    name: 'Add requiresOwner to nav_items',
+    name: 'Add requiresOwner to guild_nav_items',
     
     /**
      * Migration ausführen
@@ -19,7 +19,7 @@ module.exports = {
     async up(dbService, guildId) {
         const Logger = require('dunebot-core').ServiceManager.get('Logger');
         
-        Logger.info(`[Core Migration 6.7.1] Füge requiresOwner Spalte zu nav_items hinzu${guildId ? ` für Guild ${guildId}` : ''}...`);
+        Logger.info(`[Core Migration 6.7.1] Füge requiresOwner Spalte zu guild_nav_items hinzu${guildId ? ` für Guild ${guildId}` : ''}...`);
         
         try {
             // Prüfe ob Spalte bereits existiert
@@ -27,7 +27,7 @@ module.exports = {
                 SELECT COLUMN_NAME 
                 FROM INFORMATION_SCHEMA.COLUMNS 
                 WHERE TABLE_SCHEMA = DATABASE() 
-                AND TABLE_NAME = 'nav_items' 
+                AND TABLE_NAME = 'guild_nav_items' 
                 AND COLUMN_NAME = 'requiresOwner'
             `);
             
@@ -38,7 +38,7 @@ module.exports = {
             
             // Füge requiresOwner Spalte hinzu
             await dbService.query(`
-                ALTER TABLE nav_items 
+                ALTER TABLE guild_nav_items 
                 ADD COLUMN requiresOwner BOOLEAN DEFAULT FALSE 
                 COMMENT 'Wenn TRUE: Nur Bot-Owner (OWNER_IDS) können dieses Nav-Item sehen'
             `);
@@ -65,7 +65,7 @@ module.exports = {
         
         try {
             await dbService.query(`
-                ALTER TABLE nav_items 
+                ALTER TABLE guild_nav_items 
                 DROP COLUMN requiresOwner
             `);
             

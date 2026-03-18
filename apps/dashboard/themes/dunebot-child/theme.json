@@ -1,0 +1,12 @@
+{
+  "name": "dunebot-child",
+  "displayName": "DuneBot-Chlid",
+  "description": "Child-Theme basierend auf DuneBot Default",
+  "version": "1.0.0",
+  "author": "DuneBot Team",
+  "parent": "default",
+  "tags": [
+    "child-theme"
+  ],
+  "config": {}
+}

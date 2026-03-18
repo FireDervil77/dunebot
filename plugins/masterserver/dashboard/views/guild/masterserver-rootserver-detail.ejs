@@ -40,68 +40,133 @@
             </div>
         </div>
 
-        <!-- Status-Karten -->
-        <div class="row mb-3">
-            <div class="col-md-3">
-                <div class="info-box">
-                    <span class="info-box-icon <%= isOnline ? 'bg-success' : 'bg-secondary' %>">
-                        <i class="fa-solid fa-plug"></i>
-                    </span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">Daemon-Status</span>
-                        <span class="info-box-number"><%= isOnline ? 'Online' : 'Offline' %></span>
-                        <% if (rootserver.daemon_version) { %>
-                            <span class="progress-description">v<%= rootserver.daemon_version %></span>
-                        <% } %>
+        <!-- Live-Resource-Widgets -->
+        <div class="row mb-3" id="resource-widgets">
+
+            <!-- CPU Widget -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card card-outline <%= isOnline ? 'card-success' : 'card-secondary' %> h-100 mb-0">
+                    <div class="card-header py-2 px-3">
+                        <h3 class="card-title text-sm mb-0">
+                            <i class="fa-solid fa-microchip mr-1"></i>CPU
+                        </h3>
+                        <div class="card-tools">
+                            <% if (rootserver.cpu_model) { %>
+                                <small class="text-muted" title="<%= rootserver.cpu_model %>" style="font-size:.7rem;">
+                                    <%= rootserver.cpu_model.length > 22 ? rootserver.cpu_model.substring(0,22)+'…' : rootserver.cpu_model %>
+                                </small>
+                            <% } %>
+                        </div>
+                    </div>
+                    <div class="card-body text-center py-3">
+                        <div class="position-relative d-inline-block mb-2" style="width:80px;height:80px;">
+                            <svg viewBox="0 0 36 36" style="transform:rotate(-90deg);width:80px;height:80px;">
+                                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e9ecef" stroke-width="3.2"/>
+                                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#28a745" stroke-width="3.2"
+                                        stroke-dasharray="0 100" id="cpu-ring"
+                                        style="transition:stroke-dasharray .5s ease,stroke .3s ease;"/>
+                            </svg>
+                            <div class="position-absolute d-flex align-items-center justify-content-center"
+                                 style="top:0;left:0;right:0;bottom:0;">
+                                <span id="cpu-pct" class="font-weight-bold" style="font-size:1.1rem;">
+                                    <%= rootserver.cpu_usage_percent != null ? Math.round(rootserver.cpu_usage_percent)+'%' : '–' %>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="text-sm text-muted" style="font-size:.8rem;">
+                            <%= rootserver.cpu_cores ? rootserver.cpu_cores + ' Kerne' : '' %><% if (rootserver.cpu_threads) { %> · <%= rootserver.cpu_threads %> Threads<% } %>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="info-box">
-                    <span class="info-box-icon bg-info">
-                        <i class="fa-solid fa-microchip"></i>
-                    </span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">CPU</span>
-                        <span class="info-box-number">
-                            <%= rootserver.cpu_cores ? rootserver.cpu_cores + ' Cores' : '–' %>
-                        </span>
-                        <% if (rootserver.cpu_model) { %>
-                            <span class="progress-description text-truncate" style="max-width:160px;" title="<%= rootserver.cpu_model %>"><%= rootserver.cpu_model %></span>
-                        <% } %>
+
+            <!-- RAM Widget -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card card-outline card-info h-100 mb-0">
+                    <div class="card-header py-2 px-3">
+                        <h3 class="card-title text-sm mb-0"><i class="fa-solid fa-memory mr-1"></i>RAM</h3>
+                    </div>
+                    <div class="card-body text-center py-3">
+                        <div class="position-relative d-inline-block mb-2" style="width:80px;height:80px;">
+                            <svg viewBox="0 0 36 36" style="transform:rotate(-90deg);width:80px;height:80px;">
+                                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e9ecef" stroke-width="3.2"/>
+                                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#17a2b8" stroke-width="3.2"
+                                        stroke-dasharray="0 100" id="ram-ring"
+                                        style="transition:stroke-dasharray .5s ease,stroke .3s ease;"/>
+                            </svg>
+                            <div class="position-absolute d-flex align-items-center justify-content-center"
+                                 style="top:0;left:0;right:0;bottom:0;">
+                                <span id="ram-pct" class="font-weight-bold" style="font-size:1.1rem;">–</span>
+                            </div>
+                        </div>
+                        <div class="text-muted" id="ram-detail" style="font-size:.8rem;">
+                            <%
+                                const ramUsed = rootserver.ram_usage_gb != null ? parseFloat(rootserver.ram_usage_gb).toFixed(1) : null;
+                                const ramTot  = rootserver.ram_total_gb != null ? parseFloat(rootserver.ram_total_gb).toFixed(1) : null;
+                            %>
+                            <% if (ramUsed && ramTot) { %><%= ramUsed %> / <%= ramTot %> GB<% } else if (ramTot) { %><%= ramTot %> GB<% } else { %>–<% } %>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="info-box">
-                    <span class="info-box-icon bg-warning">
-                        <i class="fa-solid fa-memory"></i>
-                    </span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">RAM</span>
-                        <span class="info-box-number">
-                            <%= rootserver.ram_total_gb ? rootserver.ram_total_gb + ' GB' : '–' %>
-                        </span>
-                        <% if (rootserver.ram_usage_gb && rootserver.ram_total_gb) { %>
-                            <span class="progress-description"><%= parseFloat(rootserver.ram_usage_gb).toFixed(1) %> GB belegt</span>
-                        <% } %>
+
+            <!-- Disk Widget -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card card-outline card-warning h-100 mb-0">
+                    <div class="card-header py-2 px-3">
+                        <h3 class="card-title text-sm mb-0"><i class="fa-solid fa-hard-drive mr-1"></i>Disk</h3>
+                    </div>
+                    <div class="card-body text-center py-3">
+                        <div class="position-relative d-inline-block mb-2" style="width:80px;height:80px;">
+                            <svg viewBox="0 0 36 36" style="transform:rotate(-90deg);width:80px;height:80px;">
+                                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e9ecef" stroke-width="3.2"/>
+                                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#fd7e14" stroke-width="3.2"
+                                        stroke-dasharray="0 100" id="disk-ring"
+                                        style="transition:stroke-dasharray .5s ease,stroke .3s ease;"/>
+                            </svg>
+                            <div class="position-absolute d-flex align-items-center justify-content-center"
+                                 style="top:0;left:0;right:0;bottom:0;">
+                                <span id="disk-pct" class="font-weight-bold" style="font-size:1.1rem;">–</span>
+                            </div>
+                        </div>
+                        <div class="text-muted" id="disk-detail" style="font-size:.8rem;">
+                            <%
+                                const diskUsed = rootserver.disk_usage_gb != null ? Math.round(rootserver.disk_usage_gb) : null;
+                                const diskTot  = rootserver.disk_total_gb != null ? Math.round(rootserver.disk_total_gb) : null;
+                            %>
+                            <% if (diskUsed && diskTot) { %><%= diskUsed %> / <%= diskTot %> GB<% } else if (diskTot) { %><%= diskTot %> GB<% } else { %>–<% } %>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="info-box">
-                    <span class="info-box-icon bg-primary">
-                        <i class="fa-solid fa-gamepad"></i>
-                    </span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">Gameserver</span>
-                        <span class="info-box-number"><%= gameserverStats.total || 0 %></span>
-                        <% if (gameserverStats.running > 0) { %>
-                            <span class="progress-description"><%= gameserverStats.running %> laufend</span>
-                        <% } %>
+
+            <!-- Daemon/Gameserver-Widget -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card card-outline card-primary h-100 mb-0">
+                    <div class="card-header py-2 px-3">
+                        <h3 class="card-title text-sm mb-0"><i class="fa-solid fa-plug mr-1"></i>Daemon</h3>
+                    </div>
+                    <div class="card-body text-center py-3">
+                        <div class="mb-2">
+                            <span class="badge badge-<%= isOnline ? 'success' : 'secondary' %>" style="font-size:.9rem;padding:.4em .8em;">
+                                <i class="fa-solid fa-circle mr-1" style="font-size:.6rem;"></i><%= isOnline ? 'Online' : 'Offline' %>
+                            </span>
+                            <% if (rootserver.daemon_version) { %>
+                                <div class="text-muted mt-1" style="font-size:.8rem;">v<%= rootserver.daemon_version %></div>
+                            <% } %>
+                        </div>
+                        <hr class="my-2">
+                        <div>
+                            <strong><%= gameserverStats.total || 0 %></strong>
+                            <div class="text-muted" style="font-size:.75rem;">Gameserver</div>
+                            <% if (gameserverStats.running > 0) { %>
+                                <span class="badge badge-success mt-1" style="font-size:.7rem;"><i class="fa-solid fa-play mr-1"></i><%= gameserverStats.running %> laufend</span>
+                            <% } %>
+                        </div>
                     </div>
                 </div>
             </div>
+
         </div>
 
         <!-- Tabs -->
@@ -121,6 +186,22 @@
                     <li class="nav-item">
                         <a class="nav-link" data-toggle="tab" href="#tab-daemon">
                             <i class="fa-solid fa-terminal mr-1"></i>Daemon-Info
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="tab" href="#tab-network" id="tab-network-link">
+                            <i class="fa-solid fa-network-wired mr-1"></i>Netzwerk / IPs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="tab" href="#tab-allocations" id="tab-allocations-link">
+                            <i class="fa-solid fa-plug mr-1"></i>Allocations
+                            <span class="badge badge-secondary ml-1" id="alloc-count-badge" style="font-size:.7rem;">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-danger" data-toggle="tab" href="#tab-danger">
+                            <i class="fa-solid fa-triangle-exclamation mr-1"></i>Gefahrenzone
                         </a>
                     </li>
                 </ul>
@@ -156,6 +237,7 @@
                                             <td class="text-muted">Daemon-Port</td>
                                             <td><code><%= rootserver.daemon_port || 9340 %></code></td>
                                         </tr>
+
                                         <tr>
                                             <td class="text-muted">Standort</td>
                                             <td>
@@ -277,7 +359,7 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                     <tbody>
                                         <tr>
                                             <td class="text-muted" width="40%">Daemon-ID</td>
-                                            <td><code style="font-size:0.8rem;"><%= rootserver.daemon_id %></code></td>
+                                            <td><code style="font-size:0.8rem;word-break:break-all;"><%= rootserver.daemon_id %></code></td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">Version</td>
@@ -293,7 +375,7 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">Letzter Ping</td>
-                                            <td><%= rootserver.last_ping_ms != null ? rootserver.last_ping_ms + ' ms' : '–' %></td>
+                                            <td id="rs-ping"><%= rootserver.last_ping_ms != null ? rootserver.last_ping_ms + ' ms' : '–' %></td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">Verpasste Heartbeats</td>
@@ -301,7 +383,11 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">Basis-Verzeichnis</td>
-                                            <td><code><%= rootserver.base_directory || '/opt/firebot' %></code></td>
+                                            <td><code><%= rootserver.base_directory || '/opt/firebot-daemon' %></code></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Betriebssystem</td>
+                                            <td><%= rootserver.os_info || '–' %></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -313,7 +399,127 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
 sudo systemctl restart firebot-daemon
 sudo journalctl -u firebot-daemon -f</code></pre>
                                 </div>
+                                <a href="/guild/<%= guildId %>/plugins/masterserver/tokens" class="btn btn-sm btn-outline-primary mt-1">
+                                    <i class="fa-solid fa-key mr-1"></i>Daemon-Token verwalten
+                                </a>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Netzwerk / IPs -->
+                    <div class="tab-pane fade" id="tab-network">
+                        <p class="text-muted mb-3">
+                            <i class="fa-solid fa-circle-info mr-1"></i>
+                            Alle IP-Adressen dieses Servers. Jede IP muss bereits auf dem Host konfiguriert sein (eth0, eth1, ...).
+                            Bei der Gameserver-Erstellung kannst du dann wählen, auf welcher IP der Server lauscht.
+                        </p>
+
+                        <!-- Primäre IP (aus Host-Feld) -->
+                        <table class="table table-sm table-hover" id="ip-table">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>IP-Adresse</th>
+                                    <th>Bezeichnung</th>
+                                    <th>Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="ip-list-body">
+                                <tr>
+                                    <td><code><%= rootserver.host %></code></td>
+                                    <td><span class="text-muted">Primäre IP (aus Host-Feld)</span></td>
+                                    <td><span class="badge badge-primary"><i class="fa-solid fa-star mr-1"></i>Primär</span></td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- IP hinzufügen -->
+                        <div class="card card-outline card-success mt-3">
+                            <div class="card-header py-2">
+                                <h3 class="card-title text-sm"><i class="fa-solid fa-plus mr-1"></i>Weitere IP hinzufügen</h3>
+                            </div>
+                            <div class="card-body">
+                                <!-- Vom Daemon erkannte IPs als Vorschläge -->
+                                <div id="host-ip-suggestions" class="mb-3" style="display:none">
+                                    <small class="text-muted d-block mb-1"><i class="fa-solid fa-network-wired mr-1"></i>Auf dem Host verfügbare IPs (klicken zum Übernehmen):</small>
+                                    <div id="host-ip-badges"></div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <input type="text" id="new-ip-address" class="form-control" placeholder="z.B. 45.138.51.242">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <input type="text" id="new-ip-label" class="form-control" placeholder="Bezeichnung (optional, z.B. Game-IP)">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="btn btn-success btn-block" onclick="addIP()">
+                                            <i class="fa-solid fa-plus mr-1"></i>Hinzufügen
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Allocations (Pterodactyl-Style Port-Management) -->
+                    <div class="tab-pane fade" id="tab-allocations">
+                        <p class="text-muted mb-3">
+                            <i class="fa-solid fa-circle-info mr-1"></i>
+                            Port-Allocations für diesen RootServer. Jeder Port wird einzeln verwaltet.
+                            Freie Ports werden bei der Gameserver-Erstellung automatisch zugewiesen.
+                        </p>
+
+                        <!-- DuneDataTable Container -->
+                        <div id="alloc-table-container"></div>
+
+                        <!-- Allocations hinzufügen -->
+                        <div class="card card-outline card-success mt-3">
+                            <div class="card-header py-2">
+                                <h3 class="card-title text-sm"><i class="fa-solid fa-plus mr-1"></i>Ports hinzufügen</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-2">
+                                            <label class="mb-1">IP-Adresse</label>
+                                            <select id="alloc-ip" class="form-control">
+                                                <option value="<%= rootserver.host %>"><%= rootserver.host %> (Primär)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-2">
+                                            <label class="mb-1">Ports</label>
+                                            <input type="text" id="alloc-ports" class="form-control" placeholder="z.B. 25565-25600 oder 27015,27016,27017">
+                                            <small class="form-text text-muted">Einzelne Ports (komma-separiert) oder Ranges (z.B. 25565-25600)</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="form-group mb-2">
+                                            <label class="mb-1">Alias (optional)</label>
+                                            <input type="text" id="alloc-alias" class="form-control" placeholder="z.B. Game-IP">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button class="btn btn-success btn-block mb-2" onclick="addAllocations()">
+                                            <i class="fa-solid fa-plus mr-1"></i>Hinzufügen
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Gefahrenzone -->
+                    <div class="tab-pane fade" id="tab-danger">
+                        <div class="callout callout-danger">
+                            <h5><i class="fa-solid fa-triangle-exclamation mr-2"></i>RootServer löschen</h5>
+                            <p class="mb-3">Diese Aktion löscht den RootServer permanent und kann <strong>nicht rückgängig gemacht werden</strong>.</p>
+                            <p class="text-muted" style="font-size:.85rem;">Alle zugehörigen Gameserver müssen vorher entfernt werden.</p>
+                            <button class="btn btn-danger" onclick="confirmDeleteRootserver()">
+                                <i class="fa-solid fa-trash mr-1"></i><%= rootserver.name %> löschen
+                            </button>
                         </div>
                     </div>
 
@@ -323,3 +529,358 @@ sudo journalctl -u firebot-daemon -f</code></pre>
 
     </div>
 </section>
+
+<!-- Live-Widget Script -->
+<script>
+(function () {
+    const RS_ID   = '<%= rootserver.id %>';
+    const GUILD   = '<%= guildId %>';
+    const ONLINE  = <%= isOnline ? 'true' : 'false' %>;
+    const API_URL = '/guild/' + GUILD + '/plugins/masterserver/rootservers/' + RS_ID + '/status';
+
+    // ── Ring-Gauge Helfer ────────────────────────────────────
+    function setRing(id, pct, defaultColor) {
+        const el = document.getElementById(id);
+        if (!el || pct == null) return;
+        const p = Math.min(Math.max(pct, 0), 100);
+        el.setAttribute('stroke-dasharray', p + ' ' + (100 - p));
+        el.setAttribute('stroke', pickColor(p, id) || defaultColor);
+    }
+    function pickColor(pct, ringId) {
+        if (ringId === 'cpu-ring')  { if (pct >= 80) return '#dc3545'; if (pct >= 60) return '#ffc107'; return '#28a745'; }
+        if (ringId === 'ram-ring')  { if (pct >= 85) return '#dc3545'; if (pct >= 65) return '#ffc107'; return '#17a2b8'; }
+        if (ringId === 'disk-ring') { if (pct >= 90) return '#dc3545'; if (pct >= 70) return '#ffc107'; return '#fd7e14'; }
+        return null;
+    }
+
+    // ── Initiale DB-Werte eintragen ──────────────────────────
+    (function initFromDb() {
+        <%
+            const initCpu  = rootserver.cpu_usage_percent != null ? Math.round(rootserver.cpu_usage_percent) : null;
+            const initRamU = rootserver.ram_usage_gb != null ? parseFloat(rootserver.ram_usage_gb) : null;
+            const initRamT = rootserver.ram_total_gb != null ? parseFloat(rootserver.ram_total_gb) : null;
+            const initDskU = rootserver.disk_usage_gb != null ? parseFloat(rootserver.disk_usage_gb) : null;
+            const initDskT = rootserver.disk_total_gb != null ? parseFloat(rootserver.disk_total_gb) : null;
+            const initRamP = (initRamU && initRamT && initRamT > 0) ? Math.round(initRamU / initRamT * 100) : null;
+            const initDskP = (initDskU && initDskT && initDskT > 0) ? Math.round(initDskU / initDskT * 100) : null;
+        %>
+        <% if (initCpu !== null) { %>
+            setRing('cpu-ring', <%= initCpu %>, '#28a745');
+        <% } %>
+        <% if (initRamP !== null) { %>
+            setRing('ram-ring', <%= initRamP %>, '#17a2b8');
+            document.getElementById('ram-pct').textContent = '<%= initRamP %>%';
+        <% } %>
+        <% if (initDskP !== null) { %>
+            setRing('disk-ring', <%= initDskP %>, '#fd7e14');
+            document.getElementById('disk-pct').textContent = '<%= initDskP %>%';
+        <% } %>
+    })();
+
+    // ── Live-Poll ────────────────────────────────────────────
+    if (!ONLINE) return;
+
+    async function poll() {
+        try {
+            const r = await fetch(API_URL);
+            if (!r.ok) return;
+            const { success, data } = await r.json();
+            if (!success || !data || !data.systemResources) return;
+            const hw = data.systemResources;
+
+            // CPU
+            if (hw.cpu_percent != null) {
+                const c = Math.round(hw.cpu_percent);
+                document.getElementById('cpu-pct').textContent = c + '%';
+                setRing('cpu-ring', c, '#28a745');
+            }
+            // RAM
+            if (hw.ram_used_gb != null && hw.ram_total_gb != null && hw.ram_total_gb > 0) {
+                const p = Math.round(hw.ram_used_gb / hw.ram_total_gb * 100);
+                document.getElementById('ram-pct').textContent  = p + '%';
+                document.getElementById('ram-detail').textContent =
+                    parseFloat(hw.ram_used_gb).toFixed(1) + ' / ' + parseFloat(hw.ram_total_gb).toFixed(1) + ' GB';
+                setRing('ram-ring', p, '#17a2b8');
+            }
+            // Disk
+            if (hw.disk_used_gb != null && hw.disk_total_gb != null && hw.disk_total_gb > 0) {
+                const p = Math.round(hw.disk_used_gb / hw.disk_total_gb * 100);
+                document.getElementById('disk-pct').textContent   = p + '%';
+                document.getElementById('disk-detail').textContent =
+                    Math.round(hw.disk_used_gb) + ' / ' + Math.round(hw.disk_total_gb) + ' GB';
+                setRing('disk-ring', p, '#fd7e14');
+            }
+            // Ping
+            if (data.lastPingMs != null) {
+                const el = document.getElementById('rs-ping');
+                if (el) el.textContent = data.lastPingMs + ' ms';
+            }
+        } catch (_) {}
+    }
+
+    poll();
+    setInterval(poll, 8000);
+})();
+
+// ── RootServer löschen ───────────────────────────────────────
+function confirmDeleteRootserver() {
+    if (!confirm('RootServer wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) return;
+    fetch('/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+    }).then(r => r.json()).then(d => {
+        if (d.success !== false) {
+            window.location.href = d.redirectUrl || '/guild/<%= guildId %>/plugins/masterserver/rootservers';
+        } else {
+            alert('Fehler: ' + (d.message || 'Unbekannter Fehler'));
+        }
+    }).catch(() => alert('Netzwerkfehler'));
+}
+
+// ── IP-Verwaltung ────────────────────────────────────────────
+const IP_API = '/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>/ips';
+const HOST_IP_API = '/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>/host-ips';
+
+async function loadHostIPSuggestions() {
+    try {
+        const r = await fetch(HOST_IP_API);
+        const { success, data } = await r.json();
+        if (!success || !data || data.length === 0) return;
+        const container = document.getElementById('host-ip-suggestions');
+        const badges = document.getElementById('host-ip-badges');
+        // Bereits eingetragene IPs aus Tabelle lesen
+        const existingIPs = new Set(
+            Array.from(document.querySelectorAll('#ip-list-body td code')).map(el => el.textContent.trim())
+        );
+        const toShow = data.filter(d => !existingIPs.has(d.ip));
+        if (toShow.length === 0) return;
+        toShow.forEach(d => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-outline-secondary mr-1 mb-1';
+            btn.innerHTML = `<i class="fa-solid fa-ethernet mr-1"></i><code>${d.ip}</code> <small class="text-muted">${d.interface}</small>`;
+            btn.onclick = () => { document.getElementById('new-ip-address').value = d.ip; };
+            badges.appendChild(btn);
+        });
+        container.style.display = '';
+    } catch (_) {}
+}
+
+async function loadIPs() {
+    try {
+        const r = await fetch(IP_API);
+        const { success, data } = await r.json();
+        if (!success) return;
+        const tbody = document.getElementById('ip-list-body');
+        // Nur zusätzliche IPs (primäre bereits als erster Row)
+        const extra = data.filter(ip => !ip.is_primary);
+        extra.forEach(ip => {
+            const tr = document.createElement('tr');
+            tr.dataset.ipId = ip.id;
+            tr.innerHTML = `
+                <td><code>${ip.ip_address}</code></td>
+                <td>${ip.label || '<span class="text-muted">–</span>'}</td>
+                <td><span class="badge badge-secondary">Zusatz-IP</span></td>
+                <td class="text-right">
+                    <button class="btn btn-xs btn-outline-danger" onclick="removeIP(${ip.id})">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    } catch (_) {}
+}
+
+async function addIP() {
+    const ip = document.getElementById('new-ip-address').value.trim();
+    const label = document.getElementById('new-ip-label').value.trim();
+    if (!ip) return alert('Bitte eine IP-Adresse eingeben.');
+    try {
+        const r = await fetch(IP_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip_address: ip, label: label || null, is_primary: 0 })
+        });
+        const d = await r.json();
+        if (!d.success) return alert('Fehler: ' + d.message);
+        // Zeile direkt einfügen
+        const tbody = document.getElementById('ip-list-body');
+        const tr = document.createElement('tr');
+        tr.dataset.ipId = d.data.id;
+        tr.innerHTML = `
+            <td><code>${ip}</code></td>
+            <td>${label || '<span class="text-muted">–</span>'}</td>
+            <td><span class="badge badge-secondary">Zusatz-IP</span></td>
+            <td class="text-right">
+                <button class="btn btn-xs btn-outline-danger" onclick="removeIP(${d.data.id})">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </td>`;
+        tbody.appendChild(tr);
+        document.getElementById('new-ip-address').value = '';
+        document.getElementById('new-ip-label').value = '';
+    } catch (_) { alert('Netzwerkfehler'); }
+}
+
+async function removeIP(ipId) {
+    if (!confirm('IP-Adresse entfernen?')) return;
+    try {
+        const r = await fetch(IP_API + '/' + ipId, { method: 'DELETE' });
+        const d = await r.json();
+        if (!d.success) return alert('Fehler: ' + d.message);
+        const row = document.querySelector('tr[data-ip-id="' + ipId + '"]');
+        if (row) row.remove();
+    } catch (_) { alert('Netzwerkfehler'); }
+}
+
+// IPs laden wenn Tab aktiv wird (Bootstrap 4 = jQuery-Events!)
+$('#tab-network-link').on('shown.bs.tab', function() {
+    loadIPs();
+    loadHostIPSuggestions();
+});
+// Auch direkt laden falls Tab schon aktiv
+if (document.querySelector('#tab-network.active')) { loadIPs(); loadHostIPSuggestions(); }
+
+// ── Port-Allocations (DuneDataTable) ────────────────────
+const ALLOC_API = '/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>/allocations';
+
+const allocTable = new DuneDataTable({
+    containerId: 'alloc-table-container',
+    apiUrl: ALLOC_API,
+    rowKey: 'id',
+    perPage: 25,
+    selectable: true,
+    searchable: true,
+    columns: [
+        { key: 'ip', label: 'IP-Adresse', sortable: true, render: (val, row) => 
+            `<code>${val}</code>${row.ip_alias ? ' <small class="text-muted">(' + row.ip_alias + ')</small>' : ''}`
+        },
+        { key: 'port', label: 'Port', sortable: true, render: (val) => `<code>${val}</code>` },
+        { key: 'server_name', label: 'Zugewiesen an', render: (val, row) => 
+            row.server_id 
+                ? '<span class="badge badge-warning"><i class="fa-solid fa-server mr-1"></i>' + (val || 'Server #' + row.server_id) + '</span>'
+                : '<span class="badge badge-success"><i class="fa-solid fa-circle-check mr-1"></i>Frei</span>'
+        },
+        { key: 'notes', label: 'Notizen', render: (val) => val ? `<small class="text-muted">${val}</small>` : '' },
+        { key: '_actions', label: '', render: (_, row) => 
+            !row.server_id 
+                ? `<button class="btn btn-xs btn-outline-danger" onclick="deleteAllocation(${row.id})"><i class="fa-solid fa-trash"></i></button>`
+                : ''
+        }
+    ],
+    filters: [
+        { key: 'status', label: 'Status', options: [
+            { value: 'all', text: 'Alle anzeigen' },
+            { value: 'free', text: 'Nur freie' },
+            { value: 'assigned', text: 'Nur zugewiesene' }
+        ], match: (row, val) => val === 'free' ? row.server_id === null : val === 'assigned' ? row.server_id !== null : true }
+    ],
+    summaryMap: (summary) => [
+        { label: 'Gesamt', value: summary.total, color: 'info', icon: 'fa-list' },
+        { label: 'Frei', value: summary.free, color: 'success', icon: 'fa-circle-check' },
+        { label: 'Zugewiesen', value: summary.assigned, color: 'warning', icon: 'fa-server' }
+    ],
+    rowClass: (row) => row.server_id ? '' : 'table-light',
+    bulkActions: [
+        { key: 'delete', label: 'Löschen', icon: 'fa-trash', class: 'btn-danger', confirm: '{count} freie Allocations wirklich löschen?' }
+    ],
+    onBulkAction: async (action, ids) => {
+        if (action === 'delete') {
+            let deleted = 0, skipped = 0;
+            for (const id of ids) {
+                const r = await fetch(ALLOC_API + '/' + id, { method: 'DELETE' });
+                const d = await r.json();
+                if (d.success) deleted++; else skipped++;
+            }
+            if (typeof toastr !== 'undefined') {
+                toastr.success(`${deleted} Allocations gelöscht${skipped > 0 ? `, ${skipped} übersprungen (zugewiesen)` : ''}`);
+            }
+        }
+    },
+    onLoad: (data) => {
+        // Badge im Tab-Header aktualisieren
+        const badge = document.getElementById('alloc-count-badge');
+        if (badge) badge.textContent = data.length;
+        // IP-Dropdown aktualisieren
+        updateAllocIPDropdown(data);
+    },
+    emptyText: 'Keine Allocations gefunden.',
+    emptyIcon: 'fa-solid fa-inbox'
+});
+
+function updateAllocIPDropdown(allocations) {
+    const select = document.getElementById('alloc-ip');
+    if (!select) return;
+    const primaryIp = '<%= rootserver.host %>';
+    const ips = new Set([primaryIp]);
+    allocations.forEach(a => ips.add(a.ip));
+    ips.forEach(ip => {
+        if (!Array.from(select.options).some(o => o.value === ip)) {
+            const opt = document.createElement('option');
+            opt.value = ip;
+            opt.textContent = ip;
+            select.appendChild(opt);
+        }
+    });
+}
+
+async function addAllocations() {
+    const ip = document.getElementById('alloc-ip').value;
+    const ports = document.getElementById('alloc-ports').value.trim();
+    const alias = document.getElementById('alloc-alias').value.trim();
+
+    if (!ports) return alert('Bitte Ports eingeben (z.B. 25565-25600)');
+
+    try {
+        const r = await fetch(ALLOC_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip, ports, ip_alias: alias || null })
+        });
+        const d = await r.json();
+        if (!d.success) return alert('Fehler: ' + d.message);
+
+        if (typeof toastr !== 'undefined') {
+            toastr.success(d.message);
+        }
+
+        document.getElementById('alloc-ports').value = '';
+        document.getElementById('alloc-alias').value = '';
+        allocTable.load();
+    } catch (_) { alert('Netzwerkfehler'); }
+}
+
+async function deleteAllocation(allocId) {
+    if (!confirm('Port-Allocation wirklich löschen?')) return;
+    try {
+        const r = await fetch(ALLOC_API + '/' + allocId, { method: 'DELETE' });
+        const d = await r.json();
+        if (!d.success) return alert('Fehler: ' + d.message);
+        allocTable.load();
+    } catch (_) { alert('Netzwerkfehler'); }
+}
+
+// Allocations laden wenn Tab aktiv wird (Bootstrap 4 = jQuery-Events!)
+$('#tab-allocations-link').on('shown.bs.tab', function() { allocTable.load(); });
+// Auch direkt laden falls Tab schon aktiv
+if (document.querySelector('#tab-allocations.active')) { allocTable.load(); }
+
+// Zusatz-IPs in Allocation-Dropdown laden
+async function loadAllocIPs() {
+    try {
+        const r = await fetch('/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>/ips');
+        const { success, data } = await r.json();
+        if (!success) return;
+        const select = document.getElementById('alloc-ip');
+        data.forEach(ip => {
+            if (!ip.is_primary && !Array.from(select.options).some(o => o.value === ip.ip_address)) {
+                const opt = document.createElement('option');
+                opt.value = ip.ip_address;
+                opt.textContent = ip.ip_address + (ip.label ? ' (' + ip.label + ')' : '');
+                select.appendChild(opt);
+            }
+        });
+    } catch (_) {}
+}
+loadAllocIPs();
+</script>

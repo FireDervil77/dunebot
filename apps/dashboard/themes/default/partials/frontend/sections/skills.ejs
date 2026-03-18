@@ -1,0 +1,50 @@
+<%# Skills Section Partial — Progress Bars %>
+<%
+  // Standard-Werte (können via sectionConfig überschrieben werden)
+  const defaultSkills = [
+    { label: 'HTML', value: 100 },
+    { label: 'CSS', value: 82 },
+    { label: 'JavaScript', value: 100 },
+    { label: 'Discord', value: 100 },
+    { label: 'Dashboard', value: 75 },
+    { label: 'Dunebot', value: 55 }
+  ];
+  const skillItems = (sectionConfig && sectionConfig.items && sectionConfig.items.length > 0)
+    ? sectionConfig.items
+    : defaultSkills;
+
+  // In 2 Spalten aufteilen
+  const half = Math.ceil(skillItems.length / 2);
+  const leftSkills = skillItems.slice(0, half);
+  const rightSkills = skillItems.slice(half);
+%>
+
+<section id="skills" class="skills section">
+  <div class="container" data-aos="fade-up" data-aos-delay="100">
+    <div class="row skills-content skills-animation">
+
+      <div class="col-lg-6">
+        <% leftSkills.forEach(function(skill) { %>
+        <div class="progress">
+          <span class="skill"><span><%= skill.label %></span> <i class="val"><%= skill.value %>%</i></span>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" role="progressbar" aria-valuenow="<%= skill.value %>" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+        </div>
+        <% }); %>
+      </div>
+
+      <div class="col-lg-6">
+        <% rightSkills.forEach(function(skill) { %>
+        <div class="progress">
+          <span class="skill"><span><%= skill.label %></span> <i class="val"><%= skill.value %>%</i></span>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" role="progressbar" aria-valuenow="<%= skill.value %>" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+        </div>
+        <% }); %>
+      </div>
+
+    </div>
+  </div>
+</section>

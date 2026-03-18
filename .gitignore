@@ -10,6 +10,9 @@ package-lock.json
 # Logs
 logs/
 *.log
+
+# User Uploads (Medien-Manager)
+apps/dashboard/uploads/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -56,11 +59,10 @@ cookies.txt
 # Excluded Plugins (nicht für Repo)
 plugins/fun/
 plugins/economy/
-plugins/giveaway/
 plugins/imageserver/
 plugins/statistik/
-plugins/ticket/
 plugins/voiceserver/
+plugins/dunemap/
 
 # Daemon Binaries (separat laden)
 apps/dashboard/downloads/daemon/binaries/

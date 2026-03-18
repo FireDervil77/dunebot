@@ -33,7 +33,7 @@ require('dotenv').config({ path: './apps/dashboard/.env' });
         
         // Prüfen ob Navigation schon existiert
         const existing = await dbService.query(
-            'SELECT id FROM nav_items WHERE guildId = ? AND url = ?',
+            'SELECT id FROM guild_nav_items WHERE guildId = ? AND url = ?',
             [guildId, `/guild/${guildId}/donations`]
         );
         
@@ -44,7 +44,7 @@ require('dotenv').config({ path: './apps/dashboard/.env' });
         
         // Navigation hinzufügen
         const result = await dbService.query(`
-            INSERT INTO nav_items (plugin, guildId, title, url, icon, sort_order, parent, visible, type)
+            INSERT INTO guild_nav_items (plugin, guildId, title, url, icon, sort_order, parent, visible, type)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             'core',
@@ -62,7 +62,7 @@ require('dotenv').config({ path: './apps/dashboard/.env' });
         
         // Hall of Fame als Unter-Item
         await dbService.query(`
-            INSERT INTO nav_items (plugin, guildId, title, url, icon, sort_order, parent, visible, type)
+            INSERT INTO guild_nav_items (plugin, guildId, title, url, icon, sort_order, parent, visible, type)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             'core',

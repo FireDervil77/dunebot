@@ -100,7 +100,7 @@ class GameserverConsoleClient {
         const consoleTabLink = document.querySelector('a#console-tab');
         if (consoleTabLink) {
             consoleTabLink.addEventListener('shown.bs.tab', () => {
-                setTimeout(() => {
+                const doFit = () => {
                     try {
                         this.fitAddon.fit();
                         if (this.terminal && typeof this.terminal.refresh === 'function') {
@@ -110,7 +110,10 @@ class GameserverConsoleClient {
                     } catch (e) {
                         console.debug('[Console] tab shown fit/refresh error:', e?.message || e);
                     }
-                }, 50);
+                };
+                // Doppel-Fit: sofort nach Tab sichtbar + nochmal nach Layout-Reflow
+                setTimeout(doFit, 50);
+                setTimeout(doFit, 300);
             });
         }
 
@@ -171,28 +174,16 @@ class GameserverConsoleClient {
             console.log('[Console] Attach-Response:', data);
 
             if (!data.success) {
-                // Benutzerfreundliche Error-Message im Terminal anzeigen
+                // Daemon-Attach schlug fehl (Server offline/installing) → SSE trotzdem starten
+                // Install-Output + Status-Events kommen über SSE unabhängig vom PTY-Status
                 this.terminal.writeln('');
-                this.terminal.writeln('\x1b[1;31m+-----------------------------------------------------------+\x1b[0m');
-                this.terminal.writeln('\x1b[1;31m|\x1b[0m      \x1b[1;33mConsole nicht verfuegbar\x1b[0m                         \x1b[1;31m|\x1b[0m');
-                this.terminal.writeln('\x1b[1;31m+-----------------------------------------------------------+\x1b[0m');
+                this.terminal.writeln('\x1b[90m[Console] Server noch nicht gestartet – warte auf Events...\x1b[0m');
                 this.terminal.writeln('');
-                
-                // Spezifische Hinweise basierend auf Error-Message
-                if (data.message && (data.message.includes('nicht gestartet') || data.message.includes('PTY nicht verfügbar'))) {
-                    this.terminal.writeln('\x1b[33mGameserver ist offline\x1b[0m');
-                    this.terminal.writeln('');
-                    this.terminal.writeln('\x1b[90mDie Console ist nur verfuegbar wenn der Server laeuft.\x1b[0m');
-                    this.terminal.writeln('\x1b[90mStarte den Server um die Live-Console zu nutzen.\x1b[0m');
-                    this.updateStatus('Server offline', 'secondary');
-                } else {
-                    // Fallback für andere Fehler
-                    this.terminal.writeln('\x1b[31mFehler: ' + (data.message || 'Unbekannter Fehler') + '\x1b[0m');
-                    this.updateStatus('Fehler', 'danger');
-                }
-                this.terminal.writeln('');
-                
-                // Error nicht werfen - benutzerfreundliche Message ist genug
+                this.clientId = data.client_id || null;
+                // SSE trotzdem starten! Install-Output kommt so auch live an.
+                this.setupSSE();
+                this.connected = true;
+                this.updateStatus('Bereit', 'secondary');
                 return;
             }
 
@@ -203,8 +194,8 @@ class GameserverConsoleClient {
                 this.terminal.writeln('\x1b[36m[History: Letzte ' + data.history.length + ' Zeilen]\x1b[0m');
                 data.history.forEach(entry => {
                     const text = (typeof entry === 'string') ? entry : (entry && entry.line ? entry.line : '');
-                    // write() statt writeln() – History-Zeilen enthalten bereits \r\n vom PTY
-                    if (text) this.terminal.write(text);
+                    // writeln() — Daemon-Ring-Buffer liefert Zeilen ohne Newline
+                    if (text) this.terminal.writeln(this.colorizeLogLine(text));
                 });
                 this.terminal.writeln('');
                 // Nach History sicherstellen, dass Terminal korrekt gerendert ist
@@ -245,29 +236,13 @@ class GameserverConsoleClient {
         } catch (error) {
             console.error('[Console] Verbindung fehlgeschlagen:', error);
             
-            // Bei HTTP-Fehlern benutzerfreundliche Message anzeigen
-            if (error.message.includes('HTTP 500') || error.message.includes('Internal Server Error')) {
-                this.terminal.writeln('');
-                this.terminal.writeln('\x1b[1;31m╔═══════════════════════════════════════════════════════════╗\x1b[0m');
-                this.terminal.writeln('\x1b[1;31m║\x1b[0m      \x1b[1;33mWARNING  Console nicht verfügbar\x1b[0m                       \x1b[1;31m║\x1b[0m');
-                this.terminal.writeln('\x1b[1;31m╚═══════════════════════════════════════════════════════════╝\x1b[0m');
-                this.terminal.writeln('');
-                this.terminal.writeln('\x1b[33m! Gameserver ist offline\x1b[0m');
-                this.terminal.writeln('');
-                this.terminal.writeln('\x1b[90mDie Console ist nur verfügbar wenn der Server läuft.\x1b[0m');
-                this.terminal.writeln('\x1b[90mStarte den Server um die Live-Console zu nutzen.\x1b[0m');
-                this.terminal.writeln('');
-                this.updateStatus('Server offline', 'secondary');
-            } else {
-                // Andere Fehler (Netzwerk, etc.)
-                this.terminal.writeln('');
-                this.terminal.writeln('\x1b[31mERROR Verbindungsfehler:\x1b[0m');
-                this.terminal.writeln(`   ${error.message}`);
-                this.terminal.writeln('');
-                this.terminal.writeln('\x1b[90m💡 Tipp: Prüfe deine Internetverbindung und versuche es erneut.\x1b[0m');
-                this.terminal.writeln('');
-                this.updateStatus('Fehler', 'danger');
-            }
+            // Bei jedem Fehler: SSE trotzdem starten (Install/Status-Events kommen so an)
+            this.terminal.writeln('');
+            this.terminal.writeln('\x1b[90m[Console] Daemon nicht erreichbar – warte auf Events über SSE...\x1b[0m');
+            this.terminal.writeln('');
+            this.setupSSE();
+            this.connected = true;
+            this.updateStatus('Warte...', 'secondary');
         }
     }
 
@@ -292,6 +267,7 @@ class GameserverConsoleClient {
             this.eventSource.addEventListener('connected', (e) => {
                 const data = JSON.parse(e.data);
                 console.log('[Console] SSE verbunden:', data);
+                this._sseRetries = 0; // Retry-Counter zurücksetzen
                 // Bei erfolgreichem SSE-Connect sicherheitshalber refitten
                 try {
                     this.fitAddon.fit();
@@ -316,9 +292,34 @@ class GameserverConsoleClient {
 
                     // 1) Nützliche Status-Echos ins Terminal schreiben
                     if (payload.action === 'status_changed' && payload.status) {
-                        const map = { running: 'online', stopped: 'offline' };
+                        const map = { running: 'online', stopped: 'offline', starting: 'startet...', stopping: 'stoppt...' };
                         const normalized = map[payload.status] || payload.status;
                         this.handleOutputLine(`\x1b[36m[STATUS]\x1b[0m Server ist jetzt: ${normalized}`);
+
+                        // Status-Tracking für Re-Attach-Logik
+                        if (payload.status === 'starting') {
+                            // Server startet (neu) → alten PTY-State zurücksetzen
+                            this._ptyAttached = false;
+                            this.updateStatus('Server startet...', 'warning');
+
+                            // Visueller Separator: Neuer Prozess
+                            this.terminal.writeln('');
+                            this.terminal.writeln('\x1b[1;33m═══════════════════════════════════════════════════════════\x1b[0m');
+                            this.terminal.writeln('\x1b[1;33m  🔄 Server wird gestartet – neuer Prozess...\x1b[0m');
+                            this.terminal.writeln('\x1b[1;33m═══════════════════════════════════════════════════════════\x1b[0m');
+                            this.terminal.writeln('');
+                        }
+
+                        if (payload.status === 'stopped' || payload.status === 'offline') {
+                            this._ptyAttached = false;
+                            this.updateStatus('Server offline', 'secondary');
+                        }
+
+                        // Auto-Upgrade: Server läuft → PTY-Attach nachholen
+                        // Dashboard sendet 'online' (gemappt von 'running'), Daemon sendet 'running'
+                        if ((payload.status === 'running' || payload.status === 'online') && this.connected && !this._ptyAttached) {
+                            this._upgradeConsoleAttach();
+                        }
                         return;
                     }
 
@@ -363,7 +364,55 @@ class GameserverConsoleClient {
                 }
             });
 
-            // Error-Handler mit Auto-Reconnect
+            // Install-Events (namespace='install') → gleicher xterm-Buffer
+            this.eventSource.addEventListener('install', (e) => {
+                try {
+                    const message = JSON.parse(e.data);
+                    const payload = message.data || message;
+
+                    if (String(payload.server_id) !== String(this.config.serverId)) return;
+
+                    // Install-Output-Zeile
+                    if (payload.action === 'output' && payload.line) {
+                        this.handleOutputLine(payload.line);
+                        return;
+                    }
+
+                    // Install-Phasen-Status (pulling_image, installing_game)
+                    if (payload.action === 'status' && payload.message) {
+                        this.terminal.writeln('');
+                        this.terminal.writeln(`\x1b[1;36m>>> ${payload.message}\x1b[0m`);
+                        this.terminal.writeln('');
+                        return;
+                    }
+
+                    // Installation abgeschlossen
+                    if (payload.action === 'completed') {
+                        this.terminal.writeln('');
+                        this.terminal.writeln('\x1b[1;32m╔═══════════════════════════════════════════════════════════╗\x1b[0m');
+                        this.terminal.writeln('\x1b[1;32m║          ✅  Installation abgeschlossen!                   ║\x1b[0m');
+                        this.terminal.writeln('\x1b[1;32m╚═══════════════════════════════════════════════════════════╝\x1b[0m');
+                        this.terminal.writeln('');
+                        return;
+                    }
+
+                    // Installation fehlgeschlagen
+                    if (payload.action === 'failed') {
+                        this.terminal.writeln('');
+                        this.terminal.writeln('\x1b[1;31m╔═══════════════════════════════════════════════════════════╗\x1b[0m');
+                        this.terminal.writeln('\x1b[1;31m║          ❌  Installation fehlgeschlagen!                  ║\x1b[0m');
+                        this.terminal.writeln('\x1b[1;31m╚═══════════════════════════════════════════════════════════╝\x1b[0m');
+                        this.terminal.writeln(`\x1b[31m${payload.error || 'Unbekannter Fehler'}\x1b[0m`);
+                        this.terminal.writeln('');
+                        return;
+                    }
+
+                } catch (error) {
+                    console.error('[Console] Fehler beim Parsen der Install-SSE-Message:', error);
+                }
+            });
+
+            // Error-Handler mit Auto-Reconnect (Exponential Backoff)
             this.eventSource.onerror = (error) => {
                 console.error('[Console] SSE Connection error:', error);
                 
@@ -371,14 +420,21 @@ class GameserverConsoleClient {
                 this.eventSource.close();
                 this.eventSource = null;
                 
-                // Auto-Reconnect nach 5 Sekunden (wenn noch connected)
+                // Auto-Reconnect mit Backoff (wenn noch connected)
                 if (this.connected) {
-                    console.log('[Console] SSE Reconnect in 5s...');
+                    this._sseRetries = (this._sseRetries || 0) + 1;
+                    if (this._sseRetries > 10) {
+                        console.warn('[Console] Max SSE-Retries erreicht, stoppe Reconnect');
+                        this.updateStatus('Verbindung verloren', 'danger');
+                        return;
+                    }
+                    const delay = Math.min(1000 * Math.pow(2, this._sseRetries - 1), 30000);
+                    console.log(`[Console] SSE Reconnect #${this._sseRetries} in ${delay}ms...`);
                     setTimeout(() => {
                         if (this.connected) {
                             this.setupSSE();
                         }
-                    }, 5000);
+                    }, delay);
                 }
             };
 
@@ -531,6 +587,48 @@ class GameserverConsoleClient {
                 this.terminal.writeln('');
             }
         }
+    }
+
+    /**
+     * Auto-Upgrade: PTY-Attach nachholen wenn Server in 'running' wechselt.
+     * Robust mit Retry bei Fehler.
+     * @private
+     */
+    _upgradeConsoleAttach(retryCount = 0) {
+        const maxRetries = 3;
+        console.log(`[Console] Auto-Upgrade Attach (Versuch ${retryCount + 1}/${maxRetries + 1})...`);
+
+        fetch(`${this.config.apiBase}/attach`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    this._ptyAttached = true;
+                    this.clientId = d.client_id || this.clientId;
+                    this.updateStatus('Verbunden', 'success');
+                    this.terminal.writeln('\x1b[32m[Console] PTY verbunden – Live-Output aktiv\x1b[0m');
+                    console.log('[Console] Auto-Upgrade Attach erfolgreich');
+                } else if (retryCount < maxRetries) {
+                    // Daemon nicht bereit → Retry nach Delay
+                    const delay = 1000 * (retryCount + 1);
+                    console.log(`[Console] Attach nicht erfolgreich, Retry in ${delay}ms...`);
+                    setTimeout(() => this._upgradeConsoleAttach(retryCount + 1), delay);
+                } else {
+                    console.warn('[Console] Auto-Upgrade Attach fehlgeschlagen nach max Retries');
+                    this._ptyAttached = false;
+                }
+            })
+            .catch(err => {
+                console.error('[Console] Auto-Upgrade Attach Error:', err);
+                if (retryCount < maxRetries) {
+                    const delay = 1000 * (retryCount + 1);
+                    setTimeout(() => this._upgradeConsoleAttach(retryCount + 1), delay);
+                } else {
+                    this._ptyAttached = false;
+                }
+            });
     }
 
     /**

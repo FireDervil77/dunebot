@@ -65,5 +65,7 @@ async function ban(issuer, target, reason) {
         return guild.getT("moderation:BAN.BOT_PERM", { target: target.username });
     else if (response === "MEMBER_PERM")
         return guild.getT("moderation:BAN.MEMBER_PERM", { target: target.username });
+    else if (response === "PROTECTED_ROLE")
+        return guild.getT("moderation:PROTECTED_ROLE", { target: target.username });
     else return guild.getT("moderation:BAN.FAILED", { target: target.username });
 }

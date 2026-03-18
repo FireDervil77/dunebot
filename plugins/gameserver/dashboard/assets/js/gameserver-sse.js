@@ -100,6 +100,19 @@ class GameserverSSEClient {
                 }
             });
 
+            // Install-Events (completed, failed, status, output)
+            this.eventSource.addEventListener('install', (e) => {
+                try {
+                    const message = JSON.parse(e.data);
+                    console.log('[GameserverSSE] Install Event empfangen:', message);
+                    // Prefix 'install_' damit Handlers eindeutig sind (z.B. 'install_completed', 'install_failed')
+                    message.action = 'install_' + message.action;
+                    this._handleEvent(message);
+                } catch (error) {
+                    console.error('[GameserverSSE] Fehler beim Parsen der Install-Message:', error);
+                }
+            });
+
             // ✅ Console-Events (separater Event-Type!)
             this.eventSource.addEventListener('console', (e) => {
                 try {

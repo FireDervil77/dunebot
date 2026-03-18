@@ -51,21 +51,32 @@ async function getEffectiveReason(guildId, reason) {
 }
 
 /**
- * Speichert ein Moderation-Log in der Datenbank
+ * Speichert ein Moderation-Log in der Datenbank mit Guild-spezifischer Case-Nummer
  * @param {string} guildId 
  * @param {string} memberId 
  * @param {string} adminId 
  * @param {string} adminTag 
  * @param {string} type 
  * @param {string} reason 
+ * @returns {Promise<number>} Die Case-Nummer
  */
 async function createLog(guildId, memberId, adminId, adminTag, type, reason = null) {
     const dbService = ServiceManager.get('dbService');
+    
+    // Nächste Case-Nummer für diese Guild ermitteln
+    const [maxCase] = await dbService.query(`
+        SELECT COALESCE(MAX(case_number), 0) + 1 AS next_case 
+        FROM moderation_logs WHERE guild_id = ?
+    `, [guildId]);
+    const caseNumber = maxCase?.next_case || 1;
+    
     await dbService.query(`
         INSERT INTO moderation_logs 
-        (guild_id, member_id, admin_id, admin_tag, type, reason)
-        VALUES (?, ?, ?, ?, ?, ?)
-    `, [guildId, memberId, adminId, adminTag, type.toUpperCase(), reason]);
+        (guild_id, case_number, member_id, admin_id, admin_tag, type, reason)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [guildId, caseNumber, memberId, adminId, adminTag, type.toUpperCase(), reason]);
+    
+    return caseNumber;
 }
 
 /**
@@ -105,6 +116,116 @@ const memberInteract = (issuer, target) => {
     if (guild.ownerId === target.id) return false;
     return issuer.roles.highest.position > target.roles.highest.position;
 };
+
+/**
+ * Prüft ob ein User eine geschützte Rolle hat (Staff-Schutz)
+ * @param {string} guildId
+ * @param {import('discord.js').GuildMember} target
+ * @returns {Promise<boolean>}
+ */
+async function isProtectedMember(guildId, target) {
+    if (!target || !target.roles) return false;
+    const dbService = ServiceManager.get('dbService');
+    const protectedRoles = await dbService.query(
+        `SELECT role_id FROM moderation_protected_roles WHERE guild_id = ?`,
+        [guildId]
+    );
+    if (!protectedRoles || protectedRoles.length === 0) return false;
+    const protectedIds = protectedRoles.map(r => r.role_id);
+    return target.roles.cache.some(role => protectedIds.includes(role.id));
+}
+
+/**
+ * Lädt alle geschützten Rollen einer Guild
+ * @param {string} guildId
+ * @returns {Promise<Array>}
+ */
+async function getProtectedRoles(guildId) {
+    const dbService = ServiceManager.get('dbService');
+    return await dbService.query(
+        `SELECT * FROM moderation_protected_roles WHERE guild_id = ?`,
+        [guildId]
+    );
+}
+
+/**
+ * Mod-Notes: Alle Notizen zu einem User laden
+ * @param {string} guildId
+ * @param {string} userId
+ * @returns {Promise<Array>}
+ */
+async function getNotes(guildId, userId) {
+    const dbService = ServiceManager.get('dbService');
+    return await dbService.query(
+        `SELECT * FROM moderation_notes WHERE guild_id = ? AND user_id = ? ORDER BY created_at DESC`,
+        [guildId, userId]
+    );
+}
+
+/**
+ * Mod-Notes: Notiz erstellen
+ * @param {string} guildId
+ * @param {string} userId
+ * @param {string} authorId
+ * @param {string} note
+ * @returns {Promise<number>} Die ID der Notiz
+ */
+async function createNote(guildId, userId, authorId, note) {
+    const dbService = ServiceManager.get('dbService');
+    const result = await dbService.query(
+        `INSERT INTO moderation_notes (guild_id, user_id, author_id, note) VALUES (?, ?, ?, ?)`,
+        [guildId, userId, authorId, note]
+    );
+    return result.insertId;
+}
+
+/**
+ * Mod-Notes: Notiz löschen
+ * @param {string} guildId
+ * @param {number} noteId
+ * @param {string} authorId - Nur der Autor darf löschen
+ * @returns {Promise<boolean>}
+ */
+async function deleteNote(guildId, noteId, authorId) {
+    const dbService = ServiceManager.get('dbService');
+    const result = await dbService.query(
+        `DELETE FROM moderation_notes WHERE id = ? AND guild_id = ? AND author_id = ?`,
+        [noteId, guildId, authorId]
+    );
+    return result.affectedRows > 0;
+}
+
+/**
+ * Case laden per Case-Nummer
+ * @param {string} guildId
+ * @param {number} caseNumber
+ * @returns {Promise<Object|null>}
+ */
+async function getCase(guildId, caseNumber) {
+    const dbService = ServiceManager.get('dbService');
+    const [caseData] = await dbService.query(
+        `SELECT * FROM moderation_logs WHERE guild_id = ? AND case_number = ?`,
+        [guildId, caseNumber]
+    );
+    return caseData || null;
+}
+
+/**
+ * Moderation-History eines Users laden
+ * @param {string} guildId
+ * @param {string} memberId
+ * @param {number} limit
+ * @returns {Promise<Array>}
+ */
+async function getHistory(guildId, memberId, limit = 25) {
+    const dbService = ServiceManager.get('dbService');
+    return await dbService.query(
+        `SELECT * FROM moderation_logs 
+         WHERE guild_id = ? AND member_id = ? AND deleted = 0 
+         ORDER BY created_at DESC LIMIT ?`,
+        [guildId, memberId, limit]
+    );
+}
 
 /**
  * Send logs to the configured channel and stores in the database
@@ -220,8 +341,8 @@ const logModeration = async (issuer, target, reason, type, data = {}) => {
 
     embed.setFields(fields);
 
-    // Log in Datenbank speichern
-    await createLog(
+    // Log in Datenbank speichern (gibt Case-Nummer zurück)
+    const caseNumber = await createLog(
         guild.id,
         target.id,
         issuer.id,
@@ -229,6 +350,11 @@ const logModeration = async (issuer, target, reason, type, data = {}) => {
         type,
         reason
     );
+    
+    // Case-Nummer im Embed anzeigen
+    if (type.toUpperCase() !== "PURGE") {
+        embed.setAuthor({ name: `Moderation - ${type} | Case #${caseNumber}` });
+    }
     
     // DM an den betroffenen User senden (wenn aktiviert)
     if (type.toUpperCase() !== "PURGE" && target) {
@@ -503,6 +629,7 @@ module.exports = class ModUtils {
     static async timeoutTarget(issuer, target, ms, reason) {
         if (!memberInteract(issuer, target)) return "MEMBER_PERM";
         if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
+        if (await isProtectedMember(issuer.guild.id, target)) return "PROTECTED_ROLE";
         if (target.communicationDisabledUntilTimestamp - Date.now() > 0) return "ALREADY_TIMEOUT";
 
         try {
@@ -546,6 +673,7 @@ module.exports = class ModUtils {
     static async kickTarget(issuer, target, reason) {
         if (!memberInteract(issuer, target)) return "MEMBER_PERM";
         if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
+        if (await isProtectedMember(issuer.guild.id, target)) return "PROTECTED_ROLE";
 
         try {
             const effectiveReason = await getEffectiveReason(issuer.guild.id, reason);
@@ -567,6 +695,7 @@ module.exports = class ModUtils {
     static async softbanTarget(issuer, target, reason) {
         if (!memberInteract(issuer, target)) return "MEMBER_PERM";
         if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
+        if (await isProtectedMember(issuer.guild.id, target)) return "PROTECTED_ROLE";
 
         try {
             const effectiveReason = await getEffectiveReason(issuer.guild.id, reason);
@@ -591,6 +720,7 @@ module.exports = class ModUtils {
 
         if (targetMem && !memberInteract(issuer, targetMem)) return "MEMBER_PERM";
         if (targetMem && !memberInteract(issuer.guild.members.me, targetMem)) return "BOT_PERM";
+        if (targetMem && await isProtectedMember(issuer.guild.id, targetMem)) return "PROTECTED_ROLE";
 
         try {
             const effectiveReason = await getEffectiveReason(issuer.guild.id, reason);
@@ -767,6 +897,7 @@ module.exports.warnTarget = async function warnTarget(issuer, target, reason) {
     
     if (!memberInteract(issuer, target)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
+    if (await isProtectedMember(issuer.guild.id, target)) return "PROTECTED_ROLE";
 
     try {
         const effectiveReason = await getEffectiveReason(issuer.guild.id, reason);
@@ -795,3 +926,10 @@ module.exports.getSettings = getSettings;
 module.exports.createLog = createLog;
 module.exports.getWarnings = getWarnings;
 module.exports.countWarnings = countWarnings;
+module.exports.isProtectedMember = isProtectedMember;
+module.exports.getProtectedRoles = getProtectedRoles;
+module.exports.getNotes = getNotes;
+module.exports.createNote = createNote;
+module.exports.deleteNote = deleteNote;
+module.exports.getCase = getCase;
+module.exports.getHistory = getHistory;

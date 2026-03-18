@@ -144,8 +144,8 @@ class GreetingDashboardPlugin extends DashboardPlugin {
                 title: 'greeting:NAV.GREETING',
                 path: `/guild/${guildId}/plugins/greeting/settings`,
                 icon: 'fa-solid fa-hands',
-                order: 25,  // Nach Core-Settings und DuneMap
-                parent: `/guild/${guildId}/settings`,
+                order: 25,
+                parent: `/guild/${guildId}`,
                 type: 'main',
                 visible: true,
                 capability: 'GREETING.SETTINGS'
@@ -154,7 +154,7 @@ class GreetingDashboardPlugin extends DashboardPlugin {
 
         try {
             await navigationManager.registerNavigation(this.name, guildId, navItems);
-            Logger.debug('[Greeting] Navigation registriert (unter Core-Settings)');
+            Logger.debug('[Greeting] Navigation registriert (unter Dashboard)');
         } catch (error) {
             Logger.error('[Greeting] Fehler beim Registrieren der Navigation:', error);
         }

@@ -65,7 +65,11 @@
   
   "NAV": {
     "DUNEMAP": "DuneMap",
-    "SEKTOR_CARD": "Sektor-Map"
+    "SEKTOR_CARD": "Sector Map",
+    "INTERACTIVE_MAP": "Interactive Map",
+    "QUEST_FINDER": "Quest Finder",
+    "HAGGA_BASIN_MAP": "Hagga Basin",
+    "LANDRAD_PLANNER": "Landsraad Planner"
   },
 
   "SETTINGS": {

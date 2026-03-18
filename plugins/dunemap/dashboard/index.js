@@ -422,6 +422,106 @@ class DuneMapPlugin extends DashboardPlugin {
                 }
             });
             
+            // === INTERAKTIVE LEAFLET MAP ===
+            this.guildRouter.get('/map', requirePermission('DUNEMAP.VIEW'), async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+
+                try {
+                    // Alle Marker laden
+                    const markers = await dbService.query(
+                        'SELECT * FROM dunemap_markers WHERE guild_id = ? ORDER BY placed_at DESC',
+                        [guildId]
+                    );
+
+                    // Storm-Region laden
+                    const configRows = await dbService.query(
+                        `SELECT config_key, config_value FROM configs
+                         WHERE plugin_name = 'dunemap' AND guild_id = ? AND context = 'shared'`,
+                        [guildId]
+                    );
+                    const config = {};
+                    configRows.forEach(r => { config[r.config_key] = r.config_value; });
+
+                    // Marker-Typen aus dem bereits geladenen Modul
+                    const { MARKER_TYPES, getMarkerTypesByCategory } = this.markerTypes;
+
+                    await themeManager.renderView(res, 'guild/dunemap-map', {
+                        title: 'DuneMap - Interaktive Karte',
+                        activeMenu: `/guild/${guildId}/plugins/dunemap/map`,
+                        guildId,
+                        markers: JSON.stringify(markers),
+                        markerTypes: JSON.stringify(MARKER_TYPES),
+                        markerTypesByCategory: JSON.stringify(getMarkerTypesByCategory()),
+                        config,
+                        plugin: this
+                    });
+                } catch (error) {
+                    Logger.error('[DuneMap] Fehler bei /map:', error);
+                    res.status(500).send('Fehler beim Laden der Karte');
+                }
+            });
+
+            // === API: Marker CRUD für Leaflet Map ===
+            this.guildRouter.post('/map/marker', requirePermission('DUNEMAP.MARKERS_CREATE'), async (req, res) => {
+                const guildId = res.locals.guildId;
+                const dbService = ServiceManager.get('dbService');
+                const { action, markerId, sectorX, sectorY, posX, posY, markerType, label, notes } = req.body;
+
+                try {
+                    if (action === 'add') {
+                        if (!sectorX || !sectorY || !markerType) {
+                            return res.status(400).json({ success: false, message: 'Fehlende Parameter' });
+                        }
+                        // Sektor-Limit prüfen
+                        const [count] = await dbService.query(
+                            'SELECT COUNT(*) as count FROM dunemap_markers WHERE guild_id = ? AND sector_x = ? AND sector_y = ?',
+                            [guildId, sectorX, sectorY]
+                        );
+                        if (count.count >= 6) {
+                            return res.status(400).json({ success: false, message: 'Max. 6 Marker pro Sektor' });
+                        }
+
+                        const result = await dbService.query(
+                            `INSERT INTO dunemap_markers
+                             (guild_id, sector_x, sector_y, pos_x, pos_y, marker_type, label, notes, placed_by)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            [guildId, sectorX, sectorY, posX || null, posY || null, markerType,
+                             label || null, notes || null, res.locals.user?.id || 'Dashboard']
+                        );
+                        const [newMarker] = await dbService.query(
+                            'SELECT * FROM dunemap_markers WHERE id = ?', [result.insertId]
+                        );
+                        return res.json({ success: true, marker: newMarker });
+
+                    } else if (action === 'remove') {
+                        if (!markerId) return res.status(400).json({ success: false, message: 'Keine Marker-ID' });
+                        await dbService.query(
+                            'DELETE FROM dunemap_markers WHERE id = ? AND guild_id = ?',
+                            [markerId, guildId]
+                        );
+                        return res.json({ success: true });
+
+                    } else if (action === 'update') {
+                        if (!markerId) return res.status(400).json({ success: false, message: 'Keine Marker-ID' });
+                        await dbService.query(
+                            `UPDATE dunemap_markers SET label = ?, notes = ?, pos_x = ?, pos_y = ?
+                             WHERE id = ? AND guild_id = ?`,
+                            [label || null, notes || null, posX || null, posY || null, markerId, guildId]
+                        );
+                        const [updated] = await dbService.query(
+                            'SELECT * FROM dunemap_markers WHERE id = ?', [markerId]
+                        );
+                        return res.json({ success: true, marker: updated });
+                    }
+
+                    res.status(400).json({ success: false, message: 'Ungültige Aktion' });
+                } catch (error) {
+                    Logger.error('[DuneMap] Marker API Error:', error);
+                    res.status(500).json({ success: false, message: error.message });
+                }
+            });
+
             // === ADMIN-INTERFACE (Sektor-Karte mit Marker-Editor) ===
             this.guildRouter.get('/admin', requirePermission('DUNEMAP.ADMIN_MANAGE'), async (req, res) => {
                 const Logger = ServiceManager.get('Logger');
@@ -888,12 +988,22 @@ class DuneMapPlugin extends DashboardPlugin {
             {
                 title: 'dunemap:NAV.SEKTOR_CARD',
                 path: `/guild/${guildId}/plugins/dunemap/admin`,
-                icon: 'fa-solid fa-map-marked-alt',
+                icon: 'fa-solid fa-table-cells',
                 order: 10,
                 parent: `/guild/${guildId}/plugins/dunemap`,
                 type: 'main',
                 visible: true,
                 capability: 'DUNEMAP.ADMIN' // ✅ UPPERCASE! Admin-Bereich
+            },
+            {
+                title: 'dunemap:NAV.INTERACTIVE_MAP',
+                path: `/guild/${guildId}/plugins/dunemap/map`,
+                icon: 'fa-solid fa-map-location-dot',
+                order: 15,
+                parent: `/guild/${guildId}/plugins/dunemap`,
+                type: 'main',
+                visible: true,
+                capability: 'DUNEMAP.VIEW'
             },
             // Quest-Finder Navigation - TEMPORARILY DISABLED (Quest-Daten noch nicht vollständig)
             // TODO: Wieder aktivieren sobald vollständige Quest-Datenbank vorhanden

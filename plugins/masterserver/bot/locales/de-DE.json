@@ -1,3 +1,19 @@
 {
-    "greeting": "Hallo!"
+    "DAEMON": {
+        "DESCRIPTION": "Rootserver / Daemon verwalten",
+        "SUB_LIST": "Alle RootServer dieser Guild auflisten",
+        "SUB_STATUS": "Status & Hardware eines RootServers anzeigen",
+        "SUB_REGISTER": "Neuen RootServer registrieren",
+        "SUB_DELETE": "RootServer entfernen",
+        "OPT_ID": "RootServer-ID",
+        "OPT_NAME": "Name des Servers (Anzeigename)",
+        "OPT_RAM": "Verfügbarer RAM in GB",
+        "OPT_DISK": "Verfügbarer Speicher in GB",
+        "OPT_HOST": "Hostname oder IP-Adresse",
+        "OPT_PORT_START": "Anfang des Port-Bereichs (z.B. 25565)",
+        "OPT_PORT_END": "Ende des Port-Bereichs (z.B. 26000)",
+        "LIST_TITLE": "Registrierte RootServer",
+        "LIST_EMPTY_TITLE": "Keine RootServer gefunden",
+        "LIST_EMPTY_DESC": "Füge einen hinzu mit `/daemon register`."
+    }
 }

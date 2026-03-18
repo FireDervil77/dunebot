@@ -374,8 +374,48 @@
         "ADDONS_VIEW": "View Addons",
         "ADDONS_VIEW_DESC": "Allows viewing the addon marketplace",
         "ADDONS_MANAGE": "Manage Addons",
-        "ADDONS_MANAGE_DESC": "Allows installing and managing addons"
-    }
-}
+        "ADDONS_MANAGE_DESC": "Allows installing and managing addons",
 
+        "ROLES_VIEW": "View Roles",
+        "ROLES_VIEW_DESC": "Allows viewing Discord roles and their permissions",
+        "ROLES_EDIT": "Edit Roles",
+        "ROLES_EDIT_DESC": "Allows creating, editing and deleting Discord roles (CRITICAL)"
+    },
+
+    "ROLES": {
+        "TITLE": "Discord Roles",
+        "TOTAL": "Total",
+        "EDITABLE": "Editable",
+        "MANAGED": "Managed",
+        "SEARCH_PLACEHOLDER": "Search roles...",
+        "NO_ROLES": "No roles found",
+        "SELECT_ROLE": "Select a role",
+        "SELECT_ROLE_DESC": "Click on a role in the list to view details and permissions.",
+        "NO_MANAGE_ROLES_PERM": "The bot does not have the ManageRoles permission. Roles can only be viewed, not edited.",
+        "REASON_MANAGED": "This role is managed by Discord (Bot/Boost) and cannot be edited.",
+        "REASON_HIGHER": "This role is higher than the bot's role and cannot be edited.",
+        "TAB_GENERAL": "General",
+        "TAB_PERMISSIONS": "Permissions",
+        "NAME": "Role Name",
+        "COLOR": "Colour",
+        "HOIST": "Display separately",
+        "HOIST_HELP": "Members with this role will be displayed separately in the member list.",
+        "MENTIONABLE": "Mentionable",
+        "MENTIONABLE_HELP": "Anyone can mention this role with @rolename.",
+        "POSITION": "Position",
+        "MEMBERS": "Members",
+        "CREATED": "Created",
+        "PERM_HINT": "Discord permissions for this role. Changes apply immediately on the server.",
+        "BTN_CREATE": "New Role",
+        "BTN_DELETE": "Delete Role",
+        "CREATE_TITLE": "Create New Role",
+        "DELETE_TITLE": "Delete Role",
+        "DELETE_CONFIRM": "Are you sure you want to delete this role? This action cannot be undone!",
+        "TOAST_SAVED": "Role saved successfully!",
+        "TOAST_CREATED": "New role created successfully!",
+        "TOAST_DELETED": "Role deleted successfully!",
+        "TOAST_ERROR": "Error during role action."
+    }
+
+}
 

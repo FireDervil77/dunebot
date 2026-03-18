@@ -10,10 +10,14 @@
     "NAV": {
         "GREETING": "Begrüßungen"
     },
-    
+
     "TAB_WELCOME": "Willkommen",
     "TAB_FAREWELL": "Verabschiedung",
+    "TAB_DM_WELCOME": "DM Willkommen",
     "TAB_AUTOROLE": "Autorole",
+    "TAB_BOOST": "Boost",
+    "TAB_VERIFICATION": "Verifizierung",
+    "TAB_INVITE_TRACKING": "Invite-Tracking",
 
     "WELCOME": {
         "TITLE": "Willkommensnachrichten",
@@ -27,9 +31,23 @@
         "MESSAGE": "Verabschiedungsnachricht"
     },
 
+    "DM_WELCOME": {
+        "TITLE": "DM Willkommensnachricht",
+        "DESC": "Sende neuen Mitgliedern eine private Willkommensnachricht",
+        "MESSAGE": "DM Nachricht",
+        "INFO": "Diese Nachricht wird als Direktnachricht an neue Mitglieder gesendet. Hinweis: Mitglieder mit deaktivierten DMs erhalten diese nicht."
+    },
+
+    "BOOST": {
+        "TITLE": "Boost-Nachrichten",
+        "DESC": "Feiere Mitglieder die deinen Server boosten",
+        "MESSAGE": "Boost-Nachricht",
+        "INFO": "Diese Nachricht wird gesendet, wenn ein Mitglied den Server boostet."
+    },
+
     "AUTOROLE": {
-        "TITLE": "Automatische Rolle",
-        "DESC": "Diese Rolle wird neuen Mitgliedern automatisch zugewiesen"
+        "TITLE": "Automatische Rollen",
+        "DESC": "Diese Rollen werden neuen Mitgliedern automatisch zugewiesen"
     },
 
     "CHANNEL_TITLE": "Kanal",
@@ -40,9 +58,50 @@
     "STATUS_ENABLED": "Aktiviert",
     "STATUS_DISABLED": "Deaktiviert",
 
-    "AUTOROLE_SELECT": "Rolle auswählen",
-    "AUTOROLE_NONE": "Keine automatische Rolle",
-    "AUTOROLE_INFO": "Die ausgewählte Rolle wird allen neuen Mitgliedern beim Beitritt automatisch gegeben.",
+    "AUTOROLE_SELECT": "Rollen auswählen",
+    "AUTOROLE_NONE": "Keine automatischen Rollen",
+    "AUTOROLE_INFO": "Die ausgewählten Rollen werden allen neuen Mitgliedern beim Beitritt automatisch gegeben.",
+    "AUTOROLE_MULTI_HINT": "Du kannst mehrere Rollen auswählen (Strg/Cmd + Klick)",
+
+    "IMAGE": {
+        "TITLE": "Welcome-Image",
+        "DESC": "Generiertes Begrüßungsbild mit Avatar",
+        "ENABLE": "Welcome-Image aktivieren",
+        "BG_TITLE": "Hintergrund",
+        "BG_DEFAULT": "Standard",
+        "BG_DARK": "Dunkel",
+        "BG_BLUE": "Blau",
+        "BG_PURPLE": "Lila",
+        "BG_GREEN": "Grün",
+        "BG_SUNSET": "Sonnenuntergang",
+        "BG_OCEAN": "Ozean",
+        "TEXT_TITLE": "Begrüßungstext",
+        "TEXT_PLACEHOLDER": "Welcome to the server!",
+        "COLOR_TITLE": "Akzentfarbe"
+    },
+
+    "EMBED": {
+        "TITLE": "Embed-Builder",
+        "DESC": "Gestalte ein Discord-Embed",
+        "FIELD_TITLE": "Titel",
+        "FIELD_TITLE_PH": "Embed Titel eingeben...",
+        "DESCRIPTION": "Beschreibung",
+        "DESCRIPTION_PH": "Embed Beschreibung eingeben...",
+        "COLOR": "Farbe",
+        "THUMBNAIL": "Thumbnail (Profilbild anzeigen)",
+        "FOOTER": "Footer",
+        "FOOTER_PH": "Footer Text eingeben...",
+        "IMAGE": "Bild-URL",
+        "AUTHOR": "Author-Name",
+        "TIMESTAMP": "Zeitstempel anzeigen",
+        "ENABLE": "Embed aktivieren"
+    },
+
+    "PREVIEW": {
+        "TITLE": "Vorschau",
+        "PLACEHOLDER_USER": "Neues Mitglied",
+        "BOT_BADGE": "BOT"
+    },
 
     "PLACEHOLDERS_HINT": "Nutze Platzhalter wie {member:name}, {member:mention}, {guild:name}",
 
@@ -53,7 +112,7 @@
 
     "SAVE_SUCCESS": "Einstellungen erfolgreich gespeichert",
     "SAVE_ERROR": "Fehler beim Speichern der Einstellungen",
-    
+
     "TOAST": {
         "ENABLED": "Aktiviert",
         "DISABLED": "Deaktiviert",
@@ -70,11 +129,57 @@
     "HELP": {
         "TITLE": "Hilfe & Tipps",
         "WELCOME_TITLE": "Willkommensnachrichten",
-        "WELCOME_TEXT": "Begrüße neue Mitglieder mit personalisierten Nachrichten.",
+        "WELCOME_TEXT": "Begrüße neue Mitglieder mit personalisierten Nachrichten und Embeds.",
         "FAREWELL_TITLE": "Verabschiedungen",
         "FAREWELL_TEXT": "Verabschiede austretende Mitglieder.",
+        "DM_TITLE": "DM Willkommen",
+        "DM_TEXT": "Sende neuen Mitgliedern eine private Begrüßungs-DM.",
         "AUTOROLE_TITLE": "Autorole",
-        "AUTOROLE_TEXT": "Automatische Rollenzuweisung für neue Mitglieder.",
+        "AUTOROLE_TEXT": "Automatische Rollenzuweisung (mehrere Rollen möglich).",
+        "BOOST_TITLE": "Boost-Nachrichten",
+        "BOOST_TEXT": "Feiere Server-Booster mit einer besonderen Nachricht.",
+        "VERIFICATION_TITLE": "Verifizierung",
+        "VERIFICATION_TEXT": "Neues Mitglied muss einen Button klicken oder ein Captcha lösen, bevor Rollen vergeben werden.",
+        "INVITE_TRACKING_TITLE": "Invite-Tracking",
+        "INVITE_TRACKING_TEXT": "Verschiedene Willkommensnachrichten je nach verwendetem Einladungslink.",
+        "IMAGE_TITLE": "Welcome-Image",
+        "IMAGE_TEXT": "Generiertes Begrüßungsbild mit Avatar des neuen Mitglieds.",
         "PLACEHOLDERS_TITLE": "Verfügbare Platzhalter"
+    },
+
+    "VERIFICATION": {
+        "TITLE": "Verifizierung",
+        "DESC": "Neues Mitglied muss sich verifizieren, bevor voller Zugang gewährt wird",
+        "ENABLE": "Verifizierung aktivieren",
+        "TYPE": "Verifizierungs-Typ",
+        "TYPE_BUTTON": "Button (Einfacher Klick)",
+        "TYPE_CAPTCHA": "Captcha (Mathe-Aufgabe)",
+        "CHANNEL": "Verifizierungs-Channel",
+        "CHANNEL_DESC": "Der Channel, in dem der Verifizierungs-Button/Captcha angezeigt wird",
+        "VERIFIED_ROLE": "Verifiziert-Rolle",
+        "VERIFIED_ROLE_DESC": "Diese Rolle wird nach erfolgreicher Verifizierung vergeben",
+        "UNVERIFIED_ROLE": "Unverifiziert-Rolle (optional)",
+        "UNVERIFIED_ROLE_DESC": "Diese Rolle wird beim Beitritt vergeben und nach Verifizierung entfernt",
+        "MESSAGE": "Verifizierungs-Nachricht",
+        "MESSAGE_PH": "Klicke den Button, um dich zu verifizieren!",
+        "SEND_PANEL": "Verifizierungs-Panel senden",
+        "SEND_PANEL_DESC": "Sendet den Verifizierungs-Button in den ausgewählten Channel",
+        "INFO": "Die Verifizierung stellt sicher, dass neue Mitglieder kein Bot sind. Bei 'Button' genügt ein Klick, bei 'Captcha' muss eine einfache Mathe-Aufgabe gelöst werden."
+    },
+
+    "INVITE_TRACKING": {
+        "TITLE": "Invite-Tracking",
+        "DESC": "Verschiedene Willkommensnachrichten je nach verwendetem Einladungslink",
+        "ADD_TITLE": "Neues Invite-Mapping",
+        "INVITE_CODE": "Invite-Code",
+        "INVITE_CODE_PH": "z.B. abc123",
+        "LABEL": "Bezeichnung",
+        "LABEL_PH": "z.B. YouTube-Kampagne",
+        "CONTENT": "Spezielle Willkommensnachricht",
+        "CONTENT_PH": "Willkommen {member:mention}! Du kommst von...",
+        "BTN_ADD": "Mapping hinzufügen",
+        "EMPTY": "Keine Invite-Mappings konfiguriert.",
+        "CONFIRM_DELETE": "Dieses Invite-Mapping wirklich löschen?",
+        "INFO": "Wenn ein neues Mitglied über einen konfigurierten Invite-Link beitritt, wird die spezielle Nachricht statt der Standard-Willkommensnachricht gesendet."
     }
 }

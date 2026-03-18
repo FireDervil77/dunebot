@@ -1,0 +1,30 @@
+<%# Stats Section Partial — PureCounter Statistiken %>
+<%
+  // Standard-Werte (können via sectionConfig überschrieben werden)
+  const defaultStats = [
+    { label: 'Invites', value: 232, duration: 1 },
+    { label: 'Users', value: 2512, duration: 4 },
+    { label: 'Hours Of Support', value: 1453, duration: 1 },
+    { label: 'LifeTime Spend (minutes)', value: 92160, duration: 3 }
+  ];
+  const statsItems = (sectionConfig && sectionConfig.items && sectionConfig.items.length > 0)
+    ? sectionConfig.items
+    : defaultStats;
+%>
+
+<section id="stats" class="stats section">
+  <div class="container" data-aos="fade-up" data-aos-delay="100">
+    <div class="row gy-4">
+
+      <% statsItems.forEach(function(stat) { %>
+      <div class="col-lg-3 col-md-6">
+        <div class="stats-item text-center w-100 h-100">
+          <span data-purecounter-start="0" data-purecounter-end="<%= stat.value %>" data-purecounter-duration="<%= stat.duration || 1 %>" class="purecounter"></span>
+          <p><strong><%= stat.label %></strong></p>
+        </div>
+      </div>
+      <% }); %>
+
+    </div>
+  </div>
+</section>

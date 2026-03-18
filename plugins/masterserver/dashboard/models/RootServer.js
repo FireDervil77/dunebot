@@ -35,10 +35,9 @@ class RootServer {
               daemon_port, base_directory, api_key,
               daemon_status, install_status,
               cpu_cores, ram_total_gb, disk_total_gb,
-              port_range_start, port_range_end,
               datacenter, country_code,
               created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, NOW(), NOW())`,
             [
                 daemonId,
                 data.guildId,
@@ -52,8 +51,6 @@ class RootServer {
                 data.cpuCores      || null,
                 data.ramTotalGb    || null,
                 data.diskTotalGb   || null,
-                data.portRangeStart || null,
-                data.portRangeEnd   || null,
                 data.datacenter    || null,
                 data.countryCode   || null
             ]
@@ -118,7 +115,6 @@ class RootServer {
             'daemon_port', 'base_directory',
             'ram_total_gb', 'disk_total_gb', 'cpu_cores', 'cpu_threads', 'cpu_model',
             'ram_limit_gb', 'disk_limit_gb', 'cpu_limit_percent',
-            'port_range_start', 'port_range_end',
             'datacenter', 'country_code'
         ];
         const fields = [];
@@ -202,7 +198,7 @@ class RootServer {
                 stats.cpu?.usage_percent || null,
                 stats.ram?.used_gb       || null,
                 stats.disk?.used_gb      || null,
-                stats.os_info            || null,
+                stats.system ? `${stats.system.platform || ''} ${stats.system.platform_version || ''}`.trim() || null : (stats.os_info || null),
                 daemonId
             ]
         );

@@ -134,10 +134,13 @@ const buildGreeting = async (member, type, config, inviterData) => {
 
     // set default message if no content or embed provided
     if (!content && !hasEmbed) {
-        content =
-            type === "WELCOME"
-                ? `Welcome to the server, ${member.displayName} 🎉`
-                : `${member.user.username} has left the server 👋`;
+        if (type === "WELCOME") {
+            content = `Welcome to the server, ${member.displayName} 🎉`;
+        } else if (type === "FAREWELL") {
+            content = `${member.user.username} has left the server 👋`;
+        } else if (type === "BOOST") {
+            content = `${member.displayName} just boosted the server! 🚀`;
+        }
         return { content };
     }
 

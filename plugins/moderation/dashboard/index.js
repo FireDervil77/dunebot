@@ -53,13 +53,26 @@ class ModerationPlugin extends DashboardPlugin {
                 const guildId = req.params.guildId || res.locals.guildId;
                 
                 try {
-                    const channelsResponses = await ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS', { guildId });
+                    // IPC-Calls für Channels und Roles parallel
+                    const [channelsResponses, rolesResponses] = await Promise.all([
+                        ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS', { guildId }),
+                        ipcServer.broadcast('dashboard:GET_GUILD_ROLES', { guildId, includeAll: true })
+                    ]);
                     const channelsResp = channelsResponses && channelsResponses.length > 0 ? channelsResponses[0] : null;
+                    const rolesResp = rolesResponses && rolesResponses.length > 0 ? rolesResponses[0] : null;
                     const channels = channelsResp?.channels || [];
+                    const roles = rolesResp?.roles || [];
                     
-                    const [settings] = await dbService.query(`SELECT * FROM moderation_settings WHERE guild_id = ?`, [guildId]);
+                    // Parallel DB-Queries
+                    const [settingsRows, protectedRolesRows, logsRows, logsCountRows, channelRulesRows] = await Promise.all([
+                        dbService.query(`SELECT * FROM moderation_settings WHERE guild_id = ?`, [guildId]),
+                        dbService.query(`SELECT * FROM moderation_protected_roles WHERE guild_id = ? ORDER BY created_at DESC`, [guildId]),
+                        dbService.query(`SELECT * FROM moderation_logs WHERE guild_id = ? ORDER BY created_at DESC LIMIT 50`, [guildId]),
+                        dbService.query(`SELECT COUNT(*) as total FROM moderation_logs WHERE guild_id = ?`, [guildId]),
+                        dbService.query(`SELECT * FROM moderation_channel_rules WHERE guild_id = ? ORDER BY created_at DESC`, [guildId])
+                    ]);
                     
-                    const moderationSettings = settings || {
+                    const moderationSettings = settingsRows[0] || {
                         modlog_channel: null,
                         max_warn_limit: 5,
                         max_warn_action: 'KICK',
@@ -76,7 +89,12 @@ class ModerationPlugin extends DashboardPlugin {
                         activeMenu: `/guild/${guildId}/plugins/moderation`,
                         guildId,
                         channels,
+                        roles,
                         settings: moderationSettings,
+                        protectedRoles: protectedRolesRows || [],
+                        channelRules: channelRulesRows || [],
+                        logs: logsRows || [],
+                        logsTotal: logsCountRows[0]?.total || 0,
                         plugin: this
                     });
                 } catch (error) {
@@ -204,6 +222,257 @@ class ModerationPlugin extends DashboardPlugin {
                     res.status(500).json({ success: false, error: error.message });
                 }
             });
+
+            // ==================== PROTECTED ROLES API ====================
+
+            // GET /protected-roles - Liste geschützter Rollen
+            this.guildRouter.get('/protected-roles', requirePermission('MODERATION.VIEW'), async (req, res) => {
+                const guildId = req.params.guildId || res.locals.guildId;
+                try {
+                    const rows = await dbService.query(
+                        `SELECT * FROM moderation_protected_roles WHERE guild_id = ? ORDER BY created_at DESC`,
+                        [guildId]
+                    );
+                    res.json({ success: true, protectedRoles: rows });
+                } catch (error) {
+                    Logger.error('[Moderation] Fehler beim Laden der Protected Roles:', error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+            });
+
+            // POST /protected-roles - Geschützte Rolle hinzufügen
+            this.guildRouter.post('/protected-roles', requirePermission('MODERATION.PROTECTED_ROLES_MANAGE'), async (req, res) => {
+                const guildId = req.params.guildId || res.locals.guildId;
+                const { role_id } = req.body;
+
+                if (!role_id) {
+                    return res.status(400).json({ success: false, error: 'role_id ist erforderlich' });
+                }
+
+                try {
+                    await dbService.query(
+                        `INSERT IGNORE INTO moderation_protected_roles (guild_id, role_id) VALUES (?, ?)`,
+                        [guildId, role_id]
+                    );
+                    res.json({ success: true, message: 'Geschützte Rolle hinzugefügt' });
+                } catch (error) {
+                    Logger.error('[Moderation] Fehler beim Hinzufügen der Protected Role:', error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+            });
+
+            // DELETE /protected-roles/:roleId - Geschützte Rolle entfernen
+            this.guildRouter.delete('/protected-roles/:roleId', requirePermission('MODERATION.PROTECTED_ROLES_MANAGE'), async (req, res) => {
+                const guildId = req.params.guildId || res.locals.guildId;
+                const roleId = req.params.roleId;
+
+                try {
+                    await dbService.query(
+                        `DELETE FROM moderation_protected_roles WHERE guild_id = ? AND role_id = ?`,
+                        [guildId, roleId]
+                    );
+                    res.json({ success: true, message: 'Geschützte Rolle entfernt' });
+                } catch (error) {
+                    Logger.error('[Moderation] Fehler beim Entfernen der Protected Role:', error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+            });
+
+            // ==================== MODERATION LOGS API ====================
+
+            // GET /logs - Moderation-Logs (mit Pagination)
+            this.guildRouter.get('/logs', requirePermission('MODERATION.LOGS_VIEW'), async (req, res) => {
+                const guildId = req.params.guildId || res.locals.guildId;
+                const page = Math.max(1, parseInt(req.query.page) || 1);
+                const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 25));
+                const offset = (page - 1) * limit;
+                const typeFilter = req.query.type || null;
+
+                try {
+                    let whereClause = 'WHERE guild_id = ?';
+                    const params = [guildId];
+
+                    if (typeFilter) {
+                        whereClause += ' AND type = ?';
+                        params.push(typeFilter);
+                    }
+
+                    const [logs, countRows] = await Promise.all([
+                        dbService.query(
+                            `SELECT * FROM moderation_logs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+                            [...params, limit, offset]
+                        ),
+                        dbService.query(
+                            `SELECT COUNT(*) as total FROM moderation_logs ${whereClause}`,
+                            params
+                        )
+                    ]);
+
+                    const total = countRows[0]?.total || 0;
+                    res.json({
+                        success: true,
+                        logs,
+                        pagination: {
+                            page,
+                            limit,
+                            total,
+                            totalPages: Math.ceil(total / limit)
+                        }
+                    });
+                } catch (error) {
+                    Logger.error('[Moderation] Fehler beim Laden der Logs:', error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+            });
+
+            // ==================== MOD NOTES API ====================
+
+            // GET /notes/:userId - Notizen für einen User
+            this.guildRouter.get('/notes/:userId', requirePermission('MODERATION.NOTES_VIEW'), async (req, res) => {
+                const guildId = req.params.guildId || res.locals.guildId;
+                const userId = req.params.userId;
+
+                try {
+                    const notes = await dbService.query(
+                        `SELECT * FROM moderation_notes WHERE guild_id = ? AND user_id = ? ORDER BY created_at DESC`,
+                        [guildId, userId]
+                    );
+                    res.json({ success: true, notes });
+                } catch (error) {
+                    Logger.error('[Moderation] Fehler beim Laden der Notes:', error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+            });
+
+            // POST /notes - Notiz erstellen
+            this.guildRouter.post('/notes', requirePermission('MODERATION.NOTES_MANAGE'), async (req, res) => {
+                const guildId = req.params.guildId || res.locals.guildId;
+                const { user_id, note } = req.body;
+                const authorId = res.locals.user?.id || req.user?.id;
+
+                if (!user_id || !note) {
+                    return res.status(400).json({ success: false, error: 'user_id und note sind erforderlich' });
+                }
+
+                try {
+                    await dbService.query(
+                        `INSERT INTO moderation_notes (guild_id, user_id, author_id, note) VALUES (?, ?, ?, ?)`,
+                        [guildId, user_id, authorId, note.substring(0, 1000)]
+                    );
+                    res.json({ success: true, message: 'Notiz erstellt' });
+                } catch (error) {
+                    Logger.error('[Moderation] Fehler beim Erstellen der Note:', error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+            });
+
+            // DELETE /notes/:noteId - Notiz löschen
+            this.guildRouter.delete('/notes/:noteId', requirePermission('MODERATION.NOTES_MANAGE'), async (req, res) => {
+                const guildId = req.params.guildId || res.locals.guildId;
+                const noteId = parseInt(req.params.noteId);
+
+                if (isNaN(noteId)) {
+                    return res.status(400).json({ success: false, error: 'Ungültige Note-ID' });
+                }
+
+                try {
+                    await dbService.query(
+                        `DELETE FROM moderation_notes WHERE id = ? AND guild_id = ?`,
+                        [noteId, guildId]
+                    );
+                    res.json({ success: true, message: 'Notiz gelöscht' });
+                } catch (error) {
+                    Logger.error('[Moderation] Fehler beim Löschen der Note:', error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+            });
+
+            // ==================== CHANNEL RULES API ====================
+
+            // GET /channel-rules - Liste aller Channel-Regeln
+            this.guildRouter.get('/channel-rules', requirePermission('MODERATION.VIEW'), async (req, res) => {
+                const guildId = req.params.guildId || res.locals.guildId;
+                try {
+                    const rows = await dbService.query(
+                        `SELECT * FROM moderation_channel_rules WHERE guild_id = ? ORDER BY created_at DESC`,
+                        [guildId]
+                    );
+                    res.json({ success: true, channelRules: rows });
+                } catch (error) {
+                    Logger.error('[Moderation] Fehler beim Laden der Channel-Rules:', error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+            });
+
+            // POST /channel-rules - Channel-Regel erstellen/aktualisieren
+            this.guildRouter.post('/channel-rules', requirePermission('MODERATION.CHANNEL_RULES_MANAGE'), async (req, res) => {
+                const guildId = req.params.guildId || res.locals.guildId;
+                const { channel_id, max_warn_limit, max_warn_action, automod_exempt, notes } = req.body;
+
+                if (!channel_id) {
+                    return res.status(400).json({ success: false, error: 'channel_id ist erforderlich' });
+                }
+
+                try {
+                    await dbService.query(`
+                        INSERT INTO moderation_channel_rules (guild_id, channel_id, max_warn_limit, max_warn_action, automod_exempt, notes)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                            max_warn_limit = VALUES(max_warn_limit),
+                            max_warn_action = VALUES(max_warn_action),
+                            automod_exempt = VALUES(automod_exempt),
+                            notes = VALUES(notes),
+                            updated_at = NOW()
+                    `, [
+                        guildId,
+                        channel_id,
+                        max_warn_limit ? parseInt(max_warn_limit) : null,
+                        max_warn_action || null,
+                        automod_exempt ? 1 : 0,
+                        notes ? notes.substring(0, 500) : null
+                    ]);
+                    res.json({ success: true, message: 'Channel-Regel gespeichert' });
+                } catch (error) {
+                    Logger.error('[Moderation] Fehler beim Speichern der Channel-Rule:', error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+            });
+
+            // DELETE /channel-rules/:ruleId - Channel-Regel löschen
+            this.guildRouter.delete('/channel-rules/:ruleId', requirePermission('MODERATION.CHANNEL_RULES_MANAGE'), async (req, res) => {
+                const guildId = req.params.guildId || res.locals.guildId;
+                const ruleId = parseInt(req.params.ruleId);
+
+                if (isNaN(ruleId)) {
+                    return res.status(400).json({ success: false, error: 'Ungültige Rule-ID' });
+                }
+
+                try {
+                    await dbService.query(
+                        `DELETE FROM moderation_channel_rules WHERE id = ? AND guild_id = ?`,
+                        [ruleId, guildId]
+                    );
+                    res.json({ success: true, message: 'Channel-Regel entfernt' });
+                } catch (error) {
+                    Logger.error('[Moderation] Fehler beim Löschen der Channel-Rule:', error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+            });
+
+            // GET /notes-all - Alle Notizen der Guild (für Dashboard-Tab)
+            this.guildRouter.get('/notes-all', requirePermission('MODERATION.NOTES_VIEW'), async (req, res) => {
+                const guildId = req.params.guildId || res.locals.guildId;
+                try {
+                    const notes = await dbService.query(
+                        `SELECT * FROM moderation_notes WHERE guild_id = ? ORDER BY created_at DESC LIMIT 100`,
+                        [guildId]
+                    );
+                    res.json({ success: true, notes });
+                } catch (error) {
+                    Logger.error('[Moderation] Fehler beim Laden aller Notes:', error);
+                    res.status(500).json({ success: false, error: error.message });
+                }
+            });
             
             Logger.info('[Moderation] Routen eingerichtet für guildRouter');
         } catch (error) {
@@ -231,7 +500,7 @@ class ModerationPlugin extends DashboardPlugin {
         
         try {
             Logger.info(`Entferne Navigation für [Moderation] aus Guild ${guildId}`);
-            await dbService.query("DELETE FROM nav_items WHERE plugin = ? AND guildId = ?", [this.name, guildId]);
+            await dbService.query("DELETE FROM guild_nav_items WHERE plugin = ? AND guildId = ?", [this.name, guildId]);
             Logger.success(`[Moderation] Navigation für Guild ${guildId} entfernt`);
             return true;
         } catch (error) {
@@ -249,7 +518,7 @@ class ModerationPlugin extends DashboardPlugin {
             path: `/guild/${guildId}/plugins/moderation`,
             icon: 'fa-solid fa-shield-halved',
             order: null,
-            parent: `/guild/${guildId}/settings`,
+            parent: `/guild/${guildId}`,
             type: 'main',
             visible: true,
             capability: 'MODERATION.VIEW'

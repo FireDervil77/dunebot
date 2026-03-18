@@ -1,0 +1,11 @@
+<%#
+ * Frontend Section: Custom HTML
+ * Rendert benutzerdefinierten HTML-Inhalt aus der DB.
+ *
+ * @context {Object} sectionConfig - {custom_html}
+ * @context {Object} section - Die gesamte Sektion-Row (Zugriff über lokale Variable)
+%>
+
+<% if (sectionConfig.custom_html || (typeof section !== 'undefined' && section.custom_html)) { %>
+  <%- sectionConfig.custom_html || section.custom_html %>
+<% } %>

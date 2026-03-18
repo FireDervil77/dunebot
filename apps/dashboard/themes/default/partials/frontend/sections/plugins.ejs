@@ -1,0 +1,62 @@
+<%# Plugins Carousel Section Partial %>
+
+<section id="plugins" class="plugins section">
+  <div class="container section-title" data-aos="fade-up">
+    <h2>Unsere Plugins</h2>
+    <p>Entdecke die vielfältigen Features, die DuneBot zu bieten hat!</p>
+  </div>
+
+  <div class="container" data-aos="fade-up" data-aos-delay="100">
+    <% if (locals.pluginsList && pluginsList.length > 0) { %>
+      <div id="pluginsCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="5000">
+        <div class="carousel-indicators">
+          <% pluginsList.forEach((plugin, index) => { %>
+            <button type="button" 
+                    data-bs-target="#pluginsCarousel" 
+                    data-bs-slide-to="<%= index %>" 
+                    class="<%= index === 0 ? 'active' : '' %>" 
+                    aria-current="<%= index === 0 ? 'true' : 'false' %>" 
+                    aria-label="<%= plugin.displayName %>">
+            </button>
+          <% }); %>
+        </div>
+
+        <div class="carousel-inner">
+          <% pluginsList.forEach((plugin, index) => { %>
+            <div class="carousel-item <%= index === 0 ? 'active' : '' %>">
+              <div class="plugin-card">
+                <div class="plugin-icon">
+                  <i class="<%= plugin.icon %>"></i>
+                </div>
+                <div class="plugin-content">
+                  <h3><%= plugin.displayName %></h3>
+                  <p class="plugin-description"><%= plugin.description %></p>
+                  <div class="plugin-meta">
+                    <span class="badge bg-primary"><%= plugin.version %></span>
+                    <span class="text-muted ms-2">
+                      <i class="bi bi-person"></i> <%= plugin.author %>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+
+        <button class="carousel-control-prev" type="button" data-bs-target="#pluginsCarousel" data-bs-slide="prev">
+          <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+          <span class="visually-hidden">Vorheriges</span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#pluginsCarousel" data-bs-slide="next">
+          <span class="carousel-control-next-icon" aria-hidden="true"></span>
+          <span class="visually-hidden">Nächstes</span>
+        </button>
+      </div>
+    <% } else { %>
+      <div class="alert alert-info text-center">
+        <i class="bi bi-info-circle me-2"></i>
+        Keine Plugins verfügbar.
+      </div>
+    <% } %>
+  </div>
+</section>

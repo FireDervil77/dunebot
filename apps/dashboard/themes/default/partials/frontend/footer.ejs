@@ -2,41 +2,75 @@
 
     <div class="container footer-top">
       <div class="row gy-4">
-        <div class="col-lg-5 col-md-12 footer-about">
-          <a href="/" class="logo d-flex align-items-center">
-            <span class="sitename"><%= tr('LANDING.BOTNAME') %></span>
-          </a>
-          <p><%= tr('FOOTER.DESCRIPTION') %></p>
-          <div class="social-links d-flex mt-4">
-           <!-- <a href=""><i class="bi bi-twitter-x"></i></a>
-            <a href=""><i class="bi bi-facebook"></i></a>
-            <a href=""><i class="bi bi-instagram"></i></a>
-            <a href=""><i class="bi bi-linkedin"></i></a>-->
+        <% if (typeof footerColumns !== 'undefined' && footerColumns && footerColumns.length > 0) { %>
+          <% footerColumns.forEach(col => { %>
+            <% if (col.column_type === 'about') { %>
+              <div class="<%= col.col_width %> col-md-12 footer-about">
+                <a href="/" class="logo d-flex align-items-center">
+                  <span class="sitename"><%= tr('LANDING.BOTNAME') %></span>
+                </a>
+                <p><%= col.content || tr('FOOTER.DESCRIPTION') %></p>
+                <div class="social-links d-flex mt-4">
+                </div>
+              </div>
+            <% } else if (col.column_type === 'social') { %>
+              <div class="<%= col.col_width %> col-md-6 footer-links">
+                <h4><%= col.title %></h4>
+                <div class="social-links d-flex mt-2">
+                  <% if (col.links) { col.links.forEach(link => { %>
+                    <a href="<%= link.url %>"<%= link.target === '_blank' ? ' target="_blank"' : '' %> title="<%= link.label %>">
+                      <i class="<%= link.icon || 'bi bi-link' %>"></i>
+                    </a>
+                  <% }); } %>
+                </div>
+              </div>
+            <% } else if (col.column_type === 'custom') { %>
+              <div class="<%= col.col_width %> col-md-6 footer-links">
+                <h4><%= col.title %></h4>
+                <%- col.content || '' %>
+              </div>
+            <% } else { %>
+              <!-- links -->
+              <div class="<%= col.col_width %> col-md-6 footer-links">
+                <h4><%= col.title %></h4>
+                <ul>
+                  <% if (col.links) { col.links.forEach(link => { %>
+                    <li><a href="<%= link.url %>"<%= link.target === '_blank' ? ' target="_blank"' : '' %>><%= link.label %></a></li>
+                  <% }); } %>
+                </ul>
+              </div>
+            <% } %>
+          <% }); %>
+        <% } else { %>
+          <!-- Fallback: Hardcoded Footer -->
+          <div class="col-lg-5 col-md-12 footer-about">
+            <a href="/" class="logo d-flex align-items-center">
+              <span class="sitename"><%= tr('LANDING.BOTNAME') %></span>
+            </a>
+            <p><%= tr('FOOTER.DESCRIPTION') %></p>
+            <div class="social-links d-flex mt-4">
+            </div>
           </div>
-        </div>
-
-        <div class="col-lg-3 col-md-6 footer-contact text-center text-md-start">
-          <h4><%= tr('LANDING.SERVICES') %></h4>
-          <ul>
-            <li><a href="<%= coreConfig.githubUrl %>"><%= tr('LANDING.GITHUB') %></a></li>
-            <li><a href="#"><%= tr('LANDING.DOCUMENTATION') %></a></li>
-            <li><a href="/dashboard"><%= tr('LANDING.DASHBOARD') %></a></li>
-            <li><a href="#"><%= tr('LANDING.PLUGINS') %></a></li>
-            <!--<li><a href="#"></a></li>-->
-          </ul>
-        </div>
-
-        <div class="col-lg-2 col-3 footer-links">
-          <h4><%= tr('FOOTER.USEFUL_LINKS') %></h4>
-          <ul>
-            <li><a href="/"><%= tr('LANDING.HOME') %></a></li>
-            <li><a href="/#features"><%= tr('LANDING.FEATURES') %></a></li>
-            <li><a href="/#news"><%= tr('LANDING.NEWS') %></a></li>
-            <li><a href="/tos"><%= tr('FOOTER.TERMS_OF_SERVICE') %></a></li>
-            <li><a href="/privacy"><%= tr('FOOTER.PRIVACY_POLICY') %></a></li>
-          </ul>
-        </div>
-
+          <div class="col-lg-3 col-md-6 footer-contact text-center text-md-start">
+            <h4><%= tr('LANDING.SERVICES') %></h4>
+            <ul>
+              <li><a href="<%= coreConfig.githubUrl %>"><%= tr('LANDING.GITHUB') %></a></li>
+              <li><a href="#"><%= tr('LANDING.DOCUMENTATION') %></a></li>
+              <li><a href="/dashboard"><%= tr('LANDING.DASHBOARD') %></a></li>
+              <li><a href="#"><%= tr('LANDING.PLUGINS') %></a></li>
+            </ul>
+          </div>
+          <div class="col-lg-2 col-3 footer-links">
+            <h4><%= tr('FOOTER.USEFUL_LINKS') %></h4>
+            <ul>
+              <li><a href="/"><%= tr('LANDING.HOME') %></a></li>
+              <li><a href="/#features"><%= tr('LANDING.FEATURES') %></a></li>
+              <li><a href="/#news"><%= tr('LANDING.NEWS') %></a></li>
+              <li><a href="/tos"><%= tr('FOOTER.TERMS_OF_SERVICE') %></a></li>
+              <li><a href="/privacy"><%= tr('FOOTER.PRIVACY_POLICY') %></a></li>
+            </ul>
+          </div>
+        <% } %>
       </div>
     </div>
 

@@ -112,6 +112,13 @@ class GameserverOverview {
                 this.handleGameserverEvent(data);
             });
 
+            // Install-Events (Status, Completed, Failed)
+            this.eventSource.addEventListener('install', (e) => {
+                const data = JSON.parse(e.data);
+                console.log('[GameserverOverview] Install-Event empfangen:', data);
+                this.handleInstallEvent(data);
+            });
+
             // Error-Handling
             this.eventSource.onerror = (e) => {
                 console.error('[GameserverOverview] ❌ SSE-Fehler:', e);
@@ -227,7 +234,41 @@ class GameserverOverview {
             default:
                 console.log(`[GameserverOverview] Unbekannte Action: ${action}`, payload);
         }
-    }    /**
+    }
+
+    /**
+     * Handler für Install-Events
+     * @param {Object} data - Event-Daten vom SSE-Stream
+     */
+    handleInstallEvent(data) {
+        const action = data.action;
+        const payload = data.data || data;
+
+        switch (action) {
+            case 'completed':
+                // Installation abgeschlossen → Status auf offline setzen
+                this.updateServerStatus({
+                    server_id: payload.server_id,
+                    status: 'offline'
+                });
+                break;
+            case 'failed':
+                // Installation fehlgeschlagen → Status auf error setzen
+                this.updateServerStatus({
+                    server_id: payload.server_id,
+                    status: 'error'
+                });
+                break;
+            case 'status':
+                // Install-Phase aktualisieren (z.B. "downloading", "extracting")
+                console.log(`[GameserverOverview] Install-Phase: Server ${payload.server_id} → ${payload.phase || payload.message}`);
+                break;
+            default:
+                console.log(`[GameserverOverview] Unbekannte Install-Action: ${action}`, payload);
+        }
+    }
+
+    /**
      * Aktualisiert Server-Status in UI
      * Funktioniert für:
      * - Overview-Cards (data-server-id auf .card)

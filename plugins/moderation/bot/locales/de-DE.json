@@ -229,5 +229,44 @@
         "NO_WARNINGS": "{{target}} hat keine Verwarnungen",
         "WARNINGS_TITLE": "Verwarnungen für {{target}}",
         "WARN_CLEAR": "Alle Verwarnungen für {{target}} wurden gelöscht"
+    },
+
+    "PROTECTED_ROLE": "{{target}} hat eine geschützte Rolle und kann nicht bestraft werden",
+
+    "CASE": {
+        "DESCRIPTION": "Zeigt Details zu einem Moderations-Case an",
+        "NUMBER_DESC": "Die Case-Nummer",
+        "INVALID_NUMBER": "Bitte gib eine gültige Case-Nummer an (z.B. `/case 1`)",
+        "NOT_FOUND": "Case #{{number}} wurde nicht gefunden"
+    },
+
+    "HISTORY": {
+        "DESCRIPTION": "Zeigt die komplette Moderations-Historie eines Users",
+        "USER_DESC": "Der Benutzer, dessen Historie angezeigt werden soll",
+        "LIMIT_DESC": "Maximale Anzahl der Einträge (Standard: 25, Max: 50)",
+        "NO_HISTORY": "{{target}} hat keine Moderations-Historie",
+        "TITLE": "Moderations-Historie: {{target}}",
+        "FOOTER": "{{count}} Einträge gefunden"
+    },
+
+    "NOTE": {
+        "DESCRIPTION": "Interne Mod-Notizen zu Benutzern verwalten",
+        "SUB_ADD_DESC": "Fügt eine interne Notiz zu einem Benutzer hinzu",
+        "SUB_ADD_USER": "Der Benutzer, zu dem eine Notiz hinzugefügt werden soll",
+        "SUB_ADD_TEXT": "Der Text der Notiz",
+        "SUB_LIST_DESC": "Zeigt alle Notizen zu einem Benutzer an",
+        "SUB_LIST_USER": "Der Benutzer, dessen Notizen angezeigt werden sollen",
+        "SUB_DELETE_DESC": "Löscht eine Notiz",
+        "SUB_DELETE_ID": "Die ID der zu löschenden Notiz",
+
+        "NO_TEXT": "Bitte gib einen Text für die Notiz an",
+        "INVALID_ID": "Bitte gib eine gültige Notiz-ID an",
+        "NO_NOTES": "{{target}} hat keine Notizen",
+        "LIST_TITLE": "Notizen für {{target}}",
+        "LIST_FOOTER": "{{count}} Notizen gefunden",
+        "ADD_SUCCESS": "Notiz #{{id}} für {{target}} erstellt",
+        "ADD_FAILED": "Fehler beim Erstellen der Notiz",
+        "DELETE_SUCCESS": "Notiz #{{id}} wurde gelöscht",
+        "DELETE_FAILED": "Notiz #{{id}} konnte nicht gelöscht werden (nicht gefunden oder keine Berechtigung)"
     }
 }

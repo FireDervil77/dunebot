@@ -140,6 +140,18 @@
             <form id="editFeedbackForm">
                 <input type="hidden" name="feedbackId" id="edit-feedbackId">
                 <div class="modal-body">
+                    <!-- Original Feedback (read-only) -->
+                    <div class="card mb-3" style="background: #f8f9fa;">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center mb-1">
+                                <span id="edit-type-badge" class="badge mr-2"></span>
+                                <strong id="edit-title-display"></strong>
+                                <span id="edit-category-badge" class="badge badge-secondary ml-2" style="display:none;"></span>
+                            </div>
+                            <p id="edit-description-display" class="mb-0 mt-1 text-muted" style="white-space: pre-wrap; font-size: 0.9em;"></p>
+                        </div>
+                    </div>
+                    <hr>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Status</label>
@@ -187,12 +199,32 @@
 
 <script>
 // Feedback bearbeiten
-function editFeedback(id, status, priority, adminNotes, adminResponse) {
+function editFeedback(id, status, priority, adminNotes, adminResponse, title, description, type, category) {
     $('#edit-feedbackId').val(id);
     $('#edit-status').val(status);
     $('#edit-priority').val(priority);
     $('#edit-admin-notes').val(adminNotes || '');
     $('#edit-admin-response').val(adminResponse || '');
+
+    // Original-Text anzeigen
+    $('#edit-title-display').text(title || '');
+    $('#edit-description-display').text((description || '').replace(/\\n/g, '\n'));
+
+    // Typ-Badge
+    const $badge = $('#edit-type-badge');
+    if (type === 'bug') {
+        $badge.attr('class', 'badge badge-danger mr-2').html('<i class="fa-solid fa-bug mr-1"></i>Bug');
+    } else {
+        $badge.attr('class', 'badge badge-info mr-2').html('<i class="fa-solid fa-lightbulb mr-1"></i>Feature');
+    }
+
+    // Kategorie
+    if (category) {
+        $('#edit-category-badge').text(category).show();
+    } else {
+        $('#edit-category-badge').hide();
+    }
+
     $('#editFeedbackModal').modal('show');
 }
 
@@ -249,6 +281,29 @@ $('#deleteFeedbackBtn').on('click', async function() {
         }
     } catch (error) {
         alert('Fehler beim Löschen');
+    }
+});
+
+// Inline Status-Dropdown: direktes Setzen ohne Modal öffnen
+$(document).on('change', '.feedback-status-select', async function() {
+    const feedbackId = $(this).data('id');
+    const newStatus  = $(this).val();
+    const $select    = $(this);
+
+    try {
+        const response = await fetch(`/admin/feedback/${feedbackId}/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        });
+        const result = await response.json();
+        if (!result.success) {
+            alert('Fehler: ' + result.message);
+            window.location.reload(); // Revert
+        }
+    } catch (err) {
+        alert('Netzwerkfehler beim Status-Update');
+        window.location.reload();
     }
 });
 </script>

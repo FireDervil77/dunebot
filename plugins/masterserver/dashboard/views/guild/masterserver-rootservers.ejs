@@ -1,0 +1,281 @@
+<!-- RootServer Übersicht -->
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">
+                    <i class="fa-solid fa-server mr-2"></i>RootServer
+                </h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/dashboard">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver">Masterserver</a></li>
+                    <li class="breadcrumb-item active">RootServer</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+
+        <!-- Stats-Leiste -->
+        <div class="row mb-3">
+            <div class="col-md-3 col-sm-6">
+                <div class="info-box">
+                    <span class="info-box-icon bg-info"><i class="fa-solid fa-server"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">RootServer gesamt</span>
+                        <span class="info-box-number"><%= serverStats.total %></span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="info-box">
+                    <span class="info-box-icon bg-success"><i class="fa-solid fa-circle-check"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Online</span>
+                        <span class="info-box-number"><%= servers.filter(s => s.isOnline).length %></span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="info-box">
+                    <span class="info-box-icon bg-warning"><i class="fa-solid fa-circle-xmark"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Offline</span>
+                        <span class="info-box-number"><%= servers.filter(s => !s.isOnline).length %></span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="info-box">
+                    <span class="info-box-icon bg-primary"><i class="fa-solid fa-gamepad"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Gameserver</span>
+                        <span class="info-box-number"><%= serverStats.totalGameservers %></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Aktionen -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers/create"
+                   class="btn btn-success">
+                    <i class="fa-solid fa-plus mr-1"></i>Neuen RootServer hinzufügen
+                </a>
+            </div>
+        </div>
+
+        <!-- Server-Karten -->
+        <% if (!servers || servers.length === 0) { %>
+            <div class="alert alert-info">
+                <i class="fa-solid fa-info-circle mr-2"></i>
+                Noch kein RootServer konfiguriert.
+                <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers/create" class="alert-link">Jetzt einen erstellen</a>.
+            </div>
+        <% } else { %>
+            <div class="row" id="rootserver-cards">
+                <% for (const rs of servers) { %>
+                    <%
+                        const cpuPct  = rs.cpu_usage_percent != null ? parseFloat(rs.cpu_usage_percent).toFixed(0) : null;
+                        const ramUsed = rs.ram_usage_gb      != null ? parseFloat(rs.ram_usage_gb).toFixed(1) : null;
+                        const ramTot  = rs.ram_total_gb      != null ? parseFloat(rs.ram_total_gb).toFixed(0) : null;
+                        const diskUsed= rs.disk_usage_gb     != null ? parseFloat(rs.disk_usage_gb).toFixed(0) : null;
+                        const diskTot = rs.disk_total_gb     != null ? parseFloat(rs.disk_total_gb).toFixed(0) : null;
+                        const ramPct  = (ramUsed && ramTot && parseFloat(ramTot) > 0) ? Math.round(parseFloat(ramUsed)/parseFloat(ramTot)*100) : null;
+                        const diskPct = (diskUsed && diskTot && parseFloat(diskTot) > 0) ? Math.round(parseFloat(diskUsed)/parseFloat(diskTot)*100) : null;
+                    %>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="card card-outline <%= rs.isOnline ? 'card-success' : 'card-secondary' %>"
+                             id="rs-card-<%= rs.id %>"
+                             data-rs-id="<%= rs.id %>"
+                             data-online="<%= rs.isOnline ? '1' : '0' %>">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-server mr-1"></i>
+                                    <%= rs.name %>
+                                </h3>
+                                <div class="card-tools">
+                                    <span class="badge badge-<%= rs.isOnline ? 'success' : 'secondary' %>"
+                                          id="rs-badge-<%= rs.id %>">
+                                        <i class="fa-solid fa-circle mr-1" style="font-size:.6em;"></i>
+                                        <span id="rs-badge-txt-<%= rs.id %>"><%= rs.isOnline ? 'Online' : 'Offline' %></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-body pt-2 pb-2">
+                                <!-- Info-Zeilen -->
+                                <div class="d-flex justify-content-between text-sm mb-1">
+                                    <span class="text-muted"><i class="fa-solid fa-network-wired mr-1"></i>IP</span>
+                                    <span><code><%= rs.host || '–' %></code></span>
+                                </div>
+                                <% if (rs.datacenter || rs.country_code) { %>
+                                <div class="d-flex justify-content-between text-sm mb-1">
+                                    <span class="text-muted"><i class="fa-solid fa-location-dot mr-1"></i>Standort</span>
+                                    <span><%= rs.datacenter || '' %> <% if (rs.country_code) { %><span class="badge badge-light"><%= rs.country_code %></span><% } %></span>
+                                </div>
+                                <% } %>
+                                <% if (rs.daemon_version) { %>
+                                <div class="d-flex justify-content-between text-sm mb-2">
+                                    <span class="text-muted"><i class="fa-solid fa-tag mr-1"></i>Version</span>
+                                    <span>v<%= rs.daemon_version %></span>
+                                </div>
+                                <% } %>
+
+                                <!-- Resource-Widgets (live via JS) -->
+                                <div class="mb-1">
+                                    <div class="d-flex justify-content-between text-sm">
+                                        <span class="text-muted">CPU</span>
+                                        <span id="rs-cpu-txt-<%= rs.id %>" class="<%= cpuPct !== null ? (parseInt(cpuPct) > 80 ? 'text-danger' : parseInt(cpuPct) > 60 ? 'text-warning' : 'text-success') : 'text-muted' %>">
+                                            <%= cpuPct !== null ? cpuPct + '%' : '–' %>
+                                        </span>
+                                    </div>
+                                    <div class="progress progress-xs">
+                                        <div class="progress-bar <%= cpuPct !== null ? (parseInt(cpuPct) > 80 ? 'bg-danger' : parseInt(cpuPct) > 60 ? 'bg-warning' : 'bg-success') : 'bg-secondary' %>"
+                                             id="rs-cpu-bar-<%= rs.id %>"
+                                             style="width:<%= cpuPct !== null ? cpuPct + '%' : '0%' %>;transition:width .5s ease;"></div>
+                                    </div>
+                                </div>
+                                <div class="mb-1">
+                                    <div class="d-flex justify-content-between text-sm">
+                                        <span class="text-muted">RAM</span>
+                                        <span id="rs-ram-txt-<%= rs.id %>">
+                                            <%= ramUsed && ramTot ? ramUsed + ' / ' + ramTot + ' GB (' + ramPct + '%)' : '–' %>
+                                        </span>
+                                    </div>
+                                    <div class="progress progress-xs">
+                                        <div class="progress-bar <%= ramPct !== null ? (ramPct > 85 ? 'bg-danger' : ramPct > 65 ? 'bg-warning' : 'bg-info') : 'bg-secondary' %>"
+                                             id="rs-ram-bar-<%= rs.id %>"
+                                             style="width:<%= ramPct !== null ? ramPct + '%' : '0%' %>;transition:width .5s ease;"></div>
+                                    </div>
+                                </div>
+                                <div class="mb-1">
+                                    <div class="d-flex justify-content-between text-sm">
+                                        <span class="text-muted">Disk</span>
+                                        <span id="rs-disk-txt-<%= rs.id %>">
+                                            <%= diskUsed && diskTot ? diskUsed + ' / ' + diskTot + ' GB (' + diskPct + '%)' : '–' %>
+                                        </span>
+                                    </div>
+                                    <div class="progress progress-xs">
+                                        <div class="progress-bar <%= diskPct !== null ? (diskPct > 90 ? 'bg-danger' : diskPct > 70 ? 'bg-warning' : 'bg-primary') : 'bg-secondary' %>"
+                                             id="rs-disk-bar-<%= rs.id %>"
+                                             style="width:<%= diskPct !== null ? diskPct + '%' : '0%' %>;transition:width .5s ease;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer p-2 d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <% if (rs.last_seen) { %>
+                                        Zuletzt: <%= new Date(rs.last_seen).toLocaleString('de-DE', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) %>
+                                    <% } else { %>
+                                        Noch nie verbunden
+                                    <% } %>
+                                </small>
+                                <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rs.id %>"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fa-solid fa-arrow-right mr-1"></i>Details
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
+            </div>
+        <% } %>
+
+    </div>
+</section>
+
+<!-- Live-Stats Poll -->
+<script>
+(function () {
+    const GUILD_ID  = '<%= guildId %>';
+    const BASE_URL  = '/guild/' + GUILD_ID + '/plugins/masterserver/rootservers/';
+    const INTERVAL  = 10000; // 10s
+
+    // Alle Karten einsammeln (auch offline — wir pollen trotzdem, Status kann sich ändern)
+    const cards = Array.from(document.querySelectorAll('[data-rs-id]'));
+    if (!cards.length) return;
+
+    // Farbklassen für Balken
+    function cpuColor(p)  { return p >= 80 ? 'bg-danger' : p >= 60 ? 'bg-warning' : 'bg-success'; }
+    function ramColor(p)  { return p >= 85 ? 'bg-danger' : p >= 65 ? 'bg-warning' : 'bg-info'; }
+    function diskColor(p) { return p >= 90 ? 'bg-danger' : p >= 70 ? 'bg-warning' : 'bg-primary'; }
+    function cpuTextColor(p) { return p >= 80 ? 'text-danger' : p >= 60 ? 'text-warning' : 'text-success'; }
+
+    function setBar(barEl, txtEl, pct, colorFn, label) {
+        if (!barEl || pct == null) return;
+        barEl.style.width = pct + '%';
+        barEl.className = 'progress-bar ' + colorFn(pct);
+        if (txtEl) txtEl.textContent = label;
+    }
+
+    function updateCard(rsId, data) {
+        const hw  = data.systemResources;
+        const card = document.getElementById('rs-card-' + rsId);
+        const badge = document.getElementById('rs-badge-' + rsId);
+        const badgeTxt = document.getElementById('rs-badge-txt-' + rsId);
+        const online = data.isOnline;
+
+        // Badge + Card-Border
+        if (badge) {
+            badge.className = 'badge badge-' + (online ? 'success' : 'secondary');
+        }
+        if (badgeTxt) badgeTxt.textContent = online ? 'Online' : 'Offline';
+        if (card) {
+            card.classList.remove('card-success', 'card-secondary');
+            card.classList.add(online ? 'card-success' : 'card-secondary');
+        }
+
+        if (!hw) return;
+
+        // CPU
+        if (hw.cpu_percent != null) {
+            const p = Math.round(hw.cpu_percent);
+            const txtCls = cpuTextColor(p);
+            const cpuTxt = document.getElementById('rs-cpu-txt-' + rsId);
+            if (cpuTxt) { cpuTxt.textContent = p + '%'; cpuTxt.className = txtCls; }
+            setBar(document.getElementById('rs-cpu-bar-' + rsId), null, p, cpuColor, null);
+        }
+        // RAM
+        if (hw.ram_used_gb != null && hw.ram_total_gb != null && hw.ram_total_gb > 0) {
+            const p = Math.round(hw.ram_used_gb / hw.ram_total_gb * 100);
+            const used = parseFloat(hw.ram_used_gb).toFixed(1);
+            const tot  = parseFloat(hw.ram_total_gb).toFixed(0);
+            setBar(document.getElementById('rs-ram-bar-' + rsId),
+                   document.getElementById('rs-ram-txt-' + rsId),
+                   p, ramColor, used + ' / ' + tot + ' GB (' + p + '%)');
+        }
+        // Disk
+        if (hw.disk_used_gb != null && hw.disk_total_gb != null && hw.disk_total_gb > 0) {
+            const p = Math.round(hw.disk_used_gb / hw.disk_total_gb * 100);
+            const used = Math.round(hw.disk_used_gb);
+            const tot  = Math.round(hw.disk_total_gb);
+            setBar(document.getElementById('rs-disk-bar-' + rsId),
+                   document.getElementById('rs-disk-txt-' + rsId),
+                   p, diskColor, used + ' / ' + tot + ' GB (' + p + '%)');
+        }
+    }
+
+    async function pollAll() {
+        await Promise.allSettled(cards.map(async (card) => {
+            const rsId = card.dataset.rsId;
+            try {
+                const r = await fetch(BASE_URL + rsId + '/status');
+                if (!r.ok) return;
+                const { success, data } = await r.json();
+                if (!success || !data) return;
+                updateCard(rsId, data);
+            } catch (_) {}
+        }));
+    }
+
+    // Sofort + dann alle 10s
+    pollAll();
+    setInterval(pollAll, INTERVAL);
+})();
+</script>

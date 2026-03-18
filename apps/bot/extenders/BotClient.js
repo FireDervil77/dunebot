@@ -71,7 +71,6 @@ class BotClient extends Client {
         
         this.pluginManager = new PluginManager(
             this,
-            process.env.REGISTRY_PATH,
             process.env.PLUGINS_DIR
         );
 

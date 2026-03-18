@@ -168,8 +168,90 @@
                         </tr>
                     </tbody>
                 </table>
+                <% if (userPermissions.permissions['GAMESERVER.EDIT']) { %>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-primary" data-toggle="modal" data-target="#portsEditModal">
+                        <i class="fas fa-edit me-1"></i>Ports bearbeiten
+                    </button>
+                </div>
+                <% } %>
             </div>
         </div>
+
+<!-- Port-Edit-Modal -->
+<div class="modal fade" id="portsEditModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plug me-2"></i>Ports bearbeiten</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning alert-sm">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    Ports können nur geändert werden wenn der Server <strong>offline</strong> ist.
+                    Stelle sicher, dass kein anderer Server diese Ports belegt.
+                </div>
+                <div id="ports-form">
+                <%
+                const portsObj = server.ports_parsed || {};
+                const portTypeLabels = { game: 'Game-Port', query: 'Query-Port', rcon: 'RCON-Port' };
+                const allPortKeys = Object.keys(portsObj).length ? Object.keys(portsObj) : ['game'];
+                for (const pKey of allPortKeys) {
+                    const pEntry = portsObj[pKey] || {};
+                    const label = portTypeLabels[pKey] || pKey;
+                    const extVal = pEntry.external || pEntry.internal || '';
+                %>
+                    <div class="form-group">
+                        <label><strong><%= label %></strong> <code class="text-muted small"><%= pKey %></code></label>
+                        <input type="number" class="form-control port-input" data-port-key="<%= pKey %>"
+                               value="<%= extVal %>" min="1024" max="65535" placeholder="z.B. 27015">
+                    </div>
+                <% } %>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" id="ports-save-btn" onclick="savePorts()">
+                    <i class="fas fa-save me-1"></i>Speichern
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function savePorts() {
+    const btn = document.getElementById('ports-save-btn');
+    const inputs = document.querySelectorAll('.port-input');
+    const ports = {};
+    inputs.forEach(inp => {
+        const key = inp.dataset.portKey;
+        const val = parseInt(inp.value, 10);
+        if (key && val >= 1024 && val <= 65535) ports[key] = val;
+        else if (key) { toastr.error(`Ungültiger Port für ${key}: ${inp.value} (muss zwischen 1024 und 65535 liegen)`); return; }
+    });
+    if (!Object.keys(ports).length) return;
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Speichern...';
+    try {
+        const resp = await fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/ports`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify(ports)
+        });
+        const r = await resp.json();
+        if (r.success) {
+            toastr.success('Ports gespeichert – wird beim nächsten Start wirksam.');
+            $('#portsEditModal').modal('hide');
+            // Port-Anzeige aktualisieren ohne Reload
+            Object.entries(ports).forEach(([k, v]) => {
+                if (k === 'game') document.querySelector('[data-port-game]') && (document.querySelector('[data-port-game]').textContent = v);
+            });
+        } else { toastr.error(r.message || 'Fehler beim Speichern'); }
+    } catch(e) { toastr.error('Netzwerkfehler'); }
+    finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save me-1"></i>Speichern'; }
+}
+</script>
             <!-- ========================================
              PLAYER STATS (nur bei online)
              ======================================== -->
@@ -203,6 +285,167 @@
                     </div>
                 </div>
             </div>
+        <% } %>
+
+        <!-- ========================================
+             LIVE-QUERY (GameDig – nur wenn Addon Query unterstützt)
+             ======================================== -->
+        <% if (server.status === 'online' && server.gamedig_type) { %>
+            <div class="card mt-3" id="live-query-card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-satellite-dish me-2"></i>
+                        Live-Status
+                        <span class="badge bg-secondary ms-2" id="query-ping-badge" style="display:none"></span>
+                    </h3>
+                    <button class="btn btn-sm btn-outline-primary" id="btn-refresh-query" onclick="refreshLiveQuery()">
+                        <i class="fas fa-sync-alt me-1"></i>Aktualisieren
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="live-query-loading" class="text-center text-muted py-3">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Lade Live-Status…
+                    </div>
+                    <div id="live-query-content" style="display:none">
+                        <div class="row g-3 mb-3">
+                            <div class="col-6 col-md-3 text-center">
+                                <div class="fw-bold text-primary fs-4" id="qry-players">–</div>
+                                <div class="small text-muted">Spieler</div>
+                            </div>
+                            <div class="col-6 col-md-3 text-center">
+                                <div class="fw-bold fs-4" id="qry-map">–</div>
+                                <div class="small text-muted">Map</div>
+                            </div>
+                            <div class="col-6 col-md-3 text-center">
+                                <div class="fw-bold fs-4" id="qry-ping">–</div>
+                                <div class="small text-muted">Ping (ms)</div>
+                            </div>
+                            <div class="col-6 col-md-3 text-center">
+                                <div id="qry-password" class="fw-bold fs-4">–</div>
+                                <div class="small text-muted">Passwort</div>
+                            </div>
+                            <div class="col-6 col-md-3 text-center" id="qry-version-col" style="display:none">
+                                <div class="fw-bold fs-4" id="qry-version">–</div>
+                                <div class="small text-muted">Spielversion</div>
+                            </div>
+                        </div>
+                        <div id="qry-player-list" class="mt-2" style="display:none">
+                            <table class="table table-sm table-striped mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Spielername</th>
+                                        <th class="text-end">Score</th>
+                                        <th class="text-end">Spielzeit</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="qry-player-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="live-query-error" class="alert alert-warning mb-0" style="display:none">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span id="live-query-error-msg"></span>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            (function () {
+                const QUERY_URL = '/guild/<%= server.guild_id %>/plugins/gameserver/servers/<%= server.id %>/query';
+
+                function secondsToHMS(s) {
+                    if (!s && s !== 0) return '–';
+                    const h = Math.floor(s / 3600);
+                    const m = Math.floor((s % 3600) / 60);
+                    const sec = Math.floor(s % 60);
+                    return [h>0?h+'h':null, m+'m', sec+'s'].filter(Boolean).join(' ');
+                }
+
+                window.refreshLiveQuery = async function () {
+                    document.getElementById('live-query-loading').style.display = '';
+                    document.getElementById('live-query-content').style.display = 'none';
+                    document.getElementById('live-query-error').style.display = 'none';
+                    document.getElementById('btn-refresh-query').disabled = true;
+
+                    try {
+                        const res  = await fetch(QUERY_URL, { credentials: 'same-origin' });
+                        const data = await res.json();
+
+                        if (!data.success) {
+                            document.getElementById('live-query-error-msg').textContent = data.error || 'Abfrage fehlgeschlagen';
+                            document.getElementById('live-query-error').style.display = '';
+                            document.getElementById('live-query-loading').style.display = 'none';
+                            return;
+                        }
+
+                        // Felder füllen
+                        const currentPlayersCount = data.players?.length ?? 0;
+                        const maxPlayersCount     = data.maxPlayers ?? 0;
+                        document.getElementById('qry-players').textContent =
+                            currentPlayersCount + ' / ' + (data.maxPlayers ?? '?');
+
+                        // Spieler-Card oben live aktualisieren
+                        const cpEl = document.querySelector('[data-current-players]');
+                        if (cpEl) cpEl.textContent = currentPlayersCount + ' / ' + (data.maxPlayers ?? '?');
+                        const barEl = document.querySelector('[data-players-bar]');
+                        if (barEl && maxPlayersCount > 0) {
+                            const pct = Math.round((currentPlayersCount / maxPlayersCount) * 100);
+                            barEl.style.width = pct + '%';
+                            barEl.textContent = pct + '%';
+                        }
+
+                        document.getElementById('qry-map').textContent  = data.map  || '–';
+                        document.getElementById('qry-ping').textContent = data.ping != null ? data.ping + ' ms' : '–';
+                        document.getElementById('qry-password').innerHTML = data.password
+                            ? '<i class="fas fa-lock text-warning"></i>' : '<i class="fas fa-lock-open text-success"></i>';
+
+                        // Spielversion aus tags (z.B. ["g=0.221.12", ...])
+                        const versionTag = (data.tags || []).find(t => t.startsWith('g='));
+                        const gameVersion = versionTag ? versionTag.slice(2) : null;
+                        const verCol = document.getElementById('qry-version-col');
+                        if (gameVersion) {
+                            document.getElementById('qry-version').textContent = gameVersion;
+                            verCol.style.display = '';
+                        } else {
+                            verCol.style.display = 'none';
+                        }
+
+                        // Ping-Badge
+                        const badge = document.getElementById('query-ping-badge');
+                        badge.textContent = data.ping != null ? data.ping + ' ms' : '';
+                        badge.style.display = data.ping != null ? '' : 'none';
+
+                        // Spielerliste
+                        const players = data.players || [];
+                        if (players.length > 0) {
+                            const tbody = document.getElementById('qry-player-tbody');
+                            tbody.innerHTML = players.map((p, i) => `
+                                <tr>
+                                    <td>${p.name || ('Spieler ' + (i + 1))}</td>
+                                    <td class="text-end">${p.score ?? '–'}</td>
+                                    <td class="text-end">${secondsToHMS(p.time)}</td>
+                                </tr>`).join('');
+                            document.getElementById('qry-player-list').style.display = '';
+                        } else {
+                            document.getElementById('qry-player-list').style.display = 'none';
+                        }
+
+                        document.getElementById('live-query-content').style.display = '';
+                        document.getElementById('live-query-loading').style.display = 'none';
+
+                    } catch (e) {
+                        document.getElementById('live-query-error-msg').textContent = 'Netzwerkfehler: ' + e.message;
+                        document.getElementById('live-query-error').style.display = '';
+                        document.getElementById('live-query-loading').style.display = 'none';
+                    } finally {
+                        document.getElementById('btn-refresh-query').disabled = false;
+                    }
+                };
+
+                // Automatisch beim Laden ausführen
+                refreshLiveQuery();
+            })();
+            </script>
         <% } %>
     </div>
 </div>

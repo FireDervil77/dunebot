@@ -615,6 +615,20 @@ class CommandManager {
             Logger.debug('Registriere interactionCreate-Handler für den Client');
             
             this.client.on('interactionCreate', async (interaction) => {
+                // Autocomplete-Interaktionen separat behandeln
+                if (interaction.isAutocomplete()) {
+                    const command = this.slashCommands.get(interaction.commandName.toLowerCase());
+                    if (command?.autocomplete) {
+                        try {
+                            await command.autocomplete({ interaction, client: this.client });
+                        } catch (err) {
+                            Logger.error(`[Autocomplete] Fehler bei ${interaction.commandName}:`, err);
+                            await interaction.respond([]).catch(() => {});
+                        }
+                    }
+                    return;
+                }
+
                 // Nur für Slash-Commands und Kontext-Menüs
                 if (!interaction.isCommand() && !interaction.isContextMenuCommand()) return;
                 

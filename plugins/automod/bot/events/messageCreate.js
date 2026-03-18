@@ -1,6 +1,7 @@
 const { MiscUtils, Logger, EmbedUtils } = require("dunebot-sdk/utils");
 const { antispamCache, MESSAGE_SPAM_THRESHOLD, shouldModerate } = require("../utils");
-const { AutoModSettings, AutoModStrikes, AutoModLogs } = require("../../shared/models");
+const { AutoModSettings, AutoModStrikes, AutoModLogs, AutoModEscalation, AutoModExemptions, AutoModRegexRules, AutoModCompoundRules } = require("../../shared/models");
+const { loadKeywordLists } = require("../keywordLoader");
 
 // Moderation Integration - Optional dependency
 let addModAction;
@@ -36,6 +37,18 @@ module.exports = async (message) => {
     const settings = await AutoModSettings.getSettings(message.guild.id);
 
     if (settings.whitelisted_channels.includes(message.channelId)) return;
+
+    // Exemption-Check: Channels und Rollen
+    try {
+        const [channelExempt, memberExempt] = await Promise.all([
+            AutoModExemptions.isExempt(message.guild.id, 'channel', message.channelId),
+            AutoModExemptions.isMemberExempt(message.guild.id, message.member.roles.cache.map(r => r.id))
+        ]);
+        if (channelExempt || memberExempt) return;
+    } catch {
+        // Bei DB-Fehler weitermachen mit normalen Checks
+    }
+
     if (!settings.debug_mode && !shouldModerate(message)) return;
 
     const { channel, member, guild, content, author, mentions } = message;
@@ -177,6 +190,97 @@ module.exports = async (message) => {
         }
     }
 
+    // Keyword-Listen Check
+    if (settings.active_keyword_lists) {
+        let activeListIds;
+        try {
+            activeListIds = typeof settings.active_keyword_lists === 'string'
+                ? JSON.parse(settings.active_keyword_lists)
+                : settings.active_keyword_lists;
+        } catch {
+            activeListIds = [];
+        }
+
+        if (Array.isArray(activeListIds) && activeListIds.length > 0) {
+            const allLists = loadKeywordLists();
+            const lowerContent = content.toLowerCase();
+
+            for (const listId of activeListIds) {
+                const list = allLists.get(listId);
+                if (!list) continue;
+
+                const matched = list.keywords.find(kw => lowerContent.includes(kw.toLowerCase()));
+                if (matched) {
+                    fields.push({
+                        name: guild.getT("automod:HANDLER.FIELD_KEYWORD", { list: list.name }),
+                        value: `||${matched}||`,
+                        inline: true,
+                    });
+                    shouldDelete = true;
+                    strikesTotal += 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Regex-Regeln Check
+    try {
+        const matchedRule = await AutoModRegexRules.testMessage(guild.id, content);
+        if (matchedRule) {
+            fields.push({
+                name: guild.getT("automod:HANDLER.FIELD_REGEX", { rule: matchedRule.name }),
+                value: "✓",
+                inline: true,
+            });
+
+            if (matchedRule.action === 'DELETE' || matchedRule.action === 'STRIKE') {
+                shouldDelete = true;
+            }
+            if (matchedRule.action === 'STRIKE' || matchedRule.action === 'WARN') {
+                strikesTotal += 1;
+            }
+        }
+    } catch (err) {
+        Logger.error('[AutoMod] Regex-Check Fehler:', err);
+    }
+
+    // Compound Rules Check
+    try {
+        const matchedCompound = await AutoModCompoundRules.checkMessage(message);
+        if (matchedCompound) {
+            fields.push({
+                name: guild.getT("automod:HANDLER.FIELD_COMPOUND", { rule: matchedCompound.name }),
+                value: "✓",
+                inline: true,
+            });
+
+            if (['DELETE', 'STRIKE', 'TIMEOUT', 'KICK', 'BAN'].includes(matchedCompound.action)) {
+                shouldDelete = true;
+            }
+            if (['STRIKE', 'WARN'].includes(matchedCompound.action)) {
+                strikesTotal += 1;
+            }
+            // Direkte Aktionen (TIMEOUT/KICK/BAN) werden nach dem Strike-System ausgeführt
+            if (['TIMEOUT', 'KICK', 'BAN'].includes(matchedCompound.action)) {
+                const duration = matchedCompound.action === 'TIMEOUT' && matchedCompound.duration
+                    ? matchedCompound.duration * 60 * 1000
+                    : undefined;
+                try {
+                    await addModAction(
+                        guild.members.me,
+                        member,
+                        guild.getT("automod:HANDLER.AUTO_ACTION_REASON") + ` [${matchedCompound.name}]`,
+                        matchedCompound.action,
+                        duration,
+                    );
+                } catch {}
+            }
+        }
+    } catch (err) {
+        Logger.error('[AutoMod] Compound-Rules-Check Fehler:', err);
+    }
+
     // delete message if deletable
     if (shouldDelete && message.deletable) {
         message
@@ -238,12 +342,36 @@ module.exports = async (message) => {
 
         author.send({ embeds: [strikeEmbed] }).catch(() => {});
 
-        // check if max strikes are received
-        if (dbStrikes >= settings.max_strikes) {
-            // Reset Strikes
+        // check if max strikes are received - Escalation System
+        const escalationLevel = await AutoModEscalation.getActionForStrikes(guild.id, dbStrikes);
+
+        if (escalationLevel) {
+            // Eskalationsstufe gefunden -> Aktion ausführen
             dbStrikes = 0;
 
-            // Add Moderation Action
+            const actionToExecute = escalationLevel.action;
+            const duration = escalationLevel.duration;
+
+            if (actionToExecute === 'TIMEOUT' && duration) {
+                await addModAction(
+                    guild.members.me,
+                    member,
+                    guild.getT("automod:HANDLER.AUTO_ACTION_REASON"),
+                    actionToExecute,
+                    duration * 60 * 1000,
+                ).catch(() => {});
+            } else {
+                await addModAction(
+                    guild.members.me,
+                    member,
+                    guild.getT("automod:HANDLER.AUTO_ACTION_REASON"),
+                    actionToExecute,
+                ).catch(() => {});
+            }
+        } else if (dbStrikes >= settings.max_strikes) {
+            // Fallback: Kein Escalation Config -> altes System
+            dbStrikes = 0;
+
             await addModAction(
                 guild.members.me,
                 member,

@@ -108,15 +108,17 @@
             <% if (variablesArray && variablesArray.length > 0) { %>
               <form id="variablesForm">
                 <% variablesArray.forEach((variable, index) => { 
-                  // FIREBOT_v1: {key, default, description, user_editable}
-                  // Legacy:     {name, display_name, default_value, type, required}
-                  const varName = variable.name || variable.key || `VAR_${index}`;
-                  const varDisplayName = variable.display_name || variable.name || variable.key || 'Variable';
+                  // env_variable = technischer ENV-Key (SERVER_NAME), name = Anzeigename
+                  // Form-Feldname MUSS der ENV-Key sein, damit env_variables korrekt gespeichert werden
+                  const varName = variable.env_variable || variable.key || variable.name || `VAR_${index}`;
+                  const varDisplayName = variable.display_name || variable.name || varName;
                   const varDescription = variable.description || '';
                   const varDefaultValue = variable.default_value !== undefined ? variable.default_value : (variable.default !== undefined ? variable.default : '');
                   const varType = variable.type || 'text';
                   const varOptions = variable.options || [];
                   const isRequired = variable.required === true; // NUR wenn explizit true!
+                  // user_editable: false → System-assigned (z.B. Ports) → im Formular ausblenden
+                  if (variable.user_editable === false) return;
                 %>
                   <div class="form-group">
                     <label for="var_<%= varName %>">
@@ -177,6 +179,15 @@
                     <% } %>
                   </div>
                 <% }); %>
+                <% const systemAssigned = variablesArray.filter(v => v.user_editable === false); %>
+                <% if (systemAssigned.length > 0) { %>
+                  <div class="alert alert-secondary mt-3 mb-0">
+                    <i class="fa-solid fa-lock mr-2"></i>
+                    <strong>System-automatisch belegt:</strong>
+                    <%= systemAssigned.map(v => `<code>${v.env_variable || v.name}</code>`).join(', ') %>
+                    &mdash; Diese Werte werden automatisch vom System zugewiesen (z.&nbsp;B. Ports aus dem Port-Pool).
+                  </div>
+                <% } %>
               </form>
             <% } else { %>
               <div class="alert alert-info mb-0">
@@ -271,10 +282,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Variable-Value Map
     const variableValues = new Map();
     
-    // Initialize variable values from defaults
+    // Initialize variable values from defaults (env_variable als Key für korrekte Startup-Preview)
     <% if (variablesArray && variablesArray.length > 0) { %>
       <% variablesArray.forEach(variable => { 
-        const varName = variable.name || '';
+        const varName = variable.env_variable || variable.key || variable.name || '';
         const varDefault = variable.default_value || '';
       %>
         variableValues.set('<%= varName %>', '<%= varDefault %>');

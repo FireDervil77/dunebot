@@ -8,12 +8,16 @@
     },
 
     "NAV": {
-        "GREETING": "Begrüßungen"
+        "GREETING": "Greetings"
     },
-    
+
     "TAB_WELCOME": "Welcome",
     "TAB_FAREWELL": "Farewell",
+    "TAB_DM_WELCOME": "DM Welcome",
     "TAB_AUTOROLE": "Autorole",
+    "TAB_BOOST": "Boost",
+    "TAB_VERIFICATION": "Verification",
+    "TAB_INVITE_TRACKING": "Invite Tracking",
 
     "WELCOME": {
         "TITLE": "Welcome Messages",
@@ -27,9 +31,23 @@
         "MESSAGE": "Farewell Message"
     },
 
+    "DM_WELCOME": {
+        "TITLE": "DM Welcome Message",
+        "DESC": "Send new members a private welcome message",
+        "MESSAGE": "DM Message",
+        "INFO": "This message will be sent as a direct message to new members. Note: Members with DMs disabled will not receive this."
+    },
+
+    "BOOST": {
+        "TITLE": "Boost Messages",
+        "DESC": "Celebrate members who boost your server",
+        "MESSAGE": "Boost Message",
+        "INFO": "This message is sent when a member boosts the server."
+    },
+
     "AUTOROLE": {
-        "TITLE": "Automatic Role",
-        "DESC": "This role will be automatically assigned to new members"
+        "TITLE": "Automatic Roles",
+        "DESC": "These roles will be automatically assigned to new members"
     },
 
     "CHANNEL_TITLE": "Channel",
@@ -40,9 +58,50 @@
     "STATUS_ENABLED": "Enabled",
     "STATUS_DISABLED": "Disabled",
 
-    "AUTOROLE_SELECT": "Select Role",
-    "AUTOROLE_NONE": "No automatic role",
-    "AUTOROLE_INFO": "The selected role will be automatically given to all new members upon joining.",
+    "AUTOROLE_SELECT": "Select Roles",
+    "AUTOROLE_NONE": "No automatic roles",
+    "AUTOROLE_INFO": "The selected roles will be automatically given to all new members upon joining.",
+    "AUTOROLE_MULTI_HINT": "You can select multiple roles (Ctrl/Cmd + Click)",
+
+    "IMAGE": {
+        "TITLE": "Welcome Image",
+        "DESC": "Generated welcome banner with avatar",
+        "ENABLE": "Enable Welcome Image",
+        "BG_TITLE": "Background",
+        "BG_DEFAULT": "Default",
+        "BG_DARK": "Dark",
+        "BG_BLUE": "Blue",
+        "BG_PURPLE": "Purple",
+        "BG_GREEN": "Green",
+        "BG_SUNSET": "Sunset",
+        "BG_OCEAN": "Ocean",
+        "TEXT_TITLE": "Welcome Text",
+        "TEXT_PLACEHOLDER": "Welcome to the server!",
+        "COLOR_TITLE": "Accent Color"
+    },
+
+    "EMBED": {
+        "TITLE": "Embed Builder",
+        "DESC": "Design a Discord embed",
+        "FIELD_TITLE": "Title",
+        "FIELD_TITLE_PH": "Enter embed title...",
+        "DESCRIPTION": "Description",
+        "DESCRIPTION_PH": "Enter embed description...",
+        "COLOR": "Colour",
+        "THUMBNAIL": "Thumbnail (show profile picture)",
+        "FOOTER": "Footer",
+        "FOOTER_PH": "Enter footer text...",
+        "IMAGE": "Image URL",
+        "AUTHOR": "Author Name",
+        "TIMESTAMP": "Show timestamp",
+        "ENABLE": "Enable Embed"
+    },
+
+    "PREVIEW": {
+        "TITLE": "Preview",
+        "PLACEHOLDER_USER": "New Member",
+        "BOT_BADGE": "BOT"
+    },
 
     "PLACEHOLDERS_HINT": "Use placeholders like {member:name}, {member:mention}, {guild:name}",
 
@@ -53,7 +112,7 @@
 
     "SAVE_SUCCESS": "Settings saved successfully",
     "SAVE_ERROR": "Error saving settings",
-    
+
     "TOAST": {
         "ENABLED": "Enabled",
         "DISABLED": "Disabled",
@@ -70,11 +129,57 @@
     "HELP": {
         "TITLE": "Help & Tips",
         "WELCOME_TITLE": "Welcome Messages",
-        "WELCOME_TEXT": "Greet new members with personalized messages.",
+        "WELCOME_TEXT": "Greet new members with personalized messages and embeds.",
         "FAREWELL_TITLE": "Farewells",
         "FAREWELL_TEXT": "Say goodbye to leaving members.",
+        "DM_TITLE": "DM Welcome",
+        "DM_TEXT": "Send new members a private welcome DM.",
         "AUTOROLE_TITLE": "Autorole",
-        "AUTOROLE_TEXT": "Automatic role assignment for new members.",
+        "AUTOROLE_TEXT": "Automatic role assignment (multiple roles supported).",
+        "BOOST_TITLE": "Boost Messages",
+        "BOOST_TEXT": "Celebrate server boosters with a special message.",
+        "VERIFICATION_TITLE": "Verification",
+        "VERIFICATION_TEXT": "New members must click a button or solve a captcha before roles are assigned.",
+        "INVITE_TRACKING_TITLE": "Invite Tracking",
+        "INVITE_TRACKING_TEXT": "Different welcome messages depending on the invite link used.",
+        "IMAGE_TITLE": "Welcome Image",
+        "IMAGE_TEXT": "Generated welcome banner with the new member's avatar.",
         "PLACEHOLDERS_TITLE": "Available Placeholders"
+    },
+
+    "VERIFICATION": {
+        "TITLE": "Verification",
+        "DESC": "New members must verify before gaining full access",
+        "ENABLE": "Enable Verification",
+        "TYPE": "Verification Type",
+        "TYPE_BUTTON": "Button (Simple Click)",
+        "TYPE_CAPTCHA": "Captcha (Math Problem)",
+        "CHANNEL": "Verification Channel",
+        "CHANNEL_DESC": "The channel where the verification button/captcha is displayed",
+        "VERIFIED_ROLE": "Verified Role",
+        "VERIFIED_ROLE_DESC": "This role is assigned after successful verification",
+        "UNVERIFIED_ROLE": "Unverified Role (optional)",
+        "UNVERIFIED_ROLE_DESC": "This role is assigned on join and removed after verification",
+        "MESSAGE": "Verification Message",
+        "MESSAGE_PH": "Click the button to verify yourself!",
+        "SEND_PANEL": "Send Verification Panel",
+        "SEND_PANEL_DESC": "Sends the verification button to the selected channel",
+        "INFO": "Verification ensures that new members are not bots. With 'Button' a simple click suffices, with 'Captcha' a simple math problem must be solved."
+    },
+
+    "INVITE_TRACKING": {
+        "TITLE": "Invite Tracking",
+        "DESC": "Different welcome messages depending on the invite link used",
+        "ADD_TITLE": "New Invite Mapping",
+        "INVITE_CODE": "Invite Code",
+        "INVITE_CODE_PH": "e.g. abc123",
+        "LABEL": "Label",
+        "LABEL_PH": "e.g. YouTube Campaign",
+        "CONTENT": "Special Welcome Message",
+        "CONTENT_PH": "Welcome {member:mention}! You came from...",
+        "BTN_ADD": "Add Mapping",
+        "EMPTY": "No invite mappings configured.",
+        "CONFIRM_DELETE": "Really delete this invite mapping?",
+        "INFO": "When a new member joins through a configured invite link, the special message will be sent instead of the default welcome message."
     }
 }

@@ -32,7 +32,7 @@ module.exports = {
                 // Navigation-Einträge prüfen
                 const navItems = await dbService.query(
                     `SELECT id, title, url, parent 
-                     FROM nav_items 
+                     FROM guild_nav_items 
                      WHERE plugin = 'core' 
                      AND guildId = ?
                      ORDER BY sort_order`,

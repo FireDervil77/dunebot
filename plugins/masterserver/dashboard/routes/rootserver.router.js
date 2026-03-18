@@ -63,7 +63,7 @@ router.get('/', async (req, res) => {
             totalGameservers: rootservers.reduce((sum, rs) => sum + (parseInt(rs.gameserver_count) || 0), 0)
         };
 
-        await renderView(res, 'guild/masterserver-servers', {
+        await renderView(res, 'guild/masterserver-rootservers', {
             title: 'RootServer',
             activeMenu: `/guild/${guildId}/plugins/masterserver/rootservers`,
             servers: rootserversWithStatus,
@@ -139,8 +139,7 @@ router.post('/', async (req, res) => {
             cpuCores, ramTotal, diskTotal,
             quotaProfileId,
             backupLimit, mysqlEnabled, mysqlDbLimit, webDomain,
-            datacenter, countryCode,
-            portRangeStart, portRangeEnd
+            datacenter, countryCode
         } = req.body;
 
         // Validierung
@@ -203,9 +202,6 @@ router.post('/', async (req, res) => {
                     ram_limit_gb: parseFloat(ramTotal),
                     disk_limit_gb: parseFloat(diskTotal),
                     custom_path: null,
-                    // ✅ Port-Pool für diesen Rootserver im Daemon registrieren
-                    port_range_start: portRangeStart ? parseInt(portRangeStart) : null,
-                    port_range_end: portRangeEnd ? parseInt(portRangeEnd) : null,
                     // Neue Features an Daemon übergeben
                     mysql_enabled: mysqlEnabled === 'true' || mysqlEnabled === true,
                     web_domain: webDomain || null
@@ -264,6 +260,7 @@ router.post('/', async (req, res) => {
                 id: result.id,
                 daemonId: result.daemonId,
                 apiKey: result.apiKey,
+                host: host || null,
                 redirectUrl: `/guild/${guildId}/plugins/masterserver/rootservers/${result.id}`
             }
         });
@@ -349,15 +346,19 @@ router.put('/:id', async (req, res) => {
             });
         }
 
-        const { name, host, daemonPort, systemUser, baseDirectory } = req.body;
+        const { name, host, daemon_port, hostname, datacenter, country_code, description, ram_total_gb, disk_total_gb } = req.body;
 
         // RootServer aktualisieren
         await RootServer.update(rootserverId, {
             name,
             host,
-            daemon_port: daemonPort,
-            system_user: systemUser,
-            base_directory: baseDirectory
+            daemon_port,
+            hostname,
+            datacenter,
+            country_code,
+            description,
+            ram_total_gb:  ram_total_gb ? parseFloat(ram_total_gb) : undefined,
+            disk_total_gb: disk_total_gb ? parseFloat(disk_total_gb) : undefined,
         });
 
         Logger.info(`[Masterserver] RootServer updated: ${rootserverId}`);
@@ -443,24 +444,26 @@ router.get('/:id/status', async (req, res) => {
         // Online-Status prüfen
         const isOnline = ipmServer.isDaemonOnline(rootserver.daemon_id);
 
-        // TODO: System-Ressourcen vom Daemon abfragen (via IPM)
+        // Live Hardware-Daten aus IPM-Verbindung
+        const hw = isOnline ? (ipmServer.getDaemonHardware(rootserver.daemon_id) || {}) : {};
         const systemResources = {
-            cpu: 0,
-            ram: 0,
-            disk: 0
+            cpu_percent:  hw.cpu?.usage_percent  ?? rootserver.cpu_usage_percent  ?? null,
+            ram_used_gb:  hw.ram?.used_gb        ?? rootserver.ram_usage_gb        ?? null,
+            ram_total_gb: hw.ram?.total_gb       ?? rootserver.ram_total_gb        ?? null,
+            disk_used_gb: hw.disk?.used_gb       ?? rootserver.disk_usage_gb       ?? null,
+            disk_total_gb:hw.disk?.total_gb      ?? rootserver.disk_total_gb       ?? null,
+            network:      hw.network             ?? null,
         };
 
         res.json({
             success: true,
             data: {
-                status: rootserver.daemon_status,
+                status:          rootserver.daemon_status,
                 isOnline,
-                lastHeartbeat: rootserver.daemon_last_heartbeat,
-                lastPingLatency: rootserver.daemon_last_ping_latency,
-                missedHeartbeats: rootserver.daemon_missed_heartbeats,
-                version: rootserver.daemon_version,
-                osInfo: rootserver.daemon_os_info,
-                systemResources
+                lastPingMs:      rootserver.last_ping_ms,
+                version:         rootserver.daemon_version,
+                osInfo:          rootserver.os_info,
+                systemResources,
             }
         });
 
@@ -556,6 +559,357 @@ router.delete('/:id', async (req, res) => {
             message: 'Fehler beim Löschen des RootServers',
             error: error.message
         });
+    }
+});
+
+// =====================================================
+// Route: Vom Daemon bekannte Host-IPs (aus HardwareStats.Network)
+// GET /guild/:guildId/plugins/masterserver/rootservers/:id/host-ips
+// =====================================================
+router.get('/:id/host-ips', async (req, res) => {
+    const ipmServer = ServiceManager.get('ipmServer');
+    const guildId = res.locals.guildId;
+    const rootserverId = req.params.id;
+    try {
+        const rootserver = await RootServer.getById(rootserverId);
+        if (!rootserver || rootserver.guild_id !== guildId) {
+            return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
+        }
+        const hardware = ipmServer.getDaemonHardware(rootserver.daemon_id);
+        if (!hardware || !hardware.network || !hardware.network.interfaces) {
+            return res.json({ success: true, data: [] });
+        }
+        // Alle IPv4-Adressen aus physischen/echten Interfaces sammeln
+        // Docker/virtuelle Bridge-Interfaces ausschließen
+        const VIRTUAL_IFACE_PREFIXES = ['docker', 'br-', 'veth', 'virbr', 'cni', 'flannel', 'cali', 'tunl', 'weave'];
+        const ips = [];
+        for (const iface of hardware.network.interfaces) {
+            if (iface.is_loopback || !iface.is_up) continue;
+            // Virtuelle/Docker-Interfaces überspringen
+            const name = (iface.name || '').toLowerCase();
+            if (VIRTUAL_IFACE_PREFIXES.some(p => name.startsWith(p))) continue;
+            for (const addr of (iface.addresses || [])) {
+                // Nur IPv4 (kein ":" = kein IPv6), kein 127.x
+                if (!addr.includes(':') && !addr.startsWith('127.')) {
+                    // CIDR-Notation entfernen falls vorhanden
+                    const ip = addr.split('/')[0];
+                    ips.push({ ip, interface: iface.name });
+                }
+            }
+        }
+        res.json({ success: true, data: ips });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// =====================================================
+// Route: IP-Adressen eines RootServers auflisten
+// GET /guild/:guildId/plugins/masterserver/rootservers/:id/ips
+// =====================================================
+router.get('/:id/ips', async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    const rootserverId = req.params.id;
+    try {
+        const rootserver = await RootServer.getById(rootserverId);
+        if (!rootserver || rootserver.guild_id !== guildId) {
+            return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
+        }
+        const ips = await dbService.query(
+            'SELECT * FROM rootserver_ips WHERE rootserver_id = ? ORDER BY is_primary DESC, created_at ASC',
+            [rootserverId]
+        );
+        res.json({ success: true, data: ips });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// =====================================================
+// Route: IP-Adresse hinzufügen
+// POST /guild/:guildId/plugins/masterserver/rootservers/:id/ips
+// =====================================================
+router.post('/:id/ips', async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    const rootserverId = req.params.id;
+    try {
+        const rootserver = await RootServer.getById(rootserverId);
+        if (!rootserver || rootserver.guild_id !== guildId) {
+            return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
+        }
+        const { ip_address, label, is_primary } = req.body;
+        if (!ip_address || !/^[\d.:a-fA-F]+$/.test(ip_address)) {
+            return res.status(400).json({ success: false, message: 'Ungültige IP-Adresse' });
+        }
+        // Wenn neue IP primär → alle anderen nicht-primär setzen
+        if (is_primary) {
+            await dbService.query(
+                'UPDATE rootserver_ips SET is_primary = 0 WHERE rootserver_id = ?',
+                [rootserverId]
+            );
+        }
+        const result = await dbService.query(
+            'INSERT INTO rootserver_ips (rootserver_id, ip_address, label, is_primary) VALUES (?, ?, ?, ?)',
+            [rootserverId, ip_address.trim(), label || null, is_primary ? 1 : 0]
+        );
+        res.json({ success: true, data: { id: result.insertId, ip_address, label, is_primary: !!is_primary } });
+    } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ success: false, message: 'Diese IP ist bereits eingetragen' });
+        }
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// =====================================================
+// Route: IP-Adresse entfernen
+// DELETE /guild/:guildId/plugins/masterserver/rootservers/:id/ips/:ipId
+// =====================================================
+router.delete('/:id/ips/:ipId', async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    const { id: rootserverId, ipId } = req.params;
+    try {
+        const rootserver = await RootServer.getById(rootserverId);
+        if (!rootserver || rootserver.guild_id !== guildId) {
+            return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
+        }
+        // Prüfen ob die IP noch von einem Gameserver genutzt wird
+        const [used] = await dbService.query(
+            'SELECT id FROM rootserver_ips WHERE id = ? AND rootserver_id = ?',
+            [ipId, rootserverId]
+        );
+        if (!used) {
+            return res.status(404).json({ success: false, message: 'IP nicht gefunden' });
+        }
+        await dbService.query('DELETE FROM rootserver_ips WHERE id = ?', [ipId]);
+        res.json({ success: true, message: 'IP-Adresse entfernt' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// =====================================================
+// Route: IP als primär setzen
+// PUT /guild/:guildId/plugins/masterserver/rootservers/:id/ips/:ipId/primary
+// =====================================================
+router.put('/:id/ips/:ipId/primary', async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    const { id: rootserverId, ipId } = req.params;
+    try {
+        const rootserver = await RootServer.getById(rootserverId);
+        if (!rootserver || rootserver.guild_id !== guildId) {
+            return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
+        }
+        await dbService.query('UPDATE rootserver_ips SET is_primary = 0 WHERE rootserver_id = ?', [rootserverId]);
+        await dbService.query('UPDATE rootserver_ips SET is_primary = 1 WHERE id = ? AND rootserver_id = ?', [ipId, rootserverId]);
+        res.json({ success: true, message: 'Primäre IP gesetzt' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// =====================================================
+// PORT ALLOCATIONS (Pterodactyl-Style)
+// =====================================================
+
+// GET /guild/:guildId/plugins/masterserver/rootservers/:id/allocations
+// Liste aller Port-Allocations für einen RootServer
+router.get('/:id/allocations', async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    const rootserverId = req.params.id;
+    try {
+        const rootserver = await RootServer.getById(rootserverId);
+        if (!rootserver || rootserver.guild_id !== guildId) {
+            return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
+        }
+
+        const allocations = await dbService.query(
+            `SELECT pa.*, g.name AS server_name 
+             FROM port_allocations pa 
+             LEFT JOIN gameservers g ON pa.server_id = g.id
+             WHERE pa.rootserver_id = ? 
+             ORDER BY pa.ip ASC, pa.port ASC`,
+            [rootserverId]
+        );
+
+        // Zusammenfassung
+        const total = allocations.length;
+        const assigned = allocations.filter(a => a.server_id !== null).length;
+        const free = total - assigned;
+
+        res.json({ 
+            success: true, 
+            data: allocations,
+            summary: { total, assigned, free }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// POST /guild/:guildId/plugins/masterserver/rootservers/:id/allocations
+// Port-Allocations hinzufügen (IP + Port-Range → wird zu Einzel-Rows expandiert)
+router.post('/:id/allocations', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    const rootserverId = req.params.id;
+
+    try {
+        const rootserver = await RootServer.getById(rootserverId);
+        if (!rootserver || rootserver.guild_id !== guildId) {
+            return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
+        }
+
+        const { ip, ip_alias, ports } = req.body;
+
+        // Validierung: IP
+        if (!ip || !/^[\d.]+$/.test(ip)) {
+            return res.status(400).json({ success: false, message: 'Ungültige IP-Adresse' });
+        }
+
+        // Validierung: Ports (komma-separiert, einzelne Ports oder Ranges wie "25565-25600")
+        if (!ports || typeof ports !== 'string') {
+            return res.status(400).json({ success: false, message: 'Ports fehlen (z.B. "25565-25600" oder "25565,25566,25567")' });
+        }
+
+        // Ports parsen (wie Pterodactyl AssignmentService)
+        const PORT_FLOOR = 1024;
+        const PORT_CEIL = 65535;
+        const PORT_RANGE_LIMIT = 10000;
+
+        const portList = [];
+        const parts = ports.split(',').map(p => p.trim()).filter(Boolean);
+
+        for (const part of parts) {
+            const rangeMatch = part.match(/^(\d{1,5})-(\d{1,5})$/);
+            if (rangeMatch) {
+                const start = parseInt(rangeMatch[1]);
+                const end = parseInt(rangeMatch[2]);
+                if (start < PORT_FLOOR || end > PORT_CEIL || start > end) {
+                    return res.status(400).json({ success: false, message: `Ungültiger Port-Range: ${part} (erlaubt: ${PORT_FLOOR}-${PORT_CEIL})` });
+                }
+                if (end - start + 1 > PORT_RANGE_LIMIT) {
+                    return res.status(400).json({ success: false, message: `Port-Range zu groß: ${part} (max. ${PORT_RANGE_LIMIT} Ports pro Range)` });
+                }
+                for (let p = start; p <= end; p++) {
+                    portList.push(p);
+                }
+            } else {
+                const port = parseInt(part);
+                if (isNaN(port) || port < PORT_FLOOR || port > PORT_CEIL) {
+                    return res.status(400).json({ success: false, message: `Ungültiger Port: ${part}` });
+                }
+                portList.push(port);
+            }
+        }
+
+        if (portList.length === 0) {
+            return res.status(400).json({ success: false, message: 'Keine gültigen Ports gefunden' });
+        }
+
+        // Duplikate entfernen
+        const uniquePorts = [...new Set(portList)];
+
+        // Insert mit INSERT IGNORE (vorhandene überspringen)
+        const values = uniquePorts.map(port => [rootserverId, ip.trim(), ip_alias || null, port]);
+        const placeholders = values.map(() => '(?, ?, ?, ?)').join(', ');
+        const flatValues = values.flat();
+
+        const result = await dbService.query(
+            `INSERT IGNORE INTO port_allocations (rootserver_id, ip, ip_alias, port) VALUES ${placeholders}`,
+            flatValues
+        );
+
+        const created = result.affectedRows || 0;
+        const skipped = uniquePorts.length - created;
+
+        Logger.info(`[Masterserver] Port-Allocations: ${created} erstellt, ${skipped} übersprungen für RS ${rootserverId} (${ip}, ${uniquePorts.length} Ports)`);
+
+        res.json({
+            success: true,
+            message: `${created} Allocations erstellt${skipped > 0 ? `, ${skipped} bereits vorhanden` : ''}`,
+            data: { created, skipped, total: uniquePorts.length }
+        });
+
+    } catch (error) {
+        Logger.error('[Masterserver] Port-Allocation Create Error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// DELETE /guild/:guildId/plugins/masterserver/rootservers/:id/allocations/:allocId
+// Einzelne Allocation löschen (nur wenn nicht zugewiesen)
+router.delete('/:id/allocations/:allocId', async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    const { id: rootserverId, allocId } = req.params;
+
+    try {
+        const rootserver = await RootServer.getById(rootserverId);
+        if (!rootserver || rootserver.guild_id !== guildId) {
+            return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
+        }
+
+        // Prüfen ob Allocation existiert und frei ist
+        const [alloc] = await dbService.query(
+            'SELECT * FROM port_allocations WHERE id = ? AND rootserver_id = ?',
+            [allocId, rootserverId]
+        );
+        if (!alloc) {
+            return res.status(404).json({ success: false, message: 'Allocation nicht gefunden' });
+        }
+        if (alloc.server_id) {
+            return res.status(400).json({ success: false, message: 'Allocation ist einem Gameserver zugewiesen und kann nicht gelöscht werden' });
+        }
+
+        await dbService.query('DELETE FROM port_allocations WHERE id = ?', [allocId]);
+        res.json({ success: true, message: 'Allocation gelöscht' });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// DELETE /guild/:guildId/plugins/masterserver/rootservers/:id/allocations-bulk
+// Alle freien Allocations für eine IP löschen
+router.delete('/:id/allocations-bulk', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    const rootserverId = req.params.id;
+
+    try {
+        const rootserver = await RootServer.getById(rootserverId);
+        if (!rootserver || rootserver.guild_id !== guildId) {
+            return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
+        }
+
+        const { ip } = req.body;
+        if (!ip) {
+            return res.status(400).json({ success: false, message: 'IP-Adresse fehlt' });
+        }
+
+        const result = await dbService.query(
+            'DELETE FROM port_allocations WHERE rootserver_id = ? AND ip = ? AND server_id IS NULL',
+            [rootserverId, ip]
+        );
+
+        Logger.info(`[Masterserver] ${result.affectedRows} freie Allocations für IP ${ip} gelöscht (RS ${rootserverId})`);
+
+        res.json({
+            success: true,
+            message: `${result.affectedRows} freie Allocations gelöscht`,
+            data: { deleted: result.affectedRows }
+        });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 

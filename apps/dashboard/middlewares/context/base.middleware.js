@@ -458,7 +458,7 @@ module.exports = async (req, res, next) => {
 
                     // DIREKTE DB-ABFRAGE zur Prüfung
                     const testQuery = await dbService.query(
-                        "SELECT * FROM nav_items WHERE guildid = ? AND (type = 'main' OR type = 'widget') AND visible = 1",
+                        "SELECT * FROM guild_nav_items WHERE guildid = ? AND (type = 'main' OR type = 'widget') AND visible = 1",
                         [navGuildId2]
                     );
 

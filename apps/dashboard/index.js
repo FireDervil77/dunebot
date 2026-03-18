@@ -114,15 +114,6 @@ const IPMServer = require('./helpers/IPMServer');
         );
         Logger.success('Kern-Widgets registriert');
 
-        // Post-Deployment: Plugin-Update-Check (SOFORT nach Start)
-        Logger.info("🚀 Post-Deployment: Prüfe auf verfügbare Plugin-Updates...");
-        try {
-            await app.checkAndApplyPendingUpdates();
-        } catch (updateError) {
-            Logger.error("Fehler beim Post-Deployment Update-Check:", updateError);
-            // Nicht abbrechen, Dashboard startet trotzdem
-        }
-
         // Server starten
         const port = process.env.DASHBOARD_PORT || 3000;
         app.listen(port);

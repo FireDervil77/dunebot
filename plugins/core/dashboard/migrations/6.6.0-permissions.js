@@ -157,7 +157,7 @@ module.exports = {
                 try {
                     // Lösche alte Core-Navigation für diese Guild
                     await dbService.query(
-                        "DELETE FROM nav_items WHERE plugin = ? AND guildId = ?",
+                        "DELETE FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
                         ['core', guildId]
                     );
                     Logger.debug('[Core Migration 6.6.0] Alte Navigation gelöscht');
@@ -176,7 +176,7 @@ module.exports = {
                             
                             // Verifizieren
                             const navCount = await dbService.query(
-                                "SELECT COUNT(*) as count FROM nav_items WHERE plugin = ? AND guildId = ?",
+                                "SELECT COUNT(*) as count FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
                                 ['core', guildId]
                             );
                             
@@ -207,7 +207,7 @@ module.exports = {
                         
                         for (const item of navItems) {
                             await dbService.query(
-                                `INSERT INTO nav_items (title, url, icon, \`order\`, parent, plugin, guildId, createdAt, updatedAt) 
+                                `INSERT INTO guild_nav_items (title, url, icon, \`order\`, parent, plugin, guildId, createdAt, updatedAt) 
                                  VALUES (?, ?, ?, ?, ?, 'core', ?, NOW(), NOW())`,
                                 [item.title, item.url, item.icon, item.order, item.parent, guildId]
                             );

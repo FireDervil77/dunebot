@@ -10,10 +10,10 @@
 -- ════════════════════════════════════════════════════════════════
 
 -- Backup der alten Navigation (optional, zur Sicherheit)
-CREATE TABLE IF NOT EXISTS nav_items_backup_20251102 AS SELECT * FROM nav_items;
+CREATE TABLE IF NOT EXISTS guild_nav_items_backup_20251102 AS SELECT * FROM guild_nav_items;
 
--- Alte nav_items mit lowercase capabilities löschen
-DELETE FROM nav_items WHERE capability = 'manage_guild';
+-- Alte guild_nav_items mit lowercase capabilities löschen
+DELETE FROM guild_nav_items WHERE capability = 'manage_guild';
 
 -- Hinweis: Navigation wird beim nächsten Dashboard-Restart automatisch
 -- neu erstellt mit korrekten UPPERCASE capabilities aus den Plugins!

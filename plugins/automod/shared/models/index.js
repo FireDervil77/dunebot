@@ -9,5 +9,9 @@ module.exports = {
     AutoModSettings: require('./AutoModSettings'),
     AutoModStrikes: require('./AutoModStrikes'),
     AutoModLogs: require('./AutoModLogs'),
-    AutoModRaidEvents: require('./AutoModRaidEvents')
+    AutoModRaidEvents: require('./AutoModRaidEvents'),
+    AutoModEscalation: require('./AutoModEscalation'),
+    AutoModExemptions: require('./AutoModExemptions'),
+    AutoModRegexRules: require('./AutoModRegexRules'),
+    AutoModCompoundRules: require('./AutoModCompoundRules')
 };

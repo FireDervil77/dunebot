@@ -67,7 +67,19 @@ router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => 
             farewell_channel: null,
             farewell_content: null,
             farewell_embed: null,
-            autorole_id: null
+            autorole_id: null,
+            autorole_ids: null,
+            dm_welcome_enabled: false,
+            dm_welcome_content: null,
+            dm_welcome_embed: null,
+            welcome_image_enabled: false,
+            welcome_image_bg: 'default',
+            welcome_image_text: null,
+            welcome_image_color: '#5865f2',
+            boost_enabled: false,
+            boost_channel: null,
+            boost_content: null,
+            boost_embed: null
         };
         
         // Parse JSON-Felder
@@ -115,6 +127,49 @@ router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => 
             }
         }
         
+        // Parse DM welcome embed
+        let dmWelcomeEmbed = {
+            title: null, description: null, color: null, thumbnail: null, image: null,
+            fields: [], author: { name: null, iconURL: null }, footer: { text: null, iconURL: null }, timestamp: false
+        };
+        if (dbSettings.dm_welcome_embed) {
+            try {
+                dmWelcomeEmbed = typeof dbSettings.dm_welcome_embed === 'string'
+                    ? JSON.parse(dbSettings.dm_welcome_embed)
+                    : dbSettings.dm_welcome_embed;
+            } catch (e) {
+                Logger.error('[Greeting] Fehler beim Parsen von dm_welcome_embed:', e);
+            }
+        }
+
+        // Parse boost embed
+        let boostEmbed = {
+            title: null, description: null, color: null, thumbnail: null, image: null,
+            fields: [], author: { name: null, iconURL: null }, footer: { text: null, iconURL: null }, timestamp: false
+        };
+        if (dbSettings.boost_embed) {
+            try {
+                boostEmbed = typeof dbSettings.boost_embed === 'string'
+                    ? JSON.parse(dbSettings.boost_embed)
+                    : dbSettings.boost_embed;
+            } catch (e) {
+                Logger.error('[Greeting] Fehler beim Parsen von boost_embed:', e);
+            }
+        }
+
+        // Parse autorole_ids
+        let autoroleIds = [];
+        if (dbSettings.autorole_ids) {
+            try {
+                autoroleIds = typeof dbSettings.autorole_ids === 'string'
+                    ? JSON.parse(dbSettings.autorole_ids)
+                    : dbSettings.autorole_ids;
+            } catch { /* ignore */ }
+        }
+        if (autoroleIds.length === 0 && dbSettings.autorole_id) {
+            autoroleIds = [dbSettings.autorole_id];
+        }
+        
         // Struktur für die View (nested objects wie in guild.ejs erwartet)
         const greetingSettings = {
             welcome: {
@@ -129,8 +184,43 @@ router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => 
                 content: dbSettings.farewell_content || '',
                 embed: farewellEmbed
             },
-            autorole_id: dbSettings.autorole_id || ''
+            dm_welcome: {
+                enabled: Boolean(dbSettings.dm_welcome_enabled),
+                content: dbSettings.dm_welcome_content || '',
+                embed: dmWelcomeEmbed
+            },
+            autorole_id: dbSettings.autorole_id || '',
+            autorole_ids: autoroleIds,
+            welcome_image: {
+                enabled: Boolean(dbSettings.welcome_image_enabled),
+                bg: dbSettings.welcome_image_bg || 'default',
+                text: dbSettings.welcome_image_text || '',
+                color: dbSettings.welcome_image_color || '#5865f2'
+            },
+            boost: {
+                enabled: Boolean(dbSettings.boost_enabled),
+                channel: dbSettings.boost_channel || '',
+                content: dbSettings.boost_content || '',
+                embed: boostEmbed
+            },
+            verification: {
+                enabled: Boolean(dbSettings.verification_enabled),
+                channel: dbSettings.verification_channel || '',
+                role_id: dbSettings.verification_role_id || '',
+                type: dbSettings.verification_type || 'button',
+                message: dbSettings.verification_message || '',
+                remove_role_id: dbSettings.verification_remove_role_id || ''
+            }
         };
+
+        // Load invite mappings
+        let inviteMappings = [];
+        try {
+            inviteMappings = await dbService.query(
+                'SELECT * FROM greeting_invite_mappings WHERE guild_id = ? ORDER BY created_at DESC',
+                [guildId]
+            );
+        } catch { /* table might not exist yet */ }
         
         await themeManager.renderView(res, 'guild/greeting-settings', {
             title: 'Greeting Settings',
@@ -139,7 +229,8 @@ router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => 
             channels: (channelsResp && channelsResp.success) ? channelsResp.channels : [],
             roles: (rolesResp && rolesResp.success) ? rolesResp.roles : [],
             settings: greetingSettings,
-            tabs: ['Welcome', 'Farewell', 'Autorole']
+            inviteMappings,
+            tabs: ['Welcome', 'Farewell', 'DM Welcome', 'Autorole', 'Boost', 'Verification', 'Invite Tracking']
         });
         
     } catch (error) {
@@ -184,7 +275,25 @@ router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req,
             farewell_channel: null,
             farewell_content: null,
             farewell_embed: null,
-            autorole_id: null
+            autorole_id: null,
+            autorole_ids: null,
+            dm_welcome_enabled: false,
+            dm_welcome_content: null,
+            dm_welcome_embed: null,
+            welcome_image_enabled: false,
+            welcome_image_bg: 'default',
+            welcome_image_text: null,
+            welcome_image_color: '#5865f2',
+            boost_enabled: false,
+            boost_channel: null,
+            boost_content: null,
+            boost_embed: null,
+            verification_enabled: false,
+            verification_channel: null,
+            verification_role_id: null,
+            verification_type: 'button',
+            verification_message: null,
+            verification_remove_role_id: null
         };
         
         // Parse existing JSON embeds
@@ -218,6 +327,33 @@ router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req,
                 footer: { text: null, iconURL: null },
                 timestamp: false
             };
+        }
+
+        // Parse dm_welcome_embed
+        if (settings.dm_welcome_embed && typeof settings.dm_welcome_embed === 'string') {
+            settings.dm_welcome_embed = JSON.parse(settings.dm_welcome_embed);
+        } else if (!settings.dm_welcome_embed) {
+            settings.dm_welcome_embed = {
+                title: null, description: null, color: null, thumbnail: null, image: null,
+                fields: [], author: { name: null, iconURL: null }, footer: { text: null, iconURL: null }, timestamp: false
+            };
+        }
+
+        // Parse boost_embed
+        if (settings.boost_embed && typeof settings.boost_embed === 'string') {
+            settings.boost_embed = JSON.parse(settings.boost_embed);
+        } else if (!settings.boost_embed) {
+            settings.boost_embed = {
+                title: null, description: null, color: null, thumbnail: null, image: null,
+                fields: [], author: { name: null, iconURL: null }, footer: { text: null, iconURL: null }, timestamp: false
+            };
+        }
+
+        // Parse autorole_ids
+        if (settings.autorole_ids && typeof settings.autorole_ids === 'string') {
+            settings.autorole_ids = JSON.parse(settings.autorole_ids);
+        } else if (!settings.autorole_ids) {
+            settings.autorole_ids = [];
         }
         
         // ============================================================================
@@ -400,33 +536,110 @@ router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req,
         */
         
         // ============================================================================
-        // AUTOROLE SETTINGS
+        // AUTOROLE SETTINGS (Multi-Role)
         // ============================================================================
         if (body.type === 'autorole') {
-            Logger.info('[Greeting] Processing Autorole settings:', { action: body.action, autorole_id: body.autorole_id });
+            Logger.info('[Greeting] Processing Autorole settings:', { action: body.action, autorole_ids: body.autorole_ids });
             
             if (body.action === 'save') {
-                if (body.autorole_id && body.autorole_id !== '') {
-                    settings.autorole_id = body.autorole_id;
+                if (body.autorole_ids && Array.isArray(body.autorole_ids) && body.autorole_ids.length > 0) {
+                    settings.autorole_ids = body.autorole_ids;
+                    settings.autorole_id = body.autorole_ids[0]; // Backward compat
                 } else {
-                    settings.autorole_id = null; // Keine Rolle = Autorole deaktivieren
+                    settings.autorole_ids = [];
+                    settings.autorole_id = null;
                 }
             }
             if (body.action === 'disable') {
+                settings.autorole_ids = [];
                 settings.autorole_id = null;
             }
             
-            Logger.info('[Greeting] Autorole updated:', { autorole_id: settings.autorole_id });
+            Logger.info('[Greeting] Autorole updated:', { autorole_ids: settings.autorole_ids });
         }
-        
-        /* OLD AUTOROLE CODE
-        if (['autorole', 'autorole_update'].includes(body.action)) {
-            if (body.autorole_id !== undefined) {
-                // Leerer String = Autorole entfernen
-                settings.autorole_id = body.autorole_id === '' ? null : body.autorole_id;
+
+        // ============================================================================
+        // DM WELCOME SETTINGS
+        // ============================================================================
+        if (body.type === 'dm_welcome') {
+            Logger.info('[Greeting] Processing DM Welcome settings:', { action: body.action });
+            
+            if (body.action === 'save') {
+                if (body.dm_welcome_content !== undefined) settings.dm_welcome_content = body.dm_welcome_content;
+                settings.dm_welcome_enabled = true;
+
+                // Embed updates
+                if (body.dm_welcome_embed_enabled) {
+                    if (body.dm_welcome_embed_title !== undefined) settings.dm_welcome_embed.title = body.dm_welcome_embed_title || null;
+                    if (body.dm_welcome_embed_description !== undefined) settings.dm_welcome_embed.description = body.dm_welcome_embed_description || null;
+                    if (body.dm_welcome_embed_color !== undefined) settings.dm_welcome_embed.color = body.dm_welcome_embed_color || null;
+                    if (body.dm_welcome_embed_thumbnail !== undefined) settings.dm_welcome_embed.thumbnail = body.dm_welcome_embed_thumbnail;
+                    if (body.dm_welcome_embed_footer !== undefined) settings.dm_welcome_embed.footer = { text: body.dm_welcome_embed_footer || null };
+                    if (body.dm_welcome_embed_image !== undefined) settings.dm_welcome_embed.image = body.dm_welcome_embed_image || null;
+                    if (body.dm_welcome_embed_timestamp !== undefined) settings.dm_welcome_embed.timestamp = body.dm_welcome_embed_timestamp === true || body.dm_welcome_embed_timestamp === 'true';
+                }
+            }
+            if (body.action === 'enable') settings.dm_welcome_enabled = true;
+            if (body.action === 'disable') settings.dm_welcome_enabled = false;
+        }
+
+        // ============================================================================
+        // WELCOME IMAGE SETTINGS
+        // ============================================================================
+        if (body.type === 'welcome_image') {
+            Logger.info('[Greeting] Processing Welcome Image settings:', { action: body.action });
+            
+            if (body.action === 'save') {
+                settings.welcome_image_enabled = body.welcome_image_enabled === true || body.welcome_image_enabled === 'true';
+                if (body.welcome_image_bg !== undefined) settings.welcome_image_bg = body.welcome_image_bg || 'default';
+                if (body.welcome_image_text !== undefined) settings.welcome_image_text = body.welcome_image_text || null;
+                if (body.welcome_image_color !== undefined) settings.welcome_image_color = body.welcome_image_color || '#5865f2';
             }
         }
-        */
+
+        // ============================================================================
+        // BOOST SETTINGS
+        // ============================================================================
+        if (body.type === 'boost') {
+            Logger.info('[Greeting] Processing Boost settings:', { action: body.action });
+            
+            if (body.action === 'save') {
+                if (body.boost_channel) settings.boost_channel = body.boost_channel;
+                if (body.boost_content !== undefined) settings.boost_content = body.boost_content;
+                settings.boost_enabled = true;
+
+                // Embed updates
+                if (body.boost_embed_enabled) {
+                    if (body.boost_embed_title !== undefined) settings.boost_embed.title = body.boost_embed_title || null;
+                    if (body.boost_embed_description !== undefined) settings.boost_embed.description = body.boost_embed_description || null;
+                    if (body.boost_embed_color !== undefined) settings.boost_embed.color = body.boost_embed_color || null;
+                    if (body.boost_embed_thumbnail !== undefined) settings.boost_embed.thumbnail = body.boost_embed_thumbnail;
+                    if (body.boost_embed_footer !== undefined) settings.boost_embed.footer = { text: body.boost_embed_footer || null };
+                    if (body.boost_embed_image !== undefined) settings.boost_embed.image = body.boost_embed_image || null;
+                    if (body.boost_embed_timestamp !== undefined) settings.boost_embed.timestamp = body.boost_embed_timestamp === true || body.boost_embed_timestamp === 'true';
+                }
+            }
+            if (body.action === 'enable') settings.boost_enabled = true;
+            if (body.action === 'disable') settings.boost_enabled = false;
+        }
+
+        // ============================================================================
+        // VERIFICATION SETTINGS
+        // ============================================================================
+        if (body.type === 'verification') {
+            Logger.info('[Greeting] Processing Verification settings:', { action: body.action });
+            
+            if (body.action === 'save') {
+                settings.verification_enabled = body.verification_enabled === true || body.verification_enabled === 'true' ? 1 : 0;
+                if (body.verification_channel !== undefined) settings.verification_channel = body.verification_channel || null;
+                if (body.verification_role_id !== undefined) settings.verification_role_id = body.verification_role_id || null;
+                if (body.verification_type !== undefined) settings.verification_type = body.verification_type || 'button';
+                if (body.verification_message !== undefined) settings.verification_message = body.verification_message || null;
+                if (body.verification_remove_role_id !== undefined) settings.verification_remove_role_id = body.verification_remove_role_id || null;
+            }
+            if (body.action === 'enable') settings.verification_enabled = 1;
+            if (body.action === 'disable') settings.verification_enabled = 0;
+        }
         
         // ============================================================================
         // SAVE TO DATABASE
@@ -434,32 +647,72 @@ router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req,
         await dbService.query(`
             INSERT INTO greeting_settings (
                 guild_id, 
-                autorole_id,
+                autorole_id, autorole_ids,
                 welcome_enabled, welcome_channel, welcome_content, welcome_embed,
-                farewell_enabled, farewell_channel, farewell_content, farewell_embed
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                dm_welcome_enabled, dm_welcome_content, dm_welcome_embed,
+                welcome_image_enabled, welcome_image_bg, welcome_image_text, welcome_image_color,
+                farewell_enabled, farewell_channel, farewell_content, farewell_embed,
+                boost_enabled, boost_channel, boost_content, boost_embed,
+                verification_enabled, verification_channel, verification_role_id, verification_type, verification_message, verification_remove_role_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 autorole_id = VALUES(autorole_id),
+                autorole_ids = VALUES(autorole_ids),
                 welcome_enabled = VALUES(welcome_enabled),
                 welcome_channel = VALUES(welcome_channel),
                 welcome_content = VALUES(welcome_content),
                 welcome_embed = VALUES(welcome_embed),
+                dm_welcome_enabled = VALUES(dm_welcome_enabled),
+                dm_welcome_content = VALUES(dm_welcome_content),
+                dm_welcome_embed = VALUES(dm_welcome_embed),
+                welcome_image_enabled = VALUES(welcome_image_enabled),
+                welcome_image_bg = VALUES(welcome_image_bg),
+                welcome_image_text = VALUES(welcome_image_text),
+                welcome_image_color = VALUES(welcome_image_color),
                 farewell_enabled = VALUES(farewell_enabled),
                 farewell_channel = VALUES(farewell_channel),
                 farewell_content = VALUES(farewell_content),
                 farewell_embed = VALUES(farewell_embed),
+                boost_enabled = VALUES(boost_enabled),
+                boost_channel = VALUES(boost_channel),
+                boost_content = VALUES(boost_content),
+                boost_embed = VALUES(boost_embed),
+                verification_enabled = VALUES(verification_enabled),
+                verification_channel = VALUES(verification_channel),
+                verification_role_id = VALUES(verification_role_id),
+                verification_type = VALUES(verification_type),
+                verification_message = VALUES(verification_message),
+                verification_remove_role_id = VALUES(verification_remove_role_id),
                 updated_at = CURRENT_TIMESTAMP
         `, [
             guildId,
             settings.autorole_id,
+            JSON.stringify(settings.autorole_ids || []),
             settings.welcome_enabled ? 1 : 0,
             settings.welcome_channel,
             settings.welcome_content,
             JSON.stringify(settings.welcome_embed),
+            settings.dm_welcome_enabled ? 1 : 0,
+            settings.dm_welcome_content,
+            JSON.stringify(settings.dm_welcome_embed),
+            settings.welcome_image_enabled ? 1 : 0,
+            settings.welcome_image_bg,
+            settings.welcome_image_text,
+            settings.welcome_image_color,
             settings.farewell_enabled ? 1 : 0,
             settings.farewell_channel,
             settings.farewell_content,
-            JSON.stringify(settings.farewell_embed)
+            JSON.stringify(settings.farewell_embed),
+            settings.boost_enabled ? 1 : 0,
+            settings.boost_channel,
+            settings.boost_content,
+            JSON.stringify(settings.boost_embed),
+            settings.verification_enabled ? 1 : 0,
+            settings.verification_channel,
+            settings.verification_role_id,
+            settings.verification_type,
+            settings.verification_message,
+            settings.verification_remove_role_id
         ]);
         
         Logger.info(`[Greeting] Settings für Guild ${guildId} gespeichert`);
@@ -467,6 +720,96 @@ router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req,
         
     } catch (error) {
         Logger.error('[Greeting] Fehler beim Speichern der Settings:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ============================================================================
+// INVITE MAPPING CRUD
+// ============================================================================
+
+router.get('/invite-mappings', requirePermission('GREETING.SETTINGS_EDIT'), async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    try {
+        const rows = await dbService.query(
+            'SELECT * FROM greeting_invite_mappings WHERE guild_id = ? ORDER BY created_at DESC',
+            [guildId]
+        );
+        res.json({ success: true, mappings: rows });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/invite-mappings', requirePermission('GREETING.SETTINGS_EDIT'), async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const { invite_code, label, welcome_content, welcome_embed } = req.body;
+
+    if (!invite_code || typeof invite_code !== 'string' || invite_code.length > 50) {
+        return res.status(400).json({ success: false, message: 'Invalid invite code' });
+    }
+
+    // Strip discord.gg/ prefix if present
+    const code = invite_code.replace(/^(https?:\/\/)?(discord\.gg\/|discord\.com\/invite\/)/, '').trim();
+
+    try {
+        await dbService.query(`
+            INSERT INTO greeting_invite_mappings (guild_id, invite_code, label, welcome_content, welcome_embed)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                label = VALUES(label),
+                welcome_content = VALUES(welcome_content),
+                welcome_embed = VALUES(welcome_embed),
+                updated_at = CURRENT_TIMESTAMP
+        `, [guildId, code, label || null, welcome_content || null, welcome_embed ? JSON.stringify(welcome_embed) : null]);
+
+        Logger.info(`[Greeting] Invite mapping created/updated: ${code} for guild ${guildId}`);
+        res.json({ success: true });
+    } catch (error) {
+        Logger.error('[Greeting] Error creating invite mapping:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.delete('/invite-mappings/:id', requirePermission('GREETING.SETTINGS_EDIT'), async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ success: false, message: 'Invalid ID' });
+
+    try {
+        await dbService.query(
+            'DELETE FROM greeting_invite_mappings WHERE id = ? AND guild_id = ?',
+            [id, guildId]
+        );
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ============================================================================
+// SEND VERIFICATION PANEL (IPC → Bot)
+// ============================================================================
+
+router.post('/send-verification-panel', requirePermission('GREETING.SETTINGS_EDIT'), async (req, res) => {
+    const ipcServer = ServiceManager.get('ipcServer');
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+
+    try {
+        const responses = await ipcServer.broadcast('greeting:SEND_VERIFICATION_PANEL', { guildId });
+        const resp = responses && responses.length > 0 ? responses[0] : null;
+        if (resp && resp.success) {
+            res.json({ success: true });
+        } else {
+            res.json({ success: false, message: resp?.error || 'Bot did not respond' });
+        }
+    } catch (error) {
+        Logger.error('[Greeting] Error sending verification panel:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });

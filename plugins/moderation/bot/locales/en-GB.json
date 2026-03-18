@@ -230,5 +230,44 @@
         "NO_WARNINGS": "{{target}} has no warnings",
         "WARNINGS_TITLE": "Warnings for {{target}}",
         "WARN_CLEAR": "All warnings for {{target}} have been cleared"
+    },
+
+    "PROTECTED_ROLE": "{{target}} has a protected role and cannot be moderated",
+
+    "CASE": {
+        "DESCRIPTION": "Shows details of a moderation case",
+        "NUMBER_DESC": "The case number",
+        "INVALID_NUMBER": "Please provide a valid case number (e.g. `/case 1`)",
+        "NOT_FOUND": "Case #{{number}} was not found"
+    },
+
+    "HISTORY": {
+        "DESCRIPTION": "Shows the complete moderation history of a user",
+        "USER_DESC": "The user whose history should be displayed",
+        "LIMIT_DESC": "Maximum number of entries (default: 25, max: 50)",
+        "NO_HISTORY": "{{target}} has no moderation history",
+        "TITLE": "Moderation History: {{target}}",
+        "FOOTER": "{{count}} entries found"
+    },
+
+    "NOTE": {
+        "DESCRIPTION": "Manage internal mod notes for users",
+        "SUB_ADD_DESC": "Add an internal note to a user",
+        "SUB_ADD_USER": "The user to add a note to",
+        "SUB_ADD_TEXT": "The note text",
+        "SUB_LIST_DESC": "Show all notes for a user",
+        "SUB_LIST_USER": "The user whose notes should be displayed",
+        "SUB_DELETE_DESC": "Delete a note",
+        "SUB_DELETE_ID": "The ID of the note to delete",
+
+        "NO_TEXT": "Please provide a text for the note",
+        "INVALID_ID": "Please provide a valid note ID",
+        "NO_NOTES": "{{target}} has no notes",
+        "LIST_TITLE": "Notes for {{target}}",
+        "LIST_FOOTER": "{{count}} notes found",
+        "ADD_SUCCESS": "Note #{{id}} created for {{target}}",
+        "ADD_FAILED": "Failed to create note",
+        "DELETE_SUCCESS": "Note #{{id}} has been deleted",
+        "DELETE_FAILED": "Note #{{id}} could not be deleted (not found or no permission)"
     }
 }

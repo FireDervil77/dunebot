@@ -17,6 +17,7 @@
     "dashboard": "dashboard/index.js"
   },
   
+  "migrations_deprecated_note": "LEGACY: Neue Updates über dashboard/updates/ Ordner (PluginUpdater)",
   "migrations": {
     "6.6.0": "dashboard/migrations/6.6.0-permissions.js",
     "6.6.1": "dashboard/migrations/6.6.1-fix-navigation-urls.js",

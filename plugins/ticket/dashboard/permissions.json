@@ -1,0 +1,42 @@
+{
+  "plugin": "ticket",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "TICKET.VIEW",
+      "name": "Ticket-System anzeigen",
+      "description": "Berechtigung um Ticket-Einstellungen und Übersicht zu sehen",
+      "category": "ticket",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "TICKET.SETTINGS_EDIT",
+      "name": "Ticket-Einstellungen bearbeiten",
+      "description": "Berechtigung um Ticket-Einstellungen zu konfigurieren (Log-Kanal, Limit, Farben)",
+      "category": "ticket",
+      "is_dangerous": 0,
+      "requires": "TICKET.VIEW"
+    },
+    {
+      "key": "TICKET.CATEGORIES_MANAGE",
+      "name": "Ticket-Kategorien verwalten",
+      "description": "Berechtigung um Ticket-Kategorien zu erstellen, bearbeiten und löschen",
+      "category": "ticket",
+      "is_dangerous": 0,
+      "requires": "TICKET.VIEW"
+    },
+    {
+      "key": "TICKET.TICKETS_VIEW",
+      "name": "Tickets anzeigen",
+      "description": "Berechtigung um alle Tickets und Transkripte einzusehen",
+      "category": "ticket",
+      "is_dangerous": 0,
+      "requires": "TICKET.VIEW"
+    }
+  ],
+  "default_groups": {
+    "Administrator": ["TICKET.VIEW", "TICKET.SETTINGS_EDIT", "TICKET.CATEGORIES_MANAGE", "TICKET.TICKETS_VIEW"],
+    "Moderator": ["TICKET.VIEW", "TICKET.TICKETS_VIEW"]
+  }
+}

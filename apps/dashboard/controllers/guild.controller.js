@@ -447,28 +447,8 @@ exports.getPlugins = async (req, res) => {
             Logger.error(`[Plugins] Fehler beim Durchsuchen des Plugin-Verzeichnisses:`, scanErr);
         }
 
-        // Plugin-Updates laden
-        let pendingUpdates = [];
-        try {
-            pendingUpdates = await pluginManager.getAvailableUpdates(guildId);
-            
-            // Updates mit Plugins mergen
-            const updateMap = new Map(pendingUpdates.map(u => [u.plugin_name, u]));
-            
-            enabledPlugins.forEach(plugin => {
-                if (updateMap.has(plugin.name)) {
-                    plugin.updateInfo = updateMap.get(plugin.name);
-                }
-            });
-            
-            availablePlugins.forEach(plugin => {
-                if (updateMap.has(plugin.name)) {
-                    plugin.updateInfo = updateMap.get(plugin.name);
-                }
-            });
-        } catch (updateErr) {
-            Logger.error(`[Plugins] Fehler beim Laden von Plugin-Updates:`, updateErr);
-        }
+        // Plugin-Updates (externes Update-System entfernt — nur noch PluginUpdater)
+        const pendingUpdates = [];
 
         // Breadcrumbs
         const breadcrumbs = [

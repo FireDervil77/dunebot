@@ -9,10 +9,6 @@ class GameserverBotPlugin extends BotPlugin {
             description: 'GameServer Plugin für Discord-Integration',
             version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireBot Team',
-            displayName: 'GameServer',
-            description: 'GameServer Plugin für Discord-Integration',
-            version: '1.0.0',
-            author: 'FireBot Team',
             icon: 'fa-solid fa-server',
             baseDir: __dirname,
             ownerOnly: false

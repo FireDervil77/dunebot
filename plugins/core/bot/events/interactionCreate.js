@@ -11,6 +11,37 @@ module.exports = async (interaction) => {
     const dbService = ServiceManager.get("dbService");
     const Logger = ServiceManager.get("Logger");
 
+    // Autocomplete-Interaktionen separat behandeln (vor Guild-Checks!)
+    if (interaction.isAutocomplete()) {
+        const command = interaction.client.commandManager.slashCommands.get(interaction.commandName.toLowerCase());
+        if (command?.autocomplete) {
+            try {
+                await command.autocomplete({ interaction, client: interaction.client });
+            } catch (err) {
+                Logger.error(`[Autocomplete] Fehler bei ${interaction.commandName}:`, err);
+                await interaction.respond([]).catch(() => {});
+            }
+        } else {
+            await interaction.respond([]).catch(() => {});
+        }
+        return;
+    }
+
+    // Modal-Submits an den jeweiligen Command weiterleiten (vor Guild-Checks!)
+    if (interaction.isModalSubmit()) {
+        const commandName = interaction.customId.split(':')[0];
+        const command = interaction.client.commandManager.slashCommands.get(commandName);
+        if (command?.modalSubmit) {
+            try {
+                await command.modalSubmit({ interaction, client: interaction.client });
+            } catch (err) {
+                Logger.error(`[Modal] Fehler bei ${commandName}:`, err);
+                await interaction.reply({ content: '❌ Interner Fehler beim Verarbeiten des Formulars.', flags: MessageFlags.Ephemeral }).catch(() => {});
+            }
+        }
+        return;
+    }
+
     if (!interaction.guild) {
         return interaction
             .reply({

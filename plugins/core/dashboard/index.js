@@ -164,7 +164,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                     try {
                         // Alte Navigation löschen
                         await dbService.query(
-                            "DELETE FROM nav_items WHERE plugin = ? AND guildId = ?",
+                            "DELETE FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
                             ['core', guildId]
                         );
                         
@@ -172,7 +172,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                         await this._registerNavigation(guildId);
                         
                         const [navCount] = await dbService.query(
-                            "SELECT COUNT(*) as count FROM nav_items WHERE plugin = ? AND guildId = ?",
+                            "SELECT COUNT(*) as count FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
                             ['core', guildId]
                         );
                         
@@ -194,7 +194,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 try {
                     // Alte Navigation löschen
                     await dbService.query(
-                        "DELETE FROM nav_items WHERE plugin = ? AND guildId = ?",
+                        "DELETE FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
                         ['core', guildId]
                     );
                     
@@ -202,7 +202,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                     await this._registerNavigation(guildId);
                     
                     const [navCount] = await dbService.query(
-                        "SELECT COUNT(*) as count FROM nav_items WHERE plugin = ? AND guildId = ?",
+                        "SELECT COUNT(*) as count FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
                         ['core', guildId]
                     );
                     

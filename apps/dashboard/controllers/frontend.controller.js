@@ -7,6 +7,7 @@ const { ServiceManager } = require("dunebot-core");
  */
 
 const { NewsHelper } = require('dunebot-sdk/utils');
+const FrontpageSection = require('dunebot-db-client/models/FrontpageSection');
 
 /**
  * Controller für Frontend-Routen
@@ -27,118 +28,127 @@ module.exports.getIndex = async (req, res) => {
         // User-Locale einmal bestimmen
         const userLocale = req.session?.locale || res.locals?.locale || 'de-DE';
         
-        // News aus der Datenbank laden
-        let newsList = [];
-        let carouselNews = []; // Letzte 3 News für den Hero-Carousel
+        // Sichtbare Sektionen aus DB laden (Reihenfolge beachten)
+        let sections = [];
         try {
-            const rawNews = await dbService.query(
-                "SELECT * FROM news WHERE status = 'published' ORDER BY created_at DESC LIMIT 6"
-            );
-            
-            // News lokalisieren basierend auf User-Locale
-            newsList = NewsHelper.getLocalizedNewsList(rawNews, userLocale);
-            
-            // Letzte 3 News für Carousel-Slides extrahieren
-            carouselNews = newsList.slice(0, 3);
+            sections = await FrontpageSection.getVisible();
         } catch (err) {
-            Logger.error("Fehler beim Laden der News:", err);
+            Logger.warn('[Frontend] frontpage_sections Tabelle nicht verfügbar, nutze Fallback:', err.message);
+            // Fallback: Standard-Reihenfolge wenn Tabelle noch nicht existiert
+            sections = [
+                { section_type: 'hero', config: {}, css_class: 'dark-background' },
+                { section_type: 'features', config: {}, css_class: 'dark-background' },
+                { section_type: 'news', config: {}, css_class: 'light-background' },
+                { section_type: 'changelogs', config: {}, css_class: 'dark-background' },
+                { section_type: 'plugins', config: {}, css_class: '' },
+                { section_type: 'documentation', config: {}, css_class: 'dark-background' },
+                { section_type: 'stats', config: {}, css_class: '' },
+                { section_type: 'skills', config: {}, css_class: '' }
+            ];
         }
 
-        // Changelogs aus der Datenbank laden
+        // Ermittle welche Daten benötigt werden
+        const sectionTypes = new Set(sections.map(s => s.section_type));
+
+        // News laden (für hero + news Sektionen)
+        let newsList = [];
+        let carouselNews = [];
+        if (sectionTypes.has('hero') || sectionTypes.has('news')) {
+            try {
+                const rawNews = await dbService.query(
+                    "SELECT * FROM news WHERE status = 'published' ORDER BY created_at DESC LIMIT 6"
+                );
+                newsList = NewsHelper.getLocalizedNewsList(rawNews, userLocale);
+                carouselNews = newsList.slice(0, 3);
+            } catch (err) {
+                Logger.error("Fehler beim Laden der News:", err);
+            }
+        }
+
+        // Changelogs laden
         let changelogsList = [];
-        try {
-            const rawChangelogs = await dbService.query(
-                "SELECT * FROM changelogs WHERE is_public = 1 ORDER BY release_date DESC LIMIT 3"
-            );
-            
-            // Changelogs lokalisieren
-            const { ChangelogHelper } = require('dunebot-sdk/utils');
-            changelogsList = ChangelogHelper.getLocalizedChangelogList(rawChangelogs, userLocale);
-        } catch (err) {
-            Logger.error("Fehler beim Laden der Changelogs:", err);
+        if (sectionTypes.has('changelogs')) {
+            try {
+                const rawChangelogs = await dbService.query(
+                    "SELECT * FROM changelogs WHERE is_public = 1 ORDER BY release_date DESC LIMIT 3"
+                );
+                const { ChangelogHelper } = require('dunebot-sdk/utils');
+                changelogsList = ChangelogHelper.getLocalizedChangelogList(rawChangelogs, userLocale);
+            } catch (err) {
+                Logger.error("Fehler beim Laden der Changelogs:", err);
+            }
         }
 
         // Datumsformat lokalisieren
-        const localizedNewsList = newsList.map(news => {
-            // news ist bereits ein Plain-Objekt!
-            return {
-                ...news,
-                formattedDate: news.date
-                    ? new Date(news.date).toLocaleString(userLocale, {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        }
-                    )
-                    : ''
-            };
-        });
-
-                // Changelogs Datumsformat lokalisieren
-        const localizedChangelogsList = changelogsList.map(changelog => {
-            return {
-                ...changelog,
-                formattedDate: changelog.release_date 
-                    ? new Date(changelog.release_date).toLocaleString(userLocale, {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
+        const localizedNewsList = newsList.map(news => ({
+            ...news,
+            formattedDate: news.date
+                ? new Date(news.date).toLocaleString(userLocale, {
+                        year: 'numeric', month: 'long', day: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
                     })
-                    : ''
-            };
-        });
+                : ''
+        }));
+
+        const localizedChangelogsList = changelogsList.map(changelog => ({
+            ...changelog,
+            formattedDate: changelog.release_date 
+                ? new Date(changelog.release_date).toLocaleString(userLocale, {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                })
+                : ''
+        }));
         
-        // Plugins aus Registry und package.json laden
+        // Plugins laden
         let pluginsList = [];
-        try {
-            const fs = require('fs');
-            const path = require('path');
-            const pluginsDir = path.join(__dirname, '../../../plugins');
-            
-            // Nur Plugin-Ordner mit package.json
-            const pluginFolders = fs.readdirSync(pluginsDir)
-                .filter(folder => {
-                    const pluginPath = path.join(pluginsDir, folder);
-                    return fs.statSync(pluginPath).isDirectory() && 
-                           fs.existsSync(path.join(pluginPath, 'package.json'));
-                });
-            
-            pluginsList = pluginFolders.map(folder => {
-                try {
-                    // fs.readFileSync + JSON.parse statt require() (Pfad-Problem)
-                    const packagePath = path.join(pluginsDir, folder, 'package.json');
-                    const packageData = fs.readFileSync(packagePath, 'utf8');
-                    const packageJson = JSON.parse(packageData);
-                    
-                    return {
-                        name: packageJson.name || folder,
-                        displayName: packageJson.displayName || packageJson.name || folder,
-                        description: packageJson.description || 'Keine Beschreibung verfügbar',
-                        version: packageJson.version || '1.0.0',
-                        author: packageJson.author || 'FireDervil',
-                        icon: this._getPluginIcon(folder) // Icon basierend auf Plugin-Name
-                    };
-                } catch (err) {
-                    Logger.warn(`Konnte package.json für Plugin ${folder} nicht laden:`, err);
-                    return null;
-                }
-            }).filter(Boolean); // null-Werte entfernen
-            
-            Logger.debug(`Plugins für Carousel geladen: ${pluginsList.length}`);
-        } catch (err) {
-            Logger.error("Fehler beim Laden der Plugins:", err);
+        if (sectionTypes.has('plugins')) {
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const pluginsDir = path.join(__dirname, '../../../plugins');
+                
+                const pluginFolders = fs.readdirSync(pluginsDir)
+                    .filter(folder => {
+                        const pluginPath = path.join(pluginsDir, folder);
+                        return fs.statSync(pluginPath).isDirectory() && 
+                               fs.existsSync(path.join(pluginPath, 'package.json'));
+                    });
+                
+                pluginsList = pluginFolders.map(folder => {
+                    try {
+                        const packagePath = path.join(pluginsDir, folder, 'package.json');
+                        const packageData = fs.readFileSync(packagePath, 'utf8');
+                        const packageJson = JSON.parse(packageData);
+                        
+                        return {
+                            name: packageJson.name || folder,
+                            displayName: packageJson.displayName || packageJson.name || folder,
+                            description: packageJson.description || 'Keine Beschreibung verfügbar',
+                            version: packageJson.version || '1.0.0',
+                            author: packageJson.author || 'FireDervil',
+                            icon: this._getPluginIcon(folder)
+                        };
+                    } catch (err) {
+                        Logger.warn(`Konnte package.json für Plugin ${folder} nicht laden:`, err);
+                        return null;
+                    }
+                }).filter(Boolean);
+                
+                Logger.debug(`Plugins für Carousel geladen: ${pluginsList.length}`);
+            } catch (err) {
+                Logger.error("Fehler beim Laden der Plugins:", err);
+            }
         }
         
         // Template rendern
         res.render("frontend/index", {
             title: "Willkommen bei DuneBot",
             user: req.session?.user || null,
+            sections,
             newsList: localizedNewsList,
-            carouselNews: carouselNews, // Letzte 3 News für den Hero-Carousel
+            carouselNews,
             changelogsList: localizedChangelogsList,
-            pluginsList: pluginsList
+            pluginsList
         });
     } catch (error) {
         Logger.error("Fehler beim Rendern der Landing Page:", error);

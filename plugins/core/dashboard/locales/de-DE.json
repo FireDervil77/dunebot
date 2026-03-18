@@ -50,6 +50,17 @@
     "PERM_DONATE_CREATE": "Spenden erstellen",
     "PERM_DONATE_CREATE_DESC": "Erlaubt das Erstellen von Spendenlinks über Stripe",
     
+    "PERM_THEMES_VIEW": "Themes ansehen",
+    "PERM_THEMES_VIEW_DESC": "Erlaubt das Ansehen der verfügbaren Dashboard-Themes",
+    "PERM_THEMES_EDIT": "Themes verwalten",
+    "PERM_THEMES_EDIT_DESC": "Erlaubt das Aktivieren, Klonen und Bearbeiten von Themes",
+    "PERM_MEDIA_VIEW": "Medien ansehen",
+    "PERM_MEDIA_VIEW_DESC": "Erlaubt das Ansehen der Medien-Bibliothek",
+    "PERM_MEDIA_UPLOAD": "Medien hochladen",
+    "PERM_MEDIA_UPLOAD_DESC": "Erlaubt das Hochladen von Bildern und Dateien",
+    "PERM_MEDIA_DELETE": "Medien löschen",
+    "PERM_MEDIA_DELETE_DESC": "Erlaubt das Löschen von Medien aus der Bibliothek (KRITISCH)",
+    
     "CORE": {
         "PERM_SETTINGS_VIEW": "Einstellungen ansehen",
         "PERM_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Guild-Einstellungen",
@@ -70,7 +81,17 @@
         "PERM_DONATE_VIEW": "Spenden ansehen",
         "PERM_DONATE_VIEW_DESC": "Erlaubt das Ansehen des Spendenbereichs",
         "PERM_DONATE_CREATE": "Spenden erstellen",
-        "PERM_DONATE_CREATE_DESC": "Erlaubt das Erstellen von Spendenlinks über Stripe"
+        "PERM_DONATE_CREATE_DESC": "Erlaubt das Erstellen von Spendenlinks über Stripe",
+        "PERM_THEMES_VIEW": "Themes ansehen",
+        "PERM_THEMES_VIEW_DESC": "Erlaubt das Ansehen der verfügbaren Dashboard-Themes",
+        "PERM_THEMES_EDIT": "Themes verwalten",
+        "PERM_THEMES_EDIT_DESC": "Erlaubt das Aktivieren, Klonen und Bearbeiten von Themes",
+        "PERM_MEDIA_VIEW": "Medien ansehen",
+        "PERM_MEDIA_VIEW_DESC": "Erlaubt das Ansehen der Medien-Bibliothek",
+        "PERM_MEDIA_UPLOAD": "Medien hochladen",
+        "PERM_MEDIA_UPLOAD_DESC": "Erlaubt das Hochladen von Bildern und Dateien",
+        "PERM_MEDIA_DELETE": "Medien löschen",
+        "PERM_MEDIA_DELETE_DESC": "Erlaubt das Löschen von Medien aus der Bibliothek (KRITISCH)"
     },
     
     "PERMISSIONS": {
@@ -374,7 +395,47 @@
         "ADDONS_VIEW": "Addons ansehen",
         "ADDONS_VIEW_DESC": "Erlaubt das Ansehen des Addon-Marketplace",
         "ADDONS_MANAGE": "Addons verwalten",
-        "ADDONS_MANAGE_DESC": "Erlaubt das Installieren und Verwalten von Addons"
+        "ADDONS_MANAGE_DESC": "Erlaubt das Installieren und Verwalten von Addons",
+
+        "ROLES_VIEW": "Rollen ansehen",
+        "ROLES_VIEW_DESC": "Erlaubt das Ansehen der Discord-Rollen und deren Berechtigungen",
+        "ROLES_EDIT": "Rollen bearbeiten",
+        "ROLES_EDIT_DESC": "Erlaubt das Erstellen, Bearbeiten und Löschen von Discord-Rollen (KRITISCH)"
+    },
+
+    "ROLES": {
+        "TITLE": "Discord Rollen",
+        "TOTAL": "Gesamt",
+        "EDITABLE": "Bearbeitbar",
+        "MANAGED": "Verwaltet",
+        "SEARCH_PLACEHOLDER": "Rolle suchen...",
+        "NO_ROLES": "Keine Rollen gefunden",
+        "SELECT_ROLE": "Wähle eine Rolle aus",
+        "SELECT_ROLE_DESC": "Klicke auf eine Rolle in der Liste, um Details und Berechtigungen anzuzeigen.",
+        "NO_MANAGE_ROLES_PERM": "Der Bot hat keine ManageRoles-Berechtigung. Rollen können nur angezeigt, aber nicht bearbeitet werden.",
+        "REASON_MANAGED": "Diese Rolle wird von Discord verwaltet (Bot/Boost) und kann nicht bearbeitet werden.",
+        "REASON_HIGHER": "Diese Rolle ist höher als die Bot-Rolle und kann nicht bearbeitet werden.",
+        "TAB_GENERAL": "Allgemein",
+        "TAB_PERMISSIONS": "Berechtigungen",
+        "NAME": "Rollenname",
+        "COLOR": "Farbe",
+        "HOIST": "Separat anzeigen",
+        "HOIST_HELP": "Mitglieder mit dieser Rolle werden separat in der Mitgliederliste angezeigt.",
+        "MENTIONABLE": "Erwähnbar",
+        "MENTIONABLE_HELP": "Jeder kann diese Rolle mit @Rollenname erwähnen.",
+        "POSITION": "Position",
+        "MEMBERS": "Mitglieder",
+        "CREATED": "Erstellt",
+        "PERM_HINT": "Discord-Berechtigungen für diese Rolle. Änderungen gelten sofort auf dem Server.",
+        "BTN_CREATE": "Neue Rolle",
+        "BTN_DELETE": "Rolle löschen",
+        "CREATE_TITLE": "Neue Rolle erstellen",
+        "DELETE_TITLE": "Rolle löschen",
+        "DELETE_CONFIRM": "Bist du sicher, dass du diese Rolle löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden!",
+        "TOAST_SAVED": "Rolle erfolgreich gespeichert!",
+        "TOAST_CREATED": "Neue Rolle erfolgreich erstellt!",
+        "TOAST_DELETED": "Rolle erfolgreich gelöscht!",
+        "TOAST_ERROR": "Fehler bei der Rollen-Aktion."
     }
 
 }

@@ -99,8 +99,8 @@
               </a>
             </div>
             <div class="col-md-3 col-sm-6 mb-2">
-              <a href="/guild/<%= guildId %>/plugins/masterserver/tokens" class="btn btn-outline-success btn-block">
-                <i class="fa-solid fa-key me-2"></i> Token verwalten
+              <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-outline-secondary btn-block">
+                <i class="fa-solid fa-server me-2"></i> RootServer
               </a>
             </div>
             <div class="col-md-3 col-sm-6 mb-2">
@@ -124,7 +124,7 @@
 
   <div class="row">
     <!-- Daemon Info Card -->
-    <div class="col-lg-6">
+    <div class="col-12">
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">
@@ -198,53 +198,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Token Stats Card -->
-    <div class="col-lg-6">
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">
-            <i class="fa-solid fa-key me-2"></i>
-            Token-Statistiken
-          </h3>
-        </div>
-        <div class="card-body">
-          <div class="row text-center">
-            <div class="col-4">
-              <div class="border-right">
-                <h4 class="text-success"><%= tokenStats.active || 0 %></h4>
-                <small class="text-muted">Aktive Tokens</small>
-              </div>
-            </div>
-            <div class="col-4">
-              <div class="border-right">
-                <h4 class="text-danger"><%= tokenStats.expired || 0 %></h4>
-                <small class="text-muted">Abgelaufen</small>
-              </div>
-            </div>
-            <div class="col-4">
-              <h4 class="text-warning"><%= tokenStats.neverUsed || 0 %></h4>
-              <small class="text-muted">Nie genutzt</small>
-            </div>
-          </div>
-          <hr>
-          <div class="text-center">
-            <% if (daemon) { %>
-              <a href="/guild/<%= guildId %>/plugins/masterserver/tokens" class="btn btn-primary btn-sm">
-                <i class="fa-solid fa-key me-1"></i> Token verwalten
-              </a>
-            <% } else { %>
-              <div class="alert alert-info mb-2">
-                <i class="fa-solid fa-info-circle me-2"></i>
-                Erstelle zuerst einen Daemon um Tokens zu generieren.
-              </div>
-              <a href="/guild/<%= guildId %>/plugins/masterserver/daemon" class="btn btn-success btn-sm">
-                <i class="fa-solid fa-plus me-1"></i> Daemon erstellen
-              </a>
-            <% } %>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
+
 </div>

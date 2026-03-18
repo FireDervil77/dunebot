@@ -6,7 +6,7 @@
  * @author FireBot Team
  */
 
-const { DashboardPlugin } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class MasterserverDashboardPlugin extends DashboardPlugin {
@@ -15,7 +15,7 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
             name: 'masterserver',
             displayName: 'Masterserver',
             description: 'Verwalte alle deine Server hier über ein zentrales Modul.',
-            version: '0.1.0_alpha',
+            version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireBot Team',
             icon: 'fa-solid fa-server',
             baseDir: __dirname,
@@ -41,6 +41,7 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
         this.app = app;
         this._setupRoutes(); // testen ob es aktiviert wird
         this._registerHooks(); // testen ob die ausgeführt werden
+        this._registerWidgets();
 
         // Seed Standard-Quota-Profile
         try {
@@ -49,6 +50,39 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
             Logger.info('[Masterserver] Standard-Quota-Profile initialisiert');
         } catch (error) {
             Logger.error('[Masterserver] Fehler beim Seeden der Quota-Profile:', error);
+        }
+
+        // rootserver_ips Tabelle sicherstellen (Multi-IP-Support)
+        try {
+            await dbService.query(`
+                CREATE TABLE IF NOT EXISTS rootserver_ips (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    rootserver_id INT NOT NULL,
+                    ip_address VARCHAR(45) NOT NULL,
+                    label VARCHAR(100) NULL COMMENT 'Optionaler Name z.B. "Game-IP", "Admin-IP"',
+                    is_primary TINYINT(1) NOT NULL DEFAULT 0,
+                    created_at DATETIME DEFAULT NOW(),
+                    UNIQUE KEY unique_ip_per_rs (rootserver_id, ip_address),
+                    FOREIGN KEY (rootserver_id) REFERENCES rootserver(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            `);
+            Logger.info('[Masterserver] rootserver_ips Tabelle vorhanden');
+        } catch (error) {
+            Logger.error('[Masterserver] Fehler beim Erstellen der rootserver_ips Tabelle:', error);
+        }
+
+        // Overallocation-Felder in rootserver_quotas sicherstellen
+        try {
+            for (const col of [
+                "ADD COLUMN IF NOT EXISTS overallocate_ram_percent INT NOT NULL DEFAULT 0 COMMENT 'RAM-Überallokation in % (0 = keine)'",
+                "ADD COLUMN IF NOT EXISTS overallocate_disk_percent INT NOT NULL DEFAULT 0 COMMENT 'Disk-Überallokation in % (0 = keine)'"
+            ]) {
+                try { await dbService.query(`ALTER TABLE rootserver_quotas ${col}`); }
+                catch (e) { if (e.code !== 'ER_DUP_FIELDNAME') throw e; }
+            }
+            Logger.info('[Masterserver] rootserver_quotas Overallocation-Felder vorhanden');
+        } catch (error) {
+            Logger.error('[Masterserver] Fehler beim Migrieren der Overallocation-Felder:', error);
         }
 
         Logger.success('[Masterserver] Dashboard-Plugin aktiviert');
@@ -288,6 +322,58 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
           // Derzeit keine Hooks benötigt
           Logger.debug('[Masterserver] Hooks registriert');
       }
+
+    /**
+     * Haupt-Dashboard Widget registrieren
+     * Zeigt RootServer-Status im Guild-Dashboard wenn das Plugin aktiv ist
+     */
+    _registerWidgets() {
+        const Logger = ServiceManager.get('Logger');
+        const pluginManager = ServiceManager.get('pluginManager');
+        if (!pluginManager?.hooks) {
+            Logger.warn('[Masterserver] PluginManager/Hooks nicht verfügbar – Widget nicht registriert');
+            return;
+        }
+
+        pluginManager.hooks.addFilter('guild_dashboard_widgets', async (widgets, options) => {
+            const { guildId, enabledPlugins, themeManager: tm } = options;
+
+            // Nur wenn Plugin für diese Guild aktiv ist
+            const isActive = Array.isArray(enabledPlugins)
+                ? enabledPlugins.some(p => p === 'masterserver' || p?.name === 'masterserver')
+                : false;
+            if (!isActive) return widgets;
+
+            try {
+                const RootServer = require('./models/RootServer');
+                const rootservers = await RootServer.getByGuild(guildId);
+
+                const themeManager = tm || ServiceManager.get('themeManager');
+                const content = await themeManager.renderWidgetPartial('rootserver-status', {
+                    guildId,
+                    rootservers,
+                    plugin: 'masterserver'
+                });
+
+                widgets.push({
+                    id: 'masterserver-rootserver-status',
+                    title: 'RootServer',
+                    area: 'dashboard-secondary',
+                    position: 50,
+                    size: 4,
+                    icon: 'fa-solid fa-server',
+                    cardClass: '',
+                    content
+                });
+            } catch (err) {
+                Logger.error('[Masterserver] Fehler beim Rendern des RootServer-Widgets:', err);
+            }
+
+            return widgets;
+        });
+
+        Logger.debug('[Masterserver] RootServer-Widget registriert');
+    }
 
       /**
      * Navigation für das Plugin registrieren

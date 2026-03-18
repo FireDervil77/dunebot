@@ -6,6 +6,13 @@
     "PAGE_TITLE": "Moderation Einstellungen",
     "PAGE_DESC": "Konfiguriere Moderation, Logs und Benachrichtigungen"
   },
+
+  "TAB_SETTINGS": "Einstellungen",
+  "TAB_PROTECTED_ROLES": "Geschützte Rollen",
+  "TAB_CHANNEL_RULES": "Channel-Regeln",
+  "TAB_NOTES": "Mod-Notizen",
+  "TAB_LOGS": "Moderation-Logs",
+
   "SECTION_BASIC": "Basis-Einstellungen",
   "SECTION_BASIC_DESC": "Grundlegende Moderations-Konfiguration",
   
@@ -41,6 +48,60 @@
   "DM_ON_KICK": "Bei Kick",
   "DM_ON_BAN": "Bei Ban",
   "DM_ON_TIMEOUT": "Bei Timeout",
+
+  "PROTECTED": {
+    "TITLE": "Geschützte Rollen",
+    "DESC": "Mitglieder mit einer geschützten Rolle können nicht durch Moderations-Commands bestraft werden (Warn, Kick, Ban, Timeout).",
+    "SELECT_ROLE": "Rolle auswählen...",
+    "BTN_ADD": "Hinzufügen",
+    "EMPTY": "Keine geschützten Rollen konfiguriert. Alle Rollen können moderiert werden.",
+    "CONFIRM_REMOVE": "Möchtest du diese geschützte Rolle wirklich entfernen?"
+  },
+
+  "LOGS": {
+    "TITLE": "Moderation-Logs",
+    "FILTER_ALL": "Alle Typen",
+    "COL_TYPE": "Typ",
+    "COL_USER": "User",
+    "COL_MODERATOR": "Moderator",
+    "COL_REASON": "Begründung",
+    "COL_DATE": "Datum",
+    "EMPTY": "Keine Moderation-Logs vorhanden.",
+    "LOAD_MORE": "Mehr laden",
+    "REMAINING": "weitere"
+  },
+
+  "CHANNEL_RULES": {
+    "TITLE": "Channel-spezifische Regeln",
+    "DESC": "Definiere abweichende Moderations-Einstellungen für einzelne Channels. Hier kannst du z.B. in Meme-Channels lockerere Regeln setzen oder Channels vom AutoMod ausnehmen.",
+    "ADD_TITLE": "Channel-Regel hinzufügen",
+    "CHANNEL": "Channel",
+    "WARN_LIMIT": "Max. Warns",
+    "WARN_ACTION": "Aktion",
+    "AUTOMOD_EXEMPT": "AutoMod",
+    "EXEMPT": "Ausgenommen",
+    "NOTES": "Notiz",
+    "NOTES_PLACEHOLDER": "Optionale Notiz zur Regel...",
+    "BTN_ADD": "Hinzufügen",
+    "EMPTY": "Keine channel-spezifischen Regeln konfiguriert. Es gelten die globalen Einstellungen.",
+    "CONFIRM_REMOVE": "Möchtest du diese Channel-Regel wirklich entfernen?"
+  },
+
+  "NOTES": {
+    "TITLE": "Moderator-Notizen",
+    "DESC": "Interne Notizen zu Usern – nur für Moderatoren sichtbar. Kann z.B. Hintergrundinformationen oder Beobachtungen enthalten.",
+    "ADD_TITLE": "Neue Notiz erstellen",
+    "USER_ID": "User-ID",
+    "USER_ID_PLACEHOLDER": "Discord User-ID eingeben",
+    "NOTE_TEXT": "Notiz",
+    "NOTE_PLACEHOLDER": "Notiz-Text eingeben...",
+    "BTN_ADD": "Erstellen",
+    "SEARCH_PLACEHOLDER": "User-ID suchen...",
+    "BTN_SEARCH": "Suchen",
+    "BTN_ALL": "Alle",
+    "HINT": "Verwende die Suche oben um Notizen für einen bestimmten User anzuzeigen, oder klicke 'Alle' um alle Notizen zu laden.",
+    "CONFIRM_DELETE": "Möchtest du diese Notiz wirklich löschen?"
+  },
   
   "HELP": {
     "TITLE": "Hilfe & Tipps",
@@ -48,8 +109,14 @@
     "MODERATION_TEXT": "Verwalte Warnungen, Kicks, Bans und Timeouts für deinen Server.",
     "MODLOG_TITLE": "Modlog Events",
     "MODLOG_TEXT": "Protokolliere alle Moderationsaktionen in einem dedizierten Channel.",
+    "PROTECTED_TITLE": "Geschützte Rollen",
+    "PROTECTED_TEXT": "Definiere Rollen, deren Mitglieder nicht durch Moderations-Commands bestraft werden können.",
     "DM_TITLE": "DM Benachrichtigungen",
     "DM_TEXT": "Informiere betroffene User automatisch über Moderationsaktionen per Direktnachricht.",
+    "CHANNEL_RULES_TITLE": "Channel-Regeln",
+    "CHANNEL_RULES_TEXT": "Konfiguriere unterschiedliche Moderations-Einstellungen pro Channel, z.B. lockerere Regeln in Meme-Channels.",
+    "NOTES_TITLE": "Mod-Notizen",
+    "NOTES_TEXT": "Erstelle interne Notizen zu Usern, die nur für Moderatoren sichtbar sind.",
     "COMMANDS_TITLE": "Verfügbare Commands"
   },
   

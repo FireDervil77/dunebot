@@ -248,6 +248,18 @@ const INSTALL_COMPLETED = 'completed';
  */
 const INSTALL_FAILED = 'failed';
 
+/**
+ * install.output - Einzelne Log-Zeile während der Installation
+ * Payload: { server_id, line }
+ */
+const INSTALL_OUTPUT = 'output';
+
+/**
+ * install.status - Installations-Phasen-Update
+ * Payload: { server_id, phase, message }
+ */
+const INSTALL_STATUS = 'status';
+
 // =====================================================
 // EXPORTS
 // =====================================================
@@ -303,4 +315,6 @@ module.exports = {
   INSTALL_LOGS,
   INSTALL_COMPLETED,
   INSTALL_FAILED,
+  INSTALL_OUTPUT,
+  INSTALL_STATUS,
 };

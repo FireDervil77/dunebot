@@ -31,7 +31,7 @@
     </div>
 
     <!-- Terminal (xterm.js) -->
-    <div id="xterm-terminal" class="border rounded" style="background-color: #000; padding: 10px; height: 500px; overflow: hidden;"></div>
+    <div id="xterm-terminal" class="border rounded" style="background-color: #000; padding: 10px; height: 500px; width: 100%; overflow: hidden;"></div>
 
     <!-- Command Input -->
     <% if (userPermissions.permissions['GAMESERVER.CONSOLE.EXECUTE']) { %>
@@ -99,164 +99,51 @@ if (typeof gameserverConsole === 'undefined' && typeof GameserverConsoleClient !
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// ✨ TAB-BASED AUTO-CONNECT/DISCONNECT (Pterodactyl/Pelican Style)
+// ✨ PERSISTENT AUTO-CONNECT – Console bleibt dauerhaft verbunden
+// Kein Tab-basiertes Disconnect: SSE-Stream läuft immer, auch wenn Tab
+// nicht aktiv ist (Install-Output geht so nie verloren).
 // ════════════════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', function() {
-    // AssetManager-Fallback: Script im Footer geladen → jetzt instanziieren (falls noch nicht)
+    // AssetManager-Fallback: Script im Footer geladen → jetzt instanziieren
     if (typeof gameserverConsole === 'undefined' && typeof GameserverConsoleClient !== 'undefined') {
         window.gameserverConsole = new GameserverConsoleClient(CONSOLE_CONFIG);
         console.log('[Console] Console-Client initialisiert (DOMContentLoaded/AssetManager)');
     }
 
-    console.log('[Console Auto-Connect] Script geladen');
-    
-    const consoleTab = document.getElementById('console-tab');
-    const consolePane = document.getElementById('console');
-    
-    if (!consoleTab || !consolePane) {
-        console.warn('[Console Auto-Connect] Console-Tab nicht gefunden - Skip');
-        return;
-    }
-    
-    let isConnected = false;
-    
-    // ────────────────────────────────────────────────────────────────────────
-    // Helper: Console-Tab aktiv?
-    // ────────────────────────────────────────────────────────────────────────
-    function isConsoleTabVisible() {
-        return consolePane.classList.contains('active') && consolePane.classList.contains('show');
-    }
-    
-    // ────────────────────────────────────────────────────────────────────────
-    // Auto-Connect (mit Retry-Logic)
-    // ────────────────────────────────────────────────────────────────────────
+    // ── Einmalig verbinden beim Page-Load ───────────────────────────────────
     function tryConnect() {
-        if (isConnected) {
-            console.log('[Console Auto-Connect] Bereits verbunden - Skip');
-            return;
-        }
-        
         if (typeof gameserverConsole === 'undefined') {
-            console.warn('[Console Auto-Connect] gameserverConsole nicht bereit - Retry in 100ms');
             setTimeout(tryConnect, 100);
             return;
         }
-        
-        console.log('[Console Auto-Connect] ✅ Verbinde...');
-        gameserverConsole.connect();
-        isConnected = true;
+        if (!gameserverConsole.connected) {
+            console.log('[Console] Starte persistente Verbindung...');
+            gameserverConsole.connect();
+        }
     }
-    
-    // ────────────────────────────────────────────────────────────────────────
-    // Auto-Disconnect
-    // ────────────────────────────────────────────────────────────────────────
-    function tryDisconnect() {
-        if (!isConnected) {
-            console.log('[Console Auto-Connect] Bereits getrennt - Skip');
-            return;
-        }
-        
-        if (typeof gameserverConsole === 'undefined') {
-            console.warn('[Console Auto-Connect] gameserverConsole nicht verfügbar für Disconnect');
-            isConnected = false;
-            return;
-        }
-        
-        console.log('[Console Auto-Connect] ❌ Trenne...');
-        gameserverConsole.disconnect();
-        isConnected = false;
+    setTimeout(tryConnect, 100);
+
+    // ── Tab-shown: nur fitAddon neu berechnen (kein Re-Connect!) ───────────
+    const consoleTab = document.getElementById('console-tab');
+    if (consoleTab) {
+        consoleTab.addEventListener('shown.bs.tab', function() {
+            setTimeout(function() {
+                try {
+                    if (gameserverConsole?.fitAddon) gameserverConsole.fitAddon.fit();
+                    if (gameserverConsole?.terminal) {
+                        gameserverConsole.terminal.refresh(0, gameserverConsole.terminal.rows - 1);
+                        gameserverConsole.terminal.scrollToBottom();
+                    }
+                } catch(e) {}
+            }, 50);
+        });
     }
-    
-    // ────────────────────────────────────────────────────────────────────────
-    // EVENT: Console-Tab wird aktiviert (Bootstrap Tab-Click)
-    // ────────────────────────────────────────────────────────────────────────
-    consoleTab.addEventListener('click', function(e) {
-        console.log('[Console Auto-Connect] Console-Tab geklickt');
-        // Bootstrap Tab-Wechsel triggert automatisch - wir connecten nach shown.bs.tab
-    });
-    
-    // Bootstrap Tab 'shown' Event (nachdem Tab-Wechsel abgeschlossen)
-    consoleTab.addEventListener('shown.bs.tab', function(e) {
-        console.log('[Console Auto-Connect] Console-Tab aktiviert (shown.bs.tab)');
-        if (!document.hidden) {
-            tryConnect();
-        } else {
-            console.log('[Console Auto-Connect] Browser-Tab versteckt - Skip Connect');
-        }
-    });
-    
-    // ────────────────────────────────────────────────────────────────────────
-    // EVENT: Anderer Tab wird aktiviert → Disconnect
-    // ────────────────────────────────────────────────────────────────────────
-    document.querySelectorAll('#server-tabs .nav-link').forEach(function(tab) {
-        tab.addEventListener('shown.bs.tab', function(e) {
-            if (e.target.getAttribute('href') !== '#console') {
-                console.log('[Console Auto-Connect] Anderer Tab aktiviert → Disconnect');
-                tryDisconnect();
-            }
-        });
-    });
-    
-    // ────────────────────────────────────────────────────────────────────────
-    // EVENT: Browser-Tab Visibility Change
-    // ────────────────────────────────────────────────────────────────────────
-    document.addEventListener('visibilitychange', function() {
-        if (document.hidden) {
-            console.log('[Console Auto-Connect] Browser-Tab versteckt → Disconnect');
-            tryDisconnect();
-        } else if (isConsoleTabVisible()) {
-            console.log('[Console Auto-Connect] Browser-Tab sichtbar + Console-Tab aktiv → Connect');
-            tryConnect();
-        }
-    });
-    
-    // ────────────────────────────────────────────────────────────────────────
-    // EVENT: Page Unload (Browser-Tab schließen)
-    // ────────────────────────────────────────────────────────────────────────
+
+    // ── Page Unload: sauber trennen ────────────────────────────────────────
     window.addEventListener('beforeunload', function() {
-        if (isConnected) {
-            console.log('[Console Auto-Connect] Page Unload → Disconnect');
-            tryDisconnect();
+        if (gameserverConsole?.connected) {
+            gameserverConsole.disconnect();
         }
-    });
-    
-    // ────────────────────────────────────────────────────────────────────────
-    // INITIAL CHECK: Console-Tab beim Page-Load aktiv?
-    // ────────────────────────────────────────────────────────────────────────
-    setTimeout(function() {
-        if (isConsoleTabVisible() && !document.hidden) {
-            console.log('[Console Auto-Connect] ✅ Console-Tab ist aktiv beim Page-Load → Connect');
-            tryConnect();
-        } else {
-            console.log('[Console Auto-Connect] Console-Tab nicht aktiv beim Page-Load - Warte auf Tab-Click');
-        }
-    }, 100);
-    
-    // ────────────────────────────────────────────────────────────────────────
-    // FALLBACK: MutationObserver für Console-Tab Visibility
-    // (Für Fälle wo Bootstrap Events nicht feuern)
-    // ────────────────────────────────────────────────────────────────────────
-    const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                const nowVisible = isConsoleTabVisible();
-                
-                if (nowVisible && !isConnected && !document.hidden) {
-                    console.log('[Console Auto-Connect] MutationObserver: Console-Tab visible → Connect');
-                    tryConnect();
-                } else if (!nowVisible && isConnected) {
-                    console.log('[Console Auto-Connect] MutationObserver: Console-Tab hidden → Disconnect');
-                    tryDisconnect();
-                }
-            }
-        });
-    });
-    
-    observer.observe(consolePane, { attributes: true, attributeFilter: ['class'] });
-    
-    // Cleanup bei Page Unload
-    window.addEventListener('beforeunload', function() {
-        observer.disconnect();
     });
 });
 </script>

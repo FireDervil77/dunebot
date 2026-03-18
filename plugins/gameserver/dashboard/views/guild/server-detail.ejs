@@ -301,11 +301,131 @@
                             <div class="tab-pane fade" 
                                  id="logs" 
                                  role="tabpanel">
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle me-2"></i>
-                                    <strong>Log-Viewer</strong> - Wird in Milestone 3 implementiert (Event-Bus Phase 6)
+                                <!-- Log Controls -->
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                            <input type="text" class="form-control" id="log-search" placeholder="Logs durchsuchen...">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select" id="log-lines">
+                                            <option value="100">Letzte 100 Zeilen</option>
+                                            <option value="500" selected>Letzte 500 Zeilen</option>
+                                            <option value="1000">Letzte 1000 Zeilen</option>
+                                            <option value="2000">Letzte 2000 Zeilen</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-5 text-end">
+                                        <button class="btn btn-primary" id="log-refresh" onclick="loadLogs()">
+                                            <i class="fas fa-sync-alt me-1"></i> Aktualisieren
+                                        </button>
+                                        <button class="btn btn-secondary" id="log-download" onclick="downloadLogs()">
+                                            <i class="fas fa-download me-1"></i> Download
+                                        </button>
+                                    </div>
                                 </div>
-                                <!-- TODO Milestone 3: Log-Streaming mit Suche -->
+
+                                <!-- Log Output -->
+                                <div class="card bg-dark">
+                                    <div class="card-body p-0">
+                                        <div id="log-status" class="text-center text-muted py-3">
+                                            <i class="fas fa-info-circle me-1"></i> Klicke "Aktualisieren" um Logs zu laden
+                                        </div>
+                                        <pre id="log-output" class="mb-0 p-3" style="max-height: 600px; overflow-y: auto; font-size: 13px; line-height: 1.4; color: #e0e0e0; background: #1e1e1e; display: none; white-space: pre-wrap; word-break: break-all;"></pre>
+                                    </div>
+                                    <div class="card-footer text-muted d-flex justify-content-between">
+                                        <span id="log-count">0 Zeilen</span>
+                                        <span id="log-filtered" style="display: none;">Gefiltert: <span id="log-filtered-count">0</span> Treffer</span>
+                                    </div>
+                                </div>
+
+                                <script>
+                                let _logLines = [];
+
+                                async function loadLogs() {
+                                    const btn = document.getElementById('log-refresh');
+                                    const output = document.getElementById('log-output');
+                                    const status = document.getElementById('log-status');
+                                    const lines = document.getElementById('log-lines').value;
+
+                                    btn.disabled = true;
+                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Lade...';
+                                    status.style.display = 'block';
+                                    status.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Logs werden geladen...';
+                                    output.style.display = 'none';
+
+                                    try {
+                                        const res = await fetch(`/guild/<%= guildId %>/plugins/gameserver/console/<%= server.id %>/logs?lines=${lines}`);
+                                        const data = await res.json();
+
+                                        if (data.success && data.lines) {
+                                            _logLines = data.lines;
+                                            renderLogs(_logLines);
+                                            document.getElementById('log-count').textContent = `${data.count} Zeilen`;
+                                        } else {
+                                            status.style.display = 'block';
+                                            status.innerHTML = `<i class="fas fa-exclamation-triangle text-warning me-1"></i> ${data.error || 'Keine Logs verfügbar'}`;
+                                            output.style.display = 'none';
+                                        }
+                                    } catch (err) {
+                                        status.style.display = 'block';
+                                        status.innerHTML = '<i class="fas fa-times text-danger me-1"></i> Fehler beim Laden der Logs';
+                                        output.style.display = 'none';
+                                    } finally {
+                                        btn.disabled = false;
+                                        btn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Aktualisieren';
+                                    }
+                                }
+
+                                function renderLogs(lines) {
+                                    const output = document.getElementById('log-output');
+                                    const status = document.getElementById('log-status');
+
+                                    // HTML-Entities escapen
+                                    const escaped = lines.map(l => 
+                                        l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                                    ).join('\n');
+
+                                    output.textContent = '';
+                                    output.innerHTML = escaped;
+                                    output.style.display = 'block';
+                                    status.style.display = 'none';
+
+                                    // Auto-scroll nach unten
+                                    output.scrollTop = output.scrollHeight;
+                                }
+
+                                function downloadLogs() {
+                                    if (!_logLines.length) return;
+                                    const blob = new Blob([_logLines.join('\n')], { type: 'text/plain' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `server-<%= server.id %>-logs-${new Date().toISOString().slice(0,10)}.log`;
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                }
+
+                                // Suchfilter
+                                document.getElementById('log-search').addEventListener('input', function() {
+                                    const query = this.value.toLowerCase().trim();
+                                    const filteredEl = document.getElementById('log-filtered');
+                                    const filteredCountEl = document.getElementById('log-filtered-count');
+
+                                    if (!query) {
+                                        renderLogs(_logLines);
+                                        filteredEl.style.display = 'none';
+                                        return;
+                                    }
+
+                                    const filtered = _logLines.filter(l => l.toLowerCase().includes(query));
+                                    renderLogs(filtered);
+                                    filteredEl.style.display = '';
+                                    filteredCountEl.textContent = filtered.length;
+                                });
+                                </script>
                             </div>
                         <% } %>
 
@@ -385,7 +505,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastKnownStatus = '<%= server.status %>';
 
     // Helper zum Updaten der Status-Badge und Buttons
-    function updateDetailUI(status) {
+    // ✅ Global exponiert, damit server-actions.js Zwischenstatus setzen kann
+    window.updateDetailUI = function updateDetailUI(status) {
         // Mapping wie im Overview
         const map = { running: 'online', stopped: 'offline' };
         const normalized = map[status] || status;
@@ -416,13 +537,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const stopBtn = group.querySelector('button[onclick*="stop"]');
             const restartBtn = group.querySelector('button[onclick*="restart"]');
             const deleteBtn = group.querySelector('button[onclick*="deleteServer"]');
+            const reinstallBtn = group.querySelector('button[onclick*="reinstallServer"]');
 
             if (startBtn) startBtn.style.display = (normalized === 'offline' || normalized === 'error' || normalized === 'installed') ? '' : 'none';
             if (stopBtn) stopBtn.style.display = (normalized === 'online' || normalized === 'starting') ? '' : 'none';
             if (restartBtn) restartBtn.style.display = (normalized === 'online') ? '' : 'none';
+            if (reinstallBtn) reinstallBtn.style.display = (normalized === 'error') ? '' : 'none';
             if (deleteBtn) deleteBtn.style.display = (normalized === 'offline' || normalized === 'error' || normalized === 'installed') ? '' : 'none';
         }
-    }
+    };
 
     // Events binden
     sse.on('status_changed', (msg) => {
@@ -458,7 +581,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Statische Server-Infos (IP, Ports etc.) per AJAX nachladen statt Seiten-Reload.
                 // Die Konsole läuft dabei weiter.
-                _refreshServerInfoPanel();
+                // ✅ Kleiner Delay damit DB-Status sicher aktualisiert ist
+                setTimeout(() => _refreshServerInfoPanel(), 500);
             }
 
             lastKnownStatus = newStatus;
@@ -479,6 +603,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const curOverview = document.querySelector('#overview');
             if (newOverview && curOverview) {
                 curOverview.innerHTML = newOverview.innerHTML;
+                
+                // ✅ Scripts nach innerHTML-Swap manuell ausführen
+                // (innerHTML führt <script>-Tags nicht automatisch aus)
+                curOverview.querySelectorAll('script').forEach(oldScript => {
+                    const newScript = document.createElement('script');
+                    Array.from(oldScript.attributes).forEach(attr => 
+                        newScript.setAttribute(attr.name, attr.value)
+                    );
+                    newScript.textContent = oldScript.textContent;
+                    oldScript.parentNode.replaceChild(newScript, oldScript);
+                });
             }
         } catch (e) {
             console.debug('[Detail] _refreshServerInfoPanel fehlgeschlagen (ignoriere):', e?.message);

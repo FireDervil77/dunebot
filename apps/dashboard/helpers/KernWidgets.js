@@ -46,31 +46,6 @@ function registerKernWidgets(pluginManager, themeManager) {
     pluginManager.hooks.addFilter('guild_dashboard_widgets', async (widgets, options) => {
         const { guildId, guild, req, res, theme, user, stats, enabledPlugins, custom } = options;
 
-        // === PLUGIN-UPDATES WIDGET (Zuerst, wenn Updates vorhanden) ===
-        let pendingUpdates = [];
-        try {
-            pendingUpdates = await pluginManager.getAvailableUpdates(guildId);
-        } catch (err) {
-            Logger.error('[KernWidgets] Fehler beim Laden von Plugin-Updates:', err);
-        }
-
-        if (pendingUpdates.length > 0) {
-            widgets.push({
-                id: 'plugin-updates',
-                title: 'Plugin-Updates',
-                area: 'dashboard-top',
-                position: 10,
-                size: 12,
-                icon: 'fas fa-sync-alt',
-                cardClass: 'card-warning',
-                content: await themeManager.renderWidgetPartial('plugin-updates', {
-                    guildId,
-                    pendingUpdates,
-                    plugin: 'core'
-                })
-            });
-        }
-
         // === SERVER-INFORMATION WIDGET ===
         widgets.push({
             id: 'server-info',

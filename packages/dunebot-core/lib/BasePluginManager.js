@@ -2,13 +2,11 @@ const fs = require("fs");
 const fsPromises = require("fs").promises;
 const os = require("os");
 const crypto = require("crypto");
-const fetch = require("node-fetch");
 
 const path = require("path");
 const simpleGit = require("simple-git");
 const lockfile = require("proper-lockfile");
 const execa = require("execa");
-const semver = require("semver");
 
 const ServiceManager = require("./ServiceManager");
 const PluginHooks = require("./PluginHooks"); 
@@ -22,15 +20,13 @@ class BasePluginManager {
 
     /**
      * Erstellt eine neue Instanz des BasePluginManager
-     * @param {string} registryPath - Pfad oder URL zur Plugin-Registry
      * @param {string} pluginsDir - Verzeichnis der Plugins
      * @param {Object} logger - Logger-Instanz
      * @author FireDervil
      */
-    constructor(registryPath, pluginsDir, logger) {
+    constructor(pluginsDir, logger) {
         this.logger = logger;
 
-        this.registryPath = this.#isUrl(registryPath) ? registryPath : path.resolve(registryPath);
         this.pluginsDir = path.resolve(pluginsDir);
         this.pluginsLockDir = path.join(this.pluginsDir, ".locks");
         this.hooks = new PluginHooks(logger);
@@ -105,7 +101,7 @@ class BasePluginManager {
             
             const corePlugin = filteredPlugins.find((p) => p.name === "core");
             if (!corePlugin) {
-                throw new Error("Core plugin not found in registry.");
+                throw new Error("Core plugin not found in plugins directory.");
             }
 
             // "before_core_plugin_enable" Hook ausführen
@@ -484,58 +480,50 @@ class BasePluginManager {
      * @throws {Error} Bei Fehlern beim Lesen
      * @author FireDervil
      */
+    /**
+     * Scannt das plugins-Verzeichnis und liest Metadaten aus package.json.
+     * Kein registry.json mehr — package.json ist Single Source of Truth.
+     */
     async getPluginsMeta() {
         try {
-            let data;
-            if (this.#isUrl(this.registryPath)) {
-                // Fetch registry data from URL
-                const response = await fetch(this.registryPath);
-                if (!response.ok) {
-                    throw new Error(
-                        `Failed to fetch registry from ${this.registryPath}: ${response.status} ${response.statusText}`,
-                    );
-                }
-                data = await response.text();
-            } else {
-                // Read registry data from local file
-                data = await fsPromises.readFile(this.registryPath, "utf8");
-            }
-
-            const registry = JSON.parse(data);
-            const installedPlugins = await fsPromises.readdir(this.pluginsDir).catch(() => []);
+            const entries = await fsPromises.readdir(this.pluginsDir, { withFileTypes: true });
+            const pluginDirs = entries
+                .filter(e => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules')
+                .map(e => e.name);
 
             const pluginsMeta = await Promise.all(
-                registry.map(async (plugin) => {
-                    let currentVersion;
-                    const isInstalled = installedPlugins.includes(plugin.name);
-                    if (isInstalled) {
-                        currentVersion = this.#pluginMap.get(plugin.name)?.version;
-                        if (!currentVersion) {
-                            const packageJsonPath = path.join(
-                                this.pluginsDir,
-                                plugin.name,
-                                "package.json",
-                            );
-                            const packageJsonData = await fsPromises.readFile(packageJsonPath, "utf8");
-                            const packageJson = JSON.parse(packageJsonData);
-                            currentVersion = packageJson.version;
-                        }
-                    } else {
-                        currentVersion = plugin.version;
+                pluginDirs.map(async (dirName) => {
+                    const packageJsonPath = path.join(this.pluginsDir, dirName, 'package.json');
+                    let pkg = {};
+                    try {
+                        const data = await fsPromises.readFile(packageJsonPath, 'utf8');
+                        pkg = JSON.parse(data);
+                    } catch {
+                        this.logger.warn(`[PluginManager] Kein package.json for plugin dir: ${dirName}`);
                     }
 
+                    const name = pkg.name || dirName;
+                    const version = pkg.version || '0.0.0';
+                    const currentVersion = this.#pluginMap.get(name)?.version || version;
+
                     return {
-                        ...plugin,
-                        installed: installedPlugins.includes(plugin.name),
-                        enabled: this.isPluginEnabled(plugin.name),
+                        name,
+                        version,
                         currentVersion,
-                        hasUpdate: currentVersion && semver.lt(currentVersion, plugin.version),
+                        author: typeof pkg.author === 'string' ? pkg.author : (pkg.author?.name || 'Unknown'),
+                        repository: pkg.repository || '',
+                        // Plugin-zu-Plugin Abhängigkeiten über pluginDependencies in package.json
+                        dependencies: pkg.pluginDependencies || [],
+                        installed: true,
+                        enabled: this.isPluginEnabled(name),
+                        hasUpdate: false,
                     };
                 }),
             );
+
             return pluginsMeta;
         } catch (error) {
-            this.logger.error("Failed to get plugins:", error);
+            this.logger.error('Failed to get plugins:', error);
             throw error;
         }
     }
@@ -568,32 +556,29 @@ class BasePluginManager {
                 return;
             }
 
-            const data = await this.getPluginsMeta();
-            const meta = data.find((p) => p.name === pluginName);
-            if (!meta) {
-                throw new Error("Plugin not found in registry.");
+            // Plugin-Metadata aus package.json lesen (falls schon teilweise vorhanden)
+            // oder aus repository klonen wenn package.json fehlt
+            const allMeta = await this.getPluginsMeta();
+            const meta = allMeta.find((p) => p.name === pluginName);
+
+            if (!meta?.repository) {
+                throw new Error(`Plugin "${pluginName}" hat keine repository URL in package.json.`);
             }
 
-            // Check dependencies
-            const missingDeps = [];
-            for (const dep of meta.dependencies || []) {
-                if (!this.#pluginMap.has(dep)) {
-                    missingDeps.push(dep);
-                }
-            }
-
+            // Check pluginDependencies
+            const missingDeps = (meta.dependencies || []).filter(dep => !this.#pluginMap.has(dep));
             if (missingDeps.length > 0) {
                 throw new Error(
                     `Missing dependencies for ${pluginName}: ${missingDeps.join(", ")}. Please install them first.`,
                 );
             }
 
-            // Clone and copy plugin files
+            // Repository klonen und Plugin-Verzeichnis kopieren
             const repoDir = await this.#cloneOrUpdateRepo(meta.repository);
-            const sourcePath = meta.repositoryPath
-                ? path.join(repoDir, meta.repositoryPath)
-                : repoDir;
-            const targetPath = path.join(this.pluginsDir, meta.name);
+            // repositoryPath kann in package.json als "repositoryPath" definiert sein
+            const repoSubPath = meta.repositoryPath || '';
+            const sourcePath = repoSubPath ? path.join(repoDir, repoSubPath) : repoDir;
+            const targetPath = path.join(this.pluginsDir, pluginName);
 
             await fsPromises.rm(targetPath, { recursive: true, force: true }).catch(() => {});
             await fsPromises.cp(sourcePath, targetPath, { recursive: true });
@@ -807,15 +792,6 @@ class BasePluginManager {
 
     #createRepoHash(repository) {
         return crypto.createHash("md5").update(repository).digest("hex");
-    }
-
-    #isUrl(str) {
-        try {
-            const url = new URL(str);
-            return url.protocol === "http:" || url.protocol === "https:";
-        } catch {
-            return false;
-        }
     }
 }
 

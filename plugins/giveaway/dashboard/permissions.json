@@ -1,0 +1,42 @@
+{
+    "plugin": "giveaway",
+    "version": "1.0.0",
+    "permissions": [
+        {
+            "key": "GIVEAWAY.VIEW",
+            "name": "Giveaway-System anzeigen",
+            "description": "Berechtigung um Giveaway-Übersicht und Einstellungen zu sehen",
+            "category": "giveaway",
+            "is_dangerous": 0,
+            "requires": null
+        },
+        {
+            "key": "GIVEAWAY.CREATE",
+            "name": "Giveaways erstellen",
+            "description": "Berechtigung um neue Giveaways über das Dashboard zu starten",
+            "category": "giveaway",
+            "is_dangerous": 0,
+            "requires": "GIVEAWAY.VIEW"
+        },
+        {
+            "key": "GIVEAWAY.MANAGE",
+            "name": "Giveaways verwalten",
+            "description": "Berechtigung um Giveaways zu bearbeiten, pausieren, beenden und rerolls durchzuführen",
+            "category": "giveaway",
+            "is_dangerous": 0,
+            "requires": "GIVEAWAY.VIEW"
+        },
+        {
+            "key": "GIVEAWAY.DELETE",
+            "name": "Giveaways löschen",
+            "description": "Berechtigung um Giveaways dauerhaft zu löschen",
+            "category": "giveaway",
+            "is_dangerous": 1,
+            "requires": "GIVEAWAY.MANAGE"
+        }
+    ],
+    "default_groups": {
+        "Administrator": ["GIVEAWAY.VIEW", "GIVEAWAY.CREATE", "GIVEAWAY.MANAGE", "GIVEAWAY.DELETE"],
+        "Moderator": ["GIVEAWAY.VIEW", "GIVEAWAY.CREATE", "GIVEAWAY.MANAGE"]
+    }
+}

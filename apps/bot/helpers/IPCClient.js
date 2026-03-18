@@ -194,6 +194,26 @@ class IPCClient {
     }
 
     /**
+     * Sendet ein Event ans Dashboard und wartet auf Antwort (Bot → Dashboard)
+     * @param {string} event - Event-Name (z.B. "gameserver:START_SERVER")
+     * @param {object} payload - Payload-Daten
+     * @param {number} [timeout=15000] - Timeout in ms
+     * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+     */
+    async sendToDashboard(event, payload, timeout = 15000) {
+        try {
+            if (!this.firstConnect) {
+                return { success: false, error: 'IPC nicht verbunden' };
+            }
+            const result = await this.node.sendTo('Dashboard', { event, payload }, { receptive: true, timeout });
+            return result;
+        } catch (error) {
+            this.logger.error(`[IPC] sendToDashboard('${event}') Fehler:`, error);
+            return { success: false, error: error.message || 'IPC-Fehler' };
+        }
+    }
+
+    /**
      * Handlet die eingehenden messages
      * ruft für jede message den passenden message context auf
      */
@@ -534,7 +554,8 @@ class IPCClient {
                 this.logger.info(`[IPC] - Bot höchste Rolle: ${botMember.roles.highest.name} (Position: ${botMember.roles.highest.position})`);
             }
 
-            // Filtere Rollen: Keine @everyone, keine managed roles, nicht höher als Bot
+            // Filtere Rollen: Keine @everyone, keine managed roles, nicht höher als Bot (es sei denn includeAll)
+            const skipPositionCheck = payload.includeAll === true;
             const roles = guild.roles.cache
                 .filter(role => {
                     // @everyone ausschließen
@@ -550,7 +571,7 @@ class IPCClient {
                     }
                     
                     // Rollen höher als Bot ausschließen (gleiche Position ist erlaubt!)
-                    if (botMember && role.position > botMember.roles.highest.position) {
+                    if (!skipPositionCheck && botMember && role.position > botMember.roles.highest.position) {
                         this.logger.debug(`[IPC]   ❌ ${role.name} - Position ${role.position} > Bot ${botMember.roles.highest.position}`);
                         return false;
                     }

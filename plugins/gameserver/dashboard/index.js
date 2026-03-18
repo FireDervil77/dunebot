@@ -175,6 +175,31 @@ class GameserverPlugin extends DashboardPlugin {
         Logger.info('Aktiviere [Gameserver] Dashboard-Plugin...');
 
         this.app = app;
+
+        // ── DB-Migrationen ────────────────────────────────────────────────
+        try {
+            await dbService.query(
+                `ALTER TABLE gameservers
+                 ADD COLUMN IF NOT EXISTS bind_ip VARCHAR(45) NULL
+                     COMMENT 'IP-Adresse auf die der Container-Port gebunden wird (null = 0.0.0.0)'
+                     AFTER rootserver_id`
+            );
+            Logger.debug('[Gameserver] Migration: bind_ip Spalte ok');
+        } catch (err) {
+            if (err.code !== 'ER_DUP_FIELDNAME') Logger.warn('[Gameserver] Migration bind_ip:', err.message);
+        }
+        try {
+            await dbService.query(
+                `ALTER TABLE gameservers
+                 ADD COLUMN IF NOT EXISTS install_phase VARCHAR(50) NULL
+                     COMMENT 'Aktuelle Installationsphase (pulling_image, installing_game, cleanup)'
+                     AFTER install_progress`
+            );
+            Logger.debug('[Gameserver] Migration: install_phase Spalte ok');
+        } catch (err) {
+            if (err.code !== 'ER_DUP_FIELDNAME') Logger.warn('[Gameserver] Migration install_phase:', err.message);
+        }
+        // ─────────────────────────────────────────────────────────────────
         
         // ConsoleManager initialisieren und registrieren
         const ConsoleManager = require('./helpers/ConsoleManager');
@@ -581,26 +606,6 @@ class GameserverPlugin extends DashboardPlugin {
             );
             
             // ════════════════════════════════════════════════════════════
-            // Install Completed
-            // ════════════════════════════════════════════════════════════
-            eventRouter.register(
-                MessageTypes.NS_INSTALL, 
-                MessageTypes.INSTALL_COMPLETED, 
-                this._handleInstallCompleted.bind(this),
-                { priority: 1 }
-            );
-            
-            // ════════════════════════════════════════════════════════════
-            // Install Failed
-            // ════════════════════════════════════════════════════════════
-            eventRouter.register(
-                MessageTypes.NS_INSTALL, 
-                MessageTypes.INSTALL_FAILED, 
-                this._handleInstallFailed.bind(this),
-                { priority: 1 }
-            );
-            
-            // ════════════════════════════════════════════════════════════
             // Console Output (Live Console)
             // ════════════════════════════════════════════════════════════
             eventRouter.register(
@@ -609,9 +614,13 @@ class GameserverPlugin extends DashboardPlugin {
                 this._handleConsoleOutput.bind(this),
                 { priority: 10 }  // Low priority, high frequency
             );
+
+            // Install-Handler (completed, failed, output, status) werden
+            // autoritativ in IPMServer._registerEventHandlers() registriert
+            // und broadcasten dort mit dem korrekten SSE-Namespace 'install'.
             
             this._handlersRegistered = true;
-            Logger.success('[Gameserver] Event-Handler registriert (5 Handler)');
+            Logger.success('[Gameserver] Event-Handler registriert (4 Handler)');
         } catch (error) {
             Logger.error('[Gameserver] Fehler beim Registrieren der Event-Handler:', error);
             throw error;
@@ -735,10 +744,11 @@ class GameserverPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
         
-        const { server_id, error, timestamp } = payload;
+        const { server_id, error: rawError, timestamp } = payload;
         const { daemonId } = context;
+        const error = rawError || null;
         
-        Logger.error(`[Gameserver] Server Crashed: ${server_id} - ${error}`);
+        Logger.error(`[Gameserver] Server Crashed: ${server_id} - ${error || 'unknown'}`);
         
         try {
             // 1. Status auf 'error' setzen (ENUM-konform)
@@ -754,11 +764,12 @@ class GameserverPlugin extends DashboardPlugin {
             );
             
             // 2. Crash-Log speichern
+            const crashTime = timestamp ? timestamp / 1000 : Date.now() / 1000;
             await dbService.query(
                 `INSERT INTO gameserver_crash_logs 
                  (server_id, daemon_id, error_message, timestamp) 
                  VALUES (?, ?, ?, FROM_UNIXTIME(?))`,
-                [server_id, daemonId, error, timestamp / 1000]
+                [server_id, daemonId || null, error, crashTime]
             );
             
             // 3. Guild-Owner benachrichtigen + SSE-Broadcasting
@@ -911,6 +922,53 @@ class GameserverPlugin extends DashboardPlugin {
         }
     }
 
+    async _handleInstallOutput(payload, message, context) {
+        const Logger = ServiceManager.get('Logger');
+        try {
+            const { server_id, line } = payload;
+            if (!server_id || !line) return;
+
+            const dbService = ServiceManager.get('dbService');
+            const sseManager = ServiceManager.get('sseManager');
+            if (!sseManager) return;
+
+            const rows = await dbService.query('SELECT guild_id FROM gameservers WHERE id = ?', [server_id]);
+            if (!rows || rows.length === 0) return;
+
+            sseManager.broadcast(rows[0].guild_id, 'install', {
+                action:    'output',
+                server_id: String(server_id),
+                line,
+            });
+        } catch (error) {
+            Logger.error('[Gameserver] Fehler beim Install-Output-Handling:', error);
+        }
+    }
+
+    async _handleInstallStatus(payload, message, context) {
+        const Logger = ServiceManager.get('Logger');
+        try {
+            const { server_id, phase, message: msg } = payload;
+            if (!server_id) return;
+
+            const dbService = ServiceManager.get('dbService');
+            const sseManager = ServiceManager.get('sseManager');
+            if (!sseManager) return;
+
+            const rows = await dbService.query('SELECT guild_id FROM gameservers WHERE id = ?', [server_id]);
+            if (!rows || rows.length === 0) return;
+
+            sseManager.broadcast(rows[0].guild_id, 'install', {
+                action:    'status',
+                server_id: String(server_id),
+                phase,
+                message:   msg,
+            });
+        } catch (error) {
+            Logger.error('[Gameserver] Fehler beim Install-Status-Handling:', error);
+        }
+    }
+
 
     /**
      * Registriert die Navigation für das Plugin
@@ -1017,15 +1075,6 @@ class GameserverPlugin extends DashboardPlugin {
     _registerWidgets() {
         const Logger = ServiceManager.get('Logger');
         Logger.debug('[Gameserver] Widgets registriert');
-    }
-
-    /**
-     * Event-Handler für IPM-Events registrieren
-     * (Aktuell keine Event-Handler nötig - Install-Counter wird direkt im IPMServer gehandelt)
-     */
-    _registerEventHandlers() {
-        const Logger = ServiceManager.get('Logger');
-        Logger.debug('[Gameserver] Event-Handler registriert (aktuell keine)');
     }
 
 }

@@ -1,0 +1,303 @@
+<%# Theme-Detailseite — /guild/:guildId/themes/:name %>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <a href="/guild/<%= guildId %>/themes" class="btn btn-sm btn-outline-secondary">
+            <i class="fa-solid fa-arrow-left mr-1"></i>Zurück zur Übersicht
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Linke Spalte: Screenshot + Info -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <!-- Screenshot -->
+            <div class="bg-secondary d-flex align-items-center justify-content-center"
+                 style="height: 260px; overflow: hidden; border-radius: .25rem .25rem 0 0;">
+                <% const screenshotUrl = `/themes/${theme.name}/assets/${theme.screenshot || 'screenshot.png'}`; %>
+                <img src="<%= screenshotUrl %>"
+                     alt="<%= theme.displayName %> Screenshot"
+                     style="width:100%; height:100%; object-fit:cover;"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div style="display:none; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; background:#343a40; color:#6c757d;">
+                    <i class="fa-solid fa-image fa-3x mb-2"></i>
+                    <small>Kein Screenshot verfügbar</small>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <h4 class="mb-1">
+                    <%= theme.displayName || theme.name %>
+                    <small class="text-muted">v<%= theme.version || '1.0.0' %></small>
+                    <% if (theme.name === activeThemeName) { %>
+                        <span class="badge badge-success ml-2"><i class="fa-solid fa-check mr-1"></i>Aktiv</span>
+                    <% } %>
+                </h4>
+
+                <p class="text-muted mt-2"><%= theme.description || 'Keine Beschreibung verfügbar.' %></p>
+
+                <% if (theme.tags && theme.tags.length > 0) { %>
+                <div class="mb-3">
+                    <% theme.tags.forEach(tag => { %>
+                        <span class="badge badge-light border mr-1"><%= tag %></span>
+                    <% }); %>
+                </div>
+                <% } %>
+
+                <!-- Aktionen -->
+                <div class="d-flex gap-2 flex-wrap">
+                    <% if (theme.name !== activeThemeName) { %>
+                        <button class="btn btn-primary" id="btn-activate"
+                                data-theme="<%= theme.name %>">
+                            <i class="fa-solid fa-paint-brush mr-1"></i>Aktivieren
+                        </button>
+                    <% } else { %>
+                        <button class="btn btn-success" disabled>
+                            <i class="fa-solid fa-check mr-1"></i>Aktuell aktiv
+                        </button>
+                    <% } %>
+
+                    <% if (!theme.parent) { %>
+                    <button class="btn btn-outline-info" data-toggle="modal" data-target="#cloneModal">
+                        <i class="fa-solid fa-clone mr-1"></i>Als Child-Theme klonen
+                    </button>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Child-Themes Übersicht -->
+        <% if (childThemes.length > 0) { %>
+        <div class="card shadow-sm mt-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-sitemap mr-2"></i>Child-Themes (<%= childThemes.length %>)</h3>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Version</th>
+                            <th>Autor</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% childThemes.forEach(child => { %>
+                        <tr>
+                            <td>
+                                <strong><%= child.displayName || child.name %></strong>
+                                <% if (child.name === activeThemeName) { %>
+                                    <span class="badge badge-success ml-1">Aktiv</span>
+                                <% } %>
+                            </td>
+                            <td>v<%= child.version || '1.0.0' %></td>
+                            <td class="text-muted"><%= child.author || '–' %></td>
+                            <td class="text-right">
+                                <a href="/guild/<%= guildId %>/themes/<%= child.name %>" class="btn btn-xs btn-outline-secondary">
+                                    <i class="fa-solid fa-arrow-right"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <% } %>
+    </div>
+
+    <!-- Rechte Spalte: Meta-Infos -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-circle-info mr-2"></i>Informationen</h3>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted" style="width:40%;">Interner Name</td>
+                            <td><code><%= theme.name %></code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Version</td>
+                            <td><%= theme.version || '1.0.0' %></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Autor</td>
+                            <td><%= theme.author || 'Unbekannt' %></td>
+                        </tr>
+                        <% if (theme.authorUrl) { %>
+                        <tr>
+                            <td class="text-muted">Website</td>
+                            <td><a href="<%= theme.authorUrl %>" target="_blank" rel="noopener"><%= theme.authorUrl %></a></td>
+                        </tr>
+                        <% } %>
+                        <% if (theme.license) { %>
+                        <tr>
+                            <td class="text-muted">Lizenz</td>
+                            <td><%= theme.license %></td>
+                        </tr>
+                        <% } %>
+                        <tr>
+                            <td class="text-muted">Typ</td>
+                            <td>
+                                <% if (theme.parent) { %>
+                                    <span class="badge badge-secondary"><i class="fa-solid fa-sitemap mr-1"></i>Child-Theme</span>
+                                <% } else { %>
+                                    <span class="badge badge-primary"><i class="fa-solid fa-layer-group mr-1"></i>Standalone</span>
+                                <% } %>
+                            </td>
+                        </tr>
+                        <% if (theme.parent) { %>
+                        <tr>
+                            <td class="text-muted">Parent-Theme</td>
+                            <td>
+                                <a href="/guild/<%= guildId %>/themes/<%= theme.parent %>">
+                                    <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i><%= theme.parent %>
+                                </a>
+                            </td>
+                        </tr>
+                        <% } %>
+                        <tr>
+                            <td class="text-muted">Child-Themes</td>
+                            <td><%= childThemes.length %></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <% if (theme.config) { %>
+        <div class="card shadow-sm mt-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fa-solid fa-sliders mr-2"></i>Theme-Konfiguration</h3>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-0">
+                    <i class="fa-solid fa-info-circle mr-1"></i>
+                    Theme-Anpassung (Farben, Schriften etc.) kommt in einem zukünftigen Update.
+                </p>
+            </div>
+        </div>
+        <% } %>
+    </div>
+</div>
+
+<!-- Clone-Modal -->
+<div class="modal fade" id="cloneModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-clone mr-2"></i>Child-Theme erstellen
+                </h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">
+                    Erstellt eine Kopie von <strong><%= theme.displayName || theme.name %></strong> als Child-Theme.
+                    Das Child-Theme erbt alle Dateien vom Parent und du kannst einzelne Teile überschreiben.
+                </p>
+                <div class="form-group">
+                    <label>Interner Name <small class="text-muted">(nur Kleinbuchstaben, Zahlen, Bindestriche)</small></label>
+                    <input type="text" class="form-control" id="clone-name"
+                           placeholder="z.B. mein-custom-theme" pattern="[a-z0-9][a-z0-9-]*" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label>Anzeigename <small class="text-muted">(optional)</small></label>
+                    <input type="text" class="form-control" id="clone-display-name"
+                           placeholder="z.B. Mein Custom Theme">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-info" id="btn-clone">
+                    <i class="fa-solid fa-clone mr-1"></i>Child-Theme erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Theme aktivieren
+const activateBtn = document.getElementById('btn-activate');
+if (activateBtn) {
+    activateBtn.addEventListener('click', async function() {
+        const themeName = this.dataset.theme;
+        this.disabled = true;
+        this.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Wird aktiviert...';
+
+        try {
+            const res = await fetch('/guild/<%= guildId %>/themes/activate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                },
+                body: JSON.stringify({ themeName })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Fehler: ' + (data.message || 'Unbekannter Fehler'));
+                this.disabled = false;
+                this.innerHTML = '<i class="fa-solid fa-paint-brush mr-1"></i>Aktivieren';
+            }
+        } catch (err) {
+            alert('Netzwerkfehler');
+            this.disabled = false;
+            this.innerHTML = '<i class="fa-solid fa-paint-brush mr-1"></i>Aktivieren';
+        }
+    });
+}
+
+// Theme klonen
+document.getElementById('btn-clone').addEventListener('click', async function() {
+    const newName = document.getElementById('clone-name').value.trim();
+    const displayName = document.getElementById('clone-display-name').value.trim();
+
+    if (!newName) return alert('Bitte einen internen Namen eingeben.');
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(newName)) {
+        return alert('Name: nur Kleinbuchstaben, Zahlen und Bindestriche erlaubt.');
+    }
+
+    this.disabled = true;
+    this.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Wird erstellt...';
+
+    try {
+        const res = await fetch('/guild/<%= guildId %>/themes/clone', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
+            body: JSON.stringify({
+                sourceTheme: '<%= theme.name %>',
+                newName,
+                displayName: displayName || newName
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            if (typeof toastr !== 'undefined') toastr.success(data.message);
+            // Zur neuen Theme-Detailseite navigieren
+            window.location.href = '/guild/<%= guildId %>/themes/' + newName;
+        } else {
+            alert('Fehler: ' + (data.message || 'Unbekannter Fehler'));
+            this.disabled = false;
+            this.innerHTML = '<i class="fa-solid fa-clone mr-1"></i>Child-Theme erstellen';
+        }
+    } catch (err) {
+        alert('Netzwerkfehler');
+        this.disabled = false;
+        this.innerHTML = '<i class="fa-solid fa-clone mr-1"></i>Child-Theme erstellen';
+    }
+});
+</script>

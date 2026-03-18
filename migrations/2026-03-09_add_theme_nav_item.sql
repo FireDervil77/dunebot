@@ -4,7 +4,7 @@
 -- Fügt den "Theme-Auswahl"-Menüpunkt unter Einstellungen → Theme
 -- für alle Guilds ein, die bereits Core-Navigation haben.
 
-INSERT INTO nav_items
+INSERT INTO guild_nav_items
     (plugin, guildId, title, url, icon, sort_order, parent, type, capability, target, visible)
 SELECT
     'core',
@@ -20,12 +20,12 @@ SELECT
     1
 FROM (
     SELECT DISTINCT guildId
-    FROM nav_items
+    FROM guild_nav_items
     WHERE plugin = 'core'
 ) AS existing
 WHERE NOT EXISTS (
     SELECT 1
-    FROM nav_items
+    FROM guild_nav_items
     WHERE plugin = 'core'
       AND guildId = existing.guildId
       AND url = CONCAT('/guild/', existing.guildId, '/settings/theme')

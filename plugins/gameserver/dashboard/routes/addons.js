@@ -283,12 +283,6 @@ router.get('/:slug', async (req, res) => {
             `, [addon.id]),
         ]);
 
-        // install_count erhöhen
-        await dbService.query(
-            'UPDATE addon_marketplace SET install_count = install_count + 1 WHERE id = ?',
-            [addon.id]
-        );
-
         await themeManager.renderView(res, 'guild/gameserver-addon-detail', {
             title: `${addon.name} - Addon Details`,
             activeMenu: `/guild/${guildId}/plugins/gameserver/addons`,

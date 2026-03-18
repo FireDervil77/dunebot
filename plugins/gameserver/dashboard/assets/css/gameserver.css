@@ -5,6 +5,26 @@
  */
 
 /* ========================================
+   XTERM TERMINAL FULL-WIDTH FIX
+   ======================================== */
+
+#xterm-terminal {
+    width: 100% !important;
+}
+
+#xterm-terminal .xterm {
+    width: 100% !important;
+}
+
+#xterm-terminal .xterm-viewport {
+    width: 100% !important;
+}
+
+#xterm-terminal .xterm-screen {
+    width: 100% !important;
+}
+
+/* ========================================
    SERVER CARD HOVER EFFECTS
    ======================================== */
 

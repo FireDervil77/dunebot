@@ -226,30 +226,20 @@ class IPMServer {
                 return;
             }
 
-            // Legacy-Event-Mapping
+            // Legacy-Event-Mapping (nur Events die NICHT vom EventRouter gehandled werden)
             switch (event) {
                 case 'heartbeat':
                     this._handleHeartbeat(daemonId, message.data);
                     break;
 
-                case 'install.progress':
-                    await this._handleInstallProgress(daemonId, message.data);
-                    break;
-
-                case 'install.completed':
-                    await this._handleInstallCompleted(daemonId, message.data);
-                    break;
-
-                case 'install.failed':
-                    await this._handleInstallFailed(daemonId, message.data);
-                    break;
-
-                case 'gameserver.status_changed':
-                    await this._handleGameserverStatusChanged(daemonId, message.data);
-                    break;
+                // install.progress, install.completed, install.failed → EventRouter handles these
+                // gameserver.status_changed → EventRouter handles this
 
                 default:
-                    this.Logger.debug(`[IPMServer] Unbekanntes Event: ${event}`);
+                    // Nur loggen wenn es kein Event ist, das der EventRouter handled
+                    if (!namespace || !action) {
+                        this.Logger.debug(`[IPMServer] Unbekanntes Event: ${event}`);
+                    }
             }
         } catch (error) {
             this.Logger.error('[IPMServer] Fehler beim Message-Routing:', error);
@@ -327,12 +317,14 @@ class IPMServer {
                     
                     await this._logDaemonEvent(daemon_id, 'reconnected', { version });
                     
-                    // ✅ RootServer-Info laden (kein serverRegistry mehr - 1:1 Beziehung!)
-                    const [rootserver] = await this.dbService.query(
-                        `SELECT id, name, base_directory, system_user
-                         FROM rootserver 
-                         WHERE daemon_id = ?`,
-                        [daemon_id]
+                    // Server-Registry für diesen RootServer laden
+                    const reconnectServers = await this.dbService.query(
+                        `SELECT id AS server_id, name,
+                                ROUND(allocated_ram_mb / 1024.0, 2) AS ram_limit_gb,
+                                allocated_disk_gb AS disk_limit_gb
+                         FROM gameservers
+                         WHERE rootserver_id = ?`,
+                        [daemon.id]
                     );
                     
                     ws.send(JSON.stringify({ 
@@ -343,7 +335,8 @@ class IPMServer {
                             name: daemon.name,
                             base_directory: daemon.base_directory,
                             system_user: daemon.system_user
-                        }
+                        },
+                        serverRegistry: reconnectServers || []
                     }));
                     
                     return { 
@@ -408,6 +401,16 @@ class IPMServer {
             // Audit-Log
             await this._logDaemonEvent(daemon_id, 'first_registration', { version });
 
+            // Server-Registry für diesen RootServer laden (kann leer sein bei Erst-Registrierung)
+            const firstRegServers = await this.dbService.query(
+                `SELECT id AS server_id, name,
+                        ROUND(allocated_ram_mb / 1024.0, 2) AS ram_limit_gb,
+                        allocated_disk_gb AS disk_limit_gb
+                 FROM gameservers
+                 WHERE rootserver_id = ?`,
+                [rootserverByToken.id]
+            );
+
             ws.send(JSON.stringify({ 
                 type: 'registered', 
                 sessionToken,
@@ -416,7 +419,8 @@ class IPMServer {
                     name: rootserverByToken.name,
                     base_directory: rootserverByToken.base_directory,
                     system_user: rootserverByToken.system_user
-                }
+                },
+                serverRegistry: firstRegServers || []
             }));
 
             return { 
@@ -509,6 +513,9 @@ class IPMServer {
 
         conn.lastHeartbeat = Date.now();
 
+        // Latenz aus Heartbeat-Timestamp berechnen (Daemon sendet Unix-Timestamp in Sekunden)
+        const pingMs = payload.timestamp ? Math.max(0, Date.now() - (payload.timestamp * 1000)) : null;
+
         // Hardware-Stats in Connection-Metadata speichern
         if (payload.hardware) {
             conn.metadata.hardware = payload.hardware;
@@ -530,10 +537,10 @@ class IPMServer {
             this.Logger.debug(`[IPMServer] Update-Info: ${payload.updateInfo.currentVersion} → ${payload.updateInfo.latestVersion} (Available: ${payload.updateInfo.available})`);
         }
 
-        // DB-Update (last_seen)
+        // DB-Update (last_seen + last_ping_ms)
         await this.dbService.query(
-            'UPDATE rootserver SET last_seen = NOW() WHERE daemon_id = ?',
-            [daemonId]
+            'UPDATE rootserver SET last_seen = NOW(), last_ping_ms = COALESCE(?, last_ping_ms) WHERE daemon_id = ?',
+            [pingMs, daemonId]
         );
 
         // ACK senden
@@ -633,6 +640,7 @@ class IPMServer {
         await this.dbService.query(
             `UPDATE gameservers 
              SET status = 'offline', 
+                 install_phase = NULL,
                  updated_at = NOW() 
              WHERE id = ?`,
             [server_id]
@@ -676,6 +684,7 @@ class IPMServer {
         await this.dbService.query(
             `UPDATE gameservers 
              SET status = 'error', 
+                 install_phase = NULL,
                  updated_at = NOW() 
              WHERE id = ?`,
             [server_id]
@@ -1143,41 +1152,39 @@ class IPMServer {
      * @private
      */
     _registerEventHandlers() {
-        // ✅ Handler für gameserver.status_changed
-        // EventRouter ruft auf mit: handler(payload, message, context)
-        eventRouter.register('gameserver', 'status_changed', async (payload, message, context) => {
-            await this._handleGameserverStatusChanged(context.daemonId, payload);
-        }, { priority: 1 });
+        // ✅ Handler für gameserver.status_changed + crashed
+        // → Werden im Gameserver-Plugin registriert (plugins/gameserver/dashboard/index.js)
+        //   Plugin-Handler sind autoritativ: machen Status-Mapping, SSE-Broadcast + Crash-Logging.
         
-        // ✅ Handler für gameserver.crashed
-        eventRouter.register('gameserver', 'crashed', async (payload, message, context) => {
-            const { server_id } = payload;
-            this.Logger.warn(`[IPMServer] 💥 Gameserver ${server_id} crashed!`);
-            
-            // Status auf 'error' setzen
+        // ✅ Handler für install.status (granulare Phasen: pulling_image, installing_game, cleanup)
+        eventRouter.register('install', 'status', async (payload, message, context) => {
+            const { server_id, phase, message: phaseMsg } = payload;
+            if (!server_id || !phase) return;
+
+            // install_phase in DB aktualisieren
             await this.dbService.query(
-                'UPDATE gameservers SET status = ?, updated_at = NOW() WHERE id = ?',
-                ['error', server_id]
+                'UPDATE gameservers SET install_phase = ? WHERE id = ?',
+                [phase, server_id]
             );
-            
-            // SSE-Broadcast
+
+            // SSE-Broadcast → Browser bekommt Phasen-Info live
             const [server] = await this.dbService.query(
                 'SELECT guild_id FROM gameservers WHERE id = ?',
                 [server_id]
             );
-            
             if (server) {
                 const sseManager = ServiceManager.get('sseManager');
                 if (sseManager) {
-                    sseManager.broadcast(server.guild_id, 'gameserver', {
-                        action: 'crashed',
-                        server_id: server_id,
-                        timestamp: Date.now()
+                    sseManager.broadcast(server.guild_id, 'install', {
+                        action:    'status',
+                        server_id: String(server_id),
+                        phase,
+                        message:   phaseMsg || phase,
                     });
                 }
             }
         }, { priority: 1 });
-        
+
         // ✅ Handler für install.completed
         eventRouter.register('install', 'completed', async (payload, message, context) => {
             await this._handleGameserverInstallComplete(context.daemonId, payload);
@@ -1190,11 +1197,9 @@ class IPMServer {
             if (server) {
                 const sseManager = ServiceManager.get('sseManager');
                 if (sseManager) {
-                    sseManager.broadcast(server.guild_id, 'gameserver', {
-                        action: 'install_completed',
-                        server_id: payload.server_id,
-                        status: 'offline',
-                        timestamp: Date.now()
+                    sseManager.broadcast(server.guild_id, 'install', {
+                        action: 'completed',
+                        server_id: String(payload.server_id),
                     });
                 }
             }
@@ -1211,12 +1216,10 @@ class IPMServer {
             if (server) {
                 const sseManager = ServiceManager.get('sseManager');
                 if (sseManager) {
-                    sseManager.broadcast(server.guild_id, 'gameserver', {
-                        action: 'install_failed',
-                        server_id: payload.server_id,
-                        status: 'error',
+                    sseManager.broadcast(server.guild_id, 'install', {
+                        action: 'failed',
+                        server_id: String(payload.server_id),
                         error: payload.error || 'Installation fehlgeschlagen',
-                        timestamp: Date.now()
                     });
                 }
             }
@@ -1231,11 +1234,10 @@ class IPMServer {
             if (server) {
                 const sseManager = ServiceManager.get('sseManager');
                 if (sseManager) {
-                    sseManager.broadcast(server.guild_id, 'gameserver', {
-                        action: 'install_output',
-                        server_id: payload.server_id,
+                    sseManager.broadcast(server.guild_id, 'install', {
+                        action: 'output',
+                        server_id: String(payload.server_id),
                         line: payload.line,
-                        timestamp: Date.now()
                     });
                 }
             }
@@ -1243,29 +1245,9 @@ class IPMServer {
 
         this.Logger.info('[IPMServer] Event-Handler registriert (gameserver.*, install.*)');
 
-        // ✅ Handler für console.output → SSE broadcast an Browser-Console-Tab
-        eventRouter.register('console', 'output', async (payload, message, context) => {
-            const { server_id, line } = payload;
-            if (!server_id || !line) return;
+        // console.output → wird von ConsoleManager verarbeitet (nicht hier duplizieren)
 
-            const [server] = await this.dbService.query(
-                'SELECT guild_id FROM gameservers WHERE id = ?',
-                [server_id]
-            );
-            if (!server) return;
-
-            const sseManager = ServiceManager.get('sseManager');
-            if (sseManager) {
-                sseManager.broadcast(server.guild_id, 'console', {
-                    action: 'output',
-                    server_id: server_id,
-                    line: line,
-                    timestamp: Date.now()
-                });
-            }
-        }, { priority: 1 });
-
-        this.Logger.info('[IPMServer] Event-Handler registriert (gameserver.*, install.*, console.*)');
+        this.Logger.info('[IPMServer] Event-Handler registriert (gameserver.*, install.*)');
     }
 }
 

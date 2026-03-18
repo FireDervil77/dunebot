@@ -67,7 +67,7 @@ module.exports = {
             
             for (const fix of urlFixes) {
                 const result = await dbService.query(
-                    `UPDATE nav_items 
+                    `UPDATE guild_nav_items 
                      SET url = ?, updatedAt = NOW() 
                      WHERE guildId = ? AND url = ? AND plugin = 'core'`,
                     [fix.new, guildId, fix.old]
@@ -93,7 +93,7 @@ module.exports = {
             
             for (const fix of parentFixes) {
                 const result = await dbService.query(
-                    `UPDATE nav_items 
+                    `UPDATE guild_nav_items 
                      SET parent = ?, updatedAt = NOW() 
                      WHERE guildId = ? AND parent = ? AND plugin = 'core'`,
                     [fix.new, guildId, fix.old]
@@ -164,7 +164,7 @@ module.exports = {
             
             for (const fix of urlFixes) {
                 await dbService.query(
-                    `UPDATE nav_items 
+                    `UPDATE guild_nav_items 
                      SET url = ?, updatedAt = NOW() 
                      WHERE guildId = ? AND url = ? AND plugin = 'core'`,
                     [fix.new, guildId, fix.old]
@@ -185,7 +185,7 @@ module.exports = {
             
             for (const fix of parentFixes) {
                 await dbService.query(
-                    `UPDATE nav_items 
+                    `UPDATE guild_nav_items 
                      SET parent = ?, updatedAt = NOW() 
                      WHERE guildId = ? AND parent = ? AND plugin = 'core'`,
                     [fix.new, guildId, fix.old]

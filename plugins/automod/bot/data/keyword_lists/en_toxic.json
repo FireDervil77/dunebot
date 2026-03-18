@@ -1,0 +1,19 @@
+{
+  "id": "en_toxic",
+  "name": "English Toxic Behavior",
+  "language": "en",
+  "description": "Toxic, threatening and harassing language",
+  "keywords": [
+    "kill yourself",
+    "kys",
+    "go die",
+    "neck yourself",
+    "hang yourself",
+    "slit your wrists",
+    "drink bleach",
+    "jump off a bridge",
+    "nobody likes you",
+    "unalive yourself",
+    "end yourself"
+  ]
+}

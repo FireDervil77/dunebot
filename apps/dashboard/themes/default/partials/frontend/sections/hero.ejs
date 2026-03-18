@@ -1,0 +1,115 @@
+<%# Hero Section Partial — Carousel mit Standard-Slides + News-Slides %>
+
+<section id="hero" class="hero section dark-background">
+
+  <img src="<%= theme.asset('images/hero-bg.png') %>" alt="" data-aos="fade-in">
+
+  <div class="container" data-aos="fade-up" data-aos-delay="100">
+    <div id="heroCarousel" class="carousel slide carousel-fade" data-ride="carousel" data-interval="5000">
+      
+      <div class="carousel-indicators">
+        <%
+          const newsCount = (carouselNews && carouselNews.length > 0) ? carouselNews.length : 0;
+          const totalSlides = 3 + newsCount;
+        %>
+        <% for (let i = 0; i < totalSlides; i++) { %>
+          <button type="button" data-target="#heroCarousel" data-slide-to="<%= i %>" <%= i === 0 ? 'class="active"' : '' %>></button>
+        <% } %>
+      </div>
+
+      <div class="carousel-inner">
+        <% let slideIndex = 0; %>
+        
+        <!-- Slide: Standard 1 -->
+        <div class="carousel-item active">
+          <div class="text-center">
+            <h2><%= tr('LANDING.HERO') %></h2>
+            <p><%= tr('LANDING.SUBTITLE') %></p>
+            <p><%= tr('LANDING.SUBTITLE2') %></p>
+            <a href="/guild" class="btn-hero btn-get-started"><%= tr('LANDING.BTN_DASHBOARD') %></a> 
+            <a href="<%= coreConfig.githubUrl %>" class="btn-hero btn-get-github" target="_blank">
+              <i class="fa-brands fa-github"></i> <%= tr('LANDING.BTN_GITHUB') %>
+            </a>
+          </div>
+        </div>
+
+        <% if (carouselNews && carouselNews.length > 0) { %>
+          <div class="carousel-item">
+            <div class="text-center">
+              <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[0].title %></h2>
+              <p><%= carouselNews[0].excerpt || carouselNews[0].content.substring(0, 150) + '...' %></p>
+              <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[0].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
+              <a href="/news-details/<%= carouselNews[0].slug %>" class="btn-hero btn-get-started">
+                <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
+              </a>
+            </div>
+          </div>
+        <% } %>
+
+        <!-- Slide: Standard 2 -->
+        <div class="carousel-item">
+          <div class="text-center">
+            <h2><%= tr('LANDING.HERO_SLIDE2_TITLE') %></h2>
+            <p><%= tr('LANDING.HERO_SLIDE2_DESC') %></p>
+            <p><%= tr('LANDING.HERO_SLIDE2_DESC2') %></p>
+            <a href="/guild" class="btn-hero btn-get-started"><%= tr('LANDING.HERO_SLIDE2_BTN1') %></a> 
+            <a href="<%= coreConfig.githubUrl %>" class="btn-hero btn-get-github" target="_blank">
+              <i class="fa-brands fa-code"></i> <%= tr('LANDING.HERO_SLIDE2_BTN2') %>
+            </a>
+          </div>
+        </div>
+
+        <% if (carouselNews && carouselNews.length > 1) { %>
+          <div class="carousel-item">
+            <div class="text-center">
+              <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[1].title %></h2>
+              <p><%= carouselNews[1].excerpt || carouselNews[1].content.substring(0, 150) + '...' %></p>
+              <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[1].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
+              <a href="/news-details/<%= carouselNews[1].slug %>" class="btn-hero btn-get-started">
+                <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
+              </a>
+            </div>
+          </div>
+        <% } %>
+
+        <!-- Slide: Standard 3 -->
+        <div class="carousel-item">
+          <div class="text-center">
+            <h2><%= tr('LANDING.HERO_SLIDE3_TITLE') %></h2>
+            <p><%= tr('LANDING.HERO_SLIDE3_DESC') %></p>
+            <p><%= tr('LANDING.HERO_SLIDE3_DESC2') %></p>
+            <a href="/guild" class="btn-hero btn-get-started"><%= tr('LANDING.HERO_SLIDE3_BTN1') %></a> 
+            <a href="/documentation" class="btn-hero btn-get-github">
+              <i class="fa-solid fa-book"></i> <%= tr('LANDING.HERO_SLIDE3_BTN2') %>
+            </a>
+          </div>
+        </div>
+
+        <% if (carouselNews && carouselNews.length > 2) { %>
+          <div class="carousel-item">
+            <div class="text-center">
+              <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[2].title %></h2>
+              <p><%= carouselNews[2].excerpt || carouselNews[2].content.substring(0, 150) + '...' %></p>
+              <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[2].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
+              <a href="/news-details/<%= carouselNews[2].slug %>" class="btn-hero btn-get-started">
+                <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
+              </a>
+            </div>
+          </div>
+        <% } %>
+
+      </div>
+
+      <a class="carousel-control-prev" href="#heroCarousel" role="button" data-slide="prev">
+        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+        <span class="visually-hidden"><%= tr('LANDING.CAROUSEL_PREV') %></span>
+      </a>
+      <a class="carousel-control-next" href="#heroCarousel" role="button" data-slide="next">
+        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+        <span class="visually-hidden"><%= tr('LANDING.CAROUSEL_NEXT') %></span>
+      </a>
+
+    </div>
+  </div>
+
+</section>

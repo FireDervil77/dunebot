@@ -1,181 +1,321 @@
-<%# 
-  * Greeting Plugin JavaScript
-  * Handles AJAX updates for Welcome/Farewell/Autorole settings
-  * 
-  * @author DuneBot Team
-  %>
-
+<%# Greeting Plugin v2 Scripts – all 5 types, embed builder, live preview, tab persistence %>
 <script>
-console.log('[Greeting] greeting-scripts.ejs loaded');
+(function() {
+  const guildId = window.location.pathname.split('/')[2];
 
-/**
- * Update Greeting Settings via AJAX
- * 
- * @param {string} type - welcome, farewell, oder autorole
- * @param {string} action - enable, disable, oder update
- */
-async function updateGreeting(type, action) {
-    console.log(`[Greeting] updateGreeting called: type=${type}, action=${action}`);
-    
-    const guildId = window.location.pathname.split('/')[2];
-    console.log(`[Greeting] Guild ID: ${guildId}`);
-    
-    let data = { type, action };
-    
-    // Daten je nach Type sammeln
+  // ──── Embed data collector ────
+  function collectEmbed(prefix) {
+    const t  = document.querySelector(`[name="${prefix}_embed_title"]`);
+    const d  = document.querySelector(`[name="${prefix}_embed_description"]`);
+    const c  = document.querySelector(`[name="${prefix}_embed_color"]`);
+    const im = document.querySelector(`[name="${prefix}_embed_image"]`);
+    const f  = document.querySelector(`[name="${prefix}_embed_footer"]`);
+    const th = document.querySelector(`#${prefix}_embed_thumbnail`);
+    const ts = document.querySelector(`#${prefix}_embed_timestamp`);
+    if (!t && !d) return null;
+
+    const title = t ? t.value.trim() : '';
+    const desc  = d ? d.value.trim() : '';
+    if (!title && !desc) return null;
+
+    const embed = {};
+    if (title)              embed.title       = title;
+    if (desc)               embed.description = desc;
+    if (c && c.value)       embed.color       = c.value;
+    if (im && im.value.trim()) embed.image    = im.value.trim();
+    if (f && f.value.trim())   embed.footer   = { text: f.value.trim() };
+    if (th && th.checked)      embed.thumbnail = true;
+    if (ts && ts.checked)      embed.timestamp = true;
+    return embed;
+  }
+
+  // ──── Save handler ────
+  async function updateGreeting(type, action) {
+    const data = { type, action };
+
     if (type === 'welcome') {
-        const channel = document.querySelector('select[name="welcome_channel"]')?.value;
-        const content = document.querySelector('textarea[name="welcome_content"]')?.value;
-        const embedEnabled = document.querySelector('input[name="welcome_embed_enabled"]')?.checked || false;
-        
-        data.welcome_channel = channel;
-        data.welcome_content = content;
-        data.welcome_embed_enabled = embedEnabled;
-        
-        console.log(`[Greeting] Welcome Data:`, data);
-        
+      data.welcome_channel = document.querySelector('[name="welcome_channel"]')?.value || '';
+      data.welcome_content = document.querySelector('[name="welcome_content"]')?.value || '';
+      const emb = collectEmbed('welcome');
+      if (emb) data.welcome_embed = emb;
+      // welcome image fields
+      data.welcome_image_enabled = document.querySelector('[name="welcome_image_enabled"]')?.checked || false;
+      data.welcome_image_bg      = document.querySelector('[name="welcome_image_bg"]')?.value || 'default';
+      data.welcome_image_text    = document.querySelector('[name="welcome_image_text"]')?.value || '';
+      data.welcome_image_color   = document.querySelector('[name="welcome_image_color"]')?.value || '#5865f2';
+
     } else if (type === 'farewell') {
-        const channel = document.querySelector('select[name="farewell_channel"]')?.value;
-        const content = document.querySelector('textarea[name="farewell_content"]')?.value;
-        const embedEnabled = document.querySelector('input[name="farewell_embed_enabled"]')?.checked || false;
-        
-        data.farewell_channel = channel;
-        data.farewell_content = content;
-        data.farewell_embed_enabled = embedEnabled;
-        
-        console.log(`[Greeting] Farewell Data:`, data);
-        
+      data.farewell_channel = document.querySelector('[name="farewell_channel"]')?.value || '';
+      data.farewell_content = document.querySelector('[name="farewell_content"]')?.value || '';
+      const emb = collectEmbed('farewell');
+      if (emb) data.farewell_embed = emb;
+
+    } else if (type === 'dm_welcome') {
+      data.dm_welcome_content = document.querySelector('[name="dm_welcome_content"]')?.value || '';
+      const emb = collectEmbed('dm_welcome');
+      if (emb) data.dm_welcome_embed = emb;
+
     } else if (type === 'autorole') {
-        const selectedRole = document.querySelector('select[name="autorole_id"]')?.value;
-        
-        data.autorole_id = selectedRole || null;
-        
-        console.log(`[Greeting] Autorole Data:`, data);
+      const sel = document.querySelector('[name="autorole_ids"]');
+      data.autorole_ids = sel ? Array.from(sel.selectedOptions).map(o => o.value) : [];
+
+    } else if (type === 'boost') {
+      data.boost_channel = document.querySelector('[name="boost_channel"]')?.value || '';
+      data.boost_content = document.querySelector('[name="boost_content"]')?.value || '';
+      const emb = collectEmbed('boost');
+      if (emb) data.boost_embed = emb;
     }
-    
+
     try {
-        console.log(`[Greeting] Sending PUT to /guild/${guildId}/plugins/greeting/settings`);
-        console.log(`[Greeting] Payload:`, JSON.stringify(data, null, 2));
-        
-        const response = await fetch(`/guild/${guildId}/plugins/greeting/settings`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        console.log(`[Greeting] Response Status: ${response.status} ${response.statusText}`);
-        
-        const result = await response.json();
-        console.log(`[Greeting] Server Response:`, result);
-        
-        if (result.success) {
-            // Erfolgs-Toast anzeigen (Globales Toast-System)
-            showSuccess(result.message || 'Einstellungen erfolgreich gespeichert');
-            
-            // Optional: Seite neu laden
-            setTimeout(() => {
-                console.log('[Greeting] Reloading page...');
-                location.reload();
-            }, 1000);
-        } else {
-            throw new Error(result.message || 'Fehler beim Speichern');
-        }
-        
-    } catch (error) {
-        console.error('[Greeting] Error updating settings:', error);
-        
-        // Fehler-Toast mit Metadaten für Server-Logging
-        showError('Fehler beim Speichern der Einstellungen: ' + error.message, {
-            metadata: { action: 'updateGreeting', type: type, error: error.toString() }
-        });
+      const res = await fetch(`/guild/${guildId}/plugins/greeting/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await res.json();
+      if (result.success) {
+        showSuccess(result.message || 'Gespeichert!');
+        setTimeout(() => location.reload(), 800);
+      } else {
+        throw new Error(result.message || 'Fehler');
+      }
+    } catch (err) {
+      console.error('[Greeting]', err);
+      showError('Fehler: ' + err.message);
     }
-}
+  }
 
-// Funktion global verfügbar machen
-window.updateGreeting = updateGreeting;
-console.log('[Greeting] updateGreeting function registered globally');
-
-/**
- * Autorole entfernen
- */
-async function removeAutorole() {
-    if (!confirm('Möchtest du die automatische Rolle wirklich entfernen?')) {
-        return;
-    }
-    
-    const guildId = window.location.pathname.split('/')[2];
-    
+  // ──── Toggle enable/disable ────
+  async function toggleGreeting(type, enabled) {
     try {
-        const response = await fetch(`/guild/${guildId}/plugins/greeting/settings`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                type: 'autorole',
-                action: 'disable',
-                autorole_roles: []
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showSuccess('Autorole entfernt');
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            throw new Error(result.message || 'Fehler beim Entfernen');
-        }
-    } catch (error) {
-        console.error('[Greeting] Error removing autorole:', error);
-        showError('Fehler: ' + error.message, {
-            metadata: { action: 'removeAutorole', error: error.toString() }
-        });
+      const res = await fetch(`/guild/${guildId}/plugins/greeting/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, action: enabled ? 'enable' : 'disable' })
+      });
+      const result = await res.json();
+      if (result.success) {
+        showSuccess(enabled ? 'Aktiviert' : 'Deaktiviert');
+      } else {
+        throw new Error(result.message || 'Fehler');
+      }
+    } catch (err) {
+      console.error('[Greeting]', err);
+      showError('Fehler: ' + err.message);
+      location.reload();
     }
-}
+  }
 
-window.removeAutorole = removeAutorole;
-
-/**
- * Toggle Greeting Enabled/Disabled (in Overview-Card)
- */
-async function toggleGreeting(type, enabled) {
-    const guildId = window.location.pathname.split('/')[2];
-    const action = enabled ? 'enable' : 'disable';
-    
-    console.log(`[Greeting] Toggling ${type}: ${action}`);
-    
+  // ──── Remove autorole ────
+  async function removeAutorole() {
+    if (!confirm('Alle Autorollen wirklich entfernen?')) return;
     try {
-        const response = await fetch(`/guild/${guildId}/plugins/greeting/settings`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                type,
-                action
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showSuccess(enabled ? 'Aktiviert' : 'Deaktiviert');
-            // Kein Reload - Toggle aktualisiert sich selbst
-        } else {
-            throw new Error(result.message || 'Fehler beim Ändern');
-        }
-    } catch (error) {
-        console.error('[Greeting] Toggle error:', error);
-        showError('Fehler: ' + error.message, {
-            metadata: { action: 'toggleGreeting', type: type, enabled: enabled, error: error.toString() }
-        });
-        // Toggle zurücksetzen bei Fehler
+      const res = await fetch(`/guild/${guildId}/plugins/greeting/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'autorole', action: 'save', autorole_ids: [] })
+      });
+      const result = await res.json();
+      if (result.success) {
+        showSuccess('Autorollen entfernt');
+        setTimeout(() => location.reload(), 800);
+      } else {
+        throw new Error(result.message || 'Fehler');
+      }
+    } catch (err) {
+      console.error('[Greeting]', err);
+      showError('Fehler: ' + err.message);
+    }
+  }
+
+  // ──── Placeholder copy ────
+  function copyPH(el) {
+    const text = el.getAttribute('data-ph') || el.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = el.innerHTML;
+      el.innerHTML = '<i class="fa-solid fa-check"></i> Kopiert!';
+      setTimeout(() => el.innerHTML = orig, 1200);
+    });
+  }
+
+  // ──── Tab persistence via localStorage ────
+  const TAB_KEY = 'greeting_active_tab_' + guildId;
+  document.addEventListener('DOMContentLoaded', function() {
+    const savedTab = localStorage.getItem(TAB_KEY);
+    if (savedTab) {
+      const tabLink = document.querySelector(`a[href="${savedTab}"]`);
+      if (tabLink && typeof $ !== 'undefined') {
+        $(tabLink).tab('show');
+      }
+    }
+    document.querySelectorAll('#greetingTabs a[data-toggle="tab"]').forEach(tab => {
+      tab.addEventListener('shown.bs.tab', function(e) {
+        localStorage.setItem(TAB_KEY, e.target.getAttribute('href'));
+        renderLivePreview();
+      });
+    });
+  });
+
+  // ──── Live Preview ────
+  function renderLivePreview() {
+    const previewContent = document.getElementById('previewContent');
+    const previewEmbed   = document.getElementById('previewEmbed');
+    if (!previewContent || !previewEmbed) return;
+
+    // Find active tab type
+    const activeTab = document.querySelector('#greetingTabs .nav-link.active');
+    if (!activeTab) return;
+    const type = activeTab.getAttribute('href').replace('#tab-', '').replace('-', '_');
+
+    // Get message text
+    const textarea = document.querySelector(`[name="${type}_content"]`);
+    const content = textarea ? textarea.value.trim() : '';
+
+    // Replace placeholders for preview
+    const preview = content
+      .replace(/\{user\}/g, '<span class="text-info">@ExampleUser</span>')
+      .replace(/\{server\}/g, '<strong>My Server</strong>')
+      .replace(/\{memberCount\}/g, '42')
+      .replace(/\{user\.tag\}/g, 'ExampleUser#0001')
+      .replace(/\{user\.id\}/g, '123456789012345678');
+
+    previewContent.innerHTML = preview || '<span class="text-muted">Kein Text</span>';
+
+    // Embed preview
+    const embed = collectEmbed(type.replace('_', '_'));
+    if (embed && (embed.title || embed.description)) {
+      const color = embed.color || '#5865f2';
+      let html = `<div style="border-left: 4px solid ${escapeAttr(color)}; padding: 8px 12px; margin-top: 6px; background: #2f3136; border-radius: 0 4px 4px 0;">`;
+      if (embed.title) html += `<div style="font-weight:600; color: #fff; margin-bottom:4px;">${escapeHTML(embed.title)}</div>`;
+      if (embed.description) html += `<div style="color: #dcddde; font-size: 0.9em;">${escapeHTML(embed.description)}</div>`;
+      if (embed.image) html += `<div style="margin-top:6px;"><img src="${escapeAttr(embed.image)}" style="max-width:100%; border-radius:4px;" onerror="this.style.display='none'"></div>`;
+      if (embed.footer && embed.footer.text) html += `<div style="color:#72767d; font-size:0.75em; margin-top:6px;">${escapeHTML(embed.footer.text)}</div>`;
+      if (embed.timestamp) html += `<div style="color:#72767d; font-size:0.75em;">Heute um ${new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})}</div>`;
+      html += '</div>';
+      previewEmbed.innerHTML = html;
+    } else {
+      previewEmbed.innerHTML = '';
+    }
+  }
+
+  function escapeHTML(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+  function escapeAttr(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Bind live preview to text inputs
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.msg-input, .embed-input').forEach(el => {
+      el.addEventListener('input', renderLivePreview);
+      el.addEventListener('change', renderLivePreview);
+    });
+    renderLivePreview();
+  });
+
+  // Global exports
+  window.updateGreeting = updateGreeting;
+  window.toggleGreeting = toggleGreeting;
+  window.removeAutorole = removeAutorole;
+  window.copyPH = copyPH;
+
+  // ==================== VERIFICATION ====================
+  const verificationBasePath = '/guild/<%= guildId %>/plugins/greeting';
+
+  window.saveVerification = async function() {
+    const data = {
+      type: 'verification',
+      action: 'save',
+      verification_enabled: document.getElementById('verificationEnabled').checked,
+      verification_type: document.getElementById('verificationType').value,
+      verification_channel: document.getElementById('verificationChannel').value,
+      verification_role_id: document.getElementById('verificationRoleId').value,
+      verification_remove_role_id: document.getElementById('verificationRemoveRoleId').value,
+      verification_message: document.getElementById('verificationMessage').value
+    };
+
+    try {
+      const resp = await fetch(verificationBasePath + '/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await resp.json();
+      if (result.success) {
+        if (window.showToast) showToast('Gespeichert!', 'success');
+        else alert('Gespeichert!');
+      } else {
+        alert(result.message || 'Fehler');
+      }
+    } catch(e) {
+      console.error('[Greeting] saveVerification error:', e);
+    }
+  };
+
+  window.sendVerificationPanel = async function() {
+    if (!document.getElementById('verificationChannel').value) {
+      return alert('Bitte zuerst einen Verification-Channel auswählen und speichern.');
+    }
+    try {
+      const resp = await fetch(verificationBasePath + '/send-verification-panel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const result = await resp.json();
+      if (result.success) {
+        if (window.showToast) showToast('Panel gesendet!', 'success');
+        else alert('Verification-Panel wurde gesendet!');
+      } else {
+        alert(result.message || 'Fehler beim Senden');
+      }
+    } catch(e) {
+      console.error('[Greeting] sendVerificationPanel error:', e);
+    }
+  };
+
+  // ==================== INVITE TRACKING ====================
+  window.addInviteMapping = async function() {
+    const invite_code = document.getElementById('inviteCode').value.trim();
+    const label = document.getElementById('inviteLabel').value.trim();
+    const welcome_content = document.getElementById('inviteContent').value.trim();
+
+    if (!invite_code) return alert('Invite-Code erforderlich');
+
+    try {
+      const resp = await fetch(verificationBasePath + '/invite-mappings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invite_code, label, welcome_content })
+      });
+      const result = await resp.json();
+      if (result.success) {
         location.reload();
+      } else {
+        alert(result.message || 'Fehler');
+      }
+    } catch(e) {
+      console.error('[Greeting] addInviteMapping error:', e);
     }
-}
+  };
 
-window.toggleGreeting = toggleGreeting;
+  window.deleteInviteMapping = async function(id) {
+    if (!confirm('Dieses Invite-Mapping wirklich löschen?')) return;
+    try {
+      const resp = await fetch(verificationBasePath + '/invite-mappings/' + id, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const result = await resp.json();
+      if (result.success) {
+        const el = document.getElementById('invite-mapping-' + id);
+        if (el) el.remove();
+      }
+    } catch(e) {
+      console.error('[Greeting] deleteInviteMapping error:', e);
+    }
+  };
+})();
 </script>

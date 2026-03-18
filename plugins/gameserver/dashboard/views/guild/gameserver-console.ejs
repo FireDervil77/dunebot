@@ -274,11 +274,19 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
             
             // History anzeigen (letzte N Zeilen)
             if (data.history && data.history.length > 0) {
-                term.writeln('\x1b[90m═══ Console History (last ' + data.line_count + ' lines) ═══\x1b[0m');
-                data.history.forEach(line => term.writeln(line));
+                term.writeln('\x1b[90m═══ Console History (letzte ' + data.line_count + ' Zeilen) ═══\x1b[0m');
+                data.history.forEach(entry => {
+                    // entry kann String oder { line, timestamp } Objekt sein
+                    const text = typeof entry === 'string' ? entry : (entry.line || '');
+                    // Zeile kann intern \n enthalten → aufsplitten und einzeln schreiben
+                    const parts = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+                    parts.forEach(part => {
+                        if (part !== '') term.writeln(part);
+                    });
+                });
                 term.writeln('\x1b[90m═══ Live Output ═══\x1b[0m');
             } else {
-                term.writeln('\x1b[90m[Console] Waiting for output...\x1b[0m');
+                term.writeln('\x1b[90m[Console] Warte auf Output...\x1b[0m');
             }
             
             // 2. SSE-Stream starten
@@ -306,8 +314,12 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
         
         state.sseClient.addEventListener('console', (e) => {
             const data = JSON.parse(e.data);
-            term.write(data.line + '\r\n');
-            
+            const text = (data.line || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const parts = text.split('\n');
+            parts.forEach(part => {
+                if (part !== '') term.write(part + '\r\n');
+            });
+
             if (state.autoScroll) {
                 term.scrollToBottom();
             }

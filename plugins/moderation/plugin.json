@@ -1,7 +1,7 @@
 {
   "name": "moderation",
   "displayName": "Moderation",
-  "version": "1.0.0",
+  "version": "1.8.2",
   "previousVersion": null,
   "author": "FireDervil",
   "description": "Comprehensive moderation tools with warnings, timeouts, bans, and moderation logs",

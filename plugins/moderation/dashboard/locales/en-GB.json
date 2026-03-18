@@ -6,6 +6,13 @@
     "PAGE_TITLE": "Moderation Settings",
     "PAGE_DESC": "Configure moderation, logs and notifications"
   },
+
+  "TAB_SETTINGS": "Settings",
+  "TAB_PROTECTED_ROLES": "Protected Roles",
+  "TAB_CHANNEL_RULES": "Channel Rules",
+  "TAB_NOTES": "Mod Notes",
+  "TAB_LOGS": "Moderation Logs",
+
   "SECTION_BASIC": "Basic Settings",
   "SECTION_BASIC_DESC": "Basic moderation configuration",
   
@@ -41,6 +48,60 @@
   "DM_ON_KICK": "On Kick",
   "DM_ON_BAN": "On Ban",
   "DM_ON_TIMEOUT": "On Timeout",
+
+  "PROTECTED": {
+    "TITLE": "Protected Roles",
+    "DESC": "Members with a protected role cannot be punished by moderation commands (Warn, Kick, Ban, Timeout).",
+    "SELECT_ROLE": "Select role...",
+    "BTN_ADD": "Add",
+    "EMPTY": "No protected roles configured. All roles can be moderated.",
+    "CONFIRM_REMOVE": "Do you really want to remove this protected role?"
+  },
+
+  "LOGS": {
+    "TITLE": "Moderation Logs",
+    "FILTER_ALL": "All types",
+    "COL_TYPE": "Type",
+    "COL_USER": "User",
+    "COL_MODERATOR": "Moderator",
+    "COL_REASON": "Reason",
+    "COL_DATE": "Date",
+    "EMPTY": "No moderation logs available.",
+    "LOAD_MORE": "Load more",
+    "REMAINING": "remaining"
+  },
+
+  "CHANNEL_RULES": {
+    "TITLE": "Channel-specific Rules",
+    "DESC": "Define different moderation settings for individual channels. For example, set relaxed rules in meme channels or exempt channels from AutoMod.",
+    "ADD_TITLE": "Add Channel Rule",
+    "CHANNEL": "Channel",
+    "WARN_LIMIT": "Max Warns",
+    "WARN_ACTION": "Action",
+    "AUTOMOD_EXEMPT": "AutoMod",
+    "EXEMPT": "Exempt",
+    "NOTES": "Note",
+    "NOTES_PLACEHOLDER": "Optional note about this rule...",
+    "BTN_ADD": "Add",
+    "EMPTY": "No channel-specific rules configured. Global settings apply.",
+    "CONFIRM_REMOVE": "Do you really want to remove this channel rule?"
+  },
+
+  "NOTES": {
+    "TITLE": "Moderator Notes",
+    "DESC": "Internal notes about users – only visible to moderators. Can contain background information or observations.",
+    "ADD_TITLE": "Create New Note",
+    "USER_ID": "User ID",
+    "USER_ID_PLACEHOLDER": "Enter Discord User ID",
+    "NOTE_TEXT": "Note",
+    "NOTE_PLACEHOLDER": "Enter note text...",
+    "BTN_ADD": "Create",
+    "SEARCH_PLACEHOLDER": "Search User ID...",
+    "BTN_SEARCH": "Search",
+    "BTN_ALL": "All",
+    "HINT": "Use the search above to find notes for a specific user, or click 'All' to load all notes.",
+    "CONFIRM_DELETE": "Do you really want to delete this note?"
+  },
   
   "HELP": {
     "TITLE": "Help & Tips",
@@ -48,8 +109,14 @@
     "MODERATION_TEXT": "Manage warnings, kicks, bans and timeouts for your server.",
     "MODLOG_TITLE": "Modlog Events",
     "MODLOG_TEXT": "Log all moderation actions in a dedicated channel.",
+    "PROTECTED_TITLE": "Protected Roles",
+    "PROTECTED_TEXT": "Define roles whose members cannot be punished by moderation commands.",
     "DM_TITLE": "DM Notifications",
     "DM_TEXT": "Automatically inform affected users about moderation actions via direct message.",
+    "CHANNEL_RULES_TITLE": "Channel Rules",
+    "CHANNEL_RULES_TEXT": "Configure different moderation settings per channel, e.g. relaxed rules in meme channels.",
+    "NOTES_TITLE": "Mod Notes",
+    "NOTES_TEXT": "Create internal notes about users that are only visible to moderators.",
     "COMMANDS_TITLE": "Available Commands"
   },
   

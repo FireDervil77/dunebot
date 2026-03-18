@@ -1,0 +1,43 @@
+<%# News Section Partial — News-Cards aus DB %>
+
+<section id="news" class="news section light-background">
+  <div class="container section-title" data-aos="fade-up">
+    <h1><%= tr('LANDING.NEWS') %></h1>
+    <h2><%= tr('NEWS.TITLE') %></h2>
+  </div>
+  
+  <div class="container">
+    <div class="row g-4">
+      <% (newsList || []).forEach(function(news, index) { %>
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="<%= 100 + (index * 100) %>">
+        <div class="news-item">
+          <div class="news-img">
+            <img src="<%= theme.asset(news.image_url) %>" class="img-fluid" alt="<%= news.title %>">
+          </div>
+          <div class="news-content">
+            <h3><%= news.title %></h3>
+            <div class="news-meta d-flex align-items-center">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-calendar me-1"></i>
+                <span><%= news.formattedDate %></span>
+              </div>
+              <div class="d-flex align-items-center ms-3">
+                <i class="bi bi-person me-1"></i>
+                <span><%= news.author %></span>
+              </div>
+            </div>
+            <p class="news-excerpt"><%= news.excerpt %></p>
+            <a href="/news-details/<%= news.slug %>" class="readmore stretched-link">
+              <span><%= tr('NEWS.READ_MORE') %></span>
+              <i class="bi bi-arrow-right"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+      <% if ((index + 1) % 3 === 0 && index < newsList.length - 1) { %>
+        <div class="w-100 my-4"></div>
+      <% } %>
+      <% }); %>
+    </div>
+  </div>
+</section>

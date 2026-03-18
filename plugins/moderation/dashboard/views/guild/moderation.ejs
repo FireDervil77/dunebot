@@ -1,250 +1,537 @@
-<!-- Moderation Plugin Settings Page - GuildAjax Version -->
+<!-- Moderation Plugin Settings Page - Tab-System -->
 <div class="container-fluid">
   <div class="row">
-    <!-- Linke Spalte: Settings Form (8 Spalten) -->
+    <!-- Linke Spalte: Tabs (8 Spalten) -->
     <div class="col-lg-8">
-      <form class="guild-ajax-form" 
-            data-form-type="moderation-settings" 
-            action="/guild/<%= guildId %>/plugins/moderation/save"
-            method="POST">
-        
-        <div class="card">
-          
-          <div class="card-header">
-            <h3 class="card-title">
-              <i class="fa-solid fa-shield-halved me-2"></i>
-              <%= tr('moderation:SETTINGS.PAGE_TITLE') %>
-            </h3>
-            <p class="text-muted mb-0 mt-2">
-              <%= tr('moderation:SETTINGS.PAGE_DESC') %>
-            </p>
-          </div>
-
-          <div class="card-body">
-            <!-- Basic Settings Section -->
-            <div class="mb-4">
-              <h5 class="mb-3">
-                <i class="fa-solid fa-cog text-primary me-2"></i>
-                <%= tr("moderation:SECTION_BASIC") %>
-              </h5>
-              <p class="text-muted small mb-3"><%= tr("moderation:SECTION_BASIC_DESC") %></p>
-              
-              <div class="row">
-                <!-- Modlog Channel -->
-                <div class="col-md-4 mb-3">
-                  <label for="log_channel" class="form-label">
-                    <%= tr("moderation:MODLOG_CHANNEL_TITLE") %>
-                  </label>
-                  <select name="log_channel" id="log_channel" class="form-control">
-                    <option value=""><%= tr("moderation:CHANNEL_SELECT") %></option>
-                    <% channels.forEach(ch => { %>
-                    <option value="<%= ch.id %>" <%= settings.modlog_channel === ch.id ? 'selected' : '' %>><%= ch.name %></option>
-                    <% }); %>
-                  </select>
-                  <small class="form-text text-muted">
-                    <%= tr("moderation:MODLOG_CHANNEL_DESC") %>
-                  </small>
-                </div>
-
-                <!-- Max Warnings -->
-                <div class="col-md-4 mb-3">
-                  <label for="maxwarn_count" class="form-label">
-                    <%= tr("moderation:MAXWARN_LIMIT_TITLE") %>
-                  </label>
-                  <input
-                    name="maxwarn_count"
-                    type="number"
-                    min="0"
-                    max="100"
-                    id="maxwarn_count"
-                    class="form-control"
-                    value="<%= settings.max_warn_limit || 5 %>"
-                    required />
-                  <small class="form-text text-muted">
-                    <%= tr("moderation:MAXWARN_LIMIT_DESC") %>
-                  </small>
-                </div>
-
-                <!-- Max Warn Action -->
-                <div class="col-md-4 mb-3">
-                  <label for="maxwarn_action" class="form-label">
-                    <%= tr("moderation:MAXWARN_ACTION_TITLE") %>
-                  </label>
-                  <select name="maxwarn_action" id="maxwarn_action" class="form-control">
-                    <option value="TIMEOUT" <%= settings.max_warn_action === 'TIMEOUT' ? 'selected' : '' %>>TIMEOUT</option>
-                    <option value="KICK" <%= settings.max_warn_action === 'KICK' ? 'selected' : '' %>>KICK</option>
-                    <option value="BAN" <%= settings.max_warn_action === 'BAN' ? 'selected' : '' %>>BAN</option>
-                  </select>
-                  <small class="form-text text-muted">
-                    <%= tr("moderation:MAXWARN_ACTION_DESC") %>
-                  </small>
-                </div>
-              </div>
-
-              <!-- Default Reason Field -->
-              <div class="row mt-3">
-                <div class="col-md-12 mb-3">
-                  <label for="default_reason" class="form-label">
-                    <i class="fa-solid fa-message me-1"></i>
-                    <%= tr("moderation:DEFAULT_REASON_TITLE") %>
-                  </label>
-                  <textarea
-                    name="default_reason"
-                    id="default_reason"
-                    class="form-control"
-                    rows="3"
-                    placeholder="<%= tr('moderation:DEFAULT_REASON_PLACEHOLDER') %>"><%= settings.default_reason || '' %></textarea>
-                  <small class="form-text text-muted">
-                    <%= tr("moderation:DEFAULT_REASON_DESC") %>
-                  </small>
-                </div>
-              </div>
-            </div>
-
-            <hr>
-
-            <!-- Modlog Events Section -->
-            <div class="mb-4">
-              <h5 class="mb-3">
-                <i class="fa-solid fa-list-check text-info me-2"></i>
-                <%= tr("moderation:SECTION_MODLOG_EVENTS") %>
-              </h5>
-              <p class="text-muted small mb-3"><%= tr("moderation:SECTION_MODLOG_EVENTS_DESC") %></p>
-              
-              <%
-                // Parse modlog_events
-                let modlogEvents = [];
-                try {
-                  if (typeof settings.modlog_events === 'string') {
-                    modlogEvents = JSON.parse(settings.modlog_events);
-                  } else if (Array.isArray(settings.modlog_events)) {
-                    modlogEvents = settings.modlog_events;
-                  } else {
-                    modlogEvents = [];
-                  }
-                } catch(e) {
-                  modlogEvents = [];
-                }
-                
-                const events = [
-                  { key: 'WARN', label: 'EVENT_WARN', icon: 'fa-triangle-exclamation' },
-                  { key: 'KICK', label: 'EVENT_KICK', icon: 'fa-right-from-bracket' },
-                  { key: 'BAN', label: 'EVENT_BAN', icon: 'fa-ban' },
-                  { key: 'TIMEOUT', label: 'EVENT_TIMEOUT', icon: 'fa-clock' },
-                  { key: 'UNTIMEOUT', label: 'EVENT_UNTIMEOUT', icon: 'fa-clock-rotate-left' },
-                  { key: 'SOFTBAN', label: 'EVENT_SOFTBAN', icon: 'fa-user-slash' },
-                  { key: 'UNBAN', label: 'EVENT_UNBAN', icon: 'fa-user-check' }
-                ];
-              %>
-              
-              <div class="row">
-                <% events.forEach(event => { %>
-                <div class="col-md-6 col-lg-4 col-xl-3 mb-2">
-                  <div class="custom-control custom-checkbox">
-                    <input
-                      type="checkbox"
-                      class="custom-control-input"
-                      name="modlog_events[]"
-                      value="<%= event.key %>"
-                      id="event_<%= event.key %>"
-                      <%= modlogEvents.includes(event.key) ? 'checked' : '' %>>
-                    <label class="custom-control-label" for="event_<%= event.key %>">
-                      <i class="fa-solid <%= event.icon %> me-1"></i>
-                      <%= tr("moderation:" + event.label) %>
-                    </label>
-                  </div>
-                </div>
-                <% }); %>
-              </div>
-            </div>
-
-            <hr>
-
-            <!-- DM Notifications Section -->
-            <div class="mb-4">
-              <h5 class="mb-3">
-                <i class="fa-solid fa-envelope text-success me-2"></i>
-                <%= tr("moderation:SECTION_DM_NOTIFICATIONS") %>
-              </h5>
-              <p class="text-muted small mb-3"><%= tr("moderation:SECTION_DM_NOTIFICATIONS_DESC") %></p>
-              
-              <div class="row">
-                <div class="col-md-6 col-lg-3 mb-2">
-                  <div class="custom-control custom-switch">
-                    <input
-                      type="checkbox"
-                      class="custom-control-input"
-                      name="dm_on_warn"
-                      value="1"
-                      id="dm_on_warn"
-                      <%= settings.dm_on_warn ? 'checked' : '' %>>
-                    <label class="custom-control-label" for="dm_on_warn">
-                      <i class="fa-solid fa-triangle-exclamation me-1"></i>
-                      <%= tr("moderation:DM_ON_WARN") %>
-                    </label>
-                  </div>
-                </div>
-                
-                <div class="col-md-6 col-lg-3 mb-2">
-                  <div class="custom-control custom-switch">
-                    <input
-                      type="checkbox"
-                      class="custom-control-input"
-                      name="dm_on_kick"
-                      value="1"
-                      id="dm_on_kick"
-                      <%= settings.dm_on_kick ? 'checked' : '' %>>
-                    <label class="custom-control-label" for="dm_on_kick">
-                      <i class="fa-solid fa-right-from-bracket me-1"></i>
-                      <%= tr("moderation:DM_ON_KICK") %>
-                    </label>
-                  </div>
-                </div>
-                
-                <div class="col-md-6 col-lg-3 mb-2">
-                  <div class="custom-control custom-switch">
-                    <input
-                      type="checkbox"
-                      class="custom-control-input"
-                      name="dm_on_ban"
-                      value="1"
-                      id="dm_on_ban"
-                      <%= settings.dm_on_ban ? 'checked' : '' %>>
-                    <label class="custom-control-label" for="dm_on_ban">
-                      <i class="fa-solid fa-ban me-1"></i>
-                      <%= tr("moderation:DM_ON_BAN") %>
-                    </label>
-                  </div>
-                </div>
-                
-                <div class="col-md-6 col-lg-3 mb-2">
-                  <div class="custom-control custom-switch">
-                    <input
-                      type="checkbox"
-                      class="custom-control-input"
-                      name="dm_on_timeout"
-                      value="1"
-                      id="dm_on_timeout"
-                      <%= settings.dm_on_timeout ? 'checked' : '' %>>
-                    <label class="custom-control-label" for="dm_on_timeout">
-                      <i class="fa-solid fa-clock me-1"></i>
-                      <%= tr("moderation:DM_ON_TIMEOUT") %>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Save Button -->
-            <div class="d-flex justify-content-end mt-4">
-              <button type="submit" class="btn btn-primary">
-                <i class="fa-solid fa-save me-2"></i>
-                <%= tr('moderation:BTN_SAVE') %>
-              </button>
-            </div>
-          </div>
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-shield-halved me-2"></i>
+            <%= tr('moderation:SETTINGS.PAGE_TITLE') %>
+          </h3>
+          <p class="text-muted mb-0 mt-2">
+            <%= tr('moderation:SETTINGS.PAGE_DESC') %>
+          </p>
         </div>
-      </form>
+
+        <div class="card-body">
+          <!-- Bootstrap 4 Nav Tabs -->
+          <ul class="nav nav-tabs" id="moderationTabs" role="tablist">
+            <li class="nav-item">
+              <a class="nav-link active" id="settings-tab" data-toggle="tab" href="#tab-settings" role="tab">
+                <i class="fa-solid fa-cog me-1"></i>
+                <%= tr('moderation:TAB_SETTINGS') %>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="protected-tab" data-toggle="tab" href="#tab-protected" role="tab">
+                <i class="fa-solid fa-user-shield me-1"></i>
+                <%= tr('moderation:TAB_PROTECTED_ROLES') %>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="channel-rules-tab" data-toggle="tab" href="#tab-channel-rules" role="tab">
+                <i class="fa-solid fa-hashtag me-1"></i>
+                <%= tr('moderation:TAB_CHANNEL_RULES') %>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="notes-tab" data-toggle="tab" href="#tab-notes" role="tab">
+                <i class="fa-solid fa-sticky-note me-1"></i>
+                <%= tr('moderation:TAB_NOTES') %>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="logs-tab" data-toggle="tab" href="#tab-logs" role="tab">
+                <i class="fa-solid fa-list-ul me-1"></i>
+                <%= tr('moderation:TAB_LOGS') %>
+                <% if (logsTotal > 0) { %>
+                  <span class="badge bg-secondary ml-1"><%= logsTotal %></span>
+                <% } %>
+              </a>
+            </li>
+          </ul>
+
+          <!-- Tab Content -->
+          <div class="tab-content mt-4" id="moderationTabContent">
+
+            <!-- ==================== TAB 1: EINSTELLUNGEN ==================== -->
+            <div class="tab-pane fade show active" id="tab-settings" role="tabpanel">
+              <form class="guild-ajax-form" 
+                    data-form-type="moderation-settings" 
+                    action="/guild/<%= guildId %>/plugins/moderation/save"
+                    method="POST">
+                
+                <!-- Basic Settings Section -->
+                <div class="mb-4">
+                  <h5 class="mb-3">
+                    <i class="fa-solid fa-cog text-primary me-2"></i>
+                    <%= tr("moderation:SECTION_BASIC") %>
+                  </h5>
+                  <p class="text-muted small mb-3"><%= tr("moderation:SECTION_BASIC_DESC") %></p>
+                  
+                  <div class="row">
+                    <!-- Modlog Channel -->
+                    <div class="col-md-4 mb-3">
+                      <label for="log_channel" class="form-label">
+                        <%= tr("moderation:MODLOG_CHANNEL_TITLE") %>
+                      </label>
+                      <select name="log_channel" id="log_channel" class="form-control">
+                        <option value=""><%= tr("moderation:CHANNEL_SELECT") %></option>
+                        <% channels.forEach(ch => { %>
+                        <option value="<%= ch.id %>" <%= settings.modlog_channel === ch.id ? 'selected' : '' %>><%= ch.name %></option>
+                        <% }); %>
+                      </select>
+                      <small class="form-text text-muted">
+                        <%= tr("moderation:MODLOG_CHANNEL_DESC") %>
+                      </small>
+                    </div>
+
+                    <!-- Max Warnings -->
+                    <div class="col-md-4 mb-3">
+                      <label for="maxwarn_count" class="form-label">
+                        <%= tr("moderation:MAXWARN_LIMIT_TITLE") %>
+                      </label>
+                      <input
+                        name="maxwarn_count"
+                        type="number"
+                        min="0"
+                        max="100"
+                        id="maxwarn_count"
+                        class="form-control"
+                        value="<%= settings.max_warn_limit || 5 %>"
+                        required />
+                      <small class="form-text text-muted">
+                        <%= tr("moderation:MAXWARN_LIMIT_DESC") %>
+                      </small>
+                    </div>
+
+                    <!-- Max Warn Action -->
+                    <div class="col-md-4 mb-3">
+                      <label for="maxwarn_action" class="form-label">
+                        <%= tr("moderation:MAXWARN_ACTION_TITLE") %>
+                      </label>
+                      <select name="maxwarn_action" id="maxwarn_action" class="form-control">
+                        <option value="TIMEOUT" <%= settings.max_warn_action === 'TIMEOUT' ? 'selected' : '' %>>TIMEOUT</option>
+                        <option value="KICK" <%= settings.max_warn_action === 'KICK' ? 'selected' : '' %>>KICK</option>
+                        <option value="BAN" <%= settings.max_warn_action === 'BAN' ? 'selected' : '' %>>BAN</option>
+                      </select>
+                      <small class="form-text text-muted">
+                        <%= tr("moderation:MAXWARN_ACTION_DESC") %>
+                      </small>
+                    </div>
+                  </div>
+
+                  <!-- Default Reason Field -->
+                  <div class="row mt-3">
+                    <div class="col-md-12 mb-3">
+                      <label for="default_reason" class="form-label">
+                        <i class="fa-solid fa-message me-1"></i>
+                        <%= tr("moderation:DEFAULT_REASON_TITLE") %>
+                      </label>
+                      <textarea
+                        name="default_reason"
+                        id="default_reason"
+                        class="form-control"
+                        rows="3"
+                        placeholder="<%= tr('moderation:DEFAULT_REASON_PLACEHOLDER') %>"><%= settings.default_reason || '' %></textarea>
+                      <small class="form-text text-muted">
+                        <%= tr("moderation:DEFAULT_REASON_DESC") %>
+                      </small>
+                    </div>
+                  </div>
+                </div>
+
+                <hr>
+
+                <!-- Modlog Events Section -->
+                <div class="mb-4">
+                  <h5 class="mb-3">
+                    <i class="fa-solid fa-list-check text-info me-2"></i>
+                    <%= tr("moderation:SECTION_MODLOG_EVENTS") %>
+                  </h5>
+                  <p class="text-muted small mb-3"><%= tr("moderation:SECTION_MODLOG_EVENTS_DESC") %></p>
+                  
+                  <%
+                    let modlogEvents = [];
+                    try {
+                      if (typeof settings.modlog_events === 'string') {
+                        modlogEvents = JSON.parse(settings.modlog_events);
+                      } else if (Array.isArray(settings.modlog_events)) {
+                        modlogEvents = settings.modlog_events;
+                      }
+                    } catch(e) { modlogEvents = []; }
+                    
+                    const events = [
+                      { key: 'WARN', label: 'EVENT_WARN', icon: 'fa-triangle-exclamation' },
+                      { key: 'KICK', label: 'EVENT_KICK', icon: 'fa-right-from-bracket' },
+                      { key: 'BAN', label: 'EVENT_BAN', icon: 'fa-ban' },
+                      { key: 'TIMEOUT', label: 'EVENT_TIMEOUT', icon: 'fa-clock' },
+                      { key: 'UNTIMEOUT', label: 'EVENT_UNTIMEOUT', icon: 'fa-clock-rotate-left' },
+                      { key: 'SOFTBAN', label: 'EVENT_SOFTBAN', icon: 'fa-user-slash' },
+                      { key: 'UNBAN', label: 'EVENT_UNBAN', icon: 'fa-user-check' }
+                    ];
+                  %>
+                  
+                  <div class="row">
+                    <% events.forEach(event => { %>
+                    <div class="col-md-6 col-lg-4 col-xl-3 mb-2">
+                      <div class="custom-control custom-checkbox">
+                        <input
+                          type="checkbox"
+                          class="custom-control-input"
+                          name="modlog_events[]"
+                          value="<%= event.key %>"
+                          id="event_<%= event.key %>"
+                          <%= modlogEvents.includes(event.key) ? 'checked' : '' %>>
+                        <label class="custom-control-label" for="event_<%= event.key %>">
+                          <i class="fa-solid <%= event.icon %> me-1"></i>
+                          <%= tr("moderation:" + event.label) %>
+                        </label>
+                      </div>
+                    </div>
+                    <% }); %>
+                  </div>
+                </div>
+
+                <hr>
+
+                <!-- DM Notifications Section -->
+                <div class="mb-4">
+                  <h5 class="mb-3">
+                    <i class="fa-solid fa-envelope text-success me-2"></i>
+                    <%= tr("moderation:SECTION_DM_NOTIFICATIONS") %>
+                  </h5>
+                  <p class="text-muted small mb-3"><%= tr("moderation:SECTION_DM_NOTIFICATIONS_DESC") %></p>
+                  
+                  <div class="row">
+                    <div class="col-md-6 col-lg-3 mb-2">
+                      <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" name="dm_on_warn" value="1" id="dm_on_warn" <%= settings.dm_on_warn ? 'checked' : '' %>>
+                        <label class="custom-control-label" for="dm_on_warn">
+                          <i class="fa-solid fa-triangle-exclamation me-1"></i> <%= tr("moderation:DM_ON_WARN") %>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3 mb-2">
+                      <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" name="dm_on_kick" value="1" id="dm_on_kick" <%= settings.dm_on_kick ? 'checked' : '' %>>
+                        <label class="custom-control-label" for="dm_on_kick">
+                          <i class="fa-solid fa-right-from-bracket me-1"></i> <%= tr("moderation:DM_ON_KICK") %>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3 mb-2">
+                      <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" name="dm_on_ban" value="1" id="dm_on_ban" <%= settings.dm_on_ban ? 'checked' : '' %>>
+                        <label class="custom-control-label" for="dm_on_ban">
+                          <i class="fa-solid fa-ban me-1"></i> <%= tr("moderation:DM_ON_BAN") %>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3 mb-2">
+                      <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" name="dm_on_timeout" value="1" id="dm_on_timeout" <%= settings.dm_on_timeout ? 'checked' : '' %>>
+                        <label class="custom-control-label" for="dm_on_timeout">
+                          <i class="fa-solid fa-clock me-1"></i> <%= tr("moderation:DM_ON_TIMEOUT") %>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Save Button -->
+                <div class="d-flex justify-content-end mt-4">
+                  <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-save me-2"></i>
+                    <%= tr('moderation:BTN_SAVE') %>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- ==================== TAB 2: GESCHÜTZTE ROLLEN ==================== -->
+            <div class="tab-pane fade" id="tab-protected" role="tabpanel">
+              <h5 class="mb-3">
+                <i class="fa-solid fa-user-shield text-warning me-2"></i>
+                <%= tr('moderation:PROTECTED.TITLE') %>
+              </h5>
+              <p class="text-muted small mb-3"><%= tr('moderation:PROTECTED.DESC') %></p>
+
+              <!-- Rolle hinzufügen -->
+              <div class="row mb-4">
+                <div class="col-md-8">
+                  <select id="protectedRoleSelect" class="form-control">
+                    <option value=""><%= tr('moderation:PROTECTED.SELECT_ROLE') %></option>
+                    <% 
+                      const protectedRoleIds = (protectedRoles || []).map(pr => pr.role_id);
+                      (roles || []).forEach(role => { 
+                        if (!protectedRoleIds.includes(role.id)) {
+                    %>
+                      <option value="<%= role.id %>"><%= role.name %></option>
+                    <% } }); %>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <button type="button" class="btn btn-success btn-block" onclick="addProtectedRole()">
+                    <i class="fa-solid fa-plus me-1"></i>
+                    <%= tr('moderation:PROTECTED.BTN_ADD') %>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Aktuelle geschützte Rollen -->
+              <div id="protectedRolesList">
+                <% if (protectedRoles && protectedRoles.length > 0) { %>
+                  <% protectedRoles.forEach(pr => { 
+                    const roleName = (roles || []).find(r => r.id === pr.role_id);
+                  %>
+                    <div class="d-flex align-items-center justify-content-between p-2 mb-2 border rounded" id="protected-role-<%= pr.role_id %>">
+                      <div>
+                        <i class="fa-solid fa-shield-halved text-warning me-2"></i>
+                        <strong><%= roleName ? roleName.name : pr.role_id %></strong>
+                        <small class="text-muted ml-2"><%= new Date(pr.created_at).toLocaleDateString('de-DE') %></small>
+                      </div>
+                      <button type="button" class="btn btn-sm btn-danger" onclick="removeProtectedRole('<%= pr.role_id %>')">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+                  <% }); %>
+                <% } else { %>
+                  <div class="alert alert-info" id="noProtectedRolesMsg">
+                    <i class="fa-solid fa-info-circle me-2"></i>
+                    <%= tr('moderation:PROTECTED.EMPTY') %>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+
+            <!-- ==================== TAB 3: CHANNEL-REGELN ==================== -->
+            <div class="tab-pane fade" id="tab-channel-rules" role="tabpanel">
+              <h5 class="mb-3">
+                <i class="fa-solid fa-hashtag text-primary me-2"></i>
+                <%= tr('moderation:CHANNEL_RULES.TITLE') %>
+              </h5>
+              <p class="text-muted small mb-3"><%= tr('moderation:CHANNEL_RULES.DESC') %></p>
+
+              <!-- Channel-Regel hinzufügen -->
+              <div class="card card-outline card-primary mb-4">
+                <div class="card-header">
+                  <h3 class="card-title"><i class="fa-solid fa-plus me-1"></i> <%= tr('moderation:CHANNEL_RULES.ADD_TITLE') %></h3>
+                </div>
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col-md-4 mb-3">
+                      <label class="form-label"><%= tr('moderation:CHANNEL_RULES.CHANNEL') %></label>
+                      <select id="crChannelSelect" class="form-control">
+                        <option value=""><%= tr('moderation:CHANNEL_SELECT') %></option>
+                        <% channels.forEach(ch => { %>
+                          <option value="<%= ch.id %>">#<%= ch.name %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                      <label class="form-label"><%= tr('moderation:CHANNEL_RULES.WARN_LIMIT') %></label>
+                      <input type="number" id="crWarnLimit" class="form-control" min="0" max="100" placeholder="—">
+                    </div>
+                    <div class="col-md-2 mb-3">
+                      <label class="form-label"><%= tr('moderation:CHANNEL_RULES.WARN_ACTION') %></label>
+                      <select id="crWarnAction" class="form-control">
+                        <option value="">—</option>
+                        <option value="TIMEOUT">TIMEOUT</option>
+                        <option value="KICK">KICK</option>
+                        <option value="BAN">BAN</option>
+                      </select>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                      <label class="form-label"><%= tr('moderation:CHANNEL_RULES.AUTOMOD_EXEMPT') %></label>
+                      <div class="custom-control custom-switch mt-2">
+                        <input type="checkbox" class="custom-control-input" id="crAutomodExempt">
+                        <label class="custom-control-label" for="crAutomodExempt"><%= tr('moderation:CHANNEL_RULES.EXEMPT') %></label>
+                      </div>
+                    </div>
+                    <div class="col-md-2 mb-3 d-flex align-items-end">
+                      <button type="button" class="btn btn-success btn-block" onclick="addChannelRule()">
+                        <i class="fa-solid fa-plus me-1"></i> <%= tr('moderation:CHANNEL_RULES.BTN_ADD') %>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="row">
+                    <div class="col-md-12">
+                      <label class="form-label"><%= tr('moderation:CHANNEL_RULES.NOTES') %></label>
+                      <input type="text" id="crNotes" class="form-control" maxlength="500" placeholder="<%= tr('moderation:CHANNEL_RULES.NOTES_PLACEHOLDER') %>">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Aktuelle Channel-Regeln -->
+              <div id="channelRulesList">
+                <% if (channelRules && channelRules.length > 0) { %>
+                  <% channelRules.forEach(rule => {
+                    const ch = channels.find(c => c.id === rule.channel_id);
+                  %>
+                    <div class="d-flex align-items-center justify-content-between p-3 mb-2 border rounded" id="channel-rule-<%= rule.id %>">
+                      <div class="flex-grow-1">
+                        <strong><i class="fa-solid fa-hashtag text-primary me-1"></i><%= ch ? ch.name : rule.channel_id %></strong>
+                        <% if (rule.max_warn_limit !== null) { %>
+                          <span class="badge bg-warning ml-2">Max <%= rule.max_warn_limit %> Warns → <%= rule.max_warn_action || 'Standard' %></span>
+                        <% } %>
+                        <% if (rule.automod_exempt) { %>
+                          <span class="badge bg-info ml-1">AutoMod Exempt</span>
+                        <% } %>
+                        <% if (rule.notes) { %>
+                          <br><small class="text-muted"><%= rule.notes %></small>
+                        <% } %>
+                      </div>
+                      <button type="button" class="btn btn-sm btn-danger ml-2" onclick="removeChannelRule(<%= rule.id %>)">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+                  <% }); %>
+                <% } else { %>
+                  <div class="alert alert-info" id="noChannelRulesMsg">
+                    <i class="fa-solid fa-info-circle me-2"></i>
+                    <%= tr('moderation:CHANNEL_RULES.EMPTY') %>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+
+            <!-- ==================== TAB 4: MOD-NOTIZEN ==================== -->
+            <div class="tab-pane fade" id="tab-notes" role="tabpanel">
+              <h5 class="mb-3">
+                <i class="fa-solid fa-sticky-note text-success me-2"></i>
+                <%= tr('moderation:NOTES.TITLE') %>
+              </h5>
+              <p class="text-muted small mb-3"><%= tr('moderation:NOTES.DESC') %></p>
+
+              <!-- Notiz erstellen -->
+              <div class="card card-outline card-success mb-4">
+                <div class="card-header">
+                  <h3 class="card-title"><i class="fa-solid fa-plus me-1"></i> <%= tr('moderation:NOTES.ADD_TITLE') %></h3>
+                </div>
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col-md-4 mb-3">
+                      <label class="form-label"><%= tr('moderation:NOTES.USER_ID') %></label>
+                      <input type="text" id="noteUserId" class="form-control" placeholder="<%= tr('moderation:NOTES.USER_ID_PLACEHOLDER') %>" pattern="[0-9]+" maxlength="20">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                      <label class="form-label"><%= tr('moderation:NOTES.NOTE_TEXT') %></label>
+                      <input type="text" id="noteText" class="form-control" maxlength="1000" placeholder="<%= tr('moderation:NOTES.NOTE_PLACEHOLDER') %>">
+                    </div>
+                    <div class="col-md-2 mb-3 d-flex align-items-end">
+                      <button type="button" class="btn btn-success btn-block" onclick="addNote()">
+                        <i class="fa-solid fa-plus me-1"></i> <%= tr('moderation:NOTES.BTN_ADD') %>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Notiz-Suche per User -->
+              <div class="input-group mb-3">
+                <input type="text" id="noteSearchUserId" class="form-control" placeholder="<%= tr('moderation:NOTES.SEARCH_PLACEHOLDER') %>" pattern="[0-9]+" maxlength="20">
+                <div class="input-group-append">
+                  <button type="button" class="btn btn-primary" onclick="searchNotes()">
+                    <i class="fa-solid fa-search me-1"></i> <%= tr('moderation:NOTES.BTN_SEARCH') %>
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary" onclick="loadAllNotes()">
+                    <i class="fa-solid fa-list me-1"></i> <%= tr('moderation:NOTES.BTN_ALL') %>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Notizen-Liste -->
+              <div id="notesList">
+                <div class="alert alert-info">
+                  <i class="fa-solid fa-info-circle me-2"></i>
+                  <%= tr('moderation:NOTES.HINT') %>
+                </div>
+              </div>
+            </div>
+
+            <!-- ==================== TAB 5: MODERATION LOGS ==================== -->
+            <div class="tab-pane fade" id="tab-logs" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">
+                  <i class="fa-solid fa-list-ul text-info me-2"></i>
+                  <%= tr('moderation:LOGS.TITLE') %>
+                </h5>
+                <div>
+                  <select id="logTypeFilter" class="form-control form-control-sm d-inline-block" style="width: auto;" onchange="filterLogs()">
+                    <option value=""><%= tr('moderation:LOGS.FILTER_ALL') %></option>
+                    <option value="WARN">WARN</option>
+                    <option value="KICK">KICK</option>
+                    <option value="BAN">BAN</option>
+                    <option value="TIMEOUT">TIMEOUT</option>
+                    <option value="SOFTBAN">SOFTBAN</option>
+                    <option value="UNBAN">UNBAN</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table table-sm table-hover" id="logsTable">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th><%= tr('moderation:LOGS.COL_TYPE') %></th>
+                      <th><%= tr('moderation:LOGS.COL_USER') %></th>
+                      <th><%= tr('moderation:LOGS.COL_MODERATOR') %></th>
+                      <th><%= tr('moderation:LOGS.COL_REASON') %></th>
+                      <th><%= tr('moderation:LOGS.COL_DATE') %></th>
+                    </tr>
+                  </thead>
+                  <tbody id="logsTableBody">
+                    <%
+                      const typeColors = {
+                        'WARN': 'warning',
+                        'KICK': 'info',
+                        'BAN': 'danger',
+                        'TIMEOUT': 'secondary',
+                        'SOFTBAN': 'dark',
+                        'UNBAN': 'success',
+                        'UNTIMEOUT': 'light'
+                      };
+                    %>
+                    <% if (logs && logs.length > 0) { %>
+                      <% logs.forEach(log => { %>
+                        <tr>
+                          <td><span class="badge bg-dark">#<%= log.case_number || '-' %></span></td>
+                          <td><span class="badge bg-<%= typeColors[log.type] || 'secondary' %>"><%= log.type %></span></td>
+                          <td><code><%= log.member_id %></code></td>
+                          <td><code><%= log.admin_id %></code></td>
+                          <td class="text-truncate" style="max-width: 200px;"><%= log.reason || '-' %></td>
+                          <td><small><%= new Date(log.created_at).toLocaleString('de-DE') %></small></td>
+                        </tr>
+                      <% }); %>
+                    <% } else { %>
+                      <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                          <i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>
+                          <%= tr('moderation:LOGS.EMPTY') %>
+                        </td>
+                      </tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+
+              <% if (logsTotal > 50) { %>
+                <div class="text-center mt-3">
+                  <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadMoreLogs()">
+                    <i class="fa-solid fa-arrow-down me-1"></i>
+                    <%= tr('moderation:LOGS.LOAD_MORE') %> (<%= logsTotal - 50 %> <%= tr('moderation:LOGS.REMAINING') %>)
+                  </button>
+                </div>
+              <% } %>
+            </div>
+
+          </div><!-- /tab-content -->
+        </div><!-- /card-body -->
+      </div><!-- /card -->
     </div>
     
     <!-- Rechte Spalte: Hilfe & Informationen (4 Spalten) -->
@@ -271,9 +558,27 @@
             </p>
           </div>
           <div class="mb-4">
+            <h6><i class="fa-solid fa-user-shield text-warning me-2"></i><%= tr('moderation:HELP.PROTECTED_TITLE') %></h6>
+            <p class="text-muted small">
+              <%= tr('moderation:HELP.PROTECTED_TEXT') %>
+            </p>
+          </div>
+          <div class="mb-4">
             <h6><i class="fa-solid fa-envelope text-success me-2"></i><%= tr('moderation:HELP.DM_TITLE') %></h6>
             <p class="text-muted small">
               <%= tr('moderation:HELP.DM_TEXT') %>
+            </p>
+          </div>
+          <div class="mb-4">
+            <h6><i class="fa-solid fa-hashtag text-primary me-2"></i><%= tr('moderation:HELP.CHANNEL_RULES_TITLE') %></h6>
+            <p class="text-muted small">
+              <%= tr('moderation:HELP.CHANNEL_RULES_TEXT') %>
+            </p>
+          </div>
+          <div class="mb-4">
+            <h6><i class="fa-solid fa-sticky-note text-success me-2"></i><%= tr('moderation:HELP.NOTES_TITLE') %></h6>
+            <p class="text-muted small">
+              <%= tr('moderation:HELP.NOTES_TEXT') %>
             </p>
           </div>
           
@@ -286,9 +591,290 @@
             <li><code>/ban</code> - User bannen</li>
             <li><code>/timeout</code> - User timen</li>
             <li><code>/warnings</code> - Warnungen anzeigen</li>
+            <li><code>/case</code> - Case-Details anzeigen</li>
+            <li><code>/history</code> - Mod-Historie anzeigen</li>
+            <li><code>/note</code> - Mod-Notizen verwalten</li>
           </ul>
         </div>
       </div>
     </div>
   </div>
+</div>
+
+<!-- Tab State + AJAX Script -->
+<script>
+(function() {
+  'use strict';
+  
+  const guildId = '<%= guildId %>';
+  const basePath = `/guild/${guildId}/plugins/moderation`;
+  
+  // Tab-State speichern & wiederherstellen
+  $(document).ready(function() {
+    const storageKey = 'moderation_active_tab_' + guildId;
+    
+    $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+      localStorage.setItem(storageKey, $(e.target).attr('href'));
+    });
+    
+    const lastTab = localStorage.getItem(storageKey);
+    if (lastTab) {
+      $('a[href="' + lastTab + '"]').tab('show');
+    }
+  });
+  
+  // ==================== Protected Roles ====================
+  window.addProtectedRole = async function() {
+    const select = document.getElementById('protectedRoleSelect');
+    const roleId = select.value;
+    if (!roleId) return;
+    
+    try {
+      const resp = await fetch(basePath + '/protected-roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role_id: roleId })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        location.reload();
+      } else {
+        alert(data.error || 'Fehler');
+      }
+    } catch(e) {
+      console.error('[Moderation] addProtectedRole error:', e);
+    }
+  };
+  
+  window.removeProtectedRole = async function(roleId) {
+    if (!confirm('<%= tr("moderation:PROTECTED.CONFIRM_REMOVE") %>')) return;
+    
+    try {
+      const resp = await fetch(basePath + '/protected-roles/' + roleId, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await resp.json();
+      if (data.success) {
+        const el = document.getElementById('protected-role-' + roleId);
+        if (el) el.remove();
+      }
+    } catch(e) {
+      console.error('[Moderation] removeProtectedRole error:', e);
+    }
+  };
+  
+  // ==================== Logs ====================
+  let currentLogPage = 1;
+  
+  window.filterLogs = async function() {
+    const type = document.getElementById('logTypeFilter').value;
+    currentLogPage = 1;
+    await loadLogs(type, 1);
+  };
+  
+  window.loadMoreLogs = async function() {
+    const type = document.getElementById('logTypeFilter').value;
+    currentLogPage++;
+    await loadLogs(type, currentLogPage, true);
+  };
+  
+  async function loadLogs(type, page, append) {
+    try {
+      let url = basePath + '/logs?page=' + page + '&limit=25';
+      if (type) url += '&type=' + encodeURIComponent(type);
+      
+      const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const data = await resp.json();
+      
+      if (!data.success) return;
+      
+      const tbody = document.getElementById('logsTableBody');
+      if (!append) tbody.innerHTML = '';
+      
+      const typeColors = {
+        'WARN': 'warning', 'KICK': 'info', 'BAN': 'danger',
+        'TIMEOUT': 'secondary', 'SOFTBAN': 'dark', 'UNBAN': 'success', 'UNTIMEOUT': 'light'
+      };
+      
+      if (data.logs.length === 0 && !append) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>Keine Einträge</td></tr>';
+        return;
+      }
+      
+      data.logs.forEach(function(log) {
+        const tr = document.createElement('tr');
+        const date = new Date(log.created_at).toLocaleString('de-DE');
+        tr.innerHTML = 
+          '<td><span class="badge bg-dark">#' + (log.case_number || '-') + '</span></td>' +
+          '<td><span class="badge bg-' + (typeColors[log.type] || 'secondary') + '">' + log.type + '</span></td>' +
+          '<td><code>' + log.member_id + '</code></td>' +
+          '<td><code>' + log.admin_id + '</code></td>' +
+          '<td class="text-truncate" style="max-width:200px;">' + (log.reason || '-') + '</td>' +
+          '<td><small>' + date + '</small></td>';
+        tbody.appendChild(tr);
+      });
+    } catch(e) {
+      console.error('[Moderation] loadLogs error:', e);
+    }
+  }
+  
+  // ==================== Channel Rules ====================
+  window.addChannelRule = async function() {
+    const channelId = document.getElementById('crChannelSelect').value;
+    if (!channelId) return;
+    
+    const data = {
+      channel_id: channelId,
+      max_warn_limit: document.getElementById('crWarnLimit').value || null,
+      max_warn_action: document.getElementById('crWarnAction').value || null,
+      automod_exempt: document.getElementById('crAutomodExempt').checked,
+      notes: document.getElementById('crNotes').value || null
+    };
+    
+    try {
+      const resp = await fetch(basePath + '/channel-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await resp.json();
+      if (result.success) {
+        location.reload();
+      } else {
+        alert(result.error || 'Fehler');
+      }
+    } catch(e) {
+      console.error('[Moderation] addChannelRule error:', e);
+    }
+  };
+  
+  window.removeChannelRule = async function(ruleId) {
+    if (!confirm('<%= tr("moderation:CHANNEL_RULES.CONFIRM_REMOVE") %>')) return;
+    
+    try {
+      const resp = await fetch(basePath + '/channel-rules/' + ruleId, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await resp.json();
+      if (data.success) {
+        const el = document.getElementById('channel-rule-' + ruleId);
+        if (el) el.remove();
+      }
+    } catch(e) {
+      console.error('[Moderation] removeChannelRule error:', e);
+    }
+  };
+  
+  // ==================== Mod Notes ====================
+  window.addNote = async function() {
+    const userId = document.getElementById('noteUserId').value.trim();
+    const note = document.getElementById('noteText').value.trim();
+    if (!userId || !note) return;
+    
+    try {
+      const resp = await fetch(basePath + '/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, note: note })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        document.getElementById('noteUserId').value = '';
+        document.getElementById('noteText').value = '';
+        // Reload notes für diesen User
+        searchNotesForUser(userId);
+      } else {
+        alert(data.error || 'Fehler');
+      }
+    } catch(e) {
+      console.error('[Moderation] addNote error:', e);
+    }
+  };
+  
+  window.searchNotes = function() {
+    const userId = document.getElementById('noteSearchUserId').value.trim();
+    if (!userId) return;
+    searchNotesForUser(userId);
+  };
+  
+  window.loadAllNotes = async function() {
+    try {
+      const resp = await fetch(basePath + '/notes-all', { headers: { 'Accept': 'application/json' } });
+      const data = await resp.json();
+      if (data.success) {
+        renderNotes(data.notes);
+      }
+    } catch(e) {
+      console.error('[Moderation] loadAllNotes error:', e);
+    }
+  };
+  
+  async function searchNotesForUser(userId) {
+    try {
+      const resp = await fetch(basePath + '/notes/' + encodeURIComponent(userId), { headers: { 'Accept': 'application/json' } });
+      const data = await resp.json();
+      if (data.success) {
+        renderNotes(data.notes, userId);
+      }
+    } catch(e) {
+      console.error('[Moderation] searchNotes error:', e);
+    }
+  }
+  
+  function renderNotes(notes, filteredUserId) {
+    const container = document.getElementById('notesList');
+    if (!notes || notes.length === 0) {
+      container.innerHTML = '<div class="alert alert-info"><i class="fa-solid fa-info-circle me-2"></i>' +
+        (filteredUserId ? 'Keine Notizen für User ' + filteredUserId + ' gefunden.' : 'Keine Notizen vorhanden.') + '</div>';
+      return;
+    }
+    
+    let html = '';
+    notes.forEach(function(note) {
+      const date = new Date(note.created_at).toLocaleString('de-DE');
+      html += '<div class="d-flex align-items-start justify-content-between p-3 mb-2 border rounded" id="note-' + note.id + '">' +
+        '<div class="flex-grow-1">' +
+        '<div class="d-flex align-items-center mb-1">' +
+        '<strong class="text-primary"><i class="fa-solid fa-user me-1"></i>' + note.user_id + '</strong>' +
+        '<span class="text-muted mx-2">•</span>' +
+        '<small class="text-muted"><i class="fa-solid fa-pen me-1"></i>' + note.author_id + '</small>' +
+        '<span class="text-muted mx-2">•</span>' +
+        '<small class="text-muted">' + date + '</small>' +
+        '</div>' +
+        '<p class="mb-0">' + escapeHtml(note.note) + '</p>' +
+        '</div>' +
+        '<button type="button" class="btn btn-sm btn-danger ml-2" onclick="deleteNote(' + note.id + ')">' +
+        '<i class="fa-solid fa-trash"></i></button>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+  
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  
+  window.deleteNote = async function(noteId) {
+    if (!confirm('<%= tr("moderation:NOTES.CONFIRM_DELETE") %>')) return;
+    
+    try {
+      const resp = await fetch(basePath + '/notes/' + noteId, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await resp.json();
+      if (data.success) {
+        const el = document.getElementById('note-' + noteId);
+        if (el) el.remove();
+      }
+    } catch(e) {
+      console.error('[Moderation] deleteNote error:', e);
+    }
+  };
+})();
+</script>
 </div>

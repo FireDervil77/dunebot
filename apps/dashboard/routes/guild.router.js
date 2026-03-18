@@ -15,6 +15,8 @@ const settingsRouter = require("./guild/settings.router");
 const feedbackRouter = require("./guild/feedback.router");
 const { donateRouter, hallOfFameRouter } = require('./guild/donations.router');
 const pluginReloadRouter = require("./guild/plugin-reload.router");
+const themesRouter = require("./guild/themes.router");
+const mediaRouter = require("./guild/media.router");
 
 // NEU: /guild (Index) → immer zuerst Server-Selector anzeigen
 router.get("/", (req, res) => {
@@ -27,6 +29,12 @@ router.get("/:guildId", CheckGuildAccess, guildController.getDashboard);
 
 // Kern-Settings-Routes (direkt, nicht über Plugin-System)
 router.use("/:guildId/settings", CheckAuth, CheckGuildAccess, settingsRouter);
+
+// Kern-Themes-Routes (eigener Top-Level-Bereich)
+router.use("/:guildId/themes", CheckAuth, CheckGuildAccess, themesRouter);
+
+// Kern-Medien-Routes (WordPress-Style Media Manager)
+router.use("/:guildId/media", CheckAuth, CheckGuildAccess, mediaRouter);
 
 // Kern-Feedback-Routes (Bug Report, Feature Request, Toast History, My Feedback)
 router.use("/:guildId/feedback", CheckAuth, CheckGuildAccess, feedbackRouter);

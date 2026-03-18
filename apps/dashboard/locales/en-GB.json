@@ -241,7 +241,12 @@
         "FEATURE_REQUEST": "Feature Request",
         "SUPPORT_DUNEBOT": "Support DuneBot",
         "HALL_OF_FAME": "Hall of Fame",
-        "THEME": "Theme"
+        "THEME": "Theme",
+        "THEMES": "Themes",
+        "THEMES_OVERVIEW": "Overview",
+        "THEMES_WIDGETS": "Widget Areas",
+        "MEDIA": "Media",
+        "ROLES": "Roles"
     },
 
     "BREADCRUMB": {

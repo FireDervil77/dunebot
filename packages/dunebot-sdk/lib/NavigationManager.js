@@ -35,7 +35,7 @@ class NavigationManager {
             // ABER: Ignoriere alles >= 9000 (Superadmin-Bereich)
             const result = await dbService.query(
                 `SELECT MAX(sort_order) as max_order 
-                 FROM nav_items 
+                 FROM guild_nav_items 
                  WHERE guildId = ? 
                  AND type = 'main' 
                  AND (parent IS NULL OR parent = '')
@@ -84,7 +84,7 @@ class NavigationManager {
             // Höchste sort_order für Submenüs dieses Parents finden
             const result = await dbService.query(
                 `SELECT MAX(sort_order) as max_order 
-                 FROM nav_items 
+                 FROM guild_nav_items 
                  WHERE guildId = ? 
                  AND type = 'main' 
                  AND parent = ?`,
@@ -164,7 +164,7 @@ class NavigationManager {
             
             // Alle bestehenden Navigations-Items für dieses Plugin in dieser Guild laden
             const existing = await dbService.query(
-                "SELECT url, parent, type FROM nav_items WHERE plugin = ? AND guildId = ?",
+                "SELECT url, parent, type FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
                 [pluginName, guildId]
             );
             
@@ -277,7 +277,7 @@ class NavigationManager {
             // Bulk-Insert mit native MySQL
             for (const navItem of items) {
                 await dbService.query(`
-                    INSERT INTO nav_items (
+                    INSERT INTO guild_nav_items (
                         plugin, guildId, title, url, icon, 
                         sort_order, parent, type, capability, 
                         target, visible, classes, position, requiresOwner
@@ -305,7 +305,7 @@ class NavigationManager {
             
             // Alle Items zurückgeben (existing + new)
             const allItems = await dbService.query(
-                "SELECT * FROM nav_items WHERE plugin = ? AND guildId = ?",
+                "SELECT * FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
                 [pluginName, guildId]
             );
             
@@ -415,7 +415,7 @@ class NavigationManager {
 
         try {
             const results = await dbService.query(
-                "SELECT * FROM nav_items WHERE guildid = ? AND visible = true and type = 'main' ORDER BY type ASC, parent ASC, sort_order ASC, title ASC",
+                "SELECT * FROM guild_nav_items WHERE guildid = ? AND visible = true and type = 'main' ORDER BY type ASC, parent ASC, sort_order ASC, title ASC",
                 [guildId]
             );
             
@@ -444,7 +444,7 @@ class NavigationManager {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
         try {
-            let sql = "SELECT * FROM nav_items WHERE guildid = ? AND type = ? AND visible = true";
+            let sql = "SELECT * FROM guild_nav_items WHERE guildid = ? AND type = ? AND visible = true";
             const params = [guildId, type];
             if (parent !== undefined && parent !== null) {
                 sql += " AND parent = ?";
@@ -528,7 +528,7 @@ class NavigationManager {
 
         try {
             const result = await dbService.query(
-                "DELETE FROM nav_items WHERE plugin = ? AND guildId = ?",
+                "DELETE FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
                 [pluginName, guildId]
             );
             Logger.debug(`Navigationselemente für Plugin ${pluginName} in Guild ${guildId} entfernt`);

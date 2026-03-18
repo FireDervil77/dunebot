@@ -11,10 +11,13 @@
                 </div>
                 <div class="col-sm-6">
                     <div class="float-sm-right">
+                        <button type="button" class="btn btn-warning" data-toggle="modal" data-target="#modalJsonPaste">
+                            <i class="fa-solid fa-code"></i> Per JSON einfügen
+                        </button>
                         <a href="/admin/addons/import" class="btn btn-primary">
                             <i class="fa-solid fa-download"></i> Egg importieren
                         </a>
-                        <a href="#" class="btn btn-success disabled" title="Nur aus Guild-Kontext verfügbar">
+                        <a href="/admin/addons/create" class="btn btn-success">
                             <i class="fa-solid fa-plus"></i> Manuell erstellen
                         </a>
                     </div>
@@ -339,5 +342,149 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // ── JSON-Paste Modal ─────────────────────────────────────────────────────
+
+    const jsonTextarea = document.getElementById('jsonPasteContent');
+    const jsonNameField = document.getElementById('jsonPasteName');
+    const jsonSlugField = document.getElementById('jsonPasteSlug');
+
+    // JSON einfügen → Felder auto-befüllen
+    if (jsonTextarea) {
+        jsonTextarea.addEventListener('input', function () {
+            try {
+                const parsed = JSON.parse(this.value.trim());
+                const meta = parsed?.meta || {};
+                if (meta.name && !jsonNameField.value) jsonNameField.value = meta.name;
+                if (meta.slug && !jsonSlugField.value) jsonSlugField.value = meta.slug;
+            } catch (_) { /* JSON noch unvollständig */ }
+        });
+    }
+
+    document.getElementById('btnJsonPasteSubmit')?.addEventListener('click', async function () {
+        const rawJson = jsonTextarea?.value?.trim();
+        const name    = jsonNameField?.value?.trim();
+        const slug    = jsonSlugField?.value?.trim();
+        const category = document.getElementById('jsonPasteCategory')?.value;
+
+        if (!rawJson) return toastr.error('Bitte JSON einfügen');
+        if (!name)    return toastr.error('Bitte einen Namen angeben');
+        if (!slug)    return toastr.error('Bitte einen Slug angeben');
+
+        let parsed;
+        try {
+            parsed = JSON.parse(rawJson);
+        } catch (e) {
+            return toastr.error('Ungültiges JSON: ' + e.message);
+        }
+
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Speichere…';
+
+        try {
+            const response = await fetch('/admin/addons/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    slug,
+                    description: parsed?.meta?.description || '',
+                    category,
+                    game_data: JSON.stringify(parsed),
+                    source_type: 'native'
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                toastr.success('Addon gespeichert – Weiterleitung…');
+                setTimeout(() => window.location.href = `/admin/addons/${result.id || ''}`, 1200);
+            } else {
+                toastr.error(result.message || 'Fehler beim Speichern');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-save mr-1"></i> Speichern';
+            }
+        } catch (error) {
+            console.error('JSON-Paste Fehler:', error);
+            toastr.error('Netzwerkfehler');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-save mr-1"></i> Speichern';
+        }
+    });
+
 });
 </script>
+
+<!-- ── Modal: Addon per JSON einfügen ──────────────────────────────────── -->
+<div class="modal fade" id="modalJsonPaste" tabindex="-1" role="dialog" aria-labelledby="modalJsonPasteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalJsonPasteLabel">
+                    <i class="fa-solid fa-code mr-2"></i>Addon per JSON einfügen
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="jsonPasteContent">
+                        <strong>FIREBOT_v2 JSON</strong>
+                        <span class="text-muted ml-2">— vollständige Addon-Definition einfügen</span>
+                    </label>
+                    <textarea
+                        id="jsonPasteContent"
+                        class="form-control font-monospace"
+                        rows="10"
+                        placeholder='{ "meta": { "version": "FIREBOT_v2", "name": "My Server", ... }, ... }'
+                        style="font-size:12px;"></textarea>
+                </div>
+                <div class="row">
+                    <div class="col-md-5">
+                        <div class="form-group">
+                            <label for="jsonPasteName">Name <span class="text-danger">*</span></label>
+                            <input type="text" id="jsonPasteName" class="form-control" placeholder="wird aus JSON befüllt">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="jsonPasteSlug">Slug <span class="text-danger">*</span></label>
+                            <input type="text" id="jsonPasteSlug" class="form-control" placeholder="z.B. valheim">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="jsonPasteCategory">Kategorie</label>
+                            <select id="jsonPasteCategory" class="form-control">
+                                <option value="other">Sonstiges</option>
+                                <option value="fps">FPS / Shooter</option>
+                                <option value="survival">Survival</option>
+                                <option value="sandbox">Sandbox</option>
+                                <option value="mmorpg">MMORPG</option>
+                                <option value="racing">Racing</option>
+                                <option value="strategy">Strategie</option>
+                                <option value="horror">Horror</option>
+                                <option value="scifi">Sci-Fi</option>
+                                <option value="community">Community</option>
+                                <option value="pelican">Pelican</option>
+                                <option value="native">Native</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info mb-0">
+                    <i class="fa-solid fa-circle-info mr-1"></i>
+                    Das Addon wird mit Status <strong>Pending Review</strong> gespeichert.
+                    Name und Slug werden automatisch aus dem <code>meta</code>-Block befüllt, können aber manuell überschrieben werden.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                <button type="button" id="btnJsonPasteSubmit" class="btn btn-warning">
+                    <i class="fa-solid fa-save mr-1"></i> Speichern
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

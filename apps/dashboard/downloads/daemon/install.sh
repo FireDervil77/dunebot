@@ -390,14 +390,17 @@ download_binary() {
     
     log_info "Lade Binary herunter von: $url"
     
-    local tmp_file="/tmp/${BINARY_NAME}"
+    local tmp_file
+    tmp_file=$(mktemp /tmp/firebot-daemon.XXXXXX)
     
     if check_command curl; then
-        if curl -fsSL -o "$tmp_file" "$url"; then
+        # </dev/null verhindert stdin-Konflikte bei "curl ... | sudo bash"
+        if curl -fsSL -o "$tmp_file" "$url" </dev/null; then
             chmod +x "$tmp_file"
             mv "$tmp_file" "${INSTALL_DIR}/${BINARY_NAME}"
             log_success "Binary heruntergeladen und installiert"
         else
+            rm -f "$tmp_file"
             log_error "Download fehlgeschlagen!"
             log_error "URL war: $url"
             log_info "Bitte Binary manuell nach ${INSTALL_DIR}/${BINARY_NAME} kopieren"
@@ -446,9 +449,9 @@ create_data_directories() {
 
     local base_dir="/var/lib/firebot-daemon"
 
-    # Server-Volumes: {base_dir}/{serverID}/serverfiles/ → /home/container (Docker Bind-Mount)
-    mkdir -p "$base_dir"/logs           # Daemon-Logs
-    mkdir -p "$base_dir"/volumes        # Gameserver-Volumes (per Server-ID)
+    # Server-Volumes: {base_dir}/volumes/{serverID}/serverfiles/ → /home/container (Docker Bind-Mount)
+    mkdir -p "$base_dir/logs"           # Daemon-Logs
+    mkdir -p "$base_dir/volumes"        # Gameserver-Volumes (per Server-ID)
 
     # Docker-Network 'firebot' sicherstellen (falls install_docker nicht aufgerufen wurde)
     if docker info &>/dev/null && ! docker network inspect firebot &>/dev/null; then
@@ -457,12 +460,12 @@ create_data_directories() {
 
     chown -R root:root "$base_dir"
     chmod 755 "$base_dir"
-    chmod 755 "$base_dir"/logs
-    chmod 755 "$base_dir"/volumes
+    chmod 755 "$base_dir/logs"
+    chmod 755 "$base_dir/volumes"
 
     log_success "Daten-Verzeichnisse erstellt: $base_dir"
-    log_info "  - $base_dir/logs/         (Daemon-System-Logs)"
-    log_info "  - $base_dir/volumes/      (Gameserver-Volumes, per Server-ID)"
+    log_info "  - $base_dir/logs/     (Daemon-System-Logs)"
+    log_info "  - $base_dir/volumes/  (Gameserver-Volumes, per Server-ID)"
     log_info "  Container-Pfad im Volume: /home/container (Runtime) / /mnt/server (Install)"
 }
 
@@ -751,10 +754,10 @@ uninstall() {
         log_warn "Config-Datei nicht gefunden: $CONFIG_PATH"
     fi
     
-    # Remove /var/lib/firebot-daemon (Docker-Daten)
-    if [[ -d "/var/lib/firebot-daemon" ]]; then
+    # Standard-Datenverzeichnis /var/lib/firebot-daemon entfernen (falls nicht bereits über BASE_DIR erledigt)
+    if [[ -d "/var/lib/firebot-daemon" ]] && [[ "$BASE_DIR" != "/var/lib/firebot-daemon"* ]]; then
         echo ""
-        if prompt_yes_no "Docker-Datenverzeichnis /var/lib/firebot-daemon löschen? (Gameserver-Volumes!)" "n"; then
+        if prompt_yes_no "Standard-Datenverzeichnis /var/lib/firebot-daemon löschen?" "n"; then
             log_info "Entferne /var/lib/firebot-daemon..."
             rm -rf "/var/lib/firebot-daemon"
             log_success "/var/lib/firebot-daemon entfernt"
@@ -762,10 +765,11 @@ uninstall() {
             log_info "/var/lib/firebot-daemon behalten"
         fi
     fi
-    # Rückwärtskompatibilität: altes /data/firebot aufräumen
+
+    # Legacy: /data/firebot entfernen (ältere Installationen)
     if [[ -d "/data/firebot" ]]; then
         echo ""
-        if prompt_yes_no "Altes Datenverzeichnis /data/firebot löschen?" "n"; then
+        if prompt_yes_no "Altes Datenverzeichnis /data/firebot löschen? (Legacy)" "n"; then
             log_info "Entferne /data/firebot..."
             rm -rf "/data/firebot"
             log_success "/data/firebot entfernt"
@@ -782,6 +786,15 @@ uninstall() {
         log_success "Installation entfernt: $INSTALL_DIR"
     else
         log_info "Installations-Verzeichnis behalten: $INSTALL_DIR"
+    fi
+    
+    # Temporäre Dateien in /tmp bereinigen
+    local tmp_cleaned=0
+    for f in /tmp/firebot-daemon*; do
+        [[ -e "$f" ]] && rm -f "$f" && tmp_cleaned=$((tmp_cleaned + 1))
+    done
+    if [[ $tmp_cleaned -gt 0 ]]; then
+        log_success "$tmp_cleaned temporäre Datei(en) in /tmp bereinigt"
     fi
     
     # Docker-Container stoppen & entfernen (alle fb-* Container)
@@ -808,6 +821,24 @@ uninstall() {
         fi
     else
         log_info "Keine FireBot Docker-Container gefunden"
+    fi
+
+    # Docker-Images entfernen (Gameserver-Basis-Images die vom Daemon gepullt wurden)
+    echo ""
+    FB_IMAGES=$(docker images --filter "label=firebot.managed=true" -q 2>/dev/null || true)
+    if [[ -n "$FB_IMAGES" ]]; then
+        FB_IMG_COUNT=$(echo "$FB_IMAGES" | wc -l)
+        log_warn "Gefundene FireBot Docker-Images: $FB_IMG_COUNT"
+        echo ""
+        if prompt_yes_no "Alle FireBot Docker-Images entfernen?" "y"; then
+            log_info "Entferne Images..."
+            echo "$FB_IMAGES" | xargs docker rmi --force &>/dev/null || true
+            log_success "Docker-Images entfernt"
+        else
+            log_info "Docker-Images behalten"
+        fi
+    else
+        log_info "Keine FireBot Docker-Images mit Label gefunden"
     fi
 
     # Docker-Network entfernen

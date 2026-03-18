@@ -1,0 +1,971 @@
+<!-- Ticket Plugin Settings Page - 3-Tab-System -->
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-lg-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-ticket me-2"></i>
+            <%= tr('ticket:TITLE') %>
+          </h3>
+          <p class="text-muted mb-0 mt-2">
+            <%= tr('ticket:DESCRIPTION') %>
+          </p>
+        </div>
+
+        <div class="card-body">
+          <!-- Bootstrap 4 Nav Tabs -->
+          <ul class="nav nav-tabs" id="ticketTabs" role="tablist">
+            <li class="nav-item">
+              <a class="nav-link active" id="settings-tab" data-toggle="tab" href="#tab-settings" role="tab">
+                <i class="fa-solid fa-cog me-1"></i>
+                <%= tr('ticket:SETTINGS_TITLE') %>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="categories-tab" data-toggle="tab" href="#tab-categories" role="tab">
+                <i class="fa-solid fa-folder-tree me-1"></i>
+                <%= tr('ticket:CATEGORY_TITLE') %>
+                <% if (categories.length > 0) { %>
+                  <span class="badge bg-info ml-1"><%= categories.length %></span>
+                <% } %>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="tickets-tab" data-toggle="tab" href="#tab-tickets" role="tab">
+                <i class="fa-solid fa-list-ul me-1"></i>
+                <%= tr('ticket:TICKETS_TITLE') %>
+                <% if (stats.total > 0) { %>
+                  <span class="badge bg-secondary ml-1"><%= stats.total %></span>
+                <% } %>
+              </a>
+            </li>
+          </ul>
+
+          <!-- Tab Content -->
+          <div class="tab-content mt-4" id="ticketTabContent">
+
+            <!-- ==================== TAB 1: EINSTELLUNGEN ==================== -->
+            <div class="tab-pane fade show active" id="tab-settings" role="tabpanel">
+              <form id="ticketSettingsForm">
+                
+                <div class="mb-4">
+                  <h5 class="mb-3">
+                    <i class="fa-solid fa-cog text-primary me-2"></i>
+                    <%= tr('ticket:SETTINGS_TITLE') %>
+                  </h5>
+                </div>
+
+                <div class="row">
+                  <!-- Log Channel -->
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label"><%= tr('ticket:LOGS_TITLE') %></label>
+                    <p class="text-muted small"><%= tr('ticket:LOGS_DESC') %></p>
+                    <select name="log_channel" class="form-control">
+                      <option value="">-- Kein Log-Kanal --</option>
+                      <% channels.filter(c => c.type === 0).forEach(ch => { %>
+                        <option value="<%= ch.id %>" <%= settings.log_channel === ch.id ? 'selected' : '' %>>
+                          #<%= ch.name %>
+                        </option>
+                      <% }); %>
+                    </select>
+                  </div>
+
+                  <!-- Ticket Limit -->
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label"><%= tr('ticket:LIMIT_TITLE') %></label>
+                    <p class="text-muted small"><%= tr('ticket:LIMIT_DESC') %></p>
+                    <input type="number" name="ticket_limit" class="form-control" 
+                           value="<%= settings.ticket_limit || 50 %>" min="5" max="500">
+                  </div>
+                </div>
+
+                <div class="row">
+                  <!-- Create Embed Color -->
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label"><%= tr('ticket:CREATE_EMBED_TITLE') %></label>
+                    <p class="text-muted small"><%= tr('ticket:CREATE_EMBED_DESC') %></p>
+                    <input type="color" name="embed_color_create" class="form-control form-control-color" 
+                           value="<%= settings.embed_color_create || '#068ADD' %>" style="width: 60px; height: 38px;">
+                  </div>
+
+                  <!-- Close Embed Color -->
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label"><%= tr('ticket:CLOSE_EMBED_TITLE') %></label>
+                    <p class="text-muted small"><%= tr('ticket:CLOSE_EMBED_DESC') %></p>
+                    <input type="color" name="embed_color_close" class="form-control form-control-color" 
+                           value="<%= settings.embed_color_close || '#068ADD' %>" style="width: 60px; height: 38px;">
+                  </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                  <i class="fa-solid fa-save me-1"></i>
+                  <%= tr('ticket:SAVE_BTN') %>
+                </button>
+              </form>
+            </div>
+
+            <!-- ==================== TAB 2: KATEGORIEN ==================== -->
+            <div class="tab-pane fade" id="tab-categories" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">
+                  <i class="fa-solid fa-folder-tree text-info me-2"></i>
+                  <%= tr('ticket:CATEGORY_TITLE') %>
+                </h5>
+                <button class="btn btn-success btn-sm" data-toggle="modal" data-target="#categoryModal" onclick="openCategoryModal()">
+                  <i class="fa-solid fa-plus me-1"></i>
+                  <%= tr('ticket:CREATE_MODAL_BTN') %>
+                </button>
+              </div>
+              <p class="text-muted small"><%= tr('ticket:CATEGORY_DESC') %></p>
+
+              <div class="table-responsive">
+                <table class="table table-hover table-striped" id="categoriesTable">
+                  <thead>
+                    <tr>
+                      <th><%= tr('ticket:CAT_COL') %></th>
+                      <th><%= tr('ticket:CAT_DESC_COL') %></th>
+                      <th><%= tr('ticket:STAFF_ROLE_TITLE') %></th>
+                      <th><%= tr('ticket:MEMBER_ROLE_TITLE') || 'Member Rollen' %></th>
+                      <th><%= tr('ticket:CHANNEL_STYLE_TITLE') %></th>
+                      <th><%= tr('ticket:IS_ACTIVE_TITLE') %></th>
+                      <th><%= tr('ticket:ACTION_COL') %></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% if (categories.length === 0) { %>
+                      <tr><td colspan="7" class="text-center text-muted"><%= tr('ticket:CATEGORY_DESC') %></td></tr>
+                    <% } %>
+                    <% categories.forEach(cat => { %>
+                      <tr data-category-id="<%= cat.id %>">
+                        <td><strong><%= cat.name %></strong></td>
+                        <td><%= cat.description || '-' %></td>
+                        <td>
+                          <% if (cat.staff_roles && cat.staff_roles.length > 0) { %>
+                            <% cat.staff_roles.forEach(roleId => { %>
+                              <% const role = roles.find(r => r.id === roleId); %>
+                              <span class="badge bg-primary"><%= role ? role.name : roleId %></span>
+                            <% }); %>
+                          <% } else { %>
+                            <span class="text-muted">-</span>
+                          <% } %>
+                        </td>
+                        <td>
+                          <% if (cat.member_roles && cat.member_roles.length > 0) { %>
+                            <% cat.member_roles.forEach(roleId => { %>
+                              <% const mRole = roles.find(r => r.id === roleId); %>
+                              <span class="badge bg-info"><%= mRole ? mRole.name : roleId %></span>
+                            <% }); %>
+                          <% } else { %>
+                            <span class="text-muted">-</span>
+                          <% } %>
+                        </td>
+                        <td><span class="badge bg-secondary"><%= cat.channel_style || 'NUMBER' %></span></td>
+                        <td>
+                          <% if (cat.is_active) { %>
+                            <span class="badge bg-success">Aktiv</span>
+                          <% } else { %>
+                            <span class="badge bg-danger">Inaktiv</span>
+                          <% } %>
+                        </td>
+                        <td>
+                          <button class="btn btn-sm btn-outline-primary me-1" onclick="editCategory(<%= cat.id %>)" title="<%= tr('ticket:ACTION_UPDATE_BTN') %>">
+                            <i class="fa-solid fa-pen"></i>
+                          </button>
+                          <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(<%= cat.id %>, '<%= cat.name %>')" title="<%= tr('ticket:ACTION_DELETE_BTN') %>">
+                            <i class="fa-solid fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- ==================== TAB 3: TICKETS ==================== -->
+            <div class="tab-pane fade" id="tab-tickets" role="tabpanel">
+              <h5 class="mb-3">
+                <i class="fa-solid fa-list-ul text-warning me-2"></i>
+                <%= tr('ticket:TICKETS_TITLE') %>
+              </h5>
+
+              <!-- Statistiken -->
+              <div class="row mb-4">
+                <div class="col-md-4">
+                  <div class="small-box bg-success">
+                    <div class="inner">
+                      <h3><%= stats.open %></h3>
+                      <p><%= tr('ticket:STATS_OPEN') %></p>
+                    </div>
+                    <div class="icon"><i class="fa-solid fa-envelope-open"></i></div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="small-box bg-danger">
+                    <div class="inner">
+                      <h3><%= stats.closed %></h3>
+                      <p><%= tr('ticket:STATS_CLOSED') %></p>
+                    </div>
+                    <div class="icon"><i class="fa-solid fa-envelope"></i></div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="small-box bg-info">
+                    <div class="inner">
+                      <h3><%= stats.total %></h3>
+                      <p><%= tr('ticket:STATS_TOTAL') %></p>
+                    </div>
+                    <div class="icon"><i class="fa-solid fa-ticket"></i></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table table-hover table-striped" id="ticketsTable">
+                  <thead>
+                    <tr>
+                      <th><%= tr('ticket:TICKET_ID_COL') %></th>
+                      <th>#</th>
+                      <th><%= tr('ticket:CREATED_BY_COL') %></th>
+                      <th><%= tr('ticket:CLAIMED_BY_COL') %></th>
+                      <th><%= tr('ticket:CATEGORY_COL') %></th>
+                      <th><%= tr('ticket:STATUS_COL') %></th>
+                      <th><%= tr('ticket:CREATED_AT_COL') %></th>
+                      <th><%= tr('ticket:CLOSED_AT_COL') %></th>
+                      <th><%= tr('ticket:ACTIONS_COL') %></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% if (tickets.length === 0) { %>
+                      <tr><td colspan="9" class="text-center text-muted"><%= tr('ticket:NO_TICKETS') %></td></tr>
+                    <% } %>
+                    <% tickets.forEach(ticket => { %>
+                      <tr>
+                        <td><code><%= ticket.ticket_id %></code></td>
+                        <td><%= ticket.ticket_number %></td>
+                        <td><code><%= ticket.created_by %></code></td>
+                        <td>
+                          <% if (ticket.claimed_by) { %>
+                            <code><%= ticket.claimed_by %></code>
+                          <% } else { %>
+                            <span class="text-muted">-</span>
+                          <% } %>
+                        </td>
+                        <td><span class="badge bg-info"><%= ticket.category_name || 'Default' %></span></td>
+                        <td>
+                          <% if (ticket.status === 'open') { %>
+                            <span class="badge bg-success"><%= tr('ticket:STATUS_OPEN') %></span>
+                          <% } else { %>
+                            <span class="badge bg-secondary"><%= tr('ticket:STATUS_CLOSED') %></span>
+                          <% } %>
+                          <% if (ticket.reopen_count > 0) { %>
+                            <span class="badge bg-warning" title="<%= tr('ticket:REOPENED_TIMES', { count: ticket.reopen_count }) %>">↻ <%= ticket.reopen_count %></span>
+                          <% } %>
+                        </td>
+                        <td><%= ticket.opened_at ? new Date(ticket.opened_at).toLocaleString('de-DE') : '-' %></td>
+                        <td><%= ticket.closed_at ? new Date(ticket.closed_at).toLocaleString('de-DE') : '-' %></td>
+                        <td>
+                          <% if (ticket.status === 'closed') { %>
+                            <button class="btn btn-sm btn-outline-info" onclick="viewTranscript(<%= ticket.id %>, '<%= ticket.ticket_id %>')" title="<%= tr('ticket:TRANSCRIPT_BTN') %>">
+                              <i class="fa-solid fa-scroll"></i>
+                            </button>
+                          <% } else { %>
+                            <span class="text-muted">-</span>
+                          <% } %>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div><!-- /tab-content -->
+        </div><!-- /card-body -->
+      </div><!-- /card -->
+    </div><!-- /col -->
+  </div><!-- /row -->
+</div><!-- /container-fluid -->
+
+<!-- ==================== CATEGORY MODAL ==================== -->
+<div class="modal fade" id="categoryModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="categoryModalTitle"><%= tr('ticket:CREATE_TITLE') %></h5>
+        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+      </div>
+      <div class="modal-body">
+        <form id="categoryForm">
+          <input type="hidden" id="catEditId" value="">
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label"><%= tr('ticket:NAME_TITLE') %></label>
+              <input type="text" id="catName" class="form-control" maxlength="100" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label"><%= tr('ticket:DESC_TITLE') %></label>
+              <input type="text" id="catDescription" class="form-control" maxlength="100">
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label"><%= tr('ticket:PARENT_CHANNEL_TITLE') %></label>
+              <select id="catParentId" class="form-control">
+                <option value="">-- Auto --</option>
+                <% channels.filter(c => c.type === 4).forEach(ch => { %>
+                  <option value="<%= ch.id %>">#<%= ch.name %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label"><%= tr('ticket:CHANNEL_STYLE_TITLE') %></label>
+              <select id="catChannelStyle" class="form-control">
+                <option value="NUMBER"><%= tr('ticket:CHANNEL_STYLE_NUMBER') %></option>
+                <option value="NAME"><%= tr('ticket:CHANNEL_STYLE_NAME') %></option>
+                <option value="ID"><%= tr('ticket:CHANNEL_STYLE_ID') %></option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label"><%= tr('ticket:STAFF_ROLE_TITLE') %></label>
+              <p class="text-muted small"><%= tr('ticket:STAFF_ROLE_DESC') %></p>
+              <select id="catStaffRoles" class="form-control" multiple>
+                <% roles.forEach(role => { %>
+                  <option value="<%= role.id %>"><%= role.name %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label"><%= tr('ticket:MEM_ROLE_TITLE') %></label>
+              <p class="text-muted small"><%= tr('ticket:MEM_ROLE_DESC') %></p>
+              <select id="catMemberRoles" class="form-control" multiple>
+                <% roles.forEach(role => { %>
+                  <option value="<%= role.id %>"><%= role.name %></option>
+                <% }); %>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label"><%= tr('ticket:MAX_PER_USER_TITLE') %></label>
+              <input type="number" id="catMaxPerUser" class="form-control" value="1" min="1" max="10">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label"><%= tr('ticket:BUTTON_LABEL_TITLE') %></label>
+              <input type="text" id="catButtonLabel" class="form-control" value="Ticket erstellen">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label"><%= tr('ticket:BUTTON_EMOJI_TITLE') %></label>
+              <input type="text" id="catButtonEmoji" class="form-control" value="🎫">
+            </div>
+          </div>
+
+          <hr>
+          <h6><i class="fa-solid fa-envelope-open me-1"></i> <%= tr('ticket:OPEN_MSG') %></h6>
+
+          <div class="callout callout-info py-2 px-3 mb-3">
+            <small class="text-muted d-block mb-1"><strong>Verfügbare Platzhalter:</strong></small>
+            <div class="d-flex flex-wrap" style="gap: 4px;">
+              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{server}</code>
+              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{count}</code>
+              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{member:name}</code>
+              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{member:tag}</code>
+              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{member:mention}</code>
+              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{ticket:category}</code>
+              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{ticket:number}</code>
+              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{ticket:id}</code>
+            </div>
+            <small class="text-muted d-block mt-1">Klicke zum Kopieren</small>
+          </div>
+
+          <div class="row">
+            <div class="col-md-12 mb-3">
+              <label class="form-label"><%= tr('ticket:EMBED_TITLE') %></label>
+              <input type="text" id="catOpenMsgTitle" class="form-control" placeholder="Ticket {ticket:number}">
+            </div>
+            <div class="col-md-12 mb-3">
+              <label class="form-label"><%= tr('ticket:EMBED_DESC') %></label>
+              <textarea id="catOpenMsgDescription" class="form-control" rows="3" placeholder="Hello {member:mention}, ..."></textarea>
+            </div>
+            <div class="col-md-12 mb-3">
+              <label class="form-label"><%= tr('ticket:EMBED_FOOTER') %></label>
+              <input type="text" id="catOpenMsgFooter" class="form-control" placeholder="">
+            </div>
+          </div>
+
+          <hr>
+          <h6><i class="fa-solid fa-clipboard-list me-1"></i> <%= tr('ticket:FORM_FIELDS_TITLE') %></h6>
+          <p class="text-muted small"><%= tr('ticket:FORM_FIELDS_DESC') %></p>
+
+          <div id="formFieldsContainer"></div>
+          <button type="button" class="btn btn-sm btn-outline-success mb-3" onclick="addFormField()">
+            <i class="fa-solid fa-plus me-1"></i> <%= tr('ticket:FORM_FIELD_ADD') %>
+          </button>
+
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="catIsActive" checked>
+            <label class="form-check-label" for="catIsActive"><%= tr('ticket:IS_ACTIVE_TITLE') %></label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= tr('ticket:CLOSE_MODAL_BTN') %></button>
+        <button type="button" class="btn btn-primary" id="categorySubmitBtn" onclick="submitCategory()">
+          <%= tr('ticket:CREATE_BTN') %>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TRANSCRIPT MODAL ==================== -->
+<div class="modal fade" id="transcriptModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-scroll me-2"></i>
+          <%= tr('ticket:TRANSCRIPT_TITLE') %> — <span id="transcriptTicketId"></span>
+        </h5>
+        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+      </div>
+      <div class="modal-body p-0">
+        <!-- Loading -->
+        <div id="transcriptLoading" class="text-center py-5">
+          <i class="fa-solid fa-spinner fa-spin fa-2x text-muted"></i>
+          <p class="text-muted mt-2"><%= tr('ticket:TRANSCRIPT_LOADING') %></p>
+        </div>
+        <!-- No data -->
+        <div id="transcriptEmpty" class="text-center py-5 d-none">
+          <i class="fa-solid fa-file-circle-xmark fa-3x text-muted mb-3"></i>
+          <p class="text-muted"><%= tr('ticket:TRANSCRIPT_NO_DATA') %></p>
+        </div>
+        <!-- Chat container -->
+        <div id="transcriptChat" class="d-none" style="max-height: 70vh; overflow-y: auto; background: #36393f; padding: 16px;">
+        </div>
+      </div>
+      <div class="modal-footer d-none" id="transcriptFooter">
+        <span class="mr-auto text-muted" id="transcriptMsgCount"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportTranscript('txt')">
+          <i class="fa-solid fa-file-lines me-1"></i> <%= tr('ticket:TRANSCRIPT_EXPORT_TXT') %>
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="exportTranscript('html')">
+          <i class="fa-solid fa-file-code me-1"></i> <%= tr('ticket:TRANSCRIPT_EXPORT_HTML') %>
+        </button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= tr('ticket:CLOSE_MODAL_BTN') %></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* Discord-like transcript styles */
+.transcript-msg {
+    display: flex;
+    padding: 4px 0;
+    color: #dcddde;
+    font-family: 'Whitney', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.375rem;
+}
+.transcript-msg + .transcript-msg {
+    margin-top: 2px;
+}
+.transcript-msg-grouped {
+    padding-left: 56px;
+}
+.transcript-msg-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 16px;
+    flex-shrink: 0;
+    background: #5865f2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+}
+.transcript-msg-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+.transcript-msg-author {
+    font-weight: 600;
+    color: #fff;
+    font-size: 1rem;
+}
+.transcript-msg-badge {
+    background: #5865f2;
+    color: #fff;
+    font-size: 0.6rem;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+.transcript-msg-time {
+    color: #72767d;
+    font-size: 0.75rem;
+}
+.transcript-msg-content {
+    color: #dcddde;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+.transcript-msg-embed {
+    border-left: 4px solid #5865f2;
+    background: #2f3136;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 4px;
+    max-width: 520px;
+}
+.transcript-msg-embed-title {
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+}
+.transcript-msg-embed-desc {
+    color: #b9bbbe;
+    font-size: 0.875rem;
+}
+.transcript-msg-attachment {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 6px 10px;
+    background: #2f3136;
+    border: 1px solid #40444b;
+    border-radius: 4px;
+    color: #00b0f4;
+    font-size: 0.85rem;
+    text-decoration: none;
+}
+.transcript-msg-attachment:hover {
+    text-decoration: underline;
+    color: #00b0f4;
+}
+.transcript-msg-attachment i {
+    margin-right: 4px;
+}
+</style>
+
+<!-- Tab-State + AJAX JavaScript -->
+<script>
+(function() {
+    'use strict';
+    
+    const guildId = '<%= guildId %>';
+    const baseUrl = `/guild/${guildId}/plugins/ticket`;
+
+    // Categories data for editing
+    const categoriesData = <%- JSON.stringify(categories) %>;
+
+    // Helper: Toast
+    function showToast(msg, type) {
+        if (window.toastr) {
+            toastr[type || 'success'](msg);
+        } else {
+            alert(msg);
+        }
+    }
+
+    // ====== Tab Persistence ======
+    $(document).ready(function() {
+        const storageKey = 'ticket_active_tab_' + guildId;
+        
+        $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+            localStorage.setItem(storageKey, $(e.target).attr('href'));
+        });
+
+        const savedTab = localStorage.getItem(storageKey);
+        if (savedTab) {
+            const tabLink = $('a[href="' + savedTab + '"]');
+            if (tabLink.length) tabLink.tab('show');
+        }
+    });
+
+    // ====== Settings Form ======
+    $('#ticketSettingsForm').on('submit', function(e) {
+        e.preventDefault();
+        const formData = {
+            log_channel: $('[name="log_channel"]').val(),
+            ticket_limit: $('[name="ticket_limit"]').val(),
+            embed_color_create: $('[name="embed_color_create"]').val(),
+            embed_color_close: $('[name="embed_color_close"]').val()
+        };
+
+        $.ajax({
+            url: baseUrl + '/settings',
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function() {
+                showToast('<%= tr("ticket:TOAST_SETTINGS_SAVED") %>');
+            },
+            error: function() {
+                showToast('<%= tr("ticket:TOAST_ERROR") %>', 'error');
+            }
+        });
+    });
+
+    // ====== Category Modal ======
+    window.openCategoryModal = function(editId) {
+        $('#catEditId').val('');
+        $('#catName').val('');
+        $('#catDescription').val('');
+        $('#catParentId').val('');
+        $('#catChannelStyle').val('NUMBER');
+        $('#catStaffRoles').val([]);
+        $('#catMemberRoles').val([]);
+        $('#catMaxPerUser').val(1);
+        $('#catButtonLabel').val('Ticket erstellen');
+        $('#catButtonEmoji').val('🎫');
+        $('#catOpenMsgTitle').val('');
+        $('#catOpenMsgDescription').val('');
+        $('#catOpenMsgFooter').val('');
+        $('#catIsActive').prop('checked', true);
+        $('#formFieldsContainer').empty();
+        $('#categoryModalTitle').text('<%= tr("ticket:CREATE_TITLE") %>');
+        $('#categorySubmitBtn').text('<%= tr("ticket:CREATE_BTN") %>');
+    };
+
+    window.editCategory = function(catId) {
+        const cat = categoriesData.find(c => c.id === catId);
+        if (!cat) return;
+
+        $('#catEditId').val(cat.id);
+        $('#catName').val(cat.name);
+        $('#catDescription').val(cat.description || '');
+        $('#catParentId').val(cat.parent_id || '');
+        $('#catChannelStyle').val(cat.channel_style || 'NUMBER');
+        $('#catStaffRoles').val(cat.staff_roles || []);
+        $('#catMemberRoles').val(cat.member_roles || []);
+        $('#catMaxPerUser').val(cat.max_open_per_user || 1);
+        $('#catButtonLabel').val(cat.button_label || 'Ticket erstellen');
+        $('#catButtonEmoji').val(cat.button_emoji || '🎫');
+        $('#catOpenMsgTitle').val(cat.open_msg_title || '');
+        $('#catOpenMsgDescription').val(cat.open_msg_description || '');
+        $('#catOpenMsgFooter').val(cat.open_msg_footer || '');
+        $('#catIsActive').prop('checked', !!cat.is_active);
+
+        // Form Fields
+        $('#formFieldsContainer').empty();
+        if (cat.form_fields && cat.form_fields.length > 0) {
+            cat.form_fields.forEach(f => addFormField(f));
+        }
+
+        $('#categoryModalTitle').text('<%= tr("ticket:UPDATE_TITLE") %>');
+        $('#categorySubmitBtn').text('<%= tr("ticket:UPDATE_BTN") %>');
+        $('#categoryModal').modal('show');
+    };
+
+    window.submitCategory = function() {
+        const editId = $('#catEditId').val();
+
+        // Gather form fields
+        const formFields = [];
+        $('#formFieldsContainer .form-field-row').each(function() {
+            const label = $(this).find('.ff-label').val().trim();
+            if (!label) return;
+            formFields.push({
+                label: label,
+                placeholder: $(this).find('.ff-placeholder').val() || '',
+                style: $(this).find('.ff-style').val() || 'SHORT',
+                required: $(this).find('.ff-required').is(':checked')
+            });
+        });
+
+        const data = {
+            name: $('#catName').val(),
+            description: $('#catDescription').val(),
+            parent_id: $('#catParentId').val() || null,
+            channel_style: $('#catChannelStyle').val(),
+            staff_roles: $('#catStaffRoles').val() || [],
+            member_roles: $('#catMemberRoles').val() || [],
+            max_open_per_user: parseInt($('#catMaxPerUser').val(), 10) || 1,
+            button_label: $('#catButtonLabel').val(),
+            button_emoji: $('#catButtonEmoji').val(),
+            open_msg_title: $('#catOpenMsgTitle').val() || null,
+            open_msg_description: $('#catOpenMsgDescription').val() || null,
+            open_msg_footer: $('#catOpenMsgFooter').val() || null,
+            is_active: $('#catIsActive').is(':checked'),
+            form_fields: formFields.length > 0 ? formFields : null
+        };
+
+        const method = editId ? 'PUT' : 'POST';
+        const url = editId ? baseUrl + '/categories/' + editId : baseUrl + '/categories';
+
+        $.ajax({
+            url: url,
+            method: method,
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function() {
+                $('#categoryModal').modal('hide');
+                showToast(editId ? '<%= tr("ticket:TOAST_CATEGORY_UPDATED") %>' : '<%= tr("ticket:TOAST_CATEGORY_CREATED") %>');
+                setTimeout(function() { location.reload(); }, 1000);
+            },
+            error: function(xhr) {
+                const msg = xhr.responseJSON?.error || '<%= tr("ticket:TOAST_ERROR") %>';
+                showToast(msg, 'error');
+            }
+        });
+    };
+
+    window.deleteCategory = function(catId, catName) {
+        if (!confirm('<%= tr("ticket:DELETE_CONFIRM") %>\n\n' + catName)) return;
+
+        $.ajax({
+            url: baseUrl + '/categories/' + catId,
+            method: 'DELETE',
+            success: function() {
+                showToast('<%= tr("ticket:TOAST_CATEGORY_DELETED") %>');
+                $('tr[data-category-id="' + catId + '"').fadeOut(300, function() { $(this).remove(); });
+            },
+            error: function() {
+                showToast('<%= tr("ticket:TOAST_ERROR") %>', 'error');
+            }
+        });
+    };
+
+    // ====== Transcript Viewer ======
+    let _transcriptData = null;
+    let _transcriptTicketId = '';
+
+    window.viewTranscript = function(dbId, ticketId) {
+        _transcriptData = null;
+        _transcriptTicketId = ticketId;
+        $('#transcriptTicketId').text(ticketId);
+        $('#transcriptLoading').removeClass('d-none');
+        $('#transcriptEmpty').addClass('d-none');
+        $('#transcriptChat').addClass('d-none').empty();
+        $('#transcriptFooter').addClass('d-none');
+        $('#transcriptMsgCount').text('');
+        $('#transcriptModal').modal('show');
+
+        $.ajax({
+            url: baseUrl + '/tickets/' + dbId + '/transcript',
+            method: 'GET',
+            success: function(res) {
+                $('#transcriptLoading').addClass('d-none');
+                if (!res.success || !res.transcript || !res.transcript.messages || res.transcript.messages.length === 0) {
+                    $('#transcriptEmpty').removeClass('d-none');
+                    $('#transcriptFooter').addClass('d-none');
+                    return;
+                }
+                _transcriptData = res.transcript;
+                renderTranscript(res.transcript.messages);
+                $('#transcriptMsgCount').text(
+                    '<%= tr("ticket:TRANSCRIPT_MESSAGES") %>'.replace('{{count}}', res.transcript.message_count || res.transcript.messages.length)
+                );
+                $('#transcriptChat').removeClass('d-none');
+                $('#transcriptFooter').removeClass('d-none');
+            },
+            error: function() {
+                $('#transcriptLoading').addClass('d-none');
+                $('#transcriptEmpty').removeClass('d-none');
+            }
+        });
+    };
+
+    function renderTranscript(messages) {
+        const container = $('#transcriptChat');
+        let lastAuthor = null;
+        let lastTimestamp = null;
+
+        messages.forEach(function(msg) {
+            const ts = new Date(msg.timestamp);
+            const sameAuthor = (msg.author === lastAuthor);
+            const timeDiff = lastTimestamp ? (ts - lastTimestamp) : Infinity;
+            const grouped = sameAuthor && timeDiff < 420000; // 7 min grouping
+
+            const el = $('<div>').addClass('transcript-msg');
+
+            if (grouped) {
+                el.addClass('transcript-msg-grouped');
+                const body = $('<div>');
+                if (msg.content) body.append($('<div>').addClass('transcript-msg-content').text(msg.content));
+                appendEmbeds(body, msg.embeds);
+                appendAttachments(body, msg.attachments);
+                el.append(body);
+            } else {
+                // Avatar (first letter)
+                const initial = (msg.author || '?')[0].toUpperCase();
+                const avatar = $('<div>').addClass('transcript-msg-avatar').text(initial);
+                if (msg.bot) avatar.css('background', '#5865f2');
+                else avatar.css('background', '#747f8d');
+
+                const wrapper = $('<div>').css('flex', '1');
+                const header = $('<div>').addClass('transcript-msg-header');
+                header.append($('<span>').addClass('transcript-msg-author').text(msg.author || 'Unknown'));
+                if (msg.bot) {
+                    header.append($('<span>').addClass('transcript-msg-badge').text('<%= tr("ticket:TRANSCRIPT_BOT_BADGE") %>'));
+                }
+                header.append($('<span>').addClass('transcript-msg-time').text(ts.toLocaleString('de-DE')));
+                wrapper.append(header);
+
+                if (msg.content) wrapper.append($('<div>').addClass('transcript-msg-content').text(msg.content));
+                appendEmbeds(wrapper, msg.embeds);
+                appendAttachments(wrapper, msg.attachments);
+
+                el.append(avatar, wrapper);
+            }
+
+            container.append(el);
+            lastAuthor = msg.author;
+            lastTimestamp = ts;
+        });
+
+        // Scroll to bottom
+        container.scrollTop(container[0].scrollHeight);
+    }
+
+    function appendEmbeds(parent, embeds) {
+        if (!embeds || !Array.isArray(embeds)) return;
+        embeds.forEach(function(embed) {
+            if (typeof embed === 'string') {
+                try { embed = JSON.parse(embed); } catch { return; }
+            }
+            if (!embed) return;
+            const box = $('<div>').addClass('transcript-msg-embed');
+            if (embed.title) box.append($('<div>').addClass('transcript-msg-embed-title').text(embed.title));
+            if (embed.description) box.append($('<div>').addClass('transcript-msg-embed-desc').text(embed.description));
+            if (embed.fields && Array.isArray(embed.fields)) {
+                embed.fields.forEach(function(f) {
+                    box.append($('<div>').addClass('transcript-msg-embed-desc').html('<strong>' + $('<span>').text(f.name).html() + ':</strong> ' + $('<span>').text(f.value).html()));
+                });
+            }
+            parent.append(box);
+        });
+    }
+
+    function appendAttachments(parent, attachments) {
+        if (!attachments || !Array.isArray(attachments)) return;
+        attachments.forEach(function(att) {
+            const link = $('<a>').addClass('transcript-msg-attachment')
+                .attr('href', att.url || '#').attr('target', '_blank').attr('rel', 'noopener noreferrer')
+                .html('<i class="fa-solid fa-paperclip"></i> ' + $('<span>').text(att.name || 'Attachment').html());
+            parent.append(link);
+        });
+    }
+
+    window.exportTranscript = function(format) {
+        if (!_transcriptData || !_transcriptData.messages) return;
+
+        const messages = _transcriptData.messages;
+        let content, filename, mimeType;
+
+        if (format === 'txt') {
+            const lines = messages.map(function(m) {
+                const ts = new Date(m.timestamp).toLocaleString('de-DE');
+                let line = '[' + ts + '] ' + (m.author || 'Unknown') + (m.bot ? ' [BOT]' : '') + ': ' + (m.content || '');
+                if (m.attachments && m.attachments.length > 0) {
+                    line += ' [Attachments: ' + m.attachments.map(function(a) { return a.name; }).join(', ') + ']';
+                }
+                return line;
+            });
+            content = lines.join('\n');
+            filename = 'transcript-' + _transcriptTicketId + '.txt';
+            mimeType = 'text/plain';
+        } else {
+            const rows = messages.map(function(m) {
+                const ts = new Date(m.timestamp).toLocaleString('de-DE');
+                const safeContent = (m.content || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g, '<br>');
+                const safeAuthor = (m.author || 'Unknown').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                const initial = (m.author || '?')[0].toUpperCase();
+                const bgColor = m.bot ? '#5865f2' : '#747f8d';
+                let html = '<div style="display:flex;padding:6px 16px;color:#dcddde;font-family:sans-serif;">';
+                html += '<div style="width:40px;height:40px;border-radius:50%;background:' + bgColor + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;margin-right:16px;flex-shrink:0;">' + initial + '</div>';
+                html += '<div style="flex:1;">';
+                html += '<div><strong style="color:#fff;">' + safeAuthor + '</strong>';
+                if (m.bot) html += ' <span style="background:#5865f2;color:#fff;font-size:0.6rem;padding:1px 5px;border-radius:3px;">BOT</span>';
+                html += ' <span style="color:#72767d;font-size:0.75rem;">' + ts + '</span></div>';
+                if (safeContent) html += '<div>' + safeContent + '</div>';
+                if (m.attachments && m.attachments.length > 0) {
+                    m.attachments.forEach(function(a) {
+                        const safeName = (a.name || 'Attachment').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                        html += '<div style="margin-top:4px;"><a href="' + (a.url || '#') + '" target="_blank" rel="noopener noreferrer" style="color:#00b0f4;">' + safeName + '</a></div>';
+                    });
+                }
+                html += '</div></div>';
+                return html;
+            }).join('');
+
+            content = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Transcript ' + _transcriptTicketId + '</title>'
+                + '<style>body{background:#36393f;margin:0;padding:20px;}</style></head><body>' + rows + '</body></html>';
+            filename = 'transcript-' + _transcriptTicketId + '.html';
+            mimeType = 'text/html';
+        }
+
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    // ====== Form Fields Editor ======
+    window.addFormField = function(data) {
+        const idx = $('#formFieldsContainer .form-field-row').length;
+        if (idx >= 5) return showToast('Max. 5 Felder erlaubt', 'warning');
+        const html = `
+            <div class="form-field-row border rounded p-2 mb-2">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <strong><%= tr('ticket:FORM_FIELD_LABEL') %> #${idx + 1}</strong>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="$(this).closest('.form-field-row').remove()">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-1">
+                        <input type="text" class="form-control form-control-sm ff-label" placeholder="<%= tr('ticket:FORM_FIELD_NAME') %>" 
+                               value="${data ? data.label.replace(/"/g, '&quot;') : ''}" maxlength="45" required>
+                    </div>
+                    <div class="col-md-4 mb-1">
+                        <input type="text" class="form-control form-control-sm ff-placeholder" placeholder="Placeholder" 
+                               value="${data ? (data.placeholder || '').replace(/"/g, '&quot;') : ''}">
+                    </div>
+                    <div class="col-md-2 mb-1">
+                        <select class="form-control form-control-sm ff-style">
+                            <option value="SHORT" ${data && data.style === 'SHORT' ? 'selected' : ''}>Short</option>
+                            <option value="PARAGRAPH" ${data && data.style === 'PARAGRAPH' ? 'selected' : ''}>Paragraph</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 mb-1">
+                        <div class="form-check mt-1">
+                            <input type="checkbox" class="form-check-input ff-required" ${(!data || data.required !== false) ? 'checked' : ''}>
+                            <label class="form-check-label small"><%= tr('ticket:FORM_FIELD_REQUIRED') %></label>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        $('#formFieldsContainer').append(html);
+    };
+})();
+
+function copyPlaceholder(el) {
+    const text = el.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        const orig = el.textContent;
+        el.textContent = '✓ Kopiert';
+        setTimeout(() => { el.textContent = orig; }, 1000);
+    });
+}
+</script>

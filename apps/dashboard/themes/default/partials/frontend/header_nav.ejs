@@ -8,21 +8,41 @@
 
       <nav id="navmenu" class="navmenu">
         <ul>
-          <li><a href="/"><%= tr('LANDING.HOME') %></a></li>
-          <li><a href="/#features"><%= tr('LANDING.FEATURES') %></a></li>
-          <li><a href="/#news"><%= tr('LANDING.NEWS') %></a></li>
-          <li class="dropdown"><a href="/#documentation"><span><%= tr('LANDING.SERVICES') %></span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
-            <ul>
-              <li><a href="/#documentation"><%= tr('LANDING.DOCUMENTATION') %></a></li>
-              <li><a href="/changelogs"><%= tr('LANDING.CHANGELOGS') %></a></li>
-              <li><a href="/#plugins"><%= tr('LANDING.PLUGINS') %></a></li>
-              <li><a href="<%= coreConfig.githubUrl %>" target="_blank"><%= tr('LANDING.GITHUB') %></a></li>
-              <li><a href="/tos"><%= tr('FOOTER.TERMS_OF_SERVICE') %></a></li>
-              <li><a href="/privacy"><%= tr('FOOTER.PRIVACY_POLICY') %></a></li>
-              <li><a href="/guild"><%= tr('LANDING.DASHBOARD') %></a></li>
-            </ul>
-          </li>
-          <li><a href="/guild"><%= tr('LANDING.DASHBOARD') %></a></li>
+          <% if (typeof menuItems !== 'undefined' && menuItems && menuItems.length > 0) { %>
+            <% menuItems.forEach(item => { %>
+              <% if (item.children && item.children.length > 0) { %>
+                <li class="dropdown<%= item.css_class ? ' ' + item.css_class : '' %>">
+                  <a href="<%= item.url %>"><span><%= item.label %></span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+                  <ul>
+                    <% item.children.forEach(child => { %>
+                      <li><a href="<%= child.url %>"<%= child.target === '_blank' ? ' target="_blank"' : '' %>><%= child.label %></a></li>
+                    <% }); %>
+                  </ul>
+                </li>
+              <% } else { %>
+                <li class="<%= item.css_class || '' %>">
+                  <a href="<%= item.url %>"<%= item.target === '_blank' ? ' target="_blank"' : '' %>><%= item.label %></a>
+                </li>
+              <% } %>
+            <% }); %>
+          <% } else { %>
+            <!-- Fallback: Hardcoded Nav -->
+            <li><a href="/"><%= tr('LANDING.HOME') %></a></li>
+            <li><a href="/#features"><%= tr('LANDING.FEATURES') %></a></li>
+            <li><a href="/#news"><%= tr('LANDING.NEWS') %></a></li>
+            <li class="dropdown"><a href="/#documentation"><span><%= tr('LANDING.SERVICES') %></span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+              <ul>
+                <li><a href="/#documentation"><%= tr('LANDING.DOCUMENTATION') %></a></li>
+                <li><a href="/changelogs"><%= tr('LANDING.CHANGELOGS') %></a></li>
+                <li><a href="/#plugins"><%= tr('LANDING.PLUGINS') %></a></li>
+                <li><a href="<%= coreConfig.githubUrl %>" target="_blank"><%= tr('LANDING.GITHUB') %></a></li>
+                <li><a href="/tos"><%= tr('FOOTER.TERMS_OF_SERVICE') %></a></li>
+                <li><a href="/privacy"><%= tr('FOOTER.PRIVACY_POLICY') %></a></li>
+                <li><a href="/guild"><%= tr('LANDING.DASHBOARD') %></a></li>
+              </ul>
+            </li>
+            <li><a href="/guild"><%= tr('LANDING.DASHBOARD') %></a></li>
+          <% } %>
           <li class="dropdown language-switcher">
             <a href="#"><span><i class="bi bi-translate"></i> <%= tr('LANDING.LANGUAGE_SELECTOR') %></span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
             <ul>

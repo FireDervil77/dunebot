@@ -77,19 +77,26 @@ async function serverAction(serverId, action) {
             
             // ✅ Sofortiges UI-Update für besseres UX (SSE liefert später finale Status)
             // Setze Zwischenstatus bis SSE-Event kommt
-            if (window.gameserverOverview) {
-                const intermediateStatus = {
-                    start: 'starting',
-                    stop: 'stopping',
-                    restart: 'restarting'
-                }[action];
+            const intermediateStatus = {
+                start: 'starting',
+                stop: 'stopping',
+                restart: 'restarting'
+            }[action];
+            
+            if (intermediateStatus) {
+                console.log(`[ServerAction] Setze Zwischenstatus: ${intermediateStatus}`);
                 
-                if (intermediateStatus) {
-                    console.log(`[ServerAction] Setze Zwischenstatus: ${intermediateStatus}`);
+                // Overview-Page: GameserverOverview (hat eigene SSE-Connection)
+                if (window.gameserverOverview) {
                     window.gameserverOverview.updateServerStatus({
                         server_id: serverId,
                         status: intermediateStatus
                     });
+                }
+                
+                // Detail-Page: Direkte UI-Update-Funktion
+                if (window.updateDetailUI) {
+                    window.updateDetailUI(intermediateStatus);
                 }
             }
             

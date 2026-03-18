@@ -1,0 +1,135 @@
+<%#
+ * Guild: Widget-Bereiche verwalten
+ * Zeigt registrierte Widget-Bereiche mit Guild-spezifischen Overrides.
+ *
+ * @context {Array}  areas             - [{id, label, description}]
+ * @context {Array}  registeredWidgets - [{id, area, position, size, visible}]
+ * @context {Object} overrides         - { widget_id: {area, position, visible} }
+ * @context {string} guildId
+%>
+
+<div class="container-fluid">
+
+  <!-- Page-Header -->
+  <div class="row mb-3">
+    <div class="col-12">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <h1 class="h3 mb-0"><i class="fa-solid fa-puzzle-piece me-2 text-primary"></i> Widget-Bereiche</h1>
+          <p class="text-muted small mb-0">Verwalte welche Widgets im Dashboard angezeigt werden und passe die Reihenfolge an.</p>
+        </div>
+        <a href="/guild/<%= guildId %>/themes" class="btn btn-outline-secondary btn-sm">
+          <i class="fa-solid fa-arrow-left me-1"></i> Zurück zu Themes
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Widget-Bereiche -->
+  <% areas.forEach(area => { %>
+    <% const areaWidgets = registeredWidgets.filter(w => w.area === area.id).sort((a,b) => a.position - b.position); %>
+    <div class="card mb-4">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div>
+          <h5 class="card-title mb-0">
+            <i class="fa-solid fa-layer-group me-2 text-muted"></i>
+            <%= area.label %>
+          </h5>
+          <% if (area.description) { %>
+            <small class="text-muted"><%= area.description %></small>
+          <% } %>
+        </div>
+        <span class="badge badge-secondary"><%= areaWidgets.length %> Widgets</span>
+      </div>
+      <div class="card-body p-0">
+        <% if (areaWidgets.length === 0) { %>
+          <div class="text-muted small p-3">
+            <i class="fa-solid fa-info-circle me-1"></i>
+            Keine Widgets in diesem Bereich registriert.
+          </div>
+        <% } else { %>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead>
+                <tr>
+                  <th class="pl-3">Widget</th>
+                  <th>Position</th>
+                  <th>Breite</th>
+                  <th>Sichtbar</th>
+                  <th>Override</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% areaWidgets.forEach(widget => { %>
+                  <% const ov = overrides[widget.id]; %>
+                  <tr>
+                    <td class="pl-3">
+                      <code class="text-primary"><%= widget.id %></code>
+                    </td>
+                    <td><%= ov && ov.position != null ? ov.position : widget.position %></td>
+                    <td><span class="badge badge-secondary">col-<%= widget.size %></span></td>
+                    <td>
+                      <% const isVisible = ov && ov.visible != null ? Boolean(ov.visible) : widget.visible; %>
+                      <% if (isVisible) { %>
+                        <span class="badge badge-success"><i class="fa-solid fa-eye me-1"></i>Ja</span>
+                      <% } else { %>
+                        <span class="badge badge-danger"><i class="fa-solid fa-eye-slash me-1"></i>Nein</span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <% if (ov) { %>
+                        <span class="badge badge-warning">Guild-Override</span>
+                      <% } else { %>
+                        <span class="badge badge-light border">Standard</span>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  <% }); %>
+
+  <!-- Nicht zugewiesene Widgets -->
+  <% const unassigned = registeredWidgets.filter(w => !areas.some(a => a.id === w.area)); %>
+  <% if (unassigned.length > 0) { %>
+    <div class="card mb-4 border-warning">
+      <div class="card-header">
+        <h5 class="card-title mb-0 text-warning">
+          <i class="fa-solid fa-triangle-exclamation me-2"></i>Nicht zugewiesene Widgets
+        </h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th class="pl-3">Widget ID</th>
+                <th>Bereich</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% unassigned.forEach(widget => { %>
+                <tr>
+                  <td class="pl-3"><code><%= widget.id %></code></td>
+                  <td><span class="badge badge-warning"><%= widget.area || '(unbekannt)' %></span></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (registeredWidgets.length === 0) { %>
+    <div class="alert alert-info">
+      <i class="fa-solid fa-info-circle me-2"></i>
+      Keine Widgets registriert. Widgets werden von Plugins bereitgestellt — aktiviere Plugins, um Widgets zu erhalten.
+    </div>
+  <% } %>
+
+</div>

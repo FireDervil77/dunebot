@@ -34,7 +34,7 @@ class ConsoleManager {
 
         // Console-History Buffer: serverId → Array<{line, timestamp}>
         this.consoleHistory = new Map();
-        this.maxHistoryLines = 100; // Letzte 100 Zeilen buffern
+        this.maxHistoryLines = 500; // Letzte 500 Zeilen buffern (passend zum Daemon Ring-Buffer)
         
         this.Logger.info('[ConsoleManager] Service initialisiert');
         
@@ -113,47 +113,47 @@ class ConsoleManager {
             // 2. Permissions prüfen (bereits durch Middleware, aber double-check)
             // TODO: Zusätzliche Permission-Prüfung hier wenn nötig
             
-            // 3. Client zu aktiven Clients hinzufügen
+            // 3. Client zu aktiven Clients hinzufügen (alte Clients desselben Users aufräumen)
             if (!this.activeClients.has(serverId)) {
                 this.activeClients.set(serverId, new Set());
             }
-            this.activeClients.get(serverId).add(clientId);
+            const clientSet = this.activeClients.get(serverId);
             
-            // 4. Daemon-Attach senden (wenn erster Client) UND History holen
-            const clientCount = this.activeClients.get(serverId).size;
+            // Stale clientIds desselben Users entfernen (Format: userId-timestamp)
+            const userPrefix = clientId.split('-').slice(0, -1).join('-'); // z.B. "544578232704565262"
+            if (userPrefix) {
+                for (const existingId of clientSet) {
+                    if (existingId !== clientId && existingId.startsWith(userPrefix + '-')) {
+                        clientSet.delete(existingId);
+                        this.Logger.debug(`[ConsoleManager] Stale clientId entfernt: ${existingId}`);
+                    }
+                }
+            }
+            clientSet.add(clientId);
+            
+            // 4. Daemon-Attach IMMER senden
+            // Alte Logik: Nur beim ersten Client → Bug: Nach Server-Restart war der
+            // erste Client noch im Set, aber der Daemon hatte kein aktives Subscription.
+            // Neue Logik: Immer senden. Der Daemon dealt mit Duplikaten.
             let attachResponse = null;
             
-            // IMMER Daemon-Attach senden wenn erster Client
-            if (clientCount === 1) {
-                try {
-                    attachResponse = await this._sendDaemonCommand(server.daemon_id, CONSOLE_ATTACH, {
-                        server_id: serverId,
-                        client_id: clientId,
-                        attach: true
-                    });
-                    this.Logger.info(`[ConsoleManager] Daemon attach gesendet: Server ${serverId}`);
-                } catch (daemonErr) {
-                    // Nicht fatal: Server läuft möglicherweise noch nicht / kein PTY aktiv.
-                    // Console-View trotzdem laden, History bleibt leer.
-                    this.Logger.warn(`[ConsoleManager] Daemon attach nicht verfügbar (Server ${serverId}): ${daemonErr?.message || daemonErr}`);
-                }
-            }
-            // ODER History vom Daemon holen wenn lokaler Buffer leer ist
-            else if (!this.consoleHistory.has(serverId) || this.consoleHistory.get(serverId).length === 0) {
-                this.Logger.info(`[ConsoleManager] Lokaler Buffer leer - hole History vom Daemon`);
-                try {
-                    attachResponse = await this._sendDaemonCommand(server.daemon_id, CONSOLE_ATTACH, {
-                        server_id: serverId,
-                        client_id: clientId,
-                        attach: true,
-                        history_only: true // Flag für Daemon: Nur History zurückgeben, nicht neu subscriben
-                    });
-                } catch (daemonErr) {
-                    this.Logger.warn(`[ConsoleManager] Daemon history nicht verfügbar (Server ${serverId}): ${daemonErr?.message || daemonErr}`);
-                }
+            try {
+                attachResponse = await this._sendDaemonCommand(server.daemon_id, CONSOLE_ATTACH, {
+                    server_id: serverId,
+                    client_id: clientId,
+                    attach: true
+                });
+                this.Logger.info(`[ConsoleManager] Daemon attach gesendet: Server ${serverId}`);
+            } catch (daemonErr) {
+                // Nicht fatal: Server läuft möglicherweise noch nicht / kein PTY aktiv.
+                // Console-View trotzdem laden, History bleibt leer.
+                this.Logger.warn(`[ConsoleManager] Daemon attach nicht verfügbar (Server ${serverId}): ${daemonErr?.message || daemonErr}`);
             }
             
-            // 5. History aus Daemon-Response (falls vorhanden) in lokalen Buffer übernehmen
+            // 5. Bei Re-Attach: Alte lokale History verwerfen, Daemon-History übernehmen
+            //    Der Daemon hat den aktuellen Ring-Buffer des neuen Containers.
+            this.consoleHistory.delete(serverId);
+            
             try {
                 const daemonHistory = attachResponse?.data?.history
                     || attachResponse?.history
@@ -175,7 +175,7 @@ class ConsoleManager {
             // 6. History zurückgeben (lokaler Buffer)
             const history = this.consoleHistory.get(serverId) || [];
             
-            this.Logger.success(`[ConsoleManager] Attach erfolgreich: Server ${serverId}, Clients: ${clientCount}`);
+            this.Logger.success(`[ConsoleManager] Attach erfolgreich: Server ${serverId}, Clients: ${this.activeClients.get(serverId).size}`);
             
             return history.map(entry => ({
                 line: entry.line,
@@ -294,9 +294,22 @@ class ConsoleManager {
      * @private
      */
     async _handleConsoleOutput(payload, message, context) {
-        const { server_id, line, timestamp } = payload;
+        let { server_id, line, timestamp } = payload;
         
         try {
+            // Defensive: Daemon-Event-Bus kann line als JSON-Wrapper liefern
+            // z.B. {"topic":"console output","data":"tatsächlicher Text"}
+            if (typeof line === 'string' && line.startsWith('{')) {
+                try {
+                    const parsed = JSON.parse(line);
+                    if (parsed && typeof parsed.data === 'string') {
+                        line = parsed.data;
+                    }
+                } catch (_) {
+                    // Kein JSON → Originalzeile behalten
+                }
+            }
+            
             this.Logger.debug(`[ConsoleManager] Console Output: Server ${server_id}, Line: "${line}"`);
             
             // 1. Zu History hinzufügen

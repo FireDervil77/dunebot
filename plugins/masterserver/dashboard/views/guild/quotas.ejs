@@ -1,7 +1,7 @@
 <%
 /**
- * Quota-Management View
- * Ressourcen-Übersicht für alle RootServer der Guild
+ * Ressourcen-Management (Pterodactyl-Style)
+ * Zeigt Ressourcen-Auslastung pro RootServer-Node mit Overallocation-Steuerung
  */
 %>
 
@@ -10,12 +10,14 @@
     <div class="container-fluid">
         <div class="row mb-2">
             <div class="col-sm-6">
-                <h1 class="m-0"><%= tr('masterserver:QUOTAS.TITLE') %></h1>
+                <h1 class="m-0">
+                    <i class="fas fa-tachometer-alt mr-2"></i>Ressourcen-Management
+                </h1>
             </div>
             <div class="col-sm-6">
                 <ol class="breadcrumb float-sm-right">
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver"><%= tr('masterserver:NAV.MASTERSERVER') %></a></li>
-                    <li class="breadcrumb-item active"><%= tr('masterserver:QUOTAS.TITLE') %></li>
+                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver">Masterserver</a></li>
+                    <li class="breadcrumb-item active">Ressourcen</li>
                 </ol>
             </div>
         </div>
@@ -25,305 +27,345 @@
 <!-- Main Content -->
 <section class="content">
     <div class="container-fluid">
-        
-        <!-- Info Alert -->
-        <div class="alert alert-info alert-dismissible">
-            <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-            <h5><i class="icon fas fa-info"></i> <%= tr('masterserver:QUOTAS.INFO.WHAT_IS_QUOTA') %></h5>
-            <%= tr('masterserver:QUOTAS.INFO.QUOTA_DESCRIPTION') %>
-        </div>
 
-        <!-- Quota-Profile Card -->
-        <div class="card card-primary">
+        <% if (!nodes || nodes.length === 0) { %>
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            Kein RootServer konfiguriert. <a href="/guild/<%= guildId %>/plugins/masterserver/daemon">Daemon einrichten</a>.
+        </div>
+        <% } %>
+
+        <% nodes.forEach(function(node) {
+            const isOnline = node.daemon_status === 'online';
+            const l = node.limits;
+            const u = node.usage;
+            const ramBarClass  = u.ramPct  >= 90 ? 'danger' : u.ramPct  >= 75 ? 'warning' : 'success';
+            const diskBarClass = u.diskPct >= 90 ? 'danger' : u.diskPct >= 75 ? 'warning' : 'success';
+            const cpuBarClass  = u.cpuPct  >= 90 ? 'danger' : u.cpuPct  >= 75 ? 'warning' : 'success';
+        %>
+
+        <div class="card card-outline <%= isOnline ? 'card-success' : 'card-secondary' %> mb-4">
+
+            <!-- Card Header -->
             <div class="card-header">
                 <h3 class="card-title">
-                    <i class="fas fa-list"></i> 
-                    <span class="d-none d-md-inline"><%= tr('masterserver:QUOTAS.PROFILES.TITLE') %></span>
-                    <span class="d-inline d-md-none">Profile</span>
+                    <i class="fas fa-server mr-2"></i>
+                    <strong><%= node.name %></strong>
+                    <% if (isOnline) { %>
+                        <span class="badge badge-success ml-2">
+                            <i class="fas fa-circle" style="font-size:.6em;"></i> Online
+                        </span>
+                    <% } else { %>
+                        <span class="badge badge-secondary ml-2">
+                            <i class="fas fa-circle" style="font-size:.6em;"></i> Offline
+                        </span>
+                    <% } %>
                 </h3>
+                <div class="card-tools">
+                    <small class="text-muted">
+                        <i class="fas fa-microchip mr-1"></i><%= node.cpu_cores || '?' %> Kerne &nbsp;·&nbsp;
+                        <i class="fas fa-memory mr-1"></i><%= node.ram_total_gb ? parseFloat(node.ram_total_gb).toFixed(1) : '?' %> GB RAM &nbsp;·&nbsp;
+                        <i class="fas fa-hdd mr-1"></i><%= node.disk_total_gb ? parseFloat(node.disk_total_gb).toFixed(1) : '?' %> GB Disk
+                    </small>
+                </div>
             </div>
+
             <div class="card-body">
-                <div class="row">
-                    <% profiles.forEach(function(profile) { %>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="small-box <%= profile.is_default ? 'bg-success' : 'bg-info' %>">
-                            <div class="inner">
-                                <h3><%= profile.display_name %></h3>
-                                <p>
-                                    <strong><%= (profile.ram_mb / 1024).toFixed(0) %> GB RAM</strong><br>
-                                    <%= profile.cpu_cores %> CPU Cores<br>
-                                    <%= profile.disk_gb %> GB Disk
-                                    <% if (profile.max_gameservers) { %>
-                                        <br>Max. <%= profile.max_gameservers %> Gameserver
-                                    <% } else { %>
-                                        <br>Unbegrenzte Gameserver
-                                    <% } %>
-                                </p>
+
+                <!-- ── Ressourcen-Balken ── -->
+                <div class="row mb-3">
+
+                    <!-- RAM -->
+                    <div class="col-md-4 mb-3 mb-md-0">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-sm font-weight-bold">
+                                <i class="fas fa-memory mr-1 text-muted"></i>Arbeitsspeicher
+                            </span>
+                            <span class="text-sm text-muted">
+                                <%= Math.round(node.allocated.allocated_ram_mb || 0).toLocaleString() %> MB
+                                / <%= l.usableRamMB.toLocaleString() %> MB
+                            </span>
+                        </div>
+                        <div class="progress" style="height:14px;">
+                            <div class="progress-bar bg-<%= ramBarClass %>"
+                                 style="width:<%= u.ramPct %>%"
+                                 title="<%= u.ramPct %>%">
+                                <% if (u.ramPct >= 15) { %><%= u.ramPct %>%<% } %>
                             </div>
-                            <div class="icon">
-                                <i class="fas fa-hdd"></i>
-                            </div>
-                            <% if (profile.is_default) { %>
-                            <a class="small-box-footer" style="cursor: default;">
-                                <i class="fas fa-check"></i> Standard-Profil
-                            </a>
-                            <% } %>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <small class="text-muted">Reserviert: <%= l.reservedRamMB %> MB</small>
+                            <small class="text-muted">Gesamt: <%= l.totalRamMB.toLocaleString() %> MB</small>
                         </div>
                     </div>
-                    <% }); %>
-                </div>
-            </div>
-        </div>
 
-        <!-- RootServer-Ressourcen Card -->
-        <div class="card card-warning">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-server"></i> 
-                    <span class="d-none d-md-inline"><%= tr('masterserver:QUOTAS.ROOTSERVER.TITLE') %></span>
-                    <span class="d-inline d-md-none">RootServer</span>
-                </h3>
-            </div>
-            <div class="card-body">
-                <% if (rootservers.length === 0) { %>
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i> <%= tr('masterserver:ROOTSERVER.NO_SERVERS') %>
+                    <!-- Disk -->
+                    <div class="col-md-4 mb-3 mb-md-0">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-sm font-weight-bold">
+                                <i class="fas fa-hdd mr-1 text-muted"></i>Festplatte
+                            </span>
+                            <span class="text-sm text-muted">
+                                <%= Math.round(node.allocated.allocated_disk_gb || 0) %> GB
+                                / <%= l.usableDiskGB %> GB
+                            </span>
+                        </div>
+                        <div class="progress" style="height:14px;">
+                            <div class="progress-bar bg-<%= diskBarClass %>"
+                                 style="width:<%= u.diskPct %>%"
+                                 title="<%= u.diskPct %>%">
+                                <% if (u.diskPct >= 15) { %><%= u.diskPct %>%<% } %>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <small class="text-muted">Reserviert: <%= l.reservedDiskGB %> GB</small>
+                            <small class="text-muted">Gesamt: <%= l.totalDiskGB %> GB</small>
+                        </div>
+                    </div>
+
+                    <!-- CPU -->
+                    <div class="col-md-4">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-sm font-weight-bold">
+                                <i class="fas fa-microchip mr-1 text-muted"></i>CPU-Kerne
+                            </span>
+                            <span class="text-sm text-muted">
+                                <%= node.allocated.allocated_cpu_cores || 0 %> / <%= l.totalCpuCores %>
+                            </span>
+                        </div>
+                        <div class="progress" style="height:14px;">
+                            <div class="progress-bar bg-<%= cpuBarClass %>"
+                                 style="width:<%= u.cpuPct %>%"
+                                 title="<%= u.cpuPct %>%">
+                                <% if (u.cpuPct >= 15) { %><%= u.cpuPct %>%<% } %>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <small class="text-muted">Server: <%= node.allocated.server_count || 0 %></small>
+                            <small class="text-muted">Kerne: <%= l.totalCpuCores %></small>
+                        </div>
+                    </div>
+
                 </div>
-                <% } else { %>
+
+                <hr class="mt-2 mb-3">
+
+                <!-- ── Verwaltungszeilen ── -->
+                <div class="row">
+
+                    <!-- Überallokation -->
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <h6 class="text-sm font-weight-bold mb-2">
+                            <i class="fas fa-expand-arrows-alt mr-1 text-muted"></i>Überallokation
+                            <small class="text-muted font-weight-normal ml-1">(0 – 300 %)</small>
+                        </h6>
+                        <form class="form-overallocation" data-rs-id="<%= node.id %>">
+                            <div class="input-group input-group-sm mb-2">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" style="min-width:80px;">RAM %</span>
+                                </div>
+                                <input type="number" class="form-control" name="overallocateRam"
+                                       min="0" max="300" value="<%= l.overRam %>"
+                                       placeholder="0">
+                                <div class="input-group-append">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="input-group input-group-sm mb-2">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" style="min-width:80px;">Disk %</span>
+                                </div>
+                                <input type="number" class="form-control" name="overallocateDisk"
+                                       min="0" max="300" value="<%= l.overDisk %>"
+                                       placeholder="0">
+                                <div class="input-group-append">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="fas fa-save mr-1"></i>Speichern
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- OS-Reservierung -->
+                    <div class="col-md-6">
+                        <h6 class="text-sm font-weight-bold mb-2">
+                            <i class="fas fa-lock mr-1 text-muted"></i>OS-Reservierung
+                            <small class="text-muted font-weight-normal ml-1">(Betriebssystem)</small>
+                        </h6>
+                        <form class="form-reserved" data-rs-id="<%= node.id %>">
+                            <div class="input-group input-group-sm mb-2">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" style="min-width:80px;">RAM</span>
+                                </div>
+                                <input type="number" class="form-control" name="reservedRamMB"
+                                       min="0" value="<%= l.reservedRamMB %>"
+                                       placeholder="1024">
+                                <div class="input-group-append">
+                                    <span class="input-group-text">MB</span>
+                                </div>
+                            </div>
+                            <div class="input-group input-group-sm mb-2">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" style="min-width:80px;">Disk</span>
+                                </div>
+                                <input type="number" class="form-control" name="reservedDiskGB"
+                                       min="0" value="<%= l.reservedDiskGB %>"
+                                       placeholder="10">
+                                <div class="input-group-append">
+                                    <span class="input-group-text">GB</span>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="fas fa-save mr-1"></i>Speichern
+                            </button>
+                        </form>
+                    </div>
+
+                </div>
+
+                <!-- ── Gameserver-Tabelle ── -->
+                <% if (node.gameservers && node.gameservers.length > 0) { %>
+                <hr class="mt-3 mb-3">
+                <h6 class="text-sm font-weight-bold mb-2">
+                    <i class="fas fa-th-list mr-1 text-muted"></i>
+                    Gameserver (<%= node.gameservers.length %>)
+                </h6>
                 <div class="table-responsive">
-                    <table class="table table-bordered table-hover">
+                    <table class="table table-sm table-hover mb-0">
                         <thead>
-                            <tr>
-                                <th><%= tr('masterserver:QUOTAS.ROOTSERVER.NAME') %></th>
-                                <th><%= tr('masterserver:QUOTAS.ROOTSERVER.PROFILE') %></th>
-                                <th class="text-center"><%= tr('masterserver:QUOTAS.RESOURCES.RAM_MB') %></th>
-                                <th class="text-center"><%= tr('masterserver:QUOTAS.RESOURCES.CPU_CORES') %></th>
-                                <th class="text-center"><%= tr('masterserver:QUOTAS.RESOURCES.DISK_GB') %></th>
-                                <th class="text-center"><%= tr('masterserver:QUOTAS.ROOTSERVER.GAMESERVERS') %></th>
-                                <th class="text-center"><%= tr('masterserver:COMMON.ACTIONS') %></th>
+                            <tr class="text-muted" style="font-size:.8rem;">
+                                <th>Name</th>
+                                <th>Typ</th>
+                                <th class="text-right">RAM</th>
+                                <th class="text-right">CPU</th>
+                                <th class="text-right">Disk</th>
+                                <th class="text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <% rootservers.forEach(function(rs) { 
-                                const hasQuota = rs.total_ram_mb !== null;
-                                const ramPercent = hasQuota ? Math.round((rs.allocated_ram_mb / (rs.total_ram_mb - rs.reserved_ram_mb)) * 100) : 0;
-                                const cpuPercent = hasQuota ? Math.round((rs.allocated_cpu_cores / (rs.total_cpu_cores - rs.reserved_cpu_cores)) * 100) : 0;
-                                const diskPercent = hasQuota ? Math.round((rs.allocated_disk_gb / (rs.total_disk_gb - rs.reserved_disk_gb)) * 100) : 0;
-                                
-                                const getProgressColor = (percent) => {
-                                    if (percent < 50) return 'success';
-                                    if (percent < 80) return 'warning';
-                                    return 'danger';
-                                };
-                            %>
+                        <% node.gameservers.forEach(function(gs) { %>
                             <tr>
-                                <td><strong><%= rs.rootserver_name %></strong></td>
                                 <td>
-                                    <% if (hasQuota) { %>
-                                        <span class="badge badge-info"><%= rs.profile_display_name || tr('masterserver:QUOTAS.PROFILES.CUSTOM') %></span>
-                                    <% } else { %>
-                                        <span class="badge badge-secondary"><%= tr('masterserver:QUOTAS.ROOTSERVER.NO_QUOTA') %></span>
-                                    <% } %>
-                                </td>
-                                <td>
-                                    <% if (hasQuota) { %>
-                                    <div class="progress" style="height: 20px;">
-                                        <div class="progress-bar bg-<%= getProgressColor(ramPercent) %>" 
-                                             style="width: <%= ramPercent %>%"
-                                             title="<%= rs.allocated_ram_mb %> / <%= rs.total_ram_mb - rs.reserved_ram_mb %> MB">
-                                            <%= ramPercent %>%
-                                        </div>
-                                    </div>
-                                    <small class="text-muted">
-                                        <%= tr('masterserver:QUOTAS.RESOURCES.AVAILABLE') %>: <%= rs.available_ram_mb %> MB
-                                    </small>
-                                    <% } else { %>
-                                    <span class="text-muted">-</span>
-                                    <% } %>
-                                </td>
-                                <td>
-                                    <% if (hasQuota) { %>
-                                    <div class="progress" style="height: 20px;">
-                                        <div class="progress-bar bg-<%= getProgressColor(cpuPercent) %>" 
-                                             style="width: <%= cpuPercent %>%"
-                                             title="<%= rs.allocated_cpu_cores %> / <%= rs.total_cpu_cores - rs.reserved_cpu_cores %> Cores">
-                                            <%= cpuPercent %>%
-                                        </div>
-                                    </div>
-                                    <small class="text-muted">
-                                        <%= tr('masterserver:QUOTAS.RESOURCES.AVAILABLE') %>: <%= rs.available_cpu_cores %> Cores
-                                    </small>
-                                    <% } else { %>
-                                    <span class="text-muted">-</span>
-                                    <% } %>
-                                </td>
-                                <td>
-                                    <% if (hasQuota) { %>
-                                    <div class="progress" style="height: 20px;">
-                                        <div class="progress-bar bg-<%= getProgressColor(diskPercent) %>" 
-                                             style="width: <%= diskPercent %>%"
-                                             title="<%= rs.allocated_disk_gb %> / <%= rs.total_disk_gb - rs.reserved_disk_gb %> GB">
-                                            <%= diskPercent %>%
-                                        </div>
-                                    </div>
-                                    <small class="text-muted">
-                                        <%= tr('masterserver:QUOTAS.RESOURCES.AVAILABLE') %>: <%= rs.available_disk_gb %> GB
-                                    </small>
-                                    <% } else { %>
-                                    <span class="text-muted">-</span>
-                                    <% } %>
-                                </td>
-                                <td class="text-center">
-                                    <% if (hasQuota) { %>
-                                    <strong><%= rs.gameserver_count %></strong>
-                                    <% if (rs.max_gameservers) { %>
-                                        / <%= rs.max_gameservers %>
-                                    <% } %>
-                                    <% } else { %>
-                                    <span class="text-muted">-</span>
-                                    <% } %>
-                                </td>
-                                <td class="text-center">
-                                    <% if (hasQuota) { %>
-                                    <a href="/guild/<%= guildId %>/plugins/masterserver/quotas/rootserver/<%= rs.rootserver_id %>" 
-                                       class="btn btn-sm btn-primary">
-                                        <i class="fas fa-edit"></i> <%= tr('masterserver:QUOTAS.ACTIONS.EDIT') %>
+                                    <a href="/guild/<%= guildId %>/plugins/masterserver/servers/<%= gs.server_id %>"
+                                       class="text-dark">
+                                        <%= gs.server_name || gs.server_id %>
                                     </a>
+                                </td>
+                                <td><small class="text-muted"><%= gs.server_type || '–' %></small></td>
+                                <td class="text-right">
+                                    <span class="<%= (gs.allocated_ram_mb || 0) > 0 ? '' : 'text-muted' %>">
+                                        <%= gs.allocated_ram_mb ? gs.allocated_ram_mb.toLocaleString() + ' MB' : '–' %>
+                                    </span>
+                                </td>
+                                <td class="text-right">
+                                    <span class="<%= (gs.allocated_cpu_cores || 0) > 0 ? '' : 'text-muted' %>">
+                                        <%= gs.allocated_cpu_cores || '–' %>
+                                    </span>
+                                </td>
+                                <td class="text-right">
+                                    <span class="<%= (gs.allocated_disk_gb || 0) > 0 ? '' : 'text-muted' %>">
+                                        <%= gs.allocated_disk_gb ? gs.allocated_disk_gb + ' GB' : '–' %>
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <% if (gs.status === 'running') { %>
+                                        <span class="badge badge-success">running</span>
+                                    <% } else if (gs.status === 'stopped') { %>
+                                        <span class="badge badge-secondary">stopped</span>
+                                    <% } else if (gs.status === 'starting') { %>
+                                        <span class="badge badge-warning">starting</span>
                                     <% } else { %>
-                                    <button type="button" 
-                                            class="btn btn-sm btn-success btn-init-quota"
-                                            data-rootserver-id="<%= rs.rootserver_id %>">
-                                        <i class="fas fa-plus"></i> <%= tr('masterserver:QUOTAS.ACTIONS.INITIALIZE') %>
-                                    </button>
+                                        <span class="badge badge-light"><%= gs.status || 'unknown' %></span>
                                     <% } %>
                                 </td>
                             </tr>
-                            <% }); %>
+                        <% }); %>
                         </tbody>
                     </table>
                 </div>
+                <% } else { %>
+                <hr class="mt-3 mb-2">
+                <p class="text-muted text-sm mb-0">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Keine Gameserver auf diesem Node.
+                </p>
                 <% } %>
-            </div>
-        </div>
-        
-    </div>
+
+            </div><!-- /.card-body -->
+        </div><!-- /.card -->
+
+        <% }); %>
+
+    </div><!-- /.container-fluid -->
 </section>
 
-<!-- Initialize Quota Modal -->
-<div class="modal fade" id="initQuotaModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header bg-success">
-                <h5 class="modal-title"><%= tr('masterserver:QUOTAS.MODAL.INIT_TITLE') %></h5>
-                <button type="button" class="close" data-dismiss="modal">
-                    <span>&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="initQuotaForm">
-                    <input type="hidden" id="init_rootserver_id" name="rootserver_id">
-                    
-                    <!-- Profile Selection -->
-                    <div class="form-group">
-                        <label><%= tr('masterserver:QUOTAS.MODAL.SELECT_PROFILE') %></label>
-                        <select class="form-control" name="profileId" id="init_profile_id">
-                            <option value="">-- <%= tr('masterserver:QUOTAS.PROFILES.CUSTOM') %> --</option>
-                            <% profiles.forEach(function(profile) { %>
-                            <option value="<%= profile.id %>" <%= profile.is_default ? 'selected' : '' %>>
-                                <%= profile.display_name %> (<%= (profile.ram_mb / 1024).toFixed(0) %>GB / <%= profile.cpu_cores %> CPU / <%= profile.disk_gb %>GB)
-                            </option>
-                            <% }); %>
-                        </select>
-                    </div>
-                    
-                    <!-- Custom Values (disabled wenn Profil ausgewählt) -->
-                    <div id="customQuotaFields" style="display: none;">
-                        <hr>
-                        <p class="text-muted"><%= tr('masterserver:QUOTAS.MODAL.OR_CUSTOM') %></p>
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label><%= tr('masterserver:QUOTAS.MODAL.CUSTOM_RAM') %></label>
-                                    <input type="number" class="form-control" name="customRamMB" placeholder="16384">
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label><%= tr('masterserver:QUOTAS.MODAL.CUSTOM_CPU') %></label>
-                                    <input type="number" class="form-control" name="customCpuCores" placeholder="4">
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label><%= tr('masterserver:QUOTAS.MODAL.CUSTOM_DISK') %></label>
-                                    <input type="number" class="form-control" name="customDiskGB" placeholder="250">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">
-                    <%= tr('masterserver:COMMON.CANCEL') %>
-                </button>
-                <button type="button" class="btn btn-success" id="btnSubmitInitQuota">
-                    <i class="fas fa-check"></i> <%= tr('masterserver:QUOTAS.ACTIONS.INITIALIZE') %>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
+<!-- ── JavaScript ── -->
 <script>
-// Toggle Custom Fields
-$('#init_profile_id').on('change', function() {
-    if ($(this).val() === '') {
-        $('#customQuotaFields').slideDown();
-    } else {
-        $('#customQuotaFields').slideUp();
-    }
-});
+(function () {
+    'use strict';
 
-// Event-Listener für "Quota initialisieren" Buttons (CSP-konform!)
-$(document).on('click', '.btn-init-quota', function() {
-    const rootserverId = $(this).data('rootserver-id');
-    initializeQuota(rootserverId);
-});
+    const guildId = '<%= guildId %>';
 
-// Event-Listener für Modal-Submit-Button (CSP-konform!)
-$(document).on('click', '#btnSubmitInitQuota', function() {
-    submitInitQuota();
-});
-
-// Initialize Quota für RootServer
-function initializeQuota(rootserverId) {
-    $('#init_rootserver_id').val(rootserverId);
-    $('#initQuotaModal').modal('show');
-}
-
-// Submit Initialize Quota
-function submitInitQuota() {
-    const rootserverId = $('#init_rootserver_id').val();
-    const formData = $('#initQuotaForm').serialize();
-    
-    $.ajax({
-        url: `/guild/<%= guildId %>/plugins/masterserver/quotas/rootserver/${rootserverId}/initialize`,
-        method: 'POST',
-        data: formData,
-        success: function(response) {
-            if (response.success) {
-                toastr.success('<%= tr("masterserver:QUOTAS.MESSAGES.INIT_SUCCESS") %>');
-                $('#initQuotaModal').modal('hide');
-                setTimeout(() => location.reload(), 1500);
-            } else {
-                toastr.error(response.message || '<%= tr("masterserver:QUOTAS.MESSAGES.INIT_ERROR") %>');
+    // ── Überallokation speichern ──────────────────────────────────────────────
+    document.querySelectorAll('.form-overallocation').forEach(function (form) {
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const rsId = form.dataset.rsId;
+            const data = Object.fromEntries(new FormData(form));
+            try {
+                const r = await fetch(`/guild/${guildId}/plugins/masterserver/quotas/rootserver/${rsId}/overallocation`, {
+                    method:  'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ overallocateRam: data.overallocateRam, overallocateDisk: data.overallocateDisk })
+                });
+                const json = await r.json();
+                if (json.success) {
+                    showToast('Überallokation gespeichert.', 'success');
+                    setTimeout(function () { location.reload(); }, 800);
+                } else {
+                    showToast('Fehler: ' + (json.message || 'Unbekannt'), 'error');
+                }
+            } catch (err) {
+                showToast('Netzwerk-Fehler', 'error');
             }
-        },
-        error: function(xhr) {
-            const error = xhr.responseJSON?.message || '<%= tr("masterserver:QUOTAS.MESSAGES.INIT_ERROR") %>';
-            toastr.error(error);
-        }
+        });
     });
-}
+
+    // ── OS-Reservierung speichern ─────────────────────────────────────────────
+    document.querySelectorAll('.form-reserved').forEach(function (form) {
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const rsId = form.dataset.rsId;
+            const data = Object.fromEntries(new FormData(form));
+            try {
+                const r = await fetch(`/guild/${guildId}/plugins/masterserver/quotas/rootserver/${rsId}/reserved`, {
+                    method:  'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ reservedRamMB: data.reservedRamMB, reservedDiskGB: data.reservedDiskGB })
+                });
+                const json = await r.json();
+                if (json.success) {
+                    showToast('Reservierung gespeichert.', 'success');
+                    setTimeout(function () { location.reload(); }, 800);
+                } else {
+                    showToast('Fehler: ' + (json.message || 'Unbekannt'), 'error');
+                }
+            } catch (err) {
+                showToast('Netzwerk-Fehler', 'error');
+            }
+        });
+    });
+
+    // ── Toast Helper ──────────────────────────────────────────────────────────
+    function showToast(msg, type) {
+        if (window.toastr) {
+            if (type === 'success') toastr.success(msg);
+            else toastr.error(msg);
+        } else {
+            alert(msg);
+        }
+    }
+})();
 </script>

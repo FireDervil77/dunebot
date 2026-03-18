@@ -1,6 +1,6 @@
 {
   "meta": {
-    "version": "PTDL_v2",
+    "version": "FIREBOT_v2",
     "author": "DuneBot Official",
     "update_url": null
   },
@@ -320,6 +320,10 @@
       "protocol": "tcp",
       "description": "RCON Port"
     }
+  },
+  "query": {
+    "gamedig_type": "arkse",
+    "port_var": "query"
   },
   "requirements": {
     "ram_min_mb": 6144,

@@ -18,11 +18,10 @@ class PluginManager extends BasePluginManager {
     /**
      * Erstellt eine neue Instanz des Bot Plugin Managers
      * @param {import('discord.js').Client} client - Discord.js Client
-     * @param {string} registryPath - Pfad zur Plugin-Registry
      * @param {string} pluginDir - Pfad zum Plugin-Verzeichnis
      */
-    constructor(client, registryPath, pluginDir) {
-        super(registryPath, pluginDir);
+    constructor(client, pluginDir) {
+        super(pluginDir);
         this.client = client;
         
         // NEU: Config-System initialisieren

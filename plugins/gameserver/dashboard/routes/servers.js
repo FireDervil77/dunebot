@@ -10,6 +10,7 @@ const router = express.Router();
 const path = require('path');
 const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
+const QueryService = require('../helpers/QueryService');
 // const TemplateEngine = require('../helpers/TemplateEngine'); // ENTFERNT - existiert nicht mehr
 // const PortValidator = require('../helpers/PortValidator'); // ENTFERNT - existiert nicht mehr
 
@@ -550,7 +551,7 @@ router.post('/', async (req, res) => {
             gameData.docker_image = Object.values(gameData.docker_images)[0] || '';
         }
 
-        // 2. Installation aus scripts.installation → installation (flach)
+        // 2. Pterodactyl-Format: scripts.installation → installation (flach)
         if (!gameData.installation && gameData.scripts?.installation) {
             const si = gameData.scripts.installation;
 			// CRLF → LF normalisieren (Pterodactyl-Eggs haben oft Windows-Zeilenenden)
@@ -558,6 +559,14 @@ router.post('/', async (req, res) => {
 			gameData.installation = {
 				docker_image:    si.container || '',            // Install-Container-Image
 				script_content:  scriptRaw,                    // Install-Script (LF-normalisiert)
+            };
+        }
+        // 2b. DuneBot-Native-Format: installation.script → script_content
+        // (Valheim, eigene Addons nutzen 'script' statt 'script_content')
+        if (gameData.installation?.script && !gameData.installation?.script_content) {
+            gameData.installation = {
+                ...gameData.installation,
+                script_content: gameData.installation.script.replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
             };
         }
 
@@ -592,8 +601,16 @@ router.post('/', async (req, res) => {
             });
         }
 
-        // Alle variable_* Fields aus req.body sammeln
+        // Alle variable_* Fields aus req.body sammeln (Key ist der ENV-Variable-Name, z.B. SERVER_NAME)
+        // Anschliessend Defaults für fehlende Variablen aus game_data.variables ergänzen
         const envVariables = {};
+        // Zuerst alle Defaults aus game_data.variables als Basis
+        if (Array.isArray(gameData.variables)) {
+            for (const v of gameData.variables) {
+                if (v.env_variable) envVariables[v.env_variable] = v.default_value ?? '';
+            }
+        }
+        // Dann User-Eingaben aus dem Formular überschreiben (höchste Priorität)
         Object.keys(req.body).forEach((key) => {
             if (key.startsWith('variable_')) {
                 const varName = key.replace('variable_', '');
@@ -620,8 +637,105 @@ router.post('/', async (req, res) => {
                 protocol: 'udp'
             };
         }
+
+        // ✅ Query-Port aus game_data.query.port_var ableiten (z.B. "game_plus_1" → game + 1)
+        // Damit wird der Port automatisch im Container gemappt und ist für GameDig erreichbar.
+        const queryPortVar = gameData?.query?.port_var;
+        if (queryPortVar && !ports.query) {
+            const plusMatch = queryPortVar.match(/^(.+)_plus_(\d+)$/);
+            if (plusMatch && ports[plusMatch[1]]) {
+                const basePort = ports[plusMatch[1]].internal;
+                const offset = parseInt(plusMatch[2], 10);
+                ports.query = {
+                    internal: basePort + offset,
+                    external: basePort + offset,
+                    protocol: ports[plusMatch[1]].protocol || 'udp'
+                };
+                Logger.debug(`[Gameserver] Query-Port auto-abgeleitet: ${queryPortVar} → ${basePort + offset}`);
+            }
+        }
+
+        // ✅ Port-Zuweisung: User-Wahl oder Auto-Assign aus port_allocations Pool
+        const userPort = req.body.game_port; // "auto" oder eine Port-Nummer
+        const allocatedFromPool = {};
+        
+        if (rootserver_id) {
+            if (userPort && userPort !== 'auto') {
+                // User hat einen spezifischen Port gewählt → validieren gegen Pool
+                const requestedPort = parseInt(userPort);
+                if (isNaN(requestedPort) || requestedPort < 1024 || requestedPort > 65535) {
+                    return res.status(400).json({ success: false, message: 'Ungültiger Port (1024-65535)' });
+                }
+                const [matchAlloc] = await dbService.query(
+                    `SELECT id, port FROM port_allocations 
+                     WHERE rootserver_id = ? AND port = ? AND server_id IS NULL LIMIT 1`,
+                    [rootserver_id, requestedPort]
+                );
+                if (matchAlloc) {
+                    await dbService.query(
+                        'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
+                        [matchAlloc.id]
+                    );
+                    ports.game.internal = matchAlloc.port;
+                    ports.game.external = matchAlloc.port;
+                    allocatedFromPool.game = { allocId: matchAlloc.id, port: matchAlloc.port };
+                    Logger.info(`[Gameserver] Port game user-selected: ${matchAlloc.port} (Allocation #${matchAlloc.id})`);
+                } else {
+                    return res.status(400).json({ success: false, message: `Port ${requestedPort} ist nicht verfügbar oder nicht im Allocation-Pool` });
+                }
+            } else {
+                // Auto-Assign: für jeden Port-Typ den nächsten freien aus dem Pool holen
+                const portTypes = Object.keys(ports);
+                for (const portType of portTypes) {
+                    const [freeAlloc] = await dbService.query(
+                        `SELECT id, port FROM port_allocations 
+                         WHERE rootserver_id = ? AND server_id IS NULL 
+                         ORDER BY port ASC LIMIT 1`,
+                        [rootserver_id]
+                    );
+                    if (freeAlloc) {
+                        await dbService.query(
+                            'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
+                            [freeAlloc.id]
+                        );
+                        ports[portType].internal = freeAlloc.port;
+                        ports[portType].external = freeAlloc.port;
+                        allocatedFromPool[portType] = { allocId: freeAlloc.id, port: freeAlloc.port };
+                        Logger.info(`[Gameserver] Port ${portType} auto-assigned: ${freeAlloc.port} (Allocation #${freeAlloc.id})`);
+                    } else {
+                        Logger.warn(`[Gameserver] Kein freier Port im Allocation-Pool für Typ '${portType}' — nutze Default ${ports[portType].external}`);
+                    }
+                }
+            }
+        }
         
         Logger.debug('[Gameserver] Ports konfiguriert:', ports);
+
+        // ✅ daemon_auto_assign Variablen auf echte Werte mappen
+        // Eggs die SERVER_PORT/SERVER_IP/TZ in variables[] definieren, bekommen hier
+        // automatisch die korrekten Werte — User-Eingaben aus dem Formular werden überschrieben.
+        // Generisch: Für jeden Port-Typ wird die passende ENV-Variable gesetzt
+        // z.B. ports.game → SERVER_PORT, ports.query → QUERY_PORT
+        for (const [portType, portData] of Object.entries(ports)) {
+            const envKey = portType.toUpperCase() + '_PORT';
+            if (envKey in envVariables) {
+                envVariables[envKey] = String(portData.internal || portData.external || 27015);
+                Logger.debug(`[Gameserver] ${envKey} auto-mapped → ${envVariables[envKey]}`);
+            }
+            // SERVER_PORT als Alias für game/main Port
+            if ((portType === 'game' || portType === 'main') && 'SERVER_PORT' in envVariables) {
+                envVariables.SERVER_PORT = String(portData.internal || portData.external || 27015);
+                Logger.debug(`[Gameserver] SERVER_PORT auto-mapped → ${envVariables.SERVER_PORT}`);
+            }
+        }
+        if ('SERVER_IP' in envVariables) {
+            envVariables.SERVER_IP = '0.0.0.0';
+            Logger.debug('[Gameserver] SERVER_IP auto-mapped → 0.0.0.0');
+        }
+        if ('TZ' in envVariables && !envVariables.TZ) {
+            // Nur befüllen wenn leer (User-Wert/Egg-Default behalten)
+            envVariables.TZ = 'UTC';
+        }
 
         // User-ID aus Session extrahieren (falls vorhanden)
         const userId = res.locals.user?.id || '0';
@@ -670,9 +784,26 @@ router.post('/', async (req, res) => {
 
         const serverId = result.insertId;
 
+        // ✅ Port-Allocations mit echter server_id aktualisieren
+        if (Object.keys(allocatedFromPool).length > 0) {
+            for (const [portType, alloc] of Object.entries(allocatedFromPool)) {
+                await dbService.query(
+                    'UPDATE port_allocations SET server_id = ?, assigned_at = NOW() WHERE id = ?',
+                    [serverId, alloc.allocId]
+                );
+            }
+            Logger.info(`[Gameserver] ${Object.keys(allocatedFromPool).length} Port-Allocations für Server ${serverId} zugewiesen`);
+        }
+
         // Install-Pfad: {serverid}-{slug} — deterministisch, identisch zur Daemon-Logik
         const finalInstallPath = `${serverId}-${addon_slug}`;
         await dbService.query('UPDATE gameservers SET install_path = ? WHERE id = ?', [finalInstallPath, serverId]);
+
+        // bind_ip aus rootserver.host setzen (damit Ports auf der richtigen IP landen)
+        // Fallback-Kette: explizite bind_ip aus Step3-Form → rootserver.host → null (daemon.yaml)
+        if (rootserver.host) {
+            await dbService.query('UPDATE gameservers SET bind_ip = ? WHERE id = ?', [rootserver.host, serverId]);
+        }
 
         // ✅ SFTP-Credentials direkt beim Server-Erstellen setzen
         // Username = system_user des Rootservers (Linux-User dem das Verzeichnis gehört)
@@ -761,6 +892,28 @@ router.post('/', async (req, res) => {
                             [JSON.stringify(realPorts), serverId]
                         );
                         Logger.success(`[Gameserver] Ports in DB aktualisiert für Server ${serverId}`);
+
+                        // ✅ Port ENV-Variablen mit tatsächlich allokierten Ports synchronisieren
+                        let envUpdated = false;
+                        for (const [portType, allocPort] of Object.entries(allocatedPorts)) {
+                            const envKey = portType.toUpperCase() + '_PORT';
+                            if (envKey in envVariables) {
+                                envVariables[envKey] = String(allocPort);
+                                envUpdated = true;
+                                Logger.debug(`[Gameserver] ${envKey} in env_variables → ${allocPort}`);
+                            }
+                            if ((portType === 'game' || portType === 'main') && 'SERVER_PORT' in envVariables) {
+                                envVariables.SERVER_PORT = String(allocPort);
+                                envUpdated = true;
+                                Logger.debug(`[Gameserver] SERVER_PORT in env_variables → ${allocPort}`);
+                            }
+                        }
+                        if (envUpdated) {
+                            await dbService.query(
+                                'UPDATE gameservers SET env_variables = ? WHERE id = ?',
+                                [JSON.stringify(envVariables), serverId]
+                            );
+                        }
                     }
                     // Status wird vom Daemon via Heartbeat aktualisiert
                 } else {
@@ -912,6 +1065,54 @@ router.get('/status', async (req, res) => {
 });
 
 /**
+ * GET /guild/:guildId/plugins/gameserver/servers/:serverId/query
+ * Live-Status-Abfrage via GameDig (A2S, Minecraft, etc.)
+ * Gibt: name, map, ping, players[], maxPlayers, connect
+ * @permission GAMESERVER.VIEW
+ */
+router.get('/:serverId/query', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const guildId = res.locals.guildId;
+        const serverId = req.params.serverId;
+
+        const [server] = await dbService.query(`
+            SELECT
+                gs.id, gs.ports, gs.bind_ip,
+                r.host AS rootserver_ip,
+                am.game_data
+            FROM gameservers gs
+            LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+            LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
+            WHERE gs.id = ? AND gs.guild_id = ?
+        `, [serverId, guildId]);
+
+        if (!server) {
+            return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+        }
+
+        const { ports, gameData } = QueryService.parseServerData(server);
+        const result = await QueryService.query({
+            host:     server.bind_ip || server.rootserver_ip,
+            ports,
+            gameData,
+        });
+
+        if (!result.success) {
+            Logger.debug(`[Gameserver] Query fehlgeschlagen für Server ${serverId}: ${result.error}`);
+        }
+
+        return res.json(result);
+
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler bei Live-Query:', error);
+        return res.status(500).json({ success: false, error: 'Interner Serverfehler' });
+    }
+});
+
+/**
  * GET /guild/:guildId/plugins/gameserver/servers/:serverId
  * Server-Detail-Ansicht mit Tabbed-Interface
  * @permission GAMESERVER.VIEW
@@ -932,6 +1133,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         const [server] = await dbService.query(`
             SELECT 
                 gs.id,
+                gs.guild_id,
                 gs.name,
                 gs.status,
                 gs.current_players,
@@ -1016,7 +1218,15 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // Ports zum Server-Objekt hinzufügen (für einfacheren Zugriff in View)
         server.ip_address = server.rootserver_ip || 'N/A';
         server.port_game = ports.game?.external || ports.game?.internal || ports.main?.external || null;
-        server.port_query = ports.query?.external || ports.query?.internal || null;
+        // Query-Port: erst explizite "query"-Sektion, dann port_var aus Addon-Konfiguration auflösen
+        // "game_plus_1" ist eine spezielle Convention: Query-Port = Game-Port + 1 (z.B. Valheim 27030 → 27031)
+        const queryPortVar = gameData?.query?.port_var || null;
+        if (queryPortVar === 'game_plus_1' && server.port_game) {
+            server.port_query = server.port_game + 1;
+        } else {
+            server.port_query = ports.query?.external || ports.query?.internal ||
+                (queryPortVar && ports[queryPortVar] ? (ports[queryPortVar].external || ports[queryPortVar].internal) : null) || null;
+        }
         server.port_rcon = ports.rcon?.external || ports.rcon?.internal || null;
         server.ports_parsed = ports; // Original-Struktur für erweiterte Ansicht
 
@@ -1062,6 +1272,9 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         }
 
         // View rendern
+        // gamedig_type für Live-Query-Panel in der View bereitstellen
+        server.gamedig_type = gameData?.query?.gamedig_type || null;
+
         await themeManager.renderView(res, 'guild/server-detail', {
             title: `Server: ${server.name}`,
             activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
@@ -1179,6 +1392,8 @@ router.put('/:serverId/start', async (req, res) => {
                 gs.launch_params,
                 gs.ports,
                 gs.env_variables,
+                gs.frozen_game_data,
+                gs.template_name,
                 am.slug as addon_slug,
                 r.daemon_id
             FROM gameservers gs
@@ -1237,17 +1452,79 @@ router.put('/:serverId/start', async (req, res) => {
         // ✅ FIX: Ohne /gameservers/ Prefix - wird vom Daemon als relativer Pfad behandelt
         const installPath = server.install_path || `${server.addon_slug}-${serverId}`;
         
+        // JSON-Felder aus DB parsen (werden als Strings gespeichert)
+        let parsedPorts = {};
+        let parsedEnvVars = {};
+        try {
+            parsedPorts = typeof server.ports === 'string' ? JSON.parse(server.ports) : (server.ports || {});
+        } catch (_) {}
+        try {
+            parsedEnvVars = typeof server.env_variables === 'string' ? JSON.parse(server.env_variables) : (server.env_variables || {});
+        } catch (_) {}
+        
         // Start-Command an Daemon senden
         Logger.info(`[Gameserver] Sende Start-Command an Daemon ${daemonId} für Server ${serverId}`);
         
+        // game_data aus frozen_game_data rekonstruieren (docker_image, runtime, config)
+        let startGameData = {};
+        try {
+            const frozenData = typeof server.frozen_game_data === 'string'
+                ? JSON.parse(server.frozen_game_data)
+                : server.frozen_game_data;
+            if (frozenData) {
+                // Docker-Image
+                const dockerImages = frozenData.docker_images || {};
+                const imgKeys = Object.keys(dockerImages);
+                if (imgKeys.length > 0) startGameData.docker_image = dockerImages[imgKeys[0]];
+
+                // Runtime (stop, done_string)
+                const rt = { stop_mode: 'sigterm', stop_command: '', stop_timeout_sec: 30, done_string: '' };
+                const stopSignal = frozenData.startup?.stop || '';
+                if (stopSignal === '^C') rt.stop_mode = 'sigint';
+                else if (stopSignal) { rt.stop_mode = 'console_command'; rt.stop_command = stopSignal; }
+                if (frozenData.startup?.done) rt.done_string = frozenData.startup.done;
+                startGameData.runtime = rt;
+
+                // Config-Files für Patching
+                if (frozenData.config?.files && Object.keys(frozenData.config.files).length > 0) {
+                    startGameData.config = frozenData.config;
+                }
+
+                // Template-Override Merge: Wenn ein Template gewählt wurde, dessen Overrides einmergen
+                if (server.template_name && Array.isArray(frozenData.templates)) {
+                    const tpl = frozenData.templates.find(t => t.name === server.template_name);
+                    if (tpl) {
+                        // Template-Variablen in env_variables mergen (Template gewinnt)
+                        if (tpl.variables) Object.assign(parsedEnvVars, tpl.variables);
+                        // Template-Config-Overrides in config.files mergen
+                        if (tpl.config_overrides) {
+                            if (!startGameData.config) startGameData.config = { files: {} };
+                            if (!startGameData.config.files) startGameData.config.files = {};
+                            for (const [fname, overrides] of Object.entries(tpl.config_overrides)) {
+                                if (!startGameData.config.files[fname]) {
+                                    startGameData.config.files[fname] = { parser: 'file', find: {} };
+                                }
+                                Object.assign(startGameData.config.files[fname].find, overrides);
+                            }
+                        }
+                        Logger.debug(`[Gameserver] Template "${server.template_name}" Overrides angewendet`);
+                    }
+                }
+            }
+        } catch (e) {
+            Logger.warn(`[Gameserver] frozen_game_data parsen fehlgeschlagen: ${e.message}`);
+        }
+
         const response = await ipmServer.sendCommand(daemonId, 'gameserver.start', {
             server_id: serverId.toString(),
             rootserver_id: server.rootserver_id,
             addon_slug: server.addon_slug,
-            startup_command: './start.sh',
-            ports: server.ports,
-            env_variables: server.env_variables,
-            guild_id: guildId
+            startup_command: server.launch_params || './start.sh',
+            ports: parsedPorts,
+            env_variables: parsedEnvVars,
+            guild_id: guildId,
+            bind_ip: server.bind_ip || null,
+            game_data: startGameData
         }, 30000);
 
         if (!response.success) {
@@ -1397,6 +1674,7 @@ router.delete('/:serverId', async (req, res) => {
 
                 const uninstallPayload = {
                     server_id: serverId.toString(),
+                    guild_id: guildId,
                     rootserver_id: server.rootserver_id,
                     daemon_id: server.daemon_id,
                     addon_slug: server.addon_slug
@@ -1452,6 +1730,13 @@ router.delete('/:serverId', async (req, res) => {
         // 4. DB-Cleanup: Server aus Datenbank löschen (NUR wenn Daemon erfolgreich!)
         // ════════════════════════════════════════════════════════════
         if (uninstallSuccess) {
+            // ✅ Port-Allocations freigeben (server_id zurück auf NULL)
+            await dbService.query(
+                'UPDATE port_allocations SET server_id = NULL, assigned_at = NULL WHERE server_id = ?',
+                [serverId]
+            );
+            Logger.info(`[Gameserver] Port-Allocations für Server ${serverId} freigegeben`);
+
             await dbService.query('DELETE FROM gameservers WHERE id = ?', [serverId]);
             Logger.success(`[Gameserver] Server ${serverId} aus DB gelöscht`);
 
@@ -1746,7 +2031,10 @@ router.post('/:serverId/retry-installation', async (req, res) => {
             steam_app_id: retrySteamAppId,
             startup_command: server.launch_params,
             ports,
-            env_variables: envVariables
+            env_variables: envVariables,
+            game_data: gameData,
+            run_install: true,
+            start_after: false
         }, 60000);
 
         if (response.success) {
@@ -1878,10 +2166,22 @@ router.post('/:serverId/start', async (req, res) => {
         
         Logger.debug(`[Gameserver] Alle Ports verfügbar ✓`);
 
+        // 🔥 TEMPLATE-OVERRIDE: Wenn ein Template gewählt wurde, Variablen-Overrides VOR Substitution einmergen
+        try {
+            const frozenForTemplate = typeof server.frozen_game_data === 'string'
+                ? JSON.parse(server.frozen_game_data)
+                : server.frozen_game_data;
+            if (server.template_name && Array.isArray(frozenForTemplate?.templates)) {
+                const tpl = frozenForTemplate.templates.find(t => t.name === server.template_name);
+                if (tpl?.variables) {
+                    Object.assign(envVariables, tpl.variables);
+                    Logger.debug(`[Gameserver] Template "${server.template_name}" Variablen-Overrides angewendet`);
+                }
+            }
+        } catch (_) { /* frozen_game_data wird unten erneut geparst */ }
+
         // 🔥 VARIABLE-SUBSTITUTION: {{WORLD}} → "BoomTown", {{PASSWORD}} → "einstein", etc.
-        // envVariables ist mit Display-Namen als Keys gespeichert (z.B. {"World Name": "BoomTown"}).
-        // Die Templates nutzen env_variable-Namen als Platzhalter (z.B. {{WORLD}}).
-        // Mapping über frozen_game_data.variables: {name: "World Name", env_variable: "WORLD", ...}
+        // envVariables nutzt env_variable-Keys (z.B. "SERVER_NAME", "WORLD")
         let startupCommand = server.launch_params;
         
         try {
@@ -1892,7 +2192,7 @@ router.post('/:serverId/start', async (req, res) => {
                 for (const varDef of frozenVars.variables) {
                     const envKey = varDef.env_variable;     // z.B. "WORLD"
                     const displayName = varDef.name;        // z.B. "World Name"
-                    const value = envVariables[displayName] ?? varDef.default_value ?? '';
+                    const value = envVariables[envKey] ?? envVariables[displayName] ?? varDef.default_value ?? '';
                     startupCommand = startupCommand.replace(new RegExp(`{{${envKey}}}`, 'g'), String(value));
                 }
             } else {
@@ -1905,10 +2205,18 @@ router.post('/:serverId/start', async (req, res) => {
             Logger.warn(`[Gameserver] Variable-Substitution fehlgeschlagen: ${e.message}`);
         }
         
-        // Ersetze Port-Variablen
-        for (const [key, value] of Object.entries(ports)) {
-            const placeholder = `{{${key}}}`;
-            startupCommand = startupCommand.replace(new RegExp(placeholder, 'g'), String(value));
+        // Ersetze Port-Variablen (ports = {"game": {"internal": 27030, ...}})
+        for (const [key, portData] of Object.entries(ports)) {
+            const portValue = typeof portData === 'object' ? (portData.internal || portData.external) : portData;
+            if (portValue !== undefined) {
+                // z.B. GAME_PORT
+                const envKey = key.toUpperCase() + '_PORT';
+                startupCommand = startupCommand.replace(new RegExp(`{{${envKey}}}`, 'g'), String(portValue));
+                // SERVER_PORT für game/main Port
+                if (key === 'game' || key === 'main') {
+                    startupCommand = startupCommand.replace(/\{\{SERVER_PORT\}\}/g, String(portValue));
+                }
+            }
         }
 
         Logger.debug(`[Gameserver] Startup-Command nach Variable-Substitution:`, {
@@ -1922,7 +2230,8 @@ router.post('/:serverId/start', async (req, res) => {
 
         // Docker-Image und Runtime-Info aus frozen_game_data extrahieren
         let dockerImage = null;
-        let gameDataRuntime = { stop_mode: 'sigterm', stop_command: '', stop_timeout_sec: 30 };
+        let gameDataRuntime = { stop_mode: 'sigterm', stop_command: '', stop_timeout_sec: 30, done_string: '' };
+        let gameDataConfig = null; // config.files für Config-Patching vor Start
 
         try {
             const frozenData = typeof server.frozen_game_data === 'string'
@@ -1944,6 +2253,33 @@ router.post('/:serverId/start', async (req, res) => {
                 } else if (stopSignal && stopSignal !== '') {
                     gameDataRuntime.stop_mode = 'console_command';
                     gameDataRuntime.stop_command = stopSignal;
+                }
+
+                // done_string: Konsolen-String der signalisiert dass der Server bereit ist
+                if (frozenData.startup?.done) {
+                    gameDataRuntime.done_string = frozenData.startup.done;
+                }
+
+                // config.files: Config-Patching Definition (Parser + Find-Keys)
+                if (frozenData.config?.files && Object.keys(frozenData.config.files).length > 0) {
+                    gameDataConfig = frozenData.config;
+                    Logger.debug(`[Gameserver] ${Object.keys(frozenData.config.files).length} Config-Dateien für Patching geladen`);
+                }
+
+                // Template-Config-Overrides mergen
+                if (server.template_name && Array.isArray(frozenData.templates)) {
+                    const tpl = frozenData.templates.find(t => t.name === server.template_name);
+                    if (tpl?.config_overrides) {
+                        if (!gameDataConfig) gameDataConfig = { files: {} };
+                        if (!gameDataConfig.files) gameDataConfig.files = {};
+                        for (const [fname, overrides] of Object.entries(tpl.config_overrides)) {
+                            if (!gameDataConfig.files[fname]) {
+                                gameDataConfig.files[fname] = { parser: 'file', find: {} };
+                            }
+                            Object.assign(gameDataConfig.files[fname].find, overrides);
+                        }
+                        Logger.debug(`[Gameserver] Template "${server.template_name}" Config-Overrides angewendet`);
+                    }
                 }
             }
         } catch (e) {
@@ -1996,10 +2332,12 @@ router.post('/:serverId/start', async (req, res) => {
             ports,
             env_variables: envVariables,
             guild_id: guildId,
+            bind_ip: server.bind_ip || null,
             // Docker-spezifische Felder die der Daemon für StartContainer() braucht:
             game_data: {
                 docker_image: dockerImage,
-                runtime: gameDataRuntime
+                runtime: gameDataRuntime,
+                ...(gameDataConfig ? { config: gameDataConfig } : {})
             }
         }, 30000);
 
@@ -2014,15 +2352,16 @@ router.post('/:serverId/start', async (req, res) => {
                     task_id: response.task_id
                 });
             } else {
-                // Sync: Server ist direkt gestartet (Legacy-Pfad ohne Task-Queue)
+                // Sync: Container wurde direkt gestartet – done_string wird vom Daemon abgewartet.
+                // Status bleibt 'starting', der Daemon sendet das "running" Event wenn spielbereit.
                 await dbService.query(
-                    'UPDATE gameservers SET status = ?, last_started_at = NOW() WHERE id = ?',
-                    ['online', serverId]
+                    'UPDATE gameservers SET last_started_at = NOW() WHERE id = ?',
+                    [serverId]
                 );
-                Logger.success(`[Gameserver] Server ${serverId} gestartet`);
+                Logger.success(`[Gameserver] Server ${serverId} wird gestartet (warte auf done_string)`);
                 res.json({
                     success: true,
-                    message: `Server "${server.name}" wurde gestartet`
+                    message: `Server "${server.name}" wird gestartet...`
                 });
             }
         } else {
@@ -2464,6 +2803,65 @@ router.put('/:serverId/launch-params', requirePermission('GAMESERVER.EDIT'), asy
             success: false,
             message: 'Serverfehler beim Speichern der Start-Parameter'
         });
+    }
+});
+
+// ============================================================
+// PORTS: Server-Ports aktualisieren
+// PUT /guild/:guildId/plugins/gameserver/servers/:serverId/ports
+// ============================================================
+router.put('/:serverId/ports', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const guildId = res.locals.guildId;
+        const serverId = req.params.serverId;
+        const portUpdates = req.body; // { game: 27015, query: 27016, ... }
+
+        if (!portUpdates || typeof portUpdates !== 'object') {
+            return res.status(400).json({ success: false, message: 'Ungültiges Format – erwartet { portKey: portNumber }' });
+        }
+
+        const [server] = await dbService.query(
+            'SELECT id, status, ports FROM gameservers WHERE id = ? AND guild_id = ?',
+            [serverId, guildId]
+        );
+        if (!server) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        if (server.status === 'online' || server.status === 'starting') {
+            return res.status(409).json({ success: false, message: 'Ports können nicht geändert werden solange der Server läuft' });
+        }
+
+        // Validierung: nur gültige Port-Nummern
+        for (const [key, val] of Object.entries(portUpdates)) {
+            if (!/^[a-zA-Z0-9_]+$/.test(key)) return res.status(400).json({ success: false, message: `Ungültiger Port-Key: ${key}` });
+            const p = parseInt(val, 10);
+            if (isNaN(p) || p < 1024 || p > 65535) return res.status(400).json({ success: false, message: `Ungültiger Port-Wert für "${key}": ${val}` });
+        }
+
+        // Bestehende Ports laden und mergen
+        let currentPorts = {};
+        try { currentPorts = typeof server.ports === 'string' ? JSON.parse(server.ports) : (server.ports || {}); } catch (_) {}
+
+        for (const [key, val] of Object.entries(portUpdates)) {
+            const p = parseInt(val, 10);
+            if (!currentPorts[key]) currentPorts[key] = {};
+            currentPorts[key].external = p;
+            currentPorts[key].internal = p;
+        }
+
+        await dbService.query(
+            'UPDATE gameservers SET ports = ?, updated_at = NOW() WHERE id = ?',
+            [JSON.stringify(currentPorts), serverId]
+        );
+
+        Logger.info(`[Gameserver] Ports aktualisiert für Server ${serverId}: ${JSON.stringify(portUpdates)}`);
+        return res.json({ success: true, message: 'Ports gespeichert', ports: currentPorts });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Aktualisieren der Ports:', error);
+        return res.status(500).json({ success: false, message: 'Interner Fehler' });
     }
 });
 

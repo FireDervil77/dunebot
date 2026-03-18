@@ -63,5 +63,7 @@ async function softban(issuer, target, reason) {
         return guild.getT("moderation:SOFTBAN.BOT_PERM", { target: target.username });
     else if (response === "MEMBER_PERM")
         return guild.getT("moderation:SOFTBAN.MEMBER_PERM", { target: target.username });
+    else if (response === "PROTECTED_ROLE")
+        return guild.getT("moderation:PROTECTED_ROLE", { target: target.username });
     else return guild.getT("moderation:SOFTBAN.FAILED", { target: target.username });
 }

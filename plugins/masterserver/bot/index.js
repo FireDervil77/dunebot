@@ -1,44 +1,32 @@
-/**
- * Greeting-Plugin für DuneBot - Bot-Teil
- * 
- * @author DuneBot Team
- */
-const path = require('path');
+'use strict';
+
 const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 /**
- * Greeting-Plugin für den Bot-Teil von DuneBot
- * 
- * ANLEITUNG:
- * 1. Ersetzen Sie 'template' durch den Namen Ihres Plugins
- * 2. Aktualisieren Sie displayName, description, author
- * 3. Implementieren Sie die Lifecycle-Methoden nach Bedarf
- * 4. Fügen Sie Commands in bot/commands/ hinzu
- * 5. Fügen Sie Events in bot/events/ hinzu
- * 
+ * Masterserver Bot-Plugin
+ * Stellt /daemon Slash-Commands für Rootserver-Verwaltung bereit.
+ *
+ * Commands (bot/commands/):
+ *   daemon.js  — /daemon list | status | register | apikey | delete
+ *
  * @extends {BotPlugin}
- * @author FireBot Team
  */
 class MasterserverBotPlugin extends BotPlugin {
-    /**
-     * Erstellt eine neue Instanz des Masterserver-Bot-Plugins
-     */
     constructor() {
         super({
             name: 'masterserver',
-            displayName: 'Masterserver - Plugin',
-            description: 'Ein Masterserver-Plugin für FireBot',
+            displayName: 'Masterserver',
+            description: 'Rootserver & Daemon-Verwaltung via Discord',
             version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireDervil',
-            icon: 'fa-solid fa-puzzle-piece',
+            icon: 'fa-solid fa-server',
             baseDir: __dirname,
-            ownerOnly: false
+            ownerOnly: false,
         });
-        
-        const Logger = ServiceManager.get("Logger");
-        Logger.debug('[Masterserver]-Bot-Plugin initialisiert');
-    }
 
+        ServiceManager.get('Logger').debug('[Masterserver] Bot-Plugin initialisiert');
+    }
 }
-module.exports = new MasterserverBotPlugin;
+
+module.exports = new MasterserverBotPlugin();

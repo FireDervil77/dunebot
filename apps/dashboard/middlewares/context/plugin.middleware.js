@@ -159,7 +159,7 @@ module.exports.dashboard = async (req, res, next) => {
     const pluginCmds = ipcResp.success ? ipcResp.data : { prefix: [], slash: [] };
 
     const navigation = await dbService.query(
-        "SELECT * FROM nav_items WHERE guildId = ? ORDER BY plugin ASC, order_num ASC",
+        "SELECT * FROM guild_nav_items WHERE guildId = ? ORDER BY plugin ASC, order_num ASC",
         [req.params.guildId || null]
     );
 

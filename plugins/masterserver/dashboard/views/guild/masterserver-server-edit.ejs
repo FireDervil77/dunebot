@@ -160,28 +160,7 @@
                                         </small>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label for="portRangeStart">Port-Range Start</label>
-                                        <input type="number"
-                                               class="form-control"
-                                               id="portRangeStart"
-                                               name="portRangeStart"
-                                               value="<%= server.port_range_start || '' %>"
-                                               placeholder="25565">
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label for="portRangeEnd">Port-Range Ende</label>
-                                        <input type="number"
-                                               class="form-control"
-                                               id="portRangeEnd"
-                                               name="portRangeEnd"
-                                               value="<%= server.port_range_end || '' %>"
-                                               placeholder="25665">
-                                    </div>
-                                </div>
+                                <!-- Port-Range entfernt: Wird über Port-Allocations verwaltet -->
                             </div>
 
                             <!-- Standort -->
@@ -378,9 +357,7 @@
                             <li class="mb-2">
                                 <strong>Resource-Limits:</strong> Limits gelten für alle Gameserver auf diesem Server zusammen.
                             </li>
-                            <li class="mb-2">
-                                <strong>Port-Range:</strong> Definiert welche Ports für Gameserver verfügbar sind.
-                            </li>
+
                             <li class="mb-2">
                                 <strong>Status-Änderung:</strong> "Wartung" verhindert das Starten neuer Gameserver.
                             </li>

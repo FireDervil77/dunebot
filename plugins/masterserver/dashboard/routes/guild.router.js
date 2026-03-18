@@ -69,9 +69,6 @@ router.get('/dashboard', async (req, res) => {
         // Server-Statistiken für physische RootServer (nicht Gameserver!)
         const serverStats = await RootServer.getStats(guildId);
 
-        // Token-Statistiken (nutzt guild_id, nicht daemon_id!)
-        const tokenStats = await DaemonToken.getStats(guildId);
-
         // Online-Status vom IPMServer
         const isOnline = daemon ? ipmServer.isDaemonOnline(daemon.daemon_id) : false;
 
@@ -81,7 +78,6 @@ router.get('/dashboard', async (req, res) => {
             daemon,
             isOnline,
             serverStats,
-            tokenStats,
             guildId
         });
 
@@ -564,8 +560,6 @@ router.post('/servers/create', async (req, res) => {
             cpuCores,        // CPU-Kerne (name="cpuCores")
             ramTotal,        // RAM in GB (name="ramTotal")
             diskTotal,       // Disk in GB (name="diskTotal")
-            portRangeStart,  // Port-Bereich Start
-            portRangeEnd,    // Port-Bereich Ende
             datacenter,      // Datacenter-Name
             countryCode,     // Ländercode (z.B. "DE")
             quotaProfileId   // Quota-Profil ID (optional)
@@ -669,8 +663,6 @@ router.post('/servers/create', async (req, res) => {
             cpu_threads: null,
             ramTotal,
             diskTotal,
-            portRangeStart,
-            portRangeEnd,
             datacenter,
             countryCode,
             description
@@ -682,9 +674,9 @@ router.post('/servers/create', async (req, res) => {
              (daemon_id, guild_id, owner_user_id, system_user, name, host, hostname,
               daemon_port, base_directory, api_key,
               cpu_cores, cpu_threads, ram_total_gb, disk_total_gb,
-              port_range_start, port_range_end, datacenter, country_code, description,
+              datacenter, country_code, description,
               install_status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW(), NOW())`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW(), NOW())`,
             [
                 daemon.daemon_id,
                 guildId,
@@ -700,8 +692,6 @@ router.post('/servers/create', async (req, res) => {
                 null, // cpu_threads - wird vom Daemon via Heartbeat gefüllt
                 ramTotal ? parseFloat(ramTotal) : null, // User-Limit (optional)
                 diskTotal ? parseFloat(diskTotal) : null, // User-Limit (optional)
-                portRangeStart ? parseInt(portRangeStart) : null, // Port-Pool Start
-                portRangeEnd ? parseInt(portRangeEnd) : null, // Port-Pool Ende
                 datacenter || null, // Datacenter-Standort
                 countryCode || null, // ISO-Ländercode (DE, US, etc.)
                 description || null // User-Beschreibung
@@ -738,10 +728,7 @@ router.post('/servers/create', async (req, res) => {
                     server_name: name.trim(),
                     username: systemUser,
                     ram_limit_gb: ramTotal ? parseFloat(ramTotal) : 0,
-                    disk_limit_gb: diskTotal ? parseFloat(diskTotal) : 0,
-                    // ✅ Port-Pool für diesen Rootserver im Daemon registrieren
-                    port_range_start: portRangeStart ? parseInt(portRangeStart) : null,
-                    port_range_end: portRangeEnd ? parseInt(portRangeEnd) : null
+                    disk_limit_gb: diskTotal ? parseFloat(diskTotal) : 0
                 }, 30000);
 
                 if (vServerResponse.success) {
@@ -809,8 +796,6 @@ router.put('/servers/:serverId', async (req, res) => {
             diskLimitGb,
             hostname,
             ipAddress,
-            portRangeStart,
-            portRangeEnd,
             datacenter,
             countryCode,
             status
@@ -835,8 +820,6 @@ router.put('/servers/:serverId', async (req, res) => {
         if (ipAddress !== undefined) updates.host = ipAddress?.trim() || null; // DB-Spalte: host
         if (ramLimitGb !== undefined) updates.ram_total_gb = ramLimitGb ? parseFloat(ramLimitGb) : null;
         if (diskLimitGb !== undefined) updates.disk_total_gb = diskLimitGb ? parseFloat(diskLimitGb) : null;
-        if (portRangeStart !== undefined) updates.port_range_start = portRangeStart ? parseInt(portRangeStart) : null;
-        if (portRangeEnd !== undefined) updates.port_range_end = portRangeEnd ? parseInt(portRangeEnd) : null;
         if (datacenter !== undefined) updates.datacenter = datacenter?.trim() || null;
         if (countryCode !== undefined) updates.country_code = countryCode?.trim() || null;
         

@@ -53,14 +53,23 @@ router.post('/:serverId/attach',
             const consoleManager = ServiceManager.get('consoleManager');
             
             // Attach zu Server-Console
-            const history = await consoleManager.attach(
-                guildId,
-                serverId,
-                clientId,
-                systemUser  // System-User für Console-Zugriff
-            );
+            // Fehler sind nicht fatal: Server kann offline/installing sein.
+            // SSE-Stream (für Install-Output, Status-Events) läuft unabhängig davon.
+            let history = [];
+            try {
+                history = await consoleManager.attach(
+                    guildId,
+                    serverId,
+                    clientId,
+                    systemUser
+                );
+            } catch (attachErr) {
+                // Daemon nicht erreichbar oder Server nicht gestartet → kein Problem.
+                // Der SSE-Stream bringt Install- und Status-Events trotzdem live an.
+                Logger.info(`[Console API] Daemon-Attach nicht verfügbar (${attachErr?.message}) – SSE läuft trotzdem`);
+            }
             
-            Logger.info(`[Console API] Attach erfolgreich: Server ${serverId}, Client ${clientId}`);
+            Logger.info(`[Console API] Attach: Server ${serverId}, Client ${clientId}, History: ${history.length} Zeilen`);
             
             res.json({
                 success: true,
@@ -71,7 +80,6 @@ router.post('/:serverId/attach',
             
         } catch (error) {
             Logger.error(`[Console API] Attach fehlgeschlagen:`, error);
-            
             res.status(500).json({
                 success: false,
                 message: error.message || 'Fehler beim Verbinden zur Console'
@@ -254,9 +262,9 @@ router.get('/:serverId/stream',
         // SSE-Manager registrieren (für console:output Events vom Daemon)
         const sseManager = ServiceManager.get('sseManager');
         if (sseManager) {
-            // Filter: Nur Events für diesen Server
+            // Filter: Nur Events für diesen Server (console + install Namespace)
             const filter = (msg) => {
-                return msg.namespace === 'console' && 
+                return (msg.namespace === 'console' || msg.namespace === 'install') && 
                        msg.data.server_id === serverId;
             };
             
@@ -286,6 +294,70 @@ router.get('/:serverId/stream',
                     .catch(err => Logger.error(`[Console SSE] Auto-Detach fehlgeschlagen:`, err));
             }
         });
+    }
+);
+
+/**
+ * GET /console/:serverId/logs
+ * Holt Container-Logs als Snapshot (nicht-streaming)
+ * 
+ * Query-Params:
+ * - lines: Anzahl Zeilen (default: 500, max: 5000)
+ * 
+ * Permission: GAMESERVER.LOGS.VIEW
+ */
+router.get('/:serverId/logs',
+    requirePermission('GAMESERVER.LOGS.VIEW'),
+    async (req, res) => {
+        const { serverId } = req.params;
+        const { guildId } = res.locals;
+        const Logger = ServiceManager.get('Logger');
+
+        let lines = parseInt(req.query.lines, 10) || 500;
+        if (lines < 1) lines = 1;
+        if (lines > 5000) lines = 5000;
+
+        try {
+            const ipmServer = ServiceManager.get('ipmServer');
+            const dbService = ServiceManager.get('dbService');
+
+            // Daemon-ID für diesen Server holen
+            const [server] = await dbService.query(
+                `SELECT gs.id, gs.name, rs.daemon_id 
+                 FROM gameservers gs 
+                 JOIN rootserver rs ON gs.rootserver_id = rs.id 
+                 WHERE gs.id = ? AND gs.guild_id = ?`,
+                [serverId, guildId]
+            );
+
+            if (!server || !server.daemon_id) {
+                return res.json({ success: false, error: 'Server oder Daemon nicht gefunden' });
+            }
+
+            const response = await ipmServer.sendCommand(server.daemon_id, {
+                type: 'command',
+                id: require('crypto').randomUUID(),
+                action: 'gameserver.logs',
+                payload: { server_id: String(serverId), lines }
+            });
+
+            if (response?.payload?.success) {
+                return res.json({
+                    success: true,
+                    lines: response.payload.lines || [],
+                    count: response.payload.count || 0,
+                    server_name: server.name
+                });
+            } else {
+                return res.json({
+                    success: false,
+                    error: response?.payload?.error || 'Logs konnten nicht abgerufen werden'
+                });
+            }
+        } catch (error) {
+            Logger.error(`[Console/Logs] Fehler beim Abrufen der Logs für Server ${serverId}:`, error);
+            return res.json({ success: false, error: 'Interner Fehler beim Log-Abruf' });
+        }
     }
 );
 

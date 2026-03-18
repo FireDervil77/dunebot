@@ -1,0 +1,69 @@
+<%
+    // rootservers: Array von RootServer-Objekten (aus dem Hook-Context)
+    const rsList = rootservers || [];
+%>
+<% if (rsList.length === 0) { %>
+    <div class="text-center text-muted py-2" style="font-size:.85rem;">
+        <i class="fa-solid fa-server mr-1"></i>
+        Kein RootServer verbunden.
+        <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="ml-1">Jetzt einrichten →</a>
+    </div>
+<% } else { %>
+    <% for (const rs of rsList) {
+        const ramPct  = (rs.ram_usage_gb  && rs.ram_total_gb  && rs.ram_total_gb  > 0) ? Math.round(rs.ram_usage_gb  / rs.ram_total_gb  * 100) : null;
+        const diskPct = (rs.disk_usage_gb && rs.disk_total_gb && rs.disk_total_gb > 0) ? Math.round(rs.disk_usage_gb / rs.disk_total_gb * 100) : null;
+        const cpuPct  = rs.cpu_usage_percent != null ? Math.round(rs.cpu_usage_percent) : null;
+        const cpuCol  = cpuPct  >= 80 ? 'danger' : cpuPct  >= 60 ? 'warning' : 'success';
+        const ramCol  = ramPct  >= 85 ? 'danger' : ramPct  >= 65 ? 'warning' : 'info';
+        const diskCol = diskPct >= 90 ? 'danger' : diskPct >= 70 ? 'warning' : 'primary';
+        const online  = rs.status === 'online';
+    %>
+    <div class="mb-3<%= rsList.indexOf(rs) < rsList.length - 1 ? ' pb-3 border-bottom' : '' %>">
+        <!-- Header: Name + Badge -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="font-weight-bold text-truncate" style="max-width:60%;" title="<%= rs.name %>">
+                <i class="fa-solid fa-server mr-1 text-muted" style="font-size:.8rem;"></i><%= rs.name %>
+            </span>
+            <span class="badge badge-<%= online ? 'success' : 'secondary' %>" style="font-size:.7rem;">
+                <%= online ? 'Online' : 'Offline' %>
+            </span>
+        </div>
+
+        <% if (rs.datacenter || rs.country_code) { %>
+            <div class="text-muted mb-2" style="font-size:.75rem;">
+                <i class="fa-solid fa-location-dot mr-1"></i><%= rs.datacenter || '' %><% if (rs.country_code) { %> · <%= rs.country_code %><% } %>
+            </div>
+        <% } %>
+
+        <!-- CPU -->
+        <div class="d-flex align-items-center mb-1">
+            <span class="text-muted" style="width:36px;font-size:.75rem;">CPU</span>
+            <div class="progress flex-grow-1 mx-2" style="height:5px;">
+                <div class="progress-bar bg-<%= cpuCol %>" style="width:<%= cpuPct != null ? cpuPct : 0 %>%"></div>
+            </div>
+            <span style="width:32px;text-align:right;font-size:.75rem;color:#6c757d;"><%= cpuPct != null ? cpuPct+'%' : '–' %></span>
+        </div>
+        <!-- RAM -->
+        <div class="d-flex align-items-center mb-1">
+            <span class="text-muted" style="width:36px;font-size:.75rem;">RAM</span>
+            <div class="progress flex-grow-1 mx-2" style="height:5px;">
+                <div class="progress-bar bg-<%= ramCol %>" style="width:<%= ramPct != null ? ramPct : 0 %>%"></div>
+            </div>
+            <span style="width:32px;text-align:right;font-size:.75rem;color:#6c757d;"><%= ramPct != null ? ramPct+'%' : '–' %></span>
+        </div>
+        <!-- Disk -->
+        <div class="d-flex align-items-center mb-2">
+            <span class="text-muted" style="width:36px;font-size:.75rem;">Disk</span>
+            <div class="progress flex-grow-1 mx-2" style="height:5px;">
+                <div class="progress-bar bg-<%= diskCol %>" style="width:<%= diskPct != null ? diskPct : 0 %>%"></div>
+            </div>
+            <span style="width:32px;text-align:right;font-size:.75rem;color:#6c757d;"><%= diskPct != null ? diskPct+'%' : '–' %></span>
+        </div>
+
+        <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rs.id %>"
+           class="btn btn-xs btn-outline-primary" style="font-size:.75rem;padding:.15em .55em;">
+            <i class="fa-solid fa-arrow-right mr-1"></i>Details
+        </a>
+    </div>
+    <% } %>
+<% } %>

@@ -147,6 +147,51 @@
       "requires": "CORE.PLUGINS.VIEW"
     },
     {
+      "key": "CORE.THEMES.VIEW",
+      "name": "CORE.PERM_THEMES_VIEW",
+      "description": "CORE.PERM_THEMES_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 54,
+      "requires": null
+    },
+    {
+      "key": "CORE.THEMES.EDIT",
+      "name": "CORE.PERM_THEMES_EDIT",
+      "description": "CORE.PERM_THEMES_EDIT_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 55,
+      "requires": "CORE.THEMES.VIEW"
+    },
+    {
+      "key": "CORE.MEDIA.VIEW",
+      "name": "CORE.PERM_MEDIA_VIEW",
+      "description": "CORE.PERM_MEDIA_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 56,
+      "requires": null
+    },
+    {
+      "key": "CORE.MEDIA.UPLOAD",
+      "name": "CORE.PERM_MEDIA_UPLOAD",
+      "description": "CORE.PERM_MEDIA_UPLOAD_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 57,
+      "requires": "CORE.MEDIA.VIEW"
+    },
+    {
+      "key": "CORE.MEDIA.DELETE",
+      "name": "CORE.PERM_MEDIA_DELETE",
+      "description": "CORE.PERM_MEDIA_DELETE_DESC",
+      "category": "core",
+      "is_dangerous": 1,
+      "sort_order": 58,
+      "requires": "CORE.MEDIA.VIEW"
+    },
+    {
       "key": "PERMISSIONS.VIEW",
       "name": "PERMISSIONS.VIEW",
       "description": "PERMISSIONS.VIEW_DESC",

@@ -59,5 +59,7 @@ async function warn(issuer, target, reason) {
         return guild.getT("moderation:WARN.BOT_PERM", { target: target.user.username });
     else if (response === "MEMBER_PERM")
         return guild.getT("moderation:WARN.MEMBER_PERM", { target: target.user.username });
+    else if (response === "PROTECTED_ROLE")
+        return guild.getT("moderation:PROTECTED_ROLE", { target: target.user.username });
     else return guild.getT("moderation:WARN.FAILED", { target: target.user.username });
 }

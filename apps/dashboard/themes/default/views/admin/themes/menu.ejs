@@ -1,0 +1,339 @@
+<%#
+ * Admin: Navigation Builder (CMS)
+ * Verwaltet die öffentliche Frontend-Navigation (header_nav).
+ * Unterstützt verschachtelte Menüs (Dropdowns) und Drag&Drop Sortierung.
+ *
+ * @author FireDervil
+ * @context {Array} menuTree - [{id, label, url, icon, target, visible, css_class, children: [...]}]
+%>
+
+<style>
+  .menu-item-card { transition: box-shadow .2s; border-left: 3px solid #0d6efd; }
+  .menu-item-card.item-hidden { border-left-color: #dc3545; opacity: .7; }
+  .menu-item-card.sortable-ghost { opacity: .3; }
+  .child-list { margin-left: 2rem; }
+  .child-card { border-left: 3px solid #6c757d; }
+  .child-card.item-hidden { border-left-color: #dc3545; opacity: .7; }
+  .drag-handle { cursor: grab; color: #aaa; }
+  .drag-handle:hover { color: #333; }
+</style>
+
+<div class="app-content">
+  <div class="container-fluid">
+
+    <!-- Page Header -->
+    <div class="row mb-3">
+      <div class="col-12">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <h1 class="h3 mb-0"><i class="bi bi-menu-button-wide me-2 text-primary"></i>Navigation</h1>
+            <p class="text-muted small mb-0">Verwalte die Menüpunkte der öffentlichen Website-Navigation.</p>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#menuItemModal" onclick="resetMenuModal()">
+              <i class="bi bi-plus-lg me-1"></i> Neuer Menüpunkt
+            </button>
+            <a href="/admin/themes" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-arrow-left me-1"></i> Zurück
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="alert alert-info d-flex align-items-start mb-4">
+      <i class="bi bi-info-circle me-2 fs-5 mt-1"></i>
+      <div>
+        <strong>Drag &amp; Drop</strong> zum Sortieren &middot;
+        Einträge mit <strong>Unterpunkten</strong> werden als Dropdown dargestellt &middot;
+        Der <strong>Language-Switcher</strong> wird automatisch angehängt.
+      </div>
+    </div>
+
+    <!-- Menu Tree -->
+    <div id="menuList">
+      <% if (menuTree.length === 0) { %>
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle me-2"></i>Keine Menüpunkte vorhanden.
+        </div>
+      <% } %>
+
+      <% menuTree.forEach(item => { %>
+        <div class="card mb-2 menu-item-card <%= item.visible ? '' : 'item-hidden' %>" data-id="<%= item.id %>">
+          <div class="card-body py-2">
+            <div class="d-flex align-items-center gap-3">
+              <span class="drag-handle"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+              <div class="flex-grow-1">
+                <strong class="item-label"><%= item.label %></strong>
+                <small class="text-muted ms-2">
+                  <code><%= item.url %></code>
+                  <% if (item.icon) { %> &middot; <i class="<%= item.icon %>"></i><% } %>
+                  <% if (item.target === '_blank') { %> &middot; <i class="bi bi-box-arrow-up-right" title="Neues Fenster"></i><% } %>
+                  <% if (item.css_class) { %> &middot; <code>.<%= item.css_class %></code><% } %>
+                </small>
+              </div>
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-primary btn-edit-menu" data-item='<%- JSON.stringify({id:item.id, parent_id:item.parent_id||null, label:item.label, url:item.url, icon:item.icon||"", target:item.target||"_self", visible:item.visible, css_class:item.css_class||""}) %>' title="Bearbeiten">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm <%= item.visible ? 'btn-success' : 'btn-outline-danger' %> btn-toggle-menu-vis" data-id="<%= item.id %>" title="Sichtbarkeit">
+                  <i class="bi <%= item.visible ? 'bi-eye' : 'bi-eye-slash' %>"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger btn-delete-menu" data-id="<%= item.id %>" title="Löschen">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Children -->
+            <% if (item.children && item.children.length > 0) { %>
+              <div class="child-list mt-2" data-parent="<%= item.id %>">
+                <% item.children.forEach(child => { %>
+                  <div class="card mb-1 child-card <%= child.visible ? '' : 'item-hidden' %>" data-id="<%= child.id %>">
+                    <div class="card-body py-1 px-3">
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+                        <div class="flex-grow-1">
+                          <span class="item-label"><%= child.label %></span>
+                          <small class="text-muted ms-2"><code><%= child.url %></code></small>
+                        </div>
+                        <div class="d-flex gap-1">
+                          <button class="btn btn-sm btn-outline-primary btn-edit-menu" data-item='<%- JSON.stringify({id:child.id, parent_id:child.parent_id, label:child.label, url:child.url, icon:child.icon||"", target:child.target||"_self", visible:child.visible, css_class:child.css_class||""}) %>'>
+                            <i class="bi bi-pencil"></i>
+                          </button>
+                          <button class="btn btn-sm <%= child.visible ? 'btn-success' : 'btn-outline-danger' %> btn-toggle-menu-vis" data-id="<%= child.id %>">
+                            <i class="bi <%= child.visible ? 'bi-eye' : 'bi-eye-slash' %>"></i>
+                          </button>
+                          <button class="btn btn-sm btn-outline-danger btn-delete-menu" data-id="<%= child.id %>">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                <% }); %>
+              </div>
+            <% } %>
+
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+  </div>
+</div>
+
+<!-- Menu Item Modal (Create / Edit) -->
+<div class="modal fade" id="menuItemModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="menuModalTitle"><i class="bi bi-plus-circle me-2"></i>Menüpunkt</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="menuItemId" value="">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Label</label>
+            <input type="text" class="form-control" id="menuLabel" placeholder="Home">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">URL</label>
+            <input type="text" class="form-control" id="menuUrl" placeholder="/">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Icon (optional)</label>
+            <input type="text" class="form-control" id="menuIcon" placeholder="bi bi-house">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Ziel</label>
+            <select class="form-select" id="menuTarget">
+              <option value="_self">Gleicher Tab</option>
+              <option value="_blank">Neuer Tab</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Übergeordnet</label>
+            <select class="form-select" id="menuParent">
+              <option value="">— Top-Level —</option>
+              <% menuTree.forEach(item => { %>
+                <option value="<%= item.id %>"><%= item.label %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">CSS-Klasse (optional)</label>
+            <input type="text" class="form-control" id="menuCssClass" placeholder="z.B. dropdown">
+          </div>
+          <div class="col-md-6 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="menuVisible" checked>
+              <label class="form-check-label" for="menuVisible">Sichtbar</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSaveMenuItem">
+          <i class="bi bi-check-lg me-1"></i> Speichern
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+  const API = '/admin/themes/menu';
+
+  // SortableJS — Top-Level
+  const listEl = document.getElementById('menuList');
+  if (listEl) {
+    Sortable.create(listEl, {
+      handle: '.drag-handle',
+      animation: 200,
+      ghostClass: 'sortable-ghost',
+      draggable: '.menu-item-card',
+      onEnd: saveOrder
+    });
+  }
+
+  // SortableJS — Children
+  document.querySelectorAll('.child-list').forEach(cl => {
+    Sortable.create(cl, {
+      handle: '.drag-handle',
+      animation: 200,
+      ghostClass: 'sortable-ghost',
+      draggable: '.child-card',
+      onEnd: saveOrder
+    });
+  });
+
+  function saveOrder() {
+    const order = [];
+    let pos = 1;
+    document.querySelectorAll('#menuList > .menu-item-card').forEach(card => {
+      order.push({ id: Number(card.dataset.id), position: pos++, parent_id: null });
+      const childList = card.querySelector('.child-list');
+      if (childList) {
+        let cpos = 1;
+        childList.querySelectorAll('.child-card').forEach(cc => {
+          order.push({ id: Number(cc.dataset.id), position: cpos++, parent_id: Number(card.dataset.id) });
+        });
+      }
+    });
+    fetch(API + '/reorder', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order })
+    }).then(r => r.json()).then(d => {
+      if (d.success) toastr.success('Reihenfolge gespeichert');
+      else toastr.error(d.message);
+    }).catch(() => toastr.error('Netzwerkfehler'));
+  }
+
+  // Edit
+  document.querySelectorAll('.btn-edit-menu').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const data = JSON.parse(this.dataset.item);
+      document.getElementById('menuItemId').value = data.id;
+      document.getElementById('menuLabel').value = data.label;
+      document.getElementById('menuUrl').value = data.url;
+      document.getElementById('menuIcon').value = data.icon;
+      document.getElementById('menuTarget').value = data.target;
+      document.getElementById('menuParent').value = data.parent_id || '';
+      document.getElementById('menuCssClass').value = data.css_class;
+      document.getElementById('menuVisible').checked = !!data.visible;
+      document.getElementById('menuModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Menüpunkt bearbeiten';
+      new bootstrap.Modal(document.getElementById('menuItemModal')).show();
+    });
+  });
+
+  // Toggle Visibility
+  document.querySelectorAll('.btn-toggle-menu-vis').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const id = this.dataset.id;
+      const card = this.closest('.card');
+      const isVisible = !card.classList.contains('item-hidden');
+      fetch(API + '/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visible: isVisible ? 0 : 1 })
+      }).then(r => r.json()).then(d => {
+        if (d.success) {
+          card.classList.toggle('item-hidden');
+          const icon = this.querySelector('i');
+          if (isVisible) {
+            this.className = 'btn btn-sm btn-outline-danger btn-toggle-menu-vis';
+            icon.className = 'bi bi-eye-slash';
+          } else {
+            this.className = 'btn btn-sm btn-success btn-toggle-menu-vis';
+            icon.className = 'bi bi-eye';
+          }
+          toastr.success('Aktualisiert');
+        }
+      }).catch(() => toastr.error('Netzwerkfehler'));
+    });
+  });
+
+  // Delete
+  document.querySelectorAll('.btn-delete-menu').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (!confirm('Menüpunkt löschen?')) return;
+      const id = this.dataset.id;
+      fetch(API + '/' + id, { method: 'DELETE' }).then(r => r.json()).then(d => {
+        if (d.success) {
+          const card = document.querySelector('[data-id="' + id + '"].menu-item-card, [data-id="' + id + '"].child-card');
+          if (card) card.remove();
+          toastr.success('Gelöscht');
+        } else toastr.error(d.message);
+      }).catch(() => toastr.error('Netzwerkfehler'));
+    });
+  });
+
+  // Save (Create / Update)
+  document.getElementById('btnSaveMenuItem')?.addEventListener('click', function() {
+    const id = document.getElementById('menuItemId').value;
+    const data = {
+      label: document.getElementById('menuLabel').value.trim(),
+      url: document.getElementById('menuUrl').value.trim(),
+      icon: document.getElementById('menuIcon').value.trim() || null,
+      target: document.getElementById('menuTarget').value,
+      parent_id: document.getElementById('menuParent').value || null,
+      css_class: document.getElementById('menuCssClass').value.trim() || null,
+      visible: document.getElementById('menuVisible').checked ? 1 : 0
+    };
+    if (!data.label) return toastr.warning('Label ist erforderlich');
+
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? (API + '/' + id) : API;
+
+    fetch(url, {
+      method, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(r => r.json()).then(d => {
+      if (d.success) {
+        toastr.success(id ? 'Aktualisiert' : 'Erstellt');
+        setTimeout(() => location.reload(), 500);
+      } else toastr.error(d.message);
+    }).catch(() => toastr.error('Netzwerkfehler'));
+  });
+});
+
+function resetMenuModal() {
+  document.getElementById('menuItemId').value = '';
+  document.getElementById('menuLabel').value = '';
+  document.getElementById('menuUrl').value = '';
+  document.getElementById('menuIcon').value = '';
+  document.getElementById('menuTarget').value = '_self';
+  document.getElementById('menuParent').value = '';
+  document.getElementById('menuCssClass').value = '';
+  document.getElementById('menuVisible').checked = true;
+  document.getElementById('menuModalTitle').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Neuer Menüpunkt';
+}
+</script>

@@ -65,6 +65,38 @@
       "category": "moderation",
       "is_dangerous": 0,
       "requires": "MODERATION.VIEW"
+    },
+    {
+      "key": "MODERATION.NOTES_VIEW",
+      "name": "Mod-Notizen anzeigen",
+      "description": "Berechtigung um interne Moderator-Notizen einzusehen",
+      "category": "moderation",
+      "is_dangerous": 0,
+      "requires": "MODERATION.VIEW"
+    },
+    {
+      "key": "MODERATION.NOTES_MANAGE",
+      "name": "Mod-Notizen verwalten",
+      "description": "Berechtigung um Moderator-Notizen zu erstellen und zu löschen",
+      "category": "moderation",
+      "is_dangerous": 0,
+      "requires": "MODERATION.NOTES_VIEW"
+    },
+    {
+      "key": "MODERATION.PROTECTED_ROLES_MANAGE",
+      "name": "Geschützte Rollen verwalten",
+      "description": "Berechtigung um geschützte Rollen zu konfigurieren (kritische Aktion)",
+      "category": "moderation",
+      "is_dangerous": 1,
+      "requires": "MODERATION.SETTINGS_EDIT"
+    },
+    {
+      "key": "MODERATION.CHANNEL_RULES_MANAGE",
+      "name": "Channel-Regeln verwalten",
+      "description": "Berechtigung um channel-spezifische Moderationsregeln zu konfigurieren",
+      "category": "moderation",
+      "is_dangerous": 0,
+      "requires": "MODERATION.SETTINGS_EDIT"
     }
   ],
   "default_groups": 1006

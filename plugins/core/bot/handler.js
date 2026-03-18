@@ -147,6 +147,22 @@ async function handleSlashCommand(interaction, cmd) {
         }
     }
 
+    // Wenn der Command einen preInteraction-Hook hat, diesen VOR dem Defer aufrufen.
+    // Gibt er ein { modal } zurück, wird das Modal gezeigt (kein Defer nötig).
+    if (typeof cmd.preInteraction === 'function') {
+        try {
+            const preResult = await cmd.preInteraction({ interaction });
+            if (preResult?.modal) {
+                await interaction.showModal(preResult.modal);
+                if (cmd.cooldown > 0) applyCooldown("cmd", interaction.user.id, cmd);
+                return;
+            }
+        } catch (preErr) {
+            interaction.client.logger.error("preInteraction", preErr);
+            // Fehler im Hook → normal weiter mit deferReply
+        }
+    }
+
     try {
         await interaction.deferReply({
             flags: cmd.slashCommand.ephemeral ? MessageFlags.Ephemeral : 0,

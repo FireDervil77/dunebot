@@ -4,7 +4,6 @@ const DashboardPlugin = require("./lib/DashboardPlugin");
 const NavigationManager = require("./lib/NavigationManager");
 const ThemeManager = require("./lib/ThemeManager");
 const NotificationManager = require("./lib/NotificationManager");
-const UpdatesManager = require("./lib/UpdatesManager");
 const VersionHelper = require("./lib/VersionHelper");
 const { PluginHooks } = require("dunebot-core"); // PluginHooks aus dunebot-core importieren
 const RouterManager = require("./lib/RouterManager");
@@ -27,7 +26,6 @@ module.exports = {
     NavigationManager,
     ThemeManager,
     NotificationManager,
-    UpdatesManager,
     VersionHelper,
     RouterManager,
     AssetManager,

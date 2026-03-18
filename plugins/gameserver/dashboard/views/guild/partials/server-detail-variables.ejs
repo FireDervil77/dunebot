@@ -35,16 +35,21 @@ const envVars = server.env_variables_parsed || {};
 <form id="variables-form">
     <div class="row">
         <% variablesArray.forEach(variable => {
-            const varName        = variable.name || '';
-            const varDisplayName = variable.display_name || varName;
+            // env_variable = technischer ENV-Key (SERVER_NAME), name = Anzeigename ("Server Name")
+            // IPC-Pfad speichert mit env_variable-Key, Dashboard-Pfad (alt) mit name-Key
+            const envKey         = variable.env_variable || variable.name || '';
+            const varName        = envKey; // Primärschlüssel für Formulare = ENV-Key
+            const varDisplayName = variable.display_name || variable.name || envKey;
             const varDescription = variable.description || '';
-            const varType        = variable.type || 'text';
+            const varType        = variable.type || (variable.field_type) || 'text';
             const varOptions     = variable.options || [];
-            const isRequired     = variable.required === true;
-            // Aktuellen Wert aus env_variables, sonst default
-            const currentValue   = envVars[varName] !== undefined
-                                    ? envVars[varName]
-                                    : (variable.default_value || '');
+            const isRequired     = variable.required === true || (typeof variable.rules === 'string' && variable.rules.includes('required') && !variable.rules.includes('nullable'));
+            // Wert-Lookup: env_variable-Key zuerst, dann name-Key (Legacy-Compat), dann default
+            const currentValue   = envVars[envKey] !== undefined
+                                    ? envVars[envKey]
+                                    : (envVars[variable.name] !== undefined
+                                        ? envVars[variable.name]
+                                        : (variable.default_value ?? ''));
         %>
         <div class="col-md-6 col-lg-4">
             <div class="form-group">

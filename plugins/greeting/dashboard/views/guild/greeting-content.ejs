@@ -1,82 +1,84 @@
 <% if (type === 'welcome') { %>
-<!-- Welcome Tab Content -->
-<div class="card">
+<!-- ===== WELCOME ===== -->
+<div class="card card-outline card-primary">
   <div class="card-body">
     <form id="welcomeForm">
       <div class="row">
-        <div class="col-md-6">
-          <div class="mb-3">
-            <label class="form-label">
-              <i class="fa-solid fa-hashtag me-1"></i>
-              <%= tr('greeting:CHANNEL_TITLE', 'Kanal') %>
-            </label>
-            <select class="form-select" name="welcome_channel" required>
-              <option value=""><%= tr('greeting:CHANNEL_SELECT', 'Kanal wählen...') %></option>
-              <% if (channels && channels.length > 0) { %>
-                <% channels.forEach(channel => { %>
-                  <option value="<%= channel.id %>" <%= settings.welcome.channel === channel.id ? 'selected' : '' %>>
-                    #<%= channel.name %>
-                  </option>
-                <% }); %>
-              <% } %>
-            </select>
-            <small class="form-text text-muted">
-              <%= tr('greeting:CHANNEL_DESC', 'Wähle den Kanal für Willkommensnachrichten') %>
-            </small>
-          </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label"><i class="fa-solid fa-hashtag me-1"></i> <%= tr('greeting:CHANNEL_TITLE') %></label>
+          <select class="form-control" name="welcome_channel" required>
+            <option value=""><%= tr('greeting:CHANNEL_SELECT') %></option>
+            <% channels.forEach(ch => { %>
+              <option value="<%= ch.id %>" <%= settings.welcome.channel === ch.id ? 'selected' : '' %>>#<%= ch.name %></option>
+            <% }); %>
+          </select>
         </div>
-        
-        <div class="col-md-6">
-          <div class="mb-3">
-            <label class="form-label">
-              <i class="fa-solid fa-circle-info me-1"></i>
-              <%= tr('greeting:STATUS', 'Status') %>
-            </label>
-            <div>
-              <% if (settings.welcome.content) { %>
-                <!-- Nur anzeigen wenn Message gespeichert ist -->
-                <div class="custom-control custom-switch">
-                  <input type="checkbox" class="custom-control-input" id="welcomeEnabledToggle" 
-                         <%= settings.welcome.enabled ? 'checked' : '' %>
-                         onchange="toggleGreeting('welcome', this.checked)">
-                  <label class="custom-control-label" for="welcomeEnabledToggle">
-                    <span class="badge <%= settings.welcome.enabled ? 'badge-success' : 'badge-secondary' %>">
-                      <%= settings.welcome.enabled ? tr('greeting:STATUS_ENABLED', 'Aktiviert') : tr('greeting:STATUS_DISABLED', 'Deaktiviert') %>
-                    </span>
-                  </label>
-                </div>
-                <small class="form-text text-muted d-block mt-2">
-                  An/Aus schalten ohne die Message zu löschen
-                </small>
-              <% } else { %>
-                <span class="badge badge-secondary badge-lg">
-                  <i class="fa-solid fa-circle me-1"></i>
-                  <%= tr('greeting:STATUS_DISABLED', 'Nicht konfiguriert') %>
+        <div class="col-md-6 mb-3">
+          <label class="form-label"><i class="fa-solid fa-circle-info me-1"></i> <%= tr('greeting:STATUS') %></label>
+          <div>
+            <div class="custom-control custom-switch">
+              <input type="checkbox" class="custom-control-input" id="welcomeEnabledToggle"
+                     <%= settings.welcome.enabled ? 'checked' : '' %>
+                     onchange="toggleGreeting('welcome', this.checked)">
+              <label class="custom-control-label" for="welcomeEnabledToggle">
+                <span class="badge <%= settings.welcome.enabled ? 'badge-success' : 'badge-secondary' %>">
+                  <%= settings.welcome.enabled ? tr('greeting:STATUS_ENABLED') : tr('greeting:STATUS_DISABLED') %>
                 </span>
-                <small class="form-text text-muted d-block mt-2">
-                  Wird beim Speichern automatisch aktiviert
-                </small>
-              <% } %>
+              </label>
             </div>
           </div>
         </div>
       </div>
 
       <div class="mb-3">
-        <label class="form-label">
-          <i class="fa-solid fa-message me-1"></i>
-          <%= tr('greeting:WELCOME.MESSAGE', 'Willkommensnachricht') %>
-        </label>
-        <textarea class="form-control" name="welcome_content" rows="4"><%= settings.welcome.content || '' %></textarea>
-        <small class="form-text text-muted">
-          <%= tr('greeting:PLACEHOLDERS_HINT', 'Nutze Platzhalter wie {member:name}, {member:mention}, {guild:name}') %>
-        </small>
+        <label class="form-label"><i class="fa-solid fa-message me-1"></i> <%= tr('greeting:WELCOME.MESSAGE') %></label>
+        <textarea class="form-control msg-input" name="welcome_content" rows="3" data-preview-type="welcome"><%= settings.welcome.content || '' %></textarea>
+        <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+      </div>
+
+      <!-- Embed-Builder -->
+      <%- include('../partials/embed-builder', { prefix: 'welcome', embed: settings.welcome.embed }) %>
+
+      <!-- Welcome Image Section -->
+      <hr>
+      <h6><i class="fa-solid fa-image me-1"></i> <%= tr('greeting:IMAGE.TITLE') %></h6>
+      <p class="text-muted small"><%= tr('greeting:IMAGE.DESC') %></p>
+      <div class="row">
+        <div class="col-md-3 mb-3">
+          <div class="custom-control custom-switch">
+            <input type="checkbox" class="custom-control-input" id="welcomeImageToggle"
+                   name="welcome_image_enabled" <%= settings.welcome_image.enabled ? 'checked' : '' %>>
+            <label class="custom-control-label" for="welcomeImageToggle"><%= tr('greeting:IMAGE.ENABLE') %></label>
+          </div>
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label"><%= tr('greeting:IMAGE.BG_TITLE') %></label>
+          <select class="form-control" name="welcome_image_bg">
+            <option value="default" <%= settings.welcome_image.bg === 'default' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_DEFAULT') %></option>
+            <option value="dark" <%= settings.welcome_image.bg === 'dark' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_DARK') %></option>
+            <option value="blue" <%= settings.welcome_image.bg === 'blue' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_BLUE') %></option>
+            <option value="purple" <%= settings.welcome_image.bg === 'purple' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_PURPLE') %></option>
+            <option value="green" <%= settings.welcome_image.bg === 'green' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_GREEN') %></option>
+            <option value="sunset" <%= settings.welcome_image.bg === 'sunset' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_SUNSET') %></option>
+            <option value="ocean" <%= settings.welcome_image.bg === 'ocean' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_OCEAN') %></option>
+          </select>
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label"><%= tr('greeting:IMAGE.TEXT_TITLE') %></label>
+          <input type="text" class="form-control" name="welcome_image_text"
+                 value="<%= settings.welcome_image.text || '' %>"
+                 placeholder="<%= tr('greeting:IMAGE.TEXT_PLACEHOLDER') %>">
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label"><%= tr('greeting:IMAGE.COLOR_TITLE') %></label>
+          <input type="color" class="form-control form-control-color" name="welcome_image_color"
+                 value="<%= settings.welcome_image.color || '#5865f2' %>" style="height: 38px;">
+        </div>
       </div>
 
       <div class="d-flex justify-content-end">
         <button type="button" class="btn btn-primary" onclick="updateGreeting('welcome', 'save')">
-          <i class="fa-solid fa-save me-1"></i>
-          <%= tr('greeting:BTN_SAVE', 'Speichern') %>
+          <i class="fa-solid fa-save me-1"></i> <%= tr('greeting:BTN_SAVE') %>
         </button>
       </div>
     </form>
@@ -84,84 +86,88 @@
 </div>
 
 <% } else if (type === 'farewell') { %>
-<!-- Farewell Tab Content -->
-<div class="card">
+<!-- ===== FAREWELL ===== -->
+<div class="card card-outline card-warning">
   <div class="card-body">
     <form id="farewellForm">
       <div class="row">
-        <div class="col-md-6">
-          <div class="mb-3">
-            <label class="form-label">
-              <i class="fa-solid fa-hashtag me-1"></i>
-              <%= tr('greeting:CHANNEL_TITLE', 'Kanal') %>
-            </label>
-            <select class="form-select" name="farewell_channel" required>
-              <option value=""><%= tr('greeting:CHANNEL_SELECT', 'Kanal wählen...') %></option>
-              <% if (channels && channels.length > 0) { %>
-                <% channels.forEach(channel => { %>
-                  <option value="<%= channel.id %>" <%= settings.farewell.channel === channel.id ? 'selected' : '' %>>
-                    #<%= channel.name %>
-                  </option>
-                <% }); %>
-              <% } %>
-            </select>
-            <small class="form-text text-muted">
-              <%= tr('greeting:CHANNEL_DESC', 'Wähle den Kanal für Verabschiedungen') %>
-            </small>
-          </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label"><i class="fa-solid fa-hashtag me-1"></i> <%= tr('greeting:CHANNEL_TITLE') %></label>
+          <select class="form-control" name="farewell_channel" required>
+            <option value=""><%= tr('greeting:CHANNEL_SELECT') %></option>
+            <% channels.forEach(ch => { %>
+              <option value="<%= ch.id %>" <%= settings.farewell.channel === ch.id ? 'selected' : '' %>>#<%= ch.name %></option>
+            <% }); %>
+          </select>
         </div>
-        
-        <div class="col-md-6">
-          <div class="mb-3">
-            <label class="form-label">
-              <i class="fa-solid fa-circle-info me-1"></i>
-              <%= tr('greeting:STATUS', 'Status') %>
-            </label>
-            <div>
-              <% if (settings.farewell.content) { %>
-                <!-- Nur anzeigen wenn Message gespeichert ist -->
-                <div class="custom-control custom-switch">
-                  <input type="checkbox" class="custom-control-input" id="farewellEnabledToggle" 
-                         <%= settings.farewell.enabled ? 'checked' : '' %>
-                         onchange="toggleGreeting('farewell', this.checked)">
-                  <label class="custom-control-label" for="farewellEnabledToggle">
-                    <span class="badge <%= settings.farewell.enabled ? 'badge-success' : 'badge-secondary' %>">
-                      <%= settings.farewell.enabled ? tr('greeting:STATUS_ENABLED', 'Aktiviert') : tr('greeting:STATUS_DISABLED', 'Deaktiviert') %>
-                    </span>
-                  </label>
-                </div>
-                <small class="form-text text-muted d-block mt-2">
-                  An/Aus schalten ohne die Message zu löschen
-                </small>
-              <% } else { %>
-                <span class="badge badge-secondary badge-lg">
-                  <i class="fa-solid fa-circle me-1"></i>
-                  <%= tr('greeting:STATUS_DISABLED', 'Nicht konfiguriert') %>
+        <div class="col-md-6 mb-3">
+          <label class="form-label"><i class="fa-solid fa-circle-info me-1"></i> <%= tr('greeting:STATUS') %></label>
+          <div>
+            <div class="custom-control custom-switch">
+              <input type="checkbox" class="custom-control-input" id="farewellEnabledToggle"
+                     <%= settings.farewell.enabled ? 'checked' : '' %>
+                     onchange="toggleGreeting('farewell', this.checked)">
+              <label class="custom-control-label" for="farewellEnabledToggle">
+                <span class="badge <%= settings.farewell.enabled ? 'badge-success' : 'badge-secondary' %>">
+                  <%= settings.farewell.enabled ? tr('greeting:STATUS_ENABLED') : tr('greeting:STATUS_DISABLED') %>
                 </span>
-                <small class="form-text text-muted d-block mt-2">
-                  Wird beim Speichern automatisch aktiviert
-                </small>
-              <% } %>
+              </label>
             </div>
           </div>
         </div>
       </div>
 
       <div class="mb-3">
-        <label class="form-label">
-          <i class="fa-solid fa-message me-1"></i>
-          <%= tr('greeting:FAREWELL.MESSAGE', 'Verabschiedungsnachricht') %>
-        </label>
-        <textarea class="form-control" name="farewell_content" rows="4"><%= settings.farewell.content || '' %></textarea>
-        <small class="form-text text-muted">
-          <%= tr('greeting:PLACEHOLDERS_HINT', 'Nutze Platzhalter wie {member:name}, {guild:name}') %>
-        </small>
+        <label class="form-label"><i class="fa-solid fa-message me-1"></i> <%= tr('greeting:FAREWELL.MESSAGE') %></label>
+        <textarea class="form-control msg-input" name="farewell_content" rows="3" data-preview-type="farewell"><%= settings.farewell.content || '' %></textarea>
+        <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
       </div>
+
+      <%- include('../partials/embed-builder', { prefix: 'farewell', embed: settings.farewell.embed }) %>
 
       <div class="d-flex justify-content-end">
         <button type="button" class="btn btn-primary" onclick="updateGreeting('farewell', 'save')">
-          <i class="fa-solid fa-save me-1"></i>
-          <%= tr('greeting:BTN_SAVE', 'Speichern') %>
+          <i class="fa-solid fa-save me-1"></i> <%= tr('greeting:BTN_SAVE') %>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% } else if (type === 'dm_welcome') { %>
+<!-- ===== DM WELCOME ===== -->
+<div class="card card-outline card-info">
+  <div class="card-body">
+    <form id="dmWelcomeForm">
+      <div class="alert alert-info">
+        <i class="fa-solid fa-circle-info me-2"></i> <%= tr('greeting:DM_WELCOME.INFO') %>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label"><i class="fa-solid fa-circle-info me-1"></i> <%= tr('greeting:STATUS') %></label>
+        <div class="custom-control custom-switch">
+          <input type="checkbox" class="custom-control-input" id="dmWelcomeEnabledToggle"
+                 <%= settings.dm_welcome.enabled ? 'checked' : '' %>
+                 onchange="toggleGreeting('dm_welcome', this.checked)">
+          <label class="custom-control-label" for="dmWelcomeEnabledToggle">
+            <span class="badge <%= settings.dm_welcome.enabled ? 'badge-success' : 'badge-secondary' %>">
+              <%= settings.dm_welcome.enabled ? tr('greeting:STATUS_ENABLED') : tr('greeting:STATUS_DISABLED') %>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label"><i class="fa-solid fa-envelope me-1"></i> <%= tr('greeting:DM_WELCOME.MESSAGE') %></label>
+        <textarea class="form-control msg-input" name="dm_welcome_content" rows="3" data-preview-type="dm_welcome"><%= settings.dm_welcome.content || '' %></textarea>
+        <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+      </div>
+
+      <%- include('../partials/embed-builder', { prefix: 'dm_welcome', embed: settings.dm_welcome.embed }) %>
+
+      <div class="d-flex justify-content-end">
+        <button type="button" class="btn btn-primary" onclick="updateGreeting('dm_welcome', 'save')">
+          <i class="fa-solid fa-save me-1"></i> <%= tr('greeting:BTN_SAVE') %>
         </button>
       </div>
     </form>
@@ -169,39 +175,93 @@
 </div>
 
 <% } else if (type === 'autorole') { %>
-<!-- Autorole Tab Content -->
-<div class="card">
+<!-- ===== AUTOROLE (Multi) ===== -->
+<div class="card card-outline card-success">
   <div class="card-body">
     <form id="autoroleForm">
       <div class="mb-3">
-        <label class="form-label">
-          <i class="fa-solid fa-user-shield me-1"></i>
-          <%= tr('greeting:AUTOROLE_SELECT', 'Rolle auswählen') %>
-        </label>
-        <select class="form-select" name="autorole_id">
-          <option value=""><%= tr('greeting:AUTOROLE_NONE', 'Keine automatische Rolle') %></option>
-          <% if (roles && roles.length > 0) { %>
-            <% roles.forEach(role => { %>
-              <option value="<%= role.id %>" <%= settings.autorole_id === role.id ? 'selected' : '' %>>
-                <%= role.name %>
-              </option>
-            <% }); %>
-          <% } %>
+        <label class="form-label"><i class="fa-solid fa-user-shield me-1"></i> <%= tr('greeting:AUTOROLE_SELECT') %></label>
+        <p class="text-muted small"><%= tr('greeting:AUTOROLE_MULTI_HINT') %></p>
+        <select class="form-control" name="autorole_ids" multiple size="8">
+          <% roles.forEach(role => { %>
+            <option value="<%= role.id %>"
+              <%= (settings.autorole_ids && settings.autorole_ids.includes(role.id)) ? 'selected' : '' %>>
+              <%= role.name %>
+            </option>
+          <% }); %>
         </select>
-        <small class="form-text text-muted">
-          <%= tr('greeting:AUTOROLE_DESC', 'Diese Rolle wird neuen Mitgliedern automatisch zugewiesen') %>
-        </small>
       </div>
 
       <div class="alert alert-info">
-        <i class="fa-solid fa-info-circle me-2"></i>
-        <%= tr('greeting:AUTOROLE_INFO', 'Die ausgewählte Rolle wird allen neuen Mitgliedern beim Beitritt automatisch gegeben.') %>
+        <i class="fa-solid fa-info-circle me-2"></i> <%= tr('greeting:AUTOROLE_INFO') %>
       </div>
+
+      <% if (settings.autorole_ids && settings.autorole_ids.length > 0) { %>
+        <div class="mb-3">
+          <strong>Aktive Rollen:</strong>
+          <div class="mt-1">
+            <% settings.autorole_ids.forEach(rid => { %>
+              <% const roleName = (roles.find(r => r.id === rid) || {}).name || rid; %>
+              <span class="badge badge-info mr-1"><%= roleName %></span>
+            <% }); %>
+          </div>
+        </div>
+      <% } %>
 
       <div class="d-flex justify-content-end">
         <button type="button" class="btn btn-primary" onclick="updateGreeting('autorole', 'save')">
-          <i class="fa-solid fa-save me-1"></i>
-          <%= tr('greeting:BTN_SAVE', 'Speichern') %>
+          <i class="fa-solid fa-save me-1"></i> <%= tr('greeting:BTN_SAVE') %>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% } else if (type === 'boost') { %>
+<!-- ===== BOOST ===== -->
+<div class="card card-outline card-danger">
+  <div class="card-body">
+    <form id="boostForm">
+      <div class="alert alert-info">
+        <i class="fa-solid fa-rocket me-2"></i> <%= tr('greeting:BOOST.INFO') %>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label"><i class="fa-solid fa-hashtag me-1"></i> <%= tr('greeting:CHANNEL_TITLE') %></label>
+          <select class="form-control" name="boost_channel" required>
+            <option value=""><%= tr('greeting:CHANNEL_SELECT') %></option>
+            <% channels.forEach(ch => { %>
+              <option value="<%= ch.id %>" <%= settings.boost.channel === ch.id ? 'selected' : '' %>>#<%= ch.name %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label"><i class="fa-solid fa-circle-info me-1"></i> <%= tr('greeting:STATUS') %></label>
+          <div class="custom-control custom-switch">
+            <input type="checkbox" class="custom-control-input" id="boostEnabledToggle"
+                   <%= settings.boost.enabled ? 'checked' : '' %>
+                   onchange="toggleGreeting('boost', this.checked)">
+            <label class="custom-control-label" for="boostEnabledToggle">
+              <span class="badge <%= settings.boost.enabled ? 'badge-success' : 'badge-secondary' %>">
+                <%= settings.boost.enabled ? tr('greeting:STATUS_ENABLED') : tr('greeting:STATUS_DISABLED') %>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label"><i class="fa-solid fa-rocket me-1"></i> <%= tr('greeting:BOOST.MESSAGE') %></label>
+        <textarea class="form-control msg-input" name="boost_content" rows="3" data-preview-type="boost"><%= settings.boost.content || '' %></textarea>
+        <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+      </div>
+
+      <%- include('../partials/embed-builder', { prefix: 'boost', embed: settings.boost.embed }) %>
+
+      <div class="d-flex justify-content-end">
+        <button type="button" class="btn btn-primary" onclick="updateGreeting('boost', 'save')">
+          <i class="fa-solid fa-save me-1"></i> <%= tr('greeting:BTN_SAVE') %>
         </button>
       </div>
     </form>

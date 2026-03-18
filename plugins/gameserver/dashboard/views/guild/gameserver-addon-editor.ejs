@@ -267,6 +267,56 @@
                             </div>
                         </div>
 
+                        <!-- Config-Files Builder -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-warning">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-file-pen"></i>
+                                    Config-Files
+                                    <span class="badge badge-light ml-2" id="config-files-count">0</span>
+                                </h3>
+                                <div class="card-tools">
+                                    <button type="button" class="btn btn-sm btn-light" id="add-config-file-btn">
+                                        <i class="fa-solid fa-plus"></i> Datei hinzufügen
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted">Config-Dateien werden beim Server-Start automatisch gepatcht. Keys werden in der Datei gesucht und mit dem angegebenen Wert ersetzt.</p>
+                                <div id="config-files-container"></div>
+                                <div id="no-config-files-msg" class="alert alert-info" style="display: none;">
+                                    <i class="fa-solid fa-info-circle"></i> Keine Config-Dateien definiert.
+                                </div>
+                            </div>
+                            <div class="card-footer text-muted small">
+                                <i class="fa-solid fa-info-circle"></i> Werte können <code>{{VARIABLEN}}</code> enthalten, die beim Start durch Umgebungsvariablen ersetzt werden.
+                            </div>
+                        </div>
+
+                        <!-- Templates Builder -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-info">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-layer-group"></i> Templates
+                                    <span class="badge badge-light ml-2" id="templates-count">0</span>
+                                </h3>
+                                <div class="card-tools">
+                                    <button type="button" class="btn btn-sm btn-light" id="btnAddTemplate">
+                                        <i class="fa-solid fa-plus"></i> Template hinzufügen
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted small mb-2">
+                                    Templates definieren Server-Vorlagen (z.B. "Competitive 5v5") mit vordefinierten Variablen und Config-Overrides.
+                                </p>
+                                <div id="templates-container"></div>
+                                <div id="no-templates-msg" class="text-muted small" style="display: none;">
+                                    <i class="fa-solid fa-info-circle"></i> Keine Templates definiert.
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Installation Script -->
                         <div class="card mb-4">
                             <div class="card-header">
@@ -403,7 +453,10 @@ document.getElementById('addon-name').addEventListener('input', function () {
 });
 
 // ── FIREBOT_v2 game_data zusammenbauen ─────────────────────────────────────────
+// Felder die nicht im Formular abgebildet sind, aus INITIAL_GAME_DATA übernehmen
 function buildGameData() {
+    syncConfigFiles();
+    syncTemplates();
     return {
         meta: {
             version:     'FIREBOT_v2',
@@ -417,7 +470,7 @@ function buildGameData() {
             done:    document.getElementById('startup-done').value    || '',
             stop:    document.getElementById('startup-stop').value    || ''
         },
-        config: { files: {}, logs: [] },
+        config: INITIAL_GAME_DATA.config || { files: {}, logs: [] },
         scripts: {
             installation: {
                 container:  document.getElementById('install-container').value.trim()  || '',
@@ -426,7 +479,9 @@ function buildGameData() {
             }
         },
         variables: serializeVariables(),
-        templates: []
+        ...(INITIAL_GAME_DATA.ports ? { ports: INITIAL_GAME_DATA.ports } : {}),
+        ...(INITIAL_GAME_DATA.query ? { query: INITIAL_GAME_DATA.query } : {}),
+        templates: INITIAL_GAME_DATA.templates || []
     };
 }
 
@@ -691,6 +746,288 @@ function updateNoVariablesMessage() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// CONFIG-FILES BUILDER
+// ──────────────────────────────────────────────────────────────────────────────
+function renderConfigFiles() {
+    const container = document.getElementById('config-files-container');
+    container.innerHTML = '';
+    const files = (INITIAL_GAME_DATA.config && INITIAL_GAME_DATA.config.files) || {};
+    Object.entries(files).forEach(([filename, cfg]) => {
+        const parser = cfg.parser || 'file';
+        const find   = cfg.find   || {};
+        const card   = document.createElement('div');
+        card.className = 'config-file-card card card-outline card-warning mb-3';
+        card.innerHTML = `
+            <div class="card-header py-2">
+                <div class="row align-items-center">
+                    <div class="col-md-5">
+                        <input type="text" class="form-control form-control-sm font-monospace cf-filename"
+                               value="${escHtml(filename)}" placeholder="config/server.properties">
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-control form-control-sm cf-parser">
+                            <option value="file"       ${parser === 'file'       ? 'selected' : ''}>file (Zeilen-Prefix)</option>
+                            <option value="properties" ${parser === 'properties' ? 'selected' : ''}>properties (key=value)</option>
+                            <option value="yaml"       ${parser === 'yaml'       ? 'selected' : ''}>yaml</option>
+                            <option value="json"       ${parser === 'json'       ? 'selected' : ''}>json</option>
+                            <option value="ini"        ${parser === 'ini'        ? 'selected' : ''}>ini</option>
+                            <option value="xml"        ${parser === 'xml'        ? 'selected' : ''}>xml</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 text-right">
+                        <button type="button" class="btn btn-sm btn-success cf-add-key">
+                            <i class="fa-solid fa-plus"></i> Key
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger cf-remove-file">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body py-2 cf-keys-container"></div>
+        `;
+        const keysContainer = card.querySelector('.cf-keys-container');
+        Object.entries(find).forEach(([k, v]) => {
+            keysContainer.appendChild(createConfigKeyRow(k, v));
+        });
+        card.querySelector('.cf-remove-file').addEventListener('click', () => {
+            if (confirm('Config-Datei wirklich entfernen?')) {
+                card.remove();
+                updateConfigFilesMessage();
+                updateJSONPreview();
+            }
+        });
+        card.querySelector('.cf-add-key').addEventListener('click', () => {
+            keysContainer.appendChild(createConfigKeyRow('', ''));
+            updateJSONPreview();
+        });
+        card.querySelectorAll('input, select').forEach(inp => {
+            inp.addEventListener('input',  updateJSONPreview);
+            inp.addEventListener('change', updateJSONPreview);
+        });
+        container.appendChild(card);
+    });
+    updateConfigFilesMessage();
+}
+
+function createConfigKeyRow(key, val) {
+    const row = document.createElement('div');
+    row.className = 'input-group input-group-sm mb-1 cf-key-row';
+    row.innerHTML = `
+        <input type="text" class="form-control font-monospace cf-key"
+               value="${escHtml(key)}" placeholder="key.path">
+        <input type="text" class="form-control font-monospace cf-val"
+               value="${escHtml(val)}" placeholder="{{VARIABLE}}">
+        <div class="input-group-append">
+            <button type="button" class="btn btn-outline-danger cf-remove-key">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+    `;
+    row.querySelector('.cf-remove-key').addEventListener('click', () => {
+        row.remove();
+        updateJSONPreview();
+    });
+    row.querySelectorAll('input').forEach(inp => {
+        inp.addEventListener('input', updateJSONPreview);
+    });
+    return row;
+}
+
+function syncConfigFiles() {
+    if (!INITIAL_GAME_DATA.config) INITIAL_GAME_DATA.config = { files: {}, logs: [] };
+    const files = {};
+    document.querySelectorAll('.config-file-card').forEach(card => {
+        const filename = card.querySelector('.cf-filename').value.trim();
+        if (!filename) return;
+        const parser = card.querySelector('.cf-parser').value;
+        const find   = {};
+        card.querySelectorAll('.cf-key-row').forEach(row => {
+            const k = row.querySelector('.cf-key').value.trim();
+            if (k) find[k] = row.querySelector('.cf-val').value;
+        });
+        files[filename] = { parser, find };
+    });
+    INITIAL_GAME_DATA.config.files = files;
+}
+
+function updateConfigFilesMessage() {
+    const count = document.querySelectorAll('.config-file-card').length;
+    document.getElementById('no-config-files-msg').style.display = count === 0 ? 'block' : 'none';
+    document.getElementById('config-files-count').textContent = count;
+}
+
+document.getElementById('add-config-file-btn').addEventListener('click', () => {
+    if (!INITIAL_GAME_DATA.config) INITIAL_GAME_DATA.config = { files: {}, logs: [] };
+    if (!INITIAL_GAME_DATA.config.files) INITIAL_GAME_DATA.config.files = {};
+    INITIAL_GAME_DATA.config.files['neue-config.cfg'] = { parser: 'file', find: {} };
+    renderConfigFiles();
+    updateJSONPreview();
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// TEMPLATES BUILDER
+// ──────────────────────────────────────────────────────────────────────────────
+function renderTemplates() {
+    const container = document.getElementById('templates-container');
+    container.innerHTML = '';
+    const templates = INITIAL_GAME_DATA.templates || [];
+    templates.forEach((tpl, idx) => {
+        const card = document.createElement('div');
+        card.className = 'tpl-card card card-outline card-info mb-3';
+        card.dataset.idx = idx;
+
+        const varsHtml = Object.entries(tpl.variables || {}).map(([k, v]) =>
+            `<div class="input-group input-group-sm mb-1 tpl-var-row">
+                <input type="text" class="form-control font-monospace tpl-var-key" value="${escHtml(k)}" placeholder="ENV_KEY">
+                <input type="text" class="form-control font-monospace tpl-var-val" value="${escHtml(v)}" placeholder="Wert">
+                <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-var"><i class="fa-solid fa-times"></i></button></div>
+            </div>`
+        ).join('');
+
+        const ovHtml = Object.entries(tpl.config_overrides || {}).map(([fname, keys]) =>
+            `<div class="tpl-ov-file card card-outline card-secondary mb-2">
+                <div class="card-header py-1">
+                    <input type="text" class="form-control form-control-sm font-monospace tpl-ov-filename" value="${escHtml(fname)}" placeholder="config/server.cfg">
+                    <div class="card-tools"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
+                </div>
+                <div class="card-body py-1 tpl-ov-keys">${Object.entries(keys).map(([k, v]) =>
+                    `<div class="input-group input-group-sm mb-1 tpl-ov-row">
+                        <input type="text" class="form-control font-monospace tpl-ov-key" value="${escHtml(k)}" placeholder="key">
+                        <input type="text" class="form-control font-monospace tpl-ov-val" value="${escHtml(v)}" placeholder="value">
+                        <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-ov"><i class="fa-solid fa-times"></i></button></div>
+                    </div>`
+                ).join('')}</div>
+                <div class="card-footer py-1"><button type="button" class="btn btn-xs btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
+            </div>`
+        ).join('');
+
+        card.innerHTML = `
+            <div class="card-header py-2">
+                <div class="row align-items-center">
+                    <div class="col-md-3"><input type="text" class="form-control form-control-sm tpl-name" value="${escHtml(tpl.name || '')}" placeholder="template-name"></div>
+                    <div class="col-md-3"><input type="text" class="form-control form-control-sm tpl-label" value="${escHtml(tpl.label || '')}" placeholder="Anzeigename"></div>
+                    <div class="col-md-3"><input type="text" class="form-control form-control-sm tpl-icon" value="${escHtml(tpl.icon || '')}" placeholder="fa-trophy"></div>
+                    <div class="col-md-3 text-right"><button type="button" class="btn btn-sm btn-danger tpl-remove"><i class="fa-solid fa-trash"></i></button></div>
+                </div>
+            </div>
+            <div class="card-body py-2">
+                <input type="text" class="form-control form-control-sm mb-2 tpl-desc" value="${escHtml(tpl.description || '')}" placeholder="Beschreibung">
+                <p class="mb-1 text-muted small"><strong>Variable-Overrides:</strong></p>
+                <div class="tpl-vars-container">${varsHtml}</div>
+                <button type="button" class="btn btn-xs btn-outline-success mb-2 tpl-add-var"><i class="fa-solid fa-plus"></i> Variable</button>
+                <p class="mb-1 text-muted small"><strong>Config-Overrides:</strong></p>
+                <div class="tpl-overrides-container">${ovHtml}</div>
+                <button type="button" class="btn btn-xs btn-outline-info tpl-add-ov-file"><i class="fa-solid fa-plus"></i> Config-Datei</button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+    bindTemplateEvents();
+    updateTemplatesMessage();
+}
+
+function bindTemplateEvents() {
+    document.querySelectorAll('.tpl-remove').forEach(btn => btn.addEventListener('click', function() {
+        if (confirm('Template entfernen?')) { this.closest('.tpl-card').remove(); syncTemplates(); }
+    }));
+    document.querySelectorAll('.tpl-add-var').forEach(btn => btn.addEventListener('click', function() {
+        const vc = this.closest('.card-body').querySelector('.tpl-vars-container');
+        vc.insertAdjacentHTML('beforeend', `<div class="input-group input-group-sm mb-1 tpl-var-row">
+            <input type="text" class="form-control font-monospace tpl-var-key" value="" placeholder="ENV_KEY">
+            <input type="text" class="form-control font-monospace tpl-var-val" value="" placeholder="Wert">
+            <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-var"><i class="fa-solid fa-times"></i></button></div>
+        </div>`);
+        bindTemplateEvents();
+    }));
+    document.querySelectorAll('.tpl-remove-var').forEach(btn => btn.addEventListener('click', function() {
+        this.closest('.tpl-var-row').remove(); syncTemplates();
+    }));
+    document.querySelectorAll('.tpl-add-ov-file').forEach(btn => btn.addEventListener('click', function() {
+        const oc = this.closest('.card-body')
+            ? this.closest('.card-body').querySelector('.tpl-overrides-container')
+            : this.previousElementSibling;
+        if (!oc) return;
+        oc.insertAdjacentHTML('beforeend', `<div class="tpl-ov-file card card-outline card-secondary mb-2">
+            <div class="card-header py-1">
+                <input type="text" class="form-control form-control-sm font-monospace tpl-ov-filename" value="" placeholder="config/server.cfg">
+                <div class="card-tools"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
+            </div>
+            <div class="card-body py-1 tpl-ov-keys"></div>
+            <div class="card-footer py-1"><button type="button" class="btn btn-xs btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
+        </div>`);
+        bindTemplateEvents();
+    }));
+    document.querySelectorAll('.tpl-remove-ov-file').forEach(btn => btn.addEventListener('click', function() {
+        this.closest('.tpl-ov-file').remove(); syncTemplates();
+    }));
+    document.querySelectorAll('.tpl-add-ov-key').forEach(btn => btn.addEventListener('click', function() {
+        const kc = this.closest('.tpl-ov-file').querySelector('.tpl-ov-keys');
+        kc.insertAdjacentHTML('beforeend', `<div class="input-group input-group-sm mb-1 tpl-ov-row">
+            <input type="text" class="form-control font-monospace tpl-ov-key" value="" placeholder="key">
+            <input type="text" class="form-control font-monospace tpl-ov-val" value="" placeholder="value">
+            <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-ov"><i class="fa-solid fa-times"></i></button></div>
+        </div>`);
+        bindTemplateEvents();
+    }));
+    document.querySelectorAll('.tpl-remove-ov').forEach(btn => btn.addEventListener('click', function() {
+        this.closest('.tpl-ov-row').remove(); syncTemplates();
+    }));
+}
+
+function syncTemplates() {
+    const templates = [];
+    document.querySelectorAll('.tpl-card').forEach(card => {
+        const name = card.querySelector('.tpl-name').value.trim();
+        if (!name) return;
+        const variables = {};
+        card.querySelectorAll('.tpl-var-row').forEach(row => {
+            const k = row.querySelector('.tpl-var-key').value.trim();
+            if (k) variables[k] = row.querySelector('.tpl-var-val').value;
+        });
+        const config_overrides = {};
+        card.querySelectorAll('.tpl-ov-file').forEach(fileBlock => {
+            const fname = fileBlock.querySelector('.tpl-ov-filename').value.trim();
+            if (!fname) return;
+            const keys = {};
+            fileBlock.querySelectorAll('.tpl-ov-row').forEach(row => {
+                const k = row.querySelector('.tpl-ov-key').value.trim();
+                if (k) keys[k] = row.querySelector('.tpl-ov-val').value;
+            });
+            config_overrides[fname] = keys;
+        });
+        templates.push({
+            name,
+            label: card.querySelector('.tpl-label').value.trim() || name,
+            description: card.querySelector('.tpl-desc').value.trim(),
+            icon: card.querySelector('.tpl-icon').value.trim() || 'fa-server',
+            variables,
+            config_overrides,
+        });
+    });
+    INITIAL_GAME_DATA.templates = templates;
+    updateTemplatesMessage();
+    updateJSONPreview();
+}
+
+function updateTemplatesMessage() {
+    const count = document.querySelectorAll('.tpl-card').length;
+    document.getElementById('no-templates-msg').style.display = count === 0 ? 'block' : 'none';
+    document.getElementById('templates-count').textContent = count;
+}
+
+document.getElementById('btnAddTemplate').addEventListener('click', () => {
+    if (!INITIAL_GAME_DATA.templates) INITIAL_GAME_DATA.templates = [];
+    INITIAL_GAME_DATA.templates.push({
+        name: 'template-' + (INITIAL_GAME_DATA.templates.length + 1),
+        label: '', description: '', icon: 'fa-server',
+        variables: {}, config_overrides: {}
+    });
+    renderTemplates();
+    updateJSONPreview();
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Form aus FIREBOT_v2 game_data befüllen
 // ──────────────────────────────────────────────────────────────────────────────
 function populateFormFromGameData(gd) {
@@ -725,6 +1062,14 @@ function populateFormFromGameData(gd) {
     }
 
     if (gd.variables) loadVariablesIntoBuilder(gd.variables);
+
+    // Nicht-UI-Felder in INITIAL_GAME_DATA übernehmen, damit buildGameData() sie nicht verliert
+    if (gd.config)    INITIAL_GAME_DATA.config    = gd.config;
+    renderConfigFiles();
+    if (gd.ports)     INITIAL_GAME_DATA.ports     = gd.ports;
+    if (gd.query)     INITIAL_GAME_DATA.query     = gd.query;
+    if (gd.templates) INITIAL_GAME_DATA.templates = gd.templates;
+    renderTemplates();
 
     updateJSONPreview();
 }
@@ -787,9 +1132,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (INITIAL_GAME_DATA && Object.keys(INITIAL_GAME_DATA).length > 0) {
         if (INITIAL_GAME_DATA.docker_images) loadDockerImagesIntoBuilder(INITIAL_GAME_DATA.docker_images);
         if (INITIAL_GAME_DATA.variables)     loadVariablesIntoBuilder(INITIAL_GAME_DATA.variables);
+        renderConfigFiles();
+        renderTemplates();
     } else {
         updateDockerImagesMessage();
         updateNoVariablesMessage();
+        updateConfigFilesMessage();
+        updateTemplatesMessage();
     }
     updateJSONPreview();
 });

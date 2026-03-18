@@ -333,20 +333,7 @@
                 <% } %>
               </div>
             </div>
-            <div class="col-md-4">
-              <div class="form-group">
-                <label>Port-Range Start</label>
-                <input type="number" class="form-control" name="portRangeStart" 
-                       placeholder="25565">
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="form-group">
-                <label>Port-Range Ende</label>
-                <input type="number" class="form-control" name="portRangeEnd" 
-                       placeholder="25665">
-              </div>
-            </div>
+            <!-- Port-Range entfernt: Wird über Port-Allocations verwaltet -->
           </div>
 
           <h6 class="mb-3 mt-3"><i class="fa-solid fa-location-dot me-2"></i> Standort</h6>
@@ -482,7 +469,7 @@ function showServerDetails(serverId) {
   
   const networkInfo = server.ip_address ? `
     <tr><td><strong>IP-Adresse:</strong></td><td>${server.ip_address}</td></tr>
-    <tr><td><strong>Port-Range:</strong></td><td>${server.port_range_start || '?'} - ${server.port_range_end || '?'}</td></tr>
+
   ` : '<tr><td colspan="2" class="text-muted">Keine Netzwerk-Konfiguration</td></tr>';
   
   Swal.fire({

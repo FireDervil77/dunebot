@@ -39,6 +39,12 @@ async function validateServerAccess(serverId, guildId) {
         [serverId, guildId]
     );
     if (!server) throw new Error('Server nicht gefunden');
+    const ipmServer = ServiceManager.get('ipmServer');
+    if (!ipmServer || !ipmServer.isDaemonOnline(server.daemon_id)) {
+        const err = new Error('Daemon nicht verbunden – Server ist offline oder nicht erreichbar');
+        err.statusCode = 503;
+        throw err;
+    }
     return server;
 }
 
@@ -71,7 +77,12 @@ router.get('/servers/:serverId/files', async (req, res) => {
             return res.status(500).json({ success: false, error: response.error });
         }
         
-        const files = response.data.files.map(file => ({
+        const rawFiles = response.data?.files;
+        if (!rawFiles) {
+            // Server noch nicht installiert / kein Verzeichnis vorhanden
+            return res.json({ success: true, files: [], path: requestedPath });
+        }
+        const files = rawFiles.map(file => ({
             ...file,
             editable: !file.is_dir && isEditable(file.name, file.size),
             size_formatted: formatFileSize(file.size)
@@ -80,7 +91,7 @@ router.get('/servers/:serverId/files', async (req, res) => {
         res.json({ success: true, files, path: requestedPath });
     } catch (error) {
         Logger.error('[Files] Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
 
@@ -109,7 +120,7 @@ router.get('/servers/:serverId/files/read', async (req, res) => {
         res.json({ success: true, content, path: filePath });
     } catch (error) {
         Logger.error('[Files] Read Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
 
@@ -142,7 +153,7 @@ router.post('/servers/:serverId/files/write', async (req, res) => {
         res.json({ success: true, message: 'Datei gespeichert' });
     } catch (error) {
         Logger.error('[Files] Write Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
 
@@ -170,7 +181,7 @@ router.delete('/servers/:serverId/files', async (req, res) => {
         res.json({ success: true, message: 'Datei gelöscht' });
     } catch (error) {
         Logger.error('[Files] Delete Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
 
@@ -199,7 +210,7 @@ router.post('/servers/:serverId/files/bulk-delete', async (req, res) => {
         res.json({ success: true, message: `${succeeded} Dateien gelöscht` });
     } catch (error) {
         Logger.error('[Files] Bulk-Delete Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
 
@@ -227,7 +238,7 @@ router.post('/servers/:serverId/files/mkdir', async (req, res) => {
         res.json({ success: true, message: 'Verzeichnis erstellt' });
     } catch (error) {
         Logger.error('[Files] Mkdir Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
 
@@ -255,7 +266,7 @@ router.delete('/servers/:serverId/files/rmdir', async (req, res) => {
         res.json({ success: true, message: 'Verzeichnis gelöscht' });
     } catch (error) {
         Logger.error('[Files] Rmdir Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
 
@@ -286,7 +297,7 @@ router.post('/servers/:serverId/files/rename', async (req, res) => {
         res.json({ success: true, message: 'Umbenannt' });
     } catch (error) {
         Logger.error('[Files] Rename Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
 
@@ -317,7 +328,7 @@ router.post('/servers/:serverId/files/move', async (req, res) => {
         res.json({ success: true, message: 'Verschoben' });
     } catch (error) {
         Logger.error('[Files] Move Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
 
@@ -351,7 +362,7 @@ router.post('/servers/:serverId/files/bulk-move', async (req, res) => {
         res.json({ success: true, message: `${succeeded} Dateien verschoben` });
     } catch (error) {
         Logger.error('[Files] Bulk-Move Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
 
@@ -391,7 +402,46 @@ router.post('/servers/:serverId/files/upload', upload.single('file'), async (req
         res.json({ success: true, message: `${req.file.originalname} hochgeladen` });
     } catch (error) {
         Logger.error('[Files] Upload Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /servers/:serverId/files/download
+ * Datei herunterladen (als Attachment)
+ * Query: ?path=/server.properties
+ */
+router.get('/servers/:serverId/files/download', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const ipmServer = ServiceManager.get('ipmServer');
+    try {
+        const { serverId } = req.params;
+        const guildId = res.locals.guildId;
+        const filePath = req.query.path;
+        if (!filePath) return res.status(400).json({ success: false, error: 'Pfad erforderlich' });
+
+        const server = await validateServerAccess(serverId, guildId);
+        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.read', {
+            server_id: server.daemon_server_id || serverId.toString(),
+            rootserver_id: server.rootserver_id.toString(),
+            install_path: server.install_path,
+            path: filePath
+        });
+
+        if (!response.success) {
+            return res.status(500).json({ success: false, error: response.error || 'Datei konnte nicht gelesen werden' });
+        }
+
+        const fileBuffer = Buffer.from(response.data.content, 'base64');
+        const filename = path.basename(filePath);
+
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Length', fileBuffer.length);
+        res.send(fileBuffer);
+    } catch (error) {
+        Logger.error('[Files] Download Error:', error);
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
 

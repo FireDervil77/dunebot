@@ -28,7 +28,7 @@ async function registerKernNavigation(guildId) {
     try {
         // Bestehende Kern-Navigation löschen (für sauberen Neustart)
         await dbService.query(
-            'DELETE FROM nav_items WHERE plugin = ? AND guildId = ?',
+            'DELETE FROM guild_nav_items WHERE plugin = ? AND guildId = ?',
             ['core', guildId]
         );
 
@@ -121,6 +121,52 @@ async function registerKernNavigation(guildId) {
                 guildId,
                 parent: null
             },
+            // ── Themes (eigener Top-Level-Bereich) ──
+            {
+                title: 'NAV.THEMES',
+                url: `/guild/${guildId}/themes`,
+                icon: 'fa-solid fa-palette',
+                order: 2800,
+                type: navigationManager.menuTypes.MAIN,
+                capability: 'CORE.THEMES.VIEW',
+                visible: true,
+                guildId,
+                parent: null
+            },
+            // ── Medien (WordPress-Style Media Manager) ──
+            {
+                title: 'NAV.MEDIA',
+                url: `/guild/${guildId}/media`,
+                icon: 'fa-solid fa-photo-film',
+                order: 2900,
+                type: navigationManager.menuTypes.MAIN,
+                capability: 'CORE.MEDIA.VIEW',
+                visible: true,
+                guildId,
+                parent: null
+            },
+            {
+                title: 'NAV.THEMES_OVERVIEW',
+                url: `/guild/${guildId}/themes`,
+                icon: 'fa-solid fa-swatchbook',
+                order: 10,
+                type: navigationManager.menuTypes.MAIN,
+                capability: 'CORE.THEMES.VIEW',
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}/themes`
+            },
+            {
+                title: 'NAV.THEMES_WIDGETS',
+                url: `/guild/${guildId}/themes/widgets`,
+                icon: 'fa-solid fa-puzzle-piece',
+                order: 20,
+                type: navigationManager.menuTypes.MAIN,
+                capability: 'CORE.THEMES.EDIT',
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}/themes`
+            },
             // Subnav: Einstellungen
             {
                 title: 'NAV.GENERAL',
@@ -140,7 +186,7 @@ async function registerKernNavigation(guildId) {
                 order: 20,
                 type: navigationManager.menuTypes.MAIN,
                 capability: 'CORE.SETTINGS.EDIT',
-                visible: true,
+                visible: false,
                 guildId,
                 parent: `/guild/${guildId}/settings`
             },
@@ -151,6 +197,17 @@ async function registerKernNavigation(guildId) {
                 order: 30,
                 type: navigationManager.menuTypes.MAIN,
                 capability: 'CORE.SETTINGS.EDIT',
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}/settings`
+            },
+            {
+                title: 'NAV.ROLES',
+                url: `/guild/${guildId}/settings/roles`,
+                icon: 'fa-solid fa-shield-halved',
+                order: 40,
+                type: navigationManager.menuTypes.MAIN,
+                capability: 'CORE.ROLES.VIEW',
                 visible: true,
                 guildId,
                 parent: `/guild/${guildId}/settings`

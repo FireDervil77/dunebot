@@ -133,12 +133,65 @@ router.get('/', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /admin/addons/import — Import-UI
+// GET /admin/addons/import — Import-UI (Pelican Repo-Browser)
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/import', (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
     res.locals.layout  = themeManager.getLayout('guild');
     res.render('admin/addons/import', { pageTitle: 'Egg importieren' });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /admin/addons/create — Manuell erstellen / externe URL importieren
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/create', (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    res.locals.layout  = themeManager.getLayout('guild');
+    res.render('admin/addons/create', { pageTitle: 'Addon erstellen' });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /admin/addons/fetch-external?url= — Externes Egg per URL laden
+// Erlaubte Hosts: raw.githubusercontent.com, gist.githubusercontent.com
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/fetch-external', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const { url } = req.query;
+
+    if (!url) {
+        return res.status(400).json({ success: false, message: 'Parameter ?url= fehlt' });
+    }
+
+    // URL-Validierung
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(url);
+    } catch {
+        return res.status(400).json({ success: false, message: 'Ungültige URL' });
+    }
+
+    // Nur HTTPS + allowlisted Hosts (SSRF-Schutz)
+    if (parsedUrl.protocol !== 'https:') {
+        return res.status(400).json({ success: false, message: 'Nur HTTPS-URLs erlaubt' });
+    }
+    const ALLOWED_HOSTS = ['raw.githubusercontent.com', 'gist.githubusercontent.com'];
+    if (!ALLOWED_HOSTS.includes(parsedUrl.hostname)) {
+        return res.status(400).json({
+            success: false,
+            message: `Host nicht erlaubt. Erlaubt: ${ALLOWED_HOSTS.join(', ')}`,
+        });
+    }
+
+    try {
+        Logger.info(`[Addons] Externes Egg laden: ${url}`);
+        const importer = getEggImporter();
+        const egg      = await importer.fetchEgg(url);
+        const gameData = importer.convert(egg);
+        res.json({ success: true, gameData });
+    } catch (err) {
+        Logger.error(`[Addons] Externes Egg fehlgeschlagen (${url}):`, err);
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -235,7 +288,7 @@ router.post('/', async (req, res) => {
     }
 
     try {
-        const { name, slug, description, category, game_data } = req.body;
+        const { name, slug, description, category, game_data, source_type } = req.body;
 
         if (!name || !game_data) {
             return res.status(400).json({
@@ -249,13 +302,6 @@ router.post('/', async (req, res) => {
             gameData = typeof game_data === 'string' ? JSON.parse(game_data) : game_data;
         } catch {
             return res.status(400).json({ success: false, message: 'game_data ist kein valides JSON' });
-        }
-
-        if (gameData?.meta?.version !== 'FIREBOT_v2') {
-            return res.status(400).json({
-                success: false,
-                message: 'Nur FIREBOT_v2 game_data wird akzeptiert. Bitte Egg über den Import-Pfad einlesen.',
-            });
         }
 
         // Slug generieren falls nicht angegeben
@@ -277,20 +323,27 @@ router.post('/', async (req, res) => {
         const runtimeType = detectRuntimeType(gameData);
         const steamAppId  = extractSteamAppId(gameData);
 
+        const VALID_CATEGORIES = ['fps','survival','sandbox','mmorpg','racing','strategy','horror','scifi','other'];
+        const safeCategory = VALID_CATEGORIES.includes(category) ? category : 'other';
+
+        const VALID_SOURCES = ['pelican', 'community', 'native'];
+        const safeSourceType = VALID_SOURCES.includes(source_type) ? source_type : 'pelican';
+
         const result = await dbService.query(`
             INSERT INTO addon_marketplace
                 (name, slug, description, author_user_id,
                  visibility, status, trust_level,
                  game_data, category, runtime_type, source_type, steam_app_id)
-            VALUES (?, ?, ?, ?, 'unlisted', 'pending_review', 'unverified', ?, ?, ?, 'pelican', ?)
+            VALUES (?, ?, ?, ?, 'unlisted', 'pending_review', 'unverified', ?, ?, ?, ?, ?)
         `, [
             name,
             finalSlug,
             description || gameData.meta?.description || '',
             userId,
             JSON.stringify(gameData),
-            category || 'other',
+            safeCategory,
             runtimeType,
+            safeSourceType,
             steamAppId,
         ]);
 

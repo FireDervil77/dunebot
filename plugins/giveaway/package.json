@@ -1,0 +1,15 @@
+{
+    "name": "giveaway",
+    "displayName": "Giveaway",
+    "description": "The Giveaway Plugin for FireBot",
+    "version": "1.0.0",
+    "author": "FireBot Team",
+    "license": "none",
+    "type":"commonjs",
+    "peerDependencies": {
+        "discord.js": "^14.19.0",
+        "express": "^5.1.0",
+        "dunebot-core": "*",
+        "dunebot-sdk": "*"
+    }
+}

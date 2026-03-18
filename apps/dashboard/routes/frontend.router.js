@@ -8,6 +8,25 @@ const { ChangelogHelper } = require("dunebot-sdk/utils");
 // Router erstellen
 const router = express.Router();
 
+// ── Middleware: Menu + Footer Daten für alle Frontend-Seiten laden ──
+router.use(async (req, res, next) => {
+    try {
+        const FrontendMenu = require('dunebot-db-client/models/FrontendMenu');
+        const FrontendFooter = require('dunebot-db-client/models/FrontendFooter');
+        const [menuItems, footerColumns] = await Promise.all([
+            FrontendMenu.getVisibleTree(),
+            FrontendFooter.getVisibleColumnsWithLinks()
+        ]);
+        res.locals.menuItems = menuItems;
+        res.locals.footerColumns = footerColumns;
+    } catch (err) {
+        // Tabellen existieren evtl. noch nicht — Fallback auf leere Arrays
+        res.locals.menuItems = [];
+        res.locals.footerColumns = [];
+    }
+    next();
+});
+
 // News-Details Handler
 const getNewsDetails = async (req, res) => {
     const dbService = ServiceManager.get('dbService');

@@ -1,0 +1,81 @@
+<%
+  const pfx = typeof prefix !== 'undefined' ? prefix : 'welcome';
+  const emb = (typeof embed !== 'undefined' && embed) ? embed : {};
+  const embTitle  = emb.title || '';
+  const embDesc   = emb.description || '';
+  const embColor  = emb.color || '#5865f2';
+  const embThumb  = emb.thumbnail ? true : false;
+  const embImage  = emb.image || '';
+  const embFooter = (emb.footer && emb.footer.text) ? emb.footer.text : '';
+  const embTs     = emb.timestamp ? true : false;
+%>
+<div class="embed-builder mt-3 mb-3" id="<%= pfx %>_embed_builder">
+  <div class="d-flex align-items-center mb-2 cursor-pointer" data-toggle="collapse" data-target="#<%= pfx %>_embed_collapse" aria-expanded="false">
+    <i class="fa-solid fa-code me-1"></i>
+    <strong><%= tr('greeting:EMBED.TITLE') %></strong>
+    <i class="fa-solid fa-chevron-down ml-2 small"></i>
+  </div>
+
+  <div class="collapse" id="<%= pfx %>_embed_collapse">
+    <div class="card card-body bg-light">
+      <div class="row">
+        <!-- Embed Title -->
+        <div class="col-md-8 mb-2">
+          <label class="form-label small"><%= tr('greeting:EMBED.FIELD_TITLE') %></label>
+          <input type="text" class="form-control form-control-sm embed-input" name="<%= pfx %>_embed_title"
+                 value="<%= embTitle %>" data-embed-field="title" data-prefix="<%= pfx %>"
+                 placeholder="<%= tr('greeting:EMBED.FIELD_TITLE_PH') %>">
+        </div>
+        <!-- Embed Color -->
+        <div class="col-md-4 mb-2">
+          <label class="form-label small"><%= tr('greeting:EMBED.COLOR') %></label>
+          <input type="color" class="form-control form-control-sm form-control-color embed-input" name="<%= pfx %>_embed_color"
+                 value="<%= embColor %>" data-embed-field="color" data-prefix="<%= pfx %>" style="height: 31px;">
+        </div>
+      </div>
+      <!-- Embed Description -->
+      <div class="mb-2">
+        <label class="form-label small"><%= tr('greeting:EMBED.DESCRIPTION') %></label>
+        <textarea class="form-control form-control-sm embed-input" name="<%= pfx %>_embed_description" rows="3"
+                  data-embed-field="description" data-prefix="<%= pfx %>"
+                  placeholder="<%= tr('greeting:EMBED.DESCRIPTION_PH') %>"><%= embDesc %></textarea>
+      </div>
+      <div class="row">
+        <!-- Image URL -->
+        <div class="col-md-6 mb-2">
+          <label class="form-label small"><%= tr('greeting:EMBED.IMAGE') %></label>
+          <input type="text" class="form-control form-control-sm embed-input" name="<%= pfx %>_embed_image"
+                 value="<%= embImage %>" data-embed-field="image" data-prefix="<%= pfx %>"
+                 placeholder="https://...">
+        </div>
+        <!-- Footer -->
+        <div class="col-md-6 mb-2">
+          <label class="form-label small"><%= tr('greeting:EMBED.FOOTER') %></label>
+          <input type="text" class="form-control form-control-sm embed-input" name="<%= pfx %>_embed_footer"
+                 value="<%= embFooter %>" data-embed-field="footer" data-prefix="<%= pfx %>"
+                 placeholder="<%= tr('greeting:EMBED.FOOTER_PH') %>">
+        </div>
+      </div>
+      <div class="row">
+        <!-- Thumbnail Toggle -->
+        <div class="col-md-6 mb-2">
+          <div class="custom-control custom-switch">
+            <input type="checkbox" class="custom-control-input embed-input" id="<%= pfx %>_embed_thumbnail"
+                   name="<%= pfx %>_embed_thumbnail" <%= embThumb ? 'checked' : '' %>
+                   data-embed-field="thumbnail" data-prefix="<%= pfx %>">
+            <label class="custom-control-label" for="<%= pfx %>_embed_thumbnail"><%= tr('greeting:EMBED.THUMBNAIL') %></label>
+          </div>
+        </div>
+        <!-- Timestamp Toggle -->
+        <div class="col-md-6 mb-2">
+          <div class="custom-control custom-switch">
+            <input type="checkbox" class="custom-control-input embed-input" id="<%= pfx %>_embed_timestamp"
+                   name="<%= pfx %>_embed_timestamp" <%= embTs ? 'checked' : '' %>
+                   data-embed-field="timestamp" data-prefix="<%= pfx %>">
+            <label class="custom-control-label" for="<%= pfx %>_embed_timestamp"><%= tr('greeting:EMBED.TIMESTAMP') %></label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -5,7 +5,7 @@
  */
 module.exports = () => {
   return `
-    CREATE TABLE IF NOT EXISTS nav_items (
+    CREATE TABLE IF NOT EXISTS guild_nav_items (
       id INT AUTO_INCREMENT PRIMARY KEY,
       plugin VARCHAR(255) DEFAULT NULL,
       guildId VARCHAR(255) DEFAULT NULL,
@@ -21,6 +21,7 @@ module.exports = () => {
       classes VARCHAR(255) DEFAULT '',
       position VARCHAR(255) DEFAULT 'normal',
       meta LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+      requiresOwner TINYINT(1) DEFAULT 0 COMMENT 'Wenn TRUE: Nur Bot-Owner (OWNER_IDS) können dieses Nav-Item sehen',
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

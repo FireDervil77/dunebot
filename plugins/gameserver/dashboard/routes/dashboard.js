@@ -59,7 +59,8 @@ router.get('/', async (req, res) => {
                 gs.max_players,
                 gs.created_at,
                 am.name as game_name,
-                am.slug as game_slug
+                am.slug as game_slug,
+                JSON_UNQUOTE(JSON_EXTRACT(am.game_data, '$.query.gamedig_type')) as gamedig_type
             FROM gameservers gs
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
             WHERE gs.guild_id = ?

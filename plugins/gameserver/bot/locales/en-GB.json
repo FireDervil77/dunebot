@@ -1,3 +1,26 @@
 {
-    "welcome": "Welcome to the game server!"
+    "SERVER": {
+        "DESCRIPTION": "Manage game servers of this guild",
+        "SUB_LIST": "List all gameservers",
+        "SUB_STATUS": "Show status of a gameserver",
+        "SUB_CREATE": "Create a new gameserver",
+        "SUB_START": "Start a gameserver",
+        "SUB_STOP": "Stop a gameserver",
+        "SUB_RESTART": "Restart a gameserver",
+        "OPT_ID": "Gameserver ID",
+        "OPT_ROOTSERVER": "Rootserver (where the gameserver will be created)",
+        "OPT_ADDON": "Game / Addon (e.g. cs2, minecraft)",
+        "OPT_NAME": "Name for the gameserver",
+        "OPT_RAM": "RAM limit in MB (empty = no limit)",
+        "OPT_CPU": "CPU limit in % (empty = no limit)",
+        "OPT_DISK": "Disk limit in GB (empty = no limit)",
+        "OPT_FILTER_STATUS": "Filter by status",
+        "OPT_FILTER_ROOTSERVER": "Only servers of a specific rootserver",
+        "OPT_SEARCH": "Search by server name",
+        "LIST_TITLE": "Gameservers",
+        "LIST_EMPTY_TITLE": "No gameservers found",
+        "LIST_EMPTY_DESC": "Create one with `/server create`.",
+        "CREATE_SUCCESS": "Gameserver is being installed",
+        "CREATE_HINT": "Once the daemon finishes installation, start it with `/server start`."
+    }
 }

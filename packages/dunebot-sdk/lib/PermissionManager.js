@@ -648,12 +648,16 @@ class PermissionManager {
       expires_at = null
     } = options;
 
-    // Prüfe ob User Owner ist
+    // Prüfe ob Guild überhaupt existiert (FK-Guard)
     const guilds = await this.dbService.query(
       'SELECT owner_id FROM guilds WHERE _id = ?',
       [guildId]
     );
-    const isOwner = guilds && guilds[0]?.owner_id === userId ? 1 : 0;
+    if (!guilds || guilds.length === 0) {
+      this.logger.warn(`[PermissionManager] upsertGuildUser: Guild ${guildId} existiert nicht in guilds-Tabelle – übersprungen`);
+      return null;
+    }
+    const isOwner = guilds[0]?.owner_id === userId ? 1 : 0;
 
     const directPermsJson = direct_permissions ? JSON.stringify(direct_permissions) : null;
 

@@ -84,9 +84,8 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
             </span>
         </div>
         
-        <!-- Resource-Usage (nur bei online) -->
-        <% if (displayStatus === 'online') { %>
-            <div class="mb-3 server-resources">
+        <!-- Resource-Usage (immer rendern, nur bei online sichtbar) -->
+            <div class="mb-3 server-resources" style="display: <%= displayStatus === 'online' ? '' : 'none' %>;">
                 <!-- CPU -->
                 <div class="mb-2">
                     <div class="d-flex justify-content-between mb-1">
@@ -119,19 +118,20 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
                     </div>
                 </div>
                 
-                <!-- Players (falls vorhanden) -->
-                <% if (server.current_players !== undefined && server.current_players !== null) { %>
-                    <div class="d-flex justify-content-between">
-                        <small class="text-muted">
-                            <i class="bi bi-people-fill me-1"></i>Spieler
-                        </small>
-                        <small class="server-players">
+                <!-- Players -->
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">
+                        <i class="bi bi-people-fill me-1"></i>Spieler
+                    </small>
+                    <small class="server-players">
+                        <% if (displayStatus === 'online' && server.current_players !== undefined && server.current_players !== null) { %>
                             <%= server.current_players %> / <%= server.max_players || '?' %>
-                        </small>
-                    </div>
-                <% } %>
+                        <% } else { %>
+                            -- / ?
+                        <% } %>
+                    </small>
+                </div>
             </div>
-        <% } %>
         
         <!-- Connection-Info -->
         <div class="mb-3 mt-auto">

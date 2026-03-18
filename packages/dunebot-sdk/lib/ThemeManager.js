@@ -1267,6 +1267,124 @@ class ThemeManager {
         return layouts[section];
     }
 
+    // ============================================================================
+    // THEME CLONING (CHILD-THEME ERSTELLEN)
+    // ============================================================================
+
+    /**
+     * Ein bestehendes Theme als Child-Theme klonen.
+     * 
+     * Erstellt ein neues Theme-Verzeichnis mit:
+     * - theme.json (parent: sourceTheme)
+     * - theme.js (leer)
+     * - assets/css/ (leer, für Custom-Styles)
+     * - assets/js/ (leer, für Custom-Scripts)
+     * - views/ (leer, für überschriebene Templates)
+     * - partials/ (leer, für überschriebene Partials)
+     * 
+     * @param {string} sourceTheme - Name des zu klonenden Themes
+     * @param {string} newName - Interner Name des neuen Themes
+     * @param {object} [options] - Optionen
+     * @param {string} [options.displayName] - Anzeigename
+     * @returns {Promise<object>} Ergebnis mit Theme-Pfad und Metadaten
+     */
+    async cloneTheme(sourceTheme, newName, options = {}) {
+        const Logger = ServiceManager.get('Logger');
+
+        // Validierungen
+        if (!sourceTheme || !newName) {
+            throw new Error('sourceTheme und newName sind erforderlich');
+        }
+
+        if (!/^[a-z0-9][a-z0-9-]*$/.test(newName) || newName.length > 50) {
+            throw new Error('Name: nur Kleinbuchstaben, Zahlen und Bindestriche (max. 50 Zeichen)');
+        }
+
+        // Prüfe ob Source existiert
+        const sourceMeta = await this.loadTheme(sourceTheme);
+        if (!sourceMeta) {
+            throw new Error(`Quell-Theme '${sourceTheme}' nicht gefunden`);
+        }
+
+        // Child-Themes können nicht erneut geklont werden
+        if (sourceMeta.parent) {
+            throw new Error(`'${sourceMeta.displayName || sourceTheme}' ist bereits ein Child-Theme und kann nicht erneut geklont werden`);
+        }
+
+        // Prüfe ob Ziel schon existiert
+        const targetDir = path.join(this.themesDir, newName);
+        if (fs.existsSync(targetDir)) {
+            throw new Error(`Theme '${newName}' existiert bereits`);
+        }
+
+        // Verzeichnisstruktur anlegen
+        const dirs = [
+            targetDir,
+            path.join(targetDir, 'assets'),
+            path.join(targetDir, 'assets', 'css'),
+            path.join(targetDir, 'assets', 'js'),
+            path.join(targetDir, 'assets', 'img'),
+            path.join(targetDir, 'views'),
+            path.join(targetDir, 'partials')
+        ];
+
+        for (const dir of dirs) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+
+        // theme.json erstellen
+        const themeJson = {
+            name: newName,
+            displayName: options.displayName || newName,
+            description: `Child-Theme basierend auf ${sourceMeta.displayName || sourceTheme}`,
+            version: '1.0.0',
+            author: sourceMeta.author || 'Unbekannt',
+            parent: sourceTheme,
+            tags: ['child-theme'],
+            config: {}
+        };
+
+        fs.writeFileSync(
+            path.join(targetDir, 'theme.json'),
+            JSON.stringify(themeJson, null, 2),
+            'utf8'
+        );
+
+        // theme.js erstellen (leerer Skeleton)
+        const themeJs = `/**
+ * ${themeJson.displayName} — Child-Theme von ${sourceTheme}
+ * 
+ * Überschreibe hier Hooks, registriere Assets oder
+ * passe das Verhalten des Parent-Themes an.
+ */
+module.exports = {
+    // Hooks registrieren (optional)
+    // registerHooks(hookManager) { },
+
+    // Assets registrieren (optional)
+    // registerAssets(assetManager, themeName) { },
+};
+`;
+
+        fs.writeFileSync(path.join(targetDir, 'theme.js'), themeJs, 'utf8');
+
+        // Leere CSS-Datei für Custom-Styles
+        fs.writeFileSync(
+            path.join(targetDir, 'assets', 'css', 'custom.css'),
+            `/* ${themeJson.displayName} — Custom Styles */\n`,
+            'utf8'
+        );
+
+        Logger.info(`[ThemeManager] Child-Theme '${newName}' von '${sourceTheme}' erstellt: ${targetDir}`);
+
+        return {
+            name: newName,
+            path: targetDir,
+            parent: sourceTheme,
+            displayName: themeJson.displayName
+        };
+    }
+
 }
 
 module.exports = ThemeManager;

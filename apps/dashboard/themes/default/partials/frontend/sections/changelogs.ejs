@@ -1,0 +1,74 @@
+<%# Changelogs Section Partial — Letzte 3 Changelogs aus DB %>
+
+<section id="changelogs" class="changelogs section dark-background">
+  <div class="container section-title" data-aos="fade-up">
+    <h1><%= tr('LANDING.CHANGELOGS_TITLE') %></h1>
+    <h2><%= tr('CHANGELOGS.SUBTITLE') %></h2>
+  </div>
+  
+  <div class="container">
+    <div class="row gy-4">
+      <% if (locals.changelogsList && changelogsList.length > 0) { %>
+        <% changelogsList.slice(0, 3).forEach(function(changelog, index) { 
+          const typeColors = {
+            major: 'danger',
+            minor: 'warning',
+            patch: 'info'
+          };
+          const badgeColor = typeColors[changelog.type] || 'secondary';
+          
+          const typeIcons = {
+            major: 'rocket',
+            minor: 'star',
+            patch: 'wrench'
+          };
+          const icon = typeIcons[changelog.type] || 'code-branch';
+        %>
+        <div class="col-lg-4" data-aos="fade-up" data-aos-delay="<%= 100 + (index * 100) %>">
+          <div class="changelog-card h-100">
+            <div class="changelog-header">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="badge bg-<%= badgeColor %> fs-5">
+                  v<%= changelog.version %>
+                </span>
+                <small class="text-light-emphasis">
+                  <i class="bi bi-calendar me-1"></i>
+                  <%= changelog.formattedDate %>
+                </small>
+              </div>
+              <h3><%= changelog.title %></h3>
+              <% if (changelog.description) { %>
+                <p class="changelog-description"><%= changelog.description %></p>
+              <% } %>
+            </div>
+            
+            <div class="changelog-type">
+              <i class="bi bi-<%= icon %> me-1"></i>
+              <span class="text-capitalize"><%= changelog.type %> Release</span>
+            </div>
+            
+            <a href="/changelogs/<%= changelog.version %>" class="btn btn-outline-light btn-sm mt-3">
+              <%= tr('CHANGELOGS.VIEW_DETAILS') %>
+              <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+          </div>
+        </div>
+        <% }); %>
+      <% } else { %>
+        <div class="col-12 text-center" data-aos="fade-up">
+          <i class="bi bi-code-slash display-1 text-light-emphasis"></i>
+          <p class="mt-3 text-light-emphasis"><%= tr('CHANGELOGS.NO_CHANGELOGS') %></p>
+        </div>
+      <% } %>
+    </div>
+    
+    <% if (locals.changelogsList && changelogsList.length > 3) { %>
+      <div class="text-center mt-5" data-aos="fade-up">
+        <a href="/changelogs" class="btn btn-primary btn-lg">
+          <%= tr('CHANGELOGS.VIEW_ALL') %>
+          <i class="bi bi-arrow-right ms-2"></i>
+        </a>
+      </div>
+    <% } %>
+  </div>
+</section>

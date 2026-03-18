@@ -73,6 +73,8 @@ class AutoModPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const themeManager = ServiceManager.get('themeManager');
         const { AutoModSettings } = require('../shared/models');
+        const { AutoModExemptions, AutoModRegexRules, AutoModEscalation, AutoModCompoundRules } = require('../shared/models');
+        const { getAvailableKeywordLists } = require('../bot/keywordLoader');
 
         Logger.info('Registriere Routen für [AutoMod] Plugin ...');
 
@@ -125,11 +127,51 @@ class AutoModPlugin extends DashboardPlugin {
                 }
                 
                 // View rendern
+                const [exemptions, regexRules, escalationConfig, guildRoles] = await Promise.all([
+                    AutoModExemptions.getAll(guildId),
+                    AutoModRegexRules.getRules(guildId),
+                    AutoModEscalation.getConfig(guildId),
+                    (async () => {
+                        try {
+                            const roleResponses = await ipcServer.broadcast('dashboard:GET_GUILD_ROLES', { guildId, includeAll: true });
+                            const roleResp = roleResponses && roleResponses.length > 0 ? roleResponses[0] : null;
+                            return roleResp?.roles || [];
+                        } catch { return []; }
+                    })()
+                ]);
+
+                let compoundRules = [];
+                try {
+                    compoundRules = await AutoModCompoundRules.getRules(guildId);
+                } catch { compoundRules = []; }
+
+                const keywordLists = getAvailableKeywordLists();
+
+                // active_keyword_lists parsen
+                let activeKeywordLists = [];
+                if (settings.active_keyword_lists) {
+                    try {
+                        activeKeywordLists = typeof settings.active_keyword_lists === 'string'
+                            ? JSON.parse(settings.active_keyword_lists)
+                            : settings.active_keyword_lists;
+                    } catch {
+                        activeKeywordLists = [];
+                    }
+                }
+
                 res.render('guild/automod-settings', {
                     tr: t,
                     settings,
                     guildChannels,
+                    guildRoles,
                     guildId,
+                    exemptions,
+                    regexRules,
+                    escalationConfig,
+                    keywordLists,
+                    activeKeywordLists,
+                    compoundRules,
+                    conditionTypes: AutoModCompoundRules.CONDITION_TYPES,
                     layout: themeManager.getLayout('guild')
                 });
                 
@@ -181,6 +223,7 @@ class AutoModPlugin extends DashboardPlugin {
                     max_mentions,
                     max_role_mentions,
                     whitelisted_channels,
+                    active_keyword_lists,
                     // Raid Protection
                     raid_protection_enabled,
                     raid_join_threshold,
@@ -227,6 +270,22 @@ class AutoModPlugin extends DashboardPlugin {
                         } catch {
                             updates.whitelisted_channels = [];
                         }
+                    }
+                }
+
+                // Active Keyword Lists (JSON Array von IDs)
+                if (active_keyword_lists !== undefined) {
+                    if (Array.isArray(active_keyword_lists)) {
+                        updates.active_keyword_lists = JSON.stringify(active_keyword_lists);
+                    } else if (typeof active_keyword_lists === 'string') {
+                        try {
+                            JSON.parse(active_keyword_lists); // Validierung
+                            updates.active_keyword_lists = active_keyword_lists;
+                        } catch {
+                            updates.active_keyword_lists = '[]';
+                        }
+                    } else {
+                        updates.active_keyword_lists = '[]';
                     }
                 }
                 
@@ -284,6 +343,265 @@ class AutoModPlugin extends DashboardPlugin {
                     success: false, 
                     message: t('automod:MESSAGES.SETTINGS_ERROR') || 'Fehler beim Speichern der Einstellungen'
                 });
+            }
+        });
+
+        // ============================================================
+        // EXEMPTIONS API
+        // ============================================================
+
+        // GET: Alle Exemptions laden
+        this.guildRouter.get('/exemptions', requirePermission('AUTOMOD.WHITELIST_MANAGE'), async (req, res) => {
+            try {
+                const exemptions = await AutoModExemptions.getAll(res.locals.guildId);
+                res.json({ success: true, exemptions });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Laden der Exemptions' });
+            }
+        });
+
+        // POST: Exemption hinzufügen
+        this.guildRouter.post('/exemptions', requirePermission('AUTOMOD.WHITELIST_MANAGE'), async (req, res) => {
+            const { type, target_id } = req.body;
+
+            if (!type || !target_id || !['role', 'channel'].includes(type)) {
+                return res.status(400).json({ success: false, message: 'Ungültige Parameter (type: role|channel, target_id erforderlich)' });
+            }
+
+            try {
+                const id = await AutoModExemptions.add(res.locals.guildId, type, target_id);
+                res.json({ success: true, id });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Hinzufügen der Exemption' });
+            }
+        });
+
+        // DELETE: Exemption entfernen
+        this.guildRouter.delete('/exemptions/:id', requirePermission('AUTOMOD.WHITELIST_MANAGE'), async (req, res) => {
+            const id = parseInt(req.params.id);
+            if (isNaN(id)) return res.status(400).json({ success: false, message: 'Ungültige ID' });
+
+            try {
+                const success = await AutoModExemptions.remove(id, res.locals.guildId);
+                res.json({ success });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Entfernen der Exemption' });
+            }
+        });
+
+        // ============================================================
+        // REGEX RULES API
+        // ============================================================
+
+        // GET: Alle Regex-Regeln
+        this.guildRouter.get('/regex-rules', requirePermission('AUTOMOD.RULES_CREATE'), async (req, res) => {
+            try {
+                const rules = await AutoModRegexRules.getRules(res.locals.guildId);
+                res.json({ success: true, rules });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Laden der Regex-Regeln' });
+            }
+        });
+
+        // POST: Neue Regex-Regel
+        this.guildRouter.post('/regex-rules', requirePermission('AUTOMOD.RULES_CREATE'), async (req, res) => {
+            const { name, pattern, action: ruleAction } = req.body;
+
+            if (!name || !pattern || !ruleAction) {
+                return res.status(400).json({ success: false, message: 'Name, Pattern und Aktion sind erforderlich' });
+            }
+
+            if (!['DELETE', 'WARN', 'STRIKE'].includes(ruleAction)) {
+                return res.status(400).json({ success: false, message: 'Ungültige Aktion (DELETE, WARN, STRIKE)' });
+            }
+
+            try {
+                const result = await AutoModRegexRules.addRule(res.locals.guildId, name, pattern, ruleAction);
+                if (result.error) {
+                    return res.status(400).json({ success: false, message: result.error });
+                }
+                res.json({ success: true, id: result.id });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Erstellen der Regex-Regel' });
+            }
+        });
+
+        // PUT: Regex-Regel aktualisieren
+        this.guildRouter.put('/regex-rules/:id', requirePermission('AUTOMOD.RULES_EDIT'), async (req, res) => {
+            const id = parseInt(req.params.id);
+            if (isNaN(id)) return res.status(400).json({ success: false, message: 'Ungültige ID' });
+
+            const { name, pattern, action: ruleAction, enabled } = req.body;
+            const updates = {};
+            if (name !== undefined) updates.name = name;
+            if (pattern !== undefined) updates.pattern = pattern;
+            if (ruleAction !== undefined && ['DELETE', 'WARN', 'STRIKE'].includes(ruleAction)) updates.action = ruleAction;
+            if (enabled !== undefined) updates.enabled = enabled ? 1 : 0;
+
+            if (Object.keys(updates).length === 0) {
+                return res.status(400).json({ success: false, message: 'Keine Updates angegeben' });
+            }
+
+            try {
+                const result = await AutoModRegexRules.updateRule(id, res.locals.guildId, updates);
+                if (result.error) {
+                    return res.status(400).json({ success: false, message: result.error });
+                }
+                res.json({ success: result.success });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Aktualisieren der Regex-Regel' });
+            }
+        });
+
+        // DELETE: Regex-Regel löschen
+        this.guildRouter.delete('/regex-rules/:id', requirePermission('AUTOMOD.RULES_DELETE'), async (req, res) => {
+            const id = parseInt(req.params.id);
+            if (isNaN(id)) return res.status(400).json({ success: false, message: 'Ungültige ID' });
+
+            try {
+                const success = await AutoModRegexRules.deleteRule(id, res.locals.guildId);
+                res.json({ success });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Löschen der Regex-Regel' });
+            }
+        });
+
+        // ============================================================
+        // ESCALATION CONFIG API
+        // ============================================================
+
+        // GET: Alle Eskalationsstufen
+        this.guildRouter.get('/escalation', requirePermission('AUTOMOD.SETTINGS_EDIT'), async (req, res) => {
+            try {
+                const config = await AutoModEscalation.getConfig(res.locals.guildId);
+                res.json({ success: true, config });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Laden der Eskalations-Config' });
+            }
+        });
+
+        // POST: Eskalationsstufe hinzufügen
+        this.guildRouter.post('/escalation', requirePermission('AUTOMOD.SETTINGS_EDIT'), async (req, res) => {
+            const { threshold, action: escAction, duration } = req.body;
+
+            if (!threshold || !escAction || !['TIMEOUT', 'KICK', 'BAN'].includes(escAction)) {
+                return res.status(400).json({ success: false, message: 'Threshold und Aktion (TIMEOUT/KICK/BAN) sind erforderlich' });
+            }
+
+            const parsedThreshold = parseInt(threshold);
+            if (isNaN(parsedThreshold) || parsedThreshold < 1) {
+                return res.status(400).json({ success: false, message: 'Threshold muss eine positive Zahl sein' });
+            }
+
+            try {
+                const id = await AutoModEscalation.addLevel(
+                    res.locals.guildId,
+                    parsedThreshold,
+                    escAction,
+                    escAction === 'TIMEOUT' ? (parseInt(duration) || 10) : null
+                );
+                res.json({ success: true, id });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Hinzufügen der Eskalationsstufe' });
+            }
+        });
+
+        // PUT: Eskalationsstufe aktualisieren
+        this.guildRouter.put('/escalation/:id', requirePermission('AUTOMOD.SETTINGS_EDIT'), async (req, res) => {
+            const id = parseInt(req.params.id);
+            if (isNaN(id)) return res.status(400).json({ success: false, message: 'Ungültige ID' });
+
+            const { threshold, action: escAction, duration } = req.body;
+            const updates = {};
+            if (threshold !== undefined) updates.threshold = parseInt(threshold);
+            if (escAction !== undefined && ['TIMEOUT', 'KICK', 'BAN'].includes(escAction)) updates.action = escAction;
+            if (duration !== undefined) updates.duration = parseInt(duration) || null;
+
+            if (Object.keys(updates).length === 0) {
+                return res.status(400).json({ success: false, message: 'Keine Updates angegeben' });
+            }
+
+            try {
+                const success = await AutoModEscalation.updateLevel(id, res.locals.guildId, updates);
+                res.json({ success });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Aktualisieren der Eskalationsstufe' });
+            }
+        });
+
+        // DELETE: Eskalationsstufe löschen
+        this.guildRouter.delete('/escalation/:id', requirePermission('AUTOMOD.SETTINGS_EDIT'), async (req, res) => {
+            const id = parseInt(req.params.id);
+            if (isNaN(id)) return res.status(400).json({ success: false, message: 'Ungültige ID' });
+
+            try {
+                const success = await AutoModEscalation.deleteLevel(id, res.locals.guildId);
+                res.json({ success });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Löschen der Eskalationsstufe' });
+            }
+        });
+
+        // POST: Default-Eskalation erstellen
+        this.guildRouter.post('/escalation/defaults', requirePermission('AUTOMOD.SETTINGS_EDIT'), async (req, res) => {
+            try {
+                await AutoModEscalation.createDefaults(res.locals.guildId);
+                const config = await AutoModEscalation.getConfig(res.locals.guildId);
+                res.json({ success: true, config });
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Fehler beim Erstellen der Default-Eskalation' });
+            }
+        });
+
+        // ==================== COMPOUND RULES API ====================
+
+        // GET /compound-rules
+        this.guildRouter.get('/compound-rules', requirePermission('AUTOMOD.VIEW'), async (req, res) => {
+            try {
+                const rules = await AutoModCompoundRules.getRules(res.locals.guildId);
+                res.json({ success: true, rules });
+            } catch (error) {
+                res.status(500).json({ success: false, message: error.message });
+            }
+        });
+
+        // POST /compound-rules
+        this.guildRouter.post('/compound-rules', requirePermission('AUTOMOD.SETTINGS_EDIT'), async (req, res) => {
+            const { name, description, conditions, logic, action, duration } = req.body;
+            if (!name || !conditions || !Array.isArray(conditions) || conditions.length === 0) {
+                return res.status(400).json({ success: false, message: 'Name und mindestens eine Bedingung erforderlich' });
+            }
+            try {
+                const id = await AutoModCompoundRules.createRule(res.locals.guildId, { name, description, conditions, logic, action, duration });
+                const rule = await AutoModCompoundRules.getRule(id, res.locals.guildId);
+                res.json({ success: true, rule });
+            } catch (error) {
+                res.status(400).json({ success: false, message: error.message });
+            }
+        });
+
+        // PUT /compound-rules/:id
+        this.guildRouter.put('/compound-rules/:id', requirePermission('AUTOMOD.SETTINGS_EDIT'), async (req, res) => {
+            const id = parseInt(req.params.id);
+            if (isNaN(id)) return res.status(400).json({ success: false, message: 'Ungültige ID' });
+            try {
+                await AutoModCompoundRules.updateRule(id, res.locals.guildId, req.body);
+                const rule = await AutoModCompoundRules.getRule(id, res.locals.guildId);
+                res.json({ success: true, rule });
+            } catch (error) {
+                res.status(400).json({ success: false, message: error.message });
+            }
+        });
+
+        // DELETE /compound-rules/:id
+        this.guildRouter.delete('/compound-rules/:id', requirePermission('AUTOMOD.SETTINGS_EDIT'), async (req, res) => {
+            const id = parseInt(req.params.id);
+            if (isNaN(id)) return res.status(400).json({ success: false, message: 'Ungültige ID' });
+            try {
+                await AutoModCompoundRules.deleteRule(id, res.locals.guildId);
+                res.json({ success: true });
+            } catch (error) {
+                res.status(500).json({ success: false, message: error.message });
             }
         });
 
@@ -377,14 +695,14 @@ class AutoModPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const navigationManager = ServiceManager.get('navigationManager');
 
-        // AutoMod Settings UNTER Core-Einstellungen!
+        // AutoMod Settings unter Dashboard
         const navItems = [
             {
                 title: 'automod:NAV.AUTOMOD',
                 path: `/guild/${guildId}/plugins/automod/settings`,
                 icon: 'fa-solid fa-shield-halved',
-                order: null,  
-                parent: `/guild/${guildId}/settings`,  // ← Parent ist Core-Settings!
+                order: null,
+                parent: `/guild/${guildId}`,
                 type: 'main',
                 visible: true,
                 capability: 'AUTOMOD.SETTINGS'
@@ -393,7 +711,7 @@ class AutoModPlugin extends DashboardPlugin {
 
         try {
             await navigationManager.registerNavigation(this.name, guildId, navItems);
-            Logger.debug('[AutoMod] Navigation registriert (Settings unter Core)');
+            Logger.debug('[AutoMod] Navigation registriert (unter Dashboard)');
         } catch (error) {
             Logger.error('[AutoMod] Fehler beim Registrieren der Navigation:', error);
         }

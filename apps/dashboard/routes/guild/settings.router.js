@@ -123,30 +123,13 @@ router.put('/general', requirePermission('CORE.SETTINGS.EDIT'), async (req, res)
     }
 });
 
-// GET /settings/theme
-router.get('/theme', requirePermission('CORE.SETTINGS.EDIT'), async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const themeManager = ServiceManager.get('themeManager');
+// GET /settings/theme → Redirect auf neuen Themes-Bereich
+router.get('/theme', (req, res) => {
     const guildId = res.locals.guildId;
-
-    try {
-        const themes = await themeManager.getInstalledThemes();
-        const activeThemeName = await themeManager.getThemeForGuild(guildId);
-
-        return themeManager.renderView(res, 'guild/settings/theme', {
-            title: 'Theme-Auswahl',
-            activeMenu: `/guild/${guildId}/settings/theme`,
-            guildId,
-            themes,
-            activeThemeName
-        });
-    } catch (error) {
-        Logger.error('[KernSettings] Fehler beim Laden der Themes:', error);
-        res.status(500).send('Fehler beim Laden der Themes');
-    }
+    res.redirect(`/guild/${guildId}/themes`);
 });
 
-// POST /settings/theme
+// POST /settings/theme → Redirect auf neuen Endpoint
 router.post('/theme', requirePermission('CORE.SETTINGS.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const themeManager = ServiceManager.get('themeManager');
@@ -181,6 +164,149 @@ router.get('/integrations', requirePermission('CORE.SETTINGS.EDIT'), async (req,
         activeMenu: `/guild/${guildId}/settings/integrations`,
         guildId
     });
+});
+
+// =============================================
+// ROLLEN-VERWALTUNG (Discord Roles Mirror)
+// =============================================
+
+// GET /settings/roles → Rollen-Übersicht
+router.get('/roles', requirePermission('CORE.ROLES.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+    const ipcServer = ServiceManager.get('ipcServer');
+    const guildId = res.locals.guildId;
+
+    let roles = [];
+    let botHighestPosition = 0;
+    let botHasManageRoles = false;
+    let permissionFlags = [];
+
+    try {
+        if (ipcServer) {
+            const responses = await ipcServer.broadcast('dashboard:GET_GUILD_ROLES_DETAILED', { guildId });
+            const resp = responses && responses.length > 0 ? responses[0] : null;
+
+            if (resp && resp.data && resp.data.success) {
+                roles = resp.data.roles || [];
+                botHighestPosition = resp.data.botHighestPosition || 0;
+                botHasManageRoles = resp.data.botHasManageRoles || false;
+                permissionFlags = resp.data.permissionFlags || [];
+            } else if (resp && resp.success) {
+                roles = resp.roles || [];
+                botHighestPosition = resp.botHighestPosition || 0;
+                botHasManageRoles = resp.botHasManageRoles || false;
+                permissionFlags = resp.permissionFlags || [];
+            }
+        }
+    } catch (err) {
+        Logger.error('[KernSettings] Fehler beim Laden der Rollen via IPC:', err.message);
+    }
+
+    await themeManager.renderView(res, 'guild/settings/roles', {
+        title: 'Rollen-Verwaltung',
+        activeMenu: `/guild/${guildId}/settings/roles`,
+        guildId,
+        roles,
+        botHighestPosition,
+        botHasManageRoles,
+        permissionFlags
+    });
+});
+
+// POST /settings/roles → Neue Rolle erstellen
+router.post('/roles', requirePermission('CORE.ROLES.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const ipcServer = ServiceManager.get('ipcServer');
+    const guildId = res.locals.guildId;
+    const { name, color, hoist, mentionable, permissions } = req.body;
+
+    try {
+        if (!ipcServer) {
+            return res.status(503).json({ success: false, message: 'Bot nicht verbunden' });
+        }
+
+        const responses = await ipcServer.broadcast('dashboard:CREATE_GUILD_ROLE', {
+            guildId, name, color: parseInt(color, 10) || 0, hoist, mentionable, permissions
+        });
+        const resp = responses && responses.length > 0 ? responses[0] : null;
+        const result = resp?.data || resp;
+
+        if (result && result.success) {
+            return res.json({ success: true, role: result.role });
+        }
+        return res.status(400).json({ success: false, message: result?.error || 'Fehler beim Erstellen' });
+    } catch (error) {
+        Logger.error('[KernSettings] Fehler beim Erstellen der Rolle:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// PUT /settings/roles/:roleId → Rolle bearbeiten
+router.put('/roles/:roleId', requirePermission('CORE.ROLES.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const ipcServer = ServiceManager.get('ipcServer');
+    const guildId = res.locals.guildId;
+    const { roleId } = req.params;
+    const { name, color, hoist, mentionable, permissions } = req.body;
+
+    if (!roleId || !/^\d{17,20}$/.test(roleId)) {
+        return res.status(400).json({ success: false, message: 'Ungültige Role-ID' });
+    }
+
+    try {
+        if (!ipcServer) {
+            return res.status(503).json({ success: false, message: 'Bot nicht verbunden' });
+        }
+
+        const responses = await ipcServer.broadcast('dashboard:UPDATE_GUILD_ROLE', {
+            guildId, roleId, name,
+            color: color !== undefined ? (parseInt(color, 10) || 0) : undefined,
+            hoist, mentionable, permissions
+        });
+        const resp = responses && responses.length > 0 ? responses[0] : null;
+        const result = resp?.data || resp;
+
+        if (result && result.success) {
+            return res.json({ success: true, role: result.role });
+        }
+        return res.status(400).json({ success: false, message: result?.error || 'Fehler beim Aktualisieren' });
+    } catch (error) {
+        Logger.error('[KernSettings] Fehler beim Aktualisieren der Rolle:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// DELETE /settings/roles/:roleId → Rolle löschen
+router.delete('/roles/:roleId', requirePermission('CORE.ROLES.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const ipcServer = ServiceManager.get('ipcServer');
+    const guildId = res.locals.guildId;
+    const { roleId } = req.params;
+
+    if (!roleId || !/^\d{17,20}$/.test(roleId)) {
+        return res.status(400).json({ success: false, message: 'Ungültige Role-ID' });
+    }
+
+    try {
+        if (!ipcServer) {
+            return res.status(503).json({ success: false, message: 'Bot nicht verbunden' });
+        }
+
+        const responses = await ipcServer.broadcast('dashboard:DELETE_GUILD_ROLE', {
+            guildId, roleId
+        });
+        const resp = responses && responses.length > 0 ? responses[0] : null;
+        const result = resp?.data || resp;
+
+        if (result && result.success) {
+            return res.json({ success: true, deletedRoleName: result.deletedRoleName });
+        }
+        return res.status(400).json({ success: false, message: result?.error || 'Fehler beim Löschen' });
+    } catch (error) {
+        Logger.error('[KernSettings] Fehler beim Löschen der Rolle:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 module.exports = router;

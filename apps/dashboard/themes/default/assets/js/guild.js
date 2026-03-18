@@ -631,6 +631,7 @@ class GuildAjaxHandler {
                 const dashUrl = window.location.origin.replace('http://', 'ws://').replace('https://', 'wss://');
                 const wsPort  = 9340;
                 if (elYaml) {
+                    const bindIpLine = d.host ? `  bind_ip: "${d.host}"` : '  bind_ip: ""  # Leer = alle Interfaces (0.0.0.0)';
                     elYaml.value = [
                         '# FireBot Daemon Konfiguration',
                         '# Generiert vom Dashboard – bitte auf deinen Server kopieren',
@@ -653,9 +654,19 @@ class GuildAjaxHandler {
                         '  level: "info"',
                         '  file: "logs/daemon.log"',
                         '',
+                        'gameserver:',
+                        '  # Port-Allocations werden über das Dashboard verwaltet',
+                        '',
+                        'filesystem:',
+                        '  base_directory: "/var/lib/firebot-daemon/volumes"',
+                        '  auto_create_base: true',
+                        '',
                         'docker:',
                         '  socket: "/var/run/docker.sock"',
                         '  network: "firebot"',
+                        '  # Bind-IP: Gameserver-Ports werden NUR auf dieser IP geöffnet.',
+                        '  # Wichtig bei Servern mit mehreren öffentlichen IPs!',
+                        bindIpLine,
                         '  dns:',
                         '    - "1.1.1.1"',
                         '    - "8.8.8.8"',

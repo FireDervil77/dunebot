@@ -189,6 +189,24 @@
       "category": "core",
       "is_dangerous": 0,
       "requires": "DONATE.VIEW"
+    },
+    {
+      "key": "ROLES.VIEW",
+      "name": "PERMISSIONS.ROLES_VIEW",
+      "description": "PERMISSIONS.ROLES_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 50,
+      "requires": null
+    },
+    {
+      "key": "ROLES.EDIT",
+      "name": "PERMISSIONS.ROLES_EDIT",
+      "description": "PERMISSIONS.ROLES_EDIT_DESC",
+      "category": "core",
+      "is_dangerous": 1,
+      "sort_order": 51,
+      "requires": "ROLES.VIEW"
     }
   ],
   "default_groups": {

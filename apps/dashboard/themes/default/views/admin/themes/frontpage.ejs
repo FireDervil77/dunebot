@@ -1,0 +1,453 @@
+<%#
+ * Admin: Frontpage-Sektionen Manager (CMS)
+ * Drag&Drop Reihenfolge, Sichtbarkeit, Divider-Kontrolle, Inline-Config
+ *
+ * @author FireDervil
+ * @context {Array} sections - [{id, section_type, title, position, visible, config, css_class, divider_before, custom_html}]
+%>
+
+<style>
+  .section-card { transition: box-shadow .2s; cursor: default; }
+  .section-card.sortable-ghost { opacity: .4; }
+  .section-card.border-start-visible { border-left: 4px solid #28a745 !important; }
+  .section-card.border-start-hidden  { border-left: 4px solid #dc3545 !important; }
+  .section-icon { width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: .5rem; font-size: 1.1rem; }
+  .config-panel { display: none; }
+  .config-panel.show { display: block; }
+  .drag-handle { cursor: grab; color: #aaa; }
+  .drag-handle:hover { color: #666; }
+  .repeater-item { background: #f8f9fa; border-radius: .375rem; padding: .75rem; margin-bottom: .5rem; }
+  .repeater-item .btn-remove { opacity: .6; }
+  .repeater-item .btn-remove:hover { opacity: 1; }
+  .bg-purple { background-color: #6f42c1 !important; }
+  .bg-teal { background-color: #20c997 !important; }
+</style>
+
+<div class="app-content">
+  <div class="container-fluid">
+
+    <!-- Page-Header -->
+    <div class="row mb-3">
+      <div class="col-12">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <h1 class="h3 mb-0"><i class="fa-solid fa-desktop me-2 text-primary"></i>Frontpage-Sektionen</h1>
+            <p class="text-muted small mb-0">Verwalte Reihenfolge, Sichtbarkeit und Inhalte der Landing-Page Sektionen.</p>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm" id="btnAddSection">
+              <i class="bi bi-plus-lg me-1"></i> Neue Sektion
+            </button>
+            <a href="/admin/themes" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-arrow-left me-1"></i> Zurück
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="alert alert-info d-flex align-items-start mb-4" role="alert">
+      <i class="bi bi-info-circle me-2 fs-5 mt-1"></i>
+      <div>
+        <strong>Drag &amp; Drop</strong> zum Sortieren &middot;
+        <strong>Auge</strong> für Sichtbarkeit &middot;
+        <strong>Zahnrad</strong> für Konfiguration &middot;
+        <strong>Divider</strong> zwischen Sektionen werden automatisch oder manuell gesteuert.
+      </div>
+    </div>
+
+    <!-- Sortable Section List -->
+    <div id="sectionList">
+      <% const sectionIcons = {
+          hero: 'fa-solid fa-image', features: 'fa-solid fa-star', news: 'fa-solid fa-newspaper',
+          changelogs: 'fa-solid fa-code-branch', plugins: 'fa-solid fa-puzzle-piece',
+          documentation: 'fa-solid fa-book', stats: 'fa-solid fa-chart-bar',
+          skills: 'fa-solid fa-sliders-h', custom: 'fa-solid fa-code'
+      }; %>
+      <% const sectionBgColors = {
+          hero: 'bg-primary', features: 'bg-warning', news: 'bg-info', changelogs: 'bg-danger',
+          plugins: 'bg-success', documentation: 'bg-secondary', stats: 'bg-dark',
+          skills: 'bg-purple', custom: 'bg-teal'
+      }; %>
+
+      <% sections.forEach((section, index) => { %>
+        <div class="card mb-3 section-card <%= section.visible ? 'border-start-visible' : 'border-start-hidden' %>"
+             data-id="<%= section.id %>" data-type="<%= section.section_type %>">
+          <div class="card-body py-3">
+            <div class="row align-items-center">
+              <!-- Drag Handle + Icon -->
+              <div class="col-auto d-flex align-items-center gap-3">
+                <span class="drag-handle" title="Ziehen zum Sortieren">
+                  <i class="fa-solid fa-grip-vertical fa-lg"></i>
+                </span>
+                <div class="section-icon <%= sectionBgColors[section.section_type] || 'bg-secondary' %> text-white">
+                  <i class="<%= sectionIcons[section.section_type] || 'fa-solid fa-cube' %>"></i>
+                </div>
+              </div>
+
+              <!-- Title & Meta -->
+              <div class="col">
+                <h5 class="mb-0 section-title-display"><%= section.title %></h5>
+                <small class="text-muted">
+                  Typ: <code><%= section.section_type %></code>
+                  &middot; Hintergrund: <code><%= section.css_class || 'standard' %></code>
+                  &middot; Divider: <code><%= section.divider_before || 'auto' %></code>
+                  &middot; <span class="position-badge badge bg-light text-dark border">#<%= section.position %></span>
+                </small>
+              </div>
+
+              <!-- Actions -->
+              <div class="col-auto d-flex align-items-center gap-2">
+                <button class="btn btn-sm <%= section.visible ? 'btn-success' : 'btn-outline-danger' %> btn-toggle-visibility"
+                        data-id="<%= section.id %>" title="<%= section.visible ? 'Sichtbar' : 'Ausgeblendet' %>">
+                  <i class="bi <%= section.visible ? 'bi-eye' : 'bi-eye-slash' %>"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-primary btn-toggle-config" data-id="<%= section.id %>">
+                  <i class="bi bi-gear"></i>
+                </button>
+                <% if (section.section_type === 'custom') { %>
+                  <button class="btn btn-sm btn-outline-danger btn-delete-section" data-id="<%= section.id %>" title="Löschen">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                <% } %>
+              </div>
+            </div>
+
+            <!-- Config Panel -->
+            <div class="config-panel mt-3 pt-3 border-top" id="config-<%= section.id %>">
+              <form class="config-form" data-id="<%= section.id %>" data-type="<%= section.section_type %>">
+                <div class="row g-3">
+                  <!-- Titel -->
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Titel</label>
+                    <input type="text" class="form-control form-control-sm" name="title" value="<%= section.title %>">
+                  </div>
+                  <!-- CSS-Klasse -->
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Hintergrund</label>
+                    <select class="form-select form-select-sm" name="css_class">
+                      <option value="" <%= !section.css_class ? 'selected' : '' %>>Standard (Weiß/Hell)</option>
+                      <option value="dark-background" <%= section.css_class === 'dark-background' ? 'selected' : '' %>>Dunkel</option>
+                      <option value="light-background" <%= section.css_class === 'light-background' ? 'selected' : '' %>>Hell</option>
+                    </select>
+                  </div>
+                  <!-- Divider -->
+                  <div class="col-md-4">
+                    <label class="form-label fw-bold">Divider (Trenner davor)</label>
+                    <select class="form-select form-select-sm" name="divider_before">
+                      <option value="auto" <%= (section.divider_before || 'auto') === 'auto' ? 'selected' : '' %>>Automatisch</option>
+                      <option value="light-to-dark" <%= section.divider_before === 'light-to-dark' ? 'selected' : '' %>>Hell → Dunkel</option>
+                      <option value="dark-to-light" <%= section.divider_before === 'dark-to-light' ? 'selected' : '' %>>Dunkel → Hell</option>
+                      <option value="none" <%= section.divider_before === 'none' ? 'selected' : '' %>>Kein Divider</option>
+                    </select>
+                  </div>
+
+                  <!-- STATS Config -->
+                  <% if (section.section_type === 'stats') { %>
+                    <div class="col-12">
+                      <label class="form-label fw-bold">Statistik-Einträge</label>
+                      <div class="repeater" data-field="stats">
+                        <% const statsItems = (section.config && section.config.items) || []; %>
+                        <% statsItems.forEach((item, i) => { %>
+                          <div class="repeater-item d-flex align-items-center gap-2">
+                            <input type="text" class="form-control form-control-sm" placeholder="Label" value="<%= item.label || '' %>" data-key="label">
+                            <input type="number" class="form-control form-control-sm" style="width:120px" placeholder="Wert" value="<%= item.value || 0 %>" data-key="value">
+                            <input type="number" class="form-control form-control-sm" style="width:100px" placeholder="Dauer (Sek)" value="<%= item.duration || 1 %>" data-key="duration">
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove"><i class="bi bi-x"></i></button>
+                          </div>
+                        <% }); %>
+                      </div>
+                      <button type="button" class="btn btn-sm btn-outline-success mt-2 btn-add-repeater" data-field="stats" data-keys="label,value,duration">
+                        <i class="bi bi-plus me-1"></i>Eintrag hinzufügen
+                      </button>
+                    </div>
+                  <% } %>
+
+                  <!-- SKILLS Config -->
+                  <% if (section.section_type === 'skills') { %>
+                    <div class="col-12">
+                      <label class="form-label fw-bold">Skill-Einträge</label>
+                      <div class="repeater" data-field="skills">
+                        <% const skillItems = (section.config && section.config.items) || []; %>
+                        <% skillItems.forEach((item, i) => { %>
+                          <div class="repeater-item d-flex align-items-center gap-2">
+                            <input type="text" class="form-control form-control-sm" placeholder="Label" value="<%= item.label || '' %>" data-key="label">
+                            <input type="number" class="form-control form-control-sm" style="width:100px" placeholder="% (0-100)" value="<%= item.value || 0 %>" data-key="value" min="0" max="100">
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove"><i class="bi bi-x"></i></button>
+                          </div>
+                        <% }); %>
+                      </div>
+                      <button type="button" class="btn btn-sm btn-outline-success mt-2 btn-add-repeater" data-field="skills" data-keys="label,value">
+                        <i class="bi bi-plus me-1"></i>Eintrag hinzufügen
+                      </button>
+                    </div>
+                  <% } %>
+
+                  <!-- CUSTOM HTML -->
+                  <% if (section.section_type === 'custom') { %>
+                    <div class="col-12">
+                      <label class="form-label fw-bold">HTML-Inhalt</label>
+                      <textarea class="form-control form-control-sm font-monospace" name="custom_html" rows="10"
+                                placeholder="<div class=&quot;container py-5&quot;>&#10;  <h2>Überschrift</h2>&#10;  <p>Inhalt...</p>&#10;</div>"><%= section.custom_html || '' %></textarea>
+                      <small class="text-muted">HTML wird direkt in die Seite eingefügt. Bootstrap-Klassen verfügbar.</small>
+                    </div>
+                  <% } %>
+
+                  <!-- Info für auto-generierte Typen -->
+                  <% if (['hero','features','news','changelogs','plugins','documentation'].includes(section.section_type)) { %>
+                    <div class="col-12">
+                      <div class="alert alert-secondary small mb-0">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <% if (section.section_type === 'hero') { %>
+                          Der Hero-Carousel nutzt i18n-Schlüssel und bettet automatisch die letzten 3 News ein.
+                        <% } else if (section.section_type === 'features') { %>
+                          Features nutzen i18n-Schlüssel (FEATURES.CARD_ONE_TITLE usw.). Anpassung über Sprachdateien.
+                        <% } else if (section.section_type === 'news') { %>
+                          Zeigt automatisch die neusten 6 News aus der Datenbank.
+                        <% } else if (section.section_type === 'changelogs') { %>
+                          Zeigt automatisch die letzten 3 öffentlichen Changelogs.
+                        <% } else if (section.section_type === 'plugins') { %>
+                          Plugin-Carousel wird automatisch aus den installierten Plugins generiert.
+                        <% } else if (section.section_type === 'documentation') { %>
+                          Dokumentation &amp; Links Sektion. Anpassung über das Partial.
+                        <% } %>
+                      </div>
+                    </div>
+                  <% } %>
+
+                </div>
+
+                <div class="mt-3 d-flex justify-content-end">
+                  <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-check-lg me-1"></i> Speichern
+                  </button>
+                </div>
+              </form>
+            </div>
+
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <% if (sections.length === 0) { %>
+      <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Keine Sektionen gefunden. Bitte das Dashboard einmal neustarten, damit KernUpdate 004 die Tabelle erstellt.
+      </div>
+    <% } %>
+
+  </div>
+</div>
+
+<!-- Add Section Modal -->
+<div class="modal fade" id="addSectionModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Neue Sektion erstellen</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Titel</label>
+          <input type="text" class="form-control" id="newSectionTitle" placeholder="Meine Sektion">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Hintergrund</label>
+          <select class="form-select" id="newSectionCss">
+            <option value="">Standard (Weiß/Hell)</option>
+            <option value="dark-background">Dunkel</option>
+            <option value="light-background">Hell</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">HTML-Inhalt</label>
+          <textarea class="form-control font-monospace" id="newSectionHtml" rows="6" placeholder='<div class="container py-5">&#10;  <h2>Überschrift</h2>&#10;  <p>Inhalt...</p>&#10;</div>'></textarea>
+          <small class="text-muted">Bootstrap-Klassen und HTML verfügbar.</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-success btn-sm" id="btnCreateSection">
+          <i class="bi bi-plus-lg me-1"></i> Erstellen
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+  // SortableJS
+  const listEl = document.getElementById('sectionList');
+  if (listEl) {
+    Sortable.create(listEl, {
+      handle: '.drag-handle',
+      animation: 200,
+      ghostClass: 'sortable-ghost',
+      onEnd: function() {
+        const cards = listEl.querySelectorAll('.section-card');
+        const order = [];
+        cards.forEach((card, idx) => {
+          order.push({ id: Number(card.dataset.id), position: idx + 1 });
+          const badge = card.querySelector('.position-badge');
+          if (badge) badge.textContent = '#' + (idx + 1);
+        });
+        fetch('/admin/themes/frontpage/reorder', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order })
+        }).then(r => r.json()).then(d => {
+          if (d.success) toastr.success('Reihenfolge gespeichert');
+          else toastr.error(d.message || 'Fehler');
+        }).catch(() => toastr.error('Netzwerkfehler'));
+      }
+    });
+  }
+
+  // Visibility Toggle
+  document.querySelectorAll('.btn-toggle-visibility').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const id = this.dataset.id;
+      fetch('/admin/themes/frontpage/' + id + '/toggle', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }
+      }).then(r => r.json()).then(d => {
+        if (!d.success) return toastr.error(d.message);
+        const card = this.closest('.section-card');
+        const icon = this.querySelector('i');
+        if (d.visible) {
+          this.className = 'btn btn-sm btn-success btn-toggle-visibility';
+          icon.className = 'bi bi-eye';
+          card.classList.replace('border-start-hidden', 'border-start-visible');
+        } else {
+          this.className = 'btn btn-sm btn-outline-danger btn-toggle-visibility';
+          icon.className = 'bi bi-eye-slash';
+          card.classList.replace('border-start-visible', 'border-start-hidden');
+        }
+        toastr.success(d.visible ? 'Eingeblendet' : 'Ausgeblendet');
+      }).catch(() => toastr.error('Netzwerkfehler'));
+    });
+  });
+
+  // Config Panel Toggle
+  document.querySelectorAll('.btn-toggle-config').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.getElementById('config-' + this.dataset.id)?.classList.toggle('show');
+    });
+  });
+
+  // Repeater: Add Item
+  document.querySelectorAll('.btn-add-repeater').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const field = this.dataset.field;
+      const keys = this.dataset.keys.split(',');
+      const container = this.closest('.col-12').querySelector('.repeater[data-field="' + field + '"]');
+      const item = document.createElement('div');
+      item.className = 'repeater-item d-flex align-items-center gap-2';
+      let html = '';
+      keys.forEach(k => {
+        const type = (k === 'label') ? 'text' : 'number';
+        const style = (k !== 'label') ? ' style="width:' + (k === 'duration' ? '100' : '100') + 'px"' : '';
+        const ph = k === 'duration' ? 'Dauer (Sek)' : (k === 'value' ? (field === 'skills' ? '% (0-100)' : 'Wert') : k);
+        html += '<input type="' + type + '" class="form-control form-control-sm" placeholder="' + ph + '" data-key="' + k + '"' + style + '>';
+      });
+      html += '<button type="button" class="btn btn-sm btn-outline-danger btn-remove"><i class="bi bi-x"></i></button>';
+      item.innerHTML = html;
+      container.appendChild(item);
+      item.querySelector('.btn-remove').addEventListener('click', () => item.remove());
+    });
+  });
+
+  // Repeater: Remove Item
+  document.querySelectorAll('.repeater .btn-remove').forEach(btn => {
+    btn.addEventListener('click', function() { this.closest('.repeater-item').remove(); });
+  });
+
+  // Config Save
+  document.querySelectorAll('.config-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const id = this.dataset.id;
+      const title = this.querySelector('[name="title"]').value.trim();
+      const css_class = this.querySelector('[name="css_class"]').value;
+      const divider_before = this.querySelector('[name="divider_before"]').value;
+      const customHtmlEl = this.querySelector('[name="custom_html"]');
+      const custom_html = customHtmlEl ? customHtmlEl.value : null;
+
+      // Config aus Repeater sammeln
+      let config = {};
+      const repeater = this.querySelector('.repeater');
+      if (repeater) {
+        const items = [];
+        repeater.querySelectorAll('.repeater-item').forEach(ri => {
+          const obj = {};
+          ri.querySelectorAll('input[data-key]').forEach(inp => {
+            const val = inp.value.trim();
+            obj[inp.dataset.key] = inp.type === 'number' ? Number(val) : val;
+          });
+          if (Object.values(obj).some(v => v !== '' && v !== 0)) items.push(obj);
+        });
+        if (items.length) config.items = items;
+      }
+
+      const body = { title, css_class, divider_before, config };
+      if (custom_html !== null) body.custom_html = custom_html;
+
+      fetch('/admin/themes/frontpage/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(r => r.json()).then(d => {
+        if (d.success) {
+          const card = document.querySelector('.section-card[data-id="' + id + '"]');
+          if (card) card.querySelector('.section-title-display').textContent = title;
+          toastr.success('Gespeichert');
+        } else toastr.error(d.message || 'Fehler');
+      }).catch(() => toastr.error('Netzwerkfehler'));
+    });
+  });
+
+  // Delete Section
+  document.querySelectorAll('.btn-delete-section').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (!confirm('Sektion wirklich löschen?')) return;
+      const id = this.dataset.id;
+      fetch('/admin/themes/frontpage/' + id, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }
+      }).then(r => r.json()).then(d => {
+        if (d.success) {
+          document.querySelector('.section-card[data-id="' + id + '"]')?.remove();
+          toastr.success('Sektion gelöscht');
+        } else toastr.error(d.message);
+      }).catch(() => toastr.error('Netzwerkfehler'));
+    });
+  });
+
+  // Create Section Modal
+  document.getElementById('btnAddSection')?.addEventListener('click', () => {
+    new bootstrap.Modal(document.getElementById('addSectionModal')).show();
+  });
+
+  document.getElementById('btnCreateSection')?.addEventListener('click', function() {
+    const title = document.getElementById('newSectionTitle').value.trim();
+    if (!title) return toastr.warning('Bitte Titel eingeben');
+    const css_class = document.getElementById('newSectionCss').value;
+    const custom_html = document.getElementById('newSectionHtml').value;
+
+    fetch('/admin/themes/frontpage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, css_class, custom_html })
+    }).then(r => r.json()).then(d => {
+      if (d.success) {
+        toastr.success('Sektion erstellt');
+        setTimeout(() => location.reload(), 500);
+      } else toastr.error(d.message);
+    }).catch(() => toastr.error('Netzwerkfehler'));
+  });
+});
+</script>

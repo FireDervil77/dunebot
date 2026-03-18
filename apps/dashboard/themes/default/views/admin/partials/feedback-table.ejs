@@ -16,7 +16,7 @@
         </thead>
         <tbody>
             <% feedback.forEach(f => { %>
-            <tr>
+            <tr class="feedback-row" data-toggle="collapse" data-target="#desc-<%= f.id %>" style="cursor: pointer;">
                 <td><%= f.id %></td>
                 <td>
                     <% if (f.type === 'bug') { %>
@@ -25,7 +25,10 @@
                         <span class="badge badge-info"><i class="fa-solid fa-lightbulb me-1"></i>Feature</span>
                     <% } %>
                 </td>
-                <td><%= f.title %></td>
+                <td>
+                    <%= f.title %>
+                    <i class="fa-solid fa-chevron-down ml-1 text-muted" style="font-size: 0.7em;"></i>
+                </td>
                 <td><small class="text-muted"><%= f.guild_id %></small></td>
                 <td><small class="text-muted"><%= f.user_id %></small></td>
                 <td>
@@ -39,31 +42,35 @@
                         <span class="badge badge-secondary">Niedrig</span>
                     <% } %>
                 </td>
-                <td>
-                    <% if (f.status === 'open') { %>
-                        <span class="badge badge-warning">Offen</span>
-                    <% } else if (f.status === 'in_progress') { %>
-                        <span class="badge badge-primary">In Arbeit</span>
-                    <% } else if (f.status === 'resolved') { %>
-                        <span class="badge badge-success">Gelöst</span>
-                    <% } else if (f.status === 'closed') { %>
-                        <span class="badge badge-secondary">Geschlossen</span>
-                    <% } else if (f.status === 'planned') { %>
-                        <span class="badge badge-info">Geplant</span>
-                    <% } else if (f.status === 'implemented') { %>
-                        <span class="badge badge-success">Umgesetzt</span>
-                    <% } else if (f.status === 'rejected') { %>
-                        <span class="badge badge-danger">Abgelehnt</span>
-                    <% } else { %>
-                        <span class="badge badge-dark"><%= f.status %></span>
-                    <% } %>
+                <td onclick="event.stopPropagation()">
+                    <select class="form-control form-control-sm feedback-status-select"
+                            data-id="<%= f.id %>"
+                            style="min-width: 130px; font-size: 0.8em; padding: 2px 4px;">
+                        <option value="open"        <%- f.status === 'open'        ? 'selected' : '' %>>🟡 Offen</option>
+                        <option value="in_progress" <%- f.status === 'in_progress' ? 'selected' : '' %>>🔵 In Bearbeitung</option>
+                        <option value="planned"     <%- f.status === 'planned'     ? 'selected' : '' %>>🟣 Geplant</option>
+                        <option value="resolved"    <%- f.status === 'resolved'    ? 'selected' : '' %>>🟢 Gelöst</option>
+                        <option value="implemented" <%- f.status === 'implemented' ? 'selected' : '' %>>✅ Umgesetzt</option>
+                        <option value="rejected"    <%- f.status === 'rejected'    ? 'selected' : '' %>>🔴 Abgelehnt</option>
+                        <option value="closed"      <%- f.status === 'closed'      ? 'selected' : '' %>>⚫ Geschlossen</option>
+                        <option value="wontfix"     <%- f.status === 'wontfix'     ? 'selected' : '' %>>🚫 Wird nicht behoben</option>
+                    </select>
                 </td>
                 <td><small><%= new Date(f.created_at).toLocaleDateString('de-DE') %></small></td>
                 <td>
                     <button class="btn btn-xs btn-outline-primary" 
-                            onclick="editFeedback('<%= f.id %>', '<%= f.status %>', '<%= f.priority %>', `<%= (f.admin_notes || '').replace(/`/g, "'") %>`, `<%= (f.admin_response || '').replace(/`/g, "'") %>`)">
+                            onclick="event.stopPropagation(); editFeedback('<%= f.id %>', '<%= f.status %>', '<%= f.priority %>', `<%= (f.admin_notes || '').replace(/`/g, "'") %>`, `<%= (f.admin_response || '').replace(/`/g, "'") %>`, `<%= (f.title || '').replace(/`/g, "'") %>`, `<%= (f.description || '').replace(/`/g, "'").replace(/\n/g, '\\n') %>`, '<%= f.type %>', '<%= f.category || '' %>')">
                         <i class="fa-solid fa-edit"></i>
                     </button>
+                </td>
+            </tr>
+            <tr class="collapse" id="desc-<%= f.id %>">
+                <td colspan="9" style="background: #f8f9fa; border-top: none;">
+                    <div class="p-2">
+                        <% if (f.category) { %><span class="badge badge-secondary mr-2"><%= f.category %></span><% } %>
+                        <strong>Beschreibung:</strong>
+                        <p class="mb-0 mt-1" style="white-space: pre-wrap;"><%= f.description %></p>
+                    </div>
                 </td>
             </tr>
             <% }); %>

@@ -85,5 +85,7 @@ async function timeout(issuer, target, ms, reason) {
         return guild.getT("moderation:TIMEOUT.MEMBER_PERM", { target: target.user.username });
     else if (response === "ALREADY_TIMEOUT")
         return guild.getT("moderation:TIMEOUT.ALREADY_TIMEOUT", { target: target.user.username });
+    else if (response === "PROTECTED_ROLE")
+        return guild.getT("moderation:PROTECTED_ROLE", { target: target.user.username });
     else return guild.getT("moderation:TIMEOUT.FAILED", { target: target.user.username });
 }
