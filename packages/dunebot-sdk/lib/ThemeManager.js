@@ -536,15 +536,78 @@ class ThemeManager {
             if (entries.length > 0) {
                 css += ':root {\n';
                 for (const [key, value] of entries) {
-                    // Key sanitizen: nur erlaubte Zeichen
                     const safeKey = key.replace(/[^a-zA-Z0-9-_]/g, '');
-                    // Value sanitizen: keine Semikolons, Klammern oder Script-Injection
                     const safeValue = String(value).replace(/[;<>{}]/g, '').trim();
                     if (safeKey && safeValue) {
                         css += `  --${safeKey}: ${safeValue};\n`;
                     }
                 }
                 css += '}\n';
+
+                // Konkrete AdminLTE/Bootstrap Overrides generieren
+                const v = {};
+                for (const [key, value] of entries) {
+                    const safeKey = key.replace(/[^a-zA-Z0-9-_]/g, '');
+                    const safeValue = String(value).replace(/[;<>{}]/g, '').trim();
+                    if (safeKey && safeValue) v[safeKey] = safeValue;
+                }
+
+                // Sidebar
+                if (v['sidebar-bg']) {
+                    css += `.app-sidebar, .main-sidebar, .sidebar { background-color: ${v['sidebar-bg']} !important; }\n`;
+                }
+                if (v['sidebar-color']) {
+                    css += `.sidebar .nav-link, .sidebar .nav-link p, .sidebar .nav-header, .sidebar-brand-text { color: ${v['sidebar-color']} !important; }\n`;
+                    css += `.sidebar .nav-link .nav-icon { color: ${v['sidebar-color']} !important; }\n`;
+                }
+                if (v['sidebar-hover-bg']) {
+                    css += `.sidebar .nav-link:hover, .sidebar .nav-link.active, .sidebar .nav-treeview > .nav-item > .nav-link.active { background-color: ${v['sidebar-hover-bg']} !important; }\n`;
+                }
+
+                // Header
+                if (v['header-bg']) {
+                    css += `.app-header, .main-header, .main-header.navbar { background-color: ${v['header-bg']} !important; }\n`;
+                }
+
+                // Body / Content
+                if (v['body-bg']) {
+                    css += `.content-wrapper, .app-main { background-color: ${v['body-bg']} !important; }\n`;
+                }
+
+                // Cards
+                if (v['card-bg']) {
+                    css += `.card { background-color: ${v['card-bg']} !important; }\n`;
+                }
+
+                // Text
+                if (v['text-color']) {
+                    css += `body, .content-wrapper, .card-body, p, span, td, th, li, label { color: ${v['text-color']} !important; }\n`;
+                }
+
+                // Primary Color
+                if (v['primary-color']) {
+                    css += `.btn-primary { background-color: ${v['primary-color']} !important; border-color: ${v['primary-color']} !important; }\n`;
+                    css += `.btn-outline-primary { color: ${v['primary-color']} !important; border-color: ${v['primary-color']} !important; }\n`;
+                    css += `.btn-outline-primary:hover { background-color: ${v['primary-color']} !important; color: #fff !important; }\n`;
+                    css += `.badge-primary { background-color: ${v['primary-color']} !important; }\n`;
+                    css += `.bg-primary { background-color: ${v['primary-color']} !important; }\n`;
+                    css += `.text-primary { color: ${v['primary-color']} !important; }\n`;
+                    css += `.page-item.active .page-link { background-color: ${v['primary-color']} !important; border-color: ${v['primary-color']} !important; }\n`;
+                    css += `.custom-control-input:checked ~ .custom-control-label::before { background-color: ${v['primary-color']} !important; border-color: ${v['primary-color']} !important; }\n`;
+                }
+
+                // Accent Color
+                if (v['accent-color']) {
+                    css += `.btn-warning { background-color: ${v['accent-color']} !important; border-color: ${v['accent-color']} !important; }\n`;
+                    css += `.badge-warning { background-color: ${v['accent-color']} !important; }\n`;
+                    css += `.text-warning { color: ${v['accent-color']} !important; }\n`;
+                }
+
+                // Link Color
+                if (v['link-color']) {
+                    css += `a:not(.btn):not(.nav-link):not(.dropdown-item) { color: ${v['link-color']} !important; }\n`;
+                    css += `a:not(.btn):not(.nav-link):not(.dropdown-item):hover { color: ${v['link-color']} !important; filter: brightness(0.85); }\n`;
+                }
             }
         }
 

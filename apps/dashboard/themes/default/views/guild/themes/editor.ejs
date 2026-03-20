@@ -299,12 +299,50 @@
     // CSS-Variablen als Style-String
     // ============================
     function buildPreviewCSS() {
-        const vars = collectVariables();
+        const v = collectVariables();
         let css = ':root {\n';
-        for (const [key, value] of Object.entries(vars)) {
+        for (const [key, value] of Object.entries(v)) {
             if (value) css += `  --${key}: ${value};\n`;
         }
         css += '}\n';
+
+        // Konkrete AdminLTE/Bootstrap Overrides
+        if (v['sidebar-bg']) {
+            css += `.app-sidebar, .main-sidebar, .sidebar { background-color: ${v['sidebar-bg']} !important; }\n`;
+        }
+        if (v['sidebar-color']) {
+            css += `.sidebar .nav-link, .sidebar .nav-link p, .sidebar .nav-header, .sidebar-brand-text { color: ${v['sidebar-color']} !important; }\n`;
+            css += `.sidebar .nav-link .nav-icon { color: ${v['sidebar-color']} !important; }\n`;
+        }
+        if (v['sidebar-hover-bg']) {
+            css += `.sidebar .nav-link:hover, .sidebar .nav-link.active, .sidebar .nav-treeview > .nav-item > .nav-link.active { background-color: ${v['sidebar-hover-bg']} !important; }\n`;
+        }
+        if (v['header-bg']) {
+            css += `.app-header, .main-header, .main-header.navbar { background-color: ${v['header-bg']} !important; }\n`;
+        }
+        if (v['body-bg']) {
+            css += `.content-wrapper, .app-main { background-color: ${v['body-bg']} !important; }\n`;
+        }
+        if (v['card-bg']) {
+            css += `.card { background-color: ${v['card-bg']} !important; }\n`;
+        }
+        if (v['text-color']) {
+            css += `body, .content-wrapper, .card-body, p, span, td, th, li, label { color: ${v['text-color']} !important; }\n`;
+        }
+        if (v['primary-color']) {
+            css += `.btn-primary { background-color: ${v['primary-color']} !important; border-color: ${v['primary-color']} !important; }\n`;
+            css += `.btn-outline-primary { color: ${v['primary-color']} !important; border-color: ${v['primary-color']} !important; }\n`;
+            css += `.btn-outline-primary:hover { background-color: ${v['primary-color']} !important; color: #fff !important; }\n`;
+            css += `.badge-primary { background-color: ${v['primary-color']} !important; }\n`;
+            css += `.text-primary { color: ${v['primary-color']} !important; }\n`;
+        }
+        if (v['accent-color']) {
+            css += `.btn-warning { background-color: ${v['accent-color']} !important; border-color: ${v['accent-color']} !important; }\n`;
+            css += `.badge-warning { background-color: ${v['accent-color']} !important; }\n`;
+        }
+        if (v['link-color']) {
+            css += `a:not(.btn):not(.nav-link):not(.dropdown-item) { color: ${v['link-color']} !important; }\n`;
+        }
 
         const customCSS = document.getElementById('css-editor').value;
         if (customCSS) css += customCSS;
