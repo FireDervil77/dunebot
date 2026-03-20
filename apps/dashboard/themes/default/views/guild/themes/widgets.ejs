@@ -41,16 +41,17 @@
   <% areas.forEach(area => { %>
     <%
       const areaWidgets = registeredWidgets
-        .filter(w => w.area === area.id)
         .map(w => {
           const ov = overrides[w.id];
           return {
             ...w,
+            effectiveArea: ov && ov.area != null ? ov.area : w.area,
             effectivePosition: ov && ov.position != null ? ov.position : w.position,
             effectiveVisible: ov && ov.visible != null ? Boolean(ov.visible) : (w.visible !== false),
             hasOverride: !!ov
           };
         })
+        .filter(w => w.effectiveArea === area.id)
         .sort((a, b) => a.effectivePosition - b.effectivePosition);
     %>
     <div class="card mb-4">
