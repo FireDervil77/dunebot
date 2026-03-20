@@ -25,3 +25,24 @@ DuneBot ist ein modulares Discord-Bot-System mit einem WordPress-ähnlichen Plug
 **Wichtig:** Bei allen Änderungen an der Kommunikations-Architektur (IPM, SSE, Events) den Plan konsultieren und den Fortschritt dort aktualisieren!
 
 **Wichtig** Den process dunebot-dashboard-dev nicht neustarten wenn er in pm2 offline ist. dann ist er bereits in der Developper-Terminal aktiv!
+
+## 🗄️ DATENBANK-MIGRATIONEN (PFLICHT!)
+
+**Bei JEDER DB-Änderung** (neue Tabelle, ALTER TABLE, neue Spalte, Index, View, Trigger) **MUSS** eine Migration erstellt werden:
+
+```bash
+# Kern-Migration (guilds, users, permissions, etc.)
+node migrate.js create kern "beschreibung"
+
+# Plugin-Migration
+node migrate.js create plugin <pluginname> "beschreibung"
+```
+
+**Regeln:**
+- **Niemals** direkte SQL-Änderungen in onEnable(), Routen oder Controllern — immer eine Migration-Datei!
+- Kern-Migrationen → `migrations/kern/`
+- Plugin-Migrationen → `plugins/<name>/migrations/`
+- Format: `YYYYMMDD_HHMMSS_beschreibung.js` mit `up(db)` und optionalem `down(db)`
+- Idempotent schreiben: `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`
+- Status prüfen: `node migrate.js status`
+- MigrationRunner-Engine: `packages/dunebot-core/lib/MigrationRunner.js`
