@@ -248,7 +248,7 @@
                 </div>
             </div>
             <div class="card-body p-0 d-flex flex-column" style="overflow:hidden;">
-                <iframe id="preview-frame" class="preview-frame" src="/guild/<%= guildId %>/dashboard" style="width:100%; flex:1; border:none;"></iframe>
+                <iframe id="preview-frame" class="preview-frame" src="/guild/<%= guildId %>" style="width:100%; flex:1; border:none;"></iframe>
             </div>
         </div>
     </div>
@@ -489,7 +489,7 @@
     });
 
     document.getElementById('btn-open-preview').addEventListener('click', function() {
-        window.open(`/guild/${guildId}/dashboard`, '_blank');
+        window.open(`/guild/${guildId}`, '_blank');
     });
 
     // Preview nach Laden initialisieren
