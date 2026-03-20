@@ -5,7 +5,7 @@ const { DashboardPlugin } = require("dunebot-sdk");
 const { parseJsonArray } = require("dunebot-sdk/utils");
 
 const execa = require("execa");
-const PluginUpdater = require("./PluginUpdater");
+const { MigrationRunner } = require('dunebot-core');
 
 class PluginManager extends BasePluginManager {
     /**
@@ -852,11 +852,13 @@ class PluginManager extends BasePluginManager {
                     // Minimale Eigenschaften sicherstellen
                     plugin.name = plugin.name || pluginName;
                     
-                    // Tabellen registrieren vor dem Enable
-                    await this.registerDashboardTables(plugin);
-                    
-                    // ✅ Plugin-Updates aus dashboard/updates/ ausführen
-                    await PluginUpdater.runForPlugin(pluginName, this.pluginsDir);
+                    // Plugin-Migrationen ausführen (neue Migration-Dateien aus migrations/)
+                    await MigrationRunner.runPlugin(
+                        dbService,
+                        pluginName,
+                        this.pluginsDir,
+                        ServiceManager.get('Logger')
+                    );
                     
                     // ❌ DEAKTIVIERT: Permissions werden jetzt NUR noch guild-spezifisch registriert
                     // await this.registerPluginPermissions(plugin);

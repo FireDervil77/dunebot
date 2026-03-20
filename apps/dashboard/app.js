@@ -11,7 +11,7 @@ const { parseJsonArray } = require("dunebot-sdk/utils");
 const { ThemeManager, AssetManager } = require('dunebot-sdk');
 const ShortcodeParser = require("dunebot-sdk/lib/utils/ShortcodeParser");
 const { NotificationManager} = require('dunebot-sdk');
-const KernUpdater = require("./helpers/KernUpdater");
+const { MigrationRunner } = require('dunebot-core');
 const { NavigationManager } = require("dunebot-sdk");
 const PathConfig = require("dunebot-sdk/lib/utils/PathConfig"); // Hier PathConfig importieren
 const { RouterManager } = require('dunebot-sdk');
@@ -182,17 +182,16 @@ module.exports = class App {
             // NotificationManager in den ServiceManager laden
             ServiceManager.register("notificationManager", this.app.notificationManager)
 
-            // Plugins laden
-            await this.loadPlugins();
-            
-            // Kern-Updates ausführen (Migrationen, Nav-Sync, Permission-Updates)
+            // Kern-Migrationen ausführen (VOR Plugin-Load)
             try {
-                const kernUpdater = new KernUpdater();
-                await kernUpdater.run();
+                const dbService = ServiceManager.get('dbService');
+                await MigrationRunner.runKern(dbService, Logger);
             } catch (err) {
-                Logger.error('[KernUpdater] Fehler bei Kern-Updates:', err);
-                // Dashboard trotzdem starten
+                Logger.error('[Migration] Fehler bei Kern-Migrationen:', err);
             }
+
+            // Plugins laden (Plugin-Migrationen laufen in enablePlugin())
+            await this.loadPlugins();
             
             // View-Pfade nach Plugin-Load aktualisieren (damit Plugin-Views gefunden werden)
             if (this.app.themeManager && typeof this.app.themeManager.setupViewEngine === 'function') {

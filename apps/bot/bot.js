@@ -64,6 +64,14 @@ ServiceManager.register("bootHooks", bootHooks);
         ServiceManager.register("dbService", dbService);
         Logger.success("Datenbankverbindung hergestellt");
         
+        // Kern-Migrationen ausführen (idempotent — läuft sicher auch wenn Dashboard bereits lief)
+        try {
+            const { MigrationRunner } = require('dunebot-core');
+            await MigrationRunner.runKern(dbService, Logger);
+        } catch (err) {
+            Logger.error('[Migration] Fehler bei Kern-Migrationen:', err);
+        }
+        
         await bootHooks.doAction('after_db_init', { dbService });
         
         // Phase 2: Bot-Client-Initialisierung

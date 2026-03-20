@@ -257,6 +257,14 @@ async enablePlugin(pluginName) {
         }
         await this.registerBotTables(plugin);
 
+        // Plugin-Migrationen ausführen (idempotent)
+        try {
+            const { MigrationRunner } = require('dunebot-core');
+            await MigrationRunner.runPlugin(dbService, pluginName, this.pluginsDir, Logger);
+        } catch (migrationErr) {
+            Logger.error(`[Migration] Fehler bei Plugin-Migrationen für ${pluginName}:`, migrationErr);
+        }
+
         // Plugin aktivieren
         if (this.#hooks) {
             await this.#hooks.doAction('before_plugin_enable_method', { plugin });

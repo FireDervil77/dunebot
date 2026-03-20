@@ -176,30 +176,7 @@ class GameserverPlugin extends DashboardPlugin {
 
         this.app = app;
 
-        // ── DB-Migrationen ────────────────────────────────────────────────
-        try {
-            await dbService.query(
-                `ALTER TABLE gameservers
-                 ADD COLUMN IF NOT EXISTS bind_ip VARCHAR(45) NULL
-                     COMMENT 'IP-Adresse auf die der Container-Port gebunden wird (null = 0.0.0.0)'
-                     AFTER rootserver_id`
-            );
-            Logger.debug('[Gameserver] Migration: bind_ip Spalte ok');
-        } catch (err) {
-            if (err.code !== 'ER_DUP_FIELDNAME') Logger.warn('[Gameserver] Migration bind_ip:', err.message);
-        }
-        try {
-            await dbService.query(
-                `ALTER TABLE gameservers
-                 ADD COLUMN IF NOT EXISTS install_phase VARCHAR(50) NULL
-                     COMMENT 'Aktuelle Installationsphase (pulling_image, installing_game, cleanup)'
-                     AFTER install_progress`
-            );
-            Logger.debug('[Gameserver] Migration: install_phase Spalte ok');
-        } catch (err) {
-            if (err.code !== 'ER_DUP_FIELDNAME') Logger.warn('[Gameserver] Migration install_phase:', err.message);
-        }
-        // ─────────────────────────────────────────────────────────────────
+        // DB-Migrationen → jetzt via MigrationRunner (plugins/gameserver/migrations/)
         
         // ConsoleManager initialisieren und registrieren
         const ConsoleManager = require('./helpers/ConsoleManager');
