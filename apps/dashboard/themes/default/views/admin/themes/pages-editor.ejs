@@ -1,0 +1,264 @@
+<%#
+ * Admin: Seiten-Editor (Neu erstellen / Bearbeiten)
+ * HTML-Editor mit Titel, Slug, Status, Template, Meta-Daten
+ *
+ * @author FireDervil
+ * @context {Object|null} page - Bestehende Seite oder null (neue Seite)
+ * @context {boolean} isNew - true = neue Seite, false = bearbeiten
+%>
+
+<style>
+  .slug-input-group .input-group-text {
+    background: #e9ecef;
+    font-size: 0.85em;
+    color: #6c757d;
+  }
+</style>
+
+<div class="app-content">
+  <div class="container-fluid">
+
+    <!-- Page-Header -->
+    <div class="row mb-3">
+      <div class="col-12">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <h1 class="h3 mb-0">
+              <i class="fa-solid fa-file-pen me-2 text-primary"></i>
+              <%= isNew ? 'Neue Seite' : 'Seite bearbeiten' %>
+            </h1>
+            <% if (!isNew && page) { %>
+              <p class="text-muted small mb-0">ID: <%= page.id %> &middot; Slug: <code><%= page.slug %></code></p>
+            <% } %>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-sm" id="btnSave">
+              <i class="bi bi-check-lg me-1"></i> Speichern
+            </button>
+            <a href="/admin/themes/pages" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-arrow-left me-1"></i> Zurück zur Liste
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <!-- Hauptbereich: Editor -->
+      <div class="col-lg-9">
+        <div class="card mb-3">
+          <div class="card-header">
+            <h5 class="card-title mb-0"><i class="bi bi-pencil-square me-2"></i>Inhalt</h5>
+          </div>
+          <div class="card-body">
+            <!-- Titel -->
+            <div class="mb-3">
+              <label class="form-label fw-bold">Titel <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="pageTitle" value="<%= page ? page.title : '' %>" placeholder="Seitentitel" required>
+            </div>
+
+            <!-- Slug -->
+            <div class="mb-3">
+              <label class="form-label fw-bold">Slug (URL)</label>
+              <div class="input-group slug-input-group">
+                <span class="input-group-text">/page/</span>
+                <input type="text" class="form-control" id="pageSlug" value="<%= page ? page.slug : '' %>" placeholder="automatisch-aus-titel">
+              </div>
+              <small class="text-muted">Leer lassen = wird automatisch aus dem Titel generiert.</small>
+            </div>
+
+            <!-- TinyMCE WYSIWYG Editor -->
+            <textarea id="pageContent"><%= page ? page.content : '' %></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar: Einstellungen -->
+      <div class="col-lg-3">
+        <!-- Veröffentlichung -->
+        <div class="card mb-3">
+          <div class="card-header">
+            <h5 class="card-title mb-0"><i class="bi bi-gear me-2"></i>Einstellungen</h5>
+          </div>
+          <div class="card-body">
+            <!-- Status -->
+            <div class="mb-3">
+              <label class="form-label fw-bold">Status</label>
+              <select class="form-select form-select-sm" id="pageStatus">
+                <option value="draft" <%= (!page || page.status === 'draft') ? 'selected' : '' %>>Entwurf</option>
+                <option value="published" <%= (page && page.status === 'published') ? 'selected' : '' %>>Veröffentlicht</option>
+              </select>
+            </div>
+
+            <!-- Template -->
+            <div class="mb-3">
+              <label class="form-label fw-bold">Template</label>
+              <select class="form-select form-select-sm" id="pageTemplate">
+                <option value="default" <%= (!page || page.template === 'default') ? 'selected' : '' %>>Standard (volle Breite)</option>
+                <option value="sidebar" <%= (page && page.template === 'sidebar') ? 'selected' : '' %>>Mit Sidebar</option>
+                <option value="narrow" <%= (page && page.template === 'narrow') ? 'selected' : '' %>>Schmal (zentriert)</option>
+              </select>
+            </div>
+
+            <!-- Im Menü -->
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="pageVisibleInMenu" <%= (page && page.visible_in_menu) ? 'checked' : '' %>>
+              <label class="form-check-label" for="pageVisibleInMenu">
+                Im Navigation-Menü anzeigen
+              </label>
+              <small class="text-muted d-block">Fügt automatisch einen Menüpunkt hinzu.</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEO -->
+        <div class="card mb-3">
+          <div class="card-header">
+            <h5 class="card-title mb-0"><i class="bi bi-search me-2"></i>SEO</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label fw-bold">Meta-Titel</label>
+              <input type="text" class="form-control form-control-sm" id="pageMetaTitle" value="<%= page ? (page.meta_title || '') : '' %>" placeholder="Überschreibt den Seitentitel">
+            </div>
+            <div class="mb-0">
+              <label class="form-label fw-bold">Meta-Beschreibung</label>
+              <textarea class="form-control form-control-sm" id="pageMetaDesc" rows="3" placeholder="Kurze Beschreibung für Suchmaschinen"><%= page ? (page.meta_description || '') : '' %></textarea>
+            </div>
+          </div>
+        </div>
+
+        <% if (page) { %>
+          <!-- Info -->
+          <div class="card">
+            <div class="card-body small text-muted">
+              <div><strong>Erstellt:</strong> <%= new Date(page.created_at).toLocaleString('de-DE') %></div>
+              <div><strong>Aktualisiert:</strong> <%= new Date(page.updated_at).toLocaleString('de-DE') %></div>
+              <% if (page.status === 'published') { %>
+                <div class="mt-2">
+                  <a href="/page/<%= page.slug %>" target="_blank" class="btn btn-outline-primary btn-sm w-100">
+                    <i class="bi bi-box-arrow-up-right me-1"></i> Seite ansehen
+                  </a>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/themes/default/assets/vendor/tinymce/tinymce.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const isNew = <%= isNew ? 'true' : 'false' %>;
+    const pageId = <%= page ? page.id : 'null' %>;
+
+    // TinyMCE initialisieren
+    tinymce.init({
+        selector: '#pageContent',
+        height: 500,
+        menubar: true,
+        plugins: [
+            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+            'insertdatetime', 'media', 'table', 'help', 'wordcount'
+        ],
+        toolbar: 'undo redo | blocks | bold italic forecolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image | removeformat | code fullscreen | help',
+        content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
+        branding: false,
+        promotion: false,
+        license_key: 'gpl',
+        block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Blockquote=blockquote; Preformatted=pre',
+        relative_urls: true,
+        remove_script_host: true,
+        convert_urls: false,
+        setup: function(editor) {
+            editor.on('init', function() {
+                console.log('[TinyMCE Pages] Editor initialisiert');
+            });
+        }
+    });
+
+    // Auto-Slug generieren
+    const titleInput = document.getElementById('pageTitle');
+    const slugInput = document.getElementById('pageSlug');
+    let slugManuallyEdited = <%= (!isNew && page && page.slug) ? 'true' : 'false' %>;
+
+    slugInput.addEventListener('input', () => { slugManuallyEdited = true; });
+
+    titleInput.addEventListener('input', () => {
+        if (!slugManuallyEdited) {
+            slugInput.value = titleInput.value
+                .toLowerCase().trim()
+                .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+                .replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        }
+    });
+
+    // Speichern
+    document.getElementById('btnSave').addEventListener('click', async () => {
+        // TinyMCE-Inhalt in Textarea schreiben
+        if (typeof tinymce !== 'undefined') tinymce.triggerSave();
+
+        const title = titleInput.value.trim();
+        if (!title) {
+            if (typeof toastr !== 'undefined') toastr.warning('Bitte einen Titel eingeben');
+            titleInput.focus();
+            return;
+        }
+
+        const payload = {
+            title,
+            slug: slugInput.value.trim() || title,
+            content: document.getElementById('pageContent').value,
+            status: document.getElementById('pageStatus').value,
+            template: document.getElementById('pageTemplate').value,
+            meta_title: document.getElementById('pageMetaTitle').value.trim() || null,
+            meta_description: document.getElementById('pageMetaDesc').value.trim() || null,
+            visible_in_menu: document.getElementById('pageVisibleInMenu').checked
+        };
+
+        const btn = document.getElementById('btnSave');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Speichern...';
+
+        try {
+            const url = isNew ? '/admin/themes/pages' : `/admin/themes/pages/${pageId}`;
+            const method = isNew ? 'POST' : 'PUT';
+
+            const resp = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+                if (typeof toastr !== 'undefined') toastr.success('Seite gespeichert');
+                if (isNew && data.page) {
+                    // Nach Erstellen zum Editor der neuen Seite weiterleiten
+                    window.location.href = `/admin/themes/pages/${data.page.id}/edit`;
+                }
+            } else {
+                if (typeof toastr !== 'undefined') toastr.error(data.message || 'Fehler beim Speichern');
+            }
+        } catch (err) {
+            if (typeof toastr !== 'undefined') toastr.error('Netzwerkfehler');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Speichern';
+        }
+    });
+
+    // Strg+S zum Speichern
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            document.getElementById('btnSave').click();
+        }
+    });
+});
+</script>

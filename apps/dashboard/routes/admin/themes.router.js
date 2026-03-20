@@ -549,4 +549,184 @@ router.delete('/footer/link/:id', async (req, res) => {
     }
 });
 
+// =============================================================================
+// PAGES CMS (Statische Seiten)
+// =============================================================================
+
+const FrontendPage = require('dunebot-db-client/models/FrontendPage');
+
+/**
+ * GET /admin/themes/pages
+ * Alle Seiten auflisten
+ */
+router.get('/pages', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+    res.locals.layout = themeManager.getLayout('guild');
+
+    try {
+        const pages = await FrontendPage.getAll();
+        return themeManager.renderView(res, 'admin/themes/pages', {
+            pageTitle: 'Seiten',
+            activeMenu: '/admin/themes/pages',
+            pages
+        });
+    } catch (error) {
+        Logger.error('[Admin/Themes/Pages] Fehler:', error);
+        res.status(500).send('Fehler beim Laden der Seiten');
+    }
+});
+
+/**
+ * GET /admin/themes/pages/new
+ * Neue Seite erstellen (Editor)
+ */
+router.get('/pages/new', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    res.locals.layout = themeManager.getLayout('guild');
+
+    return themeManager.renderView(res, 'admin/themes/pages-editor', {
+        pageTitle: 'Neue Seite',
+        activeMenu: '/admin/themes/pages',
+        page: null,
+        isNew: true
+    });
+});
+
+/**
+ * GET /admin/themes/pages/:id/edit
+ * Seite bearbeiten (Editor)
+ */
+router.get('/pages/:id/edit', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+    res.locals.layout = themeManager.getLayout('guild');
+
+    try {
+        const page = await FrontendPage.getById(Number(req.params.id));
+        if (!page) {
+            return res.status(404).send('Seite nicht gefunden');
+        }
+        return themeManager.renderView(res, 'admin/themes/pages-editor', {
+            pageTitle: `Seite bearbeiten: ${page.title}`,
+            activeMenu: '/admin/themes/pages',
+            page,
+            isNew: false
+        });
+    } catch (error) {
+        Logger.error('[Admin/Themes/Pages] Fehler:', error);
+        res.status(500).send('Fehler beim Laden der Seite');
+    }
+});
+
+/**
+ * POST /admin/themes/pages
+ * Neue Seite erstellen (API)
+ */
+router.post('/pages', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const { title, slug, content, status, template, meta_title, meta_description, visible_in_menu } = req.body;
+
+    if (!title || !title.trim()) {
+        return res.status(400).json({ success: false, message: 'Titel erforderlich' });
+    }
+
+    const finalSlug = slug && slug.trim() ? slug.trim() : title.trim();
+
+    try {
+        // Slug-Duplikat prüfen
+        if (await FrontendPage.slugExists(finalSlug)) {
+            return res.status(400).json({ success: false, message: 'Dieser Slug ist bereits vergeben' });
+        }
+
+        const page = await FrontendPage.create({
+            title: title.trim(),
+            slug: finalSlug,
+            content: content || '',
+            status: status || 'draft',
+            template: template || 'default',
+            meta_title: meta_title || null,
+            meta_description: meta_description || null,
+            visible_in_menu: visible_in_menu ? 1 : 0,
+            created_by: req.user?.id || null
+        });
+
+        Logger.info(`[Admin/Themes/Pages] Seite erstellt: ${page.id} (${page.slug})`);
+        return res.json({ success: true, page });
+    } catch (error) {
+        Logger.error('[Admin/Themes/Pages] Fehler beim Erstellen:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+/**
+ * PUT /admin/themes/pages/:id
+ * Seite aktualisieren (API)
+ */
+router.put('/pages/:id', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const { id } = req.params;
+    const { title, slug, content, status, template, meta_title, meta_description, visible_in_menu } = req.body;
+
+    try {
+        const existing = await FrontendPage.getById(Number(id));
+        if (!existing) {
+            return res.status(404).json({ success: false, message: 'Seite nicht gefunden' });
+        }
+
+        // Slug-Duplikat prüfen (andere Seite mit gleichem Slug?)
+        if (slug && await FrontendPage.slugExists(slug, Number(id))) {
+            return res.status(400).json({ success: false, message: 'Dieser Slug ist bereits vergeben' });
+        }
+
+        const page = await FrontendPage.update(Number(id), {
+            title, slug, content, status, template,
+            meta_title, meta_description,
+            visible_in_menu: visible_in_menu !== undefined ? (visible_in_menu ? 1 : 0) : undefined
+        });
+
+        Logger.info(`[Admin/Themes/Pages] Seite ${id} aktualisiert`);
+        return res.json({ success: true, page });
+    } catch (error) {
+        Logger.error('[Admin/Themes/Pages] Fehler beim Update:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+/**
+ * DELETE /admin/themes/pages/:id
+ * Seite löschen (API)
+ */
+router.delete('/pages/:id', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const { id } = req.params;
+
+    try {
+        const page = await FrontendPage.getById(Number(id));
+        if (!page) {
+            return res.status(404).json({ success: false, message: 'Seite nicht gefunden' });
+        }
+
+        await FrontendPage.delete(Number(id));
+        Logger.info(`[Admin/Themes/Pages] Seite ${id} (${page.slug}) gelöscht`);
+        return res.json({ success: true });
+    } catch (error) {
+        Logger.error('[Admin/Themes/Pages] Fehler beim Löschen:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+/**
+ * GET /admin/themes/pages/api/list
+ * Alle Seiten als JSON (für Menu-Builder Integration)
+ */
+router.get('/pages/api/list', async (req, res) => {
+    try {
+        const pages = await FrontendPage.getPublished();
+        return res.json({ success: true, pages: pages.map(p => ({ id: p.id, title: p.title, slug: p.slug })) });
+    } catch (error) {
+        return res.status(500).json({ success: false, pages: [] });
+    }
+});
+
 module.exports = router;

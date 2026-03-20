@@ -194,6 +194,32 @@ router.get('/changelogs/:version', getChangelogDetails);
 router.get('/privacy', frontendController.privacy);
 router.get('/tos', frontendController.tos);
 
+// ── CMS-Seiten: /page/:slug ──
+router.get('/page/:slug', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+
+    try {
+        const FrontendPage = require('dunebot-db-client/models/FrontendPage');
+        const page = await FrontendPage.getBySlug(req.params.slug);
+
+        if (!page) {
+            return res.status(404).render('frontend/404');
+        }
+
+        res.locals.layout = themeManager.getLayout('frontend');
+
+        res.render('frontend/page', {
+            page,
+            title: page.meta_title || page.title,
+            metaDescription: page.meta_description || ''
+        });
+    } catch (err) {
+        Logger.error('[Frontend/Page] Fehler beim Laden:', err);
+        res.status(500).render('frontend/500');
+    }
+});
+
 /**
  * Spracheinstellung für Gäste (ohne Authentifizierung)
  * @route POST /language/guest

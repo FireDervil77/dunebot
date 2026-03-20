@@ -1,0 +1,59 @@
+<!-- CMS Page: Statische Seite -->
+<main id="main">
+  <section class="cms-page section">
+    <div class="container<%= page.template === 'narrow' ? ' narrow-container' : '' %>" data-aos="fade-up">
+
+      <% if (page.template === 'sidebar') { %>
+        <div class="row">
+          <div class="col-lg-8">
+            <article class="page-article">
+              <h1 class="page-title"><%= page.title %></h1>
+              <div class="page-content">
+                <%- page.content %>
+              </div>
+            </article>
+          </div>
+          <div class="col-lg-4">
+            <aside class="page-sidebar">
+              <!-- Sidebar-Platzhalter für Widgets -->
+            </aside>
+          </div>
+        </div>
+      <% } else { %>
+        <article class="page-article">
+          <h1 class="page-title"><%= page.title %></h1>
+          <div class="page-content">
+            <%- page.content %>
+          </div>
+        </article>
+      <% } %>
+
+    </div>
+  </section>
+</main>
+
+<style>
+  .cms-page {
+    padding: 80px 0 60px;
+    min-height: 60vh;
+  }
+  .cms-page .page-title {
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+  }
+  .cms-page .page-content {
+    line-height: 1.8;
+    font-size: 1.05rem;
+  }
+  .cms-page .page-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+  }
+  .cms-page .narrow-container {
+    max-width: 800px;
+  }
+  .cms-page .page-sidebar {
+    padding-left: 2rem;
+  }
+</style>

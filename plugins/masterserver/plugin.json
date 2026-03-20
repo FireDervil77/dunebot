@@ -1,8 +1,0 @@
-{
-    "name": "masterserver",
-    "version": "1.1.0",
-    "migrations_deprecated_note": "LEGACY: Neue Updates über dashboard/updates/ Ordner (PluginUpdater)",
-    "migrations": {
-        "1.1.0": "dashboard/migrations/1.1.0-rootserver-features.js"
-    }
-}

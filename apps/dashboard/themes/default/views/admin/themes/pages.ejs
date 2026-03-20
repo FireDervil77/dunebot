@@ -1,0 +1,148 @@
+<%#
+ * Admin: Seiten-Verwaltung (CMS Pages)
+ * Liste aller statischen Seiten mit Status, Slug, Aktionen
+ *
+ * @author FireDervil
+ * @context {Array} pages - [{id, title, slug, status, template, position, created_at, updated_at}]
+%>
+
+<style>
+  .page-status-published { color: #28a745; }
+  .page-status-draft { color: #ffc107; }
+  .slug-preview { color: #6c757d; font-size: 0.85em; }
+</style>
+
+<div class="app-content">
+  <div class="container-fluid">
+
+    <!-- Page-Header -->
+    <div class="row mb-3">
+      <div class="col-12">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <h1 class="h3 mb-0"><i class="fa-solid fa-file-lines me-2 text-primary"></i>Seiten</h1>
+            <p class="text-muted small mb-0">Verwalte statische Seiten wie Datenschutz, FAQ, Über uns usw.</p>
+          </div>
+          <div class="d-flex gap-2">
+            <a href="/admin/themes/pages/new" class="btn btn-success btn-sm">
+              <i class="bi bi-plus-lg me-1"></i> Neue Seite
+            </a>
+            <a href="/admin/themes" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-arrow-left me-1"></i> Zurück
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="alert alert-info d-flex align-items-start mb-4" role="alert">
+      <i class="bi bi-info-circle me-2 fs-5 mt-1"></i>
+      <div>
+        Erstelle statische Seiten und verlinke sie über den <strong>Navigation Builder</strong>.
+        Veröffentlichte Seiten sind unter <code>/page/{slug}</code> erreichbar.
+      </div>
+    </div>
+
+    <% if (!pages || pages.length === 0) { %>
+      <div class="card">
+        <div class="card-body text-center py-5">
+          <i class="fa-solid fa-file-circle-plus fa-3x text-muted mb-3"></i>
+          <h5 class="text-muted">Keine Seiten vorhanden</h5>
+          <p class="text-muted">Erstelle deine erste Seite über den Button oben.</p>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th style="width:40px">#</th>
+                  <th>Titel</th>
+                  <th>Slug</th>
+                  <th>Status</th>
+                  <th>Template</th>
+                  <th>Aktualisiert</th>
+                  <th style="width:150px" class="text-end">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% pages.forEach((page, index) => { %>
+                  <tr>
+                    <td class="text-muted"><%= index + 1 %></td>
+                    <td>
+                      <strong><%= page.title %></strong>
+                      <% if (page.visible_in_menu) { %>
+                        <span class="badge bg-info ms-1" title="Im Menü sichtbar"><i class="bi bi-menu-button-wide"></i></span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <span class="slug-preview">/page/<%= page.slug %></span>
+                      <% if (page.status === 'published') { %>
+                        <a href="/page/<%= page.slug %>" target="_blank" class="ms-1" title="Seite öffnen">
+                          <i class="bi bi-box-arrow-up-right small"></i>
+                        </a>
+                      <% } %>
+                    </td>
+                    <td>
+                      <% if (page.status === 'published') { %>
+                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Veröffentlicht</span>
+                      <% } else { %>
+                        <span class="badge bg-warning text-dark"><i class="bi bi-pencil me-1"></i>Entwurf</span>
+                      <% } %>
+                    </td>
+                    <td><code><%= page.template %></code></td>
+                    <td>
+                      <small class="text-muted">
+                        <%= new Date(page.updated_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                      </small>
+                    </td>
+                    <td class="text-end">
+                      <div class="btn-group btn-group-sm">
+                        <a href="/admin/themes/pages/<%= page.id %>/edit" class="btn btn-outline-primary" title="Bearbeiten">
+                          <i class="bi bi-pencil"></i>
+                        </a>
+                        <button class="btn btn-outline-danger btn-delete-page" data-id="<%= page.id %>" data-title="<%= page.title %>" title="Löschen">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    <% } %>
+
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Delete
+    document.querySelectorAll('.btn-delete-page').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const title = btn.dataset.title;
+            if (!confirm(`Seite "${title}" wirklich löschen?`)) return;
+
+            try {
+                const resp = await fetch(`/admin/themes/pages/${id}`, { method: 'DELETE' });
+                const data = await resp.json();
+                if (data.success) {
+                    btn.closest('tr').remove();
+                    if (typeof toastr !== 'undefined') toastr.success('Seite gelöscht');
+                } else {
+                    if (typeof toastr !== 'undefined') toastr.error(data.message || 'Fehler');
+                }
+            } catch (err) {
+                if (typeof toastr !== 'undefined') toastr.error('Netzwerkfehler');
+            }
+        });
+    });
+});
+</script>

@@ -59,10 +59,16 @@ cookies.txt
 # Excluded Plugins (nicht für Repo)
 plugins/fun/
 plugins/economy/
-plugins/imageserver/
+plugins/image-builder/
 plugins/statistik/
 plugins/voiceserver/
 plugins/dunemap/
+plugins/leveling/
+plugins/social-alerts/
+plugins/clan-manager/
+
+
+
 
 # Daemon Binaries (separat laden)
 apps/dashboard/downloads/daemon/binaries/
