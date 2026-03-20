@@ -447,7 +447,6 @@ exports.getPlugins = async (req, res) => {
             Logger.error(`[Plugins] Fehler beim Durchsuchen des Plugin-Verzeichnisses:`, scanErr);
         }
 
-        // Plugin-Updates (externes Update-System entfernt — nur noch PluginUpdater)
         const pendingUpdates = [];
 
         // Breadcrumbs

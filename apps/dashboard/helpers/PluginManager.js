@@ -344,36 +344,6 @@ class PluginManager extends BasePluginManager {
     }
 
     /**
-     * Dashboard-spezifische Implementierung der Tabellen-Registrierung
-     * @param {Object} plugin - Das Plugin-Objekt
-     */
-    async registerDashboardTables(plugin) {
-        // ServiceManager bereit stellen
-        const Logger = ServiceManager.get("Logger");
-
-        // "before_register_tables" Hook aufrufen
-        await this.hooks.doAction('before_register_tables', plugin);
-        
-        // Dashboard-Kontext verwenden
-        await super.registerPluginTables(plugin, 'dashboard');
-        
-        try {
-            // SQL-Dateien aus dashboard/sql/ laden (MIT MIGRATION-TRACKING!)
-            const dashboardSqlDir = path.join(this.pluginsDir, plugin.name, 'dashboard', 'sql');
-            if (fs.existsSync(dashboardSqlDir)) {
-                await this.registerModelsFromDir(plugin, dashboardSqlDir, 'dashboard-sql');
-            }
-            
-            // "after_register_tables" Hook aufrufen
-            await this.hooks.doAction('after_register_tables', plugin);
-        } catch (error) {
-            // "register_tables_failed" Hook aufrufen
-            await this.hooks.doAction('register_tables_failed', plugin, error);
-            Logger.error(`Error registering dashboard tables for ${plugin.name}:`, error);
-        }
-    }
-
-    /**
      * Registriert Permissions aus permissions.json eines Plugins
      * Lädt automatisch die permissions.json und trägt sie in permission_definitions ein
      * 

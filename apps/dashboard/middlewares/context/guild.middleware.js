@@ -154,7 +154,6 @@ try {
         res.locals.buyMeCoffeeUrl = '#';
     }
     
-    // Plugin-Updates Badge (externes Update-System entfernt — nur noch PluginUpdater)
     res.locals.pendingUpdatesCount = 0;
     
     // Admin-Status für Templates (OWNER_IDS aus ENV)
