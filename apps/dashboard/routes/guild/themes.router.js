@@ -98,6 +98,65 @@ router.get('/widgets', requirePermission('CORE.THEMES.EDIT'), async (req, res) =
 });
 
 // =====================================================
+// POST /guild/:guildId/themes/widgets — Widget-Config speichern
+// =====================================================
+router.post('/widgets', requirePermission('CORE.THEMES.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const { widgets } = req.body;
+
+    if (!Array.isArray(widgets)) {
+        return res.status(400).json({ success: false, message: 'widgets muss ein Array sein' });
+    }
+
+    try {
+        const { getInstance: getWidgetManager } = require('dunebot-sdk/lib/WidgetManager');
+        const wm = getWidgetManager();
+
+        for (const cfg of widgets) {
+            if (!cfg.widget_id || typeof cfg.widget_id !== 'string') continue;
+
+            await wm.setGuildWidgetConfig(guildId, cfg.widget_id, {
+                area: cfg.area || null,
+                position: cfg.position !== undefined ? Number(cfg.position) : null,
+                visible: cfg.visible !== undefined ? (cfg.visible ? 1 : 0) : null,
+            });
+        }
+
+        Logger.info(`[Themes/Widgets] Widget-Config für Guild ${guildId} gespeichert (${widgets.length} Widgets)`);
+        return res.json({ success: true, message: 'Widget-Konfiguration gespeichert' });
+    } catch (error) {
+        Logger.error('[Themes/Widgets] Fehler beim Speichern:', error);
+        res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+// =====================================================
+// DELETE /guild/:guildId/themes/widgets — Widget-Config zurücksetzen
+// =====================================================
+router.delete('/widgets', requirePermission('CORE.THEMES.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const { widgetId } = req.body;
+
+    try {
+        const { getInstance: getWidgetManager } = require('dunebot-sdk/lib/WidgetManager');
+        const wm = getWidgetManager();
+
+        await wm.resetGuildWidgetConfig(guildId, widgetId || null);
+
+        const msg = widgetId
+            ? `Widget '${widgetId}' für Guild ${guildId} zurückgesetzt`
+            : `Alle Widget-Configs für Guild ${guildId} zurückgesetzt`;
+        Logger.info(`[Themes/Widgets] ${msg}`);
+        return res.json({ success: true, message: msg });
+    } catch (error) {
+        Logger.error('[Themes/Widgets] Fehler beim Zurücksetzen:', error);
+        res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+// =====================================================
 // GET /guild/:guildId/themes/:name — Theme-Detail
 // =====================================================
 router.get('/:name', requirePermission('CORE.THEMES.VIEW'), async (req, res) => {

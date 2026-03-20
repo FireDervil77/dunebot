@@ -1,6 +1,6 @@
 <%#
- * Guild: Widget-Bereiche verwalten
- * Zeigt registrierte Widget-Bereiche mit Guild-spezifischen Overrides.
+ * Guild: Widget-Bereiche verwalten (interaktiv)
+ * Toggle Sichtbarkeit, Reihenfolge per Drag & Drop, Speichern/Zurücksetzen.
  *
  * @context {Array}  areas             - [{id, label, description}]
  * @context {Array}  registeredWidgets - [{id, area, position, size, visible}]
@@ -15,25 +15,51 @@
     <div class="col-12">
       <div class="d-flex align-items-center justify-content-between">
         <div>
-          <h1 class="h3 mb-0"><i class="fa-solid fa-puzzle-piece me-2 text-primary"></i> Widget-Bereiche</h1>
+          <h4 class="mb-1"><i class="fa-solid fa-puzzle-piece mr-2 text-primary"></i>Widget-Bereiche</h4>
           <p class="text-muted small mb-0">Verwalte welche Widgets im Dashboard angezeigt werden und passe die Reihenfolge an.</p>
         </div>
-        <a href="/guild/<%= guildId %>/themes" class="btn btn-outline-secondary btn-sm">
-          <i class="fa-solid fa-arrow-left me-1"></i> Zurück zu Themes
-        </a>
+        <div>
+          <button class="btn btn-outline-danger btn-sm mr-2" id="btn-reset-all" title="Alle Overrides zurücksetzen">
+            <i class="fa-solid fa-rotate-left mr-1"></i>Alles zurücksetzen
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-save" disabled>
+            <i class="fa-solid fa-save mr-1"></i>Speichern
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- Unsaved Changes Hinweis -->
+  <div class="alert alert-warning d-none mb-3" id="unsaved-alert">
+    <i class="fa-solid fa-exclamation-triangle mr-2"></i>
+    Du hast ungespeicherte Änderungen.
+    <button class="btn btn-warning btn-sm ml-2" onclick="saveWidgetConfig()">Jetzt speichern</button>
+  </div>
+
   <!-- Widget-Bereiche -->
   <% areas.forEach(area => { %>
-    <% const areaWidgets = registeredWidgets.filter(w => w.area === area.id).sort((a,b) => a.position - b.position); %>
+    <%
+      const areaWidgets = registeredWidgets
+        .filter(w => w.area === area.id)
+        .map(w => {
+          const ov = overrides[w.id];
+          return {
+            ...w,
+            effectivePosition: ov && ov.position != null ? ov.position : w.position,
+            effectiveVisible: ov && ov.visible != null ? Boolean(ov.visible) : (w.visible !== false),
+            hasOverride: !!ov
+          };
+        })
+        .sort((a, b) => a.effectivePosition - b.effectivePosition);
+    %>
     <div class="card mb-4">
       <div class="card-header d-flex align-items-center justify-content-between">
         <div>
           <h5 class="card-title mb-0">
-            <i class="fa-solid fa-layer-group me-2 text-muted"></i>
+            <i class="fa-solid fa-layer-group mr-2 text-muted"></i>
             <%= area.label %>
+            <small class="text-muted ml-1">(<%= area.id %>)</small>
           </h5>
           <% if (area.description) { %>
             <small class="text-muted"><%= area.description %></small>
@@ -44,43 +70,60 @@
       <div class="card-body p-0">
         <% if (areaWidgets.length === 0) { %>
           <div class="text-muted small p-3">
-            <i class="fa-solid fa-info-circle me-1"></i>
+            <i class="fa-solid fa-info-circle mr-1"></i>
             Keine Widgets in diesem Bereich registriert.
           </div>
         <% } else { %>
           <div class="table-responsive">
             <table class="table table-sm table-hover mb-0">
-              <thead>
+              <thead class="thead-light">
                 <tr>
-                  <th class="pl-3">Widget</th>
-                  <th>Position</th>
-                  <th>Breite</th>
-                  <th>Sichtbar</th>
-                  <th>Override</th>
+                  <th style="width:30px;" class="text-center pl-3" title="Drag & Drop Sortierung"><i class="fa-solid fa-grip-vertical text-muted"></i></th>
+                  <th>Widget</th>
+                  <th style="width:90px;" class="text-center">Position</th>
+                  <th style="width:80px;" class="text-center">Breite</th>
+                  <th style="width:80px;" class="text-center">Sichtbar</th>
+                  <th style="width:80px;" class="text-center">Status</th>
+                  <th style="width:50px;" class="text-center">Reset</th>
                 </tr>
               </thead>
-              <tbody>
-                <% areaWidgets.forEach(widget => { %>
-                  <% const ov = overrides[widget.id]; %>
-                  <tr>
-                    <td class="pl-3">
-                      <code class="text-primary"><%= widget.id %></code>
-                    </td>
-                    <td><%= ov && ov.position != null ? ov.position : widget.position %></td>
-                    <td><span class="badge badge-secondary">col-<%= widget.size %></span></td>
-                    <td>
-                      <% const isVisible = ov && ov.visible != null ? Boolean(ov.visible) : widget.visible; %>
-                      <% if (isVisible) { %>
-                        <span class="badge badge-success"><i class="fa-solid fa-eye me-1"></i>Ja</span>
-                      <% } else { %>
-                        <span class="badge badge-danger"><i class="fa-solid fa-eye-slash me-1"></i>Nein</span>
-                      <% } %>
+              <tbody class="widget-sortable" data-area="<%= area.id %>">
+                <% areaWidgets.forEach((widget, idx) => { %>
+                  <tr class="widget-row" data-widget-id="<%= widget.id %>" data-area="<%= area.id %>"
+                      data-default-position="<%= widget.position %>" data-default-visible="<%= widget.visible !== false %>">
+                    <td class="text-center pl-3 drag-handle" style="cursor:grab;">
+                      <i class="fa-solid fa-grip-vertical text-muted"></i>
                     </td>
                     <td>
-                      <% if (ov) { %>
-                        <span class="badge badge-warning">Guild-Override</span>
+                      <strong><%= widget.id %></strong>
+                    </td>
+                    <td class="text-center">
+                      <input type="number" class="form-control form-control-sm text-center widget-position"
+                             value="<%= widget.effectivePosition %>" min="0" max="999" style="width:70px; margin:0 auto;">
+                    </td>
+                    <td class="text-center">
+                      <span class="badge badge-secondary">col-<%= widget.size %></span>
+                    </td>
+                    <td class="text-center">
+                      <div class="custom-control custom-switch d-inline-block">
+                        <input type="checkbox" class="custom-control-input widget-visible"
+                               id="vis-<%= widget.id %>"
+                               <%= widget.effectiveVisible ? 'checked' : '' %>>
+                        <label class="custom-control-label" for="vis-<%= widget.id %>"></label>
+                      </div>
+                    </td>
+                    <td class="text-center">
+                      <% if (widget.hasOverride) { %>
+                        <span class="badge badge-warning">Override</span>
                       <% } else { %>
                         <span class="badge badge-light border">Standard</span>
+                      <% } %>
+                    </td>
+                    <td class="text-center">
+                      <% if (widget.hasOverride) { %>
+                        <button class="btn btn-xs btn-outline-danger btn-reset-widget" data-widget-id="<%= widget.id %>" title="Override zurücksetzen">
+                          <i class="fa-solid fa-rotate-left"></i>
+                        </button>
                       <% } %>
                     </td>
                   </tr>
@@ -99,7 +142,7 @@
     <div class="card mb-4 border-warning">
       <div class="card-header">
         <h5 class="card-title mb-0 text-warning">
-          <i class="fa-solid fa-triangle-exclamation me-2"></i>Nicht zugewiesene Widgets
+          <i class="fa-solid fa-triangle-exclamation mr-2"></i>Nicht zugewiesene Widgets
         </h5>
       </div>
       <div class="card-body p-0">
@@ -127,9 +170,151 @@
 
   <% if (registeredWidgets.length === 0) { %>
     <div class="alert alert-info">
-      <i class="fa-solid fa-info-circle me-2"></i>
+      <i class="fa-solid fa-info-circle mr-2"></i>
       Keine Widgets registriert. Widgets werden von Plugins bereitgestellt — aktiviere Plugins, um Widgets zu erhalten.
     </div>
   <% } %>
 
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script>
+(function() {
+    const guildId = '<%= guildId %>';
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    let hasChanges = false;
+
+    // =====================================================
+    // Change Tracking
+    // =====================================================
+    function markChanged() {
+        if (!hasChanges) {
+            hasChanges = true;
+            document.getElementById('btn-save').disabled = false;
+            document.getElementById('unsaved-alert').classList.remove('d-none');
+        }
+    }
+
+    // Position-Inputs & Visibility-Toggles überwachen
+    document.querySelectorAll('.widget-position').forEach(input => {
+        input.addEventListener('change', markChanged);
+    });
+    document.querySelectorAll('.widget-visible').forEach(input => {
+        input.addEventListener('change', markChanged);
+    });
+
+    // =====================================================
+    // Drag & Drop Sortierung (SortableJS)
+    // =====================================================
+    document.querySelectorAll('.widget-sortable').forEach(tbody => {
+        new Sortable(tbody, {
+            handle: '.drag-handle',
+            ghostClass: 'bg-light',
+            animation: 150,
+            onEnd: function() {
+                // Positionen nach Reihenfolge neu durchnummerieren (10er-Schritte)
+                tbody.querySelectorAll('.widget-row').forEach((row, idx) => {
+                    row.querySelector('.widget-position').value = (idx + 1) * 10;
+                });
+                markChanged();
+            }
+        });
+    });
+
+    // =====================================================
+    // Speichern
+    // =====================================================
+    window.saveWidgetConfig = async function() {
+        const btn = document.getElementById('btn-save');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Speichern...';
+
+        const widgets = [];
+        document.querySelectorAll('.widget-row').forEach(row => {
+            widgets.push({
+                widget_id: row.dataset.widgetId,
+                area: row.dataset.area,
+                position: parseInt(row.querySelector('.widget-position').value, 10),
+                visible: row.querySelector('.widget-visible').checked
+            });
+        });
+
+        try {
+            const res = await fetch(`/guild/${guildId}/themes/widgets`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                body: JSON.stringify({ widgets })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                hasChanges = false;
+                document.getElementById('unsaved-alert').classList.add('d-none');
+                // Seite neu laden um Status-Badges zu aktualisieren
+                window.location.reload();
+            } else {
+                alert('Fehler: ' + (data.message || 'Unbekannter Fehler'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-save mr-1"></i>Speichern';
+            }
+        } catch (err) {
+            alert('Netzwerkfehler beim Speichern.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-save mr-1"></i>Speichern';
+        }
+    };
+
+    document.getElementById('btn-save').addEventListener('click', saveWidgetConfig);
+
+    // =====================================================
+    // Einzelnes Widget zurücksetzen
+    // =====================================================
+    document.querySelectorAll('.btn-reset-widget').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const widgetId = this.dataset.widgetId;
+            if (!confirm(`Override für "${widgetId}" zurücksetzen?`)) return;
+
+            try {
+                const res = await fetch(`/guild/${guildId}/themes/widgets`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    body: JSON.stringify({ widgetId })
+                });
+                const data = await res.json();
+                if (data.success) window.location.reload();
+                else alert('Fehler: ' + (data.message || 'Unbekannter Fehler'));
+            } catch (err) {
+                alert('Netzwerkfehler beim Zurücksetzen.');
+            }
+        });
+    });
+
+    // =====================================================
+    // Alles zurücksetzen
+    // =====================================================
+    document.getElementById('btn-reset-all').addEventListener('click', async function() {
+        if (!confirm('Alle Widget-Overrides für diese Guild zurücksetzen?\nAlle Widgets werden auf Standardwerte zurückgesetzt.')) return;
+
+        try {
+            const res = await fetch(`/guild/${guildId}/themes/widgets`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                body: JSON.stringify({})
+            });
+            const data = await res.json();
+            if (data.success) window.location.reload();
+            else alert('Fehler: ' + (data.message || 'Unbekannter Fehler'));
+        } catch (err) {
+            alert('Netzwerkfehler beim Zurücksetzen.');
+        }
+    });
+
+    // Ctrl+S Shortcut
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            if (hasChanges) saveWidgetConfig();
+        }
+    });
+})();
+</script>
