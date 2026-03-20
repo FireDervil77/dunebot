@@ -56,3 +56,10 @@
 <% if (typeof style !== 'undefined') { %>
   <%- style %>
 <% } %>
+
+<!-- Guild Custom CSS (Theme-Editor) -->
+<% if (locals.guildCustomCSS) { %>
+<style id="guild-custom-css">
+<%- locals.guildCustomCSS %>
+</style>
+<% } %>

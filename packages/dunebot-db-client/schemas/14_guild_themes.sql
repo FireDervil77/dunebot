@@ -1,12 +1,14 @@
--- 14_guild_themes: Per-Guild Theme-Auswahl
--- Speichert welches Theme für eine Guild aktiv ist.
+-- 14_guild_themes: Per-Guild Theme-Auswahl + Customization
+-- Speichert welches Theme für eine Guild aktiv ist + Custom CSS/Variables.
 -- Fehlt ein Eintrag → globaler Default aus ENV (ACTIVE_THEME) wird genutzt.
 
 CREATE TABLE IF NOT EXISTS `guild_themes` (
-    `id`         INT          NOT NULL AUTO_INCREMENT,
-    `guild_id`   VARCHAR(20)  NOT NULL,
-    `theme_name` VARCHAR(100) NOT NULL DEFAULT 'default',
-    `updated_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `id`               INT          NOT NULL AUTO_INCREMENT,
+    `guild_id`         VARCHAR(20)  NOT NULL,
+    `theme_name`       VARCHAR(100) NOT NULL DEFAULT 'default',
+    `custom_css`       TEXT         DEFAULT NULL,
+    `custom_variables` JSON         DEFAULT NULL,
+    `updated_at`       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_guild_themes_guild` (`guild_id`),
     CONSTRAINT `fk_guild_themes_guild`

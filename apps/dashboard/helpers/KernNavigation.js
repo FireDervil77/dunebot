@@ -167,6 +167,17 @@ async function registerKernNavigation(guildId) {
                 guildId,
                 parent: `/guild/${guildId}/themes`
             },
+            {
+                title: 'NAV.THEMES_EDITOR',
+                url: `/guild/${guildId}/themes/editor`,
+                icon: 'fa-solid fa-paint-roller',
+                order: 30,
+                type: navigationManager.menuTypes.MAIN,
+                capability: 'CORE.THEMES.EDIT',
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}/themes`
+            },
             // Subnav: Einstellungen
             {
                 title: 'NAV.GENERAL',

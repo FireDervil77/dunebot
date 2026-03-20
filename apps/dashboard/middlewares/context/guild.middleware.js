@@ -159,6 +159,19 @@ try {
     // Admin-Status für Templates (OWNER_IDS aus ENV)
     const { isAdminUser } = require('../admin.middleware');
     res.locals.isAdmin = isAdminUser(req.session?.user?.id || req.session?.user?.info?.id);
+
+    // Guild Custom CSS (Theme-Editor) laden
+    try {
+        const themeManager = ServiceManager.get('themeManager');
+        if (themeManager && guildId) {
+            const customCSS = await themeManager.renderGuildCustomCSS(guildId);
+            if (customCSS) {
+                res.locals.guildCustomCSS = customCSS;
+            }
+        }
+    } catch (err) {
+        Logger.debug('[Guild Middleware] Custom CSS konnte nicht geladen werden:', err.message);
+    }
     
     next();
 };

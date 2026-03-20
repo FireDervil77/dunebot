@@ -2,10 +2,14 @@
  * Guild Theme-Router
  * 
  * Stellt Theme-Verwaltung auf Guild-Level bereit:
- * - GET  /themes          → Theme-Übersicht (Galerie)
- * - GET  /themes/:name    → Theme-Detail (Info + Clone)
- * - POST /themes/activate → Theme für Guild aktivieren
- * - POST /themes/clone    → Theme als Child klonen
+ * - GET  /themes            → Theme-Übersicht (Galerie)
+ * - GET  /themes/widgets    → Widget-Bereiche verwalten
+ * - GET  /themes/editor     → Child-Theme Editor (CSS + Live-Preview)
+ * - POST /themes/editor     → Custom CSS + Variablen speichern
+ * - DELETE /themes/editor   → Customization zurücksetzen
+ * - GET  /themes/:name      → Theme-Detail (Info + Clone)
+ * - POST /themes/activate   → Theme für Guild aktivieren
+ * - POST /themes/clone      → Theme als Child klonen
  */
 
 'use strict';
@@ -152,6 +156,118 @@ router.delete('/widgets', requirePermission('CORE.THEMES.EDIT'), async (req, res
         return res.json({ success: true, message: msg });
     } catch (error) {
         Logger.error('[Themes/Widgets] Fehler beim Zurücksetzen:', error);
+        res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+// =====================================================
+// GET /guild/:guildId/themes/editor — Theme-Editor
+// =====================================================
+router.get('/editor', requirePermission('CORE.THEMES.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+    const guildId = res.locals.guildId;
+
+    try {
+        const activeThemeName = await themeManager.getThemeForGuild(guildId);
+        const themes = await themeManager.getInstalledThemes();
+        const activeTheme = themes.find(t => t.name === activeThemeName);
+
+        // Customization aus DB laden
+        const customization = await themeManager.getGuildCustomization(guildId);
+
+        // Definierte CSS-Variablen mit Defaults aus theme.json config
+        const defaultVariables = {
+            'primary-color': activeTheme?.config?.primaryColor || '#3498db',
+            'accent-color': activeTheme?.config?.accentColor || '#f39c12',
+            'sidebar-bg': '#343a40',
+            'sidebar-color': '#c2c7d0',
+            'sidebar-hover-bg': '#495057',
+            'header-bg': '#3f6791',
+            'body-bg': '#f4f6f9',
+            'card-bg': '#ffffff',
+            'text-color': '#212529',
+            'link-color': '#3498db'
+        };
+
+        // Gespeicherte Variablen mit Defaults mergen
+        const variables = { ...defaultVariables, ...(customization.custom_variables || {}) };
+
+        return themeManager.renderView(res, 'guild/themes/editor', {
+            title: 'Theme-Editor',
+            activeMenu: `/guild/${guildId}/themes`,
+            guildId,
+            activeTheme,
+            activeThemeName,
+            customCSS: customization.custom_css || '',
+            variables,
+            defaultVariables
+        });
+    } catch (error) {
+        Logger.error('[Themes/Editor] Fehler beim Laden:', error);
+        res.status(500).send('Fehler beim Laden des Editors');
+    }
+});
+
+// =====================================================
+// POST /guild/:guildId/themes/editor — Customization speichern
+// =====================================================
+router.post('/editor', requirePermission('CORE.THEMES.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+    const guildId = res.locals.guildId;
+    const { custom_css, custom_variables } = req.body;
+
+    try {
+        // Validierung: CSS-Größe begrenzen (max 50KB)
+        if (custom_css && custom_css.length > 50000) {
+            return res.status(400).json({ success: false, message: 'Custom CSS darf maximal 50KB groß sein' });
+        }
+
+        // Variablen validieren
+        let parsedVars = null;
+        if (custom_variables && typeof custom_variables === 'object') {
+            parsedVars = {};
+            for (const [key, value] of Object.entries(custom_variables)) {
+                // Nur erlaubte Keys
+                const safeKey = key.replace(/[^a-zA-Z0-9-_]/g, '');
+                if (safeKey && value != null) {
+                    parsedVars[safeKey] = String(value).slice(0, 200);
+                }
+            }
+        }
+
+        await themeManager.setGuildCustomization(guildId, {
+            custom_css: custom_css || null,
+            custom_variables: parsedVars
+        });
+
+        Logger.info(`[Themes/Editor] Customization für Guild ${guildId} gespeichert`);
+        return res.json({ success: true, message: 'Theme-Anpassungen gespeichert' });
+    } catch (error) {
+        Logger.error('[Themes/Editor] Fehler beim Speichern:', error);
+        res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+// =====================================================
+// DELETE /guild/:guildId/themes/editor — Customization zurücksetzen
+// =====================================================
+router.delete('/editor', requirePermission('CORE.THEMES.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+    const guildId = res.locals.guildId;
+
+    try {
+        await themeManager.setGuildCustomization(guildId, {
+            custom_css: null,
+            custom_variables: null
+        });
+
+        Logger.info(`[Themes/Editor] Customization für Guild ${guildId} zurückgesetzt`);
+        return res.json({ success: true, message: 'Theme-Anpassungen zurückgesetzt' });
+    } catch (error) {
+        Logger.error('[Themes/Editor] Fehler beim Zurücksetzen:', error);
         res.status(500).json({ success: false, message: 'Serverfehler' });
     }
 });

@@ -457,6 +457,113 @@ class ThemeManager {
     }
 
     /**
+     * Custom CSS + Variablen für eine Guild laden.
+     * @param {string} guildId
+     * @returns {Promise<{custom_css: string|null, custom_variables: object|null}>}
+     */
+    async getGuildCustomization(guildId) {
+        try {
+            const dbService = ServiceManager.get('dbService');
+            const rows = await dbService.query(
+                'SELECT custom_css, custom_variables FROM guild_themes WHERE guild_id = ? LIMIT 1',
+                [guildId]
+            );
+
+            if (rows && rows.length > 0) {
+                let variables = rows[0].custom_variables;
+                if (typeof variables === 'string') {
+                    try { variables = JSON.parse(variables); } catch { variables = null; }
+                }
+                return {
+                    custom_css: rows[0].custom_css || null,
+                    custom_variables: variables || null
+                };
+            }
+            return { custom_css: null, custom_variables: null };
+        } catch {
+            return { custom_css: null, custom_variables: null };
+        }
+    }
+
+    /**
+     * Custom CSS + Variablen für eine Guild speichern.
+     * @param {string} guildId
+     * @param {object} customization - { custom_css, custom_variables }
+     */
+    async setGuildCustomization(guildId, { custom_css, custom_variables }) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+
+        const varsJson = custom_variables ? JSON.stringify(custom_variables) : null;
+
+        // Erst prüfen ob Zeile existiert
+        const existing = await dbService.query(
+            'SELECT id FROM guild_themes WHERE guild_id = ? LIMIT 1',
+            [guildId]
+        );
+
+        if (existing && existing.length > 0) {
+            // Update
+            await dbService.query(
+                'UPDATE guild_themes SET custom_css = ?, custom_variables = ? WHERE guild_id = ?',
+                [custom_css || null, varsJson, guildId]
+            );
+        } else {
+            // Insert mit Default-Theme
+            const themeName = process.env.ACTIVE_THEME || 'default';
+            await dbService.query(
+                'INSERT INTO guild_themes (guild_id, theme_name, custom_css, custom_variables) VALUES (?, ?, ?, ?)',
+                [guildId, themeName, custom_css || null, varsJson]
+            );
+        }
+
+        Logger.info(`[ThemeManager] Custom CSS/Variables für Guild ${guildId} gespeichert`);
+    }
+
+    /**
+     * Generiert CSS-<style>-Block aus Guild-Customization (Variables + Custom CSS).
+     * @param {string} guildId
+     * @returns {Promise<string>} CSS-String (leer wenn keine Customization)
+     */
+    async renderGuildCustomCSS(guildId) {
+        const { custom_css, custom_variables } = await this.getGuildCustomization(guildId);
+
+        let css = '';
+
+        // CSS-Variablen als :root Block
+        if (custom_variables && typeof custom_variables === 'object') {
+            const entries = Object.entries(custom_variables).filter(([, v]) => v != null && v !== '');
+            if (entries.length > 0) {
+                css += ':root {\n';
+                for (const [key, value] of entries) {
+                    // Key sanitizen: nur erlaubte Zeichen
+                    const safeKey = key.replace(/[^a-zA-Z0-9-_]/g, '');
+                    // Value sanitizen: keine Semikolons, Klammern oder Script-Injection
+                    const safeValue = String(value).replace(/[;<>{}]/g, '').trim();
+                    if (safeKey && safeValue) {
+                        css += `  --${safeKey}: ${safeValue};\n`;
+                    }
+                }
+                css += '}\n';
+            }
+        }
+
+        // Custom CSS anhängen
+        if (custom_css) {
+            // Basis-Sanitizing: Script-Tags entfernen
+            const safeCss = custom_css
+                .replace(/<script[\s\S]*?<\/script>/gi, '')
+                .replace(/<\/style>/gi, '')
+                .replace(/expression\s*\(/gi, '')
+                .replace(/javascript\s*:/gi, '')
+                .replace(/url\s*\(\s*['"]?\s*javascript:/gi, '');
+            css += safeCss;
+        }
+
+        return css;
+    }
+
+    /**
      * Theme-Name für den aktuellen Request ermitteln.
      * Liest guildId aus res.locals oder req.params.
      *

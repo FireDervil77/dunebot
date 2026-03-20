@@ -1,0 +1,510 @@
+<%# Theme-Editor — /guild/:guildId/themes/editor %>
+<%# Combined: CSS-Variablen + Custom CSS + Live-Preview %>
+
+<style>
+.editor-layout {
+    display: flex;
+    gap: 15px;
+    height: calc(100vh - 180px);
+    min-height: 500px;
+}
+.editor-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.preview-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.preview-frame {
+    flex: 1;
+    border: 2px solid #dee2e6;
+    border-radius: .25rem;
+    background: #fff;
+}
+.color-var-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.color-var-row label {
+    flex: 1;
+    font-size: .85rem;
+    margin-bottom: 0;
+}
+.color-var-row input[type="color"] {
+    width: 38px;
+    height: 30px;
+    border: 1px solid #ced4da;
+    border-radius: .2rem;
+    padding: 2px;
+    cursor: pointer;
+}
+.color-var-row input[type="text"] {
+    width: 90px;
+    font-size: .8rem;
+    font-family: monospace;
+}
+.css-editor-wrap {
+    flex: 1;
+    position: relative;
+    min-height: 200px;
+}
+.css-editor-wrap textarea {
+    width: 100%;
+    height: 100%;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: .85rem;
+    line-height: 1.5;
+    padding: 12px;
+    border: 1px solid #ced4da;
+    border-radius: .25rem;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    resize: none;
+    tab-size: 2;
+}
+.css-editor-wrap textarea:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 .2rem rgba(52,152,219,.25);
+}
+.var-reset-btn {
+    opacity: 0;
+    transition: opacity .15s;
+}
+.color-var-row:hover .var-reset-btn {
+    opacity: 1;
+}
+.editor-tabs .nav-link {
+    font-size: .85rem;
+    padding: .4rem .8rem;
+}
+.save-indicator {
+    display: none;
+    font-size: .8rem;
+}
+.save-indicator.show {
+    display: inline;
+}
+</style>
+
+<div class="row mb-3">
+    <div class="col-12 d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center">
+            <a href="/guild/<%= guildId %>/themes" class="btn btn-sm btn-outline-secondary mr-3">
+                <i class="fa-solid fa-arrow-left mr-1"></i>Zurück
+            </a>
+            <div>
+                <h4 class="mb-0">
+                    <i class="fa-solid fa-paint-roller mr-2"></i>Theme-Editor
+                </h4>
+                <small class="text-muted">
+                    Aktiv: <strong><%= activeTheme ? (activeTheme.displayName || activeTheme.name) : activeThemeName %></strong>
+                    <% if (activeTheme && activeTheme.parent) { %>
+                        <span class="badge badge-secondary ml-1"><i class="fa-solid fa-sitemap mr-1"></i>Child von <%= activeTheme.parent %></span>
+                    <% } %>
+                </small>
+            </div>
+        </div>
+        <div class="d-flex align-items-center">
+            <span class="save-indicator text-success mr-3" id="save-indicator">
+                <i class="fa-solid fa-check mr-1"></i>Gespeichert
+            </span>
+            <span class="save-indicator text-warning mr-3" id="unsaved-indicator">
+                <i class="fa-solid fa-circle-exclamation mr-1"></i>Ungespeichert
+            </span>
+            <button class="btn btn-outline-danger btn-sm mr-2" id="btn-reset" title="Alle Anpassungen zurücksetzen">
+                <i class="fa-solid fa-rotate-left mr-1"></i>Zurücksetzen
+            </button>
+            <button class="btn btn-primary btn-sm" id="btn-save">
+                <i class="fa-solid fa-save mr-1"></i>Speichern
+                <span class="badge badge-light ml-1" style="font-size:.65rem;">Ctrl+S</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="editor-layout">
+    <!-- Linke Seite: Editor -->
+    <div class="editor-panel">
+        <div class="card shadow-sm h-100 mb-0">
+            <div class="card-header p-0">
+                <ul class="nav nav-tabs editor-tabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-toggle="tab" href="#tab-variables" role="tab">
+                            <i class="fa-solid fa-palette mr-1"></i>Farben & Variablen
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="tab" href="#tab-css" role="tab">
+                            <i class="fa-solid fa-code mr-1"></i>Custom CSS
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body p-0 d-flex flex-column" style="overflow:hidden;">
+                <div class="tab-content flex-fill d-flex flex-column">
+                    <!-- Tab: Variablen -->
+                    <div class="tab-pane fade show active p-3" id="tab-variables" role="tabpanel" style="overflow-y:auto;">
+                        <p class="text-muted small mb-3">
+                            <i class="fa-solid fa-info-circle mr-1"></i>
+                            Passe die Farben deines Themes an. Änderungen werden sofort in der Vorschau angezeigt.
+                        </p>
+
+                        <h6 class="text-uppercase text-muted mb-2" style="font-size:.7rem; letter-spacing:1px;">Hauptfarben</h6>
+                        <% const mainColors = [
+                            { key: 'primary-color', label: 'Primärfarbe', icon: 'fa-droplet' },
+                            { key: 'accent-color', label: 'Akzentfarbe', icon: 'fa-star' },
+                            { key: 'link-color', label: 'Link-Farbe', icon: 'fa-link' }
+                        ]; %>
+                        <% mainColors.forEach(v => { %>
+                        <div class="color-var-row" data-var="<%= v.key %>">
+                            <i class="fa-solid <%= v.icon %> text-muted" style="width:16px;"></i>
+                            <label><%= v.label %></label>
+                            <input type="color" class="var-color-picker" value="<%= variables[v.key] || '#000000' %>">
+                            <input type="text" class="form-control form-control-sm var-hex-input" value="<%= variables[v.key] || '' %>" placeholder="#000000" maxlength="20">
+                            <button class="btn btn-xs btn-outline-secondary var-reset-btn" title="Auf Standard zurücksetzen" data-default="<%= defaultVariables[v.key] || '' %>">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
+                        <% }); %>
+
+                        <h6 class="text-uppercase text-muted mb-2 mt-3" style="font-size:.7rem; letter-spacing:1px;">Sidebar</h6>
+                        <% const sidebarColors = [
+                            { key: 'sidebar-bg', label: 'Hintergrund', icon: 'fa-square' },
+                            { key: 'sidebar-color', label: 'Text', icon: 'fa-font' },
+                            { key: 'sidebar-hover-bg', label: 'Hover-Hintergrund', icon: 'fa-hand-pointer' }
+                        ]; %>
+                        <% sidebarColors.forEach(v => { %>
+                        <div class="color-var-row" data-var="<%= v.key %>">
+                            <i class="fa-solid <%= v.icon %> text-muted" style="width:16px;"></i>
+                            <label><%= v.label %></label>
+                            <input type="color" class="var-color-picker" value="<%= variables[v.key] || '#000000' %>">
+                            <input type="text" class="form-control form-control-sm var-hex-input" value="<%= variables[v.key] || '' %>" placeholder="#000000" maxlength="20">
+                            <button class="btn btn-xs btn-outline-secondary var-reset-btn" title="Auf Standard zurücksetzen" data-default="<%= defaultVariables[v.key] || '' %>">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
+                        <% }); %>
+
+                        <h6 class="text-uppercase text-muted mb-2 mt-3" style="font-size:.7rem; letter-spacing:1px;">Layout</h6>
+                        <% const layoutColors = [
+                            { key: 'header-bg', label: 'Header-Hintergrund', icon: 'fa-window-maximize' },
+                            { key: 'body-bg', label: 'Seiten-Hintergrund', icon: 'fa-expand' },
+                            { key: 'card-bg', label: 'Card-Hintergrund', icon: 'fa-square-full' },
+                            { key: 'text-color', label: 'Textfarbe', icon: 'fa-font' }
+                        ]; %>
+                        <% layoutColors.forEach(v => { %>
+                        <div class="color-var-row" data-var="<%= v.key %>">
+                            <i class="fa-solid <%= v.icon %> text-muted" style="width:16px;"></i>
+                            <label><%= v.label %></label>
+                            <input type="color" class="var-color-picker" value="<%= variables[v.key] || '#000000' %>">
+                            <input type="text" class="form-control form-control-sm var-hex-input" value="<%= variables[v.key] || '' %>" placeholder="#000000" maxlength="20">
+                            <button class="btn btn-xs btn-outline-secondary var-reset-btn" title="Auf Standard zurücksetzen" data-default="<%= defaultVariables[v.key] || '' %>">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
+                        <% }); %>
+                    </div>
+
+                    <!-- Tab: Custom CSS -->
+                    <div class="tab-pane fade d-flex flex-column" id="tab-css" role="tabpanel" style="height:100%;">
+                        <div class="p-3 pb-2">
+                            <p class="text-muted small mb-2">
+                                <i class="fa-solid fa-info-circle mr-1"></i>
+                                Eigenes CSS schreiben. Nutze <code>var(--primary-color)</code> etc. für die obigen Variablen.
+                                Die Änderungen überschreiben das aktive Theme, ohne es zu verändern.
+                            </p>
+                        </div>
+                        <div class="css-editor-wrap flex-fill">
+                            <textarea id="css-editor" spellcheck="false" placeholder="/* Dein Custom CSS */&#10;&#10;.sidebar {&#10;  background: var(--sidebar-bg);&#10;}"><%= customCSS %></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rechte Seite: Live-Vorschau -->
+    <div class="preview-panel">
+        <div class="card shadow-sm h-100 mb-0">
+            <div class="card-header d-flex align-items-center justify-content-between py-2">
+                <h3 class="card-title mb-0" style="font-size:.9rem;">
+                    <i class="fa-solid fa-eye mr-1"></i>Live-Vorschau
+                </h3>
+                <div>
+                    <button class="btn btn-xs btn-outline-secondary" id="btn-refresh-preview" title="Vorschau neu laden">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                    <button class="btn btn-xs btn-outline-secondary ml-1" id="btn-open-preview" title="In neuem Tab öffnen">
+                        <i class="fa-solid fa-external-link-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0 d-flex flex-column" style="overflow:hidden;">
+                <iframe id="preview-frame" class="preview-frame" src="/guild/<%= guildId %>/dashboard" style="width:100%; flex:1; border:none;"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    const guildId = '<%= guildId %>';
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const defaultVars = <%- JSON.stringify(defaultVariables) %>;
+
+    // State
+    let isDirty = false;
+    const saveIndicator = document.getElementById('save-indicator');
+    const unsavedIndicator = document.getElementById('unsaved-indicator');
+
+    function markDirty() {
+        isDirty = true;
+        saveIndicator.classList.remove('show');
+        unsavedIndicator.classList.add('show');
+    }
+
+    function markClean() {
+        isDirty = false;
+        unsavedIndicator.classList.remove('show');
+        saveIndicator.classList.add('show');
+        setTimeout(() => saveIndicator.classList.remove('show'), 2000);
+    }
+
+    // ============================
+    // Variablen sammeln
+    // ============================
+    function collectVariables() {
+        const vars = {};
+        document.querySelectorAll('.color-var-row').forEach(row => {
+            const key = row.dataset.var;
+            const hexInput = row.querySelector('.var-hex-input');
+            if (key && hexInput) {
+                vars[key] = hexInput.value.trim();
+            }
+        });
+        return vars;
+    }
+
+    // ============================
+    // CSS-Variablen als Style-String
+    // ============================
+    function buildPreviewCSS() {
+        const vars = collectVariables();
+        let css = ':root {\n';
+        for (const [key, value] of Object.entries(vars)) {
+            if (value) css += `  --${key}: ${value};\n`;
+        }
+        css += '}\n';
+
+        const customCSS = document.getElementById('css-editor').value;
+        if (customCSS) css += customCSS;
+
+        return css;
+    }
+
+    // ============================
+    // Preview updaten
+    // ============================
+    function updatePreview() {
+        const frame = document.getElementById('preview-frame');
+        if (!frame.contentDocument) return;
+
+        try {
+            let styleEl = frame.contentDocument.getElementById('live-preview-css');
+            if (!styleEl) {
+                styleEl = frame.contentDocument.createElement('style');
+                styleEl.id = 'live-preview-css';
+                frame.contentDocument.head.appendChild(styleEl);
+            }
+            styleEl.textContent = buildPreviewCSS();
+        } catch (e) {
+            // Cross-origin, ignorieren
+        }
+    }
+
+    // ============================
+    // Color Picker <-> Hex Input sync
+    // ============================
+    document.querySelectorAll('.color-var-row').forEach(row => {
+        const colorPicker = row.querySelector('.var-color-picker');
+        const hexInput = row.querySelector('.var-hex-input');
+
+        colorPicker.addEventListener('input', function() {
+            hexInput.value = this.value;
+            markDirty();
+            updatePreview();
+        });
+
+        hexInput.addEventListener('input', function() {
+            const val = this.value.trim();
+            if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                colorPicker.value = val;
+            }
+            markDirty();
+            updatePreview();
+        });
+
+        // Reset-Button
+        const resetBtn = row.querySelector('.var-reset-btn');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function() {
+                const def = this.dataset.default;
+                hexInput.value = def;
+                if (/^#[0-9A-Fa-f]{6}$/.test(def)) {
+                    colorPicker.value = def;
+                }
+                markDirty();
+                updatePreview();
+            });
+        }
+    });
+
+    // ============================
+    // CSS Editor
+    // ============================
+    const cssEditor = document.getElementById('css-editor');
+    cssEditor.addEventListener('input', function() {
+        markDirty();
+        updatePreview();
+    });
+
+    // Tab-Support im Editor
+    cssEditor.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 2;
+            markDirty();
+        }
+    });
+
+    // ============================
+    // Speichern
+    // ============================
+    async function save() {
+        const btn = document.getElementById('btn-save');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Speichern...';
+
+        try {
+            const response = await fetch(`/guild/${guildId}/themes/editor`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({
+                    custom_css: cssEditor.value,
+                    custom_variables: collectVariables()
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                markClean();
+                if (typeof toastr !== 'undefined') toastr.success(data.message);
+            } else {
+                if (typeof toastr !== 'undefined') toastr.error(data.message || 'Fehler beim Speichern');
+            }
+        } catch (err) {
+            if (typeof toastr !== 'undefined') toastr.error('Netzwerkfehler');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-save mr-1"></i>Speichern <span class="badge badge-light ml-1" style="font-size:.65rem;">Ctrl+S</span>';
+        }
+    }
+
+    document.getElementById('btn-save').addEventListener('click', save);
+
+    // Ctrl+S
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            save();
+        }
+    });
+
+    // ============================
+    // Zurücksetzen
+    // ============================
+    document.getElementById('btn-reset').addEventListener('click', async function() {
+        if (!confirm('Alle Theme-Anpassungen für diese Guild zurücksetzen? Das kann nicht rückgängig gemacht werden.')) return;
+
+        this.disabled = true;
+
+        try {
+            const response = await fetch(`/guild/${guildId}/themes/editor`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Variablen auf Defaults zurücksetzen
+                document.querySelectorAll('.color-var-row').forEach(row => {
+                    const key = row.dataset.var;
+                    const def = defaultVars[key] || '';
+                    row.querySelector('.var-hex-input').value = def;
+                    if (/^#[0-9A-Fa-f]{6}$/.test(def)) {
+                        row.querySelector('.var-color-picker').value = def;
+                    }
+                });
+                cssEditor.value = '';
+                markClean();
+                updatePreview();
+                if (typeof toastr !== 'undefined') toastr.success(data.message);
+            } else {
+                if (typeof toastr !== 'undefined') toastr.error(data.message);
+            }
+        } catch (err) {
+            if (typeof toastr !== 'undefined') toastr.error('Netzwerkfehler');
+        } finally {
+            this.disabled = false;
+        }
+    });
+
+    // ============================
+    // Preview Controls
+    // ============================
+    document.getElementById('btn-refresh-preview').addEventListener('click', function() {
+        const frame = document.getElementById('preview-frame');
+        frame.src = frame.src;
+    });
+
+    document.getElementById('btn-open-preview').addEventListener('click', function() {
+        window.open(`/guild/${guildId}/dashboard`, '_blank');
+    });
+
+    // Preview nach Laden initialisieren
+    const previewFrame = document.getElementById('preview-frame');
+    previewFrame.addEventListener('load', function() {
+        // Kurz warten bis DOM fertig
+        setTimeout(updatePreview, 300);
+    });
+
+    // Ungespeicherte Änderungen warnen
+    window.addEventListener('beforeunload', function(e) {
+        if (isDirty) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+})();
+</script>

@@ -7,6 +7,9 @@
             <p class="text-muted mb-0">Wähle und verwalte das Aussehen deines Guild-Dashboards.</p>
         </div>
         <div>
+            <a href="/guild/<%= guildId %>/themes/editor" class="btn btn-sm btn-outline-warning mr-2">
+                <i class="fa-solid fa-paint-roller mr-1"></i>Theme-Editor
+            </a>
             <span class="badge badge-info"><%= themes.length %> Theme<%= themes.length !== 1 ? 's' : '' %> verfügbar</span>
         </div>
     </div>
