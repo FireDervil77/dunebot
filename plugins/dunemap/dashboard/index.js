@@ -993,7 +993,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 parent: `/guild/${guildId}/plugins/dunemap`,
                 type: 'main',
                 visible: true,
-                capability: 'DUNEMAP.ADMIN' // ✅ UPPERCASE! Admin-Bereich
+                capability: 'DUNEMAP.ADMIN_MANAGE' // ✅ UPPERCASE! Admin-Bereich
             },
             {
                 title: 'dunemap:NAV.INTERACTIVE_MAP',
@@ -1005,7 +1005,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 visible: true,
                 capability: 'DUNEMAP.VIEW'
             },
-            // Quest-Finder Navigation - TEMPORARILY DISABLED (Quest-Daten noch nicht vollständig)
+            // Quest-Finder Navigation - DISABLED (noch nicht implementiert)
             // TODO: Wieder aktivieren sobald vollständige Quest-Datenbank vorhanden
              {
                 title: 'dunemap:NAV.QUEST_FINDER',
@@ -1014,10 +1014,10 @@ class DuneMapPlugin extends DashboardPlugin {
                 order: 20,
                 parent: `/guild/${guildId}/plugins/dunemap`,
                 type: 'main',
-                visible: true,
+                visible: false,
                 capability: 'DUNEMAP.VIEW' // Quest-Finder für alle sichtbar
             }, 
-            // Haga Basin Map
+            // Haga Basin Map - DISABLED (noch nicht implementiert)
             {
                 title: 'dunemap:NAV.HAGGA_BASIN_MAP',
                 path: `/guild/${guildId}/plugins/dunemap/hagga_basin`,
@@ -1025,10 +1025,10 @@ class DuneMapPlugin extends DashboardPlugin {
                 order: 30,
                 parent: `/guild/${guildId}/plugins/dunemap`,
                 type: 'main',
-                visible: true,
+                visible: false,
                 capability: 'DUNEMAP.VIEW' // Haga Basin Map für alle sichtbar
             }, 
-            // Landsrad Planer
+            // Landsrad Planer - DISABLED (noch nicht implementiert)
             {
                 title: 'dunemap:NAV.LANDRAD_PLANNER',
                 path: `/guild/${guildId}/plugins/dunemap/landrad_planner`,
@@ -1036,7 +1036,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 order: 40,
                 parent: `/guild/${guildId}/plugins/dunemap`,
                 type: 'main',
-                visible: true,
+                visible: false,
                 capability: 'DUNEMAP.VIEW' // Landsrad Planer für alle sichtbar
             }, 
             // Settings als Subnav UNTER CORE-EINSTELLUNGEN!
@@ -1048,7 +1048,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 parent: `/guild/${guildId}/settings`,  // ← Parent ist Core-Settings!
                 type: 'main',
                 visible: true,
-                capability: 'DUNEMAP.SETTINGS' // ✅ UPPERCASE! Settings-Bereich
+                capability: 'DUNEMAP.SETTINGS_EDIT' // ✅ UPPERCASE! Settings-Bereich
             }
         ];
 

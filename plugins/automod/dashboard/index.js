@@ -705,7 +705,7 @@ class AutoModPlugin extends DashboardPlugin {
                 parent: `/guild/${guildId}`,
                 type: 'main',
                 visible: true,
-                capability: 'AUTOMOD.SETTINGS'
+                capability: 'AUTOMOD.VIEW'
             }
         ];
 

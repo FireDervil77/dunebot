@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS gameservers (
     -- Server-Info
     name VARCHAR(100) NOT NULL COMMENT 'Server-Name (User-definiert)',
     
-    -- Installation (Referenz zu Masterserver)
-    daemon_server_id VARCHAR(36) NOT NULL COMMENT 'FK zu masterserver.daemon_servers.server_id',
+    -- Installation (Referenz zu Rootserver)
+    rootserver_id INT DEFAULT NULL COMMENT 'FK zu rootserver.id',
     install_path VARCHAR(255) NULL COMMENT 'Pfad auf dem Server (z.B. /gameservers/cs2-server-001)',
     install_progress INT DEFAULT 0 COMMENT 'Installations-Fortschritt 0-100%',
     
@@ -66,12 +66,12 @@ CREATE TABLE IF NOT EXISTS gameservers (
     INDEX idx_user (user_id),
     INDEX idx_addon (addon_marketplace_id),
     INDEX idx_status (status),
-    INDEX idx_daemon_server (daemon_server_id),
+    INDEX idx_rootserver (rootserver_id),
     INDEX idx_update_available (update_available),
     
     -- Foreign Keys
     FOREIGN KEY (guild_id) REFERENCES guilds(_id) ON DELETE CASCADE,
     FOREIGN KEY (addon_marketplace_id) REFERENCES addon_marketplace(id) ON DELETE RESTRICT,
-    FOREIGN KEY (daemon_server_id) REFERENCES daemon_servers(server_id) ON DELETE RESTRICT
+    FOREIGN KEY (rootserver_id) REFERENCES rootserver(id) ON DELETE SET NULL ON UPDATE CASCADE
     
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Erstellte Gameserver-Instanzen';

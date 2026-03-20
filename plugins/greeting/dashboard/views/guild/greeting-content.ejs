@@ -30,14 +30,31 @@
         </div>
       </div>
 
+      <!-- Nachrichtentyp-Auswahl -->
+      <% const welcomeMode = (settings.welcome.embed && (settings.welcome.embed.title || settings.welcome.embed.description)) ? 'embed' : 'text'; %>
       <div class="mb-3">
-        <label class="form-label"><i class="fa-solid fa-message me-1"></i> <%= tr('greeting:WELCOME.MESSAGE') %></label>
-        <textarea class="form-control msg-input" name="welcome_content" rows="3" data-preview-type="welcome"><%= settings.welcome.content || '' %></textarea>
-        <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+        <label class="form-label"><i class="fa-solid fa-toggle-on me-1"></i> Nachrichtentyp</label>
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+          <label class="btn btn-outline-primary btn-sm <%= welcomeMode === 'text' ? 'active' : '' %>">
+            <input type="radio" name="welcome_message_mode" value="text" <%= welcomeMode === 'text' ? 'checked' : '' %>> <i class="fa-solid fa-align-left me-1"></i> Nachricht
+          </label>
+          <label class="btn btn-outline-primary btn-sm <%= welcomeMode === 'embed' ? 'active' : '' %>">
+            <input type="radio" name="welcome_message_mode" value="embed" <%= welcomeMode === 'embed' ? 'checked' : '' %>> <i class="fa-solid fa-code me-1"></i> Embed
+          </label>
+        </div>
       </div>
 
-      <!-- Embed-Builder -->
-      <%- include('../partials/embed-builder', { prefix: 'welcome', embed: settings.welcome.embed }) %>
+      <div id="welcome_text_section" style="<%= welcomeMode === 'embed' ? 'display:none' : '' %>">
+        <div class="mb-3">
+          <label class="form-label"><i class="fa-solid fa-message me-1"></i> <%= tr('greeting:WELCOME.MESSAGE') %></label>
+          <textarea class="form-control msg-input" name="welcome_content" rows="3" data-preview-type="welcome"><%= settings.welcome.content || '' %></textarea>
+          <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+        </div>
+      </div>
+
+      <div id="welcome_embed_section" style="<%= welcomeMode === 'text' ? 'display:none' : '' %>">
+        <%- include('../partials/embed-builder', { prefix: 'welcome', embed: settings.welcome.embed }) %>
+      </div>
 
       <!-- Welcome Image Section -->
       <hr>
@@ -117,13 +134,31 @@
         </div>
       </div>
 
+      <!-- Nachrichtentyp-Auswahl -->
+      <% const farewellMode = (settings.farewell.embed && (settings.farewell.embed.title || settings.farewell.embed.description)) ? 'embed' : 'text'; %>
       <div class="mb-3">
-        <label class="form-label"><i class="fa-solid fa-message me-1"></i> <%= tr('greeting:FAREWELL.MESSAGE') %></label>
-        <textarea class="form-control msg-input" name="farewell_content" rows="3" data-preview-type="farewell"><%= settings.farewell.content || '' %></textarea>
-        <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+        <label class="form-label"><i class="fa-solid fa-toggle-on me-1"></i> Nachrichtentyp</label>
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+          <label class="btn btn-outline-warning btn-sm <%= farewellMode === 'text' ? 'active' : '' %>">
+            <input type="radio" name="farewell_message_mode" value="text" <%= farewellMode === 'text' ? 'checked' : '' %>> <i class="fa-solid fa-align-left me-1"></i> Nachricht
+          </label>
+          <label class="btn btn-outline-warning btn-sm <%= farewellMode === 'embed' ? 'active' : '' %>">
+            <input type="radio" name="farewell_message_mode" value="embed" <%= farewellMode === 'embed' ? 'checked' : '' %>> <i class="fa-solid fa-code me-1"></i> Embed
+          </label>
+        </div>
       </div>
 
-      <%- include('../partials/embed-builder', { prefix: 'farewell', embed: settings.farewell.embed }) %>
+      <div id="farewell_text_section" style="<%= farewellMode === 'embed' ? 'display:none' : '' %>">
+        <div class="mb-3">
+          <label class="form-label"><i class="fa-solid fa-message me-1"></i> <%= tr('greeting:FAREWELL.MESSAGE') %></label>
+          <textarea class="form-control msg-input" name="farewell_content" rows="3" data-preview-type="farewell"><%= settings.farewell.content || '' %></textarea>
+          <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+        </div>
+      </div>
+
+      <div id="farewell_embed_section" style="<%= farewellMode === 'text' ? 'display:none' : '' %>">
+        <%- include('../partials/embed-builder', { prefix: 'farewell', embed: settings.farewell.embed }) %>
+      </div>
 
       <div class="d-flex justify-content-end">
         <button type="button" class="btn btn-primary" onclick="updateGreeting('farewell', 'save')">
@@ -157,13 +192,31 @@
         </div>
       </div>
 
+      <!-- Nachrichtentyp-Auswahl -->
+      <% const dmMode = (settings.dm_welcome.embed && (settings.dm_welcome.embed.title || settings.dm_welcome.embed.description)) ? 'embed' : 'text'; %>
       <div class="mb-3">
-        <label class="form-label"><i class="fa-solid fa-envelope me-1"></i> <%= tr('greeting:DM_WELCOME.MESSAGE') %></label>
-        <textarea class="form-control msg-input" name="dm_welcome_content" rows="3" data-preview-type="dm_welcome"><%= settings.dm_welcome.content || '' %></textarea>
-        <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+        <label class="form-label"><i class="fa-solid fa-toggle-on me-1"></i> Nachrichtentyp</label>
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+          <label class="btn btn-outline-info btn-sm <%= dmMode === 'text' ? 'active' : '' %>">
+            <input type="radio" name="dm_welcome_message_mode" value="text" <%= dmMode === 'text' ? 'checked' : '' %>> <i class="fa-solid fa-align-left me-1"></i> Nachricht
+          </label>
+          <label class="btn btn-outline-info btn-sm <%= dmMode === 'embed' ? 'active' : '' %>">
+            <input type="radio" name="dm_welcome_message_mode" value="embed" <%= dmMode === 'embed' ? 'checked' : '' %>> <i class="fa-solid fa-code me-1"></i> Embed
+          </label>
+        </div>
       </div>
 
-      <%- include('../partials/embed-builder', { prefix: 'dm_welcome', embed: settings.dm_welcome.embed }) %>
+      <div id="dm_welcome_text_section" style="<%= dmMode === 'embed' ? 'display:none' : '' %>">
+        <div class="mb-3">
+          <label class="form-label"><i class="fa-solid fa-envelope me-1"></i> <%= tr('greeting:DM_WELCOME.MESSAGE') %></label>
+          <textarea class="form-control msg-input" name="dm_welcome_content" rows="3" data-preview-type="dm_welcome"><%= settings.dm_welcome.content || '' %></textarea>
+          <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+        </div>
+      </div>
+
+      <div id="dm_welcome_embed_section" style="<%= dmMode === 'text' ? 'display:none' : '' %>">
+        <%- include('../partials/embed-builder', { prefix: 'dm_welcome', embed: settings.dm_welcome.embed }) %>
+      </div>
 
       <div class="d-flex justify-content-end">
         <button type="button" class="btn btn-primary" onclick="updateGreeting('dm_welcome', 'save')">
@@ -251,13 +304,31 @@
         </div>
       </div>
 
+      <!-- Nachrichtentyp-Auswahl -->
+      <% const boostMode = (settings.boost.embed && (settings.boost.embed.title || settings.boost.embed.description)) ? 'embed' : 'text'; %>
       <div class="mb-3">
-        <label class="form-label"><i class="fa-solid fa-rocket me-1"></i> <%= tr('greeting:BOOST.MESSAGE') %></label>
-        <textarea class="form-control msg-input" name="boost_content" rows="3" data-preview-type="boost"><%= settings.boost.content || '' %></textarea>
-        <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+        <label class="form-label"><i class="fa-solid fa-toggle-on me-1"></i> Nachrichtentyp</label>
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+          <label class="btn btn-outline-danger btn-sm <%= boostMode === 'text' ? 'active' : '' %>">
+            <input type="radio" name="boost_message_mode" value="text" <%= boostMode === 'text' ? 'checked' : '' %>> <i class="fa-solid fa-align-left me-1"></i> Nachricht
+          </label>
+          <label class="btn btn-outline-danger btn-sm <%= boostMode === 'embed' ? 'active' : '' %>">
+            <input type="radio" name="boost_message_mode" value="embed" <%= boostMode === 'embed' ? 'checked' : '' %>> <i class="fa-solid fa-code me-1"></i> Embed
+          </label>
+        </div>
       </div>
 
-      <%- include('../partials/embed-builder', { prefix: 'boost', embed: settings.boost.embed }) %>
+      <div id="boost_text_section" style="<%= boostMode === 'embed' ? 'display:none' : '' %>">
+        <div class="mb-3">
+          <label class="form-label"><i class="fa-solid fa-rocket me-1"></i> <%= tr('greeting:BOOST.MESSAGE') %></label>
+          <textarea class="form-control msg-input" name="boost_content" rows="3" data-preview-type="boost"><%= settings.boost.content || '' %></textarea>
+          <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+        </div>
+      </div>
+
+      <div id="boost_embed_section" style="<%= boostMode === 'text' ? 'display:none' : '' %>">
+        <%- include('../partials/embed-builder', { prefix: 'boost', embed: settings.boost.embed }) %>
+      </div>
 
       <div class="d-flex justify-content-end">
         <button type="button" class="btn btn-primary" onclick="updateGreeting('boost', 'save')">

@@ -67,7 +67,7 @@ router.get('/servers/:serverId/files', async (req, res) => {
         const server = await validateServerAccess(serverId, guildId);
         
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.list', {
-            server_id: server.daemon_server_id || serverId.toString(),
+            server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
             install_path: server.install_path,
             path: requestedPath
@@ -106,7 +106,7 @@ router.get('/servers/:serverId/files/read', async (req, res) => {
         
         const server = await validateServerAccess(serverId, guildId);
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.read', {
-            server_id: server.daemon_server_id || serverId.toString(),
+            server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
             install_path: server.install_path,
             path: filePath
@@ -139,7 +139,7 @@ router.post('/servers/:serverId/files/write', async (req, res) => {
         const contentBase64 = Buffer.from(content, 'utf8').toString('base64');
         
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.write', {
-            server_id: server.daemon_server_id || serverId.toString(),
+            server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
             install_path: server.install_path,
             path: filePath,
@@ -168,7 +168,7 @@ router.delete('/servers/:serverId/files', async (req, res) => {
         
         const server = await validateServerAccess(serverId, guildId);
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.delete', {
-            server_id: server.daemon_server_id || serverId.toString(),
+            server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
             install_path: server.install_path,
             path: filePath
@@ -199,7 +199,7 @@ router.post('/servers/:serverId/files/bulk-delete', async (req, res) => {
         const server = await validateServerAccess(serverId, guildId);
         const results = await Promise.allSettled(
             paths.map(path => ipmServer.sendCommand(server.daemon_id, 'gameserver.files.delete', {
-                server_id: server.daemon_server_id || serverId.toString(),
+                server_id: serverId.toString(),
                 rootserver_id: server.rootserver_id.toString(),
                 install_path: server.install_path,
                 path
@@ -225,7 +225,7 @@ router.post('/servers/:serverId/files/mkdir', async (req, res) => {
         
         const server = await validateServerAccess(serverId, guildId);
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.mkdir', {
-            server_id: server.daemon_server_id || serverId.toString(),
+            server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
             install_path: server.install_path,
             path: dirPath
@@ -253,7 +253,7 @@ router.delete('/servers/:serverId/files/rmdir', async (req, res) => {
         
         const server = await validateServerAccess(serverId, guildId);
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.rmdir', {
-            server_id: server.daemon_server_id || serverId.toString(),
+            server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
             install_path: server.install_path,
             path: dirPath
@@ -283,7 +283,7 @@ router.post('/servers/:serverId/files/rename', async (req, res) => {
         
         const server = await validateServerAccess(serverId, guildId);
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.rename', {
-            server_id: server.daemon_server_id || serverId.toString(),
+            server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
             install_path: server.install_path,
             path: oldPath,
@@ -314,7 +314,7 @@ router.post('/servers/:serverId/files/move', async (req, res) => {
         
         const server = await validateServerAccess(serverId, guildId);
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.mv', {
-            server_id: server.daemon_server_id || serverId.toString(),
+            server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
             install_path: server.install_path,
             source_path,
@@ -349,7 +349,7 @@ router.post('/servers/:serverId/files/bulk-move', async (req, res) => {
                 const filename = path.basename(source);
                 const dest = `${dest_folder}/${filename}`;
                 return ipmServer.sendCommand(server.daemon_id, 'gameserver.files.mv', {
-                    server_id: server.daemon_server_id || serverId.toString(),
+                    server_id: serverId.toString(),
                     rootserver_id: server.rootserver_id.toString(),
                     install_path: server.install_path,
                     source_path: source,
@@ -388,7 +388,7 @@ router.post('/servers/:serverId/files/upload', upload.single('file'), async (req
         const contentBase64 = req.file.buffer.toString('base64');
 
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.write', {
-            server_id: server.daemon_server_id || serverId.toString(),
+            server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
             install_path: server.install_path,
             path: targetPath,
@@ -422,7 +422,7 @@ router.get('/servers/:serverId/files/download', async (req, res) => {
 
         const server = await validateServerAccess(serverId, guildId);
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.read', {
-            server_id: server.daemon_server_id || serverId.toString(),
+            server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
             install_path: server.install_path,
             path: filePath

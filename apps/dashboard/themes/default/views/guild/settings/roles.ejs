@@ -178,12 +178,12 @@
                     <!-- Tab Navigation -->
                     <ul class="nav nav-tabs mb-3" role="tablist">
                         <li class="nav-item">
-                            <a class="nav-link active" data-bs-toggle="tab" href="#tabRoleGeneral" role="tab">
+                            <a class="nav-link active" data-toggle="tab" href="#tabRoleGeneral" role="tab">
                                 <i class="fa-solid fa-sliders me-1"></i> <%= tr('core:ROLES.TAB_GENERAL') %>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#tabRolePermissions" role="tab">
+                            <a class="nav-link" data-toggle="tab" href="#tabRolePermissions" role="tab">
                                 <i class="fa-solid fa-key me-1"></i> <%= tr('core:ROLES.TAB_PERMISSIONS') %>
                             </a>
                         </li>
@@ -290,7 +290,7 @@
                 <h5 class="modal-title">
                     <i class="fa-solid fa-plus-circle me-2"></i> <%= tr('core:ROLES.CREATE_TITLE') %>
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <form id="createRoleForm">
                 <div class="modal-body">
@@ -318,7 +318,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><%= tr('BTN_CANCEL') %></button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= tr('BTN_CANCEL') %></button>
                     <button type="submit" class="btn btn-success">
                         <i class="fa-solid fa-plus me-1"></i> <%= tr('BTN_CREATE') %>
                     </button>
@@ -334,14 +334,14 @@
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title"><i class="fa-solid fa-trash me-2"></i> <%= tr('core:ROLES.DELETE_TITLE') %></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body">
                 <p><%= tr('core:ROLES.DELETE_CONFIRM') %></p>
                 <p class="fw-bold text-danger" id="deleteRoleName"></p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><%= tr('BTN_CANCEL') %></button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= tr('BTN_CANCEL') %></button>
                 <button type="button" class="btn btn-danger" id="btnConfirmDelete">
                     <i class="fa-solid fa-trash me-1"></i> <%= tr('core:ROLES.BTN_DELETE') %>
                 </button>
@@ -582,7 +582,7 @@
         if (!selectedRoleId) return;
         const role = rolesData.find(r => r.id === selectedRoleId);
         document.getElementById('deleteRoleName').textContent = role ? role.name : selectedRoleId;
-        new bootstrap.Modal(document.getElementById('deleteRoleModal')).show();
+        $('#deleteRoleModal').modal('show');
     });
 
     document.getElementById('btnConfirmDelete').addEventListener('click', async function() {
@@ -596,7 +596,7 @@
             const data = await res.json();
             if (data.success) {
                 showToast('<%= tr("core:ROLES.TOAST_DELETED") %>', 'success');
-                bootstrap.Modal.getInstance(document.getElementById('deleteRoleModal'))?.hide();
+                $('#deleteRoleModal').modal('hide');
                 setTimeout(() => location.reload(), 800);
             } else {
                 showToast(data.message || '<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
@@ -608,7 +608,7 @@
 
     // ====== Neue Rolle erstellen ======
     document.getElementById('btnCreateRole')?.addEventListener('click', function() {
-        new bootstrap.Modal(document.getElementById('createRoleModal')).show();
+        $('#createRoleModal').modal('show');
     });
 
     document.getElementById('createRoleForm').addEventListener('submit', async function(e) {
@@ -633,7 +633,7 @@
             const data = await res.json();
             if (data.success) {
                 showToast('<%= tr("core:ROLES.TOAST_CREATED") %>', 'success');
-                bootstrap.Modal.getInstance(document.getElementById('createRoleModal'))?.hide();
+                $('#createRoleModal').modal('hide');
                 setTimeout(() => location.reload(), 800);
             } else {
                 showToast(data.message || '<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');

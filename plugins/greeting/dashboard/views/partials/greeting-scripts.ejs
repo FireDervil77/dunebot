@@ -29,15 +29,52 @@
     return embed;
   }
 
+  // ──── Message Mode Helper ────
+  function getMessageMode(type) {
+    const radio = document.querySelector(`input[name="${type}_message_mode"]:checked`);
+    return radio ? radio.value : 'text';
+  }
+
+  // ──── Message Mode Toggle ────
+  function initMessageModes() {
+    const types = ['welcome', 'farewell', 'dm_welcome', 'boost'];
+    types.forEach(function(type) {
+      const labels = document.querySelectorAll(`input[name="${type}_message_mode"]`);
+      labels.forEach(function(radio) {
+        radio.closest('label').addEventListener('click', function() {
+          const value = radio.value;
+          const textSection = document.getElementById(`${type}_text_section`);
+          const embedSection = document.getElementById(`${type}_embed_section`);
+          if (!textSection || !embedSection) return;
+
+          if (value === 'text') {
+            textSection.style.display = '';
+            embedSection.style.display = 'none';
+          } else {
+            textSection.style.display = 'none';
+            embedSection.style.display = '';
+            $(`#${type}_embed_collapse`).collapse('show');
+          }
+          setTimeout(renderLivePreview, 50);
+        });
+      });
+    });
+  }
+
   // ──── Save handler ────
   async function updateGreeting(type, action) {
     const data = { type, action };
 
     if (type === 'welcome') {
       data.welcome_channel = document.querySelector('[name="welcome_channel"]')?.value || '';
-      data.welcome_content = document.querySelector('[name="welcome_content"]')?.value || '';
-      const emb = collectEmbed('welcome');
-      if (emb) data.welcome_embed = emb;
+      const mode = getMessageMode('welcome');
+      if (mode === 'text') {
+        data.welcome_content = document.querySelector('[name="welcome_content"]')?.value || '';
+        data.welcome_embed = null;
+      } else {
+        data.welcome_content = '';
+        data.welcome_embed = collectEmbed('welcome') || null;
+      }
       // welcome image fields
       data.welcome_image_enabled = document.querySelector('[name="welcome_image_enabled"]')?.checked || false;
       data.welcome_image_bg      = document.querySelector('[name="welcome_image_bg"]')?.value || 'default';
@@ -46,14 +83,24 @@
 
     } else if (type === 'farewell') {
       data.farewell_channel = document.querySelector('[name="farewell_channel"]')?.value || '';
-      data.farewell_content = document.querySelector('[name="farewell_content"]')?.value || '';
-      const emb = collectEmbed('farewell');
-      if (emb) data.farewell_embed = emb;
+      const mode = getMessageMode('farewell');
+      if (mode === 'text') {
+        data.farewell_content = document.querySelector('[name="farewell_content"]')?.value || '';
+        data.farewell_embed = null;
+      } else {
+        data.farewell_content = '';
+        data.farewell_embed = collectEmbed('farewell') || null;
+      }
 
     } else if (type === 'dm_welcome') {
-      data.dm_welcome_content = document.querySelector('[name="dm_welcome_content"]')?.value || '';
-      const emb = collectEmbed('dm_welcome');
-      if (emb) data.dm_welcome_embed = emb;
+      const mode = getMessageMode('dm_welcome');
+      if (mode === 'text') {
+        data.dm_welcome_content = document.querySelector('[name="dm_welcome_content"]')?.value || '';
+        data.dm_welcome_embed = null;
+      } else {
+        data.dm_welcome_content = '';
+        data.dm_welcome_embed = collectEmbed('dm_welcome') || null;
+      }
 
     } else if (type === 'autorole') {
       const sel = document.querySelector('[name="autorole_ids"]');
@@ -61,9 +108,14 @@
 
     } else if (type === 'boost') {
       data.boost_channel = document.querySelector('[name="boost_channel"]')?.value || '';
-      data.boost_content = document.querySelector('[name="boost_content"]')?.value || '';
-      const emb = collectEmbed('boost');
-      if (emb) data.boost_embed = emb;
+      const mode = getMessageMode('boost');
+      if (mode === 'text') {
+        data.boost_content = document.querySelector('[name="boost_content"]')?.value || '';
+        data.boost_embed = null;
+      } else {
+        data.boost_content = '';
+        data.boost_embed = collectEmbed('boost') || null;
+      }
     }
 
     try {
@@ -156,6 +208,17 @@
     });
   });
 
+  // ──── Tab → Type mapping ────
+  const TAB_TYPE_MAP = {
+    '#welcome-pane': 'welcome',
+    '#farewell-pane': 'farewell',
+    '#dm-pane': 'dm_welcome',
+    '#autorole-pane': 'autorole',
+    '#boost-pane': 'boost',
+    '#verification-pane': 'verification',
+    '#invite-tracking-pane': 'invite_tracking'
+  };
+
   // ──── Live Preview ────
   function renderLivePreview() {
     const previewContent = document.getElementById('previewContent');
@@ -165,7 +228,8 @@
     // Find active tab type
     const activeTab = document.querySelector('#greetingTabs .nav-link.active');
     if (!activeTab) return;
-    const type = activeTab.getAttribute('href').replace('#tab-', '').replace('-', '_');
+    const type = TAB_TYPE_MAP[activeTab.getAttribute('href')];
+    if (!type) return;
 
     // Get message text
     const textarea = document.querySelector(`[name="${type}_content"]`);
@@ -213,6 +277,7 @@
       el.addEventListener('input', renderLivePreview);
       el.addEventListener('change', renderLivePreview);
     });
+    initMessageModes();
     renderLivePreview();
   });
 

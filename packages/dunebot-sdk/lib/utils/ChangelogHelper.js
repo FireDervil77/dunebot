@@ -199,10 +199,17 @@ function parseHierarchicalChangelog(changesText) {
     // <p>! Fix 1<br>! Fix 2<br>! Fix 3</p> → mehrere Zeilen
     processedText = processedText.replace(/<br\s*\/?>/gi, '\n');
     
+    // ⚡ SCHRITT 0.5: Multi-line <p>-Tags aufteilen
+    // Nach <br>→\n kann ein <p> mehrere Zeilen enthalten → einzelne <p>-Tags daraus machen
+    // Ohne dies scheitern alle folgenden <p>-Regexe (. matcht kein \n ohne s-Flag)
+    processedText = processedText.replace(/<p([^>]*)>([\s\S]*?)<\/p>/gi, (match, attrs, content) => {
+        if (!content.includes('\n')) return match; // Single-line: unverändert lassen
+        return content.split('\n').filter(l => l.trim()).map(l => '<p>' + l.trim() + '</p>').join('\n');
+    });
+    
     // SCHRITT 1: Überschriften normalisieren (HTML → Plain-Text für Parsing)
     // <h2>Header</h2> → # Header
     processedText = processedText.replace(/<h2[^>]*>(.*?)<\/h2>/gi, (match, content) => {
-        // Behalte inneres HTML (für Bold, Links, etc.)
         return '\n# ' + content.trim() + '\n';
     });
     
@@ -211,18 +218,25 @@ function parseHierarchicalChangelog(changesText) {
         return '\n## ' + content.trim() + '\n';
     });
     
+    // SCHRITT 1.5: Markdown-Header in <p>-Tags erkennen
+    // Wenn Nutzer # oder ## direkt in TinyMCE tippt, landen sie in <p>-Tags statt <h2>/<h3>
+    // WICHTIG: ## vor # prüfen, damit ## nicht als # mit # im Text gematcht wird
+    processedText = processedText.replace(/<p[^>]*>##\s+(.*?)<\/p>/gi, (match, content) => {
+        return '\n## ' + content.trim() + '\n';
+    });
+    processedText = processedText.replace(/<p[^>]*>#\s+(.*?)<\/p>/gi, (match, content) => {
+        return '\n# ' + content.trim() + '\n';
+    });
+    
     // SCHRITT 2: Items mit Symbolen extrahieren (BEHALTE HTML im Text!)
     // <p>! Bugfix: <strong>Server crash</strong> fixed</p> → ! Bugfix: <strong>Server crash</strong> fixed
-    // ⚡ WICHTIG: Durch <br>→\n sind jetzt mehrere Zeilen in separaten <p>-Tags!
     processedText = processedText.replace(/<p[^>]*>([!+\-*])\s+(.*?)<\/p>/gi, (match, symbol, content) => {
-        // Symbol + Leerzeichen + ORIGINAL HTML-CONTENT
         return '\n' + symbol + ' ' + content.trim() + '\n';
     });
     
-    // ✅ NEU: Normalen Text (ohne Symbol) als DESCRIPTION-Marker
+    // Normalen Text (ohne Symbol) als DESCRIPTION-Marker
     // <p>Dies ist eine Beschreibung der Sektion</p> → DESC: Dies ist eine Beschreibung...
     processedText = processedText.replace(/<p[^>]*>((?![!+\-*]\s).*?)<\/p>/gi, (match, content) => {
-        // Nur wenn es KEIN Symbol am Anfang ist
         const trimmed = content.trim();
         if (trimmed.length > 0 && !/^[!+\-*]\s/.test(trimmed)) {
             return '\nDESC: ' + trimmed + '\n';

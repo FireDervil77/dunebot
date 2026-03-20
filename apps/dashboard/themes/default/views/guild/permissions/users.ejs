@@ -541,7 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
     emptyDiv.classList.add('d-none');
     
     try {
-      const url = `/guild/${guildId}/plugins/core/permissions/users/guild-members`;
+      const url = `/guild/${guildId}/permissions/users/guild-members`;
       console.log('[LoadMembers] Fetching from:', url);
       
       const response = await fetch(url);
@@ -663,7 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Add Guild Member
   async function addGuildMember(userId, username) {
     try {
-      const response = await fetch(`/guild/${guildId}/plugins/core/permissions/users/add-guild-member`, {
+      const response = await fetch(`/guild/${guildId}/permissions/users/add-guild-member`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId })
@@ -704,7 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = Object.fromEntries(formData);
       
       try {
-        const response = await fetch(`/guild/${guildId}/plugins/core/permissions/users/invite`, {
+        const response = await fetch(`/guild/${guildId}/permissions/users/invite`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
@@ -741,11 +741,11 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('edit_user_id').value = userId;
       
       // Setze Action URL
-      form.action = `/guild/${guildId}/plugins/core/permissions/users/${userId}`;
+      form.action = `/guild/${guildId}/permissions/users/${userId}`;
       
       // Lade User-Daten via AJAX
       try {
-        const response = await fetch(`/guild/${guildId}/plugins/core/permissions/users/${userId}`);
+        const response = await fetch(`/guild/${guildId}/permissions/users/${userId}`);
         const userData = await response.json();
         
         if (userData.success) {
@@ -835,7 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Form-Action setzen für DELETE-Request
       const form = document.getElementById('removeUserForm');
-      form.action = `/guild/${guildId}/plugins/core/permissions/users/${userId}`;
+      form.action = `/guild/${guildId}/permissions/users/${userId}`;
       
       // WICHTIG: Wiederverwendung bestehender Instanz oder neue erstellen
       // Modal öffnen (Bootstrap 4 Syntax mit jQuery!)

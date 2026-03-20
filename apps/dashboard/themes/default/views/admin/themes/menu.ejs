@@ -24,17 +24,17 @@
     <!-- Page Header -->
     <div class="row mb-3">
       <div class="col-12">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center justify-content-between flex-wrap">
           <div>
-            <h1 class="h3 mb-0"><i class="bi bi-menu-button-wide me-2 text-primary"></i>Navigation</h1>
+            <h1 class="h3 mb-0"><i class="bi bi-menu-button-wide mr-2 text-primary"></i>Navigation</h1>
             <p class="text-muted small mb-0">Verwalte die Menüpunkte der öffentlichen Website-Navigation.</p>
           </div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#menuItemModal" onclick="resetMenuModal()">
-              <i class="bi bi-plus-lg me-1"></i> Neuer Menüpunkt
+          <div class="d-flex">
+            <button class="btn btn-success btn-sm mr-2" data-toggle="modal" data-target="#menuItemModal" onclick="resetMenuModal()">
+              <i class="bi bi-plus-lg mr-1"></i> Neuer Menüpunkt
             </button>
             <a href="/admin/themes" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-arrow-left me-1"></i> Zurück
+              <i class="bi bi-arrow-left mr-1"></i> Zurück
             </a>
           </div>
         </div>
@@ -43,7 +43,7 @@
 
     <!-- Info -->
     <div class="alert alert-info d-flex align-items-start mb-4">
-      <i class="bi bi-info-circle me-2 fs-5 mt-1"></i>
+      <i class="bi bi-info-circle mr-2 mt-1" style="font-size:1.25rem"></i>
       <div>
         <strong>Drag &amp; Drop</strong> zum Sortieren &middot;
         Einträge mit <strong>Unterpunkten</strong> werden als Dropdown dargestellt &middot;
@@ -55,29 +55,29 @@
     <div id="menuList">
       <% if (menuTree.length === 0) { %>
         <div class="alert alert-warning">
-          <i class="bi bi-exclamation-triangle me-2"></i>Keine Menüpunkte vorhanden.
+          <i class="bi bi-exclamation-triangle mr-2"></i>Keine Menüpunkte vorhanden.
         </div>
       <% } %>
 
       <% menuTree.forEach(item => { %>
         <div class="card mb-2 menu-item-card <%= item.visible ? '' : 'item-hidden' %>" data-id="<%= item.id %>">
           <div class="card-body py-2">
-            <div class="d-flex align-items-center gap-3">
-              <span class="drag-handle"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+            <div class="d-flex align-items-center">
+              <span class="drag-handle mr-3"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
               <div class="flex-grow-1">
                 <strong class="item-label"><%= item.label %></strong>
-                <small class="text-muted ms-2">
+                <small class="text-muted ml-2">
                   <code><%= item.url %></code>
                   <% if (item.icon) { %> &middot; <i class="<%= item.icon %>"></i><% } %>
                   <% if (item.target === '_blank') { %> &middot; <i class="bi bi-box-arrow-up-right" title="Neues Fenster"></i><% } %>
                   <% if (item.css_class) { %> &middot; <code>.<%= item.css_class %></code><% } %>
                 </small>
               </div>
-              <div class="d-flex gap-1">
-                <button class="btn btn-sm btn-outline-primary btn-edit-menu" data-item='<%- JSON.stringify({id:item.id, parent_id:item.parent_id||null, label:item.label, url:item.url, icon:item.icon||"", target:item.target||"_self", visible:item.visible, css_class:item.css_class||""}) %>' title="Bearbeiten">
+              <div class="d-flex">
+                <button class="btn btn-sm btn-outline-primary btn-edit-menu mr-1" data-item='<%- JSON.stringify({id:item.id, parent_id:item.parent_id||null, label:item.label, url:item.url, icon:item.icon||"", target:item.target||"_self", visible:item.visible, css_class:item.css_class||""}) %>' title="Bearbeiten">
                   <i class="bi bi-pencil"></i>
                 </button>
-                <button class="btn btn-sm <%= item.visible ? 'btn-success' : 'btn-outline-danger' %> btn-toggle-menu-vis" data-id="<%= item.id %>" title="Sichtbarkeit">
+                <button class="btn btn-sm mr-1 <%= item.visible ? 'btn-success' : 'btn-outline-danger' %> btn-toggle-menu-vis" data-id="<%= item.id %>" title="Sichtbarkeit">
                   <i class="bi <%= item.visible ? 'bi-eye' : 'bi-eye-slash' %>"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-danger btn-delete-menu" data-id="<%= item.id %>" title="Löschen">
@@ -92,17 +92,17 @@
                 <% item.children.forEach(child => { %>
                   <div class="card mb-1 child-card <%= child.visible ? '' : 'item-hidden' %>" data-id="<%= child.id %>">
                     <div class="card-body py-1 px-3">
-                      <div class="d-flex align-items-center gap-2">
-                        <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+                      <div class="d-flex align-items-center">
+                        <span class="drag-handle mr-2"><i class="fa-solid fa-grip-vertical"></i></span>
                         <div class="flex-grow-1">
                           <span class="item-label"><%= child.label %></span>
-                          <small class="text-muted ms-2"><code><%= child.url %></code></small>
+                          <small class="text-muted ml-2"><code><%= child.url %></code></small>
                         </div>
-                        <div class="d-flex gap-1">
-                          <button class="btn btn-sm btn-outline-primary btn-edit-menu" data-item='<%- JSON.stringify({id:child.id, parent_id:child.parent_id, label:child.label, url:child.url, icon:child.icon||"", target:child.target||"_self", visible:child.visible, css_class:child.css_class||""}) %>'>
+                        <div class="d-flex">
+                          <button class="btn btn-sm btn-outline-primary btn-edit-menu mr-1" data-item='<%- JSON.stringify({id:child.id, parent_id:child.parent_id, label:child.label, url:child.url, icon:child.icon||"", target:child.target||"_self", visible:child.visible, css_class:child.css_class||""}) %>'>
                             <i class="bi bi-pencil"></i>
                           </button>
-                          <button class="btn btn-sm <%= child.visible ? 'btn-success' : 'btn-outline-danger' %> btn-toggle-menu-vis" data-id="<%= child.id %>">
+                          <button class="btn btn-sm mr-1 <%= child.visible ? 'btn-success' : 'btn-outline-danger' %> btn-toggle-menu-vis" data-id="<%= child.id %>">
                             <i class="bi <%= child.visible ? 'bi-eye' : 'bi-eye-slash' %>"></i>
                           </button>
                           <button class="btn btn-sm btn-outline-danger btn-delete-menu" data-id="<%= child.id %>">
@@ -129,45 +129,45 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="menuModalTitle"><i class="bi bi-plus-circle me-2"></i>Menüpunkt</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <h5 class="modal-title" id="menuModalTitle"><i class="bi bi-plus-circle mr-2"></i>Menüpunkt</h5>
+        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="menuItemId" value="">
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label fw-bold">Label</label>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="font-weight-bold">Label</label>
             <input type="text" class="form-control" id="menuLabel" placeholder="Home">
           </div>
-          <div class="col-md-6">
-            <label class="form-label fw-bold">URL</label>
+          <div class="col-md-6 mb-3">
+            <label class="font-weight-bold">URL</label>
             <input type="text" class="form-control" id="menuUrl" placeholder="/">
           </div>
-          <div class="col-md-4">
-            <label class="form-label fw-bold">Icon (optional)</label>
+          <div class="col-md-4 mb-3">
+            <label class="font-weight-bold">Icon (optional)</label>
             <input type="text" class="form-control" id="menuIcon" placeholder="bi bi-house">
           </div>
-          <div class="col-md-4">
-            <label class="form-label fw-bold">Ziel</label>
-            <select class="form-select" id="menuTarget">
+          <div class="col-md-4 mb-3">
+            <label class="font-weight-bold">Ziel</label>
+            <select class="custom-select" id="menuTarget">
               <option value="_self">Gleicher Tab</option>
               <option value="_blank">Neuer Tab</option>
             </select>
           </div>
-          <div class="col-md-4">
-            <label class="form-label fw-bold">Übergeordnet</label>
-            <select class="form-select" id="menuParent">
+          <div class="col-md-4 mb-3">
+            <label class="font-weight-bold">Übergeordnet</label>
+            <select class="custom-select" id="menuParent">
               <option value="">— Top-Level —</option>
               <% menuTree.forEach(item => { %>
                 <option value="<%= item.id %>"><%= item.label %></option>
               <% }); %>
             </select>
           </div>
-          <div class="col-md-6">
-            <label class="form-label fw-bold">CSS-Klasse (optional)</label>
+          <div class="col-md-6 mb-3">
+            <label class="font-weight-bold">CSS-Klasse (optional)</label>
             <input type="text" class="form-control" id="menuCssClass" placeholder="z.B. dropdown">
           </div>
-          <div class="col-md-6 d-flex align-items-end">
+          <div class="col-md-6 d-flex align-items-end mb-3">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="menuVisible" checked>
               <label class="form-check-label" for="menuVisible">Sichtbar</label>
@@ -176,9 +176,9 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Abbrechen</button>
         <button type="button" class="btn btn-primary btn-sm" id="btnSaveMenuItem">
-          <i class="bi bi-check-lg me-1"></i> Speichern
+          <i class="bi bi-check-lg mr-1"></i> Speichern
         </button>
       </div>
     </div>
@@ -249,8 +249,8 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('menuParent').value = data.parent_id || '';
       document.getElementById('menuCssClass').value = data.css_class;
       document.getElementById('menuVisible').checked = !!data.visible;
-      document.getElementById('menuModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Menüpunkt bearbeiten';
-      new bootstrap.Modal(document.getElementById('menuItemModal')).show();
+      document.getElementById('menuModalTitle').innerHTML = '<i class="bi bi-pencil mr-2"></i>Menüpunkt bearbeiten';
+      $('#menuItemModal').modal('show');
     });
   });
 
@@ -334,6 +334,6 @@ function resetMenuModal() {
   document.getElementById('menuParent').value = '';
   document.getElementById('menuCssClass').value = '';
   document.getElementById('menuVisible').checked = true;
-  document.getElementById('menuModalTitle').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Neuer Menüpunkt';
+  document.getElementById('menuModalTitle').innerHTML = '<i class="bi bi-plus-circle mr-2"></i>Neuer Menüpunkt';
 }
 </script>

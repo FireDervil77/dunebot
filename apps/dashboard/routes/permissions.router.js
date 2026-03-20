@@ -983,11 +983,11 @@ router.post('/matrix', requirePermission('PERMISSIONS.ASSIGN'), async (req, res)
             });
         }
         
-        // Für jede Gruppe: Permissions aktualisieren (RELATIONAL!)
+        // Für jede Gruppe: Permissions MERGEN (nicht ersetzen!)
         for (const [groupId, permissions] of Object.entries(updates)) {
             // Prüfe ob Gruppe zu dieser Guild gehört
             const groups = await dbService.query(
-                'SELECT guild_id FROM guild_groups WHERE id = ? AND guild_id = ?',
+                'SELECT guild_id, permissions FROM guild_groups WHERE id = ? AND guild_id = ?',
                 [groupId, guildId]
             );
             
@@ -996,8 +996,25 @@ router.post('/matrix', requirePermission('PERMISSIONS.ASSIGN'), async (req, res)
                 continue;
             }
             
-            // Nutze updateGroup mit permissions-Object (wird relational gespeichert!)
-            await permissionManager.updateGroup(parseInt(groupId), { permissions });
+            // Bestehende Permissions laden
+            let existingPerms = groups[0].permissions || {};
+            if (typeof existingPerms === 'string') {
+                try { existingPerms = JSON.parse(existingPerms); } catch { existingPerms = {}; }
+            }
+            
+            // Merge: Änderungen auf bestehende Permissions anwenden
+            const mergedPermissions = { ...existingPerms };
+            for (const [permKey, value] of Object.entries(permissions)) {
+                if (value === true || value === 'true' || value === '1') {
+                    mergedPermissions[permKey] = true;
+                } else {
+                    // false/unchecked → Permission entfernen
+                    delete mergedPermissions[permKey];
+                }
+            }
+            
+            // updateGroup mit vollständigem Permission-Set aufrufen
+            await permissionManager.updateGroup(parseInt(groupId), { permissions: mergedPermissions });
             
             Logger.info(`[Permissions] Updated permissions for group ${groupId} (RELATIONAL)`);
         }

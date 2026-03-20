@@ -378,10 +378,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 tinymce.triggerSave();
             }
 
-            // Manuelle Pflichtfeld-Validierung für TinyMCE-Felder
-            const tinymceFields = ['excerpt_de', 'content_de', 'excerpt_en', 'content_en'];
+            // Manuelle Pflichtfeld-Validierung für TinyMCE-Felder (nur DE ist Pflicht)
+            const requiredFields = ['excerpt_de', 'content_de'];
             let hasError = false;
-            tinymceFields.forEach(function(fieldName) {
+            requiredFields.forEach(function(fieldName) {
                 const field = document.getElementById(fieldName);
                 if (field) {
                     const isEmpty = !field.value || field.value.trim() === '' || field.value.trim() === '<p></p>';
@@ -397,17 +397,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (hasError) {
                 e.preventDefault();
                 e.stopPropagation();
-                // Ersten Tab mit Fehler anzeigen
-                const firstErrorField = tinymceFields.find(f => {
-                    const el = document.getElementById(f);
-                    return el && (!el.value || el.value.trim() === '' || el.value.trim() === '<p></p>');
-                });
-                if (firstErrorField) {
-                    const tab = (firstErrorField.includes('_en')) ? '#english-tab' : '#german-tab';
-                    const tabLink = document.querySelector(tab);
-                    if (tabLink) tabLink.click();
-                }
-                alert('Bitte alle Pflichtfelder (Kurzbeschreibung und Inhalt) in beiden Sprachen ausfüllen.');
+                // Deutschen Tab anzeigen
+                const tabLink = document.querySelector('#german-tab');
+                if (tabLink) tabLink.click();
+                alert('Bitte Kurzbeschreibung und Inhalt (Deutsch) ausfüllen.');
             }
         });
         console.log('[NewsEdit] ✅ Form submit handler registered');

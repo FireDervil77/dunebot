@@ -63,7 +63,7 @@
                         <div class="card-header">
                             <h3 class="card-title">
                                 <i class="fa-solid fa-info-circle"></i>
-                                <%= tr('gameserver:SERVER.BASIC_INFO') || 'Basic Information' %>
+                                <%= tr('gameserver:SERVER.BASIC_INFO') %>
                             </h3>
                         </div>
                         <div class="card-body">
@@ -77,11 +77,11 @@
                                            class="form-control" 
                                            id="server_name" 
                                            name="server_name" 
-                                           placeholder="<%= tr('gameserver:SERVER.NAME_PLACEHOLDER') || 'Mein Gameserver' %>" 
+                                           placeholder="<%= tr('gameserver:SERVER.NAME_PLACEHOLDER') %>" 
                                            required 
                                            maxlength="100">
                                     <small class="form-text text-muted">
-                                        <%= tr('gameserver:SERVER.NAME_HELP') || 'Ein eindeutiger Name für deinen Server' %>
+                                        <%= tr('gameserver:SERVER.NAME_HELP_TEXT') %>
                                     </small>
                                 </div>
 
@@ -94,12 +94,12 @@
                                             id="addon_select" 
                                             name="addon_slug" 
                                             required 
-                                            data-placeholder="<%= tr('gameserver:SERVER.SELECT_ADDON_PLACEHOLDER') || 'Wähle ein Spiel/Addon aus' %>">
+                                            data-placeholder="<%= tr('gameserver:SERVER.SELECT_ADDON_PLACEHOLDER') %>">
                                         <option value=""></option>
                                         
                                         <!-- Eigene Addons -->
                                         <% if (guildAddons && guildAddons.length > 0) { %>
-                                            <optgroup label="<%= tr('gameserver:SERVER.MY_ADDONS') || 'Meine Addons' %>">
+                                            <optgroup label="<%= tr('gameserver:SERVER.MY_ADDONS_LABEL') %>">
                                                 <% guildAddons.forEach(addon => { %>
                                                     <option value="<%= addon.slug %>" 
                                                             data-addon='<%= JSON.stringify(addon) %>'>
@@ -111,7 +111,7 @@
                                         
                                         <!-- Öffentliche Addons -->
                                         <% if (publicAddons && publicAddons.length > 0) { %>
-                                            <optgroup label="<%= tr('gameserver:SERVER.PUBLIC_ADDONS') || 'Öffentliche Addons' %>">
+                                            <optgroup label="<%= tr('gameserver:SERVER.PUBLIC_ADDONS') %>">
                                                 <% publicAddons.forEach(addon => { %>
                                                     <option value="<%= addon.slug %>" 
                                                             data-addon='<%= JSON.stringify(addon) %>'>
@@ -130,7 +130,7 @@
                                         <% } %>
                                     </select>
                                     <small class="form-text text-muted">
-                                        <%= tr('gameserver:SERVER.ADDON_HELP') || 'Das Spiel/Template für deinen Server' %>
+                                        <%= tr('gameserver:SERVER.ADDON_HELP') %>
                                     </small>
                                 </div>
 
@@ -148,13 +148,13 @@
                                 <!-- Rootserver Selection -->
                                 <div class="form-group">
                                     <label for="rootserver_select">
-                                        <%= tr('gameserver:SERVER.SELECT_ROOTSERVER') || 'Server/Node auswählen' %> <span class="text-danger">*</span>
+                                        <%= tr('gameserver:SERVER.SELECT_ROOTSERVER') %> <span class="text-danger">*</span>
                                     </label>
                                     <select class="form-control" 
                                             id="rootserver_select" 
                                             name="rootserver_id" 
                                             required>
-                                        <option value=""><%= tr('gameserver:SERVER.SELECT_ROOTSERVER_PLACEHOLDER') || 'Wähle einen Server aus' %></option>
+                                        <option value=""><%= tr('gameserver:SERVER.SELECT_ROOTSERVER_PLACEHOLDER') %></option>
                                         <% if (rootservers && rootservers.length > 0) { %>
                                             <% rootservers.forEach(server => { %>
                                                 <option value="<%= server.id %>" 
@@ -169,12 +169,12 @@
                                             <% }) %>
                                         <% } else { %>
                                             <option value="" disabled>
-                                                <%= tr('gameserver:SERVER.NO_ROOTSERVERS') || 'Keine Server verfügbar' %>
+                                                <%= tr('gameserver:SERVER.NO_ROOTSERVERS') %>
                                             </option>
                                         <% } %>
                                     </select>
                                     <small class="form-text text-muted">
-                                        <%= tr('gameserver:SERVER.ROOTSERVER_HELP') || 'Der physische Server auf dem dein Gameserver laufen wird' %>
+                                        <%= tr('gameserver:SERVER.ROOTSERVER_HELP') %>
                                     </small>
                                 </div>
 
@@ -206,37 +206,37 @@
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-group">
-                                            <label><%= tr('gameserver:SERVER.RUN_INSTALL_SCRIPT') || 'Install-Script ausführen?' %> <span class="text-danger">*</span></label>
+                                            <label><%= tr('gameserver:SERVER.RUN_INSTALL_SCRIPT') %> <span class="text-danger">*</span></label>
                                             <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons">
                                                 <label class="btn btn-outline-success active">
                                                     <input type="radio" name="run_install_script" value="true" checked> 
-                                                    <i class="fa-solid fa-code"></i> Yes
+                                                    <i class="fa-solid fa-code"></i> <%= tr('gameserver:SERVER.YES') %>
                                                 </label>
                                                 <label class="btn btn-outline-danger">
                                                     <input type="radio" name="run_install_script" value="false"> 
-                                                    <i class="fa-solid fa-forward"></i> Skip
+                                                    <i class="fa-solid fa-forward"></i> <%= tr('gameserver:SERVER.SKIP') %>
                                                 </label>
                                             </div>
                                             <small class="form-text text-muted">
-                                                <%= tr('gameserver:SERVER.INSTALL_SCRIPT_HELP') || 'Empfohlen: Lädt und installiert das Spiel automatisch' %>
+                                                <%= tr('gameserver:SERVER.INSTALL_SCRIPT_HELP_SHORT') %>
                                             </small>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="form-group">
-                                            <label><%= tr('gameserver:SERVER.START_AFTER_INSTALL') || 'Nach Installation starten?' %> <span class="text-danger">*</span></label>
+                                            <label><%= tr('gameserver:SERVER.START_AFTER_INSTALL') %> <span class="text-danger">*</span></label>
                                             <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons">
                                                 <label class="btn btn-outline-success active">
                                                     <input type="radio" name="start_after_install" value="true" checked> 
-                                                    <i class="fa-solid fa-play"></i> Yes
+                                                    <i class="fa-solid fa-play"></i> <%= tr('gameserver:SERVER.YES') %>
                                                 </label>
                                                 <label class="btn btn-outline-danger">
                                                     <input type="radio" name="start_after_install" value="false"> 
-                                                    <i class="fa-solid fa-stop"></i> No
+                                                    <i class="fa-solid fa-stop"></i> <%= tr('gameserver:SERVER.NO') %>
                                                 </label>
                                             </div>
                                             <small class="form-text text-muted">
-                                                <%= tr('gameserver:SERVER.START_AFTER_HELP') || 'Server automatisch starten nach erfolgreicher Installation' %>
+                                                <%= tr('gameserver:SERVER.START_AFTER_HELP') %>
                                             </small>
                                         </div>
                                     </div>
@@ -246,10 +246,10 @@
                         <div class="card-footer">
                             <div class="d-flex justify-content-between">
                                 <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="btn btn-secondary">
-                                    <i class="fa-solid fa-times"></i> <%= tr('gameserver:SERVER.CANCEL') || 'Abbrechen' %>
+                                    <i class="fa-solid fa-times"></i> <%= tr('gameserver:SERVER.CANCEL') %>
                                 </a>
                                 <button type="button" id="btnNextStep1" class="btn btn-primary" disabled>
-                                    <%= tr('gameserver:SERVER.NEXT') || 'Weiter' %> <i class="fa-solid fa-arrow-right"></i>
+                                    <%= tr('gameserver:SERVER.NEXT') %> <i class="fa-solid fa-arrow-right"></i>
                                 </button>
                             </div>
                         </div>

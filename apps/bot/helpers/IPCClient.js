@@ -1063,6 +1063,19 @@ class IPCClient {
                 ? JSON.parse(target_guild_ids) 
                 : (target_guild_ids || []);
             
+            // delivery_method: Backward-compat (String → Array)
+            let methods;
+            try {
+                methods = typeof delivery_method === 'string' ? JSON.parse(delivery_method) : delivery_method;
+                if (!Array.isArray(methods)) methods = [delivery_method];
+            } catch (e) {
+                methods = [delivery_method || 'dashboard'];
+            }
+            if (methods.includes('all')) {
+                methods = ['dashboard', 'system_channel', 'discord_channel', 'discord_dm'];
+            }
+            this.logger.info(`[IPC] Notification #${id} delivery methods: ${JSON.stringify(methods)}, target guilds: ${targetGuildIds.length}`);
+            
             // Tracking für gesendete Messages
             const sentMessageIds = {};
             
@@ -1114,33 +1127,40 @@ class IPCClient {
                 }
                 
                 // Je nach Delivery-Methode senden
-                if (delivery_method === 'discord_channel' || delivery_method === 'all') {
-                    // An Channel senden
-                    let targetChannel;
-                    
-                    // Wenn custom channel_id, nutze diesen
-                    if (discord_channel_id) {
-                        targetChannel = guild.channels.cache.get(discord_channel_id);
+                if (methods.includes('system_channel')) {
+                    const systemChannel = guild.systemChannel;
+                    if (systemChannel?.isTextBased()) {
+                        try {
+                            const sentMessage = await systemChannel.send({ embeds: [embed] });
+                            sentMessageIds[guildId] = sentMessageIds[guildId] || {};
+                            sentMessageIds[guildId].systemChannel = sentMessage.id;
+                            this.logger.info(`[IPC] Notification an System-Channel ${systemChannel.name} in ${guild.name} gesendet`);
+                        } catch (channelError) {
+                            this.logger.error(`[IPC] Fehler beim Senden an System-Channel in ${guild.name}:`, channelError);
+                        }
                     } else {
-                        // Sonst System-Channel
-                        targetChannel = guild.systemChannel;
+                        this.logger.warn(`[IPC] Kein System-Channel für Guild ${guild.name} gefunden`);
                     }
+                }
+
+                if (methods.includes('discord_channel') && discord_channel_id) {
+                    const targetChannel = guild.channels.cache.get(discord_channel_id);
                     
                     if (targetChannel && targetChannel.isTextBased()) {
                         try {
                             const sentMessage = await targetChannel.send({ embeds: [embed] });
                             sentMessageIds[guildId] = sentMessageIds[guildId] || {};
                             sentMessageIds[guildId].channel = sentMessage.id;
-                            this.logger.debug(`[IPC] Notification an Channel ${targetChannel.name} in ${guild.name} gesendet`);
+                            this.logger.info(`[IPC] Notification an Channel ${targetChannel.name} in ${guild.name} gesendet`);
                         } catch (channelError) {
                             this.logger.error(`[IPC] Fehler beim Senden an Channel in ${guild.name}:`, channelError);
                         }
                     } else {
-                        this.logger.warn(`[IPC] Kein gültiger Channel für Guild ${guild.name} gefunden`);
+                        this.logger.warn(`[IPC] Channel ${discord_channel_id} nicht gefunden in Guild ${guild.name}`);
                     }
                 }
                 
-                if (delivery_method === 'discord_dm' || delivery_method === 'all') {
+                if (methods.includes('discord_dm')) {
                     // An alle Admins per DM senden
                     try {
                         // Hole alle Members mit ManageGuild-Permission

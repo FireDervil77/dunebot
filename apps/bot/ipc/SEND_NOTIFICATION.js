@@ -32,6 +32,19 @@ module.exports = async (payload, client) => {
             ? JSON.parse(target_guild_ids)
             : (target_guild_ids || []);
 
+        // delivery_method: Backward-compat (String → Array)
+        let methods;
+        try {
+            methods = typeof delivery_method === 'string' ? JSON.parse(delivery_method) : delivery_method;
+            if (!Array.isArray(methods)) methods = [delivery_method];
+        } catch (e) {
+            methods = [delivery_method || 'dashboard'];
+        }
+        // Legacy 'all' expanden
+        if (methods.includes('all')) {
+            methods = ['dashboard', 'system_channel', 'discord_channel', 'discord_dm'];
+        }
+
         const embedColors = { info: 0x3498db, warning: 0xf39c12, error: 0xe74c3c, success: 0x2ecc71 };
         const sentMessageIds = {};
 
@@ -64,11 +77,21 @@ module.exports = async (payload, client) => {
                 embed.addFields({ name: actionText, value: `[🔗 ${action_url}](${action_url})`, inline: false });
             }
 
-            if (delivery_method === 'discord_channel' || delivery_method === 'all') {
-                const targetChannel = discord_channel_id
-                    ? guild.channels.cache.get(discord_channel_id)
-                    : guild.systemChannel;
+            if (methods.includes('system_channel')) {
+                const systemChannel = guild.systemChannel;
+                if (systemChannel?.isTextBased()) {
+                    try {
+                        const sent = await systemChannel.send({ embeds: [embed] });
+                        sentMessageIds[guildId] = sentMessageIds[guildId] || {};
+                        sentMessageIds[guildId].systemChannel = sent.id;
+                    } catch (e) {
+                        Logger.error(`[IPC] SEND_NOTIFICATION: SystemChannel-Fehler in ${guild.name}:`, e);
+                    }
+                }
+            }
 
+            if (methods.includes('discord_channel') && discord_channel_id) {
+                const targetChannel = guild.channels.cache.get(discord_channel_id);
                 if (targetChannel?.isTextBased()) {
                     try {
                         const sent = await targetChannel.send({ embeds: [embed] });
@@ -80,7 +103,7 @@ module.exports = async (payload, client) => {
                 }
             }
 
-            if (delivery_method === 'discord_dm' || delivery_method === 'all') {
+            if (methods.includes('discord_dm')) {
                 try {
                     const members = await guild.members.fetch();
                     const admins = members.filter(m => m.permissions.has('ManageGuild') && !m.user.bot);

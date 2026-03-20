@@ -367,10 +367,26 @@ router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req,
                 if (body.welcome_channel) settings.welcome_channel = body.welcome_channel;
                 if (body.welcome_content !== undefined) settings.welcome_content = body.welcome_content;
                 
+                // Embed als JSON-Objekt akzeptieren (vom Frontend collectEmbed())
+                if (body.welcome_embed !== undefined) {
+                    settings.welcome_embed = body.welcome_embed || {
+                        title: null, description: null, color: null, thumbnail: null, image: null,
+                        fields: [], author: { name: null, iconURL: null }, footer: { text: null, iconURL: null }, timestamp: false
+                    };
+                }
+                
                 // Automatisch aktivieren beim ersten Speichern (wenn noch nicht konfiguriert)
                 if (!settings.welcome_content || settings.welcome_content === '') {
                     settings.welcome_enabled = true;
                 }
+                
+                // Welcome Image Felder
+                if (body.welcome_image_enabled !== undefined) {
+                    settings.welcome_image_enabled = body.welcome_image_enabled === true || body.welcome_image_enabled === 'true';
+                }
+                if (body.welcome_image_bg !== undefined) settings.welcome_image_bg = body.welcome_image_bg || 'default';
+                if (body.welcome_image_text !== undefined) settings.welcome_image_text = body.welcome_image_text || null;
+                if (body.welcome_image_color !== undefined) settings.welcome_image_color = body.welcome_image_color || '#5865f2';
                 
                 Logger.info('[Greeting] Welcome message saved (auto-enabled: true)');
             }
@@ -379,13 +395,6 @@ router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req,
             }
             if (body.action === 'disable') {
                 settings.welcome_enabled = false;
-            }
-            
-            // Embed Updates (falls vorhanden)
-            if (body.welcome_embed_enabled) {
-                if (body.welcome_embed_title !== undefined) settings.welcome_embed.title = body.welcome_embed_title;
-                if (body.welcome_embed_description !== undefined) settings.welcome_embed.description = body.welcome_embed_description;
-                if (body.welcome_embed_color !== undefined) settings.welcome_embed.color = body.welcome_embed_color;
             }
             
             Logger.info('[Greeting] Welcome settings updated:', {
@@ -460,6 +469,14 @@ router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req,
                 // Speichern der Message-Daten
                 if (body.farewell_channel) settings.farewell_channel = body.farewell_channel;
                 if (body.farewell_content !== undefined) settings.farewell_content = body.farewell_content;
+                
+                // Embed als JSON-Objekt akzeptieren
+                if (body.farewell_embed !== undefined) {
+                    settings.farewell_embed = body.farewell_embed || {
+                        title: null, description: null, color: null, thumbnail: null, image: null,
+                        fields: [], author: { name: null, iconURL: null }, footer: { text: null, iconURL: null }, timestamp: false
+                    };
+                }
                 
                 // Automatisch aktivieren beim ersten Speichern
                 if (!settings.farewell_content || settings.farewell_content === '') {
@@ -568,15 +585,12 @@ router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req,
                 if (body.dm_welcome_content !== undefined) settings.dm_welcome_content = body.dm_welcome_content;
                 settings.dm_welcome_enabled = true;
 
-                // Embed updates
-                if (body.dm_welcome_embed_enabled) {
-                    if (body.dm_welcome_embed_title !== undefined) settings.dm_welcome_embed.title = body.dm_welcome_embed_title || null;
-                    if (body.dm_welcome_embed_description !== undefined) settings.dm_welcome_embed.description = body.dm_welcome_embed_description || null;
-                    if (body.dm_welcome_embed_color !== undefined) settings.dm_welcome_embed.color = body.dm_welcome_embed_color || null;
-                    if (body.dm_welcome_embed_thumbnail !== undefined) settings.dm_welcome_embed.thumbnail = body.dm_welcome_embed_thumbnail;
-                    if (body.dm_welcome_embed_footer !== undefined) settings.dm_welcome_embed.footer = { text: body.dm_welcome_embed_footer || null };
-                    if (body.dm_welcome_embed_image !== undefined) settings.dm_welcome_embed.image = body.dm_welcome_embed_image || null;
-                    if (body.dm_welcome_embed_timestamp !== undefined) settings.dm_welcome_embed.timestamp = body.dm_welcome_embed_timestamp === true || body.dm_welcome_embed_timestamp === 'true';
+                // Embed als JSON-Objekt akzeptieren
+                if (body.dm_welcome_embed !== undefined) {
+                    settings.dm_welcome_embed = body.dm_welcome_embed || {
+                        title: null, description: null, color: null, thumbnail: null, image: null,
+                        fields: [], author: { name: null, iconURL: null }, footer: { text: null, iconURL: null }, timestamp: false
+                    };
                 }
             }
             if (body.action === 'enable') settings.dm_welcome_enabled = true;
@@ -608,15 +622,12 @@ router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req,
                 if (body.boost_content !== undefined) settings.boost_content = body.boost_content;
                 settings.boost_enabled = true;
 
-                // Embed updates
-                if (body.boost_embed_enabled) {
-                    if (body.boost_embed_title !== undefined) settings.boost_embed.title = body.boost_embed_title || null;
-                    if (body.boost_embed_description !== undefined) settings.boost_embed.description = body.boost_embed_description || null;
-                    if (body.boost_embed_color !== undefined) settings.boost_embed.color = body.boost_embed_color || null;
-                    if (body.boost_embed_thumbnail !== undefined) settings.boost_embed.thumbnail = body.boost_embed_thumbnail;
-                    if (body.boost_embed_footer !== undefined) settings.boost_embed.footer = { text: body.boost_embed_footer || null };
-                    if (body.boost_embed_image !== undefined) settings.boost_embed.image = body.boost_embed_image || null;
-                    if (body.boost_embed_timestamp !== undefined) settings.boost_embed.timestamp = body.boost_embed_timestamp === true || body.boost_embed_timestamp === 'true';
+                // Embed als JSON-Objekt akzeptieren
+                if (body.boost_embed !== undefined) {
+                    settings.boost_embed = body.boost_embed || {
+                        title: null, description: null, color: null, thumbnail: null, image: null,
+                        fields: [], author: { name: null, iconURL: null }, footer: { text: null, iconURL: null }, timestamp: false
+                    };
                 }
             }
             if (body.action === 'enable') settings.boost_enabled = true;

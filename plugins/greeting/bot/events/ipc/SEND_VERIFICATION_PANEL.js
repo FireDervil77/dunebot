@@ -5,7 +5,7 @@ const { sendVerificationPanel } = require('../../events/interactionCreate');
  * IPC Handler: greeting:SEND_VERIFICATION_PANEL
  * Sends the verification button panel to the configured channel
  */
-module.exports = async (data) => {
+module.exports = async (data, discordClient) => {
     const Logger = ServiceManager.get('Logger');
     const { guildId } = data;
 
@@ -21,9 +21,7 @@ module.exports = async (data) => {
         }
 
         // Get guild from bot client
-        const botManager = ServiceManager.get('botManager');
-        const client = botManager.getClient();
-        const guild = client.guilds.cache.get(guildId);
+        const guild = discordClient.guilds.cache.get(guildId);
         if (!guild) {
             return { success: false, error: 'Guild not found in cache' };
         }

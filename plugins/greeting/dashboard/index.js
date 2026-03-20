@@ -148,7 +148,7 @@ class GreetingDashboardPlugin extends DashboardPlugin {
                 parent: `/guild/${guildId}`,
                 type: 'main',
                 visible: true,
-                capability: 'GREETING.SETTINGS'
+                capability: 'GREETING.VIEW'
             }
         ];
 

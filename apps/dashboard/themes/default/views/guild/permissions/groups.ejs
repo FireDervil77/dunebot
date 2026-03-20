@@ -163,7 +163,7 @@
       <form id="createGroupForm" class="guild-ajax-form" 
             data-form-type="create-group"
             data-method="POST"
-            action="/guild/<%= guildId %>/plugins/core/permissions/groups">
+            action="/guild/<%= guildId %>/permissions/groups">
         <div class="modal-body">
           <div class="row">
             <div class="col-md-6 mb-3">
@@ -516,7 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Set action URL
       const form = document.getElementById('editGroupForm');
-      form.action = `/guild/${guildId}/plugins/core/permissions/groups/${groupId}`;
+      form.action = `/guild/${guildId}/permissions/groups/${groupId}`;
       
       // Update checkboxes
       document.querySelectorAll('.edit-permission-checkbox').forEach(checkbox => {
@@ -545,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Set action URL
       const form = document.getElementById('deleteGroupForm');
-      form.action = `/guild/${guildId}/plugins/core/permissions/groups/${groupId}`;
+      form.action = `/guild/${guildId}/permissions/groups/${groupId}`;
       
       // Modal öffnen (Bootstrap 4 Syntax mit jQuery!)
       $('#deleteGroupModal').modal('show');

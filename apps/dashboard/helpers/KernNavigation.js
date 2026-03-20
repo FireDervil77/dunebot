@@ -207,7 +207,7 @@ async function registerKernNavigation(guildId) {
                 icon: 'fa-solid fa-shield-halved',
                 order: 40,
                 type: navigationManager.menuTypes.MAIN,
-                capability: 'CORE.ROLES.VIEW',
+                capability: 'CORE.SETTINGS.VIEW',
                 visible: true,
                 guildId,
                 parent: `/guild/${guildId}/settings`

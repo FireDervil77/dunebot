@@ -24,7 +24,7 @@
           <div class="progress-circle bg-success text-white">
             <i class="fa-solid fa-check"></i>
           </div>
-          <div class="text-muted">1. Information</div>
+          <div class="text-muted"><%= tr('gameserver:SERVER.STEP1_LABEL') %></div>
         </div>
       </div>
       <div class="col-md-4">
@@ -32,7 +32,7 @@
           <div class="progress-circle bg-success text-white">
             <i class="fa-solid fa-check"></i>
           </div>
-          <div class="text-muted">2. Egg Configuration</div>
+          <div class="text-muted"><%= tr('gameserver:SERVER.STEP2_LABEL_EGG') %></div>
         </div>
       </div>
       <div class="col-md-4">
@@ -40,7 +40,7 @@
           <div class="progress-circle bg-primary text-white">
             <strong>3</strong>
           </div>
-          <div><strong>3. Resources & Finalization</strong></div>
+          <div><strong><%= tr('gameserver:SERVER.STEP3_LABEL_FINAL') %></strong></div>
         </div>
       </div>
     </div>
@@ -63,34 +63,34 @@
             <div class="card-header">
               <h5 class="mb-0">
                 <i class="fa-solid fa-network-wired mr-2"></i>
-                Port-Konfiguration
+                <%= tr('gameserver:SERVER.PORT_CONFIG') %>
               </h5>
             </div>
             <div class="card-body">
               <div class="form-group mb-0">
                 <label for="game_port">
-                  <i class="fa-solid fa-plug mr-1 text-primary"></i>Game-Port
+                  <i class="fa-solid fa-plug mr-1 text-primary"></i><%= tr('gameserver:SERVER.GAME_PORT') %>
                 </label>
                 <div class="input-group">
                   <select class="form-control" id="game_port" name="game_port">
-                    <option value="auto">Automatisch zuweisen (nächster freier Port)</option>
+                    <option value="auto"><%= tr('gameserver:SERVER.PORT_AUTO') %></option>
                   </select>
                   <div class="input-group-append">
-                    <button type="button" class="btn btn-outline-secondary" id="toggleManualPort" title="Manuell eingeben">
+                    <button type="button" class="btn btn-outline-secondary" id="toggleManualPort" title="<%= tr('gameserver:SERVER.PORT_MANUAL_TITLE') %>">
                       <i class="fa-solid fa-keyboard"></i>
                     </button>
                   </div>
                 </div>
                 <div id="manualPortInput" style="display:none;" class="mt-2">
                   <div class="input-group">
-                    <input type="number" class="form-control" id="game_port_manual" min="1024" max="65535" placeholder="z.B. 27015">
+                    <input type="number" class="form-control" id="game_port_manual" min="1024" max="65535" placeholder="<%= tr('gameserver:SERVER.PORT_MANUAL_PLACEHOLDER') %>">
                     <div class="input-group-append">
-                      <button type="button" class="btn btn-outline-primary" id="useManualPort">Übernehmen</button>
+                        <button type="button" class="btn btn-outline-primary" id="useManualPort"><%= tr('gameserver:SERVER.PORT_MANUAL_APPLY') %></button>
                     </div>
                   </div>
-                  <small class="form-text text-muted">Port muss im Allocation-Pool des Rootservers frei sein (1024-65535)</small>
+                  <small class="form-text text-muted"><%= tr('gameserver:SERVER.PORT_POOL_HELP') %></small>
                 </div>
-                <small class="form-text text-muted" id="portPoolInfo"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Lade verfügbare Ports...</small>
+                <small class="form-text text-muted" id="portPoolInfo"><i class="fa-solid fa-spinner fa-spin mr-1"></i><%= tr('gameserver:SERVER.PORT_LOADING') %></small>
               </div>
             </div>
           </div>
@@ -100,17 +100,17 @@
             <div class="card-header">
               <h5 class="mb-0">
                 <i class="fa-solid fa-gauge-high mr-2"></i>
-                <%= tr('gameserver:SERVER.RESOURCE_LIMITS') || 'Resource Limits' %>
+                <%= tr('gameserver:SERVER.RESOURCE_LIMITS') %>
               </h5>
             </div>
             <div class="card-body">
               <!-- Memory Limit -->
               <div class="form-group mb-4">
                 <label class="d-flex justify-content-between align-items-center">
-                  <span><i class="fa-solid fa-memory mr-2 text-info"></i>Memory</span>
+                  <span><i class="fa-solid fa-memory mr-2 text-info"></i><%= tr('gameserver:SERVER.MEMORY') %></span>
                   <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-secondary active" data-toggle-limit="ram" data-value="unlimited">Unlimited</button>
-                    <button type="button" class="btn btn-outline-secondary" data-toggle-limit="ram" data-value="limited">Limited</button>
+                    <button type="button" class="btn btn-outline-secondary active" data-toggle-limit="ram" data-value="unlimited"><%= tr('gameserver:SERVER.UNLIMITED') %></button>
+                    <button type="button" class="btn btn-outline-secondary" data-toggle-limit="ram" data-value="limited"><%= tr('gameserver:SERVER.LIMITED') %></button>
                   </div>
                 </label>
                 <div id="ramLimitInput" style="display: none;">
@@ -120,17 +120,17 @@
                       <span class="input-group-text">MiB</span>
                     </div>
                   </div>
-                  <small class="form-text text-muted">Minimum: 512 MiB | Empfohlen: 2048 MiB+</small>
+                  <small class="form-text text-muted"><%= tr('gameserver:SERVER.RAM_HELP') %></small>
                 </div>
               </div>
 
               <!-- CPU Limit -->
               <div class="form-group mb-4">
                 <label class="d-flex justify-content-between align-items-center">
-                  <span><i class="fa-solid fa-microchip mr-2 text-primary"></i>CPU</span>
+                  <span><i class="fa-solid fa-microchip mr-2 text-primary"></i><%= tr('gameserver:SERVER.CPU_LABEL') %></span>
                   <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-secondary active" data-toggle-limit="cpu" data-value="unlimited">Unlimited</button>
-                    <button type="button" class="btn btn-outline-secondary" data-toggle-limit="cpu" data-value="limited">Limited</button>
+                    <button type="button" class="btn btn-outline-secondary active" data-toggle-limit="cpu" data-value="unlimited"><%= tr('gameserver:SERVER.UNLIMITED') %></button>
+                    <button type="button" class="btn btn-outline-secondary" data-toggle-limit="cpu" data-value="limited"><%= tr('gameserver:SERVER.LIMITED') %></button>
                   </div>
                 </label>
                 <div id="cpuLimitInput" style="display: none;">
@@ -140,17 +140,17 @@
                       <span class="input-group-text">%</span>
                     </div>
                   </div>
-                  <small class="form-text text-muted">10% = 0.1 Core | 100% = 1 Core | 200% = 2 Cores</small>
+                  <small class="form-text text-muted"><%= tr('gameserver:SERVER.CPU_HELP') %></small>
                 </div>
               </div>
 
               <!-- Disk Limit -->
               <div class="form-group mb-0">
                 <label class="d-flex justify-content-between align-items-center">
-                  <span><i class="fa-solid fa-hdd mr-2 text-warning"></i>Disk Space</span>
+                  <span><i class="fa-solid fa-hdd mr-2 text-warning"></i><%= tr('gameserver:SERVER.DISK_SPACE') %></span>
                   <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-secondary active" data-toggle-limit="disk" data-value="unlimited">Unlimited</button>
-                    <button type="button" class="btn btn-outline-secondary" data-toggle-limit="disk" data-value="limited">Limited</button>
+                    <button type="button" class="btn btn-outline-secondary active" data-toggle-limit="disk" data-value="unlimited"><%= tr('gameserver:SERVER.UNLIMITED') %></button>
+                    <button type="button" class="btn btn-outline-secondary" data-toggle-limit="disk" data-value="limited"><%= tr('gameserver:SERVER.LIMITED') %></button>
                   </div>
                 </label>
                 <div id="diskLimitInput" style="display: none;">
@@ -160,7 +160,7 @@
                       <span class="input-group-text">GiB</span>
                     </div>
                   </div>
-                  <small class="form-text text-muted">Minimum: 5 GiB | Empfohlen: 50+ GiB (je nach Spiel)</small>
+                  <small class="form-text text-muted"><%= tr('gameserver:SERVER.DISK_HELP') %></small>
                 </div>
               </div>
             </div>
@@ -171,15 +171,15 @@
             <div class="card-header d-flex justify-content-between align-items-center">
               <h5 class="mb-0">
                 <i class="fa-solid fa-folder-tree mr-2"></i>
-                <%= tr('gameserver:SERVER.SFTP_ACCESS') || 'SFTP File Access' %>
+                <%= tr('gameserver:SERVER.SFTP_ACCESS') %>
               </h5>
-              <span class="badge badge-warning">Coming Soon</span>
+              <span class="badge badge-warning"><%= tr('gameserver:SERVER.COMING_SOON') %></span>
             </div>
             <div class="card-body">
               <div class="alert alert-info mb-0">
                 <i class="fa-solid fa-info-circle mr-2"></i>
-                <strong>SFTP-Zugriff wird nach der Server-Erstellung automatisch eingerichtet.</strong><br>
-                <small>Du erhältst Username, Passwort und Port nach der Installation.</small>
+                <strong><%= tr('gameserver:SERVER.SFTP_INFO') %></strong><br>
+                <small><%= tr('gameserver:SERVER.SFTP_INFO_DETAIL') %></small>
               </div>
               <!-- 
               SPÄTER: 
@@ -195,7 +195,7 @@
             <div class="card-header">
               <h5 class="mb-0">
                 <i class="fa-solid fa-sliders mr-2"></i>
-                <%= tr('gameserver:SERVER.ADVANCED_SETTINGS') || 'Advanced Settings' %>
+                <%= tr('gameserver:SERVER.ADVANCED_SETTINGS') %>
               </h5>
             </div>
             <div class="card-body">
@@ -203,27 +203,27 @@
                 <div class="col-md-6 mb-3">
                   <label for="auto_restart">
                     <i class="fa-solid fa-rotate mr-2 text-success"></i>
-                    <%= tr('gameserver:SERVER.AUTO_RESTART') || 'Auto-Restart on Crash' %>
+                    <%= tr('gameserver:SERVER.AUTO_RESTART') %>
                   </label>
                   <select class="form-control" id="auto_restart" name="auto_restart">
-                    <option value="1" selected>Enabled</option>
-                    <option value="0">Disabled</option>
+                    <option value="1" selected><%= tr('gameserver:SERVER.ENABLED') %></option>
+                    <option value="0"><%= tr('gameserver:SERVER.DISABLED') %></option>
                   </select>
                   <small class="form-text text-muted">
-                    <%= tr('gameserver:SERVER.AUTO_RESTART_HELP') || 'Server startet automatisch neu bei Absturz' %>
+                    <%= tr('gameserver:SERVER.AUTO_RESTART_HELP') %>
                   </small>
                 </div>
                 <div class="col-md-6 mb-3">
                   <label for="auto_update">
                     <i class="fa-solid fa-download mr-2 text-info"></i>
-                    <%= tr('gameserver:SERVER.AUTO_UPDATE') || 'Auto-Update' %>
+                    <%= tr('gameserver:SERVER.AUTO_UPDATE') %>
                   </label>
                   <select class="form-control" id="auto_update" name="auto_update">
-                    <option value="0" selected>Disabled</option>
-                    <option value="1">Enabled</option>
+                    <option value="0" selected><%= tr('gameserver:SERVER.DISABLED') %></option>
+                    <option value="1"><%= tr('gameserver:SERVER.ENABLED') %></option>
                   </select>
                   <small class="form-text text-muted">
-                    <%= tr('gameserver:SERVER.AUTO_UPDATE_HELP') || 'Server-Dateien automatisch aktualisieren' %>
+                    <%= tr('gameserver:SERVER.AUTO_UPDATE_HELP') %>
                   </small>
                 </div>
               </div>
@@ -236,11 +236,11 @@
               <div class="d-flex justify-content-between">
                 <button type="button" id="btnBack" class="btn btn-secondary">
                   <i class="fa-solid fa-arrow-left mr-2"></i>
-                  <%= tr('gameserver:SERVER.BACK') || 'Zurück' %>
+                  <%= tr('gameserver:SERVER.BACK') %>
                 </button>
                 <button type="submit" id="btnCreate" class="btn btn-success btn-lg">
                   <i class="fa-solid fa-rocket mr-2"></i>
-                  <%= tr('gameserver:SERVER.CREATE_SERVER') || 'Server erstellen' %>
+                  <%= tr('gameserver:SERVER.CREATE_SERVER') %>
                 </button>
               </div>
             </div>
@@ -254,35 +254,35 @@
           <div class="card-header bg-success text-white">
             <h6 class="mb-0">
               <i class="fa-solid fa-clipboard-check mr-2"></i>
-              <%= tr('gameserver:SERVER.SUMMARY') || 'Configuration Summary' %>
+              <%= tr('gameserver:SERVER.SUMMARY') %>
             </h6>
           </div>
           <div class="card-body">
             <!-- From Step 1 -->
-            <h6 class="text-muted mb-2">Step 1: Information</h6>
+            <h6 class="text-muted mb-2"><%= tr('gameserver:SERVER.SUMMARY_STEP1') %></h6>
             <ul class="list-unstyled mb-3">
-              <li><strong>Server Name:</strong> <span id="summaryServerName">-</span></li>
-              <li><strong>Addon:</strong> <%= addon.name %></li>
-              <li><strong>Rootserver:</strong> <span id="summaryRootserver">-</span></li>
-              <li><strong>Install Script:</strong> <span id="summaryInstall">-</span></li>
-              <li><strong>Auto-Start:</strong> <span id="summaryAutoStart">-</span></li>
+              <li><strong><%= tr('gameserver:SERVER.SUMMARY_SERVER_NAME') %></strong> <span id="summaryServerName">-</span></li>
+              <li><strong><%= tr('gameserver:SERVER.SUMMARY_ADDON') %></strong> <%= addon.name %></li>
+              <li><strong><%= tr('gameserver:SERVER.SUMMARY_ROOTSERVER') %></strong> <span id="summaryRootserver">-</span></li>
+              <li><strong><%= tr('gameserver:SERVER.SUMMARY_INSTALL_SCRIPT') %></strong> <span id="summaryInstall">-</span></li>
+              <li><strong><%= tr('gameserver:SERVER.SUMMARY_AUTO_START') %></strong> <span id="summaryAutoStart">-</span></li>
             </ul>
             <hr>
             
             <!-- From Step 2 -->
-            <h6 class="text-muted mb-2">Step 2: Variables</h6>
+            <h6 class="text-muted mb-2"><%= tr('gameserver:SERVER.SUMMARY_STEP2') %></h6>
             <ul class="list-unstyled mb-3" id="summaryVariables">
-              <li class="text-muted"><em>Keine Variablen konfiguriert</em></li>
+              <li class="text-muted"><em><%= tr('gameserver:SERVER.SUMMARY_NO_VARIABLES') %></em></li>
             </ul>
             <hr>
             
             <!-- From Step 3 -->
-            <h6 class="text-muted mb-2">Step 3: Resources</h6>
+            <h6 class="text-muted mb-2"><%= tr('gameserver:SERVER.SUMMARY_STEP3') %></h6>
             <ul class="list-unstyled mb-0">
-              <li><strong>Port:</strong> <span id="summaryPort">Auto</span></li>
-              <li><strong>RAM:</strong> <span id="summaryRam">Unlimited</span></li>
-              <li><strong>CPU:</strong> <span id="summaryCpu">Unlimited</span></li>
-              <li><strong>Disk:</strong> <span id="summaryDisk">Unlimited</span></li>
+              <li><strong><%= tr('gameserver:SERVER.SUMMARY_PORT') %></strong> <span id="summaryPort">Auto</span></li>
+              <li><strong><%= tr('gameserver:SERVER.SUMMARY_RAM') %></strong> <span id="summaryRam"><%= tr('gameserver:SERVER.UNLIMITED') %></span></li>
+              <li><strong><%= tr('gameserver:SERVER.SUMMARY_CPU') %></strong> <span id="summaryCpu"><%= tr('gameserver:SERVER.UNLIMITED') %></span></li>
+              <li><strong><%= tr('gameserver:SERVER.SUMMARY_DISK') %></strong> <span id="summaryDisk"><%= tr('gameserver:SERVER.UNLIMITED') %></span></li>
             </ul>
           </div>
         </div>
@@ -324,6 +324,30 @@ document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     
     // ========================================
+    // I18N TRANSLATIONS FOR JS
+    // ========================================
+    const i18n = {
+        unlimited: '<%= tr("gameserver:SERVER.UNLIMITED") %>',
+        creatingServer: '<%= tr("gameserver:SERVER.CREATING_SERVER") %>',
+        serverCreatedMsg: '<%= tr("gameserver:SERVER.SERVER_CREATED_MSG") %>',
+        errorCreatingServer: '<%= tr("gameserver:SERVER.ERROR_CREATING_SERVER") %>',
+        networkError: '<%= tr("gameserver:SERVER.NETWORK_ERROR") %>',
+        noRootserverSelected: '<%= tr("gameserver:SERVER.NO_ROOTSERVER_SELECTED") %>',
+        errorLoadingPorts: '<%= tr("gameserver:SERVER.ERROR_LOADING_PORTS") %>',
+        noFreePorts: '<%= tr("gameserver:SERVER.NO_FREE_PORTS") %>',
+        moreFreePorts: '<%= tr("gameserver:SERVER.MORE_FREE_PORTS") %>',
+        freePortsAvailable: '<%= tr("gameserver:SERVER.FREE_PORTS_AVAILABLE") %>',
+        portsAssigned: '<%= tr("gameserver:SERVER.PORTS_ASSIGNED") %>',
+        invalidPort: '<%= tr("gameserver:SERVER.INVALID_PORT") %>',
+        portManualSuffix: '<%= tr("gameserver:SERVER.PORT_MANUAL_SUFFIX") %>',
+        portAutoLabel: '<%= tr("gameserver:SERVER.PORT_AUTO_LABEL") %>',
+        yes: '<%= tr("gameserver:SERVER.YES") %>',
+        no: '<%= tr("gameserver:SERVER.NO") %>',
+        skip: '<%= tr("gameserver:SERVER.SKIP") %>',
+        noVariables: '<%= tr("gameserver:SERVER.NO_VARIABLES_SUMMARY") %>'
+    };
+    
+    // ========================================
     // RESOURCE LIMIT TOGGLES
     // ========================================
     document.querySelectorAll('[data-toggle-limit]').forEach(button => {
@@ -358,17 +382,17 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateSummary() {
         // RAM
         const ramInput = document.getElementById('allocated_ram_mb');
-        const ramValue = ramInput.value ? `${ramInput.value} MiB` : 'Unlimited';
+        const ramValue = ramInput.value ? `${ramInput.value} MiB` : i18n.unlimited;
         document.getElementById('summaryRam').textContent = ramValue;
         
         // CPU
         const cpuInput = document.getElementById('allocated_cpu_percent');
-        const cpuValue = cpuInput.value ? `${cpuInput.value}%` : 'Unlimited';
+        const cpuValue = cpuInput.value ? `${cpuInput.value}%` : i18n.unlimited;
         document.getElementById('summaryCpu').textContent = cpuValue;
         
         // Disk
         const diskInput = document.getElementById('allocated_disk_gb');
-        const diskValue = diskInput.value ? `${diskInput.value} GiB` : 'Unlimited';
+        const diskValue = diskInput.value ? `${diskInput.value} GiB` : i18n.unlimited;
         document.getElementById('summaryDisk').textContent = diskValue;
     }
     
@@ -399,8 +423,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Summary anzeigen
     document.getElementById('summaryServerName').textContent = serverName;
     document.getElementById('summaryRootserver').textContent = `ID: ${rootserverId}`;
-    document.getElementById('summaryInstall').textContent = runInstall ? 'Yes' : 'Skip';
-    document.getElementById('summaryAutoStart').textContent = startAfter ? 'Yes' : 'No';
+    document.getElementById('summaryInstall').textContent = runInstall ? i18n.yes : i18n.skip;
+    document.getElementById('summaryAutoStart').textContent = startAfter ? i18n.yes : i18n.no;
     
     // Step 2 Variables
     const variablesList = document.getElementById('summaryVariables');
@@ -418,7 +442,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     if (!hasVariables) {
-        variablesList.innerHTML = '<li class="text-muted"><em>Keine Variablen</em></li>';
+        variablesList.innerHTML = `<li class="text-muted"><em>${i18n.noVariables}</em></li>`;
     }
     
     // ========================================
@@ -442,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Button disablen + Spinner
         submitBtn.disabled = true;
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Erstelle Server...';
+        submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> ${i18n.creatingServer}`;
         
         try {
             // ✅ JSON-Payload aus Form-Daten + URL-Params
@@ -476,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (result.success) {
                 // ✅ Success Toast
-                toastr.success(result.message || 'Server wird erstellt...');
+                toastr.success(result.message || i18n.serverCreatedMsg);
                 
                 // Redirect nach 1,5s
                 setTimeout(() => {
@@ -488,14 +512,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 1500);
             } else {
                 // ❌ Error Toast
-                toastr.error(result.message || 'Fehler beim Erstellen des Servers');
+                toastr.error(result.message || i18n.errorCreatingServer);
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
             }
             
         } catch (error) {
             console.error('[Step3] Submit error:', error);
-            toastr.error('Netzwerkfehler beim Erstellen des Servers');
+            toastr.error(i18n.networkError);
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalText;
         }
@@ -515,19 +539,19 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadFreePorts() {
         const rsId = urlParams.get('rootserver');
         if (!rsId) {
-            portInfo.innerHTML = '<span class="text-warning"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Kein Rootserver gewählt</span>';
+            portInfo.innerHTML = `<span class="text-warning"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${i18n.noRootserverSelected}</span>`;
             return;
         }
         try {
             const r = await fetch(`/guild/${guildId}/plugins/masterserver/rootservers/${rsId}/allocations`);
             const { success, data, summary } = await r.json();
             if (!success) {
-                portInfo.innerHTML = '<span class="text-danger">Fehler beim Laden der Ports</span>';
+                portInfo.innerHTML = `<span class="text-danger">${i18n.errorLoadingPorts}</span>`;
                 return;
             }
             const freePorts = data.filter(a => a.server_id === null).sort((a, b) => a.port - b.port);
             if (freePorts.length === 0) {
-                portInfo.innerHTML = '<span class="text-danger"><i class="fa-solid fa-circle-xmark mr-1"></i>Keine freien Ports im Pool! Bitte zuerst Ports im Rootserver-Allocations-Tab anlegen.</span>';
+                portInfo.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-xmark mr-1"></i>${i18n.noFreePorts}</span>`;
                 return;
             }
             // Dropdown befüllen (max 200 einzeln anzeigen, danach gruppiert)
@@ -542,12 +566,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (freePorts.length > showMax) {
                 const opt = document.createElement('option');
                 opt.disabled = true;
-                opt.textContent = `... und ${freePorts.length - showMax} weitere freie Ports (nutze manuelle Eingabe)`;
+                opt.textContent = `... ${freePorts.length - showMax} ${i18n.moreFreePorts}`;
                 portSelect.appendChild(opt);
             }
-            portInfo.innerHTML = `<span class="text-success"><i class="fa-solid fa-circle-check mr-1"></i>${freePorts.length} freie Ports verfügbar (${summary.assigned} zugewiesen)</span>`;
+            portInfo.innerHTML = `<span class="text-success"><i class="fa-solid fa-circle-check mr-1"></i>${freePorts.length} ${i18n.freePortsAvailable} (${summary.assigned} ${i18n.portsAssigned})</span>`;
         } catch (_) {
-            portInfo.innerHTML = '<span class="text-danger">Netzwerkfehler beim Laden der Ports</span>';
+            portInfo.innerHTML = `<span class="text-danger">${i18n.networkError}</span>`;
         }
     }
     loadFreePorts();
@@ -564,7 +588,7 @@ document.addEventListener('DOMContentLoaded', function() {
     useManualBtn.addEventListener('click', () => {
         const port = parseInt(manualPortInput.value);
         if (!port || port < 1024 || port > 65535) {
-            toastr.warning('Ungültiger Port (1024-65535)');
+            toastr.warning(i18n.invalidPort);
             return;
         }
         // Prüfe ob Option schon existiert
@@ -572,7 +596,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!exists) {
             const opt = document.createElement('option');
             opt.value = port;
-            opt.textContent = port + ' (manuell)';
+            opt.textContent = port + ' ' + i18n.portManualSuffix;
             portSelect.insertBefore(opt, portSelect.options[1]); // Nach "Auto"
         }
         portSelect.value = String(port);
@@ -587,7 +611,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateSummary = function() {
         origUpdateSummary();
         const sel = portSelect.value;
-        document.getElementById('summaryPort').textContent = sel === 'auto' ? 'Auto (nächster freier)' : sel;
+        document.getElementById('summaryPort').textContent = sel === 'auto' ? i18n.portAutoLabel : sel;
     };
 
     // Initial Summary

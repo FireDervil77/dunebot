@@ -37,10 +37,10 @@
 
         <!-- Begin::Global Notifications -->
         <% if (locals.globalNotifications && globalNotifications.length > 0) { %>
-            <div class="container-fluid mt-3">
+            <div class="container-fluid mt-3" id="global-notifications-container">
                 <% globalNotifications.forEach(notification => { %>
                     <div class="alert alert-<%= notification.type %> alert-dismissible fade show" role="alert" data-notification-id="<%= notification.id %>">
-                        <button type="button" class="close" data-dismiss="alert" aria-label="Schließen">
+                        <button type="button" class="close dismiss-notification-btn" aria-label="Schließen">
                             <span aria-hidden="true">&times;</span>
                         </button>
                         <% if (notification.title) { %>
@@ -58,6 +58,25 @@
                     </div>
                 <% }); %>
             </div>
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                document.querySelectorAll('.dismiss-notification-btn').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        var alert = this.closest('.alert[data-notification-id]');
+                        var notificationId = alert ? alert.getAttribute('data-notification-id') : null;
+                        if (notificationId) {
+                            fetch('/api/notifications/dismiss/' + notificationId, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' }
+                            }).catch(function() {});
+                        }
+                        if (alert) {
+                            $(alert).alert('close');
+                        }
+                    });
+                });
+            });
+            </script>
         <% } %>
         <!-- End::Global Notifications -->
         

@@ -308,10 +308,22 @@ router.post('/notifications/save', async (req, res) => {
             message: { 'de-DE': message_de || '', 'en-GB': message_en || '' },
             action_text: { 'de-DE': action_text_de || 'Mehr erfahren', 'en-GB': action_text_en || 'Learn more' }
         };
+
+        // delivery_method kommt als JSON-Array-String vom Frontend
+        let deliveryMethods;
+        try {
+            deliveryMethods = JSON.parse(delivery_method);
+            if (!Array.isArray(deliveryMethods)) deliveryMethods = [delivery_method || 'dashboard'];
+        } catch (e) {
+            deliveryMethods = [delivery_method || 'dashboard'];
+        }
+        const deliveryMethodStr = JSON.stringify(deliveryMethods);
+        const needsDiscord = deliveryMethods.some(m => m !== 'dashboard');
+
         const metadata = {
             type: type || 'info', action_url: action_url || null,
             expiry: expiry || null, roles: roles || null, dismissed: 0,
-            delivery_method: delivery_method || 'dashboard',
+            delivery_method: deliveryMethodStr,
             target_guild_ids: target_guild_ids || null,
             discord_channel_id: discord_channel_id || null
         };
@@ -342,7 +354,7 @@ router.post('/notifications/save', async (req, res) => {
                 notificationData.action_url, notificationData.expiry, notificationData.roles,
                 metadata.delivery_method, metadata.target_guild_ids, metadata.discord_channel_id]);
 
-            if (metadata.delivery_method !== 'dashboard') {
+            if (needsDiscord) {
                 const ipcServer = ServiceManager.get('ipcServer');
                 try {
                     await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', {

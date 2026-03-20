@@ -403,8 +403,14 @@ function parseHierarchicalChangelog(changesText) {
     
     // ⚡ KRITISCH: <br> Tags in Newlines umwandeln (ZUERST!)
     // TinyMCE speichert mehrere Items in EINEM <p>-Tag mit <br>-Trennung!
-    // <p>! Fix 1<br>! Fix 2<br>! Fix 3</p> → <p>! Fix 1</p>\n<p>! Fix 2</p>\n<p>! Fix 3</p>
     processedText = processedText.replace(/<br\s*\/?>/gi, '\n');
+    
+    // ⚡ Multi-line <p>-Tags aufteilen
+    // Nach <br>→\n kann ein <p> mehrere Zeilen enthalten → einzelne <p>-Tags daraus machen
+    processedText = processedText.replace(/<p([^>]*)>([\s\S]*?)<\/p>/gi, (match, attrs, content) => {
+        if (!content.includes('\n')) return match;
+        return content.split('\n').filter(l => l.trim()).map(l => '<p>' + l.trim() + '</p>').join('\n');
+    });
     
     // <h2>Header</h2> → # Header
     processedText = processedText.replace(/<h2[^>]*>(.*?)<\/h2>/gi, (match, content) => {
@@ -416,8 +422,15 @@ function parseHierarchicalChangelog(changesText) {
         return '\n## ' + content.trim() + '\n';
     });
     
+    // Markdown-Header in <p>-Tags: <p># Header</p> → # Header
+    processedText = processedText.replace(/<p[^>]*>##\s+(.*?)<\/p>/gi, (match, content) => {
+        return '\n## ' + content.trim() + '\n';
+    });
+    processedText = processedText.replace(/<p[^>]*>#\s+(.*?)<\/p>/gi, (match, content) => {
+        return '\n# ' + content.trim() + '\n';
+    });
+    
     // <p>! Bugfix...</p> → ! Bugfix... (BEHALTE HTML im Text!)
-    // ⚡ WICHTIG: Durch <br>→\n Konvertierung sind jetzt mehrere Zeilen getrennt!
     processedText = processedText.replace(/<p[^>]*>([!+\-*])\s+(.*?)<\/p>/gi, (match, symbol, content) => {
         return '\n' + symbol + ' ' + content.trim() + '\n';
     });

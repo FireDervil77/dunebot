@@ -1147,7 +1147,6 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.template_name,
                 gs.addon_version,
                 gs.rootserver_id,
-                gs.daemon_server_id,
                 gs.pid,
                 gs.current_map,
                 gs.last_started_at,
@@ -1244,7 +1243,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 'UPDATE gameservers SET sftp_username = ?, sftp_password = ? WHERE id = ?',
                 [server.sftp_username, server.sftp_password, server.id]
             );
-            _syncSftpUserToDaemon(server.daemon_id, server.daemon_server_id, server.sftp_username, server.sftp_password, guildId)
+            _syncSftpUserToDaemon(server.daemon_id, String(server.id), server.sftp_username, server.sftp_password, guildId)
                 .catch(err => Logger.warn(`[Gameserver] SFTP-Sync zum Daemon fehlgeschlagen: ${err.message}`));
             Logger.info(`[Gameserver] SFTP-Credentials (Fallback) generiert für Server ${server.id} (User: ${server.sftp_username})`);
         } else if (server.sftp_username && server.system_user && server.sftp_username !== server.system_user) {
@@ -2940,7 +2939,7 @@ router.post('/:serverId/sftp/reset-password', requirePermission('GAMESERVER.EDIT
         const serverId = req.params.serverId;
 
         const [server] = await dbService.query(
-            `SELECT gs.id, gs.daemon_server_id, gs.sftp_username, gs.guild_id,
+            `SELECT gs.id, gs.sftp_username, gs.guild_id,
                     r.daemon_id, r.hostname, r.host, r.system_user
              FROM gameservers gs
              LEFT JOIN rootserver r ON gs.rootserver_id = r.id
@@ -2961,7 +2960,7 @@ router.post('/:serverId/sftp/reset-password', requirePermission('GAMESERVER.EDIT
             [sftp_username, sftp_password, server.id]
         );
 
-        _syncSftpUserToDaemon(server.daemon_id, server.daemon_server_id, sftp_username, sftp_password, guildId)
+        _syncSftpUserToDaemon(server.daemon_id, String(server.id), sftp_username, sftp_password, guildId)
             .catch(err => Logger.warn(`[Gameserver] SFTP-Sync-Fehler: ${err.message}`));
 
         Logger.info(`[Gameserver] SFTP-Passwort zurückgesetzt für Server ${serverId}`);
@@ -3010,7 +3009,7 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
         }
 
         const [server] = await dbService.query(`
-            SELECT gs.id, gs.daemon_server_id, gs.ports, gs.env_variables,
+            SELECT gs.id, gs.ports, gs.env_variables,
                    r.daemon_id, r.host AS rootserver_ip,
                    am.game_data
             FROM gameservers gs
@@ -3068,7 +3067,7 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
 
         const result = await ipmServer.sendCommand(server.daemon_id, 'gameserver.rcon', {
             guild_id: guildId,
-            server_id: server.daemon_server_id,
+            server_id: String(server.id),
             rcon_host: '127.0.0.1', // Daemon verbindet lokal
             rcon_port: rconPort,
             rcon_password: rconPassword,
