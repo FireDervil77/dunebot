@@ -29,57 +29,70 @@ Das Installationsskript:
 1. Binary herunterladen:
    ```bash
    # Für AMD64 (Standard-Server)
-   wget https://firenetworks.de/downloads/firebot-daemon-linux-amd64
+   wget https://firenetworks.de/downloads/linux-amd64/firebot-daemon
    
    # Für ARM64 (z.B. Raspberry Pi, ARM-Server)
-   wget https://firenetworks.de/downloads/firebot-daemon-linux-arm64
+   wget https://firenetworks.de/downloads/linux-arm64/firebot-daemon
    ```
 
 2. Ausführbar machen und verschieben:
    ```bash
-   chmod +x firebot-daemon-linux-amd64
-   sudo mv firebot-daemon-linux-amd64 /usr/local/bin/firebot-daemon
+   chmod +x firebot-daemon
+   sudo mv firebot-daemon /opt/firebot-daemon/firebot-daemon
    ```
 
 3. Setup-Wizard starten:
    ```bash
-   sudo firebot-daemon setup
+   sudo /opt/firebot-daemon/firebot-daemon setup
    ```
 
 4. Als Service einrichten:
    ```bash
-   sudo firebot-daemon install
+   sudo /opt/firebot-daemon/firebot-daemon install
    ```
 
 ## Setup-Wizard
 
-Der Setup-Wizard fragt:
+Der Setup-Wizard führt dich durch folgende Schritte:
 
-- **Dashboard-URL** — Die Adresse deines DuneBot-Dashboards
-- **API-Token** — Wird beim Registrieren des Root-Servers im Dashboard generiert
+1. **Daemon-Name** — Ein Name für diesen Daemon (z.B. `mein-server`)
+2. **Daemon-ID** — UUID aus dem Dashboard (Masterserver → RootServer erstellen → Setup-Modal)
+3. **Setup-Token** — API-Key aus dem Dashboard (wird nur einmal angezeigt!)
+4. **Dashboard-URL** — Wird automatisch auf `wss://firenetworks.de/ws` gesetzt. Nicht ändern!
+5. **Basis-Verzeichnis** — Wo Gameserver-Daten gespeichert werden (Standard: `/var/lib/firebot-daemon/volumes`)
+6. **Log-Verzeichnis** — Daemon-Logs (Standard: `{Basis-Verzeichnis}/daemon-logs`)
 
-Alternativ kannst du die Konfiguration manuell in `/etc/firebot-daemon/daemon.yaml` eintragen.
+> **Wichtig:** Die Dashboard-URL ist fest vorgegeben (`wss://firenetworks.de/ws`). Eine eigene URL funktioniert nicht — einfach Enter drücken, um den Standard zu übernehmen.
+
+Alternativ kannst du die Konfiguration manuell in `/opt/firebot-daemon/daemon.yaml` eintragen.
 
 ## Konfiguration (daemon.yaml)
 
-Die Konfigurationsdatei wird beim Setup automatisch erstellt. Wichtige Felder:
+Die Konfigurationsdatei wird beim Setup automatisch erstellt und liegt unter `/opt/firebot-daemon/daemon.yaml`. Wichtige Felder:
 
 ```yaml
-# Verbindung zum DuneBot Dashboard
-dashboard:
-  url: "wss://dashboard.dunebot.de"
-  token: "dein-api-token"
+# Daemon-Identifikation
+daemon:
+  name: "mein-server"
+  daemon_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # UUID aus dem Dashboard
+  token: "dein-setup-token"                           # API-Key aus dem Dashboard
 
-# Root-Server Identifikation
-server:
-  id: "wird-automatisch-generiert"
-  
-# Pfade
-paths:
-  servers: "/home/gameservers/servers"
-  backups: "/home/gameservers/backups"
-  steamcmd: "/home/gameservers/steamcmd"
+# Verbindung zum DuneBot Dashboard (NICHT ÄNDERN!)
+dashboard:
+  url: "wss://firenetworks.de/ws"
+
+# Dateisystem
+filesystem:
+  base_directory: "/var/lib/firebot-daemon/volumes"  # Basis für alle Gameserver-Daten
+  auto_create_base: true
+
+# Logging
+logging:
+  level: "info"
+  file: "daemon.log"
 ```
+
+> **Achtung:** Die `dashboard.url` muss immer `wss://firenetworks.de/ws` sein. Eine andere URL wird vom System nicht unterstützt.
 
 ## Service verwalten
 
@@ -112,10 +125,11 @@ Nach dem Start verbindet sich der Daemon automatisch mit dem Dashboard. Du kanns
 
 ### Daemon verbindet sich nicht
 
-1. **Token korrekt?** — Prüfe den Token in `daemon.yaml`
-2. **Dashboard erreichbar?** — `curl -I https://dein-dashboard.de`
-3. **Firewall?** — Der WebSocket-Port (Standard: 9340) muss erreichbar sein
-4. **Logs prüfen:** `sudo journalctl -u firebot-daemon --no-pager -n 50`
+1. **Token korrekt?** — Prüfe den Token in `/opt/firebot-daemon/daemon.yaml`
+2. **Dashboard-URL korrekt?** — Muss `wss://firenetworks.de/ws` sein
+3. **Dashboard erreichbar?** — `curl -I https://firenetworks.de`
+4. **Firewall?** — Ausgehende HTTPS/WSS-Verbindungen (Port 443) müssen erlaubt sein
+5. **Logs prüfen:** `sudo journalctl -u firebot-daemon --no-pager -n 50`
 
 ### SteamCMD-Fehler
 
@@ -132,13 +146,43 @@ sudo apt install lib32gcc-s1 lib32stdc++6
 
 ```bash
 # Automatisch (wenn über Installer installiert)
-sudo firebot-daemon update
+sudo /opt/firebot-daemon/firebot-daemon update
 
 # Manuell
 sudo systemctl stop firebot-daemon
-wget -O /usr/local/bin/firebot-daemon https://firenetworks.de/downloads/firebot-daemon-linux-amd64
-chmod +x /usr/local/bin/firebot-daemon
+wget -O /opt/firebot-daemon/firebot-daemon https://firenetworks.de/downloads/linux-amd64/firebot-daemon
+chmod +x /opt/firebot-daemon/firebot-daemon
 sudo systemctl start firebot-daemon
 ```
+
+## Deinstallation
+
+Den FireBot Daemon kannst du vollständig vom System entfernen:
+
+### Automatische Deinstallation
+
+```bash
+curl -sSL https://firenetworks.de/downloads/daemon/uninstall.sh | sudo bash
+```
+
+### Manuelle Deinstallation
+
+```bash
+# 1. Service stoppen und deaktivieren
+sudo systemctl stop firebot-daemon
+sudo systemctl disable firebot-daemon
+
+# 2. Service-Datei entfernen
+sudo rm /etc/systemd/system/firebot-daemon.service
+sudo systemctl daemon-reload
+
+# 3. Daemon-Binary und Config entfernen
+sudo rm -rf /opt/firebot-daemon
+```
+
+> **Hinweis:** Gameserver-Daten unter `/var/lib/firebot-daemon/volumes` werden bei der Deinstallation **nicht** automatisch gelöscht. Wenn du auch die Spieldaten entfernen möchtest:
+> ```bash
+> sudo rm -rf /var/lib/firebot-daemon
+> ```
 
 → Weiter: [Root-Server registrieren](masterserver.md)

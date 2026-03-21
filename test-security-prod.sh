@@ -22,6 +22,10 @@ TESTS=(
     "/package.json"
     "/ecosystem.config.js"
     "/migration.sql"
+    "/getting-started/berechtigungen.md"
+    "/docs/dashboard/%7B%7B%20.Permalink%20%7D%7D"
+    "/docs/gameserver/%7B%7B%20.Permalink%20%7D%7D"
+    "/documentation/index.md"
 )
 
 echo "🧪 Teste $(( ${#TESTS[@]} )) Endpoints..."

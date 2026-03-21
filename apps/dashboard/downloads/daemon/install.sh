@@ -390,17 +390,14 @@ download_binary() {
     
     log_info "Lade Binary herunter von: $url"
     
-    local tmp_file
-    tmp_file=$(mktemp /tmp/firebot-daemon.XXXXXX)
+    local tmp_file="/tmp/${BINARY_NAME}"
     
     if check_command curl; then
-        # </dev/null verhindert stdin-Konflikte bei "curl ... | sudo bash"
-        if curl -fsSL -o "$tmp_file" "$url" </dev/null; then
+        if curl -fsSL -o "$tmp_file" "$url"; then
             chmod +x "$tmp_file"
             mv "$tmp_file" "${INSTALL_DIR}/${BINARY_NAME}"
             log_success "Binary heruntergeladen und installiert"
         else
-            rm -f "$tmp_file"
             log_error "Download fehlgeschlagen!"
             log_error "URL war: $url"
             log_info "Bitte Binary manuell nach ${INSTALL_DIR}/${BINARY_NAME} kopieren"

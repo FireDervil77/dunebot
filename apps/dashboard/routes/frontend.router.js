@@ -8,17 +8,20 @@ const { ChangelogHelper } = require("dunebot-sdk/utils");
 // Router erstellen
 const router = express.Router();
 
-// ── Middleware: Menu + Footer Daten für alle Frontend-Seiten laden ──
+// ── Middleware: Menu + Footer + Layout für alle Frontend-Seiten laden ──
 router.use(async (req, res, next) => {
     try {
         const FrontendMenu = require('dunebot-db-client/models/FrontendMenu');
         const FrontendFooter = require('dunebot-db-client/models/FrontendFooter');
+        const themeManager = ServiceManager.get('themeManager');
         const [menuItems, footerColumns] = await Promise.all([
             FrontendMenu.getVisibleTree(),
             FrontendFooter.getVisibleColumnsWithLinks()
         ]);
         res.locals.menuItems = menuItems;
         res.locals.footerColumns = footerColumns;
+        // Layout global für alle Frontend-Routes setzen (inkl. 404/500)
+        res.locals.layout = themeManager.getLayout('frontend');
     } catch (err) {
         // Tabellen existieren evtl. noch nicht — Fallback auf leere Arrays
         res.locals.menuItems = [];
@@ -225,7 +228,7 @@ const docsPath = require('path');
 const docsFs = require('fs').promises;
 const { marked } = require('marked');
 
-const DOCS_ROOT = docsPath.resolve(__dirname, '..', '..', '..', '..', 'documentation');
+const DOCS_ROOT = docsPath.resolve(__dirname, '..', '..', '..', 'documentation');
 
 /**
  * Sicherer Pfad-Check (verhindert Path-Traversal)
@@ -298,7 +301,9 @@ router.get('/docs', async (req, res) => {
 router.get('/docs/{*docPath}', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const themeManager = ServiceManager.get('themeManager');
-    const requestedPath = req.params.docPath;
+    const requestedPath = Array.isArray(req.params.docPath)
+        ? req.params.docPath.join('/')
+        : req.params.docPath;
 
     // .md-Endung an angefragten Pfad
     let mdPath = requestedPath;
