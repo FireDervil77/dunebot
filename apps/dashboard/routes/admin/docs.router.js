@@ -24,7 +24,7 @@ const fs = require('fs').promises;
 const router = Router();
 
 // Docs-Basisverzeichnis (absolut)
-const DOCS_ROOT = path.resolve(__dirname, '..', '..', '..', 'documentation');
+const DOCS_ROOT = path.resolve(__dirname, '..', '..', '..', '..', 'documentation');
 
 /**
  * Sicherstellen, dass ein Pfad innerhalb von DOCS_ROOT liegt.

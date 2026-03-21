@@ -225,7 +225,7 @@ const docsPath = require('path');
 const docsFs = require('fs').promises;
 const { marked } = require('marked');
 
-const DOCS_ROOT = docsPath.resolve(__dirname, '..', '..', '..', 'documentation');
+const DOCS_ROOT = docsPath.resolve(__dirname, '..', '..', '..', '..', 'documentation');
 
 /**
  * Sicherer Pfad-Check (verhindert Path-Traversal)
