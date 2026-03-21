@@ -67,11 +67,11 @@ class ThemeManager {
                 ...data                   // View-spezifische Daten (überschreibt alles)
             };
 
-            // 4. WICHTIG: Layout in res.locals setzen für express-ejs-layouts
-            res.locals.layout = this.getLayout(section);
-            
-            // 5. WICHTIG: Alle View-Daten in res.locals mergen für express-ejs-layouts
+            // 4. WICHTIG: Alle View-Daten in res.locals mergen für express-ejs-layouts
             Object.assign(res.locals, viewData);
+
+            // 5. WICHTIG: Layout NACH dem Merge setzen, damit es nicht durch viewData überschrieben wird
+            res.locals.layout = this.getLayout(section);
 
             Logger.debug('Render Context:', {
                 view,

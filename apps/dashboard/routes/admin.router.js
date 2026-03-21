@@ -19,6 +19,16 @@ const { NewsHelper, ChangelogHelper, NotificationHelper } = require('dunebot-sdk
 const router = Router();
 
 // ================================================================
+// MIDDLEWARE: Guild-Layout für alle Admin-Routen setzen
+// (Schutz gegen Frontend-Router, der res.locals.layout = frontend setzt)
+// ================================================================
+router.use((req, res, next) => {
+    const themeManager = ServiceManager.get('themeManager');
+    res.locals.layout = themeManager.getLayout('guild');
+    next();
+});
+
+// ================================================================
 // HELPER: Global Stats
 // ================================================================
 
