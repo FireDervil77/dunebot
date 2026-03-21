@@ -4,6 +4,7 @@
   "description": "Child-Theme basierend auf DuneBot Default",
   "version": "1.0.0",
   "author": "DuneBot Team",
+  "screenshot": "https://dev.firenetworks.de/uploads/media/1403034310172475416/1773746247397-ea467e07cba9879f.png",
   "parent": "default",
   "tags": [
     "child-theme"

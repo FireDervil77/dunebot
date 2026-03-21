@@ -557,10 +557,15 @@ class ThemeManager {
                     css += `.app-sidebar, .main-sidebar, .sidebar { background-color: ${v['sidebar-bg']} !important; }\n`;
                 }
                 if (v['sidebar-color']) {
+                    css += `.app-sidebar .nav-link, .app-sidebar .nav-link p, .app-sidebar .nav-header, .app-sidebar .sidebar-brand-text { color: ${v['sidebar-color']} !important; }\n`;
+                    css += `.app-sidebar .nav-icon, .app-sidebar .nav-link .nav-icon { color: ${v['sidebar-color']} !important; }\n`;
+                    css += `.nav-sidebar .nav-link, .nav-sidebar .nav-link p { color: ${v['sidebar-color']} !important; }\n`;
+                    css += `[data-bs-theme="dark"] .nav-sidebar .nav-link, [data-bs-theme="dark"] .nav-link p { color: ${v['sidebar-color']} !important; }\n`;
                     css += `.sidebar .nav-link, .sidebar .nav-link p, .sidebar .nav-header, .sidebar-brand-text { color: ${v['sidebar-color']} !important; }\n`;
-                    css += `.sidebar .nav-link .nav-icon { color: ${v['sidebar-color']} !important; }\n`;
                 }
                 if (v['sidebar-hover-bg']) {
+                    css += `.app-sidebar .nav-link:hover, .app-sidebar .nav-link.active { background-color: ${v['sidebar-hover-bg']} !important; }\n`;
+                    css += `.nav-sidebar > .nav-item > .nav-link.active, .nav-sidebar .nav-treeview > .nav-item > .nav-link.active { background-color: ${v['sidebar-hover-bg']} !important; }\n`;
                     css += `.sidebar .nav-link:hover, .sidebar .nav-link.active, .sidebar .nav-treeview > .nav-item > .nav-link.active { background-color: ${v['sidebar-hover-bg']} !important; }\n`;
                 }
 
@@ -582,6 +587,9 @@ class ThemeManager {
                 // Text
                 if (v['text-color']) {
                     css += `body, .content-wrapper, .card-body, p, span, td, th, li, label { color: ${v['text-color']} !important; }\n`;
+                    css += `h1, h2, h3, h4, h5, h6, .card-title, .info-box-text, .info-box-number { color: ${v['text-color']} !important; }\n`;
+                    css += `.main-header .navbar-nav .nav-link, .main-header .navbar-nav .nav-link i { color: ${v['text-color']} !important; }\n`;
+                    css += `.content-header h1, .breadcrumb-item a, .breadcrumb-item.active { color: ${v['text-color']} !important; }\n`;
                 }
 
                 // Primary Color

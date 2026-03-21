@@ -1,0 +1,255 @@
+<%#
+ * Admin: Dokumentation verwalten
+ * Dateibaum mit Markdown-Dateien aus /documentation/
+ *
+ * @context {Array} tree - Rekursiver Dateibaum [{name, path, type, children?}]
+%>
+
+<div class="app-content">
+    <div class="container-fluid">
+
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <h2 class="mb-0"><i class="fa-solid fa-book me-2"></i>Dokumentation verwalten</h2>
+                    <p class="text-muted mb-0">Markdown-Dateien aus dem <code>/documentation/</code> Verzeichnis bearbeiten</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#newFileModal">
+                        <i class="fa-solid fa-file-circle-plus me-1"></i> Neue Datei
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newFolderModal">
+                        <i class="fa-solid fa-folder-plus me-1"></i> Neuer Ordner
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info -->
+        <div class="alert alert-info d-flex align-items-start mb-4">
+            <i class="fa-solid fa-circle-info me-2 mt-1"></i>
+            <div>
+                Alle Dateien werden als <strong>Markdown (.md)</strong> gespeichert. 
+                Öffentlich erreichbar unter <code>/docs/</code> — verlinke die Doku-Seite über den 
+                <a href="/admin/themes/menu"><strong>Navigation Builder</strong></a>.
+            </div>
+        </div>
+
+        <!-- Dateibaum -->
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="mb-0"><i class="fa-solid fa-folder-tree me-2"></i>Dateien</h5>
+                <span class="badge bg-secondary" id="fileCount">0 Dateien</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="docsTable">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Name</th>
+                                <th style="width: 120px">Typ</th>
+                                <th style="width: 180px" class="text-end pe-3">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% function renderTree(items, depth) { %>
+                                <% items.forEach(item => { %>
+                                    <tr>
+                                        <td class="ps-3">
+                                            <span style="padding-left: <%= depth * 24 %>px;">
+                                                <% if (item.type === 'folder') { %>
+                                                    <i class="fa-solid fa-folder text-warning me-2"></i>
+                                                    <strong><%= item.name %></strong>
+                                                <% } else { %>
+                                                    <i class="fa-solid fa-file-lines text-primary me-2"></i>
+                                                    <a href="/admin/docs/edit?path=<%= encodeURIComponent(item.path) %>">
+                                                        <%= item.name %>
+                                                    </a>
+                                                <% } %>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <% if (item.type === 'folder') { %>
+                                                <span class="badge bg-warning text-dark">Ordner</span>
+                                            <% } else { %>
+                                                <span class="badge bg-primary">Markdown</span>
+                                            <% } %>
+                                        </td>
+                                        <td class="text-end pe-3">
+                                            <% if (item.type === 'file') { %>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="/admin/docs/edit?path=<%= encodeURIComponent(item.path) %>" 
+                                                       class="btn btn-outline-primary" title="Bearbeiten">
+                                                        <i class="fa-solid fa-pen"></i>
+                                                    </a>
+                                                    <a href="/docs/<%= item.path.replace(/\.md$/, '') %>" 
+                                                       target="_blank" class="btn btn-outline-info" title="Öffentliche Vorschau">
+                                                        <i class="fa-solid fa-eye"></i>
+                                                    </a>
+                                                    <% if (item.path !== 'index.md') { %>
+                                                        <button class="btn btn-outline-danger btn-delete-file" 
+                                                                data-path="<%= item.path %>" 
+                                                                data-name="<%= item.name %>"
+                                                                title="Löschen">
+                                                            <i class="fa-solid fa-trash"></i>
+                                                        </button>
+                                                    <% } %>
+                                                </div>
+                                            <% } %>
+                                        </td>
+                                    </tr>
+                                    <% if (item.type === 'folder' && item.children) { %>
+                                        <% renderTree(item.children, depth + 1); %>
+                                    <% } %>
+                                <% }); %>
+                            <% } %>
+                            <% if (tree && tree.length > 0) { %>
+                                <% renderTree(tree, 0); %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-4">
+                                        <i class="fa-solid fa-folder-open fa-2x mb-2"></i>
+                                        <p>Keine Dokumentationsdateien gefunden</p>
+                                    </td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Modal: Neue Datei -->
+<div class="modal fade" id="newFileModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-file-circle-plus me-2"></i>Neue Datei erstellen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Dateipfad</label>
+                    <input type="text" class="form-control" id="newFilePath" 
+                           placeholder="z.B. getting-started/installation.md">
+                    <small class="form-text text-muted">Relativer Pfad mit .md Endung. Ordner werden automatisch erstellt.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" id="btnCreateFile">
+                    <i class="fa-solid fa-plus me-1"></i>Erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Neuer Ordner -->
+<div class="modal fade" id="newFolderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-folder-plus me-2"></i>Neuen Ordner erstellen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Ordnerpfad</label>
+                    <input type="text" class="form-control" id="newFolderPath" 
+                           placeholder="z.B. tutorials/advanced">
+                    <small class="form-text text-muted">Relativer Pfad. Verschachtelte Ordner werden automatisch erstellt.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" id="btnCreateFolder">
+                    <i class="fa-solid fa-plus me-1"></i>Erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Dateien zählen
+    const fileCount = document.querySelectorAll('.btn-delete-file, a[href^="/admin/docs/edit"]').length;
+    const badge = document.getElementById('fileCount');
+    if (badge) badge.textContent = fileCount + ' Datei' + (fileCount !== 1 ? 'en' : '');
+
+    // Neue Datei erstellen
+    document.getElementById('btnCreateFile')?.addEventListener('click', async function() {
+        let filePath = document.getElementById('newFilePath').value.trim();
+        if (!filePath) return alert('Bitte einen Pfad eingeben');
+        if (!filePath.endsWith('.md')) filePath += '.md';
+
+        try {
+            const resp = await fetch('/admin/docs/api/file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: filePath })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                window.location.href = '/admin/docs/edit?path=' + encodeURIComponent(filePath);
+            } else {
+                alert(data.message || 'Fehler beim Erstellen');
+            }
+        } catch (e) {
+            alert('Netzwerkfehler: ' + e.message);
+        }
+    });
+
+    // Neuer Ordner erstellen
+    document.getElementById('btnCreateFolder')?.addEventListener('click', async function() {
+        const folderPath = document.getElementById('newFolderPath').value.trim();
+        if (!folderPath) return alert('Bitte einen Pfad eingeben');
+
+        try {
+            const resp = await fetch('/admin/docs/api/folder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: folderPath })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.message || 'Fehler beim Erstellen');
+            }
+        } catch (e) {
+            alert('Netzwerkfehler: ' + e.message);
+        }
+    });
+
+    // Datei löschen
+    document.querySelectorAll('.btn-delete-file').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const filePath = this.dataset.path;
+            const fileName = this.dataset.name;
+            if (!confirm('Datei "' + fileName + '" wirklich löschen?')) return;
+
+            try {
+                const resp = await fetch('/admin/docs/api/file', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: filePath })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Fehler beim Löschen');
+                }
+            } catch (e) {
+                alert('Netzwerkfehler: ' + e.message);
+            }
+        });
+    });
+});
+</script>

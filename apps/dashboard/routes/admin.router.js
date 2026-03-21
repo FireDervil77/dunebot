@@ -707,4 +707,7 @@ router.use('/addons', addonsRouter);
 const themesRouter = require('./admin/themes.router');
 router.use('/themes', themesRouter);
 
+const docsRouter = require('./admin/docs.router');
+router.use('/docs', docsRouter);
+
 module.exports = router;

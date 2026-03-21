@@ -221,6 +221,14 @@
                                 Eigenes CSS schreiben. Nutze <code>var(--primary-color)</code> etc. für die obigen Variablen.
                                 Die Änderungen überschreiben das aktive Theme, ohne es zu verändern.
                             </p>
+                            <div class="d-flex gap-2" style="gap:6px;">
+                                <button class="btn btn-xs btn-outline-secondary" id="btn-restore-css" title="Zuletzt gespeicherten CSS-Stand wiederherstellen">
+                                    <i class="fa-solid fa-clock-rotate-left mr-1"></i>Letzte Sicherung
+                                </button>
+                                <button class="btn btn-xs btn-outline-danger" id="btn-clear-css" title="Custom CSS komplett leeren (Variablen bleiben erhalten)">
+                                    <i class="fa-solid fa-eraser mr-1"></i>CSS zurücksetzen
+                                </button>
+                            </div>
                         </div>
                         <div class="css-editor-wrap flex-fill">
                             <textarea id="css-editor" spellcheck="false" placeholder="/* Dein Custom CSS */&#10;&#10;.sidebar {&#10;  background: var(--sidebar-bg);&#10;}"><%= customCSS %></textarea>
@@ -261,6 +269,10 @@
     const guildId = '<%= guildId %>';
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const defaultVars = <%- JSON.stringify(defaultVariables) %>;
+
+    // Gespeicherter Stand beim Laden (für "Letzte Sicherung")
+    const savedCSS = <%= JSON.stringify(customCSS || '') %>;
+    const savedVariables = <%- JSON.stringify(variables) %>;
 
     // State
     let isDirty = false;
@@ -311,10 +323,15 @@
             css += `.app-sidebar, .main-sidebar, .sidebar { background-color: ${v['sidebar-bg']} !important; }\n`;
         }
         if (v['sidebar-color']) {
+            css += `.app-sidebar .nav-link, .app-sidebar .nav-link p, .app-sidebar .nav-header, .app-sidebar .sidebar-brand-text { color: ${v['sidebar-color']} !important; }\n`;
+            css += `.app-sidebar .nav-icon, .app-sidebar .nav-link .nav-icon { color: ${v['sidebar-color']} !important; }\n`;
+            css += `.nav-sidebar .nav-link, .nav-sidebar .nav-link p { color: ${v['sidebar-color']} !important; }\n`;
+            css += `[data-bs-theme="dark"] .nav-sidebar .nav-link, [data-bs-theme="dark"] .nav-link p { color: ${v['sidebar-color']} !important; }\n`;
             css += `.sidebar .nav-link, .sidebar .nav-link p, .sidebar .nav-header, .sidebar-brand-text { color: ${v['sidebar-color']} !important; }\n`;
-            css += `.sidebar .nav-link .nav-icon { color: ${v['sidebar-color']} !important; }\n`;
         }
         if (v['sidebar-hover-bg']) {
+            css += `.app-sidebar .nav-link:hover, .app-sidebar .nav-link.active { background-color: ${v['sidebar-hover-bg']} !important; }\n`;
+            css += `.nav-sidebar > .nav-item > .nav-link.active, .nav-sidebar .nav-treeview > .nav-item > .nav-link.active { background-color: ${v['sidebar-hover-bg']} !important; }\n`;
             css += `.sidebar .nav-link:hover, .sidebar .nav-link.active, .sidebar .nav-treeview > .nav-item > .nav-link.active { background-color: ${v['sidebar-hover-bg']} !important; }\n`;
         }
         if (v['header-bg']) {
@@ -328,6 +345,9 @@
         }
         if (v['text-color']) {
             css += `body, .content-wrapper, .card-body, p, span, td, th, li, label { color: ${v['text-color']} !important; }\n`;
+            css += `h1, h2, h3, h4, h5, h6, .card-title, .info-box-text, .info-box-number { color: ${v['text-color']} !important; }\n`;
+            css += `.main-header .navbar-nav .nav-link, .main-header .navbar-nav .nav-link i { color: ${v['text-color']} !important; }\n`;
+            css += `.content-header h1, .breadcrumb-item a, .breadcrumb-item.active { color: ${v['text-color']} !important; }\n`;
         }
         if (v['primary-color']) {
             css += `.btn-primary { background-color: ${v['primary-color']} !important; border-color: ${v['primary-color']} !important; }\n`;
@@ -516,6 +536,46 @@
         } finally {
             this.disabled = false;
         }
+    });
+
+    // ============================
+    // CSS zurücksetzen (nur CSS, Variablen bleiben)
+    // ============================
+    document.getElementById('btn-clear-css').addEventListener('click', function() {
+        if (!cssEditor.value.trim()) return;
+        if (!confirm('Custom CSS komplett leeren? Die Farb-Variablen bleiben erhalten.')) return;
+        cssEditor.value = '';
+        markDirty();
+        updatePreview();
+        if (typeof toastr !== 'undefined') toastr.info('CSS geleert — zum Speichern auf "Speichern" klicken');
+    });
+
+    // ============================
+    // Letzte Sicherung wiederherstellen
+    // ============================
+    document.getElementById('btn-restore-css').addEventListener('click', function() {
+        if (cssEditor.value === savedCSS) {
+            if (typeof toastr !== 'undefined') toastr.info('Keine Änderungen seit der letzten Speicherung');
+            return;
+        }
+        if (!confirm('CSS und Variablen auf den zuletzt gespeicherten Stand zurücksetzen?')) return;
+
+        // CSS wiederherstellen
+        cssEditor.value = savedCSS;
+
+        // Variablen wiederherstellen
+        document.querySelectorAll('.color-var-row').forEach(row => {
+            const key = row.dataset.var;
+            const val = savedVariables[key] || '';
+            row.querySelector('.var-hex-input').value = val;
+            if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                row.querySelector('.var-color-picker').value = val;
+            }
+        });
+
+        markDirty();
+        updatePreview();
+        if (typeof toastr !== 'undefined') toastr.success('Letzte Sicherung wiederhergestellt — zum Speichern auf "Speichern" klicken');
     });
 
     // ============================

@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "description": "Standard-Theme für das DuneBot-Dashboard",
     "author": "DuneBot Team",
-    "screenshot": "screenshot.png",
+    "screenshot": "https://dev.firenetworks.de/uploads/media/1403034310172475416/1773746247397-ea467e07cba9879f.png",
     "parent": null,
     "tags": ["admin", "responsive"],
     "requires": "1.0.0",

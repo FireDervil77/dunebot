@@ -1,0 +1,182 @@
+<%#
+ * Admin: Dokumentation — Markdown-Editor
+ * EasyMDE-basierter Editor für einzelne Markdown-Dateien.
+ *
+ * @context {String} filePath - Relativer Pfad der Datei
+ * @context {String} content  - Aktueller Dateiinhalt
+ * @context {Array}  tree     - Dateibaum für Sidebar-Navigation
+%>
+
+<!-- EasyMDE CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
+
+<div class="app-content">
+    <div class="container-fluid">
+
+        <!-- Header -->
+        <div class="row mb-3">
+            <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fa-solid fa-file-pen me-2"></i>
+                        <span class="text-muted"><%= filePath %></span>
+                    </h2>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/docs/<%= filePath.replace(/\.md$/, '') %>" target="_blank" class="btn btn-outline-info btn-sm">
+                        <i class="fa-solid fa-eye me-1"></i> Vorschau
+                    </a>
+                    <button class="btn btn-success btn-sm" id="btnSave">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Speichern
+                    </button>
+                    <a href="/admin/docs" class="btn btn-outline-secondary btn-sm">
+                        <i class="fa-solid fa-arrow-left me-1"></i> Zurück
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Sidebar: Dateibaum -->
+            <div class="col-lg-3 col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fa-solid fa-folder-tree me-2"></i>Dateien</h6>
+                    </div>
+                    <div class="card-body p-2" style="max-height: 70vh; overflow-y: auto;">
+                        <% function renderSidebar(items, depth) { %>
+                            <% items.forEach(item => { %>
+                                <% if (item.type === 'folder') { %>
+                                    <div style="padding-left: <%= depth * 16 %>px;" class="py-1">
+                                        <i class="fa-solid fa-folder text-warning me-1 small"></i>
+                                        <strong class="small"><%= item.name %></strong>
+                                    </div>
+                                    <% if (item.children) { renderSidebar(item.children, depth + 1); } %>
+                                <% } else { %>
+                                    <div style="padding-left: <%= depth * 16 %>px;" class="py-1">
+                                        <i class="fa-solid fa-file-lines me-1 small <%= item.path === filePath ? 'text-success' : 'text-muted' %>"></i>
+                                        <% if (item.path === filePath) { %>
+                                            <strong class="small text-success"><%= item.name %></strong>
+                                        <% } else { %>
+                                            <a href="/admin/docs/edit?path=<%= encodeURIComponent(item.path) %>" class="small text-decoration-none">
+                                                <%= item.name %>
+                                            </a>
+                                        <% } %>
+                                    </div>
+                                <% } %>
+                            <% }); %>
+                        <% } %>
+                        <% if (tree && tree.length > 0) { %>
+                            <% renderSidebar(tree, 0); %>
+                        <% } else { %>
+                            <p class="text-muted small mb-0">Keine Dateien</p>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Editor -->
+            <div class="col-lg-9 col-md-8">
+                <div class="card">
+                    <div class="card-body p-0">
+                        <textarea id="mdEditor"><%= content %></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Status-Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1055;">
+    <div id="saveToast" class="toast align-items-center border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body" id="saveToastBody"></div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+<!-- EasyMDE JS -->
+<script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const FILE_PATH = '<%= filePath.replace(/'/g, "\\'") %>';
+
+    // EasyMDE initialisieren
+    const easyMDE = new EasyMDE({
+        element: document.getElementById('mdEditor'),
+        spellChecker: false,
+        autosave: {
+            enabled: true,
+            uniqueId: 'docs-editor-' + FILE_PATH,
+            delay: 5000
+        },
+        toolbar: [
+            'bold', 'italic', 'strikethrough', 'heading', '|',
+            'quote', 'unordered-list', 'ordered-list', 'checklist', '|',
+            'link', 'image', 'table', 'horizontal-rule', '|',
+            'code', 'clean-block', '|',
+            'preview', 'side-by-side', 'fullscreen', '|',
+            'guide'
+        ],
+        minHeight: '500px',
+        status: ['lines', 'words', 'cursor'],
+        renderingConfig: {
+            codeSyntaxHighlighting: true
+        }
+    });
+
+    // Toast-Hilfsfunktion
+    function showToast(message, type) {
+        const toast = document.getElementById('saveToast');
+        const body = document.getElementById('saveToastBody');
+        toast.className = 'toast align-items-center border-0 text-bg-' + type;
+        body.textContent = message;
+        const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+        bsToast.show();
+    }
+
+    // Speichern
+    async function saveFile() {
+        const btn = document.getElementById('btnSave');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Speichern...';
+        btn.disabled = true;
+
+        try {
+            const resp = await fetch('/admin/docs/api/file', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    path: FILE_PATH,
+                    content: easyMDE.value()
+                })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast('Datei gespeichert!', 'success');
+            } else {
+                showToast(data.message || 'Fehler beim Speichern', 'danger');
+            }
+        } catch (e) {
+            showToast('Netzwerkfehler: ' + e.message, 'danger');
+        } finally {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }
+    }
+
+    document.getElementById('btnSave').addEventListener('click', saveFile);
+
+    // Strg+S Shortcut
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            saveFile();
+        }
+    });
+});
+</script>

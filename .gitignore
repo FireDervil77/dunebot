@@ -80,3 +80,4 @@ firebot-daemon-*
 #docs and docs folder
 docs/
 docs/*
+!apps/dashboard/themes/default/views/admin/docs/
