@@ -135,27 +135,27 @@
 <!-- ════════════════════════════════════════════════════════════════════════════ -->
 
 <!-- Monaco Editor Modal -->
-<div class="modal fade" id="editor-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-xl modal-fullscreen-lg-down">
+<div class="modal fade" id="editor-modal" tabindex="-1" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-edit me-2"></i>
+                    <i class="fas fa-edit mr-2"></i>
                     <span id="editor-file-name">Datei bearbeiten</span>
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span>&times;</span></button>
             </div>
             <div class="modal-body p-0">
                 <!-- Monaco Editor Container -->
                 <div id="monaco-editor" style="height: 60vh; min-height: 400px;"></div>
             </div>
             <div class="modal-footer">
-                <div class="me-auto text-muted small">
-                    <i class="fas fa-keyboard me-1"></i>
+                <div class="mr-auto text-muted small">
+                    <i class="fas fa-keyboard mr-1"></i>
                     Tipp: <kbd>Ctrl+S</kbd> zum Speichern
                 </div>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-1"></i> Abbrechen
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fas fa-times mr-1"></i> Abbrechen
                 </button>
                 <% if (canManage) { %>
                     <button type="button" class="btn btn-primary" onclick="fileManager.saveFile()">
@@ -178,10 +178,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-folder-plus me-2"></i>
+                    <i class="fas fa-folder-plus mr-2"></i>
                     Neuer Ordner
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body">
                 <form id="new-folder-form" onsubmit="fileManager.createFolder(); return false;">
@@ -200,9 +200,9 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
                 <button type="button" class="btn btn-primary" onclick="fileManager.createFolder()">
-                    <i class="fas fa-check me-1"></i> Erstellen
+                    <i class="fas fa-check mr-1"></i> Erstellen
                 </button>
             </div>
         </div>
@@ -217,10 +217,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-upload me-2"></i>
+                    <i class="fas fa-upload mr-2"></i>
                     Dateien hochladen
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-info">
@@ -251,9 +251,9 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
                 <button type="button" class="btn btn-primary" id="start-upload-btn" onclick="fileManager.startUpload()" disabled>
-                    <i class="fas fa-upload me-1"></i> Hochladen
+                    <i class="fas fa-upload mr-1"></i> Hochladen
                 </button>
             </div>
         </div>
@@ -268,10 +268,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-edit me-2"></i>
+                    <i class="fas fa-edit mr-2"></i>
                     Umbenennen
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body">
                 <form id="rename-form" onsubmit="fileManager.renameFile(); return false;">
@@ -285,9 +285,9 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
                 <button type="button" class="btn btn-primary" onclick="fileManager.renameFile()">
-                    <i class="fas fa-check me-1"></i> Umbenennen
+                    <i class="fas fa-check mr-1"></i> Umbenennen
                 </button>
             </div>
         </div>
@@ -302,10 +302,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-arrows-alt me-2"></i>
+                    <i class="fas fa-arrows-alt mr-2"></i>
                     Dateien verschieben
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body">
                 <p>Ziel-Ordner auswählen:</p>
@@ -315,9 +315,9 @@
                 </select>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
                 <button type="button" class="btn btn-primary" onclick="fileManager.bulkMove()">
-                    <i class="fas fa-check me-1"></i> Verschieben
+                    <i class="fas fa-check mr-1"></i> Verschieben
                 </button>
             </div>
         </div>
@@ -331,22 +331,22 @@
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
                     <span id="confirm-title">Bestätigung erforderlich</span>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body">
                 <p id="confirm-message">Bist du sicher?</p>
                 <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <i class="fas fa-exclamation-circle mr-2"></i>
                     <strong>Warnung:</strong> Diese Aktion kann nicht rückgängig gemacht werden!
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
                 <button type="button" class="btn btn-danger" id="confirm-action-btn">
-                    <i class="fas fa-check me-1"></i> Bestätigen
+                    <i class="fas fa-check mr-1"></i> Bestätigen
                 </button>
             </div>
         </div>

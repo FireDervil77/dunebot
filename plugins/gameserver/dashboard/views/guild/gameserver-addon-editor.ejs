@@ -929,7 +929,7 @@ function renderTemplates() {
 
 function bindTemplateEvents() {
     document.querySelectorAll('.tpl-remove').forEach(btn => btn.addEventListener('click', function() {
-        if (confirm('Template entfernen?')) { this.closest('.tpl-card').remove(); syncTemplates(); }
+        if (confirm('Template entfernen?')) { this.closest('.tpl-card').remove(); updateJSONPreview(); }
     }));
     document.querySelectorAll('.tpl-add-var').forEach(btn => btn.addEventListener('click', function() {
         const vc = this.closest('.card-body').querySelector('.tpl-vars-container');
@@ -941,7 +941,7 @@ function bindTemplateEvents() {
         bindTemplateEvents();
     }));
     document.querySelectorAll('.tpl-remove-var').forEach(btn => btn.addEventListener('click', function() {
-        this.closest('.tpl-var-row').remove(); syncTemplates();
+        this.closest('.tpl-var-row').remove(); updateJSONPreview();
     }));
     document.querySelectorAll('.tpl-add-ov-file').forEach(btn => btn.addEventListener('click', function() {
         const oc = this.closest('.card-body')
@@ -959,7 +959,7 @@ function bindTemplateEvents() {
         bindTemplateEvents();
     }));
     document.querySelectorAll('.tpl-remove-ov-file').forEach(btn => btn.addEventListener('click', function() {
-        this.closest('.tpl-ov-file').remove(); syncTemplates();
+        this.closest('.tpl-ov-file').remove(); updateJSONPreview();
     }));
     document.querySelectorAll('.tpl-add-ov-key').forEach(btn => btn.addEventListener('click', function() {
         const kc = this.closest('.tpl-ov-file').querySelector('.tpl-ov-keys');
@@ -971,7 +971,7 @@ function bindTemplateEvents() {
         bindTemplateEvents();
     }));
     document.querySelectorAll('.tpl-remove-ov').forEach(btn => btn.addEventListener('click', function() {
-        this.closest('.tpl-ov-row').remove(); syncTemplates();
+        this.closest('.tpl-ov-row').remove(); updateJSONPreview();
     }));
 }
 
@@ -1007,7 +1007,8 @@ function syncTemplates() {
     });
     INITIAL_GAME_DATA.templates = templates;
     updateTemplatesMessage();
-    updateJSONPreview();
+    // ⚠️ KEIN updateJSONPreview() hier! Würde Endlos-Rekursion auslösen:
+    // syncTemplates → updateJSONPreview → buildGameData → syncTemplates → ...
 }
 
 function updateTemplatesMessage() {

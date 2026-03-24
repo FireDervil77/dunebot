@@ -111,6 +111,17 @@ async function serverAction(serverId, action) {
         if (window.showToast) {
             window.showToast('error', `Fehler: ${error.message}`);
         }
+
+        // ✅ UI sofort auf 'error' setzen (Fallback falls SSE-Event nicht ankommt)
+        if (window.gameserverOverview) {
+            window.gameserverOverview.updateServerStatus({
+                server_id: serverId,
+                status: 'error'
+            });
+        }
+        if (window.updateDetailUI) {
+            window.updateDetailUI('error');
+        }
     } finally {
         // Button wieder aktivieren
         button.disabled = false;
