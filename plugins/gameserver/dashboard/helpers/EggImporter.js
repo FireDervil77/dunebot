@@ -288,6 +288,10 @@ class EggImporter {
             // Query-Konfiguration: GameDig-Typ + Port-Variable
             query: this._resolveQueryConfig(egg),
 
+            // File-Denylist: Dateien die im File-Manager nicht sichtbar/editierbar sind
+            // Aus Pelican-Egg übernehmen + Standard-Schutz ergänzen
+            file_denylist: this._normalizeFileDenylist(egg.file_denylist),
+
             // Templates: leer bei Import — User kann sie danach hinzufügen
             templates: [],
         };
@@ -647,6 +651,29 @@ class EggImporter {
         } catch {
             return null;
         }
+    }
+
+    /**
+     * Normalisiert die File-Denylist aus einem Pelican/Pterodactyl Egg.
+     * Pelican nutzt `file_denylist` als Array von Pfad-Patterns.
+     * Ergänzt Standard-Schutz-Einträge falls nicht vorhanden.
+     *
+     * @param {string[]|null} raw — Denylist aus dem Egg
+     * @returns {string[]}
+     */
+    _normalizeFileDenylist(raw) {
+        const defaults = ['.env', 'start.sh', 'firebot.lock', 'firebot.pid'];
+        const list = new Set(defaults);
+
+        if (Array.isArray(raw)) {
+            for (const entry of raw) {
+                if (typeof entry === 'string' && entry.trim()) {
+                    list.add(entry.trim());
+                }
+            }
+        }
+
+        return [...list];
     }
 }
 

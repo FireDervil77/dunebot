@@ -277,5 +277,12 @@
       "https://cdn.akamai.steamstatic.com/steam/apps/730/ss_2.jpg"
     ]
   },
+  "file_denylist": [
+    ".env",
+    "start.sh",
+    "firebot.lock",
+    "firebot.pid",
+    "*.log"
+  ],
   "changelog": "Initial release - CS2 with Workshop support and 4 templates"
 }

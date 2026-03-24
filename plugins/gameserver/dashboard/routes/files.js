@@ -56,6 +56,47 @@ function formatFileSize(bytes) {
     return `${size.toFixed(1)} ${units[i]}`;
 }
 
+/**
+ * Lädt die file_denylist aus frozen_game_data eines Servers.
+ * @param {object} server - DB-Zeile des Servers
+ * @returns {string[]} - Array von Denylist-Patterns
+ */
+function getFileDenylist(server) {
+    try {
+        const frozen = typeof server.frozen_game_data === 'string'
+            ? JSON.parse(server.frozen_game_data)
+            : server.frozen_game_data;
+        if (Array.isArray(frozen?.file_denylist)) return frozen.file_denylist;
+    } catch (_) {}
+    return [];
+}
+
+/**
+ * Prüft ob ein Datei-Pfad durch die Denylist blockiert wird.
+ * Unterstützt: exakte Namen, Wildcard-Patterns (*.log), Verzeichnis-Patterns (dir/)
+ * @param {string} filePath - Relativer Pfad
+ * @param {string[]} denylist - Denylist-Patterns
+ * @returns {boolean} - true wenn blockiert
+ */
+function isDenied(filePath, denylist) {
+    if (!denylist || denylist.length === 0) return false;
+    const basename = path.basename(filePath);
+    for (const pattern of denylist) {
+        // Exakter Dateiname-Match
+        if (basename === pattern) return true;
+        // Wildcard-Pattern (z.B. *.log)
+        if (pattern.includes('*')) {
+            const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+            if (regex.test(basename) || regex.test(filePath)) return true;
+        }
+        // Verzeichnis-Pattern (z.B. "dir/")
+        if (pattern.endsWith('/') && (filePath.startsWith(pattern) || basename === pattern.slice(0, -1))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // ROUTES
 router.get('/servers/:serverId/files', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
@@ -82,11 +123,15 @@ router.get('/servers/:serverId/files', async (req, res) => {
             // Server noch nicht installiert / kein Verzeichnis vorhanden
             return res.json({ success: true, files: [], path: requestedPath });
         }
-        const files = rawFiles.map(file => ({
-            ...file,
-            editable: !file.is_dir && isEditable(file.name, file.size),
-            size_formatted: formatFileSize(file.size)
-        }));
+        // Denylist aus frozen_game_data laden und Dateien filtern
+        const denylist = getFileDenylist(server);
+        const files = rawFiles
+            .filter(file => !isDenied(path.join(requestedPath, file.name), denylist))
+            .map(file => ({
+                ...file,
+                editable: !file.is_dir && isEditable(file.name, file.size),
+                size_formatted: formatFileSize(file.size)
+            }));
         
         res.json({ success: true, files, path: requestedPath });
     } catch (error) {
@@ -105,6 +150,13 @@ router.get('/servers/:serverId/files/read', async (req, res) => {
         if (!filePath) return res.status(400).json({ success: false, error: 'Pfad erforderlich' });
         
         const server = await validateServerAccess(serverId, guildId);
+
+        // Denylist-Check: Datei darf nicht gelesen werden wenn blockiert
+        const denylist = getFileDenylist(server);
+        if (isDenied(filePath, denylist)) {
+            return res.status(403).json({ success: false, error: 'Zugriff auf diese Datei ist nicht erlaubt' });
+        }
+
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.read', {
             server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
@@ -136,6 +188,13 @@ router.post('/servers/:serverId/files/write', async (req, res) => {
         }
         
         const server = await validateServerAccess(serverId, guildId);
+
+        // Denylist-Check: Datei darf nicht geschrieben werden wenn blockiert
+        const denylist = getFileDenylist(server);
+        if (isDenied(filePath, denylist)) {
+            return res.status(403).json({ success: false, error: 'Diese Datei darf nicht bearbeitet werden' });
+        }
+
         const contentBase64 = Buffer.from(content, 'utf8').toString('base64');
         
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.write', {
@@ -167,6 +226,13 @@ router.delete('/servers/:serverId/files', async (req, res) => {
         if (!filePath) return res.status(400).json({ success: false, error: 'Pfad erforderlich' });
         
         const server = await validateServerAccess(serverId, guildId);
+
+        // Denylist-Check: Datei darf nicht gelöscht werden wenn blockiert
+        const denylist = getFileDenylist(server);
+        if (isDenied(filePath, denylist)) {
+            return res.status(403).json({ success: false, error: 'Diese Datei darf nicht gelöscht werden' });
+        }
+
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.delete', {
             server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),

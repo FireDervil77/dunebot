@@ -23,7 +23,43 @@ if (gameData.variables) {
     }
 }
 const envVars = server.env_variables_parsed || {};
+
+// Startup-Command aus game_data.startup.command (Template mit {{VAR}} Platzhaltern)
+const startupTemplate = (gameData.startup && gameData.startup.command) || server.launch_params || '';
+
+// Platzhalter durch aktuelle Werte ersetzen
+let resolvedStartup = startupTemplate;
+if (startupTemplate) {
+    // Alle {{VAR}} Platzhalter substituieren
+    resolvedStartup = startupTemplate.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
+        // Prüfe env_variables zuerst, dann variable defaults
+        if (envVars[varName] !== undefined && envVars[varName] !== '') {
+            return envVars[varName];
+        }
+        // Fallback: Default-Wert aus Variable-Definition suchen
+        const varDef = variablesArray.find(v => (v.env_variable || v.name) === varName);
+        if (varDef && varDef.default_value !== undefined && varDef.default_value !== '') {
+            return varDef.default_value;
+        }
+        return match; // Platzhalter beibehalten wenn kein Wert gefunden
+    });
+}
 %>
+
+<%# ═══════ Startup Command Anzeige ═══════ %>
+<% if (startupTemplate) { %>
+<div class="card card-outline card-dark mb-3">
+    <div class="card-header py-2">
+        <h3 class="card-title">
+            <i class="fas fa-terminal me-2"></i>
+            Startup Command
+        </h3>
+    </div>
+    <div class="card-body p-2">
+        <pre id="startup-command-preview" class="bg-dark text-success p-3 rounded mb-0" style="font-size: 13px; white-space: pre-wrap; word-break: break-all;"><%= resolvedStartup %></pre>
+    </div>
+</div>
+<% } %>
 
 <% if (variablesArray.length === 0) { %>
     <div class="alert alert-info">
@@ -114,6 +150,12 @@ const envVars = server.env_variables_parsed || {};
                 <i class="fas fa-save mr-1"></i>
                 Variablen speichern
             </button>
+            <% if (gameData.config && gameData.config.files && Object.keys(gameData.config.files).length > 0) { %>
+            <button type="button" class="btn btn-outline-info ml-2" id="apply-config-btn" onclick="applyConfig()" title="Config-Dateien auf dem Server patchen (ohne Neustart)">
+                <i class="fas fa-cogs mr-1"></i>
+                Config anwenden
+            </button>
+            <% } %>
             <small class="text-muted ml-3">
                 <i class="fas fa-info-circle mr-1"></i>
                 Änderungen werden beim nächsten Server-Start wirksam.
@@ -125,6 +167,28 @@ const envVars = server.env_variables_parsed || {};
 <% } %>
 
 <script>
+// ═══════ Startup-Command Live-Vorschau ═══════
+(function() {
+    const startupTemplate = `<%= startupTemplate.replace(/`/g, '\\`').replace(/\\/g, '\\\\') %>`;
+    const preview = document.getElementById('startup-command-preview');
+    const form = document.getElementById('variables-form');
+    if (!preview || !form || !startupTemplate) return;
+
+    function updateStartupPreview() {
+        let resolved = startupTemplate;
+        form.querySelectorAll('[name]').forEach(el => {
+            const val = el.value || '';
+            // Ersetze {{VAR_NAME}} mit dem aktuellen Wert
+            resolved = resolved.replace(new RegExp('\\{\\{' + el.name + '\\}\\}', 'g'), val || '{{' + el.name + '}}');
+        });
+        preview.textContent = resolved;
+    }
+
+    // Bei jeder Eingabe-Änderung aktualisieren
+    form.addEventListener('input', updateStartupPreview);
+    form.addEventListener('change', updateStartupPreview);
+})();
+
 async function saveVariables() {
     const form = document.getElementById('variables-form');
     const btn  = document.getElementById('variables-save-btn');
@@ -161,6 +225,39 @@ async function saveVariables() {
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-save mr-1"></i> Variablen speichern';
+    }
+}
+
+// ═══════ Config-Apply (Configs auf Disk patchen) ═══════
+async function applyConfig() {
+    const btn = document.getElementById('apply-config-btn');
+    if (!btn) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Patche Configs...';
+
+    try {
+        const resp = await fetch(
+            `/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/apply-config`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }
+        );
+        const result = await resp.json();
+        if (result.success) {
+            toastr.success(result.message || 'Config-Dateien gepatcht!');
+        } else {
+            toastr.error(result.message || 'Fehler beim Config-Apply.');
+        }
+    } catch (e) {
+        toastr.error('Netzwerkfehler beim Config-Apply.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-cogs mr-1"></i> Config anwenden';
     }
 }
 </script>

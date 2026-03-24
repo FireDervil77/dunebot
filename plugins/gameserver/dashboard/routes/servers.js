@@ -1489,6 +1489,11 @@ router.put('/:serverId/start', async (req, res) => {
                     startGameData.config = frozenData.config;
                 }
 
+                // File-Denylist für File-Manager (Pterodactyl-Pattern)
+                if (Array.isArray(frozenData.file_denylist)) {
+                    startGameData._file_denylist = frozenData.file_denylist;
+                }
+
                 // Template-Override Merge: Wenn ein Template gewählt wurde, dessen Overrides einmergen
                 if (server.template_name && Array.isArray(frozenData.templates)) {
                     const tpl = frozenData.templates.find(t => t.name === server.template_name);
@@ -1523,7 +1528,8 @@ router.put('/:serverId/start', async (req, res) => {
             env_variables: parsedEnvVars,
             guild_id: guildId,
             bind_ip: server.bind_ip || null,
-            game_data: startGameData
+            game_data: startGameData,
+            file_denylist: startGameData._file_denylist || []
         }, 30000);
 
         if (!response.success) {
@@ -2231,6 +2237,7 @@ router.post('/:serverId/start', async (req, res) => {
         let dockerImage = null;
         let gameDataRuntime = { stop_mode: 'sigterm', stop_command: '', stop_timeout_sec: 30, done_string: '' };
         let gameDataConfig = null; // config.files für Config-Patching vor Start
+        let fileDenylist = []; // File-Denylist für File-Manager
 
         try {
             const frozenData = typeof server.frozen_game_data === 'string'
@@ -2263,6 +2270,11 @@ router.post('/:serverId/start', async (req, res) => {
                 if (frozenData.config?.files && Object.keys(frozenData.config.files).length > 0) {
                     gameDataConfig = frozenData.config;
                     Logger.debug(`[Gameserver] ${Object.keys(frozenData.config.files).length} Config-Dateien für Patching geladen`);
+                }
+
+                // File-Denylist für File-Manager
+                if (Array.isArray(frozenData.file_denylist)) {
+                    fileDenylist = frozenData.file_denylist;
                 }
 
                 // Template-Config-Overrides mergen
@@ -2332,6 +2344,7 @@ router.post('/:serverId/start', async (req, res) => {
             env_variables: envVariables,
             guild_id: guildId,
             bind_ip: server.bind_ip || null,
+            file_denylist: fileDenylist,
             // Docker-spezifische Felder die der Daemon für StartContainer() braucht:
             game_data: {
                 docker_image: dockerImage,
@@ -2861,6 +2874,87 @@ router.put('/:serverId/ports', requirePermission('GAMESERVER.EDIT'), async (req,
     } catch (error) {
         Logger.error('[Gameserver] Fehler beim Aktualisieren der Ports:', error);
         return res.status(500).json({ success: false, message: 'Interner Fehler' });
+    }
+});
+
+// ============================================================
+// CONFIG-APPLY: Config-Dateien auf Disk patchen (ohne Server-Neustart)
+// POST /guild/:guildId/plugins/gameserver/servers/:serverId/apply-config
+// ============================================================
+router.post('/:serverId/apply-config', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const ipmServer = ServiceManager.get('ipmServer');
+
+    try {
+        const guildId = res.locals.guildId;
+        const serverId = req.params.serverId;
+
+        // Server mit game_data + daemon_id laden
+        const [server] = await dbService.query(`
+            SELECT gs.id, gs.env_variables, gs.ports,
+                   gs.frozen_game_data, gs.install_path, gs.bind_ip,
+                   r.daemon_id, r.system_user
+            FROM gameservers gs
+            LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+            WHERE gs.id = ? AND gs.guild_id = ?
+        `, [serverId, guildId]);
+
+        if (!server) {
+            return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+        }
+
+        if (!server.daemon_id) {
+            return res.status(400).json({ success: false, message: 'Kein Daemon zugewiesen' });
+        }
+
+        // frozen_game_data parsen
+        let frozenData = {};
+        try {
+            frozenData = typeof server.frozen_game_data === 'string'
+                ? JSON.parse(server.frozen_game_data)
+                : (server.frozen_game_data || {});
+        } catch (_) { frozenData = {}; }
+
+        const configFiles = frozenData?.config?.files || {};
+        if (Object.keys(configFiles).length === 0) {
+            return res.json({ success: true, message: 'Keine Config-Dateien zum Patchen definiert' });
+        }
+
+        // env_variables + ports parsen
+        let envVars = {};
+        try {
+            envVars = typeof server.env_variables === 'string'
+                ? JSON.parse(server.env_variables) : (server.env_variables || {});
+        } catch (_) { envVars = {}; }
+
+        let ports = {};
+        try {
+            ports = typeof server.ports === 'string'
+                ? JSON.parse(server.ports) : (server.ports || {});
+        } catch (_) { ports = {}; }
+
+        // IPM Command an Daemon senden
+        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.apply_config', {
+            server_id: String(serverId),
+            config_files: configFiles,
+            env_variables: envVars,
+            ports: ports,
+            install_path: server.install_path,
+            bind_ip: server.bind_ip || null
+        }, 15000);
+
+        if (!response.success) {
+            Logger.warn(`[Gameserver] Config-Apply fehlgeschlagen für Server ${serverId}: ${response.message}`);
+            return res.status(500).json({ success: false, message: response.message || 'Config-Apply fehlgeschlagen' });
+        }
+
+        Logger.info(`[Gameserver] Config-Dateien gepatcht für Server ${serverId}`);
+        return res.json({ success: true, message: 'Config-Dateien erfolgreich gepatcht' });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Config-Apply:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler beim Config-Apply' });
     }
 });
 

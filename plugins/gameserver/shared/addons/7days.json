@@ -385,5 +385,13 @@
     "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/251570/library_hero.jpg",
     "screenshots": []
   },
+  "file_denylist": [
+    ".env",
+    "start.sh",
+    "firebot.lock",
+    "firebot.pid",
+    "*.log",
+    "7DaysToDieServer_Data/"
+  ],
   "changelog": "Initial release - 7 Days to Die with 3 templates (PvE, PvP, Hardcore)"
 }

@@ -291,5 +291,13 @@
     "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/252490/library_hero.jpg",
     "screenshots": []
   },
+  "file_denylist": [
+    ".env",
+    "start.sh",
+    "firebot.lock",
+    "firebot.pid",
+    "*.log",
+    "server/*/cfg/token.txt"
+  ],
   "changelog": "Initial release - Rust with Oxide support and 3 templates"
 }

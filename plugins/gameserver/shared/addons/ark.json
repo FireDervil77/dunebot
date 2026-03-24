@@ -337,5 +337,12 @@
     "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/346110/library_hero.jpg",
     "screenshots": []
   },
+  "file_denylist": [
+    ".env",
+    "start.sh",
+    "firebot.lock",
+    "firebot.pid",
+    "*.log"
+  ],
   "changelog": "Initial release - ARK with 12 Maps and 3 templates (PvP, PvE, Boosted)"
 }

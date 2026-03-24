@@ -177,5 +177,12 @@
     "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/892970/library_hero.jpg",
     "screenshots": []
   },
+  "file_denylist": [
+    ".env",
+    "start.sh",
+    "firebot.lock",
+    "firebot.pid",
+    "*.log"
+  ],
   "changelog": "Initial release - Valheim with Vanilla and Modded templates"
 }
