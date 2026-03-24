@@ -1535,6 +1535,19 @@ router.put('/:serverId/start', async (req, res) => {
         if (!response.success) {
             Logger.error(`[Gameserver] Start-Command fehlgeschlagen: ${response.message}`);
             await dbService.query('UPDATE gameservers SET status = ? WHERE id = ?', ['error', serverId]);
+
+            // SSE-Broadcast damit Browser sofort den Error-Status sieht
+            const sseManager = ServiceManager.get('sseManager');
+            if (sseManager) {
+                sseManager.broadcast(guildId, 'gameserver', {
+                    action: 'status_changed',
+                    server_id: String(serverId),
+                    status: 'error',
+                    error_message: response.message || 'Start fehlgeschlagen',
+                    timestamp: Date.now()
+                });
+            }
+
             return res.status(500).json({
                 success: false,
                 message: response.message || 'Fehler beim Starten des Servers'
@@ -2377,11 +2390,23 @@ router.post('/:serverId/start', async (req, res) => {
                 });
             }
         } else {
-            // Status zurück auf 'offline' setzen
+            // Status auf 'error' setzen (nicht 'offline' — User soll Fehler sehen)
             await dbService.query(
                 'UPDATE gameservers SET status = ?, error_message = ? WHERE id = ?',
-                ['offline', response.error || 'Start failed', serverId]
+                ['error', response.error || 'Start failed', serverId]
             );
+
+            // SSE-Broadcast damit Browser sofort den Error-Status sieht
+            const sseManager = ServiceManager.get('sseManager');
+            if (sseManager) {
+                sseManager.broadcast(guildId, 'gameserver', {
+                    action: 'status_changed',
+                    server_id: String(serverId),
+                    status: 'error',
+                    error_message: response.error || 'Start failed',
+                    timestamp: Date.now()
+                });
+            }
 
             Logger.error(`[Gameserver] Start fehlgeschlagen für Server ${serverId}:`, response.error);
             

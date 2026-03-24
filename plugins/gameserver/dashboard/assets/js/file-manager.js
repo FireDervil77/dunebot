@@ -59,7 +59,7 @@ class FileManager {
         // AMD Module Loader Config
         require.config({ 
             paths: { 
-                'vs': `/plugins/gameserver/vendor/monaco-editor/min/vs` 
+                'vs': `/assets/plugins/gameserver/vendor/monaco-editor/min/vs` 
             }
         });
         
@@ -94,6 +94,9 @@ class FileManager {
                 });
                 
                 resolve();
+            }, (err) => {
+                console.error('[FileManager] Monaco Editor Laden fehlgeschlagen:', err);
+                reject(new Error('Monaco Editor konnte nicht geladen werden'));
             });
         });
     }

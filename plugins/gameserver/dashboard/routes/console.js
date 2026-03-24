@@ -334,24 +334,22 @@ router.get('/:serverId/logs',
                 return res.json({ success: false, error: 'Server oder Daemon nicht gefunden' });
             }
 
-            const response = await ipmServer.sendCommand(server.daemon_id, {
-                type: 'command',
-                id: require('crypto').randomUUID(),
-                action: 'gameserver.logs',
-                payload: { server_id: String(serverId), lines }
-            });
+            const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.logs', {
+                server_id: String(serverId),
+                lines
+            }, 30000);
 
-            if (response?.payload?.success) {
+            if (response?.success) {
                 return res.json({
                     success: true,
-                    lines: response.payload.lines || [],
-                    count: response.payload.count || 0,
+                    lines: response.lines || [],
+                    count: response.count || 0,
                     server_name: server.name
                 });
             } else {
                 return res.json({
                     success: false,
-                    error: response?.payload?.error || 'Logs konnten nicht abgerufen werden'
+                    error: response?.error || response?.message || 'Logs konnten nicht abgerufen werden'
                 });
             }
         } catch (error) {
