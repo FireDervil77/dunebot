@@ -45,9 +45,6 @@ function requirePermission(permissionKey) {
             const userId = req.session.user.info.id;
             const guildId = res.locals.guildId || req.params.guildId;
             
-            // 🔍 TEMP DEBUG - Permission Debug für 403-Analyse
-            Logger.warn(`[Permission DEBUG] Check "${permissionKey}" | userId=${userId} | guildId=${guildId} | res.locals.guildId=${res.locals.guildId} | req.params.guildId=${req.params.guildId} | path=${req.originalUrl}`);
-            
             if (!guildId) {
                 Logger.error(`[Permission] Keine guildId in res.locals oder req.params`);
                 return res.status(400).json({
@@ -58,9 +55,6 @@ function requirePermission(permissionKey) {
             
             // Permission Check
             const hasPermission = await permissionManager.hasPermission(userId, guildId, permissionKey);
-            
-            // 🔍 TEMP DEBUG - Ergebnis loggen
-            Logger.warn(`[Permission DEBUG] Ergebnis: hasPermission=${hasPermission} für "${permissionKey}" | userId=${userId} | guildId=${guildId}`);
             
             if (!hasPermission) {
                 Logger.warn(`[Permission] User ${userId} hat keine Permission "${permissionKey}" in Guild ${guildId}`);

@@ -282,9 +282,6 @@ class PermissionManager {
         [guildId]
       );
       
-      // 🔍 TEMP DEBUG - Owner-Check Details
-      this.logger.warn(`[Permission DEBUG] Owner-Check: guild_found=${!!guild} | guild.owner_id=${guild?.owner_id} | userId=${userId} | match=${guild?.owner_id === userId} | typeof_owner=${typeof guild?.owner_id} | typeof_user=${typeof userId}`);
-      
       if (guild && guild.owner_id === userId) {
         this.logger.debug(`[Permission] ✅ User ${userId} ist Guild-Owner → Alle Permissions`);
         return true; // Owner hat immer alle Rechte
