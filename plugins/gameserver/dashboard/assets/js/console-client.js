@@ -315,11 +315,40 @@ class GameserverConsoleClient {
                             this.updateStatus('Server offline', 'secondary');
                         }
 
+                        // Error-Status vom Dashboard (z.B. Start fehlgeschlagen)
+                        if (payload.status === 'error') {
+                            this._ptyAttached = false;
+                            this.updateStatus('Fehler', 'danger');
+                            this.terminal.writeln('');
+                            this.terminal.writeln('\x1b[1;31m╔═══════════════════════════════════════════════════════════╗\x1b[0m');
+                            this.terminal.writeln('\x1b[1;31m║          ❌  Server-Fehler!                                ║\x1b[0m');
+                            this.terminal.writeln('\x1b[1;31m╚═══════════════════════════════════════════════════════════╝\x1b[0m');
+                            if (payload.error_message) {
+                                this.terminal.writeln(`\x1b[31m${payload.error_message}\x1b[0m`);
+                            }
+                            this.terminal.writeln('');
+                        }
+
                         // Auto-Upgrade: Server läuft → PTY-Attach nachholen
                         // Dashboard sendet 'online' (gemappt von 'running'), Daemon sendet 'running'
                         if ((payload.status === 'running' || payload.status === 'online') && this.connected && !this._ptyAttached) {
                             this._upgradeConsoleAttach();
                         }
+                        return;
+                    }
+
+                    // 1b) Crash-Event (eigene Action, nicht status_changed)
+                    if (payload.action === 'crashed') {
+                        this._ptyAttached = false;
+                        this.updateStatus('Crashed', 'danger');
+                        this.terminal.writeln('');
+                        this.terminal.writeln('\x1b[1;31m╔═══════════════════════════════════════════════════════════╗\x1b[0m');
+                        this.terminal.writeln('\x1b[1;31m║          💥  Server ist abgestürzt!                       ║\x1b[0m');
+                        this.terminal.writeln('\x1b[1;31m╚═══════════════════════════════════════════════════════════╝\x1b[0m');
+                        if (payload.error) {
+                            this.terminal.writeln(`\x1b[31mFehler: ${payload.error}\x1b[0m`);
+                        }
+                        this.terminal.writeln('');
                         return;
                     }
 
