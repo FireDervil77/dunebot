@@ -655,6 +655,20 @@ router.post('/', async (req, res) => {
             }
         }
 
+        // ✅ Port-Typen klassifizieren: "pool" (braucht eigene Allokation) vs "offset" (game + N)
+        // game_plus_N Ports werden NICHT aus dem Pool genommen, sondern als Offset vom game-Port berechnet.
+        // Explizite Ports (game, query, beacon, rcon, etc.) bekommen jeweils eine eigene Pool-Allokation.
+        const poolPorts = {};   // Ports die aus dem Pool allokiert werden
+        const offsetPorts = {}; // Ports die als game + N berechnet werden
+        for (const [portType, portData] of Object.entries(ports)) {
+            const plusMatch = portType.match(/^(.+)_plus_(\d+)$/);
+            if (plusMatch && ports[plusMatch[1]]) {
+                offsetPorts[portType] = { base: plusMatch[1], offset: parseInt(plusMatch[2], 10), ...portData };
+            } else {
+                poolPorts[portType] = portData;
+            }
+        }
+
         // ✅ Port-Zuweisung: User-Wahl oder Auto-Assign aus port_allocations Pool
         const userPort = req.body.game_port; // "auto" oder eine Port-Nummer
         const allocatedFromPool = {};
@@ -683,10 +697,32 @@ router.post('/', async (req, res) => {
                 } else {
                     return res.status(400).json({ success: false, message: `Port ${requestedPort} ist nicht verfügbar oder nicht im Allocation-Pool` });
                 }
+
+                // Zusätzliche Pool-Ports (query, beacon, rcon, etc.) auto-assign
+                for (const portType of Object.keys(poolPorts)) {
+                    if (portType === 'game') continue; // game wurde oben bereits zugewiesen
+                    const [freeAlloc] = await dbService.query(
+                        `SELECT id, port FROM port_allocations 
+                         WHERE rootserver_id = ? AND server_id IS NULL 
+                         ORDER BY port ASC LIMIT 1`,
+                        [rootserver_id]
+                    );
+                    if (freeAlloc) {
+                        await dbService.query(
+                            'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
+                            [freeAlloc.id]
+                        );
+                        ports[portType].internal = freeAlloc.port;
+                        ports[portType].external = freeAlloc.port;
+                        allocatedFromPool[portType] = { allocId: freeAlloc.id, port: freeAlloc.port };
+                        Logger.info(`[Gameserver] Port ${portType} auto-assigned: ${freeAlloc.port} (Allocation #${freeAlloc.id})`);
+                    } else {
+                        Logger.warn(`[Gameserver] Kein freier Port im Allocation-Pool für Typ '${portType}' — nutze Default ${ports[portType].external}`);
+                    }
+                }
             } else {
-                // Auto-Assign: für jeden Port-Typ den nächsten freien aus dem Pool holen
-                const portTypes = Object.keys(ports);
-                for (const portType of portTypes) {
+                // Auto-Assign: für jeden Pool-Port den nächsten freien aus dem Pool holen
+                for (const portType of Object.keys(poolPorts)) {
                     const [freeAlloc] = await dbService.query(
                         `SELECT id, port FROM port_allocations 
                          WHERE rootserver_id = ? AND server_id IS NULL 
@@ -708,6 +744,17 @@ router.post('/', async (req, res) => {
                 }
             }
         }
+
+        // ✅ Offset-Ports berechnen: game_plus_N = game_port + N (kein Pool-Verbrauch)
+        for (const [portType, offsetData] of Object.entries(offsetPorts)) {
+            const basePort = ports[offsetData.base]?.internal || ports[offsetData.base]?.external;
+            if (basePort) {
+                const computedPort = basePort + offsetData.offset;
+                ports[portType].internal = computedPort;
+                ports[portType].external = computedPort;
+                Logger.debug(`[Gameserver] Offset-Port ${portType} = ${offsetData.base}(${basePort}) + ${offsetData.offset} = ${computedPort}`);
+            }
+        }
         
         Logger.debug('[Gameserver] Ports konfiguriert:', ports);
 
@@ -715,17 +762,20 @@ router.post('/', async (req, res) => {
         // Eggs die SERVER_PORT/SERVER_IP/TZ in variables[] definieren, bekommen hier
         // automatisch die korrekten Werte — User-Eingaben aus dem Formular werden überschrieben.
         // Generisch: Für jeden Port-Typ wird die passende ENV-Variable gesetzt
-        // z.B. ports.game → SERVER_PORT, ports.query → QUERY_PORT
+        // z.B. ports.game → SERVER_PORT, ports.query → QUERY_PORT, ports.beacon → BEACON_PORT
         for (const [portType, portData] of Object.entries(ports)) {
+            const portVal = String(portData.internal || portData.external || 27015);
+
+            // Direkt-Match: GAME_PORT, QUERY_PORT, BEACON_PORT, RCON_PORT, etc.
             const envKey = portType.toUpperCase() + '_PORT';
             if (envKey in envVariables) {
-                envVariables[envKey] = String(portData.internal || portData.external || 27015);
-                Logger.debug(`[Gameserver] ${envKey} auto-mapped → ${envVariables[envKey]}`);
+                envVariables[envKey] = portVal;
+                Logger.debug(`[Gameserver] ${envKey} auto-mapped → ${portVal}`);
             }
             // SERVER_PORT als Alias für game/main Port
             if ((portType === 'game' || portType === 'main') && 'SERVER_PORT' in envVariables) {
-                envVariables.SERVER_PORT = String(portData.internal || portData.external || 27015);
-                Logger.debug(`[Gameserver] SERVER_PORT auto-mapped → ${envVariables.SERVER_PORT}`);
+                envVariables.SERVER_PORT = portVal;
+                Logger.debug(`[Gameserver] SERVER_PORT auto-mapped → ${portVal}`);
             }
         }
         if ('SERVER_IP' in envVariables) {
@@ -2766,10 +2816,14 @@ router.post('/:serverId/reinstall', requirePermission('GAMESERVER.CREATE'), asyn
 });
 
 /**
- * PUT /guild/:guildId/plugins/gameserver/servers/:serverId/launch-params
+ * PUT/POST /guild/:guildId/plugins/gameserver/servers/:serverId/launch-params
  * Aktualisiere Start-Parameter für einen Server
+ * (POST als Fallback wenn JS den Form-Submit nicht als PUT abfängt)
  */
-router.put('/:serverId/launch-params', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
+router.put('/:serverId/launch-params', requirePermission('GAMESERVER.EDIT'), launchParamsHandler);
+router.post('/:serverId/launch-params', requirePermission('GAMESERVER.EDIT'), launchParamsHandler);
+
+async function launchParamsHandler(req, res) {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     
@@ -2841,7 +2895,7 @@ router.put('/:serverId/launch-params', requirePermission('GAMESERVER.EDIT'), asy
             message: 'Serverfehler beim Speichern der Start-Parameter'
         });
     }
-});
+}
 
 // ============================================================
 // PORTS: Server-Ports aktualisieren

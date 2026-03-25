@@ -57,8 +57,12 @@ class EggImporter {
             query: { gamedig_type: 'palworld', port_var: 'query' }
         },
         'satisfactory': {
-            ports: { game: { default: 7777, protocol: 'udp' } },
-            query: { gamedig_type: 'satisfactory', port_var: 'game' }
+            ports: {
+                game:    { default: 7777,  protocol: 'udp' },
+                beacon:  { default: 15000, protocol: 'udp' },
+                query:   { default: 15777, protocol: 'udp' }
+            },
+            query: { gamedig_type: 'satisfactory', port_var: 'query' }
         },
         'core keeper': {
             ports: { game: { default: 27015, protocol: 'udp' } },

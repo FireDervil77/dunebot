@@ -1,0 +1,195 @@
+{
+  "meta": {
+    "version": "FIREBOT_v2",
+    "author": "DuneBot Official",
+    "update_url": null
+  },
+  "exported_at": "2026-03-25T00:00:00+00:00",
+  "name": "Satisfactory",
+  "slug": "satisfactory",
+  "description": "Satisfactory Dedicated Server – Build-basiertes Fabrik-Aufbauspiel von Coffee Stain Studios. Unterstützt bis zu 4 Spieler im Koop-Modus.",
+  "category": "survival",
+  "tags": [
+    "steam",
+    "factory",
+    "building",
+    "coop",
+    "automation"
+  ],
+  "visibility": "official",
+  "trust_level": "official",
+  "status": "approved",
+  "features": [],
+  "steam": {
+    "app_id": 526870,
+    "server_app_id": 1690800,
+    "install_dir": "satisfactory"
+  },
+  "installation": {
+    "method": "steamcmd",
+    "app_id": "1690800",
+    "validate": true,
+    "script": "#!/bin/bash\ncd \"${INSTALL_DIR}\"\n\"${STEAMCMD}\" +force_install_dir \"${INSTALL_DIR}\" +login anonymous +app_update 1690800 validate +quit"
+  },
+  "startup": {
+    "command": "./FactoryServer.sh -Port={{SERVER_PORT}} -BeaconPort={{BEACON_PORT}} -ServerQueryPort={{QUERY_PORT}} -MultiHome={{SERVER_IP}} -log -unattended",
+    "done": "Server started",
+    "stop": "^C"
+  },
+  "config": {
+    "files": {},
+    "startup": {
+      "done": "Server started"
+    },
+    "logs": {},
+    "stop": "^C"
+  },
+  "variables": [
+    {
+      "name": "Server Name",
+      "description": "Name deines Satisfactory-Servers",
+      "env_variable": "SERVER_NAME",
+      "default_value": "My Satisfactory Server",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Max Players",
+      "description": "Maximale Spieleranzahl",
+      "env_variable": "MAX_PLAYERS",
+      "default_value": "4",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:1|max:16",
+      "field_type": "number"
+    },
+    {
+      "name": "Server Port",
+      "description": "Hauptport des Servers (UDP)",
+      "env_variable": "SERVER_PORT",
+      "default_value": "7777",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer",
+      "field_type": "text",
+      "daemon_auto_assign": true
+    },
+    {
+      "name": "Beacon Port",
+      "description": "Beacon Port für Server Discovery (UDP)",
+      "env_variable": "BEACON_PORT",
+      "default_value": "15000",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer",
+      "field_type": "text",
+      "daemon_auto_assign": true
+    },
+    {
+      "name": "Query Port",
+      "description": "Query Port für Server-Status-Abfragen (UDP)",
+      "env_variable": "QUERY_PORT",
+      "default_value": "15777",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer",
+      "field_type": "text",
+      "daemon_auto_assign": true
+    },
+    {
+      "name": "Server IP",
+      "description": "IP-Adresse, an die der Server gebunden wird (MultiHome)",
+      "env_variable": "SERVER_IP",
+      "default_value": "0.0.0.0",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|string",
+      "field_type": "text",
+      "daemon_auto_assign": true
+    },
+    {
+      "name": "Auto Pause",
+      "description": "Server pausiert wenn keine Spieler verbunden sind",
+      "env_variable": "AUTO_PAUSE",
+      "default_value": "true",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:true,false",
+      "field_type": "select",
+      "select_options": {
+        "true": "Ja",
+        "false": "Nein"
+      }
+    },
+    {
+      "name": "Auto Save on Disconnect",
+      "description": "Automatisch speichern wenn letzter Spieler disconnectet",
+      "env_variable": "AUTO_SAVE_ON_DISCONNECT",
+      "default_value": "true",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:true,false",
+      "field_type": "select",
+      "select_options": {
+        "true": "Ja",
+        "false": "Nein"
+      }
+    }
+  ],
+  "templates": [
+    {
+      "name": "default",
+      "label": "Standard",
+      "description": "Standard Satisfactory Server für bis zu 4 Spieler",
+      "icon": "fa-industry",
+      "variables": {
+        "MAX_PLAYERS": "4",
+        "AUTO_PAUSE": "true",
+        "AUTO_SAVE_ON_DISCONNECT": "true"
+      }
+    }
+  ],
+  "ports": {
+    "game": {
+      "default": 7777,
+      "protocol": "udp",
+      "description": "Game Port"
+    },
+    "beacon": {
+      "default": 15000,
+      "protocol": "udp",
+      "description": "Beacon Port (Server Discovery)"
+    },
+    "query": {
+      "default": 15777,
+      "protocol": "udp",
+      "description": "Query Port"
+    }
+  },
+  "query": {
+    "gamedig_type": "satisfactory",
+    "port_var": "query"
+  },
+  "requirements": {
+    "ram_min_mb": 4096,
+    "ram_recommended_mb": 8192,
+    "cpu_cores_min": 2,
+    "disk_min_gb": 5,
+    "disk_recommended_gb": 15
+  },
+  "assets": {
+    "icon_url": "https://cdn.akamai.steamstatic.com/steam/apps/526870/header.jpg",
+    "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/526870/library_hero.jpg",
+    "screenshots": []
+  },
+  "file_denylist": [
+    ".env",
+    "start.sh",
+    "firebot.lock",
+    "firebot.pid",
+    "*.log"
+  ],
+  "changelog": "Initial release - Satisfactory mit 3 Ports (Game, Beacon, Query) und MultiHome-Support"
+}
