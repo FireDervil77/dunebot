@@ -304,6 +304,23 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ success: false, message: 'game_data ist kein valides JSON' });
         }
 
+        // ── Auto-Konvertierung: Pterodactyl/Pelican Egg → FIREBOT_v2 ────
+        // Wenn das eingefügte JSON kein FIREBOT_v2 Format hat (z.B. PTDL_v2),
+        // wird es automatisch durch den EggImporter konvertiert.
+        if (gameData?.meta?.version !== 'FIREBOT_v2') {
+            try {
+                const importer = getEggImporter();
+                gameData = importer.convert(gameData);
+                Logger.info(`[Addons] Auto-Konvertierung: ${gameData.meta?.version || 'unbekanntes Format'} → FIREBOT_v2`);
+            } catch (convErr) {
+                Logger.warn('[Addons] Auto-Konvertierung fehlgeschlagen:', convErr.message);
+                return res.status(400).json({
+                    success: false,
+                    message: `Konvertierung fehlgeschlagen: ${convErr.message}. Bitte FIREBOT_v2 Format verwenden.`,
+                });
+            }
+        }
+
         // Slug generieren falls nicht angegeben
         const finalSlug = slug
             ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '')
@@ -429,11 +446,19 @@ router.put('/:id', async (req, res) => {
                 return res.status(400).json({ success: false, message: 'game_data ist kein valides JSON' });
             }
 
+            // ── Auto-Konvertierung: Pterodactyl/Pelican Egg → FIREBOT_v2 ────
             if (gameData?.meta?.version !== 'FIREBOT_v2') {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Nur FIREBOT_v2 game_data wird akzeptiert',
-                });
+                try {
+                    const importer = getEggImporter();
+                    gameData = importer.convert(gameData);
+                    Logger.info(`[Addons] PUT Auto-Konvertierung → FIREBOT_v2 für ID ${id}`);
+                } catch (convErr) {
+                    Logger.warn(`[Addons] PUT Auto-Konvertierung fehlgeschlagen für ID ${id}:`, convErr.message);
+                    return res.status(400).json({
+                        success: false,
+                        message: `Konvertierung fehlgeschlagen: ${convErr.message}. Bitte FIREBOT_v2 Format verwenden.`,
+                    });
+                }
             }
         }
 
