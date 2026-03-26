@@ -455,6 +455,17 @@ create_data_directories() {
         setup_docker_network
     fi
 
+    # ── System-User 'firebot' für Container-Prozesse ──────────────────────
+    # Gameserver laufen NICHT als root, sondern als dedizierter System-User.
+    # Der Daemon löst beim Start die UID/GID dieses Users auf.
+    if id "firebot" &>/dev/null; then
+        log_success "System-User 'firebot' existiert bereits (UID: $(id -u firebot), GID: $(id -g firebot))"
+    else
+        log_info "Erstelle System-User 'firebot' für Gameserver-Container..."
+        useradd --system --no-create-home --shell /usr/sbin/nologin --comment "FireBot Daemon Container User" firebot
+        log_success "System-User 'firebot' erstellt (UID: $(id -u firebot), GID: $(id -g firebot))"
+    fi
+
     chown -R root:root "$base_dir"
     chmod 755 "$base_dir"
     chmod 755 "$base_dir/logs"
@@ -464,6 +475,7 @@ create_data_directories() {
     log_info "  - $base_dir/logs/     (Daemon-System-Logs)"
     log_info "  - $base_dir/volumes/  (Gameserver-Volumes, per Server-ID)"
     log_info "  Container-Pfad im Volume: /home/container (Runtime) / /mnt/server (Install)"
+    log_info "  Container-User: firebot (UID: $(id -u firebot), GID: $(id -g firebot))"
 }
 
 

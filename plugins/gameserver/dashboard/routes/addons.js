@@ -325,7 +325,7 @@ router.post('/', async (req, res) => {
     const userId    = req.session.user.info.id;
 
     try {
-        const { name, slug, description, category, tags, icon_url, visibility, game_data } = req.body;
+        const { name, slug, description, category, tags, icon_url, banner_url, visibility, game_data } = req.body;
 
         if (!name || !slug || !description || !category || !game_data) {
             return res.status(400).json({
@@ -369,14 +369,14 @@ router.post('/', async (req, res) => {
 
         const result = await dbService.query(`
             INSERT INTO addon_marketplace
-                (name, slug, description, category, tags, icon_url,
+                (name, slug, description, category, tags, icon_url, banner_url,
                  visibility, status, trust_level,
                  guild_id, author_user_id,
                  game_data, runtime_type, source_type, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'unverified', ?, ?, ?, ?, 'custom', NOW(), NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unverified', ?, ?, ?, ?, 'custom', NOW(), NOW())
         `, [
             name, slug, description, category,
-            parseTags(tags), icon_url || null,
+            parseTags(tags), icon_url || null, banner_url || null,
             finalVisibility, status,
             guildIdVal, userId,
             JSON.stringify(gameData), runtimeType,
@@ -419,7 +419,7 @@ router.put('/:id', async (req, res) => {
             return res.status(403).json({ success: false, message: 'Keine Berechtigung' });
         }
 
-        const { name, description, category, tags, icon_url, visibility, game_data } = req.body;
+        const { name, description, category, tags, icon_url, banner_url, visibility, game_data } = req.body;
 
         let gameData = null;
         if (game_data !== undefined) {
@@ -459,23 +459,23 @@ router.put('/:id', async (req, res) => {
             const runtimeType = detectRuntimeType(gameData);
             await dbService.query(`
                 UPDATE addon_marketplace SET
-                    name = ?, description = ?, category = ?, tags = ?, icon_url = ?,
+                    name = ?, description = ?, category = ?, tags = ?, icon_url = ?, banner_url = ?,
                     visibility = ?, status = ?, guild_id = ?,
                     game_data = ?, runtime_type = ?, updated_at = NOW()
                 WHERE id = ?
             `, [
-                name, description, category, parseTags(tags), icon_url || null,
+                name, description, category, parseTags(tags), icon_url || null, banner_url || null,
                 visibility || addonRow.visibility, status, guildIdVal,
                 JSON.stringify(gameData), runtimeType, id,
             ]);
         } else {
             await dbService.query(`
                 UPDATE addon_marketplace SET
-                    name = ?, description = ?, category = ?, tags = ?, icon_url = ?,
+                    name = ?, description = ?, category = ?, tags = ?, icon_url = ?, banner_url = ?,
                     visibility = ?, status = ?, guild_id = ?, updated_at = NOW()
                 WHERE id = ?
             `, [
-                name, description, category, parseTags(tags), icon_url || null,
+                name, description, category, parseTags(tags), icon_url || null, banner_url || null,
                 visibility || addonRow.visibility, status, guildIdVal, id,
             ]);
         }

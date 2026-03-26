@@ -147,11 +147,60 @@
                                         </div>
                                     </div>
                                 </div>
+                                <!-- Icon -->
                                 <div class="form-group">
                                     <label for="addon-icon-url"><%= tr('gameserver:ADDON_EDITOR.ICON_URL') %></label>
-                                    <input type="url" class="form-control" id="addon-icon-url" name="icon_url"
-                                           value="<%= mode === 'edit' ? addon.icon_url || '' : (template ? template.icon_url || '' : '') %>"
-                                           placeholder="https://...">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <div id="icon-preview" class="mr-3" style="width:64px;height:64px;border:2px dashed #555;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;background:#1e1e2d;">
+                                            <% const iconVal = mode === 'edit' ? addon.icon_url || '' : (template ? template.icon_url || '' : ''); %>
+                                            <% if (iconVal) { %>
+                                                <img src="<%- iconVal %>" style="max-width:100%;max-height:100%;object-fit:cover;">
+                                            <% } else { %>
+                                                <i class="fa-solid fa-image text-muted" style="font-size:1.5rem;"></i>
+                                            <% } %>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="input-group">
+                                                <input type="url" class="form-control" id="addon-icon-url" name="icon_url"
+                                                       value="<%- iconVal %>"
+                                                       placeholder="https://...">
+                                                <div class="input-group-append">
+                                                    <button type="button" class="btn btn-outline-info" onclick="openMediaPicker('addon-icon-url')" title="Aus Medien wählen">
+                                                        <i class="fa-solid fa-photo-film"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-outline-danger" onclick="clearMediaField('addon-icon-url')" title="Entfernen">
+                                                        <i class="fa-solid fa-xmark"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Banner -->
+                                <div class="form-group">
+                                    <label for="addon-banner-url">Banner</label>
+                                    <div id="banner-preview" class="mb-2" style="width:100%;height:120px;border:2px dashed #555;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#1e1e2d;">
+                                        <% const bannerVal = mode === 'edit' ? addon.banner_url || '' : ''; %>
+                                        <% if (bannerVal) { %>
+                                            <img src="<%- bannerVal %>" style="max-width:100%;max-height:100%;object-fit:cover;">
+                                        <% } else { %>
+                                            <i class="fa-solid fa-panorama text-muted" style="font-size:2rem;"></i>
+                                        <% } %>
+                                    </div>
+                                    <div class="input-group">
+                                        <input type="url" class="form-control" id="addon-banner-url" name="banner_url"
+                                               value="<%- bannerVal %>"
+                                               placeholder="https://...">
+                                        <div class="input-group-append">
+                                            <button type="button" class="btn btn-outline-info" onclick="openMediaPicker('addon-banner-url')" title="Aus Medien wählen">
+                                                <i class="fa-solid fa-photo-film"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger" onclick="clearMediaField('addon-banner-url')" title="Entfernen">
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1143,4 +1192,236 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     updateJSONPreview();
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// MEDIA PICKER — Bilder aus dem Media-Manager auswählen / hochladen
+// ──────────────────────────────────────────────────────────────────────────────
+let _mediaPickerTarget = null;   // ID des Input-Felds das befüllt wird
+let _mediaPickerPage   = 1;
+let _mediaPickerSearch = '';
+const GUILD_ID = '<%= guildId %>';
+
+// ── Previews aktualisieren bei manuellem URL-Input ──
+function updateMediaPreview(inputId) {
+    const url = document.getElementById(inputId).value.trim();
+    if (inputId === 'addon-icon-url') {
+        const preview = document.getElementById('icon-preview');
+        preview.innerHTML = url
+            ? `<img src="${escHtml(url)}" style="max-width:100%;max-height:100%;object-fit:cover;">`
+            : '<i class="fa-solid fa-image text-muted" style="font-size:1.5rem;"></i>';
+    } else if (inputId === 'addon-banner-url') {
+        const preview = document.getElementById('banner-preview');
+        preview.innerHTML = url
+            ? `<img src="${escHtml(url)}" style="max-width:100%;max-height:100%;object-fit:cover;">`
+            : '<i class="fa-solid fa-panorama text-muted" style="font-size:2rem;"></i>';
+    }
+}
+
+document.getElementById('addon-icon-url').addEventListener('input', () => updateMediaPreview('addon-icon-url'));
+document.getElementById('addon-banner-url').addEventListener('input', () => updateMediaPreview('addon-banner-url'));
+
+function clearMediaField(inputId) {
+    document.getElementById(inputId).value = '';
+    updateMediaPreview(inputId);
+    updateJSONPreview();
+}
+
+// ── Modal öffnen ──
+function openMediaPicker(targetInputId) {
+    _mediaPickerTarget = targetInputId;
+    _mediaPickerPage   = 1;
+    _mediaPickerSearch = '';
+    document.getElementById('media-picker-search').value = '';
+    loadMediaPickerItems();
+    $('#mediaPickerModal').modal('show');
+}
+
+// ── Medien laden (AJAX) ──
+async function loadMediaPickerItems() {
+    const grid = document.getElementById('media-picker-grid');
+    grid.innerHTML = '<div class="text-center py-5"><i class="fa-solid fa-spinner fa-spin fa-2x"></i></div>';
+
+    try {
+        const params = new URLSearchParams({
+            page: _mediaPickerPage,
+            limit: 24
+        });
+        if (_mediaPickerSearch) params.set('search', _mediaPickerSearch);
+
+        const resp = await fetch(`/guild/${GUILD_ID}/media/api/list?${params}`);
+        const json = await resp.json();
+
+        if (!json.success || !json.data.length) {
+            grid.innerHTML = `
+                <div class="text-center py-5 text-muted">
+                    <i class="fa-solid fa-images fa-3x mb-3"></i>
+                    <p>Keine Medien gefunden.</p>
+                    <p class="small">Lade zuerst Bilder im <a href="/guild/${GUILD_ID}/media" target="_blank">Media-Manager</a> hoch<br>oder nutze den Upload unten.</p>
+                </div>`;
+            document.getElementById('media-picker-pagination').innerHTML = '';
+            return;
+        }
+
+        grid.innerHTML = json.data.map(m => `
+            <div class="media-picker-item" onclick="selectMediaItem('${escHtml(m.url)}')" title="${escHtml(m.title || m.filename)}">
+                <img src="${escHtml(m.url)}" loading="lazy">
+                <div class="media-picker-item-name">${escHtml(m.filename)}</div>
+            </div>
+        `).join('');
+
+        // Pagination
+        const pag = json.pagination;
+        let pagHtml = '';
+        if (pag.pages > 1) {
+            pagHtml += `<button class="btn btn-sm btn-outline-secondary" ${pag.page <= 1 ? 'disabled' : ''} onclick="_mediaPickerPage--;loadMediaPickerItems()"><i class="fa-solid fa-chevron-left"></i></button> `;
+            pagHtml += `<span class="mx-2 text-muted">${pag.page} / ${pag.pages}</span>`;
+            pagHtml += ` <button class="btn btn-sm btn-outline-secondary" ${pag.page >= pag.pages ? 'disabled' : ''} onclick="_mediaPickerPage++;loadMediaPickerItems()"><i class="fa-solid fa-chevron-right"></i></button>`;
+        }
+        document.getElementById('media-picker-pagination').innerHTML = pagHtml;
+
+    } catch (err) {
+        grid.innerHTML = '<div class="text-center text-danger py-5"><i class="fa-solid fa-triangle-exclamation"></i> Fehler beim Laden</div>';
+    }
+}
+
+// ── Bild auswählen ──
+function selectMediaItem(url) {
+    if (_mediaPickerTarget) {
+        document.getElementById(_mediaPickerTarget).value = url;
+        updateMediaPreview(_mediaPickerTarget);
+        updateJSONPreview();
+    }
+    $('#mediaPickerModal').modal('hide');
+}
+
+// ── Suche mit Debounce ──
+let _mediaSearchTimer = null;
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('media-picker-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            clearTimeout(_mediaSearchTimer);
+            _mediaSearchTimer = setTimeout(() => {
+                _mediaPickerSearch = searchInput.value.trim();
+                _mediaPickerPage = 1;
+                loadMediaPickerItems();
+            }, 300);
+        });
+    }
+});
+
+// ── Upload direkt im Picker ──
+async function mediaPickerUpload(input) {
+    if (!input.files || !input.files.length) return;
+    const formData = new FormData();
+    for (const file of input.files) {
+        formData.append('files', file);
+    }
+    formData.append('folder', 'icons');
+
+    const uploadBtn = document.getElementById('media-picker-upload-btn');
+    const origHtml = uploadBtn.innerHTML;
+    uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Hochladen...';
+    uploadBtn.disabled = true;
+
+    try {
+        const resp = await fetch(`/guild/${GUILD_ID}/media/api/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        const json = await resp.json();
+        if (json.success) {
+            toastr.success(`${json.data.length} Datei(en) hochgeladen`);
+            _mediaPickerPage = 1;
+            loadMediaPickerItems();
+        } else {
+            toastr.error(json.message || 'Upload fehlgeschlagen');
+        }
+    } catch (err) {
+        toastr.error('Upload-Fehler: ' + err.message);
+    } finally {
+        uploadBtn.innerHTML = origHtml;
+        uploadBtn.disabled = false;
+        input.value = '';
+    }
+}
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- MEDIA PICKER MODAL                                                       -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="mediaPickerModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fa-solid fa-photo-film"></i> Bild aus Medien wählen</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <!-- Toolbar -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="input-group" style="max-width:300px;">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
+                        </div>
+                        <input type="text" class="form-control" id="media-picker-search" placeholder="Suche...">
+                    </div>
+                    <div>
+                        <input type="file" id="media-picker-file-input" accept="image/*" multiple style="display:none;" onchange="mediaPickerUpload(this)">
+                        <button type="button" class="btn btn-sm btn-success" id="media-picker-upload-btn"
+                                onclick="document.getElementById('media-picker-file-input').click()">
+                            <i class="fa-solid fa-upload"></i> Hochladen
+                        </button>
+                        <a href="/guild/<%= guildId %>/media" target="_blank" class="btn btn-sm btn-outline-secondary ml-1" title="Media-Manager öffnen">
+                            <i class="fa-solid fa-external-link-alt"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Grid -->
+                <div id="media-picker-grid" class="media-picker-grid"></div>
+
+                <!-- Pagination -->
+                <div id="media-picker-pagination" class="text-center mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.media-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+    min-height: 200px;
+}
+.media-picker-item {
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.15s, transform 0.15s;
+    background: #1e1e2d;
+    text-align: center;
+}
+.media-picker-item:hover {
+    border-color: #17a2b8;
+    transform: scale(1.03);
+}
+.media-picker-item img {
+    width: 100%;
+    height: 90px;
+    object-fit: cover;
+    display: block;
+}
+.media-picker-item-name {
+    font-size: 0.7rem;
+    padding: 3px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #aaa;
+}
+</style>
