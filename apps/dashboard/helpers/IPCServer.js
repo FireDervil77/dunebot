@@ -441,8 +441,18 @@ class IPCServer {
                         };
                     }
                     // 3. variables: Array → Map mit Defaults
+                    // Vorher: Port-Variablen mit daemon_auto_assign merken
+                    const autoAssignPortVars = [];
                     const envVariables = {};
                     if (Array.isArray(gameData.variables)) {
+                        for (const v of gameData.variables) {
+                            if (v.daemon_auto_assign && v.env_variable && v.env_variable.endsWith('_PORT') && v.env_variable !== 'SERVER_PORT') {
+                                autoAssignPortVars.push({
+                                    env_variable: v.env_variable,
+                                    default_value: parseInt(v.default_value, 10) || 0,
+                                });
+                            }
+                        }
                         for (const v of gameData.variables) {
                             if (v.env_variable) envVariables[v.env_variable] = v.default_value ?? '';
                         }
@@ -475,28 +485,77 @@ class IPCServer {
                     }
                     if (!ports.game) ports.game = { internal: 27015, external: 27015, protocol: 'udp' };
 
-                    // ✅ Port-Auto-Assign aus port_allocations Pool (wie Dashboard-Route)
-                    const allocatedFromPool = {};
-                    const portTypes = Object.keys(ports);
-                    for (const portType of portTypes) {
-                        const [freeAlloc] = await dbService.query(
-                            `SELECT id, port FROM port_allocations 
-                             WHERE rootserver_id = ? AND server_id IS NULL 
-                             ORDER BY port ASC LIMIT 1`,
-                            [rootserverId]
-                        );
-                        if (freeAlloc) {
-                            await dbService.query(
-                                'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
-                                [freeAlloc.id]
-                            );
-                            ports[portType].internal = freeAlloc.port;
-                            ports[portType].external = freeAlloc.port;
-                            allocatedFromPool[portType] = { allocId: freeAlloc.id, port: freeAlloc.port };
-                            Logger.info(`[IPC/Gameserver] Port ${portType} auto-assigned: ${freeAlloc.port} (Allocation #${freeAlloc.id})`);
-                        } else {
-                            Logger.warn(`[IPC/Gameserver] Kein freier Port im Allocation-Pool für Typ '${portType}' — nutze Default ${ports[portType].external}`);
+                    // ✅ Ports aus daemon_auto_assign Variablen ergänzen
+                    for (const pv of autoAssignPortVars) {
+                        const portType = pv.env_variable.replace(/_PORT$/, '').toLowerCase();
+                        if (!ports[portType] && pv.default_value > 0) {
+                            ports[portType] = { internal: pv.default_value, external: pv.default_value, protocol: 'udp' };
+                            Logger.debug(`[IPC/Gameserver] Port '${portType}' aus daemon_auto_assign Variable ${pv.env_variable} ergänzt (default: ${pv.default_value})`);
                         }
+                    }
+
+                    // ✅ Port-Auto-Assign aus port_allocations Pool (sequenziell: Game, Game+1, Game+2, ...)
+                    const allocatedFromPool = {};
+                    const extraPortTypes = Object.keys(ports).filter(t => t !== 'game');
+
+                    // Game-Port zuerst zuweisen
+                    const [gameAlloc] = await dbService.query(
+                        `SELECT id, port FROM port_allocations 
+                         WHERE rootserver_id = ? AND server_id IS NULL 
+                         ORDER BY port ASC LIMIT 1`,
+                        [rootserverId]
+                    );
+                    if (gameAlloc) {
+                        await dbService.query(
+                            'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
+                            [gameAlloc.id]
+                        );
+                        ports.game.internal = gameAlloc.port;
+                        ports.game.external = gameAlloc.port;
+                        allocatedFromPool.game = { allocId: gameAlloc.id, port: gameAlloc.port };
+                        Logger.info(`[IPC/Gameserver] Port game auto-assigned: ${gameAlloc.port} (Allocation #${gameAlloc.id})`);
+
+                        // Extra-Ports sequenziell: Game+1, Game+2, ...
+                        for (let i = 0; i < extraPortTypes.length; i++) {
+                            const portType = extraPortTypes[i];
+                            const desiredPort = gameAlloc.port + i + 1;
+                            const [seqAlloc] = await dbService.query(
+                                `SELECT id, port FROM port_allocations 
+                                 WHERE rootserver_id = ? AND port = ? AND server_id IS NULL LIMIT 1`,
+                                [rootserverId, desiredPort]
+                            );
+                            if (seqAlloc) {
+                                await dbService.query(
+                                    'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
+                                    [seqAlloc.id]
+                                );
+                                ports[portType].internal = seqAlloc.port;
+                                ports[portType].external = seqAlloc.port;
+                                allocatedFromPool[portType] = { allocId: seqAlloc.id, port: seqAlloc.port };
+                                Logger.info(`[IPC/Gameserver] Port ${portType} sequential: ${seqAlloc.port} (Game+${i + 1}, Allocation #${seqAlloc.id})`);
+                            } else {
+                                const [freeAlloc] = await dbService.query(
+                                    `SELECT id, port FROM port_allocations 
+                                     WHERE rootserver_id = ? AND server_id IS NULL 
+                                     ORDER BY port ASC LIMIT 1`,
+                                    [rootserverId]
+                                );
+                                if (freeAlloc) {
+                                    await dbService.query(
+                                        'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
+                                        [freeAlloc.id]
+                                    );
+                                    ports[portType].internal = freeAlloc.port;
+                                    ports[portType].external = freeAlloc.port;
+                                    allocatedFromPool[portType] = { allocId: freeAlloc.id, port: freeAlloc.port };
+                                    Logger.warn(`[IPC/Gameserver] Port ${portType}: sequenzieller Port ${desiredPort} nicht frei → Fallback: ${freeAlloc.port}`);
+                                } else {
+                                    Logger.warn(`[IPC/Gameserver] Kein freier Port im Allocation-Pool für Typ '${portType}'`);
+                                }
+                            }
+                        }
+                    } else {
+                        Logger.warn('[IPC/Gameserver] Kein freier Port im Allocation-Pool für game — nutze Default');
                     }
 
                     // Automatische Variablen-Belegung (generisch für alle Port-Typen)

@@ -160,6 +160,31 @@
                                 <% } %>
                             </td>
                         </tr>
+                        <%
+                            // Dynamisch alle zusätzlichen Ports anzeigen (beacon, etc.)
+                            const knownPorts = ['game', 'query', 'rcon', 'main'];
+                            const extraPortEntries = server.ports_parsed
+                                ? Object.entries(server.ports_parsed).filter(([k]) => !knownPorts.includes(k))
+                                : [];
+                        %>
+                        <% extraPortEntries.forEach(([portType, portData]) => { %>
+                            <tr>
+                                <th><%= portType.charAt(0).toUpperCase() + portType.slice(1) %>-Port:</th>
+                                <td>
+                                    <% const epVal = portData.external || portData.internal; %>
+                                    <% if (epVal) { %>
+                                        <code><%= epVal %></code>
+                                        <button class="btn btn-sm btn-outline-secondary ms-2" 
+                                                onclick="copyToClipboard('<%= server.ip_address %>:<%= epVal %>')"
+                                                title="<%= portType %>-String kopieren">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    <% } else { %>
+                                        <span class="text-muted">Nicht konfiguriert</span>
+                                    <% } %>
+                                </td>
+                            </tr>
+                        <% }); %>
                         <tr>
                             <th>Installationspfad:</th>
                             <td>

@@ -67,7 +67,7 @@
               </h5>
             </div>
             <div class="card-body">
-              <div class="form-group mb-0">
+              <div class="form-group mb-3">
                 <label for="game_port">
                   <i class="fa-solid fa-plug mr-1 text-primary"></i><%= tr('gameserver:SERVER.GAME_PORT') %>
                 </label>
@@ -92,6 +92,49 @@
                 </div>
                 <small class="form-text text-muted" id="portPoolInfo"><i class="fa-solid fa-spinner fa-spin mr-1"></i><%= tr('gameserver:SERVER.PORT_LOADING') %></small>
               </div>
+
+              <% 
+                // Zusätzliche Ports des Addons (query, beacon, rcon, etc.)
+                const extraPorts = (typeof addonPortRequirements !== 'undefined' ? addonPortRequirements : [])
+                  .filter(p => p.type !== 'game');
+              %>
+              <% if (extraPorts.length > 0) { %>
+                <hr class="my-3">
+                <h6 class="text-muted mb-3">
+                  <i class="fa-solid fa-list-ol mr-1"></i>
+                  Zusätzliche Ports <small class="text-muted">(werden automatisch zugewiesen)</small>
+                </h6>
+                <div class="table-responsive">
+                  <table class="table table-sm table-bordered mb-0" id="extraPortsTable">
+                    <thead class="thead-light">
+                      <tr>
+                        <th>Port-Typ</th>
+                        <th>Zugewiesener Port</th>
+                        <th>Protokoll</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% extraPorts.forEach((ep, idx) => { %>
+                        <tr data-port-type="<%= ep.type %>" data-port-offset="<%= idx + 1 %>">
+                          <td>
+                            <i class="fa-solid fa-plug mr-1 text-secondary"></i>
+                            <strong><%= ep.label %></strong>
+                            <code class="ml-1 text-muted"><%= ep.env_variable || (ep.type.toUpperCase() + '_PORT') %></code>
+                          </td>
+                          <td class="extra-port-value text-muted">
+                            <em>Game-Port + <%= idx + 1 %></em>
+                          </td>
+                          <td><span class="badge badge-secondary"><%= ep.protocol.toUpperCase() %></span></td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
+                </div>
+                <small class="form-text text-muted mt-2">
+                  <i class="fa-solid fa-info-circle mr-1"></i>
+                  Zusätzliche Ports werden sequenziell ab dem Game-Port vergeben (Game+1, Game+2, ...) und automatisch im Pool reserviert.
+                </small>
+              <% } %>
             </div>
           </div>
 
@@ -606,6 +649,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
     portSelect.addEventListener('change', updateSummary);
 
+    // ========================================
+    // EXTRA-PORTS: Live-Update bei Game-Port-Änderung
+    // ========================================
+    function updateExtraPorts() {
+        const table = document.getElementById('extraPortsTable');
+        if (!table) return;
+        const sel = portSelect.value;
+        const gamePort = (sel && sel !== 'auto') ? parseInt(sel) : null;
+        table.querySelectorAll('tbody tr[data-port-offset]').forEach(row => {
+            const offset = parseInt(row.dataset.portOffset);
+            const cell = row.querySelector('.extra-port-value');
+            if (gamePort) {
+                cell.innerHTML = `<strong>${gamePort + offset}</strong> <small class="text-muted">(${gamePort} + ${offset})</small>`;
+            } else {
+                cell.innerHTML = `<em>Game-Port + ${offset}</em>`;
+            }
+        });
+    }
+    portSelect.addEventListener('change', updateExtraPorts);
+
     // Summary Port-Info
     const origUpdateSummary = updateSummary;
     updateSummary = function() {
@@ -616,5 +679,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial Summary
     updateSummary();
+    updateExtraPorts();
 });
 </script>
