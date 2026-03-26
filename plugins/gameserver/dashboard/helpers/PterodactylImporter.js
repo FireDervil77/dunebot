@@ -326,6 +326,13 @@ class PterodactylImporter {
                 ports,
             };
 
+            // ── RCON-Konfiguration (Auto-Detect) ────────────────────────────────
+            const rconConfig = this._detectRconConfig(rawVariables, ports);
+            if (rconConfig) {
+                gameData.config = { rcon: rconConfig };
+                Logger.info(`[PterodactylImporter] RCON erkannt: port_var=${rconConfig.port_var}, password_var=${rconConfig.password_var}`);
+            }
+
             Logger.success(`[PterodactylImporter] Conversion complete: ${gameData.meta.name} (needsReview: ${needsReview})`);
 
             return { gameData, isSteamcmd, needsReview, steamAppId };
@@ -557,6 +564,44 @@ echo "Download abgeschlossen."
         const text = `${egg.name} ${egg.description} ${egg.startup}`.toLowerCase();
         if (text.includes(' tcp ') || text.includes('rcon'))    return 'tcp';
         return 'udp'; // Gameserver-Default
+    }
+
+    /**
+     * Erkennt RCON-Konfiguration aus Egg-Variablen.
+     * Sucht nach typischen RCON-Port- und Passwort-Variablen.
+     *
+     * @param {Array} variables - Rohvariablen aus dem Pterodactyl Egg
+     * @param {object} ports - Bereits extrahierte Port-Map
+     * @returns {object|null} { protocol, port_var, password_var } oder null
+     */
+    _detectRconConfig(variables, ports) {
+        if (!Array.isArray(variables)) return null;
+
+        // RCON-Port-Variable finden (RCON_PORT, RCONPORT, etc.)
+        const rconPortVar = variables.find(v =>
+            /^RCON_?PORT$/i.test(v.env_variable || '')
+        );
+
+        // RCON-Passwort-Variable finden (RCON_PASSWORD, RCONPASSWORD, ADMIN_PASSWORD, etc.)
+        const rconPassVar = variables.find(v =>
+            /^(RCON_?PASSWORD|ADMIN_?PASSWORD)$/i.test(v.env_variable || '')
+        );
+
+        // Beide müssen vorhanden sein damit RCON als unterstützt gilt
+        if (!rconPortVar && !ports.rcon) return null;
+        if (!rconPassVar) return null;
+
+        // port_var: Wenn es einen "rcon"-Port in ports gibt → Kleinbuchstaben (Port-Key),
+        // sonst die ENV-Variable (Großbuchstaben)
+        const portVar = ports.rcon
+            ? 'rcon'                           // → lookup in ports["rcon"].external
+            : rconPortVar.env_variable;        // → lookup in env_variables["RCON_PORT"]
+
+        return {
+            protocol:     'srcds',
+            port_var:     portVar,
+            password_var: rconPassVar.env_variable,
+        };
     }
 
     // ══════════════════════════════════════════════════════════════════════════
