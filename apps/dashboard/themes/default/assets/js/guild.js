@@ -291,6 +291,10 @@ class GuildAjaxHandler {
                 case 'gameserver-edit':
                     await this.handleGameserverEditResponse(form, result);
                     break;
+                
+                case 'addon-editor':
+                    await this.handleAddonEditorResponse(form, result);
+                    break;
                     
                 default:
                     // Generische Behandlung
@@ -534,6 +538,20 @@ class GuildAjaxHandler {
             }, 2000);
         } else {
             this.showToast('error', result.message || 'Fehler beim Erstellen des Servers');
+        }
+    }
+
+    static async handleAddonEditorResponse(form, result) {
+        console.log('[GuildAjax] handleAddonEditorResponse called:', result);
+        if (result.success) {
+            this.showToast('success', result.message || 'Addon erfolgreich gespeichert');
+            if (result.redirect) {
+                setTimeout(() => {
+                    window.location.href = result.redirect;
+                }, 1500);
+            }
+        } else {
+            this.showToast('error', result.message || 'Fehler beim Speichern des Addons');
         }
     }
 
