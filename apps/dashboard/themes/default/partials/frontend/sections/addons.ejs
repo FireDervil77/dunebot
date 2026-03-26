@@ -86,6 +86,22 @@
             </div>
           </div>
         </div>
+        <%
+          // Responsive Row-Spacer nach jeder vollen Zeile (xl=4 Spalten, lg=3, md=2)
+          const pos = index + 1;
+          if (pos < addonsList.length) {
+            if (pos % 4 === 0) {
+        %>
+          <div class="w-100 my-3 d-none d-xl-block"></div>
+        <%  } else if (pos % 3 === 0) { %>
+          <div class="w-100 my-3 d-none d-lg-block d-xl-none"></div>
+        <%  }
+            if (pos % 2 === 0) {
+        %>
+          <div class="w-100 my-3 d-none d-md-block d-lg-none"></div>
+        <%  }
+          }
+        %>
         <% }); %>
       </div>
 
