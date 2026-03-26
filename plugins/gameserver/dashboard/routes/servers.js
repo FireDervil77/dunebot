@@ -1544,6 +1544,11 @@ router.put('/:serverId/start', async (req, res) => {
                     startGameData._file_denylist = frozenData.file_denylist;
                 }
 
+                // Platform (linux/windows) für Proton-GE-Wrapping
+                if (frozenData.platform) {
+                    startGameData.platform = frozenData.platform;
+                }
+
                 // Template-Override Merge: Wenn ein Template gewählt wurde, dessen Overrides einmergen
                 if (server.template_name && Array.isArray(frozenData.templates)) {
                     const tpl = frozenData.templates.find(t => t.name === server.template_name);
@@ -2301,6 +2306,7 @@ router.post('/:serverId/start', async (req, res) => {
         let gameDataRuntime = { stop_mode: 'sigterm', stop_command: '', stop_timeout_sec: 30, done_string: '' };
         let gameDataConfig = null; // config.files für Config-Patching vor Start
         let fileDenylist = []; // File-Denylist für File-Manager
+        let gameDataPlatform = null; // Platform (linux/windows) für Proton-GE
 
         try {
             const frozenData = typeof server.frozen_game_data === 'string'
@@ -2338,6 +2344,11 @@ router.post('/:serverId/start', async (req, res) => {
                 // File-Denylist für File-Manager
                 if (Array.isArray(frozenData.file_denylist)) {
                     fileDenylist = frozenData.file_denylist;
+                }
+
+                // Platform (linux/windows) für Proton-GE-Wrapping
+                if (frozenData.platform) {
+                    gameDataPlatform = frozenData.platform;
                 }
 
                 // Template-Config-Overrides mergen
@@ -2412,7 +2423,8 @@ router.post('/:serverId/start', async (req, res) => {
             game_data: {
                 docker_image: dockerImage,
                 runtime: gameDataRuntime,
-                ...(gameDataConfig ? { config: gameDataConfig } : {})
+                ...(gameDataConfig ? { config: gameDataConfig } : {}),
+                ...(gameDataPlatform ? { platform: gameDataPlatform } : {})
             }
         }, 30000);
 
