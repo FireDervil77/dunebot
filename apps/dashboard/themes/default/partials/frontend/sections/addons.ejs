@@ -99,12 +99,18 @@
 </section>
 
 <style>
+  .addons .addon-card-wrapper {
+    display: flex;
+  }
   .addons .addon-card {
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 12px;
     overflow: hidden;
     transition: transform .25s ease, box-shadow .25s ease;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
   }
   .addons .addon-card:hover {
     transform: translateY(-4px);
@@ -112,7 +118,8 @@
     border-color: rgba(255,255,255,0.2);
   }
   .addons .addon-card-img {
-    height: 160px;
+    height: 180px;
+    flex-shrink: 0;
     overflow: hidden;
     background: rgba(0,0,0,0.2);
   }
@@ -134,6 +141,15 @@
   }
   .addons .addon-card-body {
     padding: 1rem 1.25rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .addons .addon-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    margin-top: auto;
   }
   .addons .addon-card-title {
     font-size: 1.05rem;
@@ -145,11 +161,6 @@
     color: rgba(255,255,255,.6);
     margin-bottom: .75rem;
     min-height: 2.5em;
-  }
-  .addons .addon-card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .35rem;
   }
   .addons .addon-rating {
     font-size: .85rem;
