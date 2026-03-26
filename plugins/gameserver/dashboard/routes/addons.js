@@ -54,6 +54,21 @@ function parseTags(tags) {
     }
 }
 
+/**
+ * Erkennt die Plattform anhand der Docker-Images in game_data.
+ * Wenn ein Image-Key `:proton` enthält → "windows" (Proton GE).
+ */
+function detectPlatform(gameData) {
+    const images = gameData?.docker_images;
+    if (!images || typeof images !== 'object') return null;
+    for (const [key, label] of Object.entries(images)) {
+        const lower = key.toLowerCase();
+        if (lower.includes(':proton') || lower.includes('/proton')) return 'windows';
+        if (typeof label === 'string' && label.toLowerCase().includes('proton')) return 'windows';
+    }
+    return null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GET / — Marketplace
 // ─────────────────────────────────────────────────────────────────────────────
@@ -341,6 +356,12 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ success: false, message: `Slug "${slug}" existiert bereits` });
         }
 
+        // Platform auto-detect: Docker-Image mit :proton → windows
+        if (!gameData.platform) {
+            const detected = detectPlatform(gameData);
+            if (detected) gameData.platform = detected;
+        }
+
         const runtimeType = detectRuntimeType(gameData);
         const finalVisibility = visibility || 'private';
         const status     = finalVisibility === 'private' ? 'approved' : 'pending_review';
@@ -429,6 +450,12 @@ router.put('/:id', async (req, res) => {
         }
 
         if (gameData) {
+            // Platform auto-detect: Docker-Image mit :proton → windows
+            if (!gameData.platform) {
+                const detected = detectPlatform(gameData);
+                if (detected) gameData.platform = detected;
+            }
+
             const runtimeType = detectRuntimeType(gameData);
             await dbService.query(`
                 UPDATE addon_marketplace SET

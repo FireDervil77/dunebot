@@ -59,6 +59,23 @@ function detectRuntimeType(gameData) {
 }
 
 /**
+ * Erkennt die Plattform anhand der Docker-Images in game_data.
+ * Wenn ein Image-Key `:proton` enthält → "windows" (Proton GE).
+ * @param {object} gameData
+ * @returns {string|null}
+ */
+function detectPlatform(gameData) {
+    const images = gameData?.docker_images;
+    if (!images || typeof images !== 'object') return null;
+    for (const [key, label] of Object.entries(images)) {
+        const lower = key.toLowerCase();
+        if (lower.includes(':proton') || lower.includes('/proton')) return 'windows';
+        if (typeof label === 'string' && label.toLowerCase().includes('proton')) return 'windows';
+    }
+    return null;
+}
+
+/**
  * Extrahiert die Steam AppID aus game_data.
  * @param {object} gameData
  * @returns {string|null}
@@ -340,6 +357,12 @@ router.post('/', async (req, res) => {
         const runtimeType = detectRuntimeType(gameData);
         const steamAppId  = extractSteamAppId(gameData);
 
+        // Platform auto-detect: Docker-Image mit :proton → windows
+        if (!gameData.platform) {
+            const detected = detectPlatform(gameData);
+            if (detected) gameData.platform = detected;
+        }
+
         const VALID_CATEGORIES = ['fps','survival','sandbox','mmorpg','racing','strategy','horror','scifi','other'];
         const safeCategory = VALID_CATEGORIES.includes(category) ? category : 'other';
 
@@ -467,6 +490,12 @@ router.put('/:id', async (req, res) => {
             : null;
 
         if (gameData) {
+            // Platform auto-detect: Docker-Image mit :proton → windows
+            if (!gameData.platform) {
+                const detected = detectPlatform(gameData);
+                if (detected) gameData.platform = detected;
+            }
+
             const runtimeType = detectRuntimeType(gameData);
             await dbService.query(`
                 UPDATE addon_marketplace

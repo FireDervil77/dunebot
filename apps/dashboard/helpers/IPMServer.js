@@ -1116,7 +1116,8 @@ class IPMServer {
                         startup_command: server.startup_command,
                         ports,
                         env_variables: envVariables,
-                        game_data: gameData
+                        game_data: gameData,
+                        platform: gameData.platform || 'linux'
                     }, 60000);
 
                     if (response.success) {

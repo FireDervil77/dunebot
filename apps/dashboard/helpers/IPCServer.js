@@ -745,6 +745,13 @@ class IPCServer {
                     if (!dockerImage) return message.reply({ success: false, error: 'Kein Docker-Image konfiguriert – Server muss neu installiert werden' });
 
                     await dbService.query("UPDATE gameservers SET status = 'starting', last_started_at = NOW() WHERE id = ?", [serverId]);
+                    // Platform aus frozen_game_data extrahieren (Proton GE Wrapping)
+                    let gameDataPlatform = null;
+                    try {
+                        const fd = typeof srv.frozen_game_data === 'string' ? JSON.parse(srv.frozen_game_data) : srv.frozen_game_data;
+                        if (fd?.platform) gameDataPlatform = fd.platform;
+                    } catch (_) {}
+
                     const startPayload = {
                         server_id:      String(serverId),
                         rootserver_id:  srv.rootserver_id,
@@ -759,6 +766,7 @@ class IPCServer {
                         game_data: {
                             docker_image: dockerImage,
                             runtime:      gameDataRuntime,
+                            ...(gameDataPlatform ? { platform: gameDataPlatform } : {}),
                         },
                     };
                     const startR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.start', startPayload, 30000);

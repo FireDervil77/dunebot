@@ -2239,6 +2239,7 @@ router.post('/:serverId/retry-installation', async (req, res) => {
             ports,
             env_variables: envVariables,
             game_data: gameData,
+            platform: gameData.platform || 'linux',
             run_install: true,
             start_after: false
         }, 60000);
@@ -2921,6 +2922,7 @@ router.post('/:serverId/reinstall', requirePermission('GAMESERVER.CREATE'), asyn
             startup_command: server.launch_params || gameData.startup?.command || '',
             steam_app_id: server.steam_app_id || server.steam_server_app_id || null,
             game_data: gameData,
+            platform: gameData.platform || 'linux',
             run_install: true,
             start_after: false,
             reinstall: true  // ✅ Erzwingt Neuinstallation (überschreibt vorhandene start.sh / Spieledateien)

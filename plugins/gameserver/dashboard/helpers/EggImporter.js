@@ -300,7 +300,13 @@ class EggImporter {
             templates: [],
         };
 
-        Logger.info(`[EggImporter] Konvertiert: ${gameData.meta.name}`);
+        // ── Platform-Erkennung: Docker-Image mit :proton → Windows (Proton GE) ──
+        const detectedPlatform = this._detectPlatform(gameData.docker_images);
+        if (detectedPlatform) {
+            gameData.platform = detectedPlatform;
+        }
+
+        Logger.info(`[EggImporter] Konvertiert: ${gameData.meta.name}${detectedPlatform ? ` (Platform: ${detectedPlatform})` : ''}`);
         return gameData;
     }
 
@@ -343,6 +349,30 @@ class EggImporter {
         }
 
         return {};
+    }
+
+    /**
+     * Erkennt die Plattform anhand der Docker-Images.
+     * Wenn ein Image-Key `:proton` enthält → Plattform = "windows" (Proton GE).
+     *
+     * @param {object} dockerImages  — { "image:tag": "Label" }
+     * @returns {string|null}        — "windows" oder null (= Linux)
+     */
+    _detectPlatform(dockerImages) {
+        if (!dockerImages || typeof dockerImages !== 'object') return null;
+
+        for (const [imageKey, label] of Object.entries(dockerImages)) {
+            const lower = imageKey.toLowerCase();
+            if (lower.includes(':proton') || lower.includes('/proton')) {
+                return 'windows';
+            }
+            // Label-Check als Fallback
+            if (typeof label === 'string' && label.toLowerCase().includes('proton')) {
+                return 'windows';
+            }
+        }
+
+        return null;
     }
 
     /**
