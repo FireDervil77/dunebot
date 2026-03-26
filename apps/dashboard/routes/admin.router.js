@@ -308,8 +308,8 @@ router.post('/notifications/save', async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const {
         notificationId, title_de, title_en, message_de, message_en,
-        action_text_de, action_text_en, type, action_url, expiry, roles,
-        delivery_method, target_guild_ids, discord_channel_id
+        action_text_de, action_text_en, type, category, action_url, expiry, roles,
+        delivery_method
     } = req.body;
 
     try {
@@ -330,24 +330,42 @@ router.post('/notifications/save', async (req, res) => {
         const deliveryMethodStr = JSON.stringify(deliveryMethods);
         const needsDiscord = deliveryMethods.some(m => m !== 'dashboard');
 
+        // Bei discord_category: Channel aus admin_settings per Kategorie auflösen
+        let resolvedChannelId = null;
+        let resolvedGuildId = null;
+        if (deliveryMethods.includes('discord_category') && category) {
+            const [setting] = await dbService.query(
+                "SELECT `value` FROM admin_settings WHERE `key` = ?",
+                [`notification_channel_${category}`]
+            );
+            if (setting) {
+                try {
+                    const cfg = JSON.parse(setting.value);
+                    resolvedChannelId = cfg.channel_id || null;
+                } catch {}
+            }
+            resolvedGuildId = process.env.CONTROL_GUILD_ID || null;
+        }
+
         const metadata = {
             type: type || 'info', action_url: action_url || null,
             expiry: expiry || null, roles: roles || null, dismissed: 0,
             delivery_method: deliveryMethodStr,
-            target_guild_ids: target_guild_ids || null,
-            discord_channel_id: discord_channel_id || null
+            category: category || 'other',
+            target_guild_ids: resolvedGuildId ? JSON.stringify([resolvedGuildId]) : null,
+            discord_channel_id: resolvedChannelId
         };
         const notificationData = NotificationHelper.prepareNotificationForDB(translations, metadata);
 
         if (notificationId) {
             await dbService.query(`
                 UPDATE notifications SET title_translations=?, message_translations=?,
-                action_text_translations=?, type=?, action_url=?, expiry=?, roles=?,
+                action_text_translations=?, type=?, category=?, action_url=?, expiry=?, roles=?,
                 delivery_method=?, target_guild_ids=?, discord_channel_id=?, updated_at=NOW()
                 WHERE id=?
             `, [notificationData.title_translations, notificationData.message_translations,
                 notificationData.action_text_translations, notificationData.type,
-                notificationData.action_url, notificationData.expiry, notificationData.roles,
+                metadata.category, notificationData.action_url, notificationData.expiry, notificationData.roles,
                 metadata.delivery_method, metadata.target_guild_ids, metadata.discord_channel_id,
                 notificationId]);
             return res.json({ success: true, message: 'Notification erfolgreich aktualisiert' });
@@ -355,13 +373,13 @@ router.post('/notifications/save', async (req, res) => {
             const result = await dbService.query(`
                 INSERT INTO notifications
                 (title_translations, message_translations, action_text_translations,
-                 type, action_url, expiry, roles, dismissed,
+                 type, category, action_url, expiry, roles, dismissed,
                  delivery_method, target_guild_ids, discord_channel_id,
                  created_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,0,?,?,?,NOW(),NOW())
+                VALUES (?,?,?,?,?,?,?,?,0,?,?,?,NOW(),NOW())
             `, [notificationData.title_translations, notificationData.message_translations,
                 notificationData.action_text_translations, notificationData.type,
-                notificationData.action_url, notificationData.expiry, notificationData.roles,
+                metadata.category, notificationData.action_url, notificationData.expiry, notificationData.roles,
                 metadata.delivery_method, metadata.target_guild_ids, metadata.discord_channel_id]);
 
             if (needsDiscord) {
@@ -394,6 +412,79 @@ router.post('/notifications/delete/:id', async (req, res) => {
         res.json({ success: true, message: 'Notification erfolgreich gelöscht' });
     } catch (error) {
         Logger.error('[Admin] Fehler beim Löschen der Notification:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ================================================================
+// NOTIFICATION CHANNEL-KONFIGURATION
+// ================================================================
+
+const NOTIFICATION_CATEGORIES = ['announcement', 'changelog', 'status', 'maintenance', 'other'];
+
+// API: Channel-Config laden (für notification-edit.ejs AJAX)
+router.get('/notifications/api/channel-config', async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const rows = await dbService.query(
+            "SELECT `key`, `value` FROM admin_settings WHERE `key` LIKE 'notification_channel_%'"
+        );
+        const config = {};
+        for (const cat of NOTIFICATION_CATEGORIES) {
+            const row = rows.find(r => r.key === `notification_channel_${cat}`);
+            if (row) {
+                try { config[cat] = JSON.parse(row.value); } catch { config[cat] = null; }
+            }
+        }
+        res.json({ success: true, config });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// GET: Channel-Config Seite
+router.get('/notifications/channels', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const rows = await dbService.query(
+            "SELECT `key`, `value` FROM admin_settings WHERE `key` LIKE 'notification_channel_%'"
+        );
+        const channelConfig = {};
+        for (const cat of NOTIFICATION_CATEGORIES) {
+            const row = rows.find(r => r.key === `notification_channel_${cat}`);
+            channelConfig[cat] = row ? JSON.parse(row.value || '{}') : {};
+        }
+        await themeManager.renderView(res, 'admin/notification-channels', {
+            title: 'Notification Channel-Konfiguration',
+            activeMenu: '/admin/notifications',
+            channelConfig,
+            categories: NOTIFICATION_CATEGORIES,
+            controlGuildId: process.env.CONTROL_GUILD_ID || ''
+        });
+    } catch (error) {
+        res.status(500).render('error', { message: 'Fehler beim Laden der Channel-Config', error });
+    }
+});
+
+// POST: Channel-Config speichern
+router.post('/notifications/channels/save', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        for (const cat of NOTIFICATION_CATEGORIES) {
+            const channelId = req.body[`channel_${cat}`] || '';
+            const channelName = req.body[`channel_name_${cat}`] || '';
+            const value = JSON.stringify({ channel_id: channelId, channel_name: channelName });
+            await dbService.query(
+                "INSERT INTO admin_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?",
+                [`notification_channel_${cat}`, value, value]
+            );
+        }
+        Logger.info('[Admin] Notification Channel-Config aktualisiert');
+        res.json({ success: true, message: 'Channel-Konfiguration gespeichert!' });
+    } catch (error) {
+        Logger.error('[Admin] Fehler beim Speichern der Channel-Config:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });

@@ -38,6 +38,7 @@
                                 <th style="width: 10px">#</th>
                                 <th><%= tr('NOTIFICATIONS.TABLE.TITLE') %></th>
                                 <th><%= tr('NOTIFICATIONS.TABLE.TYPE') %></th>
+                                <th>Kategorie</th>
                                 <th><%= tr('NOTIFICATIONS.TABLE.EXPIRES') %></th>
                                 <th><%= tr('NOTIFICATIONS.TABLE.CREATED') %></th>
                                 <th style="width: 120px"><%= tr('NOTIFICATIONS.TABLE.ACTIONS') %></th>
@@ -62,6 +63,19 @@
                                         %>
                                         <i class="fas fa-<%= icon %>"></i>
                                         <span class="ml-1"><%= notification.type %></span>
+                                    </td>
+                                    <td>
+                                        <%
+                                        const catIcons = {
+                                            announcement: '📢',
+                                            changelog: '📋',
+                                            status: '🔔',
+                                            maintenance: '🔧',
+                                            other: '📌'
+                                        };
+                                        const catIcon = catIcons[notification.category] || '📌';
+                                        %>
+                                        <span><%= catIcon %> <%= notification.category || 'other' %></span>
                                     </td>
                                     <td>
                                         <% if (notification.expiry) { %>

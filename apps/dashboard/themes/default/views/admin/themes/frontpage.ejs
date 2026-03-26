@@ -63,12 +63,12 @@
           hero: 'fa-solid fa-image', features: 'fa-solid fa-star', news: 'fa-solid fa-newspaper',
           changelogs: 'fa-solid fa-code-branch', plugins: 'fa-solid fa-puzzle-piece',
           documentation: 'fa-solid fa-book', stats: 'fa-solid fa-chart-bar',
-          skills: 'fa-solid fa-sliders-h', custom: 'fa-solid fa-code'
+          skills: 'fa-solid fa-sliders-h', addons: 'fa-solid fa-gamepad', custom: 'fa-solid fa-code'
       }; %>
       <% const sectionBgColors = {
           hero: 'bg-primary', features: 'bg-warning', news: 'bg-info', changelogs: 'bg-danger',
           plugins: 'bg-success', documentation: 'bg-secondary', stats: 'bg-dark',
-          skills: 'bg-purple', custom: 'bg-teal'
+          skills: 'bg-purple', addons: 'bg-success', custom: 'bg-teal'
       }; %>
 
       <% sections.forEach((section, index) => { %>
@@ -195,7 +195,7 @@
                   <% } %>
 
                   <!-- Info für auto-generierte Typen -->
-                  <% if (['hero','features','news','changelogs','plugins','documentation'].includes(section.section_type)) { %>
+                  <% if (['hero','features','news','changelogs','plugins','documentation','addons'].includes(section.section_type)) { %>
                     <div class="col-12">
                       <div class="alert alert-secondary small mb-0">
                         <i class="bi bi-info-circle me-1"></i>
@@ -211,6 +211,8 @@
                           Plugin-Carousel wird automatisch aus den installierten Plugins generiert.
                         <% } else if (section.section_type === 'documentation') { %>
                           Dokumentation &amp; Links Sektion. Anpassung über das Partial.
+                        <% } else if (section.section_type === 'addons') { %>
+                          Zeigt alle Spiele aus dem Addon-Marketplace (approved + public/official) als Game-Cards mit Kategorie-Filter.
                         <% } %>
                       </div>
                     </div>

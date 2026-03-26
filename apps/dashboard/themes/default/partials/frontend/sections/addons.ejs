@@ -1,0 +1,185 @@
+<%# Addons/Games Section Partial — Spiele aus dem Addon-Marketplace %>
+
+<%
+  const categoryIcons = {
+    fps: 'bi-bullseye', survival: 'bi-tree', sandbox: 'bi-box',
+    mmorpg: 'bi-globe', racing: 'bi-speedometer2', strategy: 'bi-diagram-3',
+    horror: 'bi-bug', scifi: 'bi-rocket', other: 'bi-controller'
+  };
+  const categoryLabels = {
+    fps: 'FPS', survival: 'Survival', sandbox: 'Sandbox',
+    mmorpg: 'MMORPG', racing: 'Racing', strategy: 'Strategie',
+    horror: 'Horror', scifi: 'Sci-Fi', other: 'Sonstige'
+  };
+%>
+
+<section id="addons" class="addons section dark-background">
+  <div class="container section-title" data-aos="fade-up">
+    <h1>Spiele</h1>
+    <h2>Unterstützte Gameserver</h2>
+    <p>Alle Spiele, die du mit DuneBot hosten kannst — direkt aus unserem Marketplace.</p>
+  </div>
+
+  <div class="container">
+    <% if (locals.addonsList && addonsList.length > 0) { %>
+
+      <!-- Kategorie-Filter -->
+      <div class="text-center mb-4" data-aos="fade-up" data-aos-delay="50">
+        <div class="btn-group flex-wrap" role="group" id="addon-filter">
+          <button type="button" class="btn btn-outline-light btn-sm active" data-filter="all">
+            <i class="bi bi-grid me-1"></i> Alle
+          </button>
+          <%
+            const usedCategories = [...new Set(addonsList.map(a => a.category).filter(Boolean))];
+            usedCategories.forEach(cat => {
+          %>
+            <button type="button" class="btn btn-outline-light btn-sm" data-filter="<%= cat %>">
+              <i class="bi <%= categoryIcons[cat] || 'bi-controller' %> me-1"></i> <%= categoryLabels[cat] || cat %>
+            </button>
+          <% }); %>
+        </div>
+      </div>
+
+      <!-- Game Grid -->
+      <div class="row g-4" id="addon-grid">
+        <% addonsList.forEach(function(addon, index) {
+          const imgSrc = addon.banner_url || addon.image_url || addon.icon_url || '';
+          let tags = [];
+          try { tags = typeof addon.tags === 'string' ? JSON.parse(addon.tags) : (addon.tags || []); } catch(e) {}
+        %>
+        <div class="col-xl-3 col-lg-4 col-md-6 addon-card-wrapper" 
+             data-category="<%= addon.category || 'other' %>"
+             data-aos="fade-up" data-aos-delay="<%= 50 + (index % 8) * 50 %>">
+          <div class="addon-card h-100">
+            <% if (imgSrc) { %>
+              <div class="addon-card-img">
+                <img src="<%= imgSrc %>" alt="<%= addon.name %>" loading="lazy">
+              </div>
+            <% } else { %>
+              <div class="addon-card-img addon-card-placeholder">
+                <i class="bi <%= categoryIcons[addon.category] || 'bi-controller' %>"></i>
+              </div>
+            <% } %>
+            <div class="addon-card-body">
+              <div class="d-flex align-items-start justify-content-between mb-2">
+                <h4 class="addon-card-title mb-0"><%= addon.name %></h4>
+                <% if (addon.rating_avg > 0) { %>
+                  <span class="addon-rating" title="<%= addon.rating_avg %>/5 (<%= addon.rating_count %> Bewertungen)">
+                    <i class="bi bi-star-fill"></i> <%= Number(addon.rating_avg).toFixed(1) %>
+                  </span>
+                <% } %>
+              </div>
+              <p class="addon-card-desc"><%= addon.description ? addon.description.substring(0, 100) + (addon.description.length > 100 ? '...' : '') : '' %></p>
+              <div class="addon-card-meta">
+                <span class="badge bg-primary bg-opacity-25 text-primary">
+                  <i class="bi <%= categoryIcons[addon.category] || 'bi-controller' %> me-1"></i><%= categoryLabels[addon.category] || addon.category || 'Game' %>
+                </span>
+                <% if (addon.version) { %>
+                  <span class="badge bg-secondary bg-opacity-25 text-secondary">v<%= addon.version %></span>
+                <% } %>
+                <% if (addon.steam_app_id) { %>
+                  <span class="badge bg-dark bg-opacity-50 text-light" title="Steam App ID: <%= addon.steam_app_id %>">
+                    <i class="bi bi-steam me-1"></i>Steam
+                  </span>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        </div>
+        <% }); %>
+      </div>
+
+    <% } else { %>
+      <div class="text-center py-5" data-aos="fade-up">
+        <i class="bi bi-controller" style="font-size: 3rem; opacity: .5;"></i>
+        <p class="mt-3 text-muted">Noch keine Spiele im Marketplace verfügbar.</p>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<style>
+  .addons .addon-card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform .25s ease, box-shadow .25s ease;
+  }
+  .addons .addon-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(0,0,0,.3);
+    border-color: rgba(255,255,255,0.2);
+  }
+  .addons .addon-card-img {
+    height: 160px;
+    overflow: hidden;
+    background: rgba(0,0,0,0.2);
+  }
+  .addons .addon-card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform .3s ease;
+  }
+  .addons .addon-card:hover .addon-card-img img {
+    transform: scale(1.05);
+  }
+  .addons .addon-card-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    color: rgba(255,255,255,0.2);
+  }
+  .addons .addon-card-body {
+    padding: 1rem 1.25rem;
+  }
+  .addons .addon-card-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #fff;
+  }
+  .addons .addon-card-desc {
+    font-size: .85rem;
+    color: rgba(255,255,255,.6);
+    margin-bottom: .75rem;
+    min-height: 2.5em;
+  }
+  .addons .addon-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+  }
+  .addons .addon-rating {
+    font-size: .85rem;
+    color: #ffc107;
+    white-space: nowrap;
+  }
+  .addons #addon-filter .btn.active {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.3);
+    color: #fff;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Kategorie-Filter
+  var filterBtns = document.querySelectorAll('#addon-filter [data-filter]');
+  filterBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      filterBtns.forEach(function(b) { b.classList.remove('active'); });
+      this.classList.add('active');
+      var filter = this.dataset.filter;
+      document.querySelectorAll('.addon-card-wrapper').forEach(function(card) {
+        if (filter === 'all' || card.dataset.category === filter) {
+          card.style.display = '';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+  });
+});
+</script>

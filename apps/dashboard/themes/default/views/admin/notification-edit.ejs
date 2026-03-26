@@ -39,133 +39,47 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
-    const targetGuildsSelect = document.getElementById('target_guild_ids');
-    const channelPickerGroup = document.getElementById('channel-picker-group');
-    const channelSelect = document.getElementById('discord_channel_id');
-    const discordSections = document.getElementById('discord-options-section');
+    const categorySelect = document.getElementById('category');
+    const channelConfigBox = document.getElementById('category-channel-config');
+    const channelHint = document.getElementById('category-channel-hint');
+    const resolvedChannelName = document.getElementById('resolved-channel-name');
+    let channelConfig = {};
 
-    // Toggle Discord-Optionen basierend auf Checkboxes
-    function toggleDiscordOptions() {
-        const needsChannel = document.getElementById('dm_discord_channel')?.checked;
-        const needsDiscord = document.getElementById('dm_system_channel')?.checked || 
-                             needsChannel || 
-                             document.getElementById('dm_discord_dm')?.checked;
-
-        if (channelPickerGroup) {
-            channelPickerGroup.style.display = needsChannel ? 'block' : 'none';
-        }
-        if (discordSections) {
-            discordSections.style.display = needsDiscord ? 'block' : 'none';
-        }
-    }
-
-    document.querySelectorAll('.delivery-method-cb').forEach(function(cb) {
-        cb.addEventListener('change', toggleDiscordOptions);
-    });
-    toggleDiscordOptions(); // Initial
-
-    // Lade Bot-Guilds
+    // Lade Channel-Konfiguration pro Kategorie
     try {
-        const response = await fetch('/api/bot-guilds');
-        const data = await response.json();
+        const resp = await fetch('/admin/notifications/api/channel-config');
+        const data = await resp.json();
+        if (data.success) channelConfig = data.config || {};
+    } catch (e) {
+        console.error('Channel-Config laden fehlgeschlagen:', e);
+    }
 
-        if (data.success && data.guilds) {
-            targetGuildsSelect.innerHTML = '';
-            const sortedGuilds = data.guilds.sort((a, b) => a.name.localeCompare(b.name));
+    // Toggle Discord-Optionen + Channel-Anzeige
+    function updateChannelInfo() {
+        const discordChecked = document.getElementById('dm_discord_category')?.checked;
+        const cat = categorySelect.value;
+        const cfg = channelConfig[cat];
 
-            sortedGuilds.forEach(function(guild) {
-                const option = document.createElement('option');
-                option.value = guild.id;
-                option.textContent = guild.name + ' (' + guild.memberCount + ' Members)';
-
-                <% if (notification?.target_guild_ids) { %>
-                try {
-                    const raw = '<%= notification.target_guild_ids %>';
-                    const targetIds = JSON.parse(raw);
-                    if (Array.isArray(targetIds) && targetIds.includes(guild.id)) {
-                        option.selected = true;
-                    }
-                } catch (e) {}
-                <% } %>
-
-                targetGuildsSelect.appendChild(option);
-            });
-
-            // Channel-Picker: Lade Channels wenn nur EINE Guild gewählt
-            targetGuildsSelect.addEventListener('change', loadChannelsForSelectedGuild);
-            loadChannelsForSelectedGuild();
+        if (discordChecked && cfg?.channel_id) {
+            channelConfigBox.style.display = 'block';
+            resolvedChannelName.textContent = '#' + (cfg.channel_name || cfg.channel_id);
+            channelHint.textContent = 'Channel "' + (cfg.channel_name || cfg.channel_id) + '" ist für ' + cat + ' konfiguriert.';
+        } else if (discordChecked) {
+            channelConfigBox.style.display = 'block';
+            resolvedChannelName.innerHTML = '<span class="text-warning">Kein Channel für "' + cat + '" konfiguriert!</span>';
+            channelHint.innerHTML = '<span class="text-warning">⚠ Kein Channel konfiguriert — bitte <a href="/admin/notifications/channels">hier einrichten</a>.</span>';
         } else {
-            targetGuildsSelect.innerHTML = '<option value="" disabled>Fehler beim Laden</option>';
-        }
-    } catch (error) {
-        targetGuildsSelect.innerHTML = '<option value="" disabled>Fehler beim Laden</option>';
-        console.error('Fehler beim Laden der Bot-Guilds:', error);
-    }
-
-    // Channel-Picker: Channels einer Guild laden
-    async function loadChannelsForSelectedGuild() {
-        const selected = Array.from(targetGuildsSelect.selectedOptions).map(o => o.value);
-        if (selected.length !== 1) {
-            channelSelect.innerHTML = '<option value="">Zuerst genau einen Server wählen</option>';
-            channelSelect.disabled = true;
-            return;
-        }
-        channelSelect.innerHTML = '<option value="">Lade Channels...</option>';
-        channelSelect.disabled = true;
-        try {
-            const resp = await fetch('/api/guild-channels/' + selected[0]);
-            const data = await resp.json();
-            if (data.success && data.channels) {
-                channelSelect.innerHTML = '<option value="">(System-Channel verwenden)</option>';
-                let currentCategory = '';
-                data.channels.forEach(function(ch) {
-                    if (ch.parentName && ch.parentName !== currentCategory) {
-                        currentCategory = ch.parentName;
-                        const optGroup = document.createElement('optgroup');
-                        optGroup.label = ch.parentName;
-                        // Sammle alle Channels dieser Category
-                        data.channels.filter(c => c.parentName === ch.parentName).forEach(function(c) {
-                            const opt = document.createElement('option');
-                            opt.value = c.id;
-                            opt.textContent = '#' + c.name;
-                            <% if (notification?.discord_channel_id) { %>
-                            if (c.id === '<%= notification.discord_channel_id %>') opt.selected = true;
-                            <% } %>
-                            optGroup.appendChild(opt);
-                        });
-                        channelSelect.appendChild(optGroup);
-                    }
-                });
-                // Channels ohne Category
-                data.channels.filter(c => !c.parentName).forEach(function(ch) {
-                    const opt = document.createElement('option');
-                    opt.value = ch.id;
-                    opt.textContent = '#' + ch.name;
-                    <% if (notification?.discord_channel_id) { %>
-                    if (ch.id === '<%= notification.discord_channel_id %>') opt.selected = true;
-                    <% } %>
-                    channelSelect.appendChild(opt);
-                });
-                channelSelect.disabled = false;
-            }
-        } catch (err) {
-            channelSelect.innerHTML = '<option value="">Fehler beim Laden</option>';
-            console.error('Channel-Laden fehlgeschlagen:', err);
+            channelConfigBox.style.display = 'none';
+            channelHint.textContent = 'Der Channel wird aus der Kategorie-Konfiguration geladen...';
         }
     }
 
-    // Form-Submit: Konvertiere Daten
+    document.querySelectorAll('.delivery-method-cb').forEach(cb => cb.addEventListener('change', updateChannelInfo));
+    categorySelect.addEventListener('change', updateChannelInfo);
+    updateChannelInfo();
+
+    // Form-Submit: Delivery Methods als JSON-Array
     document.querySelector('form').addEventListener('submit', function() {
-        // Target Guild IDs
-        const selectedGuilds = Array.from(targetGuildsSelect.selectedOptions).map(o => o.value);
-        var hiddenGuilds = document.createElement('input');
-        hiddenGuilds.type = 'hidden';
-        hiddenGuilds.name = 'target_guild_ids';
-        hiddenGuilds.value = selectedGuilds.length > 0 ? JSON.stringify(selectedGuilds) : '';
-        targetGuildsSelect.name = '';
-        this.appendChild(hiddenGuilds);
-
-        // Delivery Methods als JSON-Array
         var methods = [];
         document.querySelectorAll('.delivery-method-cb:checked').forEach(function(cb) {
             methods.push(cb.value);
@@ -288,7 +202,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                     <!-- Gemeinsame Felder -->
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="form-group">
                                 <label for="type"><%= tr('NOTIFICATIONS.FORM.TYPE') %> <span class="text-danger">*</span></label>
                                 <select class="form-control" id="type" name="type" required>
@@ -308,7 +222,23 @@ document.addEventListener('DOMContentLoaded', async function() {
                             </div>
                         </div>
 
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="category">Kategorie</label>
+                                <select class="form-control" id="category" name="category">
+                                    <option value="announcement" <%= notification?.category === 'announcement' ? 'selected' : '' %>>📢 Announcement</option>
+                                    <option value="changelog" <%= notification?.category === 'changelog' ? 'selected' : '' %>>📋 Changelog</option>
+                                    <option value="status" <%= notification?.category === 'status' ? 'selected' : '' %>>🔔 Status</option>
+                                    <option value="maintenance" <%= notification?.category === 'maintenance' ? 'selected' : '' %>>🔧 Maintenance</option>
+                                    <option value="other" <%= notification?.category === 'other' ? 'selected' : '' %>>📌 Sonstige</option>
+                                </select>
+                                <small class="form-text text-muted">
+                                    Bestimmt den Discord-Channel (per Kategorie konfigurierbar)
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
                             <div class="form-group">
                                 <label for="action_url"><%= tr('NOTIFICATIONS.FORM.ACTION_URL') %></label>
                                 <input type="url" 
@@ -349,19 +279,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                             </div>
                             <div class="custom-control custom-checkbox mb-2">
                                 <input type="checkbox" class="custom-control-input delivery-method-cb" 
-                                       id="dm_system_channel" value="system_channel"
-                                       <%= deliveryMethods.includes('system_channel') ? 'checked' : '' %>>
-                                <label class="custom-control-label" for="dm_system_channel">
-                                    📢 Im System-Channel senden
+                                       id="dm_discord_category" value="discord_category"
+                                       <%= deliveryMethods.includes('discord_category') || deliveryMethods.includes('discord_channel') || deliveryMethods.includes('system_channel') ? 'checked' : '' %>>
+                                <label class="custom-control-label" for="dm_discord_category">
+                                    📢 Im konfigurierten Discord-Channel posten (nach Kategorie)
                                 </label>
-                            </div>
-                            <div class="custom-control custom-checkbox mb-2">
-                                <input type="checkbox" class="custom-control-input delivery-method-cb" 
-                                       id="dm_discord_channel" value="discord_channel"
-                                       <%= deliveryMethods.includes('discord_channel') ? 'checked' : '' %>>
-                                <label class="custom-control-label" for="dm_discord_channel">
-                                    💬 Im ausgewählten Discord-Channel senden
-                                </label>
+                                <small class="form-text text-muted ml-4" id="category-channel-info">
+                                    <i class="fas fa-info-circle"></i> <span id="category-channel-hint">Der Channel wird aus der Kategorie-Konfiguration geladen...</span>
+                                </small>
                             </div>
                             <div class="custom-control custom-checkbox mb-2">
                                 <input type="checkbox" class="custom-control-input delivery-method-cb" 
@@ -372,36 +297,15 @@ document.addEventListener('DOMContentLoaded', async function() {
                                 </label>
                             </div>
                         </div>
-                        <small class="form-text text-muted">
-                            Mehrere Methoden gleichzeitig auswählbar
-                        </small>
                     </div>
 
-                    <div id="discord-options-section" style="display: none;">
-                        <div class="form-group" id="channel-picker-group" style="display: none;">
-                            <label for="discord_channel_id">Discord-Channel</label>
-                            <select class="form-control" id="discord_channel_id" name="discord_channel_id" disabled>
-                                <option value="">Zuerst einen Server wählen</option>
-                            </select>
-                            <small class="form-text text-muted">
-                                Leer lassen = System-Channel verwenden. Wähle zuerst genau einen Ziel-Server.
-                            </small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="target_guild_ids">Ziel-Server (optional)</label>
-                            <select class="form-control" 
-                                    id="target_guild_ids" 
-                                    name="target_guild_ids" 
-                                    multiple
-                                    size="8"
-                                    style="height: auto;">
-                                <option value="" disabled>Lade Server-Liste...</option>
-                            </select>
-                            <small class="form-text text-muted">
-                                <i class="fas fa-info-circle"></i> Halte <kbd>Strg</kbd> (Windows) oder <kbd>Cmd</kbd> (Mac) gedrückt, um mehrere Server auszuwählen. Leer lassen = an alle Server senden.
-                            </small>
-                        </div>
+                    <!-- Konfigurierte Channels (nur Anzeige) -->
+                    <div id="category-channel-config" class="alert alert-info" style="display: none;">
+                        <i class="fas fa-hashtag mr-1"></i>
+                        <strong>Ziel-Channel:</strong> <span id="resolved-channel-name">Wird geladen...</span>
+                        <a href="/admin/notifications/channels" class="btn btn-sm btn-outline-primary float-right">
+                            <i class="fas fa-cog"></i> Channel-Konfiguration
+                        </a>
                     </div>
                 </div>
 

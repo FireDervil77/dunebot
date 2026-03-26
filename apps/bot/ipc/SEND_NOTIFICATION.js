@@ -6,6 +6,7 @@ const { EmbedBuilder } = require('discord.js');
 /**
  * Kern-IPC-Handler: SEND_NOTIFICATION
  * Sendet eine mehrsprachige Notification an Discord-Channels oder per DM.
+ * Unterstützt discord_category: löst Channel aus admin_settings per Kategorie auf.
  */
 module.exports = async (payload, client) => {
     const Logger = ServiceManager.get('Logger');
@@ -18,6 +19,7 @@ module.exports = async (payload, client) => {
             message_translations,
             action_text_translations,
             type,
+            category,
             action_url,
             delivery_method,
             target_guild_ids,
@@ -28,7 +30,7 @@ module.exports = async (payload, client) => {
         const titleTranslations = parse(title_translations);
         const messageTranslations = parse(message_translations);
         const actionTextTranslations = parse(action_text_translations);
-        const targetGuildIds = typeof target_guild_ids === 'string'
+        let targetGuildIds = typeof target_guild_ids === 'string'
             ? JSON.parse(target_guild_ids)
             : (target_guild_ids || []);
 
@@ -43,6 +45,28 @@ module.exports = async (payload, client) => {
         // Legacy 'all' expanden
         if (methods.includes('all')) {
             methods = ['dashboard', 'system_channel', 'discord_channel', 'discord_dm'];
+        }
+
+        // discord_category: Channel aus admin_settings per Kategorie auflösen
+        let categoryChannelId = null;
+        if (methods.includes('discord_category') && category) {
+            try {
+                const [setting] = await dbService.query(
+                    "SELECT `value` FROM admin_settings WHERE `key` = ?",
+                    [`notification_channel_${category}`]
+                );
+                if (setting) {
+                    const cfg = JSON.parse(setting.value);
+                    categoryChannelId = cfg.channel_id || null;
+                }
+            } catch (e) {
+                Logger.warn(`[IPC] SEND_NOTIFICATION: Channel-Config für Kategorie "${category}" konnte nicht geladen werden:`, e.message);
+            }
+            // Control-Guild als Ziel verwenden
+            const controlGuildId = process.env.CONTROL_GUILD_ID;
+            if (controlGuildId && !targetGuildIds.includes(controlGuildId)) {
+                targetGuildIds = [controlGuildId];
+            }
         }
 
         const embedColors = { info: 0x3498db, warning: 0xf39c12, error: 0xe74c3c, success: 0x2ecc71 };
@@ -75,6 +99,22 @@ module.exports = async (payload, client) => {
 
             if (action_url) {
                 embed.addFields({ name: actionText, value: `[🔗 ${action_url}](${action_url})`, inline: false });
+            }
+
+            // discord_category: In den konfigurierten Kategorie-Channel posten
+            if (methods.includes('discord_category') && categoryChannelId) {
+                const targetChannel = guild.channels.cache.get(categoryChannelId);
+                if (targetChannel?.isTextBased()) {
+                    try {
+                        const sent = await targetChannel.send({ embeds: [embed] });
+                        sentMessageIds[guildId] = sentMessageIds[guildId] || {};
+                        sentMessageIds[guildId].categoryChannel = sent.id;
+                    } catch (e) {
+                        Logger.error(`[IPC] SEND_NOTIFICATION: Category-Channel-Fehler in ${guild.name}:`, e);
+                    }
+                } else {
+                    Logger.warn(`[IPC] SEND_NOTIFICATION: Category-Channel ${categoryChannelId} nicht gefunden oder kein Text-Channel in ${guild.name}`);
+                }
             }
 
             if (methods.includes('system_channel')) {

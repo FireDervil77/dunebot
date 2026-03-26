@@ -139,6 +139,23 @@ module.exports.getIndex = async (req, res) => {
                 Logger.error("Fehler beim Laden der Plugins:", err);
             }
         }
+
+        // Addons (Spiele aus dem Marketplace) laden
+        let addonsList = [];
+        if (sectionTypes.has('addons')) {
+            try {
+                addonsList = await dbService.query(
+                    `SELECT id, name, slug, description, category, icon_url, banner_url, image_url,
+                            version, steam_app_id, install_count, rating_avg, rating_count, tags
+                     FROM addon_marketplace
+                     WHERE status = 'approved' AND visibility IN ('official', 'public')
+                     ORDER BY install_count DESC, rating_avg DESC`
+                );
+                Logger.debug(`Addons für Frontpage geladen: ${addonsList.length}`);
+            } catch (err) {
+                Logger.error("Fehler beim Laden der Addons:", err);
+            }
+        }
         
         // Template rendern
         res.render("frontend/index", {
@@ -148,7 +165,8 @@ module.exports.getIndex = async (req, res) => {
             newsList: localizedNewsList,
             carouselNews,
             changelogsList: localizedChangelogsList,
-            pluginsList
+            pluginsList,
+            addonsList
         });
     } catch (error) {
         Logger.error("Fehler beim Rendern der Landing Page:", error);

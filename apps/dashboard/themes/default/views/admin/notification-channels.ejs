@@ -1,0 +1,158 @@
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0"><i class="fas fa-hashtag mr-2"></i>Notification Channel-Konfiguration</h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="/admin">SuperAdmin</a></li>
+                    <li class="breadcrumb-item"><a href="/admin/notifications">Notifications</a></li>
+                    <li class="breadcrumb-item active">Channel-Konfiguration</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="content">
+    <div class="container-fluid">
+        <div class="callout callout-info">
+            <h5><i class="fas fa-info-circle mr-1"></i> Hinweis</h5>
+            <p class="mb-0">
+                Hier legst du fest, in welchem Discord-Channel Notifications je nach Kategorie gepostet werden.
+                Die Channels beziehen sich auf den <strong>Control-Server</strong> (ID: <code><%= controlGuildId %></code>).
+            </p>
+        </div>
+
+        <form class="guild-ajax-form" data-form-type="channel-config-save" data-method="POST"
+              action="/admin/notifications/channels/save" method="POST">
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-cog mr-2"></i>Channel pro Kategorie</h3>
+                </div>
+                <div class="card-body">
+                    <div id="channels-loading" class="text-center py-4">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p class="mt-2 text-muted">Lade Discord-Channels...</p>
+                    </div>
+
+                    <div id="channels-content" style="display: none;">
+                        <%
+                        const categoryLabels = {
+                            announcement: '📢 Announcement',
+                            changelog: '📋 Changelog',
+                            status: '🔔 Status',
+                            maintenance: '🔧 Maintenance',
+                            other: '📌 Sonstige'
+                        };
+                        %>
+                        <% for (const cat of categories) { %>
+                            <div class="form-group row">
+                                <label class="col-sm-3 col-form-label">
+                                    <%= categoryLabels[cat] || cat %>
+                                </label>
+                                <div class="col-sm-7">
+                                    <select class="form-control channel-select" 
+                                            id="channel_<%= cat %>" 
+                                            name="channel_<%= cat %>"
+                                            data-category="<%= cat %>">
+                                        <option value="">— Kein Channel (deaktiviert) —</option>
+                                    </select>
+                                    <input type="hidden" name="channel_name_<%= cat %>" id="channel_name_<%= cat %>" value="">
+                                </div>
+                                <div class="col-sm-2">
+                                    <% if (channelConfig[cat]?.channel_id) { %>
+                                        <span class="badge badge-success mt-2 d-inline-block">
+                                            <i class="fas fa-check"></i> Konfiguriert
+                                        </span>
+                                    <% } else { %>
+                                        <span class="badge badge-warning mt-2 d-inline-block">
+                                            <i class="fas fa-exclamation-triangle"></i> Nicht gesetzt
+                                        </span>
+                                    <% } %>
+                                </div>
+                            </div>
+                        <% } %>
+                    </div>
+
+                    <div id="channels-error" class="alert alert-danger" style="display: none;">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        <span id="channels-error-msg">Fehler beim Laden der Channels.</span>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary" id="btn-save" disabled>
+                        <i class="fas fa-save mr-2"></i>Speichern
+                    </button>
+                    <a href="/admin/notifications" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left mr-2"></i>Zurück
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async function() {
+    const controlGuildId = '<%= controlGuildId %>';
+    const savedConfig = <%- JSON.stringify(channelConfig) %>;
+
+    if (!controlGuildId) {
+        document.getElementById('channels-loading').style.display = 'none';
+        document.getElementById('channels-error').style.display = 'block';
+        document.getElementById('channels-error-msg').textContent = 'CONTROL_GUILD_ID ist nicht gesetzt. Bitte in der .env konfigurieren.';
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/guild-channels/' + controlGuildId);
+        const data = await resp.json();
+
+        if (!data.success || !data.channels) {
+            throw new Error(data.error || 'Keine Channels gefunden');
+        }
+
+        // Nur Text-Channels anzeigen (type 0 = GUILD_TEXT, 5 = GUILD_ANNOUNCEMENT)
+        const textChannels = data.channels
+            .filter(ch => ch.type === 0 || ch.type === 5)
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        document.querySelectorAll('.channel-select').forEach(select => {
+            const cat = select.dataset.category;
+            textChannels.forEach(ch => {
+                const opt = document.createElement('option');
+                opt.value = ch.id;
+                opt.textContent = '#' + ch.name + (ch.type === 5 ? ' (Announcement)' : '');
+                if (savedConfig[cat]?.channel_id === ch.id) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            // Hidden name-Feld aktualisieren
+            select.addEventListener('change', function() {
+                const opt = this.options[this.selectedIndex];
+                const nameField = document.getElementById('channel_name_' + cat);
+                nameField.value = opt.value ? opt.textContent.replace(/^#/, '') : '';
+            });
+
+            // Initial setzen
+            const currentOpt = select.options[select.selectedIndex];
+            if (currentOpt && currentOpt.value) {
+                document.getElementById('channel_name_' + cat).value = currentOpt.textContent.replace(/^#/, '');
+            }
+        });
+
+        document.getElementById('channels-loading').style.display = 'none';
+        document.getElementById('channels-content').style.display = 'block';
+        document.getElementById('btn-save').disabled = false;
+
+    } catch (err) {
+        console.error('Channel-Load-Error:', err);
+        document.getElementById('channels-loading').style.display = 'none';
+        document.getElementById('channels-error').style.display = 'block';
+        document.getElementById('channels-error-msg').textContent = 'Fehler: ' + err.message;
+    }
+});
+</script>
