@@ -128,8 +128,8 @@
                                 <% if (server.port_query) { %>
                                     <code><%= server.port_query %></code>
                                     <button class="btn btn-sm btn-outline-secondary ms-2" 
-                                            onclick="copyToClipboard('<%= server.ip_address %>:<%= server.port_query %>')"
-                                            title="Query-String kopieren">
+                                            onclick="copyToClipboard('<%= server.port_query %>')"
+                                            title="Port kopieren">
                                         <i class="fas fa-copy"></i>
                                     </button>
                                 <% } else { %>
@@ -147,8 +147,8 @@
                                 <% if (server.port_rcon) { %>
                                     <code><%= server.port_rcon %></code>
                                     <button class="btn btn-sm btn-outline-secondary ms-2" 
-                                            onclick="copyToClipboard('<%= server.ip_address %>:<%= server.port_rcon %>')"
-                                            title="RCON-String kopieren">
+                                            onclick="copyToClipboard('<%= server.port_rcon %>')"
+                                            title="Port kopieren">
                                         <i class="fas fa-copy"></i>
                                     </button>
                                 <% } else { %>
@@ -175,8 +175,8 @@
                                     <% if (epVal) { %>
                                         <code><%= epVal %></code>
                                         <button class="btn btn-sm btn-outline-secondary ms-2" 
-                                                onclick="copyToClipboard('<%= server.ip_address %>:<%= epVal %>')"
-                                                title="<%= portType %>-String kopieren">
+                                                onclick="copyToClipboard('<%= epVal %>')"
+                                                title="Port kopieren">
                                             <i class="fas fa-copy"></i>
                                         </button>
                                     <% } else { %>
