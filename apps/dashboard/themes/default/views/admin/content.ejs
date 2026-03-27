@@ -1,12 +1,11 @@
 <%#
  * Admin Content Hub — Unified Content Management
- * Vereint: News, Changelogs, Benachrichtigungen, Ankündigungen, Einstellungen
+ * Vereint: News, Changelogs, Benachrichtigungen, Einstellungen
  *
- * @context {string} activeTab   — 'news' | 'changelogs' | 'notifications' | 'announcements' | 'settings'
+ * @context {string} activeTab   — 'news' | 'changelogs' | 'notifications' | 'settings'
  * @context {Array}  newsList    — lokalisierte News
  * @context {Array}  changelogsList — lokalisierte Changelogs
- * @context {Array}  notifications — Benachrichtigungen
- * @context {Array}  announcements — nur category=announcement
+ * @context {Array}  notifications — Alle Benachrichtigungen (inkl. Ankündigungen)
  * @context {string} currentLocale
  * @context {Object} channelConfig — Channel-Config pro Kategorie
  * @context {Array}  categories    — Kategorie-Liste
@@ -55,13 +54,6 @@
                            href="/admin/content?tab=notifications" data-tab="notifications">
                             <i class="fas fa-bell mr-1"></i> Benachrichtigungen
                             <span class="badge badge-info ml-1"><%= notifications ? notifications.length : 0 %></span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link <%= activeTab === 'announcements' ? 'active' : '' %>"
-                           href="/admin/content?tab=announcements" data-tab="announcements">
-                            <i class="fas fa-bullhorn mr-1"></i> Ankündigungen
-                            <span class="badge badge-info ml-1"><%= announcements ? announcements.length : 0 %></span>
                         </a>
                     </li>
                     <li class="nav-item ml-auto">
@@ -214,10 +206,7 @@
                             </a>
                         </div>
 
-                        <%
-                        const notifFiltered = (notifications || []).filter(n => n.category !== 'announcement');
-                        %>
-                        <% if (notifFiltered.length > 0) { %>
+                        <% if (notifications && notifications.length > 0) { %>
                         <table class="table table-striped table-hover table-sm">
                             <thead>
                                 <tr>
@@ -231,7 +220,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                            <% notifFiltered.forEach((n, i) => { %>
+                            <% notifications.forEach((n, i) => { %>
                                 <%
                                 const catEmojis = { changelog: '📋', status: '🔔', maintenance: '🔧', other: '📌' };
                                 let deliveryBadges = '';
@@ -273,89 +262,6 @@
                             <p>Keine Benachrichtigungen vorhanden.</p>
                             <a href="/admin/content/notifications/new" class="btn btn-primary">
                                 <i class="fas fa-plus mr-1"></i> Erste Benachrichtigung
-                            </a>
-                        </div>
-                        <% } %>
-                    </div>
-
-                    <%# ====== ANKÜNDIGUNGEN TAB ====== %>
-                    <div class="tab-pane fade <%= activeTab === 'announcements' ? 'show active' : '' %>" id="tab-announcements">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="mb-0">Ankündigungen</h4>
-                            <a href="/admin/content/announcements/new" class="btn btn-primary btn-sm">
-                                <i class="fas fa-plus mr-1"></i> Neue Ankündigung
-                            </a>
-                        </div>
-
-                        <div class="callout callout-info">
-                            <h5><i class="fas fa-info-circle mr-1"></i> Hinweis</h5>
-                            <p class="mb-0">Ankündigungen werden als Notification mit Kategorie <code>announcement</code> erstellt und direkt an den konfigurierten Bot-Channel im Control-Server gesendet.</p>
-                        </div>
-
-                        <% if (announcements && announcements.length > 0) { %>
-                        <table class="table table-striped table-hover table-sm">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Titel</th>
-                                    <th>Type</th>
-                                    <th>Discord</th>
-                                    <th>Erstellt</th>
-                                    <th style="width:120px">Aktionen</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            <% announcements.forEach((a, i) => { %>
-                                <tr>
-                                    <td><%= i + 1 %></td>
-                                    <td>
-                                        <strong>📢 <%= a.title || 'Untitled' %></strong>
-                                        <%
-                                        // Zeige verknüpfte Inhalte
-                                        let linkedRefs = [];
-                                        try {
-                                            if (a.action_url) {
-                                                if (a.action_url.includes('/news-details/')) linkedRefs.push('📰 News');
-                                                if (a.action_url.includes('/changelogs/')) linkedRefs.push('📋 Changelog');
-                                            }
-                                        } catch(e) {}
-                                        %>
-                                        <% if (linkedRefs.length > 0) { %>
-                                            <br><small class="text-muted">Verknüpft: <%= linkedRefs.join(', ') %></small>
-                                        <% } %>
-                                    </td>
-                                    <td>
-                                        <% const aIcons = { info:'info-circle text-info', warning:'exclamation-triangle text-warning', error:'exclamation-circle text-danger', success:'check-circle text-success' }; %>
-                                        <i class="fas fa-<%= aIcons[a.type] || 'bell' %>"></i> <%= a.type %>
-                                    </td>
-                                    <td>
-                                        <% if (a.sent_to_discord) { %>
-                                            <span class="badge badge-success"><i class="fas fa-check"></i> Gesendet</span>
-                                        <% } else { %>
-                                            <span class="badge badge-secondary">Nicht gesendet</span>
-                                        <% } %>
-                                    </td>
-                                    <td><%= new Date(a.created_at).toLocaleDateString(currentLocale) %></td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="/admin/content/announcements/edit/<%= a.id %>" class="btn btn-info" title="Bearbeiten">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <button class="btn btn-danger" onclick="deleteContent('notifications', '<%= a.id %>')" title="Löschen">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <% }); %>
-                            </tbody>
-                        </table>
-                        <% } else { %>
-                        <div class="text-center text-muted py-5">
-                            <i class="fas fa-bullhorn fa-3x mb-3"></i>
-                            <p>Keine Ankündigungen vorhanden.</p>
-                            <a href="/admin/content/announcements/new" class="btn btn-primary">
-                                <i class="fas fa-plus mr-1"></i> Erste Ankündigung
                             </a>
                         </div>
                         <% } %>
@@ -467,9 +373,6 @@
                     </a>
                     <a href="#" class="list-group-item list-group-item-action" data-action="create-news">
                         <i class="fas fa-newspaper mr-2"></i> Neue News mit Verweis erstellen
-                    </a>
-                    <a href="#" class="list-group-item list-group-item-action" data-action="create-announcement">
-                        <i class="fas fa-bullhorn mr-2"></i> Neue Ankündigung mit Verweis erstellen
                     </a>
                     <a href="#" class="list-group-item list-group-item-action" data-action="create-notification">
                         <i class="fas fa-bell mr-2"></i> Neue Benachrichtigung mit Verweis erstellen
@@ -663,9 +566,6 @@ document.querySelectorAll('#link-targets [data-action]').forEach(el => {
         } else if (action === 'create-news') {
             $('#linkModal').modal('hide');
             window.location.href = '/admin/content/news/new?link_url=' + encodeURIComponent(url) + '&link_title=' + encodeURIComponent(_linkTitle);
-        } else if (action === 'create-announcement') {
-            $('#linkModal').modal('hide');
-            window.location.href = '/admin/content/announcements/new?link_url=' + encodeURIComponent(url) + '&link_title=' + encodeURIComponent(_linkTitle);
         } else if (action === 'create-notification') {
             $('#linkModal').modal('hide');
             window.location.href = '/admin/content/notifications/new?link_url=' + encodeURIComponent(url) + '&link_title=' + encodeURIComponent(_linkTitle);

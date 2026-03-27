@@ -13,13 +13,7 @@
         }
     }
     if (deliveryMethods.length === 0) {
-        // Neue Ankündigungen: standardmäßig auch an Discord senden
-        const _ct = typeof contentTab !== 'undefined' ? contentTab : 'notifications';
-        if (_ct === 'announcements' && !notification) {
-            deliveryMethods = ['dashboard', 'discord_category'];
-        } else {
-            deliveryMethods = ['dashboard'];
-        }
+        deliveryMethods = ['dashboard'];
     }
     // Expand legacy 'all' value
     if (deliveryMethods.includes('all')) {

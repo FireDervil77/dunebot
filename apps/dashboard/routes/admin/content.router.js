@@ -1,7 +1,7 @@
 /**
  * Content Router — Unified Content Management
  *
- * Vereint News, Changelogs, Benachrichtigungen und Ankündigungen
+ * Vereint News, Changelogs und Benachrichtigungen
  * in einem einzigen Admin-Bereich unter /admin/content.
  *
  * @route /admin/content
@@ -43,13 +43,9 @@ async function loadHubData(dbService, userLocale) {
         componentBadge: ChangelogHelper.getComponentBadge(c.component)
     }));
 
-    // All notifications
+    // All notifications (inkl. Ankündigungen)
     const rawNotifications = await dbService.query('SELECT * FROM notifications ORDER BY created_at DESC');
-    const allNotifications = NotificationHelper.getLocalizedNotificationList(rawNotifications, userLocale);
-
-    // Split: Benachrichtigungen vs. Ankündigungen
-    const notifications = allNotifications.filter(n => n.category !== 'announcement');
-    const announcements = allNotifications.filter(n => n.category === 'announcement');
+    const notifications = NotificationHelper.getLocalizedNotificationList(rawNotifications, userLocale);
 
     // Channel-Config
     const rows = await dbService.query(
@@ -61,7 +57,7 @@ async function loadHubData(dbService, userLocale) {
         channelConfig[cat] = row ? (() => { try { return JSON.parse(row.value); } catch { return {}; } })() : {};
     }
 
-    return { newsList, changelogsList, notifications, announcements, channelConfig };
+    return { newsList, changelogsList, notifications, channelConfig };
 }
 
 // ================================================================
@@ -73,7 +69,7 @@ router.get('/', async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
     const dbService = ServiceManager.get('dbService');
     const userLocale = req.session.locale || res.locals.locale || 'de-DE';
-    const activeTab = req.query.tab || 'news';
+    const activeTab = req.query.tab === 'announcements' ? 'notifications' : (req.query.tab || 'news');
 
     try {
         const data = await loadHubData(dbService, userLocale);
@@ -86,7 +82,6 @@ router.get('/', async (req, res) => {
             newsList: data.newsList,
             changelogsList: data.changelogsList,
             notifications: data.notifications,
-            announcements: data.announcements,
             channelConfig: data.channelConfig,
             categories: CONTENT_CATEGORIES,
             controlGuildId: process.env.CONTROL_GUILD_ID || ''
@@ -219,46 +214,15 @@ router.get('/notifications/edit/:id', async (req, res) => {
 });
 
 // ================================================================
-// ANNOUNCEMENTS: Ankündigungen = Notifications mit category=announcement
+// ANNOUNCEMENTS: Redirect → Notifications (backward compat)
 // ================================================================
 
-router.get('/announcements/new', async (req, res) => {
-    const themeManager = ServiceManager.get('themeManager');
-    await themeManager.renderView(res, 'admin/notification-edit', {
-        title: 'Neue Ankündigung erstellen',
-        activeMenu: '/admin/content',
-        backUrl: '/admin/content?tab=announcements',
-        contentTab: 'announcements',
-        notification: null
-    });
+router.get('/announcements/new', (req, res) => {
+    res.redirect('/admin/content/notifications/new');
 });
 
-router.get('/announcements/edit/:id', async (req, res) => {
-    const themeManager = ServiceManager.get('themeManager');
-    const dbService = ServiceManager.get('dbService');
-
-    const rawNotification = await dbService.query(
-        'SELECT * FROM notifications WHERE id = ?', [req.params.id]
-    );
-    if (!rawNotification || rawNotification.length === 0) {
-        return res.status(404).render('error', { message: 'Ankündigung nicht gefunden', error: { status: 404 } });
-    }
-
-    const notification = rawNotification[0];
-    notification.title_de = JSON.parse(notification.title_translations)['de-DE'] || '';
-    notification.title_en = JSON.parse(notification.title_translations)['en-GB'] || '';
-    notification.message_de = JSON.parse(notification.message_translations)['de-DE'] || '';
-    notification.message_en = JSON.parse(notification.message_translations)['en-GB'] || '';
-    notification.action_text_de = JSON.parse(notification.action_text_translations)['de-DE'] || 'Mehr erfahren';
-    notification.action_text_en = JSON.parse(notification.action_text_translations)['en-GB'] || 'Learn more';
-
-    await themeManager.renderView(res, 'admin/notification-edit', {
-        title: 'Ankündigung bearbeiten',
-        activeMenu: '/admin/content',
-        backUrl: '/admin/content?tab=announcements',
-        contentTab: 'announcements',
-        notification
-    });
+router.get('/announcements/edit/:id', (req, res) => {
+    res.redirect('/admin/content/notifications/edit/' + req.params.id);
 });
 
 // ================================================================

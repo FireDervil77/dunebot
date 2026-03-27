@@ -2,7 +2,7 @@
  * Content Management Navigation — Shared Partial
  * Zeigt die Content-Tabs in Edit-Views an, damit man schnell zwischen Bereichen wechseln kann
  *
- * @param {string} contentTab — 'news' | 'changelogs' | 'notifications' | 'announcements' | 'settings'
+ * @param {string} contentTab — 'news' | 'changelogs' | 'notifications' | 'settings'
 %>
 <%
 const _ct = typeof contentTab !== 'undefined' ? contentTab : 'news';
@@ -10,7 +10,6 @@ const _tabs = [
     { key: 'news', icon: 'fa-newspaper', label: 'News' },
     { key: 'changelogs', icon: 'fa-code-branch', label: 'Changelogs' },
     { key: 'notifications', icon: 'fa-bell', label: 'Benachrichtigungen' },
-    { key: 'announcements', icon: 'fa-bullhorn', label: 'Ankündigungen' },
     { key: 'settings', icon: 'fa-cog', label: 'Einstellungen' }
 ];
 %>
