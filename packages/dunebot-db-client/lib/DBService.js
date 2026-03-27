@@ -1011,7 +1011,7 @@ async getAllConfigs() {
     async getUserConfig(userId, pluginName, configKey, guildId = null) {
         try {
             const [rows] = await this.query(
-                'SELECT config_value FROM user_configs WHERE user_id = ? AND plugin_name = ? AND config_key = ? AND (guild_id <=> ?)',
+                'SELECT config_value FROM user_configs WHERE user_id = ? AND plugin_name = ? AND config_key = ? AND (guild_id <=> ?) ORDER BY updated_at DESC LIMIT 1',
                 [userId, pluginName, configKey, guildId]
             );
             
@@ -1055,14 +1055,21 @@ async getAllConfigs() {
                 valueToStore = JSON.stringify(configValue);
             }
             
-            await this.query(
-                `INSERT INTO user_configs (user_id, plugin_name, config_key, config_value, guild_id) 
-                 VALUES (?, ?, ?, ?, ?) 
-                 ON DUPLICATE KEY UPDATE 
-                    config_value = VALUES(config_value),
-                    updated_at = CURRENT_TIMESTAMP`,
-                [userId, pluginName, configKey, valueToStore, guildId]
+            // NULL-safe: Erst versuchen zu updaten, dann inserieren
+            // (ON DUPLICATE KEY funktioniert nicht zuverlässig mit NULL in UNIQUE KEY)
+            const updated = await this.query(
+                `UPDATE user_configs SET config_value = ?, updated_at = CURRENT_TIMESTAMP
+                 WHERE user_id = ? AND plugin_name = ? AND config_key = ? AND (guild_id <=> ?)`,
+                [valueToStore, userId, pluginName, configKey, guildId]
             );
+            
+            if (!updated || updated.affectedRows === 0) {
+                await this.query(
+                    `INSERT INTO user_configs (user_id, plugin_name, config_key, config_value, guild_id) 
+                     VALUES (?, ?, ?, ?, ?)`,
+                    [userId, pluginName, configKey, valueToStore, guildId]
+                );
+            }
         } catch (error) {
             const Logger = ServiceManager.get('Logger');
             Logger.error(`[DBService] Fehler beim Setzen von User-Config (${userId}/${pluginName}/${configKey}):`, error);

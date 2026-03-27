@@ -225,12 +225,10 @@ router.post('/notifications/dismiss/:id', CheckAuth, async (req, res) => {
     
     try {
         if (!notificationManager) {
-            Logger.error('[NotificationManager] nicht verfügbar');
             return res.status(501).json({ success: false, message: 'Benachrichtigungssystem nicht verfügbar' });
         }
 
         const userId = req.session?.user?.info?.id || req.user?.info?.id;
-        
         if (!userId) {
             return res.status(401).json({ success: false, message: 'Nicht authentifiziert' });
         }
@@ -243,7 +241,7 @@ router.post('/notifications/dismiss/:id', CheckAuth, async (req, res) => {
             return res.status(500).json({ success: false, message: 'Fehler beim Dismissing' });
         }
     } catch (error) {
-        Logger.error('[API] Fehler beim Markieren der Benachrichtigung als gelesen:', error);
+        Logger.error('[API] Fehler beim Dismiss:', error);
         return res.status(500).json({ success: false, message: 'Interner Serverfehler' });
     }
 });

@@ -152,9 +152,32 @@ class NotificationManager {
             // Lade aktuelle dismissed IDs für diesen User
             let dismissedIds = [];
             try {
-                const userDismissed = await dbService.getUserConfig(userId, 'core', 'DISMISSED_NOTIFICATIONS');
-                if (Array.isArray(userDismissed)) {
-                    dismissedIds = userDismissed;
+                // Cleanup: Alle Einträge laden und zusammenführen (falls Duplikate von NULL-UNIQUE-Bug)
+                const allRows = await dbService.query(
+                    "SELECT id, config_value FROM user_configs WHERE user_id = ? AND plugin_name = 'core' AND config_key = 'DISMISSED_NOTIFICATIONS' AND guild_id IS NULL ORDER BY updated_at DESC",
+                    [userId]
+                );
+                if (allRows && allRows.length > 0) {
+                    // Alle IDs aus allen Einträgen zusammenführen
+                    const mergedIds = new Set();
+                    for (const row of allRows) {
+                        try {
+                            const parsed = JSON.parse(row.config_value);
+                            if (Array.isArray(parsed)) parsed.forEach(id => mergedIds.add(Number(id)));
+                        } catch {}
+                    }
+                    dismissedIds = [...mergedIds];
+                    
+                    // Duplikate löschen (alle bis auf den neuesten)
+                    if (allRows.length > 1) {
+                        const keepId = allRows[0].id;
+                        const deleteIds = allRows.slice(1).map(r => r.id);
+                        await dbService.query(
+                            "DELETE FROM user_configs WHERE id IN (?)",
+                            [deleteIds]
+                        );
+                        Logger.debug(`[NotificationManager] ${deleteIds.length} Duplikat-Einträge bereinigt für User ${userId}`);
+                    }
                 }
             } catch (err) {
                 Logger.debug('[NotificationManager] Keine dismissed IDs gefunden, erstelle neue Liste');

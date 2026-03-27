@@ -61,13 +61,16 @@
             <script>
             document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('.dismiss-notification-btn').forEach(function(btn) {
-                    btn.addEventListener('click', function() {
+                    btn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
                         var alert = this.closest('.alert[data-notification-id]');
                         var notificationId = alert ? alert.getAttribute('data-notification-id') : null;
                         if (notificationId) {
                             fetch('/api/notifications/dismiss/' + notificationId, {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' }
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'same-origin'
                             }).catch(function() {});
                         }
                         if (alert) {
