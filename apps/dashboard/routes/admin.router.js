@@ -185,7 +185,8 @@ router.post('/news/save', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const { newsId, title_de, title_en, excerpt_de, excerpt_en,
-            content_de, content_en, slug, author, image_url, status, date } = req.body;
+            content_de, content_en, slug, author, image_url, status, date,
+            send_discord_post, send_dashboard_badge } = req.body;
 
     try {
         const translations = {
@@ -195,22 +196,107 @@ router.post('/news/save', async (req, res) => {
         const metadata = { slug, author, image_url, status, date };
         const newsData = NewsHelper.prepareNewsForDB(translations, metadata);
 
+        let savedNewsId = newsId;
         if (newsId) {
             await dbService.query(`
                 UPDATE news SET title_translations=?, content_translations=?, excerpt_translations=?,
                 slug=?, author=?, image_url=?, status=?, date=?, updated_at=NOW() WHERE _id=?
             `, [newsData.title_translations, newsData.content_translations, newsData.excerpt_translations,
                 newsData.slug, newsData.author, newsData.image_url, newsData.status, newsData.date, newsId]);
-            res.json({ success: true, message: 'News erfolgreich aktualisiert' });
         } else {
-            await dbService.query(`
+            const result = await dbService.query(`
                 INSERT INTO news (title_translations, content_translations, excerpt_translations,
                 slug, author, image_url, status, date, created_at, updated_at)
                 VALUES (?,?,?,?,?,?,?,?,NOW(),NOW())
             `, [newsData.title_translations, newsData.content_translations, newsData.excerpt_translations,
                 newsData.slug, newsData.author, newsData.image_url, newsData.status, newsData.date]);
-            res.json({ success: true, message: 'News erfolgreich erstellt' });
+            savedNewsId = result.insertId;
         }
+
+        // ============================================================
+        // VERÖFFENTLICHUNGS-AKTIONEN
+        // ============================================================
+        const wantDiscord = send_discord_post === '1';
+        const wantBadge = send_dashboard_badge === '1';
+        const newsActions = [];
+
+        if (wantDiscord || wantBadge) {
+            try {
+                const baseUrl = process.env.DASHBOARD_BASE_URL || '';
+                const newsUrl = `${baseUrl}/news/${slug || 'news'}`;
+
+                const cleanExcerpt_de = (excerpt_de || title_de || '').replace(/<[^>]+>/g, '').trim();
+                const cleanExcerpt_en = (excerpt_en || title_en || '').replace(/<[^>]+>/g, '').trim();
+
+                const notifTranslations = {
+                    title: { 'de-DE': `📰 ${title_de || 'Neue News'}`, 'en-GB': `📰 ${title_en || 'New Article'}` },
+                    message: { 'de-DE': cleanExcerpt_de, 'en-GB': cleanExcerpt_en },
+                    action_text: { 'de-DE': 'News lesen', 'en-GB': 'Read News' }
+                };
+
+                const methods = [];
+                if (wantBadge) methods.push('dashboard');
+                if (wantDiscord) methods.push('discord_category');
+                const deliveryMethods = JSON.stringify(methods);
+
+                let resolvedChannelId = null;
+                const resolvedGuildId = process.env.CONTROL_GUILD_ID || null;
+                if (wantDiscord) {
+                    const [setting] = await dbService.query(
+                        "SELECT `value` FROM admin_settings WHERE `key` = ?",
+                        ['notification_channel_announcement']
+                    );
+                    if (setting) {
+                        try { resolvedChannelId = JSON.parse(setting.value).channel_id || null; } catch {}
+                    }
+                }
+
+                const notifMeta = {
+                    type: 'info', action_url: newsUrl,
+                    expiry: null, roles: null, dismissed: 0,
+                    delivery_method: deliveryMethods,
+                    category: 'announcement',
+                    target_guild_ids: resolvedGuildId ? JSON.stringify([resolvedGuildId]) : null,
+                    discord_channel_id: resolvedChannelId
+                };
+                const notifData = NotificationHelper.prepareNotificationForDB(notifTranslations, notifMeta);
+
+                const notifResult = await dbService.query(`
+                    INSERT INTO notifications
+                    (title_translations, message_translations, action_text_translations,
+                     type, category, action_url, expiry, roles, dismissed,
+                     delivery_method, target_guild_ids, discord_channel_id,
+                     created_at, updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,0,?,?,?,NOW(),NOW())
+                `, [notifData.title_translations, notifData.message_translations,
+                    notifData.action_text_translations, notifData.type,
+                    notifMeta.category, notifData.action_url, notifData.expiry,
+                    notifData.roles, notifMeta.delivery_method,
+                    notifMeta.target_guild_ids, notifMeta.discord_channel_id]);
+
+                // Discord-Post via IPC
+                if (wantDiscord) {
+                    const ipcServer = ServiceManager.get('ipcServer');
+                    await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', {
+                        id: notifResult.insertId, ...notifData, ...notifMeta,
+                        base_url: baseUrl
+                    }, true);
+                }
+
+                if (wantDiscord) newsActions.push('📢 Discord-Post gesendet');
+                if (wantBadge) newsActions.push('🔔 Dashboard-Badge erstellt');
+                Logger.info(`[Admin] News-Aktionen für "${title_de}": ${newsActions.join(', ')}`);
+            } catch (actionErr) {
+                Logger.error('[Admin] News-Aktion fehlgeschlagen:', actionErr);
+                newsActions.push('⚠️ Aktion fehlgeschlagen');
+            }
+        }
+
+        let message = newsId ? 'News erfolgreich aktualisiert' : 'News erfolgreich erstellt';
+        if (newsActions.length > 0) {
+            message += ' | ' + newsActions.join(' | ');
+        }
+        res.json({ success: true, message });
     } catch (error) {
         Logger.error('[Admin] Fehler beim Speichern der News:', error);
         res.status(500).json({ success: false, message: error.message });
@@ -563,7 +649,7 @@ router.post('/changelogs/save', async (req, res) => {
         changelogId, title_de, title_en, description_de, description_en,
         changes_de, changes_en, version, type, component, component_name,
         is_public, release_date, author_id, status, slug, author,
-        create_news_draft, send_discord_announcement
+        create_news_draft, send_discord_announcement, send_dashboard_notification
     } = req.body;
 
     try {
@@ -656,41 +742,48 @@ router.post('/changelogs/save', async (req, res) => {
             }
         }
 
-        // 2) Discord-Ankündigung senden
-        if (send_discord_announcement === '1') {
+        // 2) Discord-Post und/oder Dashboard-Benachrichtigung
+        const wantDiscord = send_discord_announcement === '1';
+        const wantDashboard = send_dashboard_notification === '1';
+
+        if (wantDiscord || wantDashboard) {
             try {
                 const announcementTitle_de = `📢 Update v${version} veröffentlicht!`;
                 const announcementTitle_en = `📢 Update v${version} released!`;
                 // HTML-Tags aus TinyMCE-Beschreibung entfernen für Discord
                 const cleanDesc_de = (description_de || `Version ${version} ist jetzt verfügbar.`).replace(/<[^>]+>/g, '').trim();
                 const cleanDesc_en = (description_en || `Version ${version} is now available.`).replace(/<[^>]+>/g, '').trim();
-                const announcementMsg_de = cleanDesc_de;
-                const announcementMsg_en = cleanDesc_en;
 
                 const announcementTranslations = {
                     title: { 'de-DE': announcementTitle_de, 'en-GB': announcementTitle_en },
-                    message: { 'de-DE': announcementMsg_de, 'en-GB': announcementMsg_en },
+                    message: { 'de-DE': cleanDesc_de, 'en-GB': cleanDesc_en },
                     action_text: { 'de-DE': 'Changelog anzeigen', 'en-GB': 'View Changelog' }
                 };
 
-                const deliveryMethods = JSON.stringify(['dashboard', 'discord_category']);
+                // Delivery-Methods je nach Checkboxen zusammenbauen
+                const methods = [];
+                if (wantDashboard) methods.push('dashboard');
+                if (wantDiscord) methods.push('discord_category');
+                const deliveryMethods = JSON.stringify(methods);
 
                 // Channel für 'announcement' Kategorie auflösen
                 let resolvedChannelId = null;
                 const resolvedGuildId = process.env.CONTROL_GUILD_ID || null;
-                const [setting] = await dbService.query(
-                    "SELECT `value` FROM admin_settings WHERE `key` = ?",
-                    ['notification_channel_announcement']
-                );
-                if (setting) {
-                    try { resolvedChannelId = JSON.parse(setting.value).channel_id || null; } catch {}
+                if (wantDiscord) {
+                    const [setting] = await dbService.query(
+                        "SELECT `value` FROM admin_settings WHERE `key` = ?",
+                        ['notification_channel_announcement']
+                    );
+                    if (setting) {
+                        try { resolvedChannelId = JSON.parse(setting.value).channel_id || null; } catch {}
+                    }
                 }
 
                 const announcementMeta = {
                     type: 'info', action_url: changelogUrl,
                     expiry: null, roles: null, dismissed: 0,
                     delivery_method: deliveryMethods,
-                    category: 'announcement',
+                    category: 'changelog',
                     target_guild_ids: resolvedGuildId ? JSON.stringify([resolvedGuildId]) : null,
                     discord_channel_id: resolvedChannelId
                 };
@@ -709,18 +802,23 @@ router.post('/changelogs/save', async (req, res) => {
                     notificationData.roles, announcementMeta.delivery_method,
                     announcementMeta.target_guild_ids, announcementMeta.discord_channel_id]);
 
-                // IPC an Bot senden
-                const ipcServer = ServiceManager.get('ipcServer');
-                await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', {
-                    id: result.insertId, ...notificationData, ...announcementMeta,
-                    base_url: baseUrl
-                }, true);
+                // Discord-Post via IPC (nur wenn Discord gewünscht)
+                if (wantDiscord) {
+                    const ipcServer = ServiceManager.get('ipcServer');
+                    await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', {
+                        id: result.insertId, ...notificationData, ...announcementMeta,
+                        base_url: baseUrl
+                    }, true);
+                }
 
-                releaseActions.push('📢 Discord-Ankündigung gesendet');
-                Logger.info(`[Admin] Release-Aktion: Discord-Ankündigung für v${version} gesendet`);
+                const actionParts = [];
+                if (wantDiscord) actionParts.push('📢 Discord-Post gesendet');
+                if (wantDashboard) actionParts.push('🔔 Dashboard-Benachrichtigung erstellt');
+                releaseActions.push(...actionParts);
+                Logger.info(`[Admin] Release-Aktionen für v${version}: ${actionParts.join(', ')}`);
             } catch (announcementErr) {
-                Logger.error('[Admin] Release-Aktion Discord-Ankündigung fehlgeschlagen:', announcementErr);
-                releaseActions.push('⚠️ Discord-Ankündigung fehlgeschlagen');
+                Logger.error('[Admin] Release-Aktion fehlgeschlagen:', announcementErr);
+                releaseActions.push('⚠️ Ankündigung fehlgeschlagen');
             }
         }
 

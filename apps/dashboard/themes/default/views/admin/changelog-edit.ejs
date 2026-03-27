@@ -279,11 +279,22 @@
                     <div class="custom-control custom-checkbox mb-3">
                         <input type="checkbox" class="custom-control-input" id="sendDiscordAnnouncement" name="send_discord_announcement" value="1">
                         <label class="custom-control-label" for="sendDiscordAnnouncement">
-                            <i class="fas fa-bullhorn text-warning mr-1"></i>
-                            <strong>Discord-Ankündigung senden</strong>
+                            <i class="fab fa-discord text-primary mr-1"></i>
+                            <strong>In Discord posten</strong>
                         </label>
                         <small class="form-text text-muted ml-4">
-                            Sendet eine Ankündigung mit Changelog-Embed in den konfigurierten Announcement-Channel.
+                            Sendet ein Changelog-Embed in den konfigurierten Announcement-Channel auf Discord.
+                        </small>
+                    </div>
+
+                    <div class="custom-control custom-checkbox mb-3">
+                        <input type="checkbox" class="custom-control-input" id="sendDashboardNotification" name="send_dashboard_notification" value="1">
+                        <label class="custom-control-label" for="sendDashboardNotification">
+                            <i class="fas fa-bell text-success mr-1"></i>
+                            <strong>Dashboard-Benachrichtigung erstellen</strong>
+                        </label>
+                        <small class="form-text text-muted ml-4">
+                            Erstellt eine Benachrichtigung (Badge) die allen Nutzern im Dashboard angezeigt wird.
                         </small>
                     </div>
                 </div>

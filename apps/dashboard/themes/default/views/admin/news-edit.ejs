@@ -224,6 +224,37 @@
                             </div>
 
                             <!-- Submit Buttons -->
+                            <hr class="mt-4">
+                            <h5 class="mb-3"><i class="fas fa-rocket mr-2"></i> Veröffentlichungs-Aktionen <small class="text-muted">(optional)</small></h5>
+                            <p class="text-muted small mb-3">
+                                Wähle aus, wie diese News verteilt werden soll.
+                                <% if (news && news._id) { %>
+                                <br><i class="fas fa-info-circle text-info"></i> Aktionen können auch nachträglich ausgelöst werden.
+                                <% } %>
+                            </p>
+
+                            <div class="custom-control custom-checkbox mb-3">
+                                <input type="checkbox" class="custom-control-input" id="sendDiscordPost" name="send_discord_post" value="1">
+                                <label class="custom-control-label" for="sendDiscordPost">
+                                    <i class="fab fa-discord text-primary mr-1"></i>
+                                    <strong>In Discord posten</strong>
+                                </label>
+                                <small class="form-text text-muted ml-4">
+                                    Postet die News als Embed in den konfigurierten Announcement-Channel auf Discord.
+                                </small>
+                            </div>
+
+                            <div class="custom-control custom-checkbox mb-3">
+                                <input type="checkbox" class="custom-control-input" id="sendDashboardBadge" name="send_dashboard_badge" value="1">
+                                <label class="custom-control-label" for="sendDashboardBadge">
+                                    <i class="fas fa-bell text-success mr-1"></i>
+                                    <strong>Dashboard-Benachrichtigung senden</strong>
+                                </label>
+                                <small class="form-text text-muted ml-4">
+                                    Erstellt eine Benachrichtigung (Badge) die allen Nutzern im Dashboard angezeigt wird.
+                                </small>
+                            </div>
+
                             <div class="d-flex justify-content-between mt-4 pt-3 border-top">
                                 <a href="<%= _backUrl %>" class="btn btn-secondary">
                                     Abbrechen
