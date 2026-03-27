@@ -223,6 +223,17 @@ async function registerKernNavigation(guildId) {
                 guildId,
                 parent: `/guild/${guildId}/settings`
             },
+            {
+                title: 'NAV.CHANNELS',
+                url: `/guild/${guildId}/settings/channels`,
+                icon: 'fa-solid fa-hashtag',
+                order: 45,
+                type: navigationManager.menuTypes.MAIN,
+                capability: 'CORE.SETTINGS.VIEW',
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}/settings`
+            },
             // Subnav: Berechtigungen
             {
                 title: 'NAV.PERMISSIONS_USERS',

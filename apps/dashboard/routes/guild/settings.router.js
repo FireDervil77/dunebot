@@ -167,6 +167,50 @@ router.get('/integrations', requirePermission('CORE.SETTINGS.EDIT'), async (req,
 });
 
 // =============================================
+// CHANNEL-VERWALTUNG (Discord Channels Mirror)
+// =============================================
+
+// GET /settings/channels → Channel-Übersicht
+router.get('/channels', requirePermission('CORE.SETTINGS.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+    const ipcServer = ServiceManager.get('ipcServer');
+    const guildId = res.locals.guildId;
+
+    let channels = [];
+    let categories = [];
+    let botHasManageChannels = false;
+    let channelTypeIcons = {};
+
+    try {
+        if (ipcServer) {
+            const responses = await ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS_DETAILED', { guildId });
+            const resp = responses && responses.length > 0 ? responses[0] : null;
+            const result = resp?.data || resp;
+
+            if (result && result.success) {
+                channels = result.channels || [];
+                categories = result.categories || [];
+                botHasManageChannels = result.botHasManageChannels || false;
+                channelTypeIcons = result.channelTypeIcons || {};
+            }
+        }
+    } catch (err) {
+        Logger.error('[KernSettings] Fehler beim Laden der Channels via IPC:', err.message);
+    }
+
+    await themeManager.renderView(res, 'guild/settings/channels', {
+        title: 'Channel-Verwaltung',
+        activeMenu: `/guild/${guildId}/settings/channels`,
+        guildId,
+        channels,
+        categories,
+        botHasManageChannels,
+        channelTypeIcons
+    });
+});
+
+// =============================================
 // ROLLEN-VERWALTUNG (Discord Roles Mirror)
 // =============================================
 

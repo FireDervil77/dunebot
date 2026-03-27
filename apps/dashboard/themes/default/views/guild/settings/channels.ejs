@@ -1,0 +1,481 @@
+<!-- Kern: Channel-Verwaltung (Discord Channels Mirror) -->
+<style>
+    .channel-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        font-weight: 500;
+        gap: 6px;
+    }
+    .channel-badge.type-text { background: rgba(88, 101, 242, 0.1); color: #5865f2; }
+    .channel-badge.type-voice { background: rgba(87, 242, 135, 0.1); color: #2ecc71; }
+    .channel-badge.type-announcement { background: rgba(254, 231, 92, 0.1); color: #f1c40f; }
+    .channel-badge.type-stage { background: rgba(235, 69, 158, 0.1); color: #eb459e; }
+    .channel-badge.type-forum { background: rgba(237, 66, 69, 0.1); color: #ed4245; }
+    .channel-badge.type-media { background: rgba(230, 126, 34, 0.1); color: #e67e22; }
+
+    .channel-card {
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .channel-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .category-header {
+        background: rgba(0,0,0,0.03);
+        border-left: 3px solid #6c757d;
+        padding: 10px 15px;
+        margin-bottom: 0;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .category-header:hover {
+        background: rgba(0,0,0,0.06);
+    }
+    .category-header .collapse-icon {
+        transition: transform 0.2s ease;
+    }
+    .category-header.collapsed .collapse-icon {
+        transform: rotate(-90deg);
+    }
+
+    .channel-item {
+        display: flex;
+        align-items: center;
+        padding: 8px 15px 8px 30px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        gap: 10px;
+    }
+    .channel-item:last-child {
+        border-bottom: none;
+    }
+    .channel-item:hover {
+        background: rgba(0,0,0,0.02);
+    }
+
+    .channel-icon {
+        width: 20px;
+        text-align: center;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+    }
+    .channel-icon.type-text { color: #5865f2; }
+    .channel-icon.type-voice { color: #2ecc71; }
+    .channel-icon.type-announcement { color: #f1c40f; }
+    .channel-icon.type-stage { color: #eb459e; }
+    .channel-icon.type-forum { color: #ed4245; }
+    .channel-icon.type-media { color: #e67e22; }
+
+    .channel-name {
+        font-weight: 500;
+        flex: 1;
+    }
+    .channel-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        color: #6c757d;
+    }
+
+    .nsfw-badge {
+        font-size: 0.65rem;
+        padding: 1px 5px;
+        border-radius: 3px;
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+        font-weight: 600;
+    }
+    .slowmode-badge {
+        font-size: 0.65rem;
+        padding: 1px 5px;
+        border-radius: 3px;
+        background: rgba(108, 117, 125, 0.1);
+        color: #6c757d;
+    }
+
+    #channelDetailPanel {
+        display: none;
+    }
+    .detail-row {
+        display: flex;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+    .detail-label {
+        font-weight: 600;
+        width: 140px;
+        flex-shrink: 0;
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+    .detail-value {
+        flex: 1;
+        font-size: 0.85rem;
+    }
+
+    .stat-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+</style>
+
+<div class="row">
+    <!-- Linke Spalte: Channel-Liste -->
+    <div class="col-lg-5 col-xl-4">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fa-solid fa-hashtag me-2"></i>
+                    Discord Channels
+                </h5>
+                <span class="badge bg-secondary"><%= channels.length %> Channels</span>
+            </div>
+            <div class="card-body p-0">
+                <% if (!botHasManageChannels) { %>
+                <div class="alert alert-info m-3 mb-0">
+                    <i class="fa-solid fa-info-circle me-2"></i>
+                    Bot hat keine <strong>Manage Channels</strong> Berechtigung — Nur-Lese-Ansicht.
+                </div>
+                <% } %>
+
+                <!-- Suchfeld -->
+                <div class="p-3 pb-0">
+                    <input type="text" class="form-control form-control-sm" id="channelSearch"
+                           placeholder="Channel suchen...">
+                </div>
+
+                <!-- Statistiken -->
+                <div class="px-3 py-2 d-flex flex-wrap gap-3 text-muted small">
+                    <span><i class="fa-solid fa-hashtag me-1 text-primary"></i> <%= channels.filter(c => c.type === 'text').length %> Text</span>
+                    <span><i class="fa-solid fa-volume-high me-1 text-success"></i> <%= channels.filter(c => c.type === 'voice').length %> Voice</span>
+                    <span><i class="fa-solid fa-bullhorn me-1 text-warning"></i> <%= channels.filter(c => c.type === 'announcement').length %> Announcement</span>
+                    <span><i class="fa-solid fa-comments me-1 text-danger"></i> <%= channels.filter(c => c.type === 'forum').length %> Forum</span>
+                    <span><i class="fa-solid fa-folder me-1"></i> <%= categories.length %> Kategorien</span>
+                </div>
+
+                <!-- Channel-Liste nach Kategorien -->
+                <div id="channelList" style="max-height: 600px; overflow-y: auto;">
+                    <%
+                        // Channels ohne Kategorie
+                        const uncategorized = channels.filter(c => !c.parentId);
+                        // Channels pro Kategorie
+                        const channelsByCategory = {};
+                        categories.forEach(cat => {
+                            channelsByCategory[cat.id] = channels.filter(c => c.parentId === cat.id);
+                        });
+                    %>
+
+                    <% if (uncategorized.length > 0) { %>
+                    <div class="channel-category" data-category="uncategorized">
+                        <div class="category-header" data-toggle="collapse" data-target="#cat-uncategorized">
+                            <span><i class="fa-solid fa-folder-open me-2"></i> Ohne Kategorie (<%= uncategorized.length %>)</span>
+                            <i class="fa-solid fa-chevron-down collapse-icon"></i>
+                        </div>
+                        <div class="collapse show" id="cat-uncategorized">
+                            <% uncategorized.forEach(ch => { %>
+                            <div class="channel-item channel-card" data-channel-id="<%= ch.id %>" data-channel-type="<%= ch.type %>">
+                                <span class="channel-icon type-<%= ch.type %>">
+                                    <i class="fa-solid <%= ch.icon %>"></i>
+                                </span>
+                                <span class="channel-name"><%= ch.name %></span>
+                                <span class="channel-meta">
+                                    <% if (ch.nsfw) { %><span class="nsfw-badge">NSFW</span><% } %>
+                                    <% if (ch.rateLimitPerUser > 0) { %><span class="slowmode-badge"><i class="fa-solid fa-clock"></i> <%= ch.rateLimitPerUser %>s</span><% } %>
+                                    <span class="channel-badge type-<%= ch.type %>"><%= ch.type %></span>
+                                </span>
+                            </div>
+                            <% }); %>
+                        </div>
+                    </div>
+                    <% } %>
+
+                    <% categories.forEach(cat => { 
+                        const catChannels = channelsByCategory[cat.id] || [];
+                    %>
+                    <div class="channel-category" data-category="<%= cat.id %>">
+                        <div class="category-header" data-toggle="collapse" data-target="#cat-<%= cat.id %>">
+                            <span><i class="fa-solid fa-folder me-2"></i> <%= cat.name %> (<%= catChannels.length %>)</span>
+                            <i class="fa-solid fa-chevron-down collapse-icon"></i>
+                        </div>
+                        <div class="collapse show" id="cat-<%= cat.id %>">
+                            <% if (catChannels.length === 0) { %>
+                            <div class="channel-item text-muted small">
+                                <i class="fa-solid fa-circle-info me-2"></i> Keine Channels in dieser Kategorie
+                            </div>
+                            <% } else { %>
+                                <% catChannels.forEach(ch => { %>
+                                <div class="channel-item channel-card" data-channel-id="<%= ch.id %>" data-channel-type="<%= ch.type %>">
+                                    <span class="channel-icon type-<%= ch.type %>">
+                                        <i class="fa-solid <%= ch.icon %>"></i>
+                                    </span>
+                                    <span class="channel-name"><%= ch.name %></span>
+                                    <span class="channel-meta">
+                                        <% if (ch.nsfw) { %><span class="nsfw-badge">NSFW</span><% } %>
+                                        <% if (ch.rateLimitPerUser > 0) { %><span class="slowmode-badge"><i class="fa-solid fa-clock"></i> <%= ch.rateLimitPerUser %>s</span><% } %>
+                                        <span class="channel-badge type-<%= ch.type %>"><%= ch.type %></span>
+                                    </span>
+                                </div>
+                                <% }); %>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% }); %>
+
+                    <% if (channels.length === 0 && categories.length === 0) { %>
+                    <div class="text-center text-muted p-4">
+                        <i class="fa-solid fa-circle-info fa-2x mb-2"></i>
+                        <p>Keine Channels gefunden. Ist der Bot online?</p>
+                    </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rechte Spalte: Channel-Detail -->
+    <div class="col-lg-7 col-xl-8">
+        <!-- Leerzustand -->
+        <div id="channelEmptyState" class="card mb-4">
+            <div class="card-body text-center text-muted py-5">
+                <i class="fa-solid fa-hand-pointer fa-3x mb-3"></i>
+                <h5>Channel auswählen</h5>
+                <p>Wähle einen Channel aus der Liste, um seine Details zu sehen.</p>
+            </div>
+        </div>
+
+        <!-- Detail-Panel -->
+        <div id="channelDetailPanel">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <span id="detailChannelIcon" class="me-2"></span>
+                        <span id="detailChannelName"></span>
+                    </h5>
+                    <div>
+                        <span class="badge bg-secondary" id="detailChannelId"></span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Channel-Info -->
+                    <div id="channelInfoArea">
+                        <div class="detail-row">
+                            <span class="detail-label"><i class="fa-solid fa-tag me-2"></i>Name</span>
+                            <span class="detail-value" id="infoName">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label"><i class="fa-solid fa-cube me-2"></i>Typ</span>
+                            <span class="detail-value" id="infoType">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label"><i class="fa-solid fa-folder me-2"></i>Kategorie</span>
+                            <span class="detail-value" id="infoCategory">-</span>
+                        </div>
+                        <div class="detail-row" id="rowTopic" style="display:none;">
+                            <span class="detail-label"><i class="fa-solid fa-align-left me-2"></i>Topic</span>
+                            <span class="detail-value" id="infoTopic">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label"><i class="fa-solid fa-sort me-2"></i>Position</span>
+                            <span class="detail-value" id="infoPosition">-</span>
+                        </div>
+                        <div class="detail-row" id="rowNsfw" style="display:none;">
+                            <span class="detail-label"><i class="fa-solid fa-triangle-exclamation me-2"></i>NSFW</span>
+                            <span class="detail-value" id="infoNsfw">-</span>
+                        </div>
+                        <div class="detail-row" id="rowSlowmode" style="display:none;">
+                            <span class="detail-label"><i class="fa-solid fa-clock me-2"></i>Slowmode</span>
+                            <span class="detail-value" id="infoSlowmode">-</span>
+                        </div>
+                        <div class="detail-row" id="rowBitrate" style="display:none;">
+                            <span class="detail-label"><i class="fa-solid fa-signal me-2"></i>Bitrate</span>
+                            <span class="detail-value" id="infoBitrate">-</span>
+                        </div>
+                        <div class="detail-row" id="rowUserLimit" style="display:none;">
+                            <span class="detail-label"><i class="fa-solid fa-users me-2"></i>User-Limit</span>
+                            <span class="detail-value" id="infoUserLimit">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label"><i class="fa-solid fa-calendar me-2"></i>Erstellt</span>
+                            <span class="detail-value" id="infoCreated">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistik-Karte -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa-solid fa-chart-bar me-2"></i>Channel-Übersicht</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center" id="channelStats">
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-number text-primary" id="statText">0</div>
+                            <small class="text-muted">Text</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-number text-success" id="statVoice">0</div>
+                            <small class="text-muted">Voice</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-number text-warning" id="statAnnouncement">0</div>
+                            <small class="text-muted">Announcement</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-number text-danger" id="statForum">0</div>
+                            <small class="text-muted">Forum</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const channelsData = <%- JSON.stringify(channels) %>;
+    const categoriesData = <%- JSON.stringify(categories) %>;
+
+    const typeNames = {
+        text: 'Text-Channel',
+        voice: 'Voice-Channel',
+        announcement: 'Announcement-Channel',
+        stage: 'Stage-Channel',
+        forum: 'Forum-Channel',
+        media: 'Media-Channel'
+    };
+
+    const typeIcons = {
+        text: 'fa-hashtag',
+        voice: 'fa-volume-high',
+        announcement: 'fa-bullhorn',
+        stage: 'fa-podcast',
+        forum: 'fa-comments',
+        media: 'fa-images'
+    };
+
+    // Statistiken füllen
+    document.getElementById('statText').textContent = channelsData.filter(c => c.type === 'text').length;
+    document.getElementById('statVoice').textContent = channelsData.filter(c => c.type === 'voice').length;
+    document.getElementById('statAnnouncement').textContent = channelsData.filter(c => c.type === 'announcement').length;
+    document.getElementById('statForum').textContent = channelsData.filter(c => c.type === 'forum').length;
+
+    // Suche
+    document.getElementById('channelSearch').addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        document.querySelectorAll('#channelList .channel-item.channel-card').forEach(item => {
+            const name = item.querySelector('.channel-name').textContent.toLowerCase();
+            item.style.display = name.includes(query) ? '' : 'none';
+        });
+        // Kategorien mit 0 sichtbaren Channels ausblenden
+        document.querySelectorAll('#channelList .channel-category').forEach(cat => {
+            const visibleItems = cat.querySelectorAll('.channel-item.channel-card:not([style*="display: none"])');
+            cat.style.display = visibleItems.length > 0 || !query ? '' : 'none';
+        });
+    });
+
+    // Kategorie-Toggle
+    document.querySelectorAll('.category-header').forEach(header => {
+        header.addEventListener('click', function() {
+            this.classList.toggle('collapsed');
+        });
+    });
+
+    // Channel auswählen
+    document.querySelectorAll('.channel-item.channel-card').forEach(item => {
+        item.addEventListener('click', function() {
+            const channelId = this.dataset.channelId;
+            selectChannel(channelId);
+        });
+    });
+
+    function selectChannel(channelId) {
+        const ch = channelsData.find(c => c.id === channelId);
+        if (!ch) return;
+
+        // Aktiv-Markierung
+        document.querySelectorAll('.channel-item.channel-card').forEach(c => c.classList.remove('active'));
+        document.querySelector('[data-channel-id="' + channelId + '"]')?.classList.add('active');
+
+        // Panel anzeigen
+        document.getElementById('channelEmptyState').style.display = 'none';
+        document.getElementById('channelDetailPanel').style.display = 'block';
+
+        // Header
+        const icon = typeIcons[ch.type] || 'fa-circle';
+        document.getElementById('detailChannelIcon').innerHTML = '<i class="fa-solid ' + icon + ' type-' + ch.type + '"></i>';
+        document.getElementById('detailChannelName').textContent = ch.name;
+        document.getElementById('detailChannelId').textContent = ch.id;
+
+        // Details
+        document.getElementById('infoName').textContent = ch.name;
+        document.getElementById('infoType').innerHTML = '<span class="channel-badge type-' + ch.type + '">' + (typeNames[ch.type] || ch.type) + '</span>';
+        document.getElementById('infoCategory').textContent = ch.parentName || 'Kein';
+        document.getElementById('infoPosition').textContent = ch.position;
+        document.getElementById('infoCreated').textContent = new Date(ch.createdAt).toLocaleDateString('de-DE', {
+            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+
+        // Bedingte Felder
+        const rowTopic = document.getElementById('rowTopic');
+        if (ch.topic) {
+            rowTopic.style.display = '';
+            document.getElementById('infoTopic').textContent = ch.topic;
+        } else {
+            rowTopic.style.display = 'none';
+        }
+
+        const rowNsfw = document.getElementById('rowNsfw');
+        if (ch.type === 'text' || ch.type === 'forum') {
+            rowNsfw.style.display = '';
+            document.getElementById('infoNsfw').innerHTML = ch.nsfw
+                ? '<span class="badge bg-danger">Ja</span>'
+                : '<span class="badge bg-success">Nein</span>';
+        } else {
+            rowNsfw.style.display = 'none';
+        }
+
+        const rowSlowmode = document.getElementById('rowSlowmode');
+        if (ch.rateLimitPerUser > 0) {
+            rowSlowmode.style.display = '';
+            document.getElementById('infoSlowmode').textContent = ch.rateLimitPerUser + ' Sekunden';
+        } else {
+            rowSlowmode.style.display = 'none';
+        }
+
+        const rowBitrate = document.getElementById('rowBitrate');
+        if (ch.type === 'voice' || ch.type === 'stage') {
+            rowBitrate.style.display = '';
+            document.getElementById('infoBitrate').textContent = (ch.bitrate / 1000) + ' kbps';
+        } else {
+            rowBitrate.style.display = 'none';
+        }
+
+        const rowUserLimit = document.getElementById('rowUserLimit');
+        if (ch.type === 'voice' || ch.type === 'stage') {
+            rowUserLimit.style.display = '';
+            document.getElementById('infoUserLimit').textContent = ch.userLimit > 0 ? ch.userLimit + ' User' : 'Unbegrenzt';
+        } else {
+            rowUserLimit.style.display = 'none';
+        }
+    }
+})();
+</script>

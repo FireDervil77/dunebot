@@ -247,7 +247,8 @@
         "THEMES_WIDGETS": "Widget Areas",
         "THEMES_EDITOR": "Theme Editor",
         "MEDIA": "Media",
-        "ROLES": "Roles"
+        "ROLES": "Roles",
+        "CHANNELS": "Channels"
     },
 
     "BREADCRUMB": {
