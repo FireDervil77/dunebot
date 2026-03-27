@@ -214,6 +214,40 @@ router.get('/guild-channels/:guildId', CheckAuth, async (req, res) => {
     }
 });
 
+/**
+ * Markiert eine Benachrichtigung als gelesen für den aktuellen User
+ * @route POST /api/notifications/dismiss/:id
+ * @security Authentifizierung erforderlich
+ */
+router.post('/notifications/dismiss/:id', CheckAuth, async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const notificationManager = ServiceManager.get('notificationManager');
+    
+    try {
+        if (!notificationManager) {
+            Logger.error('[NotificationManager] nicht verfügbar');
+            return res.status(501).json({ success: false, message: 'Benachrichtigungssystem nicht verfügbar' });
+        }
+
+        const userId = req.session?.user?.info?.id || req.user?.info?.id;
+        
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Nicht authentifiziert' });
+        }
+        
+        const success = await notificationManager.dismissNotification(req.params.id, userId);
+        
+        if (success) {
+            return res.json({ success: true });
+        } else {
+            return res.status(500).json({ success: false, message: 'Fehler beim Dismissing' });
+        }
+    } catch (error) {
+        Logger.error('[API] Fehler beim Markieren der Benachrichtigung als gelesen:', error);
+        return res.status(500).json({ success: false, message: 'Interner Serverfehler' });
+    }
+});
+
 // Plugin-spezifische API-Endpunkte (AM ENDE!)
 // HINWEIS: Plugins MÜSSEN CheckAuth selbst in ihren Routen verwenden!
 // Das Base-API-System schützt nicht automatisch alle Plugin-Endpunkte
@@ -231,55 +265,6 @@ router.use("/:pluginName", pluginMiddleware.loadPlugin, (req, res, next) => {
 
     // Plugin-API-Router einbinden
     plugin.apiRouter(req, res, next);
-});
-
-/**
- * Markiert eine Benachrichtigung als gelesen für den aktuellen User
- * @route POST /api/notifications/dismiss/:id
- * @security Authentifizierung erforderlich
- */
-router.post('/notifications/dismiss/:id', CheckAuth, async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const notificationManager = ServiceManager.get('notificationManager');
-    
-    // ERWEITERES DEBUG LOGGING
-    Logger.info('🔍 [DEBUG] Notification Dismiss Request:');
-    Logger.info(`   - Notification ID: ${req.params.id}`);
-    Logger.info(`   - Session existiert: ${!!req.session}`);
-    Logger.info(`   - Session User: ${JSON.stringify(req.session?.user?.info || 'KEINE')}`);
-    Logger.info(`   - req.user: ${JSON.stringify(req.user?.info || 'KEINE')}`);
-    Logger.info(`   - Headers: ${JSON.stringify(req.headers.authorization || 'KEINE AUTH HEADER')}`);
-    
-    try {
-        if (!notificationManager) {
-            Logger.error('❌ NotificationManager nicht verfügbar!');
-            return res.status(501).json({ success: false, message: 'Benachrichtigungssystem nicht verfügbar' });
-        }
-
-        // User-ID aus Session holen
-        const userId = req.session?.user?.info?.id || req.user?.info?.id;
-        Logger.info(`🎯 [DEBUG] Extrahierte User-ID: ${userId}`);
-        
-        if (!userId) {
-            Logger.error('❌ Keine User-ID gefunden in Session!');
-            return res.status(401).json({ success: false, message: 'Nicht authentifiziert' });
-        }
-        
-        Logger.info(`📤 [DEBUG] Rufe notificationManager.dismissNotification(${req.params.id}, ${userId}) auf...`);
-        const success = await notificationManager.dismissNotification(req.params.id, userId);
-        Logger.info(`📥 [DEBUG] NotificationManager Ergebnis: ${success}`);
-        
-        if (success) {
-            Logger.success(`✅ Notification ${req.params.id} erfolgreich dismissed für User ${userId}`);
-            return res.json({ success: true });
-        } else {
-            Logger.error(`❌ NotificationManager dismiss fehlgeschlagen für Notification ${req.params.id}, User ${userId}`);
-            return res.status(500).json({ success: false, message: 'Fehler beim Dismissing' });
-        }
-    } catch (error) {
-        Logger.error('💥 [DEBUG] Fehler beim Markieren der Benachrichtigung als gelesen:', error);
-        return res.status(500).json({ success: false, message: 'Interner Serverfehler' });
-    }
 });
 
 module.exports = router;
