@@ -26,7 +26,7 @@
                 <span><%= news.author %></span>
               </div>
             </div>
-            <p class="news-excerpt"><%= news.excerpt %></p>
+            <p class="news-excerpt"><%- news.excerpt %></p>
             <a href="/news-details/<%= news.slug %>" class="readmore stretched-link">
               <span><%= tr('NEWS.READ_MORE') %></span>
               <i class="bi bi-arrow-right"></i>

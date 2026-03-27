@@ -301,8 +301,7 @@ class IPCClient {
                 case "GET_BOT_GUILDS":
                     return await this.#handleGetBotGuilds(message);
                     
-                case "SEND_NOTIFICATION":
-                    return await this.#handleSendNotification(message, payload);
+                // SEND_NOTIFICATION → via Kern-IPC-Handler (apps/bot/ipc/SEND_NOTIFICATION.js)
                     
                 case "GET_CMDS_SUMMARY":
                     return await this.#handleGetCommandsSummary(message, payload);

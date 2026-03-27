@@ -386,7 +386,8 @@ router.post('/notifications/save', async (req, res) => {
                 const ipcServer = ServiceManager.get('ipcServer');
                 try {
                     await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', {
-                        id: result.insertId, ...notificationData, ...metadata
+                        id: result.insertId, ...notificationData, ...metadata,
+                        base_url: process.env.DASHBOARD_BASE_URL || ''
                     }, true);
                 } catch (ipcError) {
                     Logger.error('[Admin] Fehler beim Senden der Notification an Bot:', ipcError);
@@ -561,7 +562,8 @@ router.post('/changelogs/save', async (req, res) => {
     const {
         changelogId, title_de, title_en, description_de, description_en,
         changes_de, changes_en, version, type, component, component_name,
-        is_public, release_date, author_id, status, slug, author
+        is_public, release_date, author_id, status, slug, author,
+        create_news_draft, send_discord_announcement
     } = req.body;
 
     try {
@@ -582,6 +584,7 @@ router.post('/changelogs/save', async (req, res) => {
         };
         const changelogData = ChangelogHelper.prepareChangelogForDB(translations, metadata);
 
+        let isNew = false;
         if (changelogId) {
             await dbService.query(`
                 UPDATE changelogs SET title_translations=?, description_translations=?,
@@ -594,6 +597,7 @@ router.post('/changelogs/save', async (req, res) => {
                 changelogData.release_date, changelogData.author_id,
                 metadata.status, metadata.slug, metadata.author, changelogId]);
         } else {
+            isNew = true;
             await dbService.query(`
                 INSERT INTO changelogs
                 (title_translations, description_translations, changes_translations,
@@ -607,16 +611,134 @@ router.post('/changelogs/save', async (req, res) => {
                 metadata.status, metadata.slug, metadata.author]);
         }
 
-        req.session.toast = {
-            type: 'success',
-            message: changelogId ? 'Changelog erfolgreich aktualisiert' : 'Changelog erfolgreich erstellt'
-        };
-        res.redirect('/admin/changelogs');
+        // ============================================================
+        // RELEASE-AKTIONEN (nur bei neuem Changelog)
+        // ============================================================
+        const baseUrl = process.env.DASHBOARD_BASE_URL || '';
+        const changelogUrl = `${baseUrl}/changelogs/v${version}`;
+        const releaseActions = [];
+
+        // 1) News-Draft erstellen
+        if (create_news_draft === '1') {
+            try {
+                const newsTitle_de = `Update v${version} — ${title_de || 'Neues Update'}`;
+                const newsTitle_en = `Update v${version} — ${title_en || 'New Update'}`;
+                const newsContent_de = `<p>${description_de || ''}</p><p><a href="${changelogUrl}">📋 Vollständiger Changelog v${version}</a></p>`;
+                const newsContent_en = `<p>${description_en || ''}</p><p><a href="${changelogUrl}">📋 Full Changelog v${version}</a></p>`;
+                const newsExcerpt_de = description_de || `Update v${version} ist da!`;
+                const newsExcerpt_en = description_en || `Update v${version} is here!`;
+
+                const newsTranslations = {
+                    'de-DE': { title: newsTitle_de, content: newsContent_de, excerpt: newsExcerpt_de },
+                    'en-GB': { title: newsTitle_en, content: newsContent_en, excerpt: newsExcerpt_en }
+                };
+                const newsMetadata = {
+                    slug: `update-v${version?.replace(/\./g, '-')}`,
+                    author: metadata.author,
+                    image_url: null,
+                    status: 'draft',
+                    date: new Date()
+                };
+                const newsData = NewsHelper.prepareNewsForDB(newsTranslations, newsMetadata);
+
+                await dbService.query(`
+                    INSERT INTO news (title_translations, content_translations, excerpt_translations,
+                    slug, author, image_url, status, date, created_at, updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,NOW(),NOW())
+                `, [newsData.title_translations, newsData.content_translations, newsData.excerpt_translations,
+                    newsData.slug, newsData.author, newsData.image_url, newsData.status, newsData.date]);
+
+                releaseActions.push('📰 News-Entwurf erstellt');
+                Logger.info(`[Admin] Release-Aktion: News-Draft für v${version} erstellt`);
+            } catch (newsErr) {
+                Logger.error('[Admin] Release-Aktion News-Draft fehlgeschlagen:', newsErr);
+                releaseActions.push('⚠️ News-Entwurf fehlgeschlagen');
+            }
+        }
+
+        // 2) Discord-Ankündigung senden
+        if (send_discord_announcement === '1') {
+            try {
+                const announcementTitle_de = `📢 Update v${version} veröffentlicht!`;
+                const announcementTitle_en = `📢 Update v${version} released!`;
+                // HTML-Tags aus TinyMCE-Beschreibung entfernen für Discord
+                const cleanDesc_de = (description_de || `Version ${version} ist jetzt verfügbar.`).replace(/<[^>]+>/g, '').trim();
+                const cleanDesc_en = (description_en || `Version ${version} is now available.`).replace(/<[^>]+>/g, '').trim();
+                const announcementMsg_de = cleanDesc_de;
+                const announcementMsg_en = cleanDesc_en;
+
+                const announcementTranslations = {
+                    title: { 'de-DE': announcementTitle_de, 'en-GB': announcementTitle_en },
+                    message: { 'de-DE': announcementMsg_de, 'en-GB': announcementMsg_en },
+                    action_text: { 'de-DE': 'Changelog anzeigen', 'en-GB': 'View Changelog' }
+                };
+
+                const deliveryMethods = JSON.stringify(['dashboard', 'discord_category']);
+
+                // Channel für 'announcement' Kategorie auflösen
+                let resolvedChannelId = null;
+                const resolvedGuildId = process.env.CONTROL_GUILD_ID || null;
+                const [setting] = await dbService.query(
+                    "SELECT `value` FROM admin_settings WHERE `key` = ?",
+                    ['notification_channel_announcement']
+                );
+                if (setting) {
+                    try { resolvedChannelId = JSON.parse(setting.value).channel_id || null; } catch {}
+                }
+
+                const announcementMeta = {
+                    type: 'info', action_url: changelogUrl,
+                    expiry: null, roles: null, dismissed: 0,
+                    delivery_method: deliveryMethods,
+                    category: 'announcement',
+                    target_guild_ids: resolvedGuildId ? JSON.stringify([resolvedGuildId]) : null,
+                    discord_channel_id: resolvedChannelId
+                };
+                const notificationData = NotificationHelper.prepareNotificationForDB(announcementTranslations, announcementMeta);
+
+                const result = await dbService.query(`
+                    INSERT INTO notifications
+                    (title_translations, message_translations, action_text_translations,
+                     type, category, action_url, expiry, roles, dismissed,
+                     delivery_method, target_guild_ids, discord_channel_id,
+                     created_at, updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,0,?,?,?,NOW(),NOW())
+                `, [notificationData.title_translations, notificationData.message_translations,
+                    notificationData.action_text_translations, notificationData.type,
+                    announcementMeta.category, notificationData.action_url, notificationData.expiry,
+                    notificationData.roles, announcementMeta.delivery_method,
+                    announcementMeta.target_guild_ids, announcementMeta.discord_channel_id]);
+
+                // IPC an Bot senden
+                const ipcServer = ServiceManager.get('ipcServer');
+                await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', {
+                    id: result.insertId, ...notificationData, ...announcementMeta,
+                    base_url: baseUrl
+                }, true);
+
+                releaseActions.push('📢 Discord-Ankündigung gesendet');
+                Logger.info(`[Admin] Release-Aktion: Discord-Ankündigung für v${version} gesendet`);
+            } catch (announcementErr) {
+                Logger.error('[Admin] Release-Aktion Discord-Ankündigung fehlgeschlagen:', announcementErr);
+                releaseActions.push('⚠️ Discord-Ankündigung fehlgeschlagen');
+            }
+        }
+
+        // Toast mit Release-Aktionen zusammenbauen
+        let toastMsg = changelogId ? 'Changelog erfolgreich aktualisiert' : 'Changelog erfolgreich erstellt';
+        if (releaseActions.length > 0) {
+            toastMsg += ' | ' + releaseActions.join(' | ');
+        }
+
+        req.session.toast = { type: 'success', message: toastMsg };
+        const backTo = req.get('Referer')?.includes('/admin/content') ? '/admin/content?tab=changelogs' : '/admin/changelogs';
+        res.redirect(backTo);
 
     } catch (error) {
         Logger.error('[Admin] Fehler beim Speichern des Changelogs:', error);
         req.session.toast = { type: 'danger', message: 'Fehler beim Speichern: ' + error.message };
-        res.redirect('/admin/changelogs');
+        const backTo = req.get('Referer')?.includes('/admin/content') ? '/admin/content?tab=changelogs' : '/admin/changelogs';
+        res.redirect(backTo);
     }
 });
 
@@ -810,5 +932,8 @@ router.use('/themes', themesRouter);
 
 const docsRouter = require('./admin/docs.router');
 router.use('/docs', docsRouter);
+
+const contentRouter = require('./admin/content.router');
+router.use('/content', contentRouter);
 
 module.exports = router;

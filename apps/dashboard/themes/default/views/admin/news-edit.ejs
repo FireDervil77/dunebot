@@ -1,16 +1,19 @@
-<%# 
+<%#
   * News Editor - Multi-Language (DE/EN)
   * Erstellen & Bearbeiten von News mit Übersetzungen
   %>
 
-<div class="app-content">
+<% const _backUrl = typeof backUrl !== 'undefined' ? backUrl : '/admin/news'; %>
+<%- include('./partials/content-nav', { contentTab: 'news' }) %>
+
+<div class="content">
     <div class="container-fluid">
-        <div class="row mb-4">
+        <div class="row mb-3">
             <div class="col-md-6">
-                <h2><%= news && news._id ? 'News bearbeiten' : 'Neue News erstellen' %></h2>
+                <h4><%= news && news._id ? 'News bearbeiten' : 'Neue News erstellen' %></h4>
             </div>
             <div class="col-md-6 text-end">
-                <a href="/admin/news" class="btn btn-secondary">
+                <a href="<%= _backUrl %>" class="btn btn-secondary btn-sm">
                     <i class="fa-solid fa-arrow-left me-2"></i>Zurück zur Übersicht
                 </a>
             </div>
@@ -24,7 +27,8 @@
                         <form method="POST" 
                               action="/admin/news/save"
                               class="guild-ajax-form"
-                              data-form-type="news">
+                              data-form-type="news"
+                              data-success-url="<%= _backUrl %>">
                             <!-- Verstecktes Feld für ID bei Bearbeitung -->
                             <% if (news && news._id) { %>
                                 <input type="hidden" name="newsId" value="<%= news._id %>">
@@ -221,7 +225,7 @@
 
                             <!-- Submit Buttons -->
                             <div class="d-flex justify-content-between mt-4 pt-3 border-top">
-                                <a href="/admin/news" class="btn btn-secondary">
+                                <a href="<%= _backUrl %>" class="btn btn-secondary">
                                     Abbrechen
                                 </a>
                                 <button type="submit" class="btn btn-success">

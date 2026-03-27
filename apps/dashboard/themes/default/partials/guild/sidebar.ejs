@@ -98,34 +98,50 @@
           </a>
         </li>
 
-        <!-- News & Changelogs -->
-        <li class="nav-item <%= _adminPath.startsWith('/admin/news') || _adminPath.startsWith('/admin/changelogs') ? 'menu-open' : '' %>">
-          <a href="#" class="nav-link <%= _adminPath.startsWith('/admin/news') || _adminPath.startsWith('/admin/changelogs') ? 'active' : '' %>">
-            <i class="nav-icon fa-solid fa-newspaper"></i>
-            <p>News & Changelogs <i class="bi bi-chevron-right right"></i></p>
+        <!-- Content Management -->
+        <li class="nav-item <%= _adminPath.startsWith('/admin/content') || _adminPath.startsWith('/admin/news') || _adminPath.startsWith('/admin/changelogs') || _adminPath.startsWith('/admin/notifications') || _adminPath.startsWith('/admin/docs') ? 'menu-open' : '' %>">
+          <a href="/admin/content" class="nav-link <%= _adminPath.startsWith('/admin/content') || _adminPath.startsWith('/admin/news') || _adminPath.startsWith('/admin/changelogs') || _adminPath.startsWith('/admin/notifications') || _adminPath.startsWith('/admin/docs') ? 'active' : '' %>">
+            <i class="nav-icon fa-solid fa-layer-group"></i>
+            <p>Content Management <i class="bi bi-chevron-right right"></i></p>
           </a>
           <ul class="nav nav-treeview">
             <li class="nav-item">
-              <a href="/admin/news" class="nav-link <%= _adminPath.startsWith('/admin/news') ? 'active' : '' %>">
+              <a href="/admin/content?tab=news" class="nav-link <%= _adminPath === '/admin/content' || _adminPath.startsWith('/admin/news') ? 'active' : '' %>">
                 <i class="nav-icon fa-regular fa-dot-circle"></i>
                 <p>News</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/changelogs" class="nav-link <%= _adminPath.startsWith('/admin/changelogs') ? 'active' : '' %>">
+              <a href="/admin/content?tab=changelogs" class="nav-link <%= _adminPath.startsWith('/admin/changelogs') ? 'active' : '' %>">
                 <i class="nav-icon fa-regular fa-dot-circle"></i>
                 <p>Changelogs</p>
               </a>
             </li>
+            <li class="nav-item">
+              <a href="/admin/content?tab=notifications" class="nav-link <%= _adminPath.startsWith('/admin/notifications') ? 'active' : '' %>">
+                <i class="nav-icon fa-regular fa-dot-circle"></i>
+                <p>Benachrichtigungen</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="/admin/content?tab=announcements" class="nav-link">
+                <i class="nav-icon fa-regular fa-dot-circle"></i>
+                <p>Ankündigungen</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="/admin/content?tab=settings" class="nav-link">
+                <i class="nav-icon fa-regular fa-dot-circle"></i>
+                <p>Einstellungen</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="/admin/docs" class="nav-link <%= _adminPath.startsWith('/admin/docs') ? 'active' : '' %>">
+                <i class="nav-icon fa-regular fa-dot-circle"></i>
+                <p>Dokumentation</p>
+              </a>
+            </li>
           </ul>
-        </li>
-
-        <!-- Benachrichtigungen -->
-        <li class="nav-item">
-          <a href="/admin/notifications" class="nav-link <%= _adminPath.startsWith('/admin/notifications') ? 'active' : '' %>">
-            <i class="nav-icon fa-solid fa-bell"></i>
-            <p>Benachrichtigungen</p>
-          </a>
         </li>
 
         <!-- Statistiken -->
@@ -214,13 +230,7 @@
           </ul>
         </li>
 
-        <!-- Dokumentation -->
-        <li class="nav-item">
-          <a href="/admin/docs" class="nav-link <%= _adminPath.startsWith('/admin/docs') ? 'active' : '' %>">
-            <i class="nav-icon fa-solid fa-book"></i>
-            <p>Dokumentation</p>
-          </a>
-        </li>
+
 
       </ul>
     </nav>

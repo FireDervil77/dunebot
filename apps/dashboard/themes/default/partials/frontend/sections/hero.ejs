@@ -37,7 +37,7 @@
           <div class="carousel-item">
             <div class="text-center">
               <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[0].title %></h2>
-              <p><%= carouselNews[0].excerpt || carouselNews[0].content.substring(0, 150) + '...' %></p>
+              <p><%- carouselNews[0].excerpt || carouselNews[0].content.substring(0, 150) + '...' %></p>
               <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[0].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
               <a href="/news-details/<%= carouselNews[0].slug %>" class="btn-hero btn-get-started">
                 <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
@@ -63,7 +63,7 @@
           <div class="carousel-item">
             <div class="text-center">
               <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[1].title %></h2>
-              <p><%= carouselNews[1].excerpt || carouselNews[1].content.substring(0, 150) + '...' %></p>
+              <p><%- carouselNews[1].excerpt || carouselNews[1].content.substring(0, 150) + '...' %></p>
               <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[1].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
               <a href="/news-details/<%= carouselNews[1].slug %>" class="btn-hero btn-get-started">
                 <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
@@ -89,7 +89,7 @@
           <div class="carousel-item">
             <div class="text-center">
               <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[2].title %></h2>
-              <p><%= carouselNews[2].excerpt || carouselNews[2].content.substring(0, 150) + '...' %></p>
+              <p><%- carouselNews[2].excerpt || carouselNews[2].content.substring(0, 150) + '...' %></p>
               <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[2].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
               <a href="/news-details/<%= carouselNews[2].slug %>" class="btn-hero btn-get-started">
                 <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>

@@ -4,6 +4,39 @@ const { ServiceManager } = require('dunebot-core');
 const { EmbedBuilder } = require('discord.js');
 
 /**
+ * HTML zu Discord-Markdown konvertieren.
+ * Wandelt gängige HTML-Tags in Discord-Formatierung um und entfernt den Rest.
+ */
+function htmlToDiscord(html) {
+    if (!html || typeof html !== 'string') return html || '';
+    return html
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
+        .replace(/<\/?p[^>]*>/gi, '\n')
+        .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+        .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
+        .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+        .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
+        .replace(/<u[^>]*>(.*?)<\/u>/gi, '__$1__')
+        .replace(/<s[^>]*>(.*?)<\/s>/gi, '~~$1~~')
+        .replace(/<strike[^>]*>(.*?)<\/strike>/gi, '~~$1~~')
+        .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
+        .replace(/<a\s+href="([^"]+)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
+        .replace(/<li[^>]*>/gi, '• ')
+        .replace(/<\/li>/gi, '\n')
+        .replace(/<\/?(ul|ol|div|span|h[1-6]|hr|blockquote|pre|table|thead|tbody|tr|td|th|img)[^>]*>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+/**
  * Kern-IPC-Handler: SEND_NOTIFICATION
  * Sendet eine mehrsprachige Notification an Discord-Channels oder per DM.
  * Unterstützt discord_category: löst Channel aus admin_settings per Kategorie auf.
@@ -86,9 +119,9 @@ module.exports = async (payload, client) => {
             );
             const locale = localeRow?.config_value || 'de-DE';
 
-            const title = titleTranslations[locale] || titleTranslations['de-DE'] || 'Notification';
-            const message = messageTranslations[locale] || messageTranslations['de-DE'] || '';
-            const actionText = actionTextTranslations[locale] || actionTextTranslations['de-DE'] || 'Mehr erfahren';
+            const title = htmlToDiscord(titleTranslations[locale] || titleTranslations['de-DE'] || 'Notification');
+            const message = htmlToDiscord(messageTranslations[locale] || messageTranslations['de-DE'] || '');
+            const actionText = htmlToDiscord(actionTextTranslations[locale] || actionTextTranslations['de-DE'] || 'Mehr erfahren');
 
             const embed = new EmbedBuilder()
                 .setTitle(title)
@@ -98,7 +131,10 @@ module.exports = async (payload, client) => {
                 .setFooter({ text: `Notification #${id}` });
 
             if (action_url) {
-                embed.addFields({ name: actionText, value: `[🔗 ${action_url}](${action_url})`, inline: false });
+                // Relative URLs zu absoluten URLs auflösen (base_url kommt ggf. vom Dashboard)
+                const baseUrl = payload.base_url || process.env.DASHBOARD_BASE_URL || '';
+                const fullUrl = action_url.startsWith('http') ? action_url : `${baseUrl}${action_url}`;
+                embed.addFields({ name: actionText, value: `[🔗 ${actionText}](${fullUrl})`, inline: false });
             }
 
             // discord_category: In den konfigurierten Kategorie-Channel posten

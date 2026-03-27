@@ -395,9 +395,9 @@ class GuildAjaxHandler {
     static async handleNewsResponse(form, result) {
         if (result.success) {
             this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.NEWS_UPDATED || 'News erfolgreich gespeichert'));
-            // Nach 1 Sekunde zur News-Übersicht weiterleiten
+            const successUrl = form.dataset.successUrl || '/admin/news';
             setTimeout(() => {
-                window.location.href = '/admin/news';
+                window.location.href = successUrl;
             }, 1000);
         } else {
             this.showToast('error', result.message || (window.i18n?.TOAST_MESSAGES?.NEWS_ERROR || 'Fehler beim Speichern der News'));
@@ -432,9 +432,9 @@ class GuildAjaxHandler {
         console.log('[GuildAjax] handleNotificationSaveResponse called:', result);
         if (result.success) {
             this.showToast('success', result.message || 'Notification erfolgreich gespeichert');
-            // Nach 1,5s zur Notifications-Liste redirecten
+            const successUrl = form.dataset.successUrl || '/admin/notifications';
             setTimeout(() => {
-                window.location.href = '/admin/notifications';
+                window.location.href = successUrl;
             }, 1500);
         } else {
             this.showToast('error', result.message || 'Fehler beim Speichern der Notification');

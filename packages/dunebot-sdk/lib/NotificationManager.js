@@ -102,9 +102,12 @@ class NotificationManager {
                 }
             }
 
+            // Dismissed IDs als Set mit String-Vergleich (robust gegen String/Number-Mismatch)
+            const dismissedSet = new Set(dismissedIds.map(String));
+
             // JSON-Spalten parsen und lokalisieren
             return notifications
-                .filter(n => !dismissedIds.includes(n.id)) // Filter dismissed Notifications raus
+                .filter(n => !dismissedSet.has(String(n.id))) // Filter dismissed Notifications raus
                 .map(n => {
                 const titleTrans = JSON.parse(n.title_translations);
                 const messageTrans = JSON.parse(n.message_translations);
@@ -157,9 +160,10 @@ class NotificationManager {
                 Logger.debug('[NotificationManager] Keine dismissed IDs gefunden, erstelle neue Liste');
             }
 
-            // Füge neue ID hinzu (wenn noch nicht vorhanden)
-            if (!dismissedIds.includes(notificationId)) {
-                dismissedIds.push(notificationId);
+            // Füge neue ID hinzu (wenn noch nicht vorhanden) - als Number speichern!
+            const numId = Number(notificationId);
+            if (!dismissedIds.includes(numId)) {
+                dismissedIds.push(numId);
             }
 
             // Speichere aktualisierte Liste

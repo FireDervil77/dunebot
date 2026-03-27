@@ -109,10 +109,13 @@ const getChangelogDetails = async (req, res) => {
     const themeManager = ServiceManager.get("themeManager");
 
     try {
+        // "v" Prefix entfernen falls vorhanden (URL: /changelogs/v1.0.0 → DB: 1.0.0)
+        const version = req.params.version.replace(/^v/i, '');
+
         const rawChangelog = await dbService.query(`
             SELECT * FROM changelogs 
             WHERE version = ?
-        `, [req.params.version]);
+        `, [version]);
 
         if (!rawChangelog?.length) {
             return res.status(404).render('frontend/404');

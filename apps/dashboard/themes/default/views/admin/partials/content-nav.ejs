@@ -1,0 +1,42 @@
+<%#
+ * Content Management Navigation — Shared Partial
+ * Zeigt die Content-Tabs in Edit-Views an, damit man schnell zwischen Bereichen wechseln kann
+ *
+ * @param {string} contentTab — 'news' | 'changelogs' | 'notifications' | 'announcements' | 'settings'
+%>
+<%
+const _ct = typeof contentTab !== 'undefined' ? contentTab : 'news';
+const _tabs = [
+    { key: 'news', icon: 'fa-newspaper', label: 'News' },
+    { key: 'changelogs', icon: 'fa-code-branch', label: 'Changelogs' },
+    { key: 'notifications', icon: 'fa-bell', label: 'Benachrichtigungen' },
+    { key: 'announcements', icon: 'fa-bullhorn', label: 'Ankündigungen' },
+    { key: 'settings', icon: 'fa-cog', label: 'Einstellungen' }
+];
+%>
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0"><i class="fas fa-layer-group mr-2"></i>Content Management</h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="/admin">Admin</a></li>
+                    <li class="breadcrumb-item"><a href="/admin/content">Content</a></li>
+                    <li class="breadcrumb-item active"><%= _tabs.find(t => t.key === _ct)?.label || _ct %></li>
+                </ol>
+            </div>
+        </div>
+        <ul class="nav nav-pills mt-2">
+            <% for (const tab of _tabs) { %>
+            <li class="nav-item">
+                <a class="nav-link <%= _ct === tab.key ? 'active' : '' %>"
+                   href="/admin/content?tab=<%= tab.key %>">
+                    <i class="fas <%= tab.icon %> mr-1"></i> <%= tab.label %>
+                </a>
+            </li>
+            <% } %>
+        </ul>
+    </div>
+</div>

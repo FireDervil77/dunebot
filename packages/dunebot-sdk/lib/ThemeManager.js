@@ -1386,7 +1386,8 @@ class ThemeManager {
             const userLocale = req.session?.locale || res.locals?.locale || 'de-DE';
             
             // Benachrichtigungen für den aktuellen Benutzer laden
-            const notifications = await notificationManager.getNotificationsForUser(req.user, userLocale);
+            const user = req.session?.user?.info || req.user?.info || req.user || null;
+            const notifications = await notificationManager.getNotificationsForUser(user, userLocale);
             
             // In den View-Kontext einfügen
             res.locals.globalNotifications = notifications;
