@@ -85,6 +85,7 @@ class NotificationManager {
                 WHERE (expiry IS NULL OR expiry > NOW())
                 AND dismissed = 0
                 AND (roles IS NULL OR JSON_CONTAINS(roles, ?))
+                AND (delivery_method IS NULL OR delivery_method LIKE '%dashboard%')
                 ORDER BY created_at DESC
             `, [JSON.stringify(user?.roles || [])]);
 
