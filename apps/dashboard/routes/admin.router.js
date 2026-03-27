@@ -18,6 +18,23 @@ const { NewsHelper, ChangelogHelper, NotificationHelper } = require('dunebot-sdk
 
 const router = Router();
 
+/**
+ * Entfernt HTML-Tags und dekodiert HTML-Entities (inkl. Umlaute)
+ */
+function stripHtmlForDiscord(html) {
+    if (!html || typeof html !== 'string') return '';
+    return html
+        .replace(/<[^>]+>/g, '')
+        .replace(/&auml;/g, 'ä').replace(/&ouml;/g, 'ö').replace(/&uuml;/g, 'ü')
+        .replace(/&Auml;/g, 'Ä').replace(/&Ouml;/g, 'Ö').replace(/&Uuml;/g, 'Ü')
+        .replace(/&szlig;/g, 'ß')
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&nbsp;/g, ' ')
+        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+        .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+        .trim();
+}
+
 // ================================================================
 // MIDDLEWARE: Guild-Layout für alle Admin-Routen setzen
 // (Schutz gegen Frontend-Router, der res.locals.layout = frontend setzt)
@@ -225,8 +242,8 @@ router.post('/news/save', async (req, res) => {
                 const baseUrl = process.env.DASHBOARD_BASE_URL || '';
                 const newsUrl = `${baseUrl}/news/${slug || 'news'}`;
 
-                const cleanExcerpt_de = (excerpt_de || title_de || '').replace(/<[^>]+>/g, '').trim();
-                const cleanExcerpt_en = (excerpt_en || title_en || '').replace(/<[^>]+>/g, '').trim();
+                const cleanExcerpt_de = stripHtmlForDiscord(excerpt_de || title_de || '');
+                const cleanExcerpt_en = stripHtmlForDiscord(excerpt_en || title_en || '');
 
                 const notifTranslations = {
                     title: { 'de-DE': `📰 ${title_de || 'Neue News'}`, 'en-GB': `📰 ${title_en || 'New Article'}` },
@@ -751,8 +768,8 @@ router.post('/changelogs/save', async (req, res) => {
                 const announcementTitle_de = `📢 Update v${version} veröffentlicht!`;
                 const announcementTitle_en = `📢 Update v${version} released!`;
                 // HTML-Tags aus TinyMCE-Beschreibung entfernen für Discord
-                const cleanDesc_de = (description_de || `Version ${version} ist jetzt verfügbar.`).replace(/<[^>]+>/g, '').trim();
-                const cleanDesc_en = (description_en || `Version ${version} is now available.`).replace(/<[^>]+>/g, '').trim();
+                const cleanDesc_de = stripHtmlForDiscord(description_de || `Version ${version} ist jetzt verfügbar.`);
+                const cleanDesc_en = stripHtmlForDiscord(description_en || `Version ${version} is now available.`);
 
                 const announcementTranslations = {
                     title: { 'de-DE': announcementTitle_de, 'en-GB': announcementTitle_en },

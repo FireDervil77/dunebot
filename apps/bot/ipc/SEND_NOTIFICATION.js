@@ -32,6 +32,15 @@ function htmlToDiscord(html) {
         .replace(/&quot;/g, '"')
         .replace(/&#039;/g, "'")
         .replace(/&nbsp;/g, ' ')
+        .replace(/&auml;/g, 'ä')
+        .replace(/&ouml;/g, 'ö')
+        .replace(/&uuml;/g, 'ü')
+        .replace(/&Auml;/g, 'Ä')
+        .replace(/&Ouml;/g, 'Ö')
+        .replace(/&Uuml;/g, 'Ü')
+        .replace(/&szlig;/g, 'ß')
+        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+        .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
         .replace(/\n{3,}/g, '\n\n')
         .trim();
 }
