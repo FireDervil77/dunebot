@@ -529,7 +529,6 @@ module.exports = class ModUtils {
             for (const message of messages.values()) {
                 if (toDelete.length >= amount) break;
                 if (!message.deletable) continue;
-                if (message.createdTimestamp < Date.now() - 1209600000) continue; // skip messages older than 14 days
 
                 if (type === "ALL") {
                     toDelete.push(message);
@@ -562,14 +561,37 @@ module.exports = class ModUtils {
                 return "NO_MESSAGES";
             }
 
-            const deletedMessages = await channel.bulkDelete(toDelete, true);
+            const cutoff = Date.now() - 1209600000; // 14 Tage
+            const bulkable = toDelete.filter(m => m.createdTimestamp >= cutoff);
+            const old = toDelete.filter(m => m.createdTimestamp < cutoff);
+
+            let deletedCount = 0;
+            if (bulkable.length > 1) {
+                const result = await channel.bulkDelete(bulkable, true);
+                deletedCount += result.size;
+            } else if (bulkable.length === 1) {
+                await bulkable[0].delete();
+                deletedCount++;
+            }
+
+            // Alte Nachrichten einzeln löschen – im Hintergrund, nicht blockierend
+            if (old.length > 0) {
+                deletedCount += old.length; // Count sofort hochzählen für die Antwort
+                (async () => {
+                    for (const msg of old) {
+                        await msg.delete().catch(() => {});
+                        await new Promise(r => setTimeout(r, 500));
+                    }
+                })(); // fire & forget
+            }
+
             await logModeration(issuer, "", "", "Purge", {
                 purgeType: type,
                 channel: channel,
-                deletedCount: deletedMessages.size,
+                deletedCount: deletedCount,
             });
 
-            return deletedMessages.size;
+            return deletedCount;
         } catch (ex) {
             Logger.error("purgeMessages", ex);
             return "ERROR";

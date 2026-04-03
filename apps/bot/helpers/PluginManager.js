@@ -617,11 +617,7 @@ async enablePlugin(pluginName) {
                     return []; // Strikt blockieren (außer bei guildDelete)
                 }
                 
-                if (guild) {
-                    Logger.debug(`[PluginManager] ✅ Guild gefunden: ${guild.name} (${guild.id})`);
-                } else if (eventName === "guildDelete") {
-                    Logger.debug(`[PluginManager] ✅ guildDelete Event für Guild ${guildId} (Cache-Ausnahme)`);
-                }
+
                 
                 // 2. Prüfen ob Guild in Datenbank ist
                 const [guildExists] = await dbService.query(
@@ -649,7 +645,6 @@ async enablePlugin(pluginName) {
                     enabled_plugins.push("core");
                 }
                 
-                Logger.debug(`[PluginManager] Aktivierte Plugins für Guild ${guildId}: ${enabled_plugins.join(', ')}`);
             }
         } catch (error) {
             Logger.warn(`[PluginManager] Fehler beim Ermitteln aktivierter Plugins für Event ${eventName}:`, error);

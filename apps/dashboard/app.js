@@ -590,6 +590,19 @@ module.exports = class App {
         // Beispiel: /themes/default/assets/js/guild.js
         this.app.use('/themes', express.static(path.join(__dirname, 'themes')));
 
+        // robots.txt — Suchmaschinen von geschützten Bereichen fernhalten
+        this.app.get('/robots.txt', (req, res) => {
+            res.type('text/plain').send([
+                'User-agent: *',
+                'Disallow: /guild/',
+                'Disallow: /admin/',
+                'Disallow: /auth/',
+                'Disallow: /api/',
+                'Allow: /',
+                ''
+            ].join('\n'));
+        });
+
         // Media Uploads (Guild-spezifische Medien-Bibliothek)
         // Beispiel: /uploads/media/1234567890/abc123.png
         this.app.use('/uploads/media', express.static(path.join(__dirname, 'uploads/media')));

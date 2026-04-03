@@ -221,7 +221,7 @@ module.exports = {
 
         // Success
         if (typeof response === "number") {
-            return interaction.followUpT("moderation:PURGE.SUCCESS", { amount: response, channel });
+            return interaction.followUpT("moderation:PURGE.SUCCESS", { amount: response, channel: `<#${channel.id}>` });
         }
 
         // Member missing permissions

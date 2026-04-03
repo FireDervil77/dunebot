@@ -185,10 +185,14 @@ async function pluginStatus(arg0) {
 
     const options = [];
     for (const p of client.pluginManager.plugins.filter((p) => !p.ownerOnly)) {
+        const isEnabled = enabled_plugins.includes(p.name);
         options.push({
-            label: p.name,
+            label: `${isEnabled ? "✅" : "🔴"} ${p.name}`,
             value: p.name,
-            default: enabled_plugins.includes(p.name),
+            description: isEnabled
+                ? guild.getT("core:PLUGIN.ENABLED")
+                : guild.getT("core:PLUGIN.DISABLED"),
+            default: isEnabled,
         });
     }
 
@@ -232,40 +236,28 @@ async function pluginStatus(arg0) {
         components: [],
     });
 
-    for (const p of client.pluginManager.plugins) {
+    const allPlugins = client.pluginManager.plugins.filter(p => !p.ownerOnly && p.name !== 'core');
+    const enabledList = [];
+    const disabledList = [];
+
+    for (const p of allPlugins) {
         if (waiter.values.includes(p.name)) {
             await client.pluginManager.enableInGuild(p.name, guild.id);
-        } else if (p.name !== "core") {
+            enabledList.push(p.name);
+        } else {
             await client.pluginManager.disableInGuild(p.name, guild.id);
+            disabledList.push(p.name);
         }
     }
 
-    // NEU: Plugin-Status über guild_plugins speichern
-    // Alte aktivierte Plugins holen
-    const currentlyEnabled = await dbService.getEnabledPlugins(guild.id);
-    const selectedPlugins = waiter.values; // Array der vom User gewählten Plugins
-    
-    // Plugins die NEU aktiviert werden sollen
-    const toEnable = selectedPlugins.filter(p => !currentlyEnabled.includes(p));
-    // Plugins die deaktiviert werden sollen
-    const toDisable = currentlyEnabled.filter(p => !selectedPlugins.includes(p) && p !== 'core');
-    
-    // Enable neue Plugins
-    for (const pluginName of toEnable) {
-        try {
-            await client.pluginManager.enableInGuild(pluginName, guild.id);
-        } catch (err) {
-            Logger.error(`Fehler beim Aktivieren von ${pluginName}:`, err);
-        }
-    }
-    
-    // Disable alte Plugins (außer core - das darf nie deaktiviert werden!)
-    for (const pluginName of toDisable) {
-        try {
-            await client.pluginManager.disableInGuild(pluginName, guild.id);
-        } catch (err) {
-            Logger.error(`Fehler beim Deaktivieren von ${pluginName}:`, err);
-        }
+    // Dashboard per IPC benachrichtigen, damit Navigation/Permissions aktualisiert werden
+    const ipcClient = ServiceManager.get('ipcClient');
+    if (ipcClient) {
+        ipcClient.sendToDashboard('core:UPDATE_PLUGIN_STATUS', {
+            guildId: guild.id,
+            enabled: enabledList,
+            disabled: disabledList,
+        }).catch(() => {});
     }
 
     await sentMsg.edit({

@@ -62,13 +62,13 @@ exports.getDashboard = async (req, res) => {
             Logger.error(`Fehler beim Laden der Statistiken für Guild ${guildId}:`, err);
         }
 
-        // Aktivierte Plugins aus guild_plugins Tabelle laden
+        // Aktivierte Plugins aus guild_plugins Tabelle laden (mit Badge-Info für Widget)
         let enabledPlugins = [];
         try {
-            enabledPlugins = await dbService.getEnabledPlugins(guildId);
+            enabledPlugins = await dbService.getEnabledPluginsWithBadges(guildId);
         } catch (err) {
             Logger.error(`Fehler beim Laden der aktivierten Plugins für Guild ${guildId}:`, err);
-            enabledPlugins = ["core"]; 
+            enabledPlugins = [{ name: "core" }]; 
         }
         
         // Sicherstellen, dass das Icon-URL korrekt ist

@@ -174,12 +174,52 @@ class IPCServer {
         Logger.debug(`[IPC] Plugin-Message: ${pluginName}:${action}`);
 
         switch (pluginName) {
+            case 'core':
+                return this._handleCoreEvent(action, payload, message);
             case 'masterserver':
                 return this._handleMasterserverEvent(action, payload, message);
             case 'gameserver':
                 return this._handleGameserverEvent(action, payload, message);
             default:
                 return message.reply({ success: false, error: `Unbekanntes Plugin: ${pluginName}` });
+        }
+    }
+
+    /**
+     * Core-Events vom Bot verarbeiten (Bot→Dashboard)
+     * Aktuell: UPDATE_PLUGIN_STATUS – synchronisiert Plugin-Enable/Disable ans Dashboard
+     * @private
+     */
+    async _handleCoreEvent(action, payload, message) {
+        const Logger = ServiceManager.get('Logger');
+        const pluginManager = ServiceManager.get('pluginManager');
+
+        switch (action) {
+            case 'UPDATE_PLUGIN_STATUS': {
+                const { guildId, enabled = [], disabled = [] } = payload;
+                if (!guildId) return message.reply({ success: false, error: 'guildId fehlt' });
+
+                Logger.info(`[IPC/core] Plugin-Status-Update für Guild ${guildId}: +[${enabled.join(',')}] -[${disabled.join(',')}]`);
+
+                for (const pluginName of enabled) {
+                    try {
+                        await pluginManager.enableInGuild(pluginName, guildId);
+                    } catch (err) {
+                        Logger.error(`[IPC/core] enableInGuild(${pluginName}) gescheitert:`, err);
+                    }
+                }
+                for (const pluginName of disabled) {
+                    try {
+                        await pluginManager.disableInGuild(pluginName, guildId);
+                    } catch (err) {
+                        Logger.error(`[IPC/core] disableInGuild(${pluginName}) gescheitert:`, err);
+                    }
+                }
+
+                return message.reply({ success: true });
+            }
+            default:
+                return message.reply({ success: false, error: `Unbekannte core-Aktion: ${action}` });
         }
     }
 

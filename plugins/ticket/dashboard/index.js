@@ -308,7 +308,7 @@ class TicketPlugin extends DashboardPlugin {
 
         const navItems = [
             {
-                title: 'TICKET:TITLE',
+                title: 'ticket:TITLE',
                 path: `/guild/${guildId}/plugins/ticket`,
                 icon: 'fa-solid fa-ticket',
                 order: null,

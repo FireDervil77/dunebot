@@ -46,3 +46,19 @@ node migrate.js create plugin <pluginname> "beschreibung"
 - Idempotent schreiben: `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`
 - Status prüfen: `node migrate.js status`
 - MigrationRunner-Engine: `packages/dunebot-core/lib/MigrationRunner.js`
+
+## 🔄 PLUGIN-UPDATES & NAVIGATION
+
+**Bei Änderungen an Navigation, Routen oder Plugin-Struktur** muss die `version` in der `package.json` des Plugins gebumpt werden:
+
+```
+plugins/<name>/package.json → "version": "x.y.z" hochsetzen
+```
+
+**Warum:** Das Plugin-System vergleicht DB-Version mit Code-Version. Bei Unterschied wird `onUpdate(oldVersion, newVersion, guildId)` automatisch für jede Guild aufgerufen. Dort wird z.B. `registerKernNavigation(guildId)` ausgeführt, das alle Nav-Items löscht und neu erstellt.
+
+**Regeln:**
+- **Niemals** Nav-Items manuell in der DB ändern — immer über Version-Bump triggern!
+- Navigation wird in `KernNavigation.js` (Core) bzw. `onGuildEnable()` (Plugins) definiert
+- Nav-Items werden in `guild_nav_items` Tabelle gespeichert und per `NavigationManager` verwaltet
+- Ohne Version-Bump sehen bestehende Guilds neue Nav-Einträge **nicht**
