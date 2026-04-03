@@ -119,6 +119,22 @@ class GameserverOverview {
                 this.handleInstallEvent(data);
             });
 
+            // Metrics-Events (CPU, RAM, Players pro Gameserver)
+            this.eventSource.addEventListener('metrics', (e) => {
+                const data = JSON.parse(e.data);
+                if (data.action === 'server_stats') {
+                    console.log('[GameserverOverview] Metrics empfangen:', data);
+                    this.updateServerResources({
+                        server_id: data.server_id,
+                        cpu: data.cpu_percent,
+                        ram_used_mb: data.ram_used_mb,
+                        ram_total_mb: data.ram_total_mb,
+                        current_players: data.current_players,
+                        max_players: data.max_players
+                    });
+                }
+            });
+
             // Error-Handling
             this.eventSource.onerror = (e) => {
                 console.error('[GameserverOverview] ❌ SSE-Fehler:', e);

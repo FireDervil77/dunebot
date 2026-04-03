@@ -99,26 +99,26 @@
         </li>
 
         <!-- Content Management -->
-        <li class="nav-item <%= _adminPath.startsWith('/admin/content') || _adminPath.startsWith('/admin/news') || _adminPath.startsWith('/admin/changelogs') || _adminPath.startsWith('/admin/notifications') || _adminPath.startsWith('/admin/docs') ? 'menu-open' : '' %>">
-          <a href="/admin/content" class="nav-link <%= _adminPath.startsWith('/admin/content') || _adminPath.startsWith('/admin/news') || _adminPath.startsWith('/admin/changelogs') || _adminPath.startsWith('/admin/notifications') || _adminPath.startsWith('/admin/docs') ? 'active' : '' %>">
+        <li class="nav-item <%= _adminPath.startsWith('/admin/content') || _adminPath.startsWith('/admin/docs') ? 'menu-open' : '' %>">
+          <a href="/admin/content" class="nav-link <%= _adminPath.startsWith('/admin/content') || _adminPath.startsWith('/admin/docs') ? 'active' : '' %>">
             <i class="nav-icon fa-solid fa-layer-group"></i>
             <p>Content Management <i class="bi bi-chevron-right right"></i></p>
           </a>
           <ul class="nav nav-treeview">
             <li class="nav-item">
-              <a href="/admin/content?tab=news" class="nav-link <%= _adminPath === '/admin/content' || _adminPath.startsWith('/admin/news') ? 'active' : '' %>">
+              <a href="/admin/content?tab=news" class="nav-link <%= _adminPath === '/admin/content' || _adminPath.startsWith('/admin/content/news') ? 'active' : '' %>">
                 <i class="nav-icon fa-regular fa-dot-circle"></i>
                 <p>News</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/content?tab=changelogs" class="nav-link <%= _adminPath.startsWith('/admin/changelogs') ? 'active' : '' %>">
+              <a href="/admin/content?tab=changelogs" class="nav-link <%= _adminPath.startsWith('/admin/content/changelogs') ? 'active' : '' %>">
                 <i class="nav-icon fa-regular fa-dot-circle"></i>
                 <p>Changelogs</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/content?tab=notifications" class="nav-link <%= _adminPath.startsWith('/admin/notifications') ? 'active' : '' %>">
+              <a href="/admin/content?tab=notifications" class="nav-link <%= _adminPath.startsWith('/admin/content/notifications') ? 'active' : '' %>">
                 <i class="nav-icon fa-regular fa-dot-circle"></i>
                 <p>Benachrichtigungen</p>
               </a>

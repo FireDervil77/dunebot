@@ -344,11 +344,11 @@ const logModeration = async (issuer, target, reason, type, data = {}) => {
     // Log in Datenbank speichern (gibt Case-Nummer zurück)
     const caseNumber = await createLog(
         guild.id,
-        target.id,
+        target?.id || null,
         issuer.id,
         issuer.user.tag,
         type,
-        reason
+        reason || null
     );
     
     // Case-Nummer im Embed anzeigen

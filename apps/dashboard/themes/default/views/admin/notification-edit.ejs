@@ -1,4 +1,4 @@
-<% const _backUrl = typeof backUrl !== 'undefined' ? backUrl : '/admin/notifications'; %>
+<% const _backUrl = typeof backUrl !== 'undefined' ? backUrl : '/admin/content?tab=notifications'; %>
 <%- include('./partials/content-nav', { contentTab: typeof contentTab !== 'undefined' ? contentTab : 'notifications' }) %>
 
 <%
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Lade Channel-Konfiguration pro Kategorie
     try {
-        const resp = await fetch('/admin/notifications/api/channel-config');
+        const resp = await fetch('/admin/content/notifications/api/channel-config');
         const data = await resp.json();
         if (data.success) channelConfig = data.config || {};
     } catch (e) {
@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', async function() {
               data-form-type="notification-save" 
               data-method="POST"
               data-success-url="<%= _backUrl %>"
-              action="/admin/notifications/save" 
+              action="/admin/content/notifications/save" 
               method="POST">
             <input type="hidden" name="guildId" value="<%= guildId %>">
             <input type="hidden" name="delivery_method" id="delivery_method_hidden" value="<%= JSON.stringify(deliveryMethods) %>">

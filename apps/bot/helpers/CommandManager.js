@@ -367,9 +367,9 @@ class CommandManager {
                     const commands = await this.#registerGuildCommands(guildId, force);
                     
                     if (guild) {
-                        Logger.info(`Registered ${commands.length || 0} interactions in guild ${guild.name} (${guild.id})`);
+                        Logger.info(`Registered ${commands?.size ?? 0} interactions in guild ${guild.name} (${guild.id})`);
                     } else {
-                        Logger.info(`Registered ${commands.length || 0} interactions in guild ${guildId}`);
+                        Logger.info(`Registered ${commands?.size ?? 0} interactions in guild ${guildId}`);
                     }
                 } catch (error) {
                     Logger.error(`Failed to register commands for guild ${guildId}:`, error);
@@ -459,28 +459,17 @@ class CommandManager {
         const disabledSlashCommands = configs?.DISABLED_SLASH || [];
 
         // Filter commands from enabled plugins
-        if (configs?.INTERACTIONS_SLASH === "1" || configs?.INTERACTIONS_SLASH === true) {
-            this.slashCommands
+        if (slashEnabled) {
+            Array.from(this.slashCommands.values())
                 .filter((cmd) => {
-                    // Check if the command is disabled
                     if (Array.isArray(disabledSlashCommands) && disabledSlashCommands.includes(cmd.name)) {
                         Logger.debug(`Command ${cmd.name} ist für Guild ${guildId} deaktiviert`);
                         return false;
                     }
-
-                    // Check if the plugin is globally enabled AND enabled for this guild
                     const plugin = cmd.plugin;
-
-                    // Kern-Commands ('kern') sind immer registriert – unabhängig vom Plugin-System
                     if (plugin.name === 'kern') return true;
-
-                    const isGloballyEnabled = this.client.pluginManager.isPluginEnabled(
-                        plugin.name,
-                    );
-
-                    // Plugin muss in enabledPlugins sein (force wird nur für Cooldown verwendet)
+                    const isGloballyEnabled = this.client.pluginManager.isPluginEnabled(plugin.name);
                     const isGuildEnabled = enabledPlugins.includes(plugin.name);
-
                     return isGloballyEnabled && isGuildEnabled;
                 })
                 .map((cmd) => ({
@@ -514,7 +503,7 @@ class CommandManager {
 
         // Filter context menus from enabled plugins
         if (configs["INTERACTIONS_CONTEXT"]) {
-            this.contextMenus
+            Array.from(this.contextMenus.values())
                 .filter((ctx) => {
                     // Check if the plugin is globally enabled AND enabled for this guild
                     const plugin = ctx.plugin;

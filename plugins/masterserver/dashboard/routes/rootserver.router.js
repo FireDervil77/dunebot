@@ -83,6 +83,46 @@ router.get('/', async (req, res) => {
 });
 
 // =====================================================
+// Route: SSE-Events für RootServer-Metriken (Live-Push)
+// GET /guild/:guildId/plugins/masterserver/rootservers/events
+// ⚠️ MUSS VOR /:id stehen, sonst wird "events" als ID interpretiert!
+// =====================================================
+router.get('/events', (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const sseManager = ServiceManager.get('sseManager');
+    const guildId = res.locals.guildId;
+
+    try {
+        const sessionUser = req.session?.user;
+        const localUser = res.locals.user;
+        const userId = localUser?.id || sessionUser?.info?.id || 'anonymous';
+        const clientId = `ms-${userId}-${Date.now()}`;
+
+        // Optional: Filter auf bestimmten RootServer
+        const daemonFilter = req.query.daemon_id ?
+            (message) => {
+                return message.data && message.data.daemon_id === req.query.daemon_id;
+            } : null;
+
+        sseManager.addClient(guildId, clientId, res, {
+            filter: daemonFilter,
+            metadata: {
+                userId,
+                source: 'masterserver',
+                daemonId: req.query.daemon_id || null
+            }
+        });
+
+        Logger.info(`[Masterserver SSE] Client ${clientId} connected (Guild: ${guildId})`);
+    } catch (error) {
+        Logger.error('[Masterserver SSE] Fehler:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: 'SSE-Fehler' });
+        }
+    }
+});
+
+// =====================================================
 // Route: RootServer erstellen (Wizard)
 // GET /guild/:guildId/plugins/masterserver/rootservers/create
 // =====================================================
@@ -301,11 +341,24 @@ router.get('/:id', async (req, res) => {
         // Online-Status prüfen
         const isOnline = ipmServer.isDaemonOnline(rootserver.daemon_id);
 
-        // TODO: Gameserver-Statistiken für diesen RootServer laden
+        // Gameserver-Statistiken und Liste für diesen RootServer laden
+        const dbService = ServiceManager.get('dbService');
+        const gameservers = await dbService.query(
+            `SELECT sr.server_id, sr.server_name, sr.server_type, sr.status,
+                    sr.current_players, sr.cpu_percent, sr.ram_used_mb, sr.ram_total_mb,
+                    sr.last_heartbeat,
+                    gs.name AS display_name, gs.game_name, gs.max_players
+             FROM server_registry sr
+             LEFT JOIN gameservers gs ON gs.id = sr.server_id
+             WHERE sr.daemon_id = ?
+             ORDER BY sr.server_name ASC`,
+            [rootserver.daemon_id]
+        );
+
         const gameserverStats = {
-            total: 0,
-            running: 0,
-            stopped: 0
+            total: gameservers.length,
+            running: gameservers.filter(g => g.status === 'online').length,
+            stopped: gameservers.filter(g => g.status === 'offline').length
         };
 
         await renderView(res, 'guild/masterserver-rootserver-detail', {
@@ -314,6 +367,7 @@ router.get('/:id', async (req, res) => {
             rootserver,
             isOnline,
             gameserverStats,
+            gameservers,
             guildId
         });
 

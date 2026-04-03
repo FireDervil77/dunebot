@@ -395,7 +395,7 @@ class GuildAjaxHandler {
     static async handleNewsResponse(form, result) {
         if (result.success) {
             this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.NEWS_UPDATED || 'News erfolgreich gespeichert'));
-            const successUrl = form.dataset.successUrl || '/admin/news';
+            const successUrl = form.dataset.successUrl || '/admin/content?tab=news';
             setTimeout(() => {
                 window.location.href = successUrl;
             }, 1000);
@@ -432,7 +432,7 @@ class GuildAjaxHandler {
         console.log('[GuildAjax] handleNotificationSaveResponse called:', result);
         if (result.success) {
             this.showToast('success', result.message || 'Notification erfolgreich gespeichert');
-            const successUrl = form.dataset.successUrl || '/admin/notifications';
+            const successUrl = form.dataset.successUrl || '/admin/content?tab=notifications';
             setTimeout(() => {
                 window.location.href = successUrl;
             }, 1500);

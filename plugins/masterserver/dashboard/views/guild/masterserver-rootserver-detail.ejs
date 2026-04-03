@@ -278,6 +278,88 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                 <% } %>
                             </div>
                         </div>
+
+                        <!-- Gameserver-Auslastung -->
+                        <% if (typeof gameservers !== 'undefined' && gameservers.length > 0) { %>
+                        <hr class="my-3">
+                        <h5 class="mb-3"><i class="fa-solid fa-chart-bar mr-2"></i>Gameserver-Auslastung</h5>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover" id="gs-metrics-table">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Server</th>
+                                        <th>Status</th>
+                                        <th style="width:25%">CPU</th>
+                                        <th style="width:25%">RAM</th>
+                                        <th>Spieler</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% for (const gs of gameservers) { 
+                                        const gsStatusColors = { online: 'success', offline: 'secondary', starting: 'warning', stopping: 'warning', error: 'danger' };
+                                        const gsColor = gsStatusColors[gs.status] || 'secondary';
+                                        const cpuPct = gs.cpu_percent != null ? parseFloat(gs.cpu_percent) : null;
+                                        const ramUsed = gs.ram_used_mb != null ? parseInt(gs.ram_used_mb) : null;
+                                        const ramTotal = gs.ram_total_mb != null ? parseInt(gs.ram_total_mb) : null;
+                                        const ramPct = (ramUsed && ramTotal && ramTotal > 0) ? Math.round(ramUsed / ramTotal * 100) : null;
+                                        const players = gs.current_players != null ? gs.current_players : 0;
+                                        const maxPlayers = gs.max_players || '?';
+                                    %>
+                                    <tr data-gs-id="<%= gs.server_id %>">
+                                        <td>
+                                            <strong><%= gs.display_name || gs.server_name %></strong>
+                                            <% if (gs.game_name) { %>
+                                                <br><small class="text-muted"><%= gs.game_name %></small>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-<%= gsColor %>" data-gs-status>
+                                                <%= gs.status %>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1 mr-2" style="height:16px;">
+                                                    <div class="progress-bar bg-<%= cpuPct != null && cpuPct >= 80 ? 'danger' : cpuPct != null && cpuPct >= 60 ? 'warning' : 'success' %>"
+                                                         role="progressbar"
+                                                         style="width: <%= cpuPct != null ? cpuPct : 0 %>%"
+                                                         data-gs-cpu-bar></div>
+                                                </div>
+                                                <small class="text-nowrap" data-gs-cpu-text><%= cpuPct != null ? cpuPct.toFixed(1) + '%' : '–' %></small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1 mr-2" style="height:16px;">
+                                                    <div class="progress-bar bg-<%= ramPct != null && ramPct >= 85 ? 'danger' : ramPct != null && ramPct >= 65 ? 'warning' : 'info' %>"
+                                                         role="progressbar"
+                                                         style="width: <%= ramPct != null ? ramPct : 0 %>%"
+                                                         data-gs-ram-bar></div>
+                                                </div>
+                                                <small class="text-nowrap" data-gs-ram-text>
+                                                    <% if (ramUsed != null && ramTotal != null) { %>
+                                                        <%= (ramUsed / 1024).toFixed(1) %> / <%= (ramTotal / 1024).toFixed(1) %> GB
+                                                    <% } else { %>
+                                                        –
+                                                    <% } %>
+                                                </small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span data-gs-players><%= players %> / <%= maxPlayers %></span>
+                                        </td>
+                                    </tr>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        </div>
+                        <% } else { %>
+                        <hr class="my-3">
+                        <div class="text-center text-muted py-3">
+                            <i class="fa-solid fa-server fa-2x mb-2 d-block"></i>
+                            Noch keine Gameserver auf diesem RootServer.
+                        </div>
+                        <% } %>
                     </div>
 
                     <!-- Tab: Einstellungen -->
@@ -577,9 +659,129 @@ sudo journalctl -u firebot-daemon -f</code></pre>
         <% } %>
     })();
 
-    // ── Live-Poll ────────────────────────────────────────────
+    // ── Live-Updates via SSE (mit Polling-Fallback) ────────
     if (!ONLINE) return;
 
+    const DAEMON_ID = '<%= rootserver.daemon_id %>';
+    let sseConnected = false;
+    let pollInterval = null;
+
+    // Aktualisiert alle Gauges aus einem Hardware-Objekt
+    function updateGauges(hw) {
+        // CPU
+        if (hw.cpu_percent != null) {
+            const c = Math.round(hw.cpu_percent);
+            document.getElementById('cpu-pct').textContent = c + '%';
+            setRing('cpu-ring', c, '#28a745');
+        }
+        // RAM
+        if (hw.ram_used_gb != null && hw.ram_total_gb != null && hw.ram_total_gb > 0) {
+            const p = Math.round(hw.ram_used_gb / hw.ram_total_gb * 100);
+            document.getElementById('ram-pct').textContent  = p + '%';
+            document.getElementById('ram-detail').textContent =
+                parseFloat(hw.ram_used_gb).toFixed(1) + ' / ' + parseFloat(hw.ram_total_gb).toFixed(1) + ' GB';
+            setRing('ram-ring', p, '#17a2b8');
+        }
+        // Disk
+        if (hw.disk_used_gb != null && hw.disk_total_gb != null && hw.disk_total_gb > 0) {
+            const p = Math.round(hw.disk_used_gb / hw.disk_total_gb * 100);
+            document.getElementById('disk-pct').textContent   = p + '%';
+            document.getElementById('disk-detail').textContent =
+                Math.round(hw.disk_used_gb) + ' / ' + Math.round(hw.disk_total_gb) + ' GB';
+            setRing('disk-ring', p, '#fd7e14');
+        }
+        // Ping
+        if (hw.ping_ms != null) {
+            const el = document.getElementById('rs-ping');
+            if (el) el.textContent = hw.ping_ms + ' ms';
+        }
+    }
+
+    // Aktualisiert eine Gameserver-Zeile in der Auslastungs-Tabelle
+    function updateGameserverRow(data) {
+        const row = document.querySelector('[data-gs-id="' + data.server_id + '"]');
+        if (!row) return;
+
+        // Status
+        if (data.status) {
+            const statusEl = row.querySelector('[data-gs-status]');
+            if (statusEl) {
+                const colors = { online: 'success', offline: 'secondary', starting: 'warning', stopping: 'warning', error: 'danger' };
+                statusEl.className = 'badge badge-' + (colors[data.status] || 'secondary');
+                statusEl.textContent = data.status;
+            }
+        }
+
+        // CPU
+        if (data.cpu_percent != null) {
+            const cpu = parseFloat(data.cpu_percent);
+            const cpuBar = row.querySelector('[data-gs-cpu-bar]');
+            const cpuText = row.querySelector('[data-gs-cpu-text]');
+            if (cpuBar) {
+                cpuBar.style.width = cpu + '%';
+                cpuBar.className = 'progress-bar bg-' + (cpu >= 80 ? 'danger' : cpu >= 60 ? 'warning' : 'success');
+            }
+            if (cpuText) cpuText.textContent = cpu.toFixed(1) + '%';
+        }
+
+        // RAM
+        if (data.ram_used_mb != null && data.ram_total_mb != null && data.ram_total_mb > 0) {
+            const ramPct = Math.round(data.ram_used_mb / data.ram_total_mb * 100);
+            const ramBar = row.querySelector('[data-gs-ram-bar]');
+            const ramText = row.querySelector('[data-gs-ram-text]');
+            if (ramBar) {
+                ramBar.style.width = ramPct + '%';
+                ramBar.className = 'progress-bar bg-' + (ramPct >= 85 ? 'danger' : ramPct >= 65 ? 'warning' : 'info');
+            }
+            if (ramText) ramText.textContent = (data.ram_used_mb / 1024).toFixed(1) + ' / ' + (data.ram_total_mb / 1024).toFixed(1) + ' GB';
+        }
+
+        // Spieler
+        if (data.current_players != null) {
+            const playersEl = row.querySelector('[data-gs-players]');
+            if (playersEl) playersEl.textContent = data.current_players + ' / ' + (data.max_players || '?');
+        }
+    }
+
+    // ── SSE-Verbindung ──────────────────────────────────────
+    function connectSSE() {
+        const sseUrl = '/guild/' + GUILD + '/plugins/masterserver/rootservers/events?daemon_id=' + DAEMON_ID;
+        const evtSource = new EventSource(sseUrl);
+
+        evtSource.addEventListener('connected', function() {
+            sseConnected = true;
+            // Polling stoppen wenn SSE aktiv
+            if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+            console.log('[RootServer] SSE verbunden');
+        });
+
+        evtSource.addEventListener('metrics', function(e) {
+            try {
+                const data = JSON.parse(e.data);
+                // Host-Stats für diesen Daemon → Ring-Gauges aktualisieren
+                if (data.action === 'host_stats' && data.daemon_id === DAEMON_ID) {
+                    updateGauges(data);
+                }
+                // Per-Gameserver Stats → Tabelle aktualisieren
+                if (data.action === 'server_stats') {
+                    updateGameserverRow(data);
+                }
+            } catch (_) {}
+        });
+
+        evtSource.onerror = function() {
+            sseConnected = false;
+            evtSource.close();
+            console.warn('[RootServer] SSE getrennt, Fallback auf Polling');
+            startPolling();
+            // Reconnect nach 5s
+            setTimeout(connectSSE, 5000);
+        };
+
+        return evtSource;
+    }
+
+    // ── Polling-Fallback ────────────────────────────────────
     async function poll() {
         try {
             const r = await fetch(API_URL);
@@ -587,30 +789,7 @@ sudo journalctl -u firebot-daemon -f</code></pre>
             const { success, data } = await r.json();
             if (!success || !data || !data.systemResources) return;
             const hw = data.systemResources;
-
-            // CPU
-            if (hw.cpu_percent != null) {
-                const c = Math.round(hw.cpu_percent);
-                document.getElementById('cpu-pct').textContent = c + '%';
-                setRing('cpu-ring', c, '#28a745');
-            }
-            // RAM
-            if (hw.ram_used_gb != null && hw.ram_total_gb != null && hw.ram_total_gb > 0) {
-                const p = Math.round(hw.ram_used_gb / hw.ram_total_gb * 100);
-                document.getElementById('ram-pct').textContent  = p + '%';
-                document.getElementById('ram-detail').textContent =
-                    parseFloat(hw.ram_used_gb).toFixed(1) + ' / ' + parseFloat(hw.ram_total_gb).toFixed(1) + ' GB';
-                setRing('ram-ring', p, '#17a2b8');
-            }
-            // Disk
-            if (hw.disk_used_gb != null && hw.disk_total_gb != null && hw.disk_total_gb > 0) {
-                const p = Math.round(hw.disk_used_gb / hw.disk_total_gb * 100);
-                document.getElementById('disk-pct').textContent   = p + '%';
-                document.getElementById('disk-detail').textContent =
-                    Math.round(hw.disk_used_gb) + ' / ' + Math.round(hw.disk_total_gb) + ' GB';
-                setRing('disk-ring', p, '#fd7e14');
-            }
-            // Ping
+            updateGauges(hw);
             if (data.lastPingMs != null) {
                 const el = document.getElementById('rs-ping');
                 if (el) el.textContent = data.lastPingMs + ' ms';
@@ -618,8 +797,15 @@ sudo journalctl -u firebot-daemon -f</code></pre>
         } catch (_) {}
     }
 
+    function startPolling() {
+        if (pollInterval || sseConnected) return;
+        poll();
+        pollInterval = setInterval(poll, 8000);
+    }
+
+    // Initiales Laden + SSE starten
     poll();
-    setInterval(poll, 8000);
+    connectSSE();
 })();
 
 // ── RootServer löschen ───────────────────────────────────────

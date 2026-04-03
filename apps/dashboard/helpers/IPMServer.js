@@ -529,6 +529,27 @@ class IPMServer {
             } catch (error) {
                 this.Logger.error('[IPMServer] Fehler beim Speichern der Hardware-Stats:', error);
             }
+
+            // ✅ SSE-Broadcast: Hardware-Metriken an Browser pushen
+            const guildId = conn.metadata.guild_id;
+            if (guildId) {
+                const sseManager = ServiceManager.get('sseManager');
+                if (sseManager) {
+                    const hw = payload.hardware;
+                    sseManager.broadcast(guildId, 'metrics', {
+                        action: 'host_stats',
+                        daemon_id: daemonId,
+                        cpu_percent:  hw.cpu?.usage_percent ?? null,
+                        ram_used_gb:  hw.ram?.used_gb ?? null,
+                        ram_total_gb: hw.ram?.total_gb ?? null,
+                        disk_used_gb: hw.disk?.used_gb ?? null,
+                        disk_total_gb: hw.disk?.total_gb ?? null,
+                        network:      hw.network ?? null,
+                        ping_ms:      pingMs,
+                        timestamp:    Date.now()
+                    });
+                }
+            }
         }
 
         // Update-Info in Connection-Metadata speichern
@@ -549,9 +570,9 @@ class IPMServer {
             timestamp: Date.now()
         }));
 
-        // Optional: Server-Registry-Status aktualisieren
+        // Optional: Server-Registry-Status aktualisieren + SSE-Broadcast pro Gameserver
         if (payload.servers) {
-            await this._updateServerRegistry(daemonId, payload.servers);
+            await this._updateServerRegistry(daemonId, payload.servers, conn.metadata.guild_id);
         }
     }
 
@@ -559,9 +580,10 @@ class IPMServer {
      * Server-Registry aktualisieren
      * @private
      */
-    async _updateServerRegistry(daemonId, servers) {
+    async _updateServerRegistry(daemonId, servers, guildId) {
         // Status-Mapping: Daemon-States → MySQL ENUM (online,offline,starting,stopping,error)
         const registryStatusMap = { running: 'online', stopped: 'offline', crashed: 'error' };
+        const sseManager = ServiceManager.get('sseManager');
 
         for (const server of servers) {
             const rawStatus = server.status || 'offline';
@@ -571,15 +593,36 @@ class IPMServer {
                 `UPDATE server_registry 
                  SET status = ?, 
                      current_players = ?,
+                     cpu_percent = ?,
+                     ram_used_mb = ?,
+                     ram_total_mb = ?,
                      last_heartbeat = NOW()
                  WHERE daemon_id = ? AND server_id = ?`,
                 [
                     dbStatus,
-                    server.players ?? null,  // undefined → null für MySQL
+                    server.players ?? null,
+                    server.cpu_percent ?? null,
+                    server.ram_used_mb ?? null,
+                    server.ram_total_mb ?? null,
                     daemonId, 
                     server.server_id
                 ]
             );
+
+            // ✅ SSE-Broadcast: Per-Gameserver Metriken an Browser pushen
+            if (guildId && sseManager) {
+                sseManager.broadcast(guildId, 'metrics', {
+                    action: 'server_stats',
+                    server_id: server.server_id,
+                    status: dbStatus,
+                    cpu_percent: server.cpu_percent ?? null,
+                    ram_used_mb: server.ram_used_mb ?? null,
+                    ram_total_mb: server.ram_total_mb ?? null,
+                    current_players: server.players ?? null,
+                    max_players: server.max_players ?? null,
+                    timestamp: Date.now()
+                });
+            }
         }
     }
 

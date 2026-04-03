@@ -1,4 +1,4 @@
-<% const _backUrl = typeof backUrl !== 'undefined' ? backUrl : '/admin/changelogs'; %>
+<% const _backUrl = typeof backUrl !== 'undefined' ? backUrl : '/admin/content?tab=changelogs'; %>
 <%- include('./partials/content-nav', { contentTab: 'changelogs' }) %>
 
 <div class="content">
@@ -12,7 +12,7 @@
             </div>
         <% } %>
 
-        <form action="/admin/changelogs/save" method="POST">
+        <form action="/admin/content/changelogs/save" method="POST">
             <input type="hidden" name="guildId" value="<%= guildId %>">
             <% if (changelog && changelog.id) { %>
                 <input type="hidden" name="changelogId" value="<%= changelog.id %>">
@@ -408,7 +408,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // TinyMCE Inhalte vor Form-Submit in Textareas zurückschreiben
-    const changelogForm = document.querySelector('form[action="/admin/changelogs/save"]');
+    const changelogForm = document.querySelector('form[action="/admin/content/changelogs/save"]');
     if (changelogForm) {
         changelogForm.addEventListener('submit', function() {
             if (typeof tinymce !== 'undefined') {

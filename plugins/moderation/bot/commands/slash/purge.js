@@ -8,8 +8,11 @@ module.exports = {
     name: "purge",
     description: "moderation:PURGE.DESCRIPTION",
     userPermissions: ["ManageMessages"],
+    botPermissions: ["ManageMessages", "ReadMessageHistory"],
     command: {
-        enabled: false,
+        enabled: true,
+        usage: "<amount>",
+        minArgsCount: 1,
     },
     slashCommand: {
         enabled: true,
@@ -150,11 +153,34 @@ module.exports = {
         ],
     },
 
+    async messageRun({ message, args }) {
+        const amount = args[0];
+
+        if (isNaN(amount)) return message.replyT("moderation:PURGE.INVALID_AMOUNT");
+        if (parseInt(amount) > 99) return message.replyT("moderation:PURGE.TOO_MANY_MESSAGES");
+
+        const { channel, guild } = message;
+        const response = await purgeMessages(message.member, channel, "ALL", amount);
+
+        if (typeof response === "number") {
+            return channel.send(guild.getT("moderation:PURGE.SUCCESS", { amount: response, channel: channel.toString() }));
+        } else if (response === "BOT_PERM") {
+            return message.reply(guild.getT("moderation:PURGE.BOT_PERM", { channel }), 5);
+        } else if (response === "MEMBER_PERM") {
+            return message.reply(guild.getT("moderation:PURGE.MEMBER_PERM", { channel }), 5);
+        } else if (response === "NO_MESSAGES") {
+            return channel.send(guild.getT("moderation:PURGE.NO_MESSAGES"), 5);
+        } else {
+            return message.replyT("moderation:PURGE.ERROR");
+        }
+    },
+
     async interactionRun({ interaction }) {
         const { options, member } = interaction;
 
         const sub = options.getSubcommand();
-        const channel = options.getChannel("channel");
+        const channelOption = options.getChannel("channel");
+        const channel = interaction.guild.channels.cache.get(channelOption.id) || channelOption;
         const amount = options.getInteger("amount") || 99;
 
         if (amount > 100) return interaction.followUpT("moderation:PURGE.TOO_MANY_MESSAGES");
@@ -185,7 +211,7 @@ module.exports = {
 
             case "user": {
                 const user = interaction.options.getUser("user");
-                response = await purgeMessages(member, channel, "USER", amount, user);
+                response = await purgeMessages(member, channel, "USER", amount, user.id);
                 break;
             }
 

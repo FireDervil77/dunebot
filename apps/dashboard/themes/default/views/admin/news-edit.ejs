@@ -3,7 +3,7 @@
   * Erstellen & Bearbeiten von News mit Übersetzungen
   %>
 
-<% const _backUrl = typeof backUrl !== 'undefined' ? backUrl : '/admin/news'; %>
+<% const _backUrl = typeof backUrl !== 'undefined' ? backUrl : '/admin/content?tab=news'; %>
 <%- include('./partials/content-nav', { contentTab: 'news' }) %>
 
 <div class="content">
@@ -25,7 +25,7 @@
                 <div class="card">
                     <div class="card-body">
                         <form method="POST" 
-                              action="/admin/news/save"
+                              action="/admin/content/news/save"
                               class="guild-ajax-form"
                               data-form-type="news"
                               data-success-url="<%= _backUrl %>">

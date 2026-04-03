@@ -522,7 +522,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function deleteContent(type, id) {
     if (!confirm('Wirklich löschen?')) return;
 
-    fetch('/admin/' + type + '/delete/' + id, {
+    fetch('/admin/content/' + type + '/delete/' + id, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
     })
