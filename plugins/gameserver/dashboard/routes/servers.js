@@ -3339,7 +3339,7 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
         }
 
         const [server] = await dbService.query(`
-            SELECT gs.id, gs.ports, gs.env_variables,
+            SELECT gs.id, gs.ports, gs.env_variables, gs.bind_ip,
                    r.daemon_id, r.host AS rootserver_ip,
                    am.game_data
             FROM gameservers gs
@@ -3398,7 +3398,7 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
         const result = await ipmServer.sendCommand(server.daemon_id, 'gameserver.rcon', {
             guild_id: guildId,
             server_id: String(server.id),
-            rcon_host: '127.0.0.1', // Daemon verbindet lokal
+            rcon_host: server.bind_ip || server.rootserver_ip || '127.0.0.1',
             rcon_port: rconPort,
             rcon_password: rconPassword,
             rcon_command: command
