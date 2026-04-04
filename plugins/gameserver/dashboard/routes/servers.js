@@ -1417,6 +1417,16 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             ? JSON.parse(server.game_data) : (server.game_data || {});
         server.rcon_available = !!(frozenGameData?.config?.rcon);
 
+        // RCON-Port Fallback: Wenn port_var auf "game" zeigt, nutzt RCON den Game-Port
+        if (!server.port_rcon && frozenGameData?.config?.rcon) {
+            const rconPortVar = frozenGameData.config.rcon.port_var || '';
+            if (rconPortVar === 'game' && server.port_game) {
+                server.port_rcon = server.port_game;
+            } else if (rconPortVar && ports[rconPortVar]) {
+                server.port_rcon = ports[rconPortVar]?.external || ports[rconPortVar]?.internal || null;
+            }
+        }
+
         // SFTP-Credentials: Normally set at creation time. Lazy-fallback only if missing.
         if (!server.sftp_username && server.system_user) {
             // Fallback für ältere Server die vor dem direkten SFTP-Setup angelegt wurden
