@@ -277,11 +277,17 @@ async function savePorts() {
     finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save me-1"></i>Speichern'; }
 }
 </script>
+    </div>
+</div>
+
+<!-- Zweite Row: Spieler, Ressourcen, Live-Query -->
+<div class="row mt-3">
+    <div class="col-md-6">
             <!-- ========================================
              PLAYER STATS (nur bei online)
              ======================================== -->
         <% if (server.status === 'online') { %>
-            <div class="card mt-3">
+            <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-users me-2"></i>
@@ -312,11 +318,13 @@ async function savePorts() {
             </div>
         <% } %>
 
+    </div>
+    <div class="col-md-6">
         <!-- ========================================
              RESOURCE METRICS (CPU / RAM – immer bei online)
              ======================================== -->
         <% if (server.status === 'online') { %>
-            <div class="card mt-3" id="metrics-card">
+            <div class="card" id="metrics-card">
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-chart-bar me-2"></i>
@@ -324,6 +332,7 @@ async function savePorts() {
                     </h3>
                     <span class="badge bg-secondary float-end" id="metrics-live-badge" style="display:none">
                         <i class="fas fa-circle text-success me-1" style="font-size:0.6em"></i>Live
+                        <small class="ms-1" id="metrics-last-update"></small>
                     </span>
                 </div>
                 <div class="card-body">
@@ -338,7 +347,7 @@ async function savePorts() {
                         <% const cpuPct = server.cpu_percent || 0; %>
                         <div class="progress-bar <%= cpuPct > 80 ? 'bg-danger' : cpuPct > 50 ? 'bg-warning' : 'bg-success' %>" 
                              role="progressbar" 
-                             style="width: <%= cpuPct %>%"
+                             style="width: <%= cpuPct %>%; transition: width 1s ease, background-color 1s ease;"
                              data-metric-cpu-bar>
                             <%= cpuPct.toFixed(1) %>%
                         </div>
@@ -358,7 +367,7 @@ async function savePorts() {
                         <% const ramPct = (server.ram_total_mb > 0) ? (server.ram_used_mb / server.ram_total_mb) * 100 : 0; %>
                         <div class="progress-bar <%= ramPct > 80 ? 'bg-danger' : ramPct > 50 ? 'bg-warning' : 'bg-info' %>" 
                              role="progressbar" 
-                             style="width: <%= ramPct %>%"
+                             style="width: <%= ramPct %>%; transition: width 1s ease, background-color 1s ease;"
                              data-metric-ram-bar>
                             <%= ramPct.toFixed(1) %>%
                         </div>
@@ -367,6 +376,12 @@ async function savePorts() {
             </div>
         <% } %>
 
+    </div>
+</div>
+
+<!-- Dritte Row: Live-Query full-width -->
+<div class="row mt-3">
+    <div class="col-12">
         <!-- ========================================
              LIVE-QUERY (GameDig – nur wenn Addon Query unterstützt)
              ======================================== -->

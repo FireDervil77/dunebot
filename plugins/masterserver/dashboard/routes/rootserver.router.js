@@ -352,7 +352,7 @@ router.get('/:id', async (req, res) => {
             `SELECT sr.server_id, sr.server_name, sr.server_type, sr.status,
                     sr.current_players, sr.cpu_percent, sr.ram_used_mb, sr.ram_total_mb,
                     sr.last_heartbeat,
-                    gs.name AS display_name, gs.game_name, gs.max_players
+                    gs.name AS display_name, gs.template_name AS game_name, gs.max_players
              FROM server_registry sr
              LEFT JOIN gameservers gs ON gs.id = sr.server_id
              WHERE sr.daemon_id = ?

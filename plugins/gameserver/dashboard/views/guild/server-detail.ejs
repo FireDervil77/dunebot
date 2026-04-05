@@ -709,6 +709,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Live-Badge anzeigen
         const liveBadge = document.getElementById('metrics-live-badge');
         if (liveBadge) liveBadge.style.display = '';
+        const lastUpdate = document.getElementById('metrics-last-update');
+        if (lastUpdate) lastUpdate.textContent = new Date().toLocaleTimeString('de-DE');
     });
 
     sse.connect();
