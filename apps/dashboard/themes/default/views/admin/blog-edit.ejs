@@ -1,0 +1,267 @@
+<%#
+  * Blog Editor - Multi-Language (DE/EN)
+  * Erstellen & Bearbeiten von Blog-Posts mit Übersetzungen
+  %>
+
+<% const _backUrl = typeof backUrl !== 'undefined' ? backUrl : '/admin/content?tab=blog'; %>
+<%- include('./partials/content-nav', { contentTab: 'blog' }) %>
+
+<div class="content">
+    <div class="container-fluid">
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <h4><%= post && post.id ? 'Blog-Post bearbeiten' : 'Neuen Blog-Post erstellen' %></h4>
+            </div>
+            <div class="col-md-6 text-end">
+                <a href="<%= _backUrl %>" class="btn btn-secondary btn-sm">
+                    <i class="fa-solid fa-arrow-left me-2"></i>Zurück zur Übersicht
+                </a>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST" 
+                              action="/admin/content/blog/save"
+                              class="guild-ajax-form"
+                              data-form-type="blog"
+                              data-success-url="<%= _backUrl %>">
+                            <% if (post && post.id) { %>
+                                <input type="hidden" name="postId" value="<%= post.id %>">
+                            <% } %>
+
+                            <!-- Language Tabs -->
+                            <ul class="nav nav-tabs mb-4" id="blogLanguageTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <a class="nav-link active" 
+                                       id="german-tab" 
+                                       data-bs-toggle="tab" 
+                                       data-bs-target="#german" 
+                                       href="#german"
+                                       role="tab">
+                                        🇩🇪 Deutsch
+                                    </a>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <a class="nav-link" 
+                                       id="english-tab" 
+                                       data-bs-toggle="tab" 
+                                       data-bs-target="#english"
+                                       href="#english" 
+                                       role="tab">
+                                        🇬🇧 English
+                                    </a>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <a class="nav-link" 
+                                       id="metadata-tab" 
+                                       data-bs-toggle="tab" 
+                                       data-bs-target="#metadata"
+                                       href="#metadata" 
+                                       role="tab">
+                                        ⚙️ Einstellungen
+                                    </a>
+                                </li>
+                            </ul>
+
+                            <div class="tab-content" id="blogLanguageTabsContent">
+                                <!-- German Tab -->
+                                <div class="tab-pane fade show active" id="german" role="tabpanel" tabindex="0">
+                                    <h4 class="mb-3">Deutsche Übersetzung</h4>
+                                    
+                                    <div class="mb-3">
+                                        <label for="title_de" class="form-label">Titel (DE) *</label>
+                                        <input type="text" class="form-control" id="title_de" name="title_de" 
+                                               value="<%= post && post.title_de ? post.title_de : '' %>" required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="excerpt_de" class="form-label">Kurzbeschreibung (DE)</label>
+                                        <textarea class="form-control" id="excerpt_de" name="excerpt_de" 
+                                                  rows="3"><%= post && post.excerpt_de ? post.excerpt_de : '' %></textarea>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="content_de" class="form-label">Inhalt (DE) *</label>
+                                        <textarea class="form-control" id="content_de" name="content_de" 
+                                                  rows="15"><%= post && post.content_de ? post.content_de : '' %></textarea>
+                                        <small class="form-text text-muted">
+                                            HTML-Tags werden unterstützt (z.B. &lt;p&gt;, &lt;h3&gt;, &lt;ul&gt;, &lt;strong&gt;)
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <!-- English Tab -->
+                                <div class="tab-pane fade" id="english" role="tabpanel" tabindex="0">
+                                    <h4 class="mb-3">English Translation</h4>
+                                    
+                                    <div class="mb-3">
+                                        <label for="title_en" class="form-label">Title (EN)</label>
+                                        <input type="text" class="form-control" id="title_en" name="title_en" 
+                                               value="<%= post && post.title_en ? post.title_en : '' %>">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="excerpt_en" class="form-label">Excerpt (EN)</label>
+                                        <textarea class="form-control" id="excerpt_en" name="excerpt_en" 
+                                                  rows="3"><%= post && post.excerpt_en ? post.excerpt_en : '' %></textarea>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="content_en" class="form-label">Content (EN)</label>
+                                        <textarea class="form-control" id="content_en" name="content_en" 
+                                                  rows="15"><%= post && post.content_en ? post.content_en : '' %></textarea>
+                                        <small class="form-text text-muted">
+                                            HTML tags are supported (e.g. &lt;p&gt;, &lt;h3&gt;, &lt;ul&gt;, &lt;strong&gt;)
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <!-- Metadata Tab -->
+                                <div class="tab-pane fade" id="metadata" role="tabpanel" tabindex="0">
+                                    <h4 class="mb-3">Blog-Einstellungen</h4>
+                                    
+                                    <div class="mb-3">
+                                        <label for="slug" class="form-label">Slug</label>
+                                        <input type="text" class="form-control" id="slug" name="slug" 
+                                               value="<%= post && post.slug ? post.slug : '' %>"
+                                               placeholder="wird automatisch generiert">
+                                        <small class="form-text text-muted">
+                                            URL-freundlicher Name (z.B. "counter-strike-2-tipps"). Leer lassen für Auto-Generierung.
+                                        </small>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="author" class="form-label">Autor *</label>
+                                        <input type="text" class="form-control" id="author" name="author" 
+                                               value="<%= post && post.author ? post.author : (user && (user.username || (user.info && user.info.username)) ? (user.username || user.info.username) : 'Admin') %>" 
+                                               required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="image_url" class="form-label">Titelbild URL</label>
+                                        <input type="text" class="form-control" id="image_url" name="image_url" 
+                                               value="<%= post && post.image_url ? post.image_url : '' %>"
+                                               placeholder="/images/blog/mein-bild.jpg oder https://...">
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="category" class="form-label">Kategorie</label>
+                                                <select class="form-select" id="category" name="category">
+                                                    <% const cats = ['gaming', 'updates', 'tutorials', 'community', 'esports', 'reviews', 'other']; %>
+                                                    <% cats.forEach(c => { %>
+                                                        <option value="<%= c %>" <%= post && post.category === c ? 'selected' : (c === 'gaming' && (!post || !post.category) ? 'selected' : '') %>>
+                                                            <%= c.charAt(0).toUpperCase() + c.slice(1) %>
+                                                        </option>
+                                                    <% }); %>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="tags" class="form-label">Tags</label>
+                                                <input type="text" class="form-control" id="tags" name="tags" 
+                                                       value="<%= post && post.tags ? post.tags : '' %>"
+                                                       placeholder="cs2, gaming, tipps (kommagetrennt)">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="status" class="form-label">Status *</label>
+                                                <select class="form-select" id="status" name="status" required>
+                                                    <option value="draft" <%= post && post.status === 'draft' ? 'selected' : (!post ? 'selected' : '') %>>
+                                                        📝 Entwurf
+                                                    </option>
+                                                    <option value="published" <%= post && post.status === 'published' ? 'selected' : '' %>>
+                                                        ✅ Veröffentlicht
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="published_at" class="form-label">Veröffentlichungsdatum</label>
+                                                <input type="datetime-local" class="form-control" id="published_at" name="published_at" 
+                                                       value="<%= post && post.published_at ? new Date(post.published_at).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16) %>">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                                <a href="<%= _backUrl %>" class="btn btn-secondary">
+                                    Abbrechen
+                                </a>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fa-solid fa-save me-2"></i>Speichern
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TinyMCE WYSIWYG Editor -->
+<script src="/themes/default/assets/vendor/tinymce/tinymce.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    tinymce.init({
+        selector: '#content_de, #content_en, #excerpt_de, #excerpt_en',
+        height: 500,
+        menubar: true,
+        plugins: [
+            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+            'insertdatetime', 'media', 'table', 'help', 'wordcount'
+        ],
+        toolbar: 'undo redo | blocks | ' +
+            'bold italic forecolor | alignleft aligncenter ' +
+            'alignright alignjustify | bullist numlist outdent indent | ' +
+            'link image | removeformat | help',
+        content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
+        branding: false,
+        promotion: false,
+        license_key: 'gpl',
+        images_upload_url: '/upload/image',
+        automatic_uploads: false,
+        block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Blockquote=blockquote'
+    });
+});
+</script>
+
+<script>
+// Tab switching
+document.addEventListener('DOMContentLoaded', function() {
+    const tabLinks = document.querySelectorAll('#blogLanguageTabs a[data-bs-toggle="tab"]');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    function showTab(targetId, clickedLink) {
+        tabPanes.forEach(pane => pane.classList.remove('show', 'active'));
+        tabLinks.forEach(link => link.classList.remove('active'));
+        const target = document.querySelector(targetId);
+        if (target) {
+            target.classList.add('show', 'active');
+        }
+        if (clickedLink) clickedLink.classList.add('active');
+    }
+
+    tabLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('data-bs-target') || this.getAttribute('href');
+            showTab(targetId, this);
+        });
+    });
+});
+</script>

@@ -43,6 +43,13 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link <%= activeTab === 'blog' ? 'active' : '' %>"
+                           href="/admin/content?tab=blog" data-tab="blog">
+                            <i class="fas fa-blog mr-1"></i> Blog
+                            <span class="badge badge-info ml-1"><%= blogPosts ? blogPosts.length : 0 %></span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link <%= activeTab === 'changelogs' ? 'active' : '' %>"
                            href="/admin/content?tab=changelogs" data-tab="changelogs">
                             <i class="fas fa-code-branch mr-1"></i> Changelogs
@@ -129,6 +136,71 @@
                             <p>Noch keine News vorhanden.</p>
                             <a href="/admin/content/news/new" class="btn btn-primary">
                                 <i class="fas fa-plus mr-1"></i> Erste News erstellen
+                            </a>
+                        </div>
+                        <% } %>
+                    </div>
+
+                    <%# ====== BLOG TAB ====== %>
+                    <div class="tab-pane fade <%= activeTab === 'blog' ? 'show active' : '' %>" id="tab-blog">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="mb-0">Blog Verwalten</h4>
+                            <a href="/admin/content/blog/new" class="btn btn-primary btn-sm">
+                                <i class="fas fa-plus mr-1"></i> Neuer Blog-Post
+                            </a>
+                        </div>
+
+                        <% if (blogPosts && blogPosts.length > 0) { %>
+                        <table class="table table-striped table-hover table-sm">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Titel</th>
+                                    <th>Kategorie</th>
+                                    <th>Status</th>
+                                    <th>Autor</th>
+                                    <th>Datum</th>
+                                    <th style="width:100px">Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <% blogPosts.forEach((p, i) => { %>
+                                <tr>
+                                    <td><%= i + 1 %></td>
+                                    <td>
+                                        <strong><%= p.title || 'Ohne Titel' %></strong>
+                                        <% if (p.slug) { %>
+                                            <br><small class="text-muted">/blog/<%= p.slug %></small>
+                                        <% } %>
+                                    </td>
+                                    <td><span class="badge badge-secondary"><%= p.category || 'gaming' %></span></td>
+                                    <td>
+                                        <span class="badge badge-<%= p.status === 'published' ? 'success' : 'warning' %>">
+                                            <%= p.status || 'draft' %>
+                                        </span>
+                                    </td>
+                                    <td><%= p.author || '—' %></td>
+                                    <td><%= p.formattedDate %></td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/admin/content/blog/edit/<%= p.id %>" class="btn btn-info" title="Bearbeiten">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button class="btn btn-danger" onclick="deleteContent('blog', '<%= p.id %>')" title="Löschen">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                            </tbody>
+                        </table>
+                        <% } else { %>
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-blog fa-3x mb-3"></i>
+                            <p>Noch keine Blog-Posts vorhanden.</p>
+                            <a href="/admin/content/blog/new" class="btn btn-primary">
+                                <i class="fas fa-plus mr-1"></i> Ersten Blog-Post erstellen
                             </a>
                         </div>
                         <% } %>

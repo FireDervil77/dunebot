@@ -200,6 +200,92 @@ router.get('/changelogs/:version', getChangelogDetails);
 router.get('/privacy', frontendController.privacy);
 router.get('/tos', frontendController.tos);
 
+// ── Blog: /blog und /blog/:slug ──
+router.get('/blog', async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+
+    try {
+        const userLocale = res.locals.locale || 'de-DE';
+        const category = req.query.category || null;
+
+        let query = "SELECT * FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC";
+        let params = [];
+        if (category) {
+            query = "SELECT * FROM blog_posts WHERE status = 'published' AND category = ? ORDER BY published_at DESC";
+            params = [category];
+        }
+
+        const rawPosts = await dbService.query(query, params);
+        const blogPosts = rawPosts.map(p => {
+            const titles = typeof p.title_translations === 'string' ? JSON.parse(p.title_translations) : (p.title_translations || {});
+            const excerpts = typeof p.excerpt_translations === 'string' ? JSON.parse(p.excerpt_translations) : (p.excerpt_translations || {});
+            return {
+                ...p,
+                title: titles[userLocale] || titles['de-DE'] || '',
+                excerpt: excerpts[userLocale] || excerpts['de-DE'] || '',
+                formattedDate: p.published_at
+                    ? new Date(p.published_at).toLocaleString(userLocale, { year: 'numeric', month: 'long', day: 'numeric' })
+                    : '—'
+            };
+        });
+
+        res.locals.layout = themeManager.getLayout('frontend');
+        res.render('frontend/blog', {
+            blogPosts,
+            currentCategory: category,
+            currentLocale: userLocale,
+            title: 'Blog'
+        });
+    } catch (err) {
+        Logger.error('[Frontend/Blog] Fehler:', err);
+        res.status(500).render('frontend/500');
+    }
+});
+
+router.get('/blog/:slug', async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+
+    try {
+        const [rawPost] = await dbService.query(
+            "SELECT * FROM blog_posts WHERE slug = ? AND status = 'published'",
+            [req.params.slug]
+        );
+
+        if (!rawPost) {
+            return res.status(404).render('frontend/404');
+        }
+
+        const userLocale = res.locals.locale || 'de-DE';
+        const titles = typeof rawPost.title_translations === 'string' ? JSON.parse(rawPost.title_translations) : (rawPost.title_translations || {});
+        const contents = typeof rawPost.content_translations === 'string' ? JSON.parse(rawPost.content_translations) : (rawPost.content_translations || {});
+        const excerpts = typeof rawPost.excerpt_translations === 'string' ? JSON.parse(rawPost.excerpt_translations) : (rawPost.excerpt_translations || {});
+
+        const post = {
+            ...rawPost,
+            title: titles[userLocale] || titles['de-DE'] || '',
+            content: contents[userLocale] || contents['de-DE'] || '',
+            excerpt: excerpts[userLocale] || excerpts['de-DE'] || '',
+            formattedDate: rawPost.published_at
+                ? new Date(rawPost.published_at).toLocaleString(userLocale, { year: 'numeric', month: 'long', day: 'numeric' })
+                : '—'
+        };
+
+        res.locals.layout = themeManager.getLayout('frontend');
+        res.render('frontend/blog-detail', {
+            post,
+            title: post.title,
+            currentLocale: userLocale
+        });
+    } catch (err) {
+        Logger.error('[Frontend/Blog] Fehler:', err);
+        res.status(500).render('frontend/500');
+    }
+});
+
 // ── CMS-Seiten: /page/:slug ──
 router.get('/page/:slug', async (req, res) => {
     const Logger = ServiceManager.get('Logger');

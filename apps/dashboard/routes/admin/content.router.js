@@ -50,6 +50,21 @@ async function loadHubData(dbService, userLocale) {
         })
     }));
 
+    // Blog Posts
+    const rawBlogPosts = await dbService.query('SELECT * FROM blog_posts ORDER BY published_at DESC, created_at DESC');
+    const blogPosts = rawBlogPosts.map(p => {
+        const titles = typeof p.title_translations === 'string' ? JSON.parse(p.title_translations) : (p.title_translations || {});
+        const excerpts = typeof p.excerpt_translations === 'string' ? JSON.parse(p.excerpt_translations) : (p.excerpt_translations || {});
+        return {
+            ...p,
+            title: titles[userLocale] || titles['de-DE'] || '',
+            excerpt: excerpts[userLocale] || excerpts['de-DE'] || '',
+            formattedDate: p.published_at
+                ? new Date(p.published_at).toLocaleString(userLocale, { year: 'numeric', month: 'long', day: 'numeric' })
+                : '—'
+        };
+    });
+
     // Changelogs
     const rawChangelogs = await dbService.query('SELECT * FROM changelogs ORDER BY release_date DESC');
     const changelogsList = ChangelogHelper.getLocalizedChangelogList(rawChangelogs, userLocale).map(c => ({
@@ -75,7 +90,7 @@ async function loadHubData(dbService, userLocale) {
         channelConfig[cat] = row ? (() => { try { return JSON.parse(row.value); } catch { return {}; } })() : {};
     }
 
-    return { newsList, changelogsList, notifications, channelConfig };
+    return { newsList, blogPosts, changelogsList, notifications, channelConfig };
 }
 
 // ================================================================
@@ -98,6 +113,7 @@ router.get('/', async (req, res) => {
             activeTab,
             currentLocale: userLocale,
             newsList: data.newsList,
+            blogPosts: data.blogPosts,
             changelogsList: data.changelogsList,
             notifications: data.notifications,
             channelConfig: data.channelConfig,
@@ -763,6 +779,109 @@ router.post('/changelogs/delete/:id', async (req, res) => {
         res.json({ success: true, message: 'Changelog erfolgreich gelöscht' });
     } catch (error) {
         Logger.error('[Content] Fehler beim Löschen des Changelogs:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ================================================================
+// BLOG: Create / Edit Views
+// ================================================================
+
+router.get('/blog/new', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    await themeManager.renderView(res, 'admin/blog-edit', {
+        title: 'Neuen Blog-Post erstellen',
+        activeMenu: '/admin/content',
+        backUrl: '/admin/content?tab=blog',
+        post: null
+    });
+});
+
+router.get('/blog/edit/:id', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    const dbService = ServiceManager.get('dbService');
+
+    const [post] = await dbService.query('SELECT * FROM blog_posts WHERE id = ?', [req.params.id]);
+    if (!post) {
+        return res.status(404).render('error', { message: 'Blog-Post nicht gefunden', error: { status: 404 } });
+    }
+
+    const titles = typeof post.title_translations === 'string' ? JSON.parse(post.title_translations) : (post.title_translations || {});
+    const contents = typeof post.content_translations === 'string' ? JSON.parse(post.content_translations) : (post.content_translations || {});
+    const excerpts = typeof post.excerpt_translations === 'string' ? JSON.parse(post.excerpt_translations) : (post.excerpt_translations || {});
+
+    post.title_de = titles['de-DE'] || '';
+    post.title_en = titles['en-GB'] || '';
+    post.content_de = contents['de-DE'] || '';
+    post.content_en = contents['en-GB'] || '';
+    post.excerpt_de = excerpts['de-DE'] || '';
+    post.excerpt_en = excerpts['en-GB'] || '';
+
+    await themeManager.renderView(res, 'admin/blog-edit', {
+        title: 'Blog-Post bearbeiten',
+        activeMenu: '/admin/content',
+        backUrl: '/admin/content?tab=blog',
+        post
+    });
+});
+
+// ================================================================
+// BLOG: Save (Create / Update)
+// ================================================================
+
+router.post('/blog/save', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const { postId, title_de, title_en, excerpt_de, excerpt_en,
+            content_de, content_en, slug, author, image_url, category, tags, status, published_at } = req.body;
+
+    try {
+        const titleTranslations = JSON.stringify({ 'de-DE': title_de || '', 'en-GB': title_en || '' });
+        const contentTranslations = JSON.stringify({ 'de-DE': content_de || '', 'en-GB': content_en || '' });
+        const excerptTranslations = JSON.stringify({ 'de-DE': excerpt_de || '', 'en-GB': excerpt_en || '' });
+
+        // Slug auto-generieren falls leer
+        const finalSlug = slug || (title_de || 'post').toLowerCase()
+            .replace(/[äÄ]/g, 'ae').replace(/[öÖ]/g, 'oe').replace(/[üÜ]/g, 'ue').replace(/ß/g, 'ss')
+            .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+        if (postId) {
+            await dbService.query(`
+                UPDATE blog_posts SET title_translations=?, content_translations=?, excerpt_translations=?,
+                slug=?, author=?, image_url=?, category=?, tags=?, status=?, published_at=?, updated_at=NOW()
+                WHERE id=?
+            `, [titleTranslations, contentTranslations, excerptTranslations,
+                finalSlug, author || 'Admin', image_url || null, category || 'gaming',
+                tags || null, status || 'draft', published_at || null, postId]);
+        } else {
+            await dbService.query(`
+                INSERT INTO blog_posts (title_translations, content_translations, excerpt_translations,
+                slug, author, image_url, category, tags, status, published_at, created_at, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),NOW())
+            `, [titleTranslations, contentTranslations, excerptTranslations,
+                finalSlug, author || 'Admin', image_url || null, category || 'gaming',
+                tags || null, status || 'draft', published_at || null]);
+        }
+
+        res.json({ success: true, message: postId ? 'Blog-Post aktualisiert' : 'Blog-Post erstellt' });
+    } catch (error) {
+        Logger.error('[Content] Fehler beim Speichern des Blog-Posts:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ================================================================
+// BLOG: Delete
+// ================================================================
+
+router.post('/blog/delete/:id', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        await dbService.query('DELETE FROM blog_posts WHERE id = ?', [req.params.id]);
+        res.json({ success: true, message: 'Blog-Post erfolgreich gelöscht' });
+    } catch (error) {
+        Logger.error('[Content] Fehler beim Löschen des Blog-Posts:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
