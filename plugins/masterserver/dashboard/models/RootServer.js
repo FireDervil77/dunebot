@@ -31,19 +31,21 @@ class RootServer {
 
         const result = await dbService.query(
             `INSERT INTO rootserver
-             (daemon_id, guild_id, owner_user_id, name, description, host,
+             (daemon_id, guild_id, owner_user_id, name, description, hostname, host,
               daemon_port, base_directory, api_key,
               daemon_status, install_status,
               cpu_cores, ram_total_gb, disk_total_gb,
               datacenter, country_code,
+              fqdn, fastdl_enabled, fastdl_url,
               created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, NOW(), NOW())`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
             [
                 daemonId,
                 data.guildId,
                 data.ownerUserId   || null,
                 data.name,
                 data.description   || null,
+                data.hostname      || null,
                 data.host,
                 data.daemonPort    || 9340,
                 data.baseDirectory || '/opt/firebot',
@@ -52,7 +54,10 @@ class RootServer {
                 data.ramTotalGb    || null,
                 data.diskTotalGb   || null,
                 data.datacenter    || null,
-                data.countryCode   || null
+                data.countryCode   || null,
+                data.fqdn          || null,
+                data.fastdlEnabled ? 1 : 0,
+                data.fastdlUrl     || null
             ]
         );
 
@@ -115,7 +120,8 @@ class RootServer {
             'daemon_port', 'base_directory',
             'ram_total_gb', 'disk_total_gb', 'cpu_cores', 'cpu_threads', 'cpu_model',
             'ram_limit_gb', 'disk_limit_gb', 'cpu_limit_percent',
-            'datacenter', 'country_code'
+            'datacenter', 'country_code',
+            'fqdn', 'fastdl_enabled', 'fastdl_url'
         ];
         const fields = [];
         const values = [];

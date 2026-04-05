@@ -1448,8 +1448,8 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             );
             Logger.info(`[Gameserver] SFTP-Username korrigiert für Server ${server.id} → ${server.sftp_username}`);
         }
-        // SFTP-Verbindungsinfo anfügen
-        server.sftp_host = server.rootserver_hostname || server.rootserver_ip || 'N/A';
+        // SFTP-Verbindungsinfo anfügen (IP bevorzugen – Hostname ist oft nicht konfiguriert)
+        server.sftp_host = server.rootserver_ip || server.rootserver_hostname || 'N/A';
         server.sftp_port = 2022;
 
         Logger.success(`[Gameserver] Server ${server.name} (${server.id}) geladen für Detail-View`);

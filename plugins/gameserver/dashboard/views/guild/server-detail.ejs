@@ -662,8 +662,54 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Optional: Resource-Updates für spätere Erweiterung
-    // sse.on('resource_usage', (msg) => { /* CPU/RAM in Header anzeigen */ });
+    // Resource-Metrics live updaten (CPU, RAM)
+    sse.on('server_stats', (msg) => {
+        if (msg.server_id !== String(serverId) && msg.server_id !== serverId) return;
+
+        // CPU
+        const cpuText = document.querySelector('[data-metric-cpu-text]');
+        const cpuBar = document.querySelector('[data-metric-cpu-bar]');
+        if (cpuText && msg.cpu_percent != null) {
+            const cpu = parseFloat(msg.cpu_percent);
+            cpuText.textContent = cpu.toFixed(1) + '%';
+            if (cpuBar) {
+                cpuBar.style.width = cpu + '%';
+                cpuBar.textContent = cpu.toFixed(1) + '%';
+                cpuBar.className = 'progress-bar ' + (cpu > 80 ? 'bg-danger' : cpu > 50 ? 'bg-warning' : 'bg-success');
+            }
+        }
+
+        // RAM
+        const ramText = document.querySelector('[data-metric-ram-text]');
+        const ramBar = document.querySelector('[data-metric-ram-bar]');
+        if (ramText && msg.ram_used_mb != null && msg.ram_total_mb) {
+            ramText.textContent = msg.ram_used_mb + ' / ' + msg.ram_total_mb + ' MB';
+            if (ramBar) {
+                const ramPct = (msg.ram_total_mb > 0) ? (msg.ram_used_mb / msg.ram_total_mb) * 100 : 0;
+                ramBar.style.width = ramPct + '%';
+                ramBar.textContent = ramPct.toFixed(1) + '%';
+                ramBar.className = 'progress-bar ' + (ramPct > 80 ? 'bg-danger' : ramPct > 50 ? 'bg-warning' : 'bg-info');
+            }
+        }
+
+        // Players (optional, falls im gleichen Event)
+        if (msg.current_players != null) {
+            const playersEl = document.querySelector('[data-current-players]');
+            if (playersEl) {
+                playersEl.textContent = msg.current_players + ' / ' + (msg.max_players || '?');
+            }
+            const playersBar = document.querySelector('[data-players-bar]');
+            if (playersBar && msg.max_players > 0) {
+                const pct = (msg.current_players / msg.max_players) * 100;
+                playersBar.style.width = pct + '%';
+                playersBar.textContent = pct.toFixed(0) + '%';
+            }
+        }
+
+        // Live-Badge anzeigen
+        const liveBadge = document.getElementById('metrics-live-badge');
+        if (liveBadge) liveBadge.style.display = '';
+    });
 
     sse.connect();
     window.addEventListener('beforeunload', () => sse.disconnect());

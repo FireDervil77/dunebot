@@ -179,7 +179,8 @@ router.post('/', async (req, res) => {
             cpuCores, ramTotal, diskTotal,
             quotaProfileId,
             backupLimit, mysqlEnabled, mysqlDbLimit, webDomain,
-            datacenter, countryCode
+            datacenter, countryCode,
+            fqdn, fastdlEnabled, fastdlUrl
         } = req.body;
 
         // Validierung
@@ -207,6 +208,10 @@ router.post('/', async (req, res) => {
             systemUser,
             baseDirectory,
             description: description || null,
+            hostname: hostname || null,
+            fqdn: fqdn || null,
+            fastdlEnabled: fastdlEnabled === 'true' || fastdlEnabled === true,
+            fastdlUrl: fastdlUrl || null,
             // Hardware-Specs (CPU optional, wird vom Daemon auto-detected)
             cpuCores: cpuCores ? parseFloat(cpuCores) : null,
             cpuThreads: null, // Auto-detected

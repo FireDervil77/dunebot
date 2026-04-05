@@ -134,6 +134,16 @@ class GameserverSSEClient {
                 this.disconnect();
             });
 
+            // Metrics-Event (CPU, RAM, Players pro Gameserver)
+            this.eventSource.addEventListener('metrics', (e) => {
+                try {
+                    const message = JSON.parse(e.data);
+                    this._handleEvent(message);
+                } catch (error) {
+                    console.error('[GameserverSSE] Fehler beim Parsen der Metrics-Message:', error);
+                }
+            });
+
             // Error-Handler
             this.eventSource.onerror = (error) => {
                 console.error('[GameserverSSE] Connection error:', error);

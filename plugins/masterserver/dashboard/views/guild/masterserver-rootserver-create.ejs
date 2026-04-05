@@ -85,7 +85,43 @@
                                        id="hostname"
                                        name="hostname"
                                        placeholder="z.B. node1.example.com">
-                                <small class="form-text text-muted">Öffentlicher FQDN (nur zur Anzeige)</small>
+                                <small class="form-text text-muted">Öffentlicher Hostname (nur zur Anzeige)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="fqdn">FQDN (optional)</label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="fqdn"
+                                       name="fqdn"
+                                       placeholder="z.B. node1.firenetworks.de">
+                                <small class="form-text text-muted">Vollqualifizierter Domainname (DNS muss auf die IP zeigen)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="fastdlEnabled">FastDL</label>
+                                <div class="custom-control custom-switch mt-2">
+                                    <input type="checkbox" class="custom-control-input" id="fastdlEnabled" name="fastdlEnabled" value="true">
+                                    <label class="custom-control-label" for="fastdlEnabled">FastDL aktivieren</label>
+                                </div>
+                                <small class="form-text text-muted">Stellt Downloads über HTTP bereit (benötigt Nginx)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row" id="fastdlUrlRow" style="display: none;">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="fastdlUrl">FastDL Base-URL</label>
+                                <input type="url"
+                                       class="form-control"
+                                       id="fastdlUrl"
+                                       name="fastdlUrl"
+                                       placeholder="z.B. https://fastdl.firenetworks.de">
+                                <small class="form-text text-muted">Base-URL für FastDL-Downloads (ohne abschließenden /)</small>
                             </div>
                         </div>
                     </div>
@@ -371,4 +407,9 @@ function copyFieldValue(id) {
     el.style.borderColor = '#28a745';
     setTimeout(() => { el.style.borderColor = orig; }, 800);
 }
+
+// FastDL Toggle: URL-Feld ein-/ausblenden
+document.getElementById('fastdlEnabled').addEventListener('change', function() {
+    document.getElementById('fastdlUrlRow').style.display = this.checked ? '' : 'none';
+});
 </script>

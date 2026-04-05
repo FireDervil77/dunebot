@@ -313,6 +313,61 @@ async function savePorts() {
         <% } %>
 
         <!-- ========================================
+             RESOURCE METRICS (CPU / RAM – immer bei online)
+             ======================================== -->
+        <% if (server.status === 'online') { %>
+            <div class="card mt-3" id="metrics-card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Ressourcen
+                    </h3>
+                    <span class="badge bg-secondary float-end" id="metrics-live-badge" style="display:none">
+                        <i class="fas fa-circle text-success me-1" style="font-size:0.6em"></i>Live
+                    </span>
+                </div>
+                <div class="card-body">
+                    <!-- CPU -->
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span><i class="fas fa-microchip me-1"></i> CPU:</span>
+                        <strong data-metric-cpu-text>
+                            <%= server.cpu_percent != null ? server.cpu_percent.toFixed(1) + '%' : '–' %>
+                        </strong>
+                    </div>
+                    <div class="progress mb-3" style="height: 20px;">
+                        <% const cpuPct = server.cpu_percent || 0; %>
+                        <div class="progress-bar <%= cpuPct > 80 ? 'bg-danger' : cpuPct > 50 ? 'bg-warning' : 'bg-success' %>" 
+                             role="progressbar" 
+                             style="width: <%= cpuPct %>%"
+                             data-metric-cpu-bar>
+                            <%= cpuPct.toFixed(1) %>%
+                        </div>
+                    </div>
+                    <!-- RAM -->
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span><i class="fas fa-memory me-1"></i> RAM:</span>
+                        <strong data-metric-ram-text>
+                            <% if (server.ram_used_mb != null && server.ram_total_mb) { %>
+                                <%= server.ram_used_mb %> / <%= server.ram_total_mb %> MB
+                            <% } else { %>
+                                –
+                            <% } %>
+                        </strong>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <% const ramPct = (server.ram_total_mb > 0) ? (server.ram_used_mb / server.ram_total_mb) * 100 : 0; %>
+                        <div class="progress-bar <%= ramPct > 80 ? 'bg-danger' : ramPct > 50 ? 'bg-warning' : 'bg-info' %>" 
+                             role="progressbar" 
+                             style="width: <%= ramPct %>%"
+                             data-metric-ram-bar>
+                            <%= ramPct.toFixed(1) %>%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <% } %>
+
+        <!-- ========================================
              LIVE-QUERY (GameDig – nur wenn Addon Query unterstützt)
              ======================================== -->
         <% if (server.status === 'online' && server.gamedig_type) { %>

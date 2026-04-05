@@ -19,6 +19,10 @@
                             <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
                                 <i class="fas fa-upload me-1"></i> Hochladen
                             </button>
+                            <!-- Neue Datei -->
+                            <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#createFileModal">
+                                <i class="fas fa-file-plus me-1"></i> Neue Datei
+                            </button>
                             <!-- Neuer Ordner -->
                             <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#mkdirModal">
                                 <i class="fas fa-folder-plus me-1"></i> Neuer Ordner
@@ -330,6 +334,35 @@
     </div>
 </div>
 
+<!-- Create File Modal -->
+<div class="modal fade" id="createFileModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Neue Datei erstellen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="createFileForm">
+                <div class="modal-body">
+                    <label class="form-label">Dateiname:</label>
+                    <input type="text" name="filename" class="form-control" placeholder="z.B. config.cfg" required pattern="[a-zA-Z0-9_\-\.]+">
+                    <input type="hidden" name="path" value="<%= currentPath %>">
+                    <div class="form-text">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Nur Buchstaben, Zahlen, _ , - und . erlaubt
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-info">
+                        <i class="fas fa-file-plus me-1"></i> Erstellen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Rename Modal -->
 <div class="modal fade" id="renameModal" tabindex="-1">
     <div class="modal-dialog">
@@ -447,6 +480,37 @@ document.getElementById('mkdirForm').addEventListener('submit', async (e) => {
         }
     } catch (error) {
         console.error('Mkdir-Fehler:', error);
+        showToast('error', 'Netzwerkfehler beim Erstellen');
+    }
+});
+
+// Create-File-Handling (AJAX)
+document.getElementById('createFileForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const basePath = formData.get('path') || '/';
+    const filename = formData.get('filename');
+    const filePath = basePath === '/' ? '/' + filename : basePath + '/' + filename;
+    
+    try {
+        const response = await fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/files/write`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                path: filePath,
+                content: btoa('')  // Leere Datei (Base64)
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showToast('success', result.message || 'Datei erstellt');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('error', result.message);
+        }
+    } catch (error) {
+        console.error('Create-File-Fehler:', error);
         showToast('error', 'Netzwerkfehler beim Erstellen');
     }
 });
