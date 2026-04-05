@@ -349,15 +349,15 @@ router.get('/:id', async (req, res) => {
         // Gameserver-Statistiken und Liste für diesen RootServer laden
         const dbService = ServiceManager.get('dbService');
         const gameservers = await dbService.query(
-            `SELECT sr.server_id, sr.server_name, sr.server_type, sr.status,
-                    sr.current_players, sr.cpu_percent, sr.ram_used_mb, sr.ram_total_mb,
-                    sr.last_heartbeat,
-                    gs.name AS display_name, gs.template_name AS game_name, gs.max_players
-             FROM server_registry sr
-             LEFT JOIN gameservers gs ON gs.id = sr.server_id
-             WHERE sr.daemon_id = ?
-             ORDER BY sr.server_name ASC`,
-            [rootserver.daemon_id]
+            `SELECT gs.id AS server_id, gs.name AS server_name, gs.name AS display_name,
+                    gs.template_name AS game_name, gs.status,
+                    gs.current_players, gs.max_players,
+                    sr.cpu_percent, sr.ram_used_mb, sr.ram_total_mb, sr.last_heartbeat
+             FROM gameservers gs
+             LEFT JOIN server_registry sr ON sr.server_id = gs.id AND sr.daemon_id = ?
+             WHERE gs.rootserver_id = ?
+             ORDER BY gs.name ASC`,
+            [rootserver.daemon_id, rootserverId]
         );
 
         const gameserverStats = {
