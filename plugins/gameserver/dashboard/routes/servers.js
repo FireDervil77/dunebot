@@ -605,7 +605,7 @@ router.post('/', async (req, res) => {
 				script_content:  scriptRaw,                    // Install-Script (LF-normalisiert)
             };
         }
-        // 2b. DuneBot-Native-Format: installation.script → script_content
+        // 2b. FireBot-Native-Format: installation.script → script_content
         // (Valheim, eigene Addons nutzen 'script' statt 'script_content')
         if (gameData.installation?.script && !gameData.installation?.script_content) {
             gameData.installation = {

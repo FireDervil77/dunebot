@@ -1,7 +1,7 @@
 {
     "name": "dunebot-sdk",
     "version": "0.1.0-beta",
-    "description": "A plugin SDK for the dunebot discord bot",
+    "description": "A plugin SDK for the FireBot discord bot",
     "main": "index.js",
     "types": "typings/index.d.ts",
     "scripts": {},

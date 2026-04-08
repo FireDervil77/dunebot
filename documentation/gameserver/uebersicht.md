@@ -1,13 +1,13 @@
 # Gameserver — Übersicht
 
-DuneBot bietet ein integriertes Gameserver-Management-System, mit dem du Spielserver direkt aus Discord oder dem Dashboard heraus erstellen und verwalten kannst.
+FireBot bietet ein integriertes Gameserver-Management-System, mit dem du Spielserver direkt aus Discord oder dem Dashboard heraus erstellen und verwalten kannst.
 
 ## Wie funktioniert es?
 
 Das System besteht aus drei Komponenten:
 
 ```
-Discord/Dashboard  ←→  DuneBot (Masterserver-Plugin)  ←→  FireBot Daemon (auf dem Server)
+Discord/Dashboard  ←→  FireBot (Masterserver-Plugin)  ←→  FireBot Daemon (auf dem Server)
 ```
 
 1. **Masterserver-Plugin** — Die zentrale Schnittstelle im Dashboard. Verwaltet die Verbindung zu deiner Hardware.
@@ -16,7 +16,7 @@ Discord/Dashboard  ←→  DuneBot (Masterserver-Plugin)  ←→  FireBot Daemon
 
 ## Was du brauchst
 
-- **DuneBot** auf deinem Discord-Server (mit Masterserver- und Gameserver-Plugin)
+- **FireBot** auf deinem Discord-Server (mit Masterserver- und Gameserver-Plugin)
 - **Einen Root-Server oder VServer** mit Linux (Ubuntu/Debian empfohlen)
 - **FireBot Daemon** auf dem Root-Server installiert
 

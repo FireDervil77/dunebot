@@ -4,7 +4,7 @@ const { Logger } = require("dunebot-sdk/utils");
 const path = require("path");
 
 /**
- * DuneBot Sharding-Manager
+ * FireBot Sharding-Manager
  * Verwaltet mehrere Bot-Instanzen für große Discord-Bots
  * 
  * @author FireBot Team
@@ -19,7 +19,7 @@ Logger.init(path.join(logsDir, logsFile), {
 });
 
 
-Logger.info("=== DuneBot Shard-Manager startet ===");
+Logger.info("=== FireBot Shard-Manager startet ===");
 Logger.info(`Version: ${process.env.BOT_VERSION || '1.0.0'}`);
 Logger.info(`Umgebung: ${process.env.NODE_ENV || 'development'}`);
 Logger.info(`Log-Level: ${process.env.LOG_LEVEL || 'info'}`);

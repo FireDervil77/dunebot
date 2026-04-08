@@ -472,7 +472,7 @@ class IPCServer {
                             script_content: (si.script || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
                         };
                     }
-                    // 2b. DuneBot-Native-Format: installation.script → script_content
+                    // 2b. FireBot-Native-Format: installation.script → script_content
                     // (Valheim, eigene Addons nutzen 'script' statt 'script_content')
                     if (gameData.installation?.script && !gameData.installation?.script_content) {
                         gameData.installation = {

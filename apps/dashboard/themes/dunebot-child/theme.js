@@ -1,5 +1,5 @@
 /**
- * DuneBot-Chlid — Child-Theme von default
+ * FireBot-Child — Child-Theme von default
  * 
  * Überschreibe hier Hooks, registriere Assets oder
  * passe das Verhalten des Parent-Themes an.

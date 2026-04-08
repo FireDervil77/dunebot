@@ -1,7 +1,7 @@
 {
     "name": "dunebot-db-client",
     "version": "0.1.0-beta",
-    "description": "Database client for the dunebot discord bot",
+    "description": "Database client for the FireBot discord bot",
     "main": "index.js",
     "types": "index.d.ts",
     "scripts": {},

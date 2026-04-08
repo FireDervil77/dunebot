@@ -45,7 +45,7 @@ class PterodactylImporter {
     async fetch(url) {
         return new Promise((resolve, reject) => {
             const headers = {
-                'User-Agent': 'DuneBot-Pterodactyl-Importer/1.0'
+                'User-Agent': 'FireBot-Pterodactyl-Importer/1.0'
             };
             
             // GitHub Token aus .env wenn vorhanden

@@ -321,7 +321,7 @@
     },
     "INTEGRATIONS": {
         "TITLE": "Integrationen",
-        "NOTICE_TEXT": "Verbinde DuneBot mit externen Services und APIs.",
+        "NOTICE_TEXT": "Verbinde FireBot mit externen Services und APIs.",
         "WEBHOOK_TITLE": "Webhooks",
         "WEBHOOK_SUBTITLE": "Empfange externe Events",
         "WEBHOOK_DESC": "Konfiguriere Webhooks um externe Events in deinem Server zu empfangen.",

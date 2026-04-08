@@ -1,6 +1,6 @@
 # Daemon installieren
 
-Der FireBot Daemon ist das Programm, das auf deinem Root- oder VServer läuft und die tatsächlichen Gameserver ausführt. Er kommuniziert per WebSocket mit dem DuneBot-Dashboard.
+Der FireBot Daemon ist das Programm, das auf deinem Root- oder VServer läuft und die tatsächlichen Gameserver ausführt. Er kommuniziert per WebSocket mit dem FireBot-Dashboard.
 
 ## Voraussetzungen
 
@@ -8,7 +8,7 @@ Der FireBot Daemon ist das Programm, das auf deinem Root- oder VServer läuft un
 - **Root-Zugriff** auf den Server
 - **Mindestens 1 GB RAM** (zusätzlich zum RAM für die Gameserver selbst)
 - **Freier Speicherplatz** für Spieldateien (je nach Spiel 5–50 GB)
-- **DuneBot Dashboard** erreichbar (für die WebSocket-Verbindung)
+- **FireBot Dashboard** erreichbar (für die WebSocket-Verbindung)
 
 ## Installation
 
@@ -77,7 +77,7 @@ daemon:
   daemon_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # UUID aus dem Dashboard
   token: "dein-setup-token"                           # API-Key aus dem Dashboard
 
-# Verbindung zum DuneBot Dashboard (NICHT ÄNDERN!)
+# Verbindung zum FireBot Dashboard (NICHT ÄNDERN!)
 dashboard:
   url: "wss://firenetworks.de/ws"
 

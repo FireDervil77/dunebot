@@ -5,7 +5,7 @@
  * Referenzdatum: Montag, 23. Juni 2025
  * 
  * @module coriolisStormConfig
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 /**
@@ -123,7 +123,7 @@ const STORM_CYCLE_DAYS = 7; // 7 Tage = wöchentlich
  * @param {string} region - Region-Code (EU, NA, SA, AS, OCE)
  * @param {Date} [fromDate=new Date()] - Ausgangsdatum für Berechnung
  * @returns {Object} { nextStormStart: Date, nextStormEnd: Date, daysUntil, hoursUntil, minutesUntil, isActive }
- * @author DuneBot Team
+ * @author FireBot Team
  */
 function getNextStormTiming(region, fromDate = new Date()) {
     const config = STORM_TIMINGS[region];

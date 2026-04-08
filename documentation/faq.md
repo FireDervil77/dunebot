@@ -2,13 +2,13 @@
 
 ## Allgemein
 
-### Ist DuneBot kostenlos?
+### Ist FireBot kostenlos?
 
-Ja, DuneBot ist kostenlos nutzbar. Optionale Donations unterstützen die Weiterentwicklung.
+Ja, FireBot ist kostenlos nutzbar. Optionale Donations unterstützen die Weiterentwicklung.
 
-### Auf wie vielen Servern kann ich DuneBot nutzen?
+### Auf wie vielen Servern kann ich FireBot nutzen?
 
-Es gibt kein Limit — du kannst DuneBot auf beliebig vielen Servern einsetzen.
+Es gibt kein Limit — du kannst FireBot auf beliebig vielen Servern einsetzen.
 
 ### Welche Sprachen werden unterstützt?
 
@@ -26,7 +26,7 @@ Aktuell Deutsch (`de-DE`). Weitere Sprachen sind geplant.
 
 ### Ich sehe meinen Server nicht im Dashboard
 
-- DuneBot muss auf dem Server aktiv sein (Bot eingeladen)
+- FireBot muss auf dem Server aktiv sein (Bot eingeladen)
 - Du brauchst die nötigen Berechtigungen auf dem Server
 - Prüfe, ob du mit dem richtigen Discord-Account eingeloggt bist
 
@@ -40,7 +40,7 @@ Dein Admin muss dir die entsprechenden Berechtigungen über **Benutzer & Gruppen
 
 ### Bot reagiert nicht auf Befehle
 
-1. **Ist der Bot online?** — Prüfe, ob DuneBot in der Mitgliederliste als online angezeigt wird
+1. **Ist der Bot online?** — Prüfe, ob FireBot in der Mitgliederliste als online angezeigt wird
 2. **Slash-Commands aktiviert?** — Unter Einstellungen → Allgemein prüfen
 3. **Richtiger Prefix?** — Für Textbefehle: Ist der Prefix korrekt? (Standard: `!`)
 4. **Berechtigungen?** — Hat der Bot die nötigen Discord-Berechtigungen im Kanal?
@@ -48,7 +48,7 @@ Dein Admin muss dir die entsprechenden Berechtigungen über **Benutzer & Gruppen
 ### Slash-Commands werden nicht angezeigt
 
 - Discord braucht manchmal bis zu 1 Stunde, um neue Slash-Commands zu synchronisieren
-- Stelle sicher, dass DuneBot die Berechtigung `applications.commands` auf dem Server hat
+- Stelle sicher, dass FireBot die Berechtigung `applications.commands` auf dem Server hat
 - Versuche, Discord neu zu starten
 
 ### Bot ist offline
@@ -79,7 +79,7 @@ Nein. Die Daten bleiben in der Datenbank erhalten. Beim erneuten Aktivieren sind
 
 ### Brauche ich einen eigenen Server?
 
-Ja, für Gameserver brauchst du einen Root-Server oder VServer mit Linux. DuneBot selbst wird von uns gehostet — nur der FireBot Daemon muss auf deiner Hardware laufen.
+Ja, für Gameserver brauchst du einen Root-Server oder VServer mit Linux. FireBot selbst wird von uns gehostet — nur der FireBot Daemon muss auf deiner Hardware laufen.
 
 ### Welche Spiele werden unterstützt?
 

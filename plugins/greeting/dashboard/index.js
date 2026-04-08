@@ -3,7 +3,7 @@
  * Verwaltet Willkommens-/Verabschiedungs-Nachrichten und Autoroles
  * 
  * @module greeting/dashboard
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');

@@ -10,7 +10,7 @@ Nach dem Einladen des Bots kannst du direkt loslegen — hier erfährst du, wie 
 
 ## Server auswählen
 
-Nach dem Login siehst du eine Übersicht aller Server, auf denen DuneBot aktiv ist und auf denen du Berechtigungen hast. Klicke auf den Server, den du konfigurieren möchtest.
+Nach dem Login siehst du eine Übersicht aller Server, auf denen FireBot aktiv ist und auf denen du Berechtigungen hast. Klicke auf den Server, den du konfigurieren möchtest.
 
 ## Dashboard-Aufbau
 

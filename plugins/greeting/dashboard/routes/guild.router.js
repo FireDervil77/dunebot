@@ -3,7 +3,7 @@
  * Handles guild-specific greeting settings (Welcome, Farewell, Autorole)
  * 
  * @module greeting/dashboard/routes/guild
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 const express = require('express');

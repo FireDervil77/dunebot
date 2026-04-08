@@ -1,5 +1,5 @@
 /**
- * DuneBot DataTable – Wiederverwendbare Listen-Komponente
+ * FireBot DataTable – Wiederverwendbare Listen-Komponente
  * 
  * Features:
  * - Multi-Select (Checkbox pro Zeile + "Alle auswählen")

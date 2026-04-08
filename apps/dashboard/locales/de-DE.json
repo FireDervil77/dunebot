@@ -21,7 +21,7 @@
         "NEWS": "Neuigkeiten",
         "SERVICES": "Dienste",
         "DASHBOARD": "Dashboard",
-        "BOTNAME": "DuneBot",
+        "BOTNAME": "FireBot",
         "GITHUB": "GitHub",
         "READ_MORE": "Mehr wissen...",
         "DOCUMENTATION": "Dokumentation",
@@ -31,7 +31,7 @@
         "LANGUAGE_SELECTOR": "Sprache",
         "LANGUAGE_DE": "Deutsch",
         "LANGUAGE_EN": "English",
-        "HERO": "Die Ultimative Discord DuneBot Plattform",
+        "HERO": "Die Ultimative Discord FireBot Plattform",
         "SUBTITLE": "Gestalte das perfekte Discord-Erlebnis für deine Community.",
         "SUBTITLE2": "100% Anpassbar. Powered by einem ultraflexiblen Plugin-System.",
         "BTN_DASHBOARD_TOP": "Dashboard",
@@ -58,7 +58,7 @@
     },
     
     "FEATURES": {
-        "TITLE": "Warum Communities DuneBot wählen",
+        "TITLE": "Warum Communities FireBot wählen",
         "CARD_ONE_TITLE": "Leistungsstarkes Plugin-System",
         "CARD_ONE_DESCRIPTION": "Plugins mit einem Klick hinzufügen, entfernen oder aktualisieren. Wähle aus einer wachsenden Bibliothek – ohne Grenzen.",
         "CARD_TWO_TITLE": "Erweiterbar",
@@ -68,16 +68,16 @@
         "CARD_FOUR_TITLE": "Modernes Dashboard",
         "CARD_FOUR_DESCRIPTION": "Erlebe ein modernes Dashboard-Design mit erweiterten Funktionen und Anpassungsoptionen.",
         "CARD_FIVE_TITLE": "Skalierbar & Zuverlässig",
-        "CARD_FIVE_DESCRIPTION": "Skaliere deine Community mit Leichtigkeit. DuneBot ist für große Server optimiert und bietet eine zuverlässige Leistung.",
+        "CARD_FIVE_DESCRIPTION": "Skaliere deine Community mit Leichtigkeit. FireBot ist für große Server optimiert und bietet eine zuverlässige Leistung.",
         "CARD_SIX_TITLE": "Anpassbar für Jede Community",
-        "CARD_SIX_DESCRIPTION": "Gestalte DuneBot nach deinen Wünschen mit einer Vielzahl von Anpassungsoptionen.",
+        "CARD_SIX_DESCRIPTION": "Gestalte FireBot nach deinen Wünschen mit einer Vielzahl von Anpassungsoptionen.",
         "CARD_SEVEN_TITLE": "Hooking System",
         "CARD_SEVEN_DESCRIPTION": "Erlebe ein völlig neues Hooking System. Das deinen Plugins für den Bot und das Dashboard, ganz neue Optionen bietet!",
         "CARD_EIGHT_TITLE": "Theme Management",
-        "CARD_EIGHT_DESCRIPTION": "Passe in DuneBot alles nach deinen vorstellungen an. Vom Button bis zum Icon alles deins!",
+        "CARD_EIGHT_DESCRIPTION": "Passe in FireBot alles nach deinen vorstellungen an. Vom Button bis zum Icon alles deins!",
         "CARD_NINE_TITLE": "Werbung für alle",
         "CARD_NINE_DESCRIPTION": "Du möchtest deine reichweite Erhöhen! Schalte Werbung für deinen Server auf anderen Servern.",        
-        "STAR": "Geplante Funktionen & zur aktuellen Zeit eventuel noch nicht  im DuneBot enthalten!"
+        "STAR": "Geplante Funktionen & zur aktuellen Zeit eventuel noch nicht  im FireBot enthalten!"
     },
 
     "FOOTER": {
@@ -85,15 +85,15 @@
         "PRIVACY_POLICY": "Datenschutzrichtlinie",
         "USEFUL_LINKS": "Nützliche Links",
         "CONTACT": "Kontakt",
-        "DESCRIPTION": "DuneBot ist eine Discord Bot Plattform, die es dir ermöglicht, deinen Bot mit einem modernen Dashboard zu verwalten und anzupassen. Mit einer Fülle an Plugins, die sich einfach verwalten lassen."
+        "DESCRIPTION": "FireBot ist eine Discord Bot Plattform, die es dir ermöglicht, deinen Bot mit einem modernen Dashboard zu verwalten und anzupassen. Mit einer Fülle an Plugins, die sich einfach verwalten lassen."
     },
 
     "PRIVACY": {
-        "PAGE_TITLE": "Datenschutzrichtlinie für DuneBot",
+        "PAGE_TITLE": "Datenschutzrichtlinie für FireBot",
         "LAST_UPDATED": "Letzte Aktualisierung:",
         "LAST_UPDATED_DATE": "12. Juli 2025",
         "SCOPE": "Geltungsbereich:",
-        "SCOPE_TEXT": "Diese Datenschutzrichtlinie gilt für den Discord-Bot DuneBot und beschreibt, welche personenbezogenen Daten verarbeitet werden und wie sie geschützt werden.",
+        "SCOPE_TEXT": "Diese Datenschutzrichtlinie gilt für den Discord-Bot FireBot und beschreibt, welche personenbezogenen Daten verarbeitet werden und wie sie geschützt werden.",
         
         "SECTION1_TITLE": "1. Verantwortlicher",
         "SECTION1_TEXT": "Verantwortlich für die Datenverarbeitung im Sinne der Datenschutzgesetze ist:",
@@ -103,7 +103,7 @@
         "SECTION1_DISCORD": "Discord Support Server",
         
         "SECTION2_TITLE": "2. Welche Daten werden erhoben?",
-        "SECTION2_INTRO": "DuneBot verarbeitet ausschließlich Daten, die zur Funktion des Bots notwendig sind. Dazu gehören:",
+        "SECTION2_INTRO": "FireBot verarbeitet ausschließlich Daten, die zur Funktion des Bots notwendig sind. Dazu gehören:",
         "SECTION2_ITEM1": "Discord-Benutzer-ID: zur eindeutigen Identifikation von Spielern",
         "SECTION2_ITEM2": "Benutzername und Servername (optional): zur Anzeige auf der Dune-Karte",
         "SECTION2_ITEM3": "Kartenpositionen, Markierungen, Befehleingaben: zur Spielinteraktion",
@@ -145,14 +145,14 @@
     },
 
     "TOS": {
-        "PAGE_TITLE": "Nutzungsbedingungen für DuneBot",
+        "PAGE_TITLE": "Nutzungsbedingungen für FireBot",
         "LAST_UPDATED": "Letzte Aktualisierung:",
         "LAST_UPDATED_DATE": "12. Juli 2025",
         "SCOPE": "Geltungsbereich:",
-        "SCOPE_TEXT": "Diese Nutzungsbedingungen gelten für den Discord-Bot DuneBot und die Nutzung des Dashboards.",
+        "SCOPE_TEXT": "Diese Nutzungsbedingungen gelten für den Discord-Bot FireBot und die Nutzung des Dashboards.",
         
         "SECTION1_TITLE": "1. Allgemeines",
-        "SECTION1_TEXT": "Mit der Nutzung von DuneBot erklärst du dich mit diesen Bedingungen einverstanden. Wenn du nicht zustimmst, verwende den Bot bitte nicht.",
+        "SECTION1_TEXT": "Mit der Nutzung von FireBot erklärst du dich mit diesen Bedingungen einverstanden. Wenn du nicht zustimmst, verwende den Bot bitte nicht.",
         
         "SECTION2_TITLE": "2. Nutzungsvoraussetzungen",
         "SECTION2_ITEM1": "Du musst mindestens 13 Jahre alt sein (gemäß Discord-Richtlinien).",
@@ -160,15 +160,15 @@
         "SECTION2_ITEM3": "Der Bot ist ausschließlich für den Gebrauch auf Discord-Servern bestimmt.",
         
         "SECTION3_TITLE": "3. Funktionsumfang",
-        "SECTION3_ITEM1": "DuneBot bietet verschiedene Funktionen rund um das Dune-Spiel und Discord.",
+        "SECTION3_ITEM1": "FireBot bietet verschiedene Funktionen rund um das Dune-Spiel und Discord.",
         "SECTION3_ITEM2": "Der Funktionsumfang kann sich jederzeit ändern oder erweitert werden.",
         
         "SECTION4_TITLE": "4. Haftungsausschluss",
-        "SECTION4_P1": "DuneBot wird wie besehen bereitgestellt ohne Garantie auf Verfügbarkeit, Genauigkeit oder Fehlerfreiheit.",
+        "SECTION4_P1": "FireBot wird wie besehen bereitgestellt ohne Garantie auf Verfügbarkeit, Genauigkeit oder Fehlerfreiheit.",
         "SECTION4_P2": "Der Entwickler haftet nicht für direkte oder indirekte Schäden durch die Nutzung des Bots.",
         
         "SECTION5_TITLE": "5. Datenschutz",
-        "SECTION5_INTRO": "DuneBot speichert möglicherweise folgende Daten:",
+        "SECTION5_INTRO": "FireBot speichert möglicherweise folgende Daten:",
         "SECTION5_ITEM1": "Discord-User-IDs (zur Identifikation von Spielern)",
         "SECTION5_ITEM2": "Kartendaten, Positionseinträge und Zeitstempel",
         "SECTION5_P1": "Diese Daten werden nicht an Dritte weitergegeben und nur für die Funktion des Bots verwendet.",
@@ -223,7 +223,7 @@
 
     "NEWS": {
         "TITLE": "Neuigkeiten",
-        "DESCRIPTION": "Bleibe auf dem Laufenden mit den neuesten Entwicklungen, Updates und Ankündigungen rund um DuneBot.",
+        "DESCRIPTION": "Bleibe auf dem Laufenden mit den neuesten Entwicklungen, Updates und Ankündigungen rund um FireBot.",
         "NO_NEWS": "Keine Neuigkeiten verfügbar",
         "READ_MORE": "Mehr lesen",
         "BACK_TO_NEWS": "Zurück zu den Neuigkeiten"
@@ -247,7 +247,7 @@
         "LOCALES": "Lokalisierung",
         "BUG_REPORT": "Bug Report",
         "FEATURE_REQUEST": "Feature Request",
-        "SUPPORT_DUNEBOT": "DuneBot unterstützen",
+        "SUPPORT_DUNEBOT": "FireBot unterstützen",
         "HALL_OF_FAME": "Hall of Fame",
         "THEME": "Theme",
         "THEMES": "Themes",
@@ -279,7 +279,7 @@
         "BOT_NOT_IN_GUILD": "Bot nicht in Guild",
         
         "BOT_OFFLINE_TITLE": "Bot nicht erreichbar",
-        "BOT_OFFLINE_DESC": "DuneBot ist aktuell nicht verbunden.",
+        "BOT_OFFLINE_DESC": "FireBot ist aktuell nicht verbunden.",
         "BOT_OFFLINE_REASON": "Er wird möglicherweise neu gestartet oder befindet sich in Wartung.",
         "BOT_OFFLINE_WAIT": "Bitte warte einen Moment und aktualisiere die Seite.",
         "BOT_OFFLINE_NO_DATA": "Ohne aktive Bot-Verbindung können keine Server-Daten geladen werden.",
@@ -457,7 +457,7 @@
         "NAVIGATION_HEADER": "Navigation",
         "NO_NAVIGATION": "Keine Navigation verfügbar",
         "ADMIN_AREA": "Admin Area",
-        "DESCRIPTION_META": "DuneBot ist eine hochskalierbare Discord Bot Plattform in Javascript mit einem Dashboard.",
+        "DESCRIPTION_META": "FireBot ist eine hochskalierbare Discord Bot Plattform in Javascript mit einem Dashboard.",
         "WELCOME_SETTINGS": "Willkommen bei den Einstellungen!",
         "WELCOME_SETTINGS_DESC": "Hier kannst du deinen Bot konfigurieren, Berechtigungen verwalten und Plugin-Einstellungen anpassen."
     },

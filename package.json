@@ -1,7 +1,7 @@
 {
   "name": "dunebot-bot",
   "version": "0.1.0-beta",
-  "description": "A Discord JS DuneBot",
+  "description": "A Discord JS FireBot",
   "author": "FireDervil",
   "license": "none",
   "type": "commonjs",

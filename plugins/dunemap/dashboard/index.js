@@ -46,7 +46,7 @@ class DuneMapPlugin extends DashboardPlugin {
     
     /**
      * WordPress-Style Asset Registration
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     _registerAssets() {
         const assetManager = ServiceManager.get('assetManager');

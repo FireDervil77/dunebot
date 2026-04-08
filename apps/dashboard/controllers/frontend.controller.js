@@ -159,7 +159,7 @@ module.exports.getIndex = async (req, res) => {
         
         // Template rendern
         res.render("frontend/index", {
-            title: "Willkommen bei DuneBot",
+            title: "Willkommen bei FireBot",
             user: req.session?.user || null,
             sections,
             newsList: localizedNewsList,
@@ -222,7 +222,7 @@ exports.getChangelog = async (req, res) => {
 
         // Template rendern
         res.render("frontend/changelog", {
-            title: "DuneBot Changelogs",
+            title: "FireBot Changelogs",
             user: req.session?.user || null,
             changelogs
         });
@@ -248,7 +248,7 @@ exports.privacy = async (req, res) => {
         res.locals.layout = themeManager?.getLayout('frontend');
         
         res.render("frontend/privacy", {
-            title: "Datenschutz - DuneBot",
+            title: "Datenschutz - FireBot",
             user: req.session.user || null,
             privacyContent: await getPrivacyContent(req.app)
         });
@@ -271,7 +271,7 @@ exports.tos = async (req, res) => {
         res.locals.layout = themeManager?.getLayout('frontend');
         
         res.render("frontend/tos", {
-            title: "Terms of Service - DuneBot",
+            title: "Terms of Service - FireBot",
             user: req.session.user || null,
             termsContent: await getTermsContent(req.app)
         });

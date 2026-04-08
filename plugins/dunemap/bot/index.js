@@ -28,7 +28,7 @@ class DuneMapBotPlugin extends BotPlugin {
      * 
      * @param {import('discord.js').Client} client - Discord.js Client
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onEnable(client) {
         const Logger = ServiceManager.get("Logger");

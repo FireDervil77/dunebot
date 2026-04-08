@@ -1,6 +1,6 @@
 # Themes & Anpassung
 
-DuneBot bietet ein umfangreiches Theme-System, mit dem du das Aussehen deines Dashboards individuell anpassen kannst.
+FireBot bietet ein umfangreiches Theme-System, mit dem du das Aussehen deines Dashboards individuell anpassen kannst.
 
 ## Theme-Galerie
 

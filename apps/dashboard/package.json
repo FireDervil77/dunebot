@@ -1,7 +1,7 @@
 {
     "name": "dashboard",
     "version": "0.1.0-beta",
-    "description": "Dashboard for the Dunebot Multipurpose Discord Bot",
+    "description": "Dashboard for the FireBot Multipurpose Discord Bot",
     "main": "index.js",
     "author": "FireDervil",
     "license": "none",

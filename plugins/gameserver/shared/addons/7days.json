@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "FIREBOT_v2",
-    "author": "DuneBot Official",
+    "author": "FireBot Official",
     "update_url": null
   },
   "exported_at": "2025-10-19T00:00:00+00:00",
@@ -169,7 +169,7 @@
       "name": "World Seed",
       "description": "Map-Seed für Random Gen (beliebiger Text)",
       "env_variable": "WORLD_SEED",
-      "default_value": "DuneBot",
+      "default_value": "FireBot",
       "user_viewable": true,
       "user_editable": true,
       "rules": "nullable|string|max:50",

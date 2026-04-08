@@ -161,7 +161,7 @@ function registerKernWidgets(pluginManager, themeManager) {
 
             widgets.push({
                 id: 'support-dunebot',
-                title: 'DuneBot unterstützen',
+                title: 'FireBot unterstützen',
                 area: 'dashboard-bottom',
                 position: 10,
                 size: 12,

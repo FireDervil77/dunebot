@@ -59,6 +59,6 @@
         "ADMIN_DESC": "**Remove Marker:** `/map remove <coordinate>`\n_Note: You can only remove your own markers. Permanent markers (A1-A9) cannot be deleted._",
         "COMMANDS_TITLE": "Command Overview",
         "COMMANDS_LIST": "🗺️ `/map show` - Display map\n📍 `/map set` - Set marker\n🗑️ `/map remove` - Remove marker\n⚙️ `/dunemap-setup channel` - Configure channel\n❓ `/tutorial` - Show this help",
-        "FOOTER": "DuneBot Map System • Good luck in the Deep Desert!"
+        "FOOTER": "FireBot Map System • Good luck in the Deep Desert!"
     }
 }

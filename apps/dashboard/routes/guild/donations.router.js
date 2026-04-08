@@ -45,7 +45,7 @@ donateRouter.get('/', async (req, res) => {
         const stats = Array.isArray(statsResult) ? statsResult : [];
 
         await themeManager.renderView(res, 'guild/donate', {
-            title: 'DuneBot unterstützen',
+            title: 'FireBot unterstützen',
             activeMenu: `/guild/${guildId}/donate`,
             guildId,
             userBadge: badges[0] || null,

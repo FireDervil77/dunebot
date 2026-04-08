@@ -42,7 +42,7 @@ module.exports = async (payload, client) => {
     }
 
     try {
-        const updateData = { reason: 'Bearbeitet via DuneBot Dashboard' };
+        const updateData = { reason: 'Bearbeitet via FireBot Dashboard' };
 
         if (name !== undefined) {
             const trimmed = String(name).trim();

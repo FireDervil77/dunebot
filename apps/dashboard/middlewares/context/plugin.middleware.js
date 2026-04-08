@@ -167,7 +167,7 @@ module.exports.dashboard = async (req, res, next) => {
         plugin.name.charAt(0).toUpperCase() +
         plugin.name.slice(1) +
         " | " +
-        (coreSettings.DASHBOARD_LOGO_NAME || "DuneBot");
+        (coreSettings.DASHBOARD_LOGO_NAME || "FireBot");
 
     res.locals.locale = req.session.locale;
     res.locals.tr = req.translate;

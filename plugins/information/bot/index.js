@@ -1,8 +1,8 @@
 /**
- * Information-Plugin für DuneBot - Bot-Teil
+ * Information-Plugin für FireBot - Bot-Teil
  * Stellt Basisfunktionalitäten für den Bot bereit
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 const path = require('path');
 const { BotPlugin, VersionHelper } = require('dunebot-sdk');
@@ -10,11 +10,11 @@ const { ServiceManager } = require('dunebot-core');
 const { models } = require('dunebot-db-client');
 
 /**
- * Information-Plugin für den Bot-Teil von DuneBot
+ * Information-Plugin für den Bot-Teil von FireBot
  * Implementiert grundlegende Bot-Funktionen und Konfigurationen
  * 
  * @extends {BotPlugin}
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class InfoBotPlugin extends BotPlugin {
     /**
@@ -26,7 +26,7 @@ class InfoBotPlugin extends BotPlugin {
             displayName: 'Information-Plugin',
             description: 'Stellt verschiedene Informationen rund um den Server / Owner / Member bereit.',
             version: VersionHelper.getVersionFromContext(__dirname),
-            author: 'DuneBot Team',
+            author: 'FireBot Team',
             icon: 'fa-solid fa-cog',
             baseDir: __dirname,
             ownerOnly: false
@@ -41,7 +41,7 @@ class InfoBotPlugin extends BotPlugin {
      * 
      * @param {import('discord.js').Client} client - Discord.js Client
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onEnable(client) {
         const Logger = ServiceManager.get("Logger");
@@ -59,7 +59,7 @@ class InfoBotPlugin extends BotPlugin {
      * 
      * @param {import('discord.js').Client} client - Discord.js Client
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onDisable(client) {
         const Logger = ServiceManager.get("Logger");
@@ -76,7 +76,7 @@ class InfoBotPlugin extends BotPlugin {
      * 
      * @param {string} guildId - ID der Discord-Guild
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get("Logger");
@@ -97,7 +97,7 @@ class InfoBotPlugin extends BotPlugin {
      * 
      * @param {string} guildId - ID der Discord-Guild
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get("Logger");
@@ -110,7 +110,7 @@ class InfoBotPlugin extends BotPlugin {
      * 
      * @param {import('dunebot-sdk').HookSystem} hooks - Das Hook-System
      * @returns {void}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     registerHooks(hooks) {
         const Logger = ServiceManager.get("Logger");

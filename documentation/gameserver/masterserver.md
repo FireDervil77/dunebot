@@ -1,6 +1,6 @@
 # Masterserver
 
-Das Masterserver-Plugin ist die zentrale Schnittstelle zwischen DuneBot und deinen Root-Servern. Es verwaltet Daemon-Verbindungen, Root-Server-Ressourcen und stellt die Grundlage für das Gameserver-Plugin bereit.
+Das Masterserver-Plugin ist die zentrale Schnittstelle zwischen FireBot und deinen Root-Servern. Es verwaltet Daemon-Verbindungen, Root-Server-Ressourcen und stellt die Grundlage für das Gameserver-Plugin bereit.
 
 ## Konzept
 

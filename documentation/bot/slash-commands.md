@@ -1,6 +1,6 @@
 # Bot-Commands
 
-Übersicht aller Slash-Commands und Textbefehle, die DuneBot bietet.
+Übersicht aller Slash-Commands und Textbefehle, die FireBot bietet.
 
 ## Kern-Commands
 
@@ -86,7 +86,7 @@ Jedes aktivierte Plugin bringt eigene Befehle mit. Hier eine Kurzübersicht — 
 
 ## Slash-Commands vs. Textbefehle
 
-DuneBot unterstützt zwei Befehlsarten:
+FireBot unterstützt zwei Befehlsarten:
 
 | Typ | Syntax | Vorteile |
 |-----|--------|---------|

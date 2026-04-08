@@ -186,7 +186,7 @@ async function getHelpMenu({ client, guild }) {
             "**About Me:**\n" +
                 `Hello I am ${guild.members.me.displayName}!\n` +
                 "A cool multipurpose discord bot which can serve all your needs\n\n" +
-                "When you first use the Dunebot, you can use the `help` command to get a list of all available commands.\n" +
+                "When you first use the FireBot, you can use the `help` command to get a list of all available commands.\n" +
                 "You can also use the `help <plugin>` command to get more information about a specific plugin.\n\n" +
                 "I have spend so many hours to build a framework that can handle all the plugins and commands.\n" +
                 "If you have any questions or suggestions, feel free to join my support server.\n\n" +

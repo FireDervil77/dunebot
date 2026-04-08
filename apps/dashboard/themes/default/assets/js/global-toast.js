@@ -1,5 +1,5 @@
 /**
- * Globales Toast-System für DuneBot Dashboard
+ * Globales Toast-System für FireBot Dashboard
  * 
  * Features:
  * - Einheitliche Toast-API über alle Plugins hinweg

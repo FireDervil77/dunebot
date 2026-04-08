@@ -3,7 +3,7 @@
  * Handles base-level plugin routes (non-guild-specific)
  * 
  * @module greeting/dashboard/routes/settings
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 const express = require('express');

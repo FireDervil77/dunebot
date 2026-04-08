@@ -1,6 +1,6 @@
 # Bot einladen
 
-So fügst du DuneBot zu deinem Discord-Server hinzu.
+So fügst du FireBot zu deinem Discord-Server hinzu.
 
 ## Voraussetzungen
 
@@ -9,22 +9,22 @@ So fügst du DuneBot zu deinem Discord-Server hinzu.
 
 ## Schritt 1: Einladungslink
 
-Klicke auf den folgenden Link, um DuneBot zu deinem Server einzuladen:
+Klicke auf den folgenden Link, um FireBot zu deinem Server einzuladen:
 
-> **[DuneBot einladen](https://dunebot.de/invite)**
+> **[FireBot einladen](https://dunebot.de/invite)**
 
 Du wirst auf die Discord-Autorisierungsseite weitergeleitet.
 
 ## Schritt 2: Server auswählen
 
 1. Wähle im Dropdown-Menü den Server aus, zu dem der Bot hinzugefügt werden soll
-2. Stelle sicher, dass alle angeforderten Berechtigungen aktiviert bleiben — DuneBot braucht diese, um korrekt zu funktionieren
+2. Stelle sicher, dass alle angeforderten Berechtigungen aktiviert bleiben — FireBot braucht diese, um korrekt zu funktionieren
 3. Klicke auf **Autorisieren**
 4. Bestätige die Captcha-Abfrage
 
 ## Schritt 3: Bot ist da!
 
-DuneBot erscheint jetzt in deiner Serverliste. Er wird automatisch:
+FireBot erscheint jetzt in deiner Serverliste. Er wird automatisch:
 
 - Deinen Server im System registrieren
 - Standard-Berechtigungsgruppen anlegen (Administrator, Moderator, Support, User)
@@ -32,7 +32,7 @@ DuneBot erscheint jetzt in deiner Serverliste. Er wird automatisch:
 
 ## Was passiert im Hintergrund?
 
-Beim Beitritt zu einem neuen Server führt DuneBot automatisch ein **Guild-Setup** durch:
+Beim Beitritt zu einem neuen Server führt FireBot automatisch ein **Guild-Setup** durch:
 
 1. Server-Daten werden in der Datenbank gespeichert
 2. Standard-Gruppen werden erstellt

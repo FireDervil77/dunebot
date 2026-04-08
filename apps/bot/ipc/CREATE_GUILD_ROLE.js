@@ -51,7 +51,7 @@ module.exports = async (payload, client) => {
             hoist: !!hoist,
             mentionable: !!mentionable,
             permissions: permissionBits,
-            reason: 'Erstellt via DuneBot Dashboard'
+            reason: 'Erstellt via FireBot Dashboard'
         };
 
         const newRole = await guild.roles.create(roleData);

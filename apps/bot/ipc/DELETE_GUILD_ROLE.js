@@ -43,7 +43,7 @@ module.exports = async (payload, client) => {
 
     try {
         const roleName = role.name;
-        await role.delete('Gelöscht via DuneBot Dashboard');
+        await role.delete('Gelöscht via FireBot Dashboard');
 
         Logger.info(`[IPC] DELETE_GUILD_ROLE: Rolle "${roleName}" (${roleId}) gelöscht in Guild ${guildId}`);
 

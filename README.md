@@ -1,2 +1,2 @@
 # dunebot
-dunebot - a multipurpose discord plugin bot
+FireBot - a multipurpose discord plugin bot

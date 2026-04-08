@@ -2,8 +2,8 @@ const DunemapBotPlugin = require('./bot');
 const DuneMapPlugin = require('./dashboard');
 
 /**
- * Dunemap-Plugin für DuneBot
- * Stellt die uhrsprünglichen funktionen aus dem DuneBot bereit!
+ * Dunemap-Plugin für FireBot
+ * Stellt die uhrsprünglichen funktionen aus dem FireBot bereit!
  */
 module.exports = {
   bot: DunemapBotPlugin,

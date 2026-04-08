@@ -2,8 +2,8 @@ const AutoModBotPlugin = require('./bot');
 const AutoModPlugin = require('./dashboard');
 
 /**
- * Moderation-Plugin für DuneBot
- * Stellt die ursprünglichen Funktionen aus dem DuneBot bereit!
+ * Moderation-Plugin für FireBot
+ * Stellt die ursprünglichen Funktionen aus dem FireBot bereit!
  */
 module.exports = {
   bot: AutoModBotPlugin,

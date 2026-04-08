@@ -1,10 +1,10 @@
 # Dashboard-Übersicht
 
-Das DuneBot Dashboard ist deine zentrale Anlaufstelle, um deinen Discord-Server zu konfigurieren. Hier findest du einen Überblick über alle Bereiche.
+Das FireBot Dashboard ist deine zentrale Anlaufstelle, um deinen Discord-Server zu konfigurieren. Hier findest du einen Überblick über alle Bereiche.
 
 ## Zugang
 
-Das Dashboard erreichst du über **[dashboard.dunebot.de](https://dashboard.dunebot.de)** mit deinem Discord-Account. Du siehst nur Server, auf denen DuneBot aktiv ist und auf denen du entsprechende Berechtigungen hast.
+Das Dashboard erreichst du über **[dashboard.dunebot.de](https://dashboard.dunebot.de)** mit deinem Discord-Account. Du siehst nur Server, auf denen FireBot aktiv ist und auf denen du entsprechende Berechtigungen hast.
 
 ## Navigation
 

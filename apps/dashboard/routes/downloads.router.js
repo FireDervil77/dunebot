@@ -167,7 +167,7 @@ router.get('/daemon', async (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daemon Downloads - DuneBot</title>
+    <title>Daemon Downloads - FireBot</title>
     <style>
         body { font-family: monospace; max-width: 800px; margin: 50px auto; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
         h1 { color: #4ec9b0; }
@@ -180,7 +180,7 @@ router.get('/daemon', async (req, res) => {
     </style>
 </head>
 <body>
-    <h1>🚀 DuneBot Daemon Downloads</h1>
+    <h1>🚀 FireBot Daemon Downloads</h1>
     
     <div class="section">
         <h2>📥 Schnellinstallation</h2>

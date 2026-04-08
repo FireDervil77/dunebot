@@ -350,7 +350,7 @@ echo "Installation abgeschlossen."
         vars.push({
             name:          'Server Name',
             env_variable:  'SERVER_NAME',
-            default_value: config.servername || 'DuneBot Server',
+            default_value: config.servername || 'FireBot Server',
             description:   'Anzeige-Name des Servers',
             user_viewable: true,
             user_editable: true,
@@ -412,7 +412,7 @@ echo "Installation abgeschlossen."
     async _fetch(url) {
         return new Promise((resolve, reject) => {
             const headers = {
-                'User-Agent': 'DuneBot-LGSM-Importer/1.0',
+                'User-Agent': 'FireBot-LGSM-Importer/1.0',
             };
             if (process.env.GITHUB_API_TOKEN) {
                 headers['Authorization'] = `Bearer ${process.env.GITHUB_API_TOKEN}`;

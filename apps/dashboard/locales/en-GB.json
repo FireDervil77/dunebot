@@ -21,7 +21,7 @@
         "NEWS": "News",
         "SERVICES": "Services",
         "DASHBOARD": "Dashboard",
-        "BOTNAME": "DuneBot",
+        "BOTNAME": "FireBot",
         "GITHUB": "GitHub",
         "READ_MORE": "Read more...",
         "DOCUMENTATION": "Documentation",
@@ -31,7 +31,7 @@
         "LANGUAGE_SELECTOR": "Language",
         "LANGUAGE_DE": "Deutsch",
         "LANGUAGE_EN": "English",
-        "HERO": "The Ultimate Discord Dunebot Platform",
+        "HERO": "The Ultimate Discord FireBot Platform",
         "SUBTITLE": "Build the perfect Discord experience for your community.",
         "SUBTITLE2": "100% Customizable. Powered by a flexible plugin system.",
         "BTN_DASHBOARD_TOP": "Dashboard",
@@ -60,7 +60,7 @@
         "CAROUSEL_NEXT": "Next"
     },
     "FEATURES": {
-        "TITLE": "Why Communities Choose DuneBots",
+        "TITLE": "Why Communities Choose FireBots",
         "CARD_ONE_TITLE": "Powerful Plugin System",
         "CARD_ONE_DESCRIPTION": "Add, remove, or update plugins with a click. Choose from a growing library —no limits.",
         "CARD_TWO_TITLE": "Extensible",
@@ -70,15 +70,15 @@
         "CARD_FOUR_TITLE": "Modern Dashboard",
         "CARD_FOUR_DESCRIPTION": "Experience a modern dashboard design with advanced features and customization options.",
         "CARD_FIVE_TITLE": "Scalable & Reliable",
-        "CARD_FIVE_DESCRIPTION": "Easily scale your community. DuneBot is optimized for large servers and provides reliable performance.",
+        "CARD_FIVE_DESCRIPTION": "Easily scale your community. FireBot is optimized for large servers and provides reliable performance.",
         "CARD_SIX_TITLE": "Customizable for Every Community",
-        "CARD_SIX_DESCRIPTION": "Tailor DuneBot to your needs with a variety of customization options.",
+        "CARD_SIX_DESCRIPTION": "Tailor FireBot to your needs with a variety of customization options.",
         "CARD_SEVEN_TITLE": "Hook System",
         "CARD_SEVEN_DESCRIPTION": "Experience a new hooking system! In the dashboard and in the bot.",
         "CARD_EIGHT_TITLE": "Scalable & Reliable",
-        "CARD_EIGHT_DESCRIPTION": "Scale your community with ease. DuneBot is optimized for large servers and provides reliable performance.",
+        "CARD_EIGHT_DESCRIPTION": "Scale your community with ease. FireBot is optimized for large servers and provides reliable performance.",
         "CARD_NINE_TITLE": "Customizable for Every Community",
-        "CARD_NINE_DESCRIPTION": "Customize DuneBot to your needs with a variety of customization options.",
+        "CARD_NINE_DESCRIPTION": "Customize FireBot to your needs with a variety of customization options.",
         "STAR": "Planned Features"
     },
 
@@ -87,15 +87,15 @@
         "PRIVACY_POLICY": "Privacy Policy",
         "USEFUL_LINKS": "Useful Links",
         "CONTACT": "Contact",
-        "DESCRIPTION": "DuneBot is a Discord Bot platform that allows you to manage and customize your bot with a modern dashboard. With a wide range of plugins that are easy to manage."
+        "DESCRIPTION": "FireBot is a Discord Bot platform that allows you to manage and customize your bot with a modern dashboard. With a wide range of plugins that are easy to manage."
     },
 
     "PRIVACY": {
-        "PAGE_TITLE": "Privacy Policy for DuneBot",
+        "PAGE_TITLE": "Privacy Policy for FireBot",
         "LAST_UPDATED": "Last Updated:",
         "LAST_UPDATED_DATE": "July 12, 2025",
         "SCOPE": "Scope:",
-        "SCOPE_TEXT": "This privacy policy applies to the Discord bot DuneBot and describes what personal data is processed and how it is protected.",
+        "SCOPE_TEXT": "This privacy policy applies to the Discord bot FireBot and describes what personal data is processed and how it is protected.",
         
         "SECTION1_TITLE": "1. Data Controller",
         "SECTION1_TEXT": "Responsible for data processing within the meaning of data protection laws is:",
@@ -105,7 +105,7 @@
         "SECTION1_DISCORD": "Discord Support Server",
         
         "SECTION2_TITLE": "2. What Data is Collected?",
-        "SECTION2_INTRO": "DuneBot exclusively processes data necessary for the bot's functionality. This includes:",
+        "SECTION2_INTRO": "FireBot exclusively processes data necessary for the bot's functionality. This includes:",
         "SECTION2_ITEM1": "Discord User ID: for unique player identification",
         "SECTION2_ITEM2": "Username and server name (optional): for display on the Dune map",
         "SECTION2_ITEM3": "Map positions, markers, command inputs: for game interaction",
@@ -147,14 +147,14 @@
     },
 
     "TOS": {
-        "PAGE_TITLE": "Terms of Service for DuneBot",
+        "PAGE_TITLE": "Terms of Service for FireBot",
         "LAST_UPDATED": "Last Updated:",
         "LAST_UPDATED_DATE": "July 12, 2025",
         "SCOPE": "Scope:",
-        "SCOPE_TEXT": "These terms of service apply to the Discord bot DuneBot and the use of the dashboard.",
+        "SCOPE_TEXT": "These terms of service apply to the Discord bot FireBot and the use of the dashboard.",
         
         "SECTION1_TITLE": "1. General",
-        "SECTION1_TEXT": "By using DuneBot, you agree to these terms. If you do not agree, please do not use the bot.",
+        "SECTION1_TEXT": "By using FireBot, you agree to these terms. If you do not agree, please do not use the bot.",
         
         "SECTION2_TITLE": "2. Requirements for Use",
         "SECTION2_ITEM1": "You must be at least 13 years old (according to Discord guidelines).",
@@ -162,15 +162,15 @@
         "SECTION2_ITEM3": "The bot is exclusively intended for use on Discord servers.",
         
         "SECTION3_TITLE": "3. Scope of Features",
-        "SECTION3_ITEM1": "DuneBot offers various features related to the Dune game and Discord.",
+        "SECTION3_ITEM1": "FireBot offers various features related to the Dune game and Discord.",
         "SECTION3_ITEM2": "The scope of features may change or be expanded at any time.",
         
         "SECTION4_TITLE": "4. Disclaimer",
-        "SECTION4_P1": "DuneBot is provided as is without guarantee of availability, accuracy, or error-free operation.",
+        "SECTION4_P1": "FireBot is provided as is without guarantee of availability, accuracy, or error-free operation.",
         "SECTION4_P2": "The developer is not liable for direct or indirect damages resulting from the use of the bot.",
         
         "SECTION5_TITLE": "5. Privacy",
-        "SECTION5_INTRO": "DuneBot may store the following data:",
+        "SECTION5_INTRO": "FireBot may store the following data:",
         "SECTION5_ITEM1": "Discord User IDs (for player identification)",
         "SECTION5_ITEM2": "Map data, position entries, and timestamps",
         "SECTION5_P1": "This data is not shared with third parties and is only used for the bot's functionality.",
@@ -215,7 +215,7 @@
 
     "NEWS": {
         "TITLE": "News",
-        "DESCRIPTION": "Stay up to date with the latest developments, updates, and announcements regarding DuneBot.",
+        "DESCRIPTION": "Stay up to date with the latest developments, updates, and announcements regarding FireBot.",
         "NO_NEWS": "No news available",
         "READ_MORE": "Read more",
         "BACK_TO_NEWS": "Back to News"
@@ -239,7 +239,7 @@
         "LOCALES": "Localisation",
         "BUG_REPORT": "Bug Report",
         "FEATURE_REQUEST": "Feature Request",
-        "SUPPORT_DUNEBOT": "Support DuneBot",
+        "SUPPORT_DUNEBOT": "Support FireBot",
         "HALL_OF_FAME": "Hall of Fame",
         "THEME": "Theme",
         "THEMES": "Themes",
@@ -271,7 +271,7 @@
         "BOT_NOT_IN_GUILD": "Bot not in Guild",
         
         "BOT_OFFLINE_TITLE": "Bot Unavailable",
-        "BOT_OFFLINE_DESC": "DuneBot is currently not connected.",
+        "BOT_OFFLINE_DESC": "FireBot is currently not connected.",
         "BOT_OFFLINE_REASON": "It may be restarting or under maintenance.",
         "BOT_OFFLINE_WAIT": "Please wait a moment and refresh the page.",
         "BOT_OFFLINE_NO_DATA": "Without an active bot connection, no server data can be loaded.",
@@ -436,7 +436,7 @@
         "NAVIGATION_HEADER": "Navigation",
         "NO_NAVIGATION": "No navigation available",
         "ADMIN_AREA": "Admin Area",
-        "DESCRIPTION_META": "DuneBot is a highly scalable Discord Bot platform in Javascript with a Dashboard.",
+        "DESCRIPTION_META": "FireBot is a highly scalable Discord Bot platform in Javascript with a Dashboard.",
         "WELCOME_SETTINGS": "Welcome to Settings!",
         "WELCOME_SETTINGS_DESC": "Here you can configure your bot, manage permissions and adjust plugin settings."
     },

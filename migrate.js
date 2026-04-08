@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * DuneBot Migration CLI
+ * FireBot Migration CLI
  * 
  * Nutzung:
  *   node migrate.js status                              - Status aller Migrationen
@@ -52,7 +52,7 @@ async function cmdStatus(filterPending = false) {
         await MigrationRunner.ensureTable(db);
 
         console.log('\n┌──────────────────────────────────────────────────┐');
-        console.log('│          DuneBot Migration Status                │');
+        console.log('│          FireBot Migration Status                │');
         console.log('└──────────────────────────────────────────────────┘\n');
 
         // Kern-Migrationen
@@ -218,7 +218,7 @@ async function cmdRollback(args) {
                 break;
             default:
                 console.log(`
-  DuneBot Migration CLI
+  FireBot Migration CLI
 
   Befehle:
     status                              Status aller Migrationen

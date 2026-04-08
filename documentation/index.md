@@ -1,16 +1,16 @@
-# DuneBot Dokumentation
+# FireBot Dokumentation
 
-Willkommen bei der offiziellen DuneBot-Dokumentation! DuneBot ist ein modularer Discord-Bot mit einem leistungsfähigen Web-Dashboard, Plugin-System und integriertem Gameserver-Management.
+Willkommen bei der offiziellen FireBot-Dokumentation! FireBot ist ein modularer Discord-Bot mit einem leistungsfähigen Web-Dashboard, Plugin-System und integriertem Gameserver-Management.
 
-## Was ist DuneBot?
+## Was ist FireBot?
 
-DuneBot verbindet drei Kernkomponenten zu einem umfassenden Discord-Management-System:
+FireBot verbindet drei Kernkomponenten zu einem umfassenden Discord-Management-System:
 
 - **Discord Bot** — Slash-Commands, Auto-Moderation, Willkommensnachrichten, Tickets, und vieles mehr
 - **Web-Dashboard** — Browser-basierte Verwaltung deines Discord-Servers mit Theme-Editor, Plugin-Konfiguration und Benutzer-Management
 - **Gameserver-Verwaltung** — Erstelle, starte und verwalte Gameserver direkt aus Discord oder dem Dashboard
 
-## Für wen ist DuneBot?
+## Für wen ist FireBot?
 
 - **Server-Besitzer**, die ihren Discord-Server professionell verwalten wollen
 - **Community-Manager**, die Moderation, Tickets und Willkommensnachrichten automatisieren möchten
@@ -18,7 +18,7 @@ DuneBot verbindet drei Kernkomponenten zu einem umfassenden Discord-Management-S
 
 ## Schnelleinstieg
 
-1. [Bot einladen](getting-started/bot-einladen.md) — Füge DuneBot zu deinem Server hinzu
+1. [Bot einladen](getting-started/bot-einladen.md) — Füge FireBot zu deinem Server hinzu
 2. [Erste Schritte](getting-started/erste-schritte.md) — Dashboard öffnen und loslegen
 3. [Berechtigungen einrichten](getting-started/berechtigungen.md) — Wer darf was?
 

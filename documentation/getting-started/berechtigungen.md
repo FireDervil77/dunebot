@@ -1,6 +1,6 @@
 # Berechtigungen
 
-DuneBot hat ein feingranulares Berechtigungssystem, mit dem du genau festlegen kannst, wer im Dashboard und Bot welche Aktionen ausführen darf.
+FireBot hat ein feingranulares Berechtigungssystem, mit dem du genau festlegen kannst, wer im Dashboard und Bot welche Aktionen ausführen darf.
 
 ## Konzept
 

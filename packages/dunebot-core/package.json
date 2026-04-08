@@ -1,7 +1,7 @@
 {
     "name": "dunebot-core",
     "version": "0.1.0-beta",
-    "description": "Core package for dunebot bot",
+    "description": "Core package for FireBot bot",
     "files": [
         "lib",
         "types",

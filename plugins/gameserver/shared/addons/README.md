@@ -21,7 +21,7 @@ Dieses Verzeichnis enthält die offiziellen Game-Addons (Game Configs) im Pterod
 {
   "meta": {
     "version": "PTDL_v2",
-    "author": "DuneBot Official",
+    "author": "FireBot Official",
     "update_url": null
   }
 }
@@ -293,14 +293,14 @@ Wenn Community-User eigene Addons erstellen:
    - `trust_level: 'unverified'`
    - `visibility: 'unlisted'`
    - `status: 'pending_review'`
-3. DuneBot Team reviewed → Freigabe als `'verified'`
+3. FireBot Team reviewed → Freigabe als `'verified'`
 4. Nach 5 approved Addons → Auto-Upgrade zu `'trusted'`
 
 **Trust-Level-Rechte:**
 - `unverified`: Nur Templates installieren (kein Custom-Script)
 - `verified`: Full Installation-Scripts, Auto-Approve
 - `trusted`: Community Moderator, kann andere Addons reviewen
-- `official`: DuneBot Team, unrestricted
+- `official`: FireBot Team, unrestricted
 
 ---
 
@@ -361,6 +361,6 @@ Wenn Community-User eigene Addons erstellen:
 
 ---
 
-**Autor:** DuneBot Official  
+**Autor:** FireBot Official  
 **Datum:** 2025-10-19  
 **Version:** 1.0.0

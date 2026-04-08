@@ -372,7 +372,7 @@ module.exports = async (req, res, next) => {
             Object.assign(res.locals, siteConfig.toLocals(dashboardUrl));
         } else {
             // Fallback falls SiteConfig noch nicht registriert
-            res.locals.siteName = process.env.SITE_NAME || 'DuneBot';
+            res.locals.siteName = process.env.SITE_NAME || 'FireBot';
             res.locals.dashboard_version = process.env.DASHBOARD_VERSION || '0.1.0-beta';
             res.locals.dashboardVersion = res.locals.dashboard_version;
             res.locals.bot_version = process.env.BOT_VERSION || '0.1.0-beta';

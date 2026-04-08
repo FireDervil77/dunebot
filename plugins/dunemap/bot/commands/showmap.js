@@ -188,7 +188,7 @@ module.exports = {
             
             // Map senden
             await channel.send({
-                content: '🌍 **DuneBot Map Update**',
+                content: '🌍 **FireBot Map Update**',
                 files: [{ attachment: mapBuffer, name: 'map.png' }]
             });
 

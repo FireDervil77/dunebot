@@ -1,6 +1,6 @@
 # Plugins verwalten
 
-DuneBot ist modular aufgebaut — Funktionen werden über Plugins bereitgestellt, die du einzeln aktivieren und konfigurieren kannst.
+FireBot ist modular aufgebaut — Funktionen werden über Plugins bereitgestellt, die du einzeln aktivieren und konfigurieren kannst.
 
 ## Plugin-Übersicht
 

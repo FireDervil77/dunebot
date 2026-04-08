@@ -13,7 +13,7 @@
  * - Error-Handling und Logging
  * 
  * @class GameserverSSEClient
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class GameserverSSEClient {
     /**

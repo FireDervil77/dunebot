@@ -1,7 +1,7 @@
 /**
- * DuneBot Standard-Theme
+ * FireBot Standard-Theme
  * 
- * Dieses Modul stellt das Standard-Theme für das DuneBot-Dashboard bereit
+ * Dieses Modul stellt das Standard-Theme für das FireBot-Dashboard bereit
  * mit zwei Hauptbereichen: Frontend und Guild
  */
 class DefaultTheme {
@@ -9,8 +9,8 @@ class DefaultTheme {
         this.app = app;
         this.name = 'default';
         this.version = '1.0.0';
-        this.description = 'Standard-Theme für DuneBot';
-        this.author = 'DuneBot Team';
+        this.description = 'Standard-Theme für FireBot';
+        this.author = 'FireBot Team';
         this.info = { darkMode: false, supportRTL: false, responsive: true };
 
         // Entfernt: this.navigation = { frontend: [], guild: [] };

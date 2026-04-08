@@ -3,7 +3,7 @@
  * Route: POST /api/core/create-donation
  * 
  * @module plugins/core/dashboard/routes/api/create-donation
- * @author DuneBot Team
+ * @author FireBot Team
  */
 
 const express = require('express');
@@ -96,7 +96,7 @@ router.post('/', async (req, res) => {
                 price_data: {
                     currency: 'eur',
                     product_data: {
-                        name: 'DuneBot Unterstützung',
+                        name: 'FireBot Unterstützung',
                         description: sanitizedMessage || 'Vielen Dank für deine Spende!',
                         images: [`${process.env.DASHBOARD_BASE_URL}/themes/default/assets/images/DuneBot.png`]
                     },

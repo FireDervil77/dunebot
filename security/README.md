@@ -1,6 +1,6 @@
-# DuneBot Security - Fail2Ban Integration
+# FireBot Security - Fail2Ban Integration
 
-Dieses Verzeichnis enthält alle Fail2Ban-Konfigurationsdateien und Setup-Scripts für DuneBot.
+Dieses Verzeichnis enthält alle Fail2Ban-Konfigurationsdateien und Setup-Scripts für FireBot.
 
 ## 📁 Dateien
 
@@ -84,7 +84,7 @@ sudo ./setup-fail2ban.sh
 
 **Was wird installiert:**
 
-- Fail2Ban Filter für DuneBot-Exploits
+- Fail2Ban Filter für FireBot-Exploits
 - Jail-Konfiguration für automatisches Bannen
 - Log-Datei `/var/log/dunebot-exploits.log`
 
@@ -234,7 +234,7 @@ sudo crontab -l | grep fail2ban-db-reader
 - **OS:** Ubuntu/Debian
 - **Fail2Ban:** >= 0.11
 - **Python:** >= 3.6 (für DB-Integration)
-- **MySQL:** DuneBot-Datenbank mit `blocked_ips` Tabelle
+- **MySQL:** FireBot-Datenbank mit `blocked_ips` Tabelle
 
 ---
 

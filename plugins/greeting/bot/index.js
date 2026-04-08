@@ -1,14 +1,14 @@
 /**
- * Greeting-Plugin für DuneBot - Bot-Teil
+ * Greeting-Plugin für FireBot - Bot-Teil
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  */
 const path = require('path');
 const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 /**
- * Greeting-Plugin für den Bot-Teil von DuneBot
+ * Greeting-Plugin für den Bot-Teil von FireBot
  * 
  * ANLEITUNG:
  * 1. Ersetzen Sie 'template' durch den Namen Ihres Plugins
@@ -18,7 +18,7 @@ const { ServiceManager } = require('dunebot-core');
  * 5. Fügen Sie Events in bot/events/ hinzu
  * 
  * @extends {BotPlugin}
- * @author DuneBot Team
+ * @author FireBot Team
  */
 class GreetingBotPlugin extends BotPlugin {
     /**
@@ -46,7 +46,7 @@ class GreetingBotPlugin extends BotPlugin {
      * 
      * @param {string} guildId - ID der Discord-Guild
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get("Logger");
@@ -66,7 +66,7 @@ class GreetingBotPlugin extends BotPlugin {
      * 
      * @param {string} guildId - ID der Discord-Guild
      * @returns {Promise<void>}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get("Logger");
@@ -82,7 +82,7 @@ class GreetingBotPlugin extends BotPlugin {
      * 
      * @param {import('dunebot-sdk').HookSystem} hooks - Das Hook-System
      * @returns {void}
-     * @author DuneBot Team
+     * @author FireBot Team
      */
     registerHooks(hooks) {
         const Logger = ServiceManager.get("Logger");
