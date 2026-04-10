@@ -423,13 +423,29 @@ async function savePorts() {
                                 <div class="fw-bold fs-4" id="qry-version">–</div>
                                 <div class="small text-muted">Spielversion</div>
                             </div>
+                            <div class="col-6 col-md-3 text-center" id="qry-bots-col" style="display:none">
+                                <div class="fw-bold fs-4" id="qry-bots">–</div>
+                                <div class="small text-muted">Bots</div>
+                            </div>
+                            <div class="col-6 col-md-3 text-center" id="qry-vac-col" style="display:none">
+                                <div class="fw-bold fs-4" id="qry-vac">–</div>
+                                <div class="small text-muted">VAC</div>
+                            </div>
+                            <div class="col-6 col-md-3 text-center" id="qry-connect-col" style="display:none">
+                                <div class="fw-bold fs-6" id="qry-connect">–</div>
+                                <div class="small text-muted">Verbinden</div>
+                            </div>
+                        </div>
+                        <!-- Spiel-spezifische Extras (Rust wipe, PVE etc.) -->
+                        <div id="qry-extras" class="mb-3" style="display:none">
+                            <div class="d-flex flex-wrap gap-2" id="qry-extras-badges"></div>
                         </div>
                         <div id="qry-player-list" class="mt-2" style="display:none">
                             <table class="table table-sm table-striped mb-0">
                                 <thead>
                                     <tr>
                                         <th>Spielername</th>
-                                        <th class="text-end">Score</th>
+                                        <th class="text-end" id="qry-score-header">Score</th>
                                         <th class="text-end">Spielzeit</th>
                                     </tr>
                                 </thead>
@@ -494,9 +510,11 @@ async function savePorts() {
                         document.getElementById('qry-password').innerHTML = data.password
                             ? '<i class="fas fa-lock text-warning"></i>' : '<i class="fas fa-lock-open text-success"></i>';
 
-                        // Spielversion aus tags (z.B. ["g=0.221.12", ...])
-                        const versionTag = (data.tags || []).find(t => t.startsWith('g='));
-                        const gameVersion = versionTag ? versionTag.slice(2) : null;
+                        // Version (aus extra oder tags oder raw)
+                        const gameVersion = data.extra?.gameVersion
+                            || data.version
+                            || ((data.tags || []).find(t => typeof t === 'string' && t.startsWith('g=')) || '').slice(2)
+                            || null;
                         const verCol = document.getElementById('qry-version-col');
                         if (gameVersion) {
                             document.getElementById('qry-version').textContent = gameVersion;
@@ -505,21 +523,80 @@ async function savePorts() {
                             verCol.style.display = 'none';
                         }
 
+                        // Bots
+                        const botsCol = document.getElementById('qry-bots-col');
+                        if (data.bots > 0) {
+                            document.getElementById('qry-bots').textContent = data.bots;
+                            botsCol.style.display = '';
+                        } else {
+                            botsCol.style.display = 'none';
+                        }
+
+                        // VAC (CS2/Source)
+                        const vacCol = document.getElementById('qry-vac-col');
+                        if (data.extra?.vac != null) {
+                            document.getElementById('qry-vac').innerHTML = data.extra.vac
+                                ? '<i class="fas fa-shield-alt text-success"></i> An'
+                                : '<i class="fas fa-shield-alt text-muted"></i> Aus';
+                            vacCol.style.display = '';
+                        } else {
+                            vacCol.style.display = 'none';
+                        }
+
+                        // Connect-Adresse
+                        const connectCol = document.getElementById('qry-connect-col');
+                        if (data.connect) {
+                            const connectEl = document.getElementById('qry-connect');
+                            connectEl.innerHTML = '<code class="user-select-all">' + data.connect + '</code>';
+                            connectCol.style.display = '';
+                        } else {
+                            connectCol.style.display = 'none';
+                        }
+
+                        // Spiel-spezifische Extras (Badges)
+                        const extrasDiv = document.getElementById('qry-extras');
+                        const badgesDiv = document.getElementById('qry-extras-badges');
+                        const extra = data.extra || {};
+                        const badges = [];
+                        if (extra.pve) badges.push('<span class="badge bg-success"><i class="fas fa-dove me-1"></i>PvE</span>');
+                        if (extra.oxide) badges.push('<span class="badge bg-info"><i class="fas fa-plug me-1"></i>Oxide</span>');
+                        if (extra.wipeDate) badges.push('<span class="badge bg-secondary"><i class="fas fa-broom me-1"></i>Wipe: ' + new Date(Number(extra.wipeDate) * 1000).toLocaleDateString('de-DE') + '</span>');
+                        if (badges.length > 0) {
+                            badgesDiv.innerHTML = badges.join('');
+                            extrasDiv.style.display = '';
+                        } else {
+                            extrasDiv.style.display = 'none';
+                        }
+
                         // Ping-Badge
                         const badge = document.getElementById('query-ping-badge');
                         badge.textContent = data.ping != null ? data.ping + ' ms' : '';
                         badge.style.display = data.ping != null ? '' : 'none';
 
+                        // Score-Header anpassen (ARK: "Level" statt "Score")
+                        const scoreHeader = document.getElementById('qry-score-header');
+                        if (data.gameType === 'arkse') {
+                            scoreHeader.textContent = 'Level';
+                        } else {
+                            scoreHeader.textContent = 'Score';
+                        }
+
                         // Spielerliste
                         const players = data.players || [];
                         if (players.length > 0) {
                             const tbody = document.getElementById('qry-player-tbody');
-                            tbody.innerHTML = players.map((p, i) => `
-                                <tr>
-                                    <td>${p.name || ('Spieler ' + (i + 1))}</td>
-                                    <td class="text-end">${p.score ?? '–'}</td>
+                            tbody.innerHTML = players.map((p, i) => {
+                                const avatar = p.avatar
+                                    ? `<img src="${p.avatar}" width="20" height="20" class="rounded me-2" alt="">`
+                                    : '';
+                                const name = p.name || ('Spieler ' + (i + 1));
+                                const scoreVal = p.level ?? p.score;
+                                return `<tr>
+                                    <td>${avatar}${name}</td>
+                                    <td class="text-end">${scoreVal ?? '–'}</td>
                                     <td class="text-end">${secondsToHMS(p.time)}</td>
-                                </tr>`).join('');
+                                </tr>`;
+                            }).join('');
                             document.getElementById('qry-player-list').style.display = '';
                         } else {
                             document.getElementById('qry-player-list').style.display = 'none';

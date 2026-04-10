@@ -21,6 +21,76 @@ const QUERY_TIMEOUT_MS = 5000;
 /** Maximale Verbindungsversuche */
 const QUERY_MAX_ATTEMPTS = 2;
 
+// ============================================================================
+// Pro-Spiel Query-Aufbereitung: Spieltyp-spezifische Post-Processing-Regeln
+// ============================================================================
+const GAME_PROCESSORS = {
+    /**
+     * CS2: GOTV-Bot filtern, Tags parsen (Version, VAC, etc.)
+     */
+    cs2(result, state) {
+        // GOTV-Bot aus Spielerliste filtern
+        result.players = result.players.filter(p => {
+            if (p.name === 'GOTV' || p.name === 'SourceTV') return false;
+            // Leere Spieler mit Score=0 und Time=0 sind oft Phantom-Einträge
+            if (!p.name && p.score === 0 && (p.time === 0 || p.time == null)) return false;
+            return true;
+        });
+        // Bot-Zählung korrigieren (GOTV ist kein echter Bot)
+        const gotvBots = (state.bots || []).filter(b => b.name === 'GOTV' || b.name === 'SourceTV');
+        result.bots = Math.max(0, result.bots - gotvBots.length);
+        // Tags parsen → extra Felder
+        result.extra.vac = (state.raw?.tags || '').includes('secure');
+        const versionMatch = (state.raw?.version || '').match(/[\d.]+/);
+        if (versionMatch) result.extra.gameVersion = versionMatch[0];
+    },
+
+    /**
+     * Minecraft: MOTD bereinigen, Spieler-Avatare via Crafthead
+     */
+    minecraft(result, state) {
+        // MOTD bereinigen (Minecraft Farb-Codes §x entfernen)
+        if (result.name) {
+            result.name = result.name.replace(/§[0-9a-fk-or]/gi, '');
+        }
+        // Spieler-UUIDs für Avatar-URLs
+        result.players = result.players.map(p => ({
+            ...p,
+            avatar: p.raw?.id ? `https://crafthead.net/avatar/${p.raw.id}/32` : null,
+        }));
+    },
+
+    /**
+     * Valheim: Spieler haben keine Namen über A2S → Platzhalter setzen
+     */
+    valheim(result) {
+        result.players = result.players.map((p, i) => ({
+            ...p,
+            name: p.name || `Wikinger ${i + 1}`,
+        }));
+    },
+
+    /**
+     * Rust: Tags enthalten viele nützliche Infos
+     */
+    rust(result, state) {
+        const tags = state.raw?.tags || '';
+        result.extra.wipeDate = tags.match(/born(\d+)/)?.[1] || null;
+        result.extra.pve = tags.includes('pve');
+        result.extra.oxide = tags.includes('oxide');
+    },
+
+    /**
+     * ARK: Spieler-Score = Level
+     */
+    arkse(result) {
+        result.players = result.players.map(p => ({
+            ...p,
+            level: p.score,
+        }));
+    },
+};
+
 class QueryService {
     /**
      * Fragt den Live-Status eines Gameservers ab.
@@ -62,9 +132,11 @@ class QueryService {
             return { success: false, error: `Query-Port (${portVar}) nicht in Server-Konfiguration gefunden` };
         }
 
+        const gameType = queryConfig.gamedig_type;
+
         try {
             const state = await GameDig.query({
-                type: queryConfig.gamedig_type,
+                type: gameType,
                 host,
                 port,
                 maxAttempts: QUERY_MAX_ATTEMPTS,
@@ -72,8 +144,9 @@ class QueryService {
                 attemptTimeout: QUERY_TIMEOUT_MS,
             });
 
-            return {
+            const result = {
                 success: true,
+                gameType,
                 name:       state.name    || null,
                 map:        state.map     || null,
                 ping:       state.ping    ?? null,
@@ -81,6 +154,7 @@ class QueryService {
                     name:   p.name || '',
                     score:  p.score ?? null,
                     time:   p.raw?.time ?? p.time ?? null,
+                    raw:    p.raw || null,
                 })),
                 bots:       (state.bots   || []).length,
                 maxPlayers: state.maxplayers ?? null,
@@ -88,7 +162,28 @@ class QueryService {
                 version:    state.version  || null,
                 tags:       state.raw?.tags || [],
                 connect:    state.connect  || `${host}:${port}`,
+                // Raw-Daten komplett durchreichen (für Pro-Spiel Aufbereitung im Frontend)
+                raw: {
+                    rules:      state.raw?.rules   || null,
+                    tags:       state.raw?.tags     || null,
+                    version:    state.raw?.version  || null,
+                    numplayers: state.raw?.numplayers ?? null,
+                    numbots:    state.raw?.numbots   ?? null,
+                    folder:     state.raw?.folder    || null,
+                    game:       state.raw?.game      || null,
+                    appId:      state.raw?.appId     ?? null,
+                },
+                // Extra-Feld für spielspezifische Daten (wird von GAME_PROCESSORS befüllt)
+                extra: {},
             };
+
+            // Pro-Spiel Post-Processing anwenden
+            const processor = GAME_PROCESSORS[gameType];
+            if (processor) {
+                processor(result, state);
+            }
+
+            return result;
 
         } catch (err) {
             // GameDig wirft einen Error wenn der Server nicht erreichbar ist
