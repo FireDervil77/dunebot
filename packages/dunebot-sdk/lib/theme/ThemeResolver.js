@@ -68,24 +68,33 @@ class ThemeResolver {
     }
 
     /**
-     * Absoluten Dateipfad einer View auflösen — Plugin → Child → Parent Fallback.
+     * Absoluten Dateipfad einer View auflösen — Theme-Chain → Plugin Fallback.
+     *
+     * Reihenfolge:
+     *  1. Theme-Chain (Child → Parent → Default) — damit Themes Plugin-Views überschreiben können
+     *  2. Plugin-eigene Views (Fallback)
      *
      * @param {string} view - Relativer View-Name ohne .ejs
-     * @param {string} [pluginName] - Optional: zuerst im Plugin suchen
+     * @param {string} [pluginName] - Optional: als Fallback im Plugin suchen
      * @param {string[]} [chain] - Theme-Chain (Standard: this.manager._themeChain)
      * @returns {string|null} Absoluter Pfad oder null
      */
     resolveViewPath(view, pluginName = null, chain = this.manager._themeChain) {
-        // 1. Plugin-Views zuerst
-        if (pluginName) {
-            const pluginView = path.join(this.manager.PathConfig.getPath('plugin', pluginName).views, view + '.ejs');
-            if (fs.existsSync(pluginView)) return pluginView;
-        }
-
-        // 2. Theme-Chain
+        // 1. Theme-Chain (ermöglicht Theme-Overrides für Plugin-Views)
         for (const themeName of chain) {
             const viewPath = path.join(this.manager.PathConfig.getPath('theme', themeName).views, view + '.ejs');
             if (fs.existsSync(viewPath)) return viewPath;
+        }
+
+        // 2. Plugin-Views als Fallback
+        if (pluginName) {
+            try {
+                const pluginPaths = this.manager.PathConfig.getPath('plugin', pluginName);
+                if (pluginPaths?.views) {
+                    const pluginView = path.join(pluginPaths.views, view + '.ejs');
+                    if (fs.existsSync(pluginView)) return pluginView;
+                }
+            } catch { /* Plugin existiert nicht */ }
         }
 
         return null;

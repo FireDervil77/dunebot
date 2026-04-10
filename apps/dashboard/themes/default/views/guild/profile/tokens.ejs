@@ -1,0 +1,51 @@
+<div class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-key mr-2"></i>
+                            API-Tokens
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <% if (tokens && tokens.length) { %>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Typ</th>
+                                            <th>Läuft ab</th>
+                                            <th>Token</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% tokens.forEach(token => { %>
+                                            <tr>
+                                                <td><%= token.name %></td>
+                                                <td><span class="badge badge-info"><%= token.type %></span></td>
+                                                <td><%= token.expires_at %></td>
+                                                <td>
+                                                    <code class="text-truncate d-inline-block" style="max-width: 200px;">
+                                                        <%= token.token ? token.token.substring(0, 10) + '...' : 'N/A' %>
+                                                    </code>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <% } else { %>
+                            <div class="text-center py-5">
+                                <i class="fas fa-key fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">Keine API-Tokens vorhanden.</p>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

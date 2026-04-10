@@ -58,12 +58,15 @@ class ThemeRenderer {
                 hasEnabledPlugins: !!viewData.enabledPlugins
             });
 
-            // 6. Template-Hierarchie auflösen und View rendern
+            // 6. Plugin-Name erkennen (für Plugin-View-Fallback)
+            const pluginName = data.pluginName || res.locals.pluginName || null;
+
+            // 7. Template-Hierarchie auflösen und View rendern
             const hierarchy = this.manager.resolver.resolveTemplateHierarchy(view, viewData);
             Logger.debug('[ThemeRenderer] Template-Hierarchie:', hierarchy);
 
             const resolvedPath = hierarchy
-                .map(candidate => this.manager.resolver.resolveViewPath(candidate))
+                .map(candidate => this.manager.resolver.resolveViewPath(candidate, pluginName))
                 .find(p => p !== null);
 
             if (resolvedPath) {

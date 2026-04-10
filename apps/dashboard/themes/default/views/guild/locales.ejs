@@ -1,0 +1,55 @@
+<div class="content">
+    <div class="container-fluid">
+        <!-- Flash -->
+        <%
+            const successMsgs = Array.isArray(locals.success) ? locals.success : [];
+            const errorMsgs = Array.isArray(locals.error) ? locals.error : [];
+        %>
+        <% if (successMsgs.length) { %>
+            <div class="alert alert-success"><%= successMsgs.join('<br>') %></div>
+        <% } %>
+        <% if (errorMsgs.length) { %>
+            <div class="alert alert-danger"><%= errorMsgs.join('<br>') %></div>
+        <% } %>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-language mr-2"></i>
+                            Lokalisierung
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">
+                            Wähle die Sprache für deinen Server. Die Sprache beeinflusst Bot-Nachrichten und Dashboard-Texte.
+                        </p>
+
+                        <form id="localeForm" method="POST" action="/guild/<%= guildId %>/locales">
+                            <div class="form-group">
+                                <label for="locale">Sprache</label>
+                                <select class="form-control" id="locale" name="locale">
+                                    <% if (availableLanguages && availableLanguages.length) { %>
+                                        <% availableLanguages.forEach(lang => { %>
+                                            <option value="<%= lang.value %>"
+                                                <%= (guild.locale === lang.value) ? 'selected' : '' %>>
+                                                <%= lang.name %>
+                                            </option>
+                                        <% }) %>
+                                    <% } else { %>
+                                        <option value="de" selected>Deutsch</option>
+                                    <% } %>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save mr-1"></i> Speichern
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
