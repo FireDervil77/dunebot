@@ -244,7 +244,7 @@ router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => 
  * PUT /guild/:guildId/plugins/greeting/settings
  * Speichert Guild-spezifische Greeting-Einstellungen
  */
-router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req, res) => {
+router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
@@ -739,7 +739,7 @@ router.put('/settings', requirePermission('GREETING.SETTINGS_EDIT'), async (req,
 // INVITE MAPPING CRUD
 // ============================================================================
 
-router.get('/invite-mappings', requirePermission('GREETING.SETTINGS_EDIT'), async (req, res) => {
+router.get('/invite-mappings', requirePermission('GREETING.SETTINGS.EDIT'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
     try {
@@ -753,7 +753,7 @@ router.get('/invite-mappings', requirePermission('GREETING.SETTINGS_EDIT'), asyn
     }
 });
 
-router.post('/invite-mappings', requirePermission('GREETING.SETTINGS_EDIT'), async (req, res) => {
+router.post('/invite-mappings', requirePermission('GREETING.SETTINGS.EDIT'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
@@ -785,7 +785,7 @@ router.post('/invite-mappings', requirePermission('GREETING.SETTINGS_EDIT'), asy
     }
 });
 
-router.delete('/invite-mappings/:id', requirePermission('GREETING.SETTINGS_EDIT'), async (req, res) => {
+router.delete('/invite-mappings/:id', requirePermission('GREETING.SETTINGS.EDIT'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
     const id = parseInt(req.params.id);
@@ -806,7 +806,7 @@ router.delete('/invite-mappings/:id', requirePermission('GREETING.SETTINGS_EDIT'
 // SEND VERIFICATION PANEL (IPC → Bot)
 // ============================================================================
 
-router.post('/send-verification-panel', requirePermission('GREETING.SETTINGS_EDIT'), async (req, res) => {
+router.post('/send-verification-panel', requirePermission('GREETING.SETTINGS.EDIT'), async (req, res) => {
     const ipcServer = ServiceManager.get('ipcServer');
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;

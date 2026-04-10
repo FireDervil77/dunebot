@@ -11,7 +11,7 @@
       "requires": null
     },
     {
-      "key": "AUTOMOD.SETTINGS_EDIT",
+      "key": "AUTOMOD.SETTINGS.EDIT",
       "name": "AutoMod-Einstellungen bearbeiten",
       "description": "Berechtigung um AutoMod-Regeln zu konfigurieren (Spam-Filter, Link-Filter, etc.)",
       "category": "automod",
@@ -19,7 +19,7 @@
       "requires": "AUTOMOD.VIEW"
     },
     {
-      "key": "AUTOMOD.RULES_CREATE",
+      "key": "AUTOMOD.RULES.CREATE",
       "name": "AutoMod-Regeln erstellen",
       "description": "Berechtigung um neue AutoMod-Regeln zu erstellen",
       "category": "automod",
@@ -27,7 +27,7 @@
       "requires": "AUTOMOD.VIEW"
     },
     {
-      "key": "AUTOMOD.RULES_EDIT",
+      "key": "AUTOMOD.RULES.EDIT",
       "name": "AutoMod-Regeln bearbeiten",
       "description": "Berechtigung um bestehende AutoMod-Regeln zu ändern",
       "category": "automod",
@@ -35,7 +35,7 @@
       "requires": "AUTOMOD.VIEW"
     },
     {
-      "key": "AUTOMOD.RULES_DELETE",
+      "key": "AUTOMOD.RULES.DELETE",
       "name": "AutoMod-Regeln löschen",
       "description": "Berechtigung um AutoMod-Regeln zu entfernen (kritisch)",
       "category": "automod",
@@ -43,7 +43,7 @@
       "requires": "AUTOMOD.VIEW"
     },
     {
-      "key": "AUTOMOD.WHITELIST_MANAGE",
+      "key": "AUTOMOD.WHITELIST.MANAGE",
       "name": "AutoMod-Whitelist verwalten",
       "description": "Berechtigung um User/Channels von AutoMod auszunehmen",
       "category": "automod",
@@ -51,7 +51,7 @@
       "requires": "AUTOMOD.VIEW"
     },
     {
-      "key": "AUTOMOD.LOGS_VIEW",
+      "key": "AUTOMOD.LOGS.VIEW",
       "name": "AutoMod-Logs anzeigen",
       "description": "Berechtigung um AutoMod-Aktionen zu sehen (Gelöschte Nachrichten, Warns, etc.)",
       "category": "automod",
@@ -59,5 +59,5 @@
       "requires": "AUTOMOD.VIEW"
     }
   ],
-  "default_groups": 1006
+  "default_groups": {}
 }

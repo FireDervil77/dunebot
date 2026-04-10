@@ -11,7 +11,7 @@
       "requires": null
     },
     {
-      "key": "GREETING.SETTINGS_EDIT",
+      "key": "GREETING.SETTINGS.EDIT",
       "name": "Begrüßungs-Einstellungen bearbeiten",
       "description": "Berechtigung um Begrüßungsnachrichten zu konfigurieren",
       "category": "greeting",
@@ -19,7 +19,7 @@
       "requires": "GREETING.VIEW"
     },
     {
-      "key": "GREETING.TEMPLATES_CREATE",
+      "key": "GREETING.TEMPLATES.CREATE",
       "name": "Begrüßungs-Templates erstellen",
       "description": "Berechtigung um neue Begrüßungs-Vorlagen zu erstellen",
       "category": "greeting",
@@ -27,7 +27,7 @@
       "requires": "GREETING.VIEW"
     },
     {
-      "key": "GREETING.TEMPLATES_EDIT",
+      "key": "GREETING.TEMPLATES.EDIT",
       "name": "Begrüßungs-Templates bearbeiten",
       "description": "Berechtigung um bestehende Begrüßungs-Vorlagen zu ändern",
       "category": "greeting",
@@ -35,7 +35,7 @@
       "requires": "GREETING.VIEW"
     },
     {
-      "key": "GREETING.TEMPLATES_DELETE",
+      "key": "GREETING.TEMPLATES.DELETE",
       "name": "Begrüßungs-Templates löschen",
       "description": "Berechtigung um Begrüßungs-Vorlagen zu entfernen",
       "category": "greeting",
@@ -43,7 +43,7 @@
       "requires": "GREETING.VIEW"
     },
     {
-      "key": "GREETING.TEST_EXECUTE",
+      "key": "GREETING.TEST.EXECUTE",
       "name": "Test-Begrüßung senden",
       "description": "Berechtigung um Test-Begrüßungen zu senden",
       "category": "greeting",
@@ -51,5 +51,5 @@
       "requires": "GREETING.VIEW"
     }
   ],
-  "default_groups": 1006
+  "default_groups": {}
 }

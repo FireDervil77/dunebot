@@ -11,7 +11,7 @@
       "requires": null
     },
     {
-      "key": "DUNEMAP.SETTINGS_EDIT",
+      "key": "DUNEMAP.SETTINGS.EDIT",
       "name": "DuneMap-Einstellungen bearbeiten",
       "description": "Berechtigung um DuneMap-Konfiguration zu ändern",
       "category": "dunemap",
@@ -19,7 +19,7 @@
       "requires": "DUNEMAP.VIEW"
     },
     {
-      "key": "DUNEMAP.SECTORS_VIEW",
+      "key": "DUNEMAP.SECTORS.VIEW",
       "name": "Sektoren anzeigen",
       "description": "Berechtigung um Sektoren-Karten zu sehen",
       "category": "dunemap",
@@ -27,7 +27,7 @@
       "requires": "DUNEMAP.VIEW"
     },
     {
-      "key": "DUNEMAP.SECTORS_CREATE",
+      "key": "DUNEMAP.SECTORS.CREATE",
       "name": "Sektoren erstellen",
       "description": "Berechtigung um neue Sektoren anzulegen",
       "category": "dunemap",
@@ -35,7 +35,7 @@
       "requires": "DUNEMAP.VIEW"
     },
     {
-      "key": "DUNEMAP.SECTORS_EDIT",
+      "key": "DUNEMAP.SECTORS.EDIT",
       "name": "Sektoren bearbeiten",
       "description": "Berechtigung um bestehende Sektoren zu ändern",
       "category": "dunemap",
@@ -43,7 +43,7 @@
       "requires": "DUNEMAP.VIEW"
     },
     {
-      "key": "DUNEMAP.SECTORS_DELETE",
+      "key": "DUNEMAP.SECTORS.DELETE",
       "name": "Sektoren löschen",
       "description": "Berechtigung um Sektoren zu entfernen (kritisch)",
       "category": "dunemap",
@@ -51,7 +51,7 @@
       "requires": "DUNEMAP.VIEW"
     },
     {
-      "key": "DUNEMAP.MARKERS_CREATE",
+      "key": "DUNEMAP.MARKERS.CREATE",
       "name": "Marker erstellen",
       "description": "Berechtigung um Map-Marker zu setzen",
       "category": "dunemap",
@@ -59,7 +59,7 @@
       "requires": "DUNEMAP.VIEW"
     },
     {
-      "key": "DUNEMAP.MARKERS_EDIT",
+      "key": "DUNEMAP.MARKERS.EDIT",
       "name": "Marker bearbeiten",
       "description": "Berechtigung um bestehende Marker zu ändern",
       "category": "dunemap",
@@ -67,7 +67,7 @@
       "requires": "DUNEMAP.VIEW"
     },
     {
-      "key": "DUNEMAP.MARKERS_DELETE",
+      "key": "DUNEMAP.MARKERS.DELETE",
       "name": "Marker löschen",
       "description": "Berechtigung um Marker zu entfernen",
       "category": "dunemap",
@@ -75,7 +75,7 @@
       "requires": "DUNEMAP.VIEW"
     },
     {
-      "key": "DUNEMAP.ADMIN_MANAGE",
+      "key": "DUNEMAP.ADMIN.MANAGE",
       "name": "Admin-Panel verwalten",
       "description": "Berechtigung für erweiterte Admin-Funktionen (Sektor-Karten, Export, etc.)",
       "category": "dunemap",
@@ -83,5 +83,5 @@
       "requires": "DUNEMAP.VIEW"
     }
   ],
-  "default_groups": 1006
+  "default_groups": {}
 }

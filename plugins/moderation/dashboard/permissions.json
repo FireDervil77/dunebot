@@ -11,7 +11,7 @@
       "requires": null
     },
     {
-      "key": "MODERATION.SETTINGS_EDIT",
+      "key": "MODERATION.SETTINGS.EDIT",
       "name": "Moderation-Einstellungen bearbeiten",
       "description": "Berechtigung um Moderation-Einstellungen zu ändern (Automod-Regeln, Filter, etc.)",
       "category": "moderation",
@@ -19,7 +19,7 @@
       "requires": "MODERATION.VIEW"
     },
     {
-      "key": "MODERATION.BAN_EXECUTE",
+      "key": "MODERATION.BAN.EXECUTE",
       "name": "Bans ausführen",
       "description": "Berechtigung um User zu bannen (kritische Aktion)",
       "category": "moderation",
@@ -27,7 +27,7 @@
       "requires": "MODERATION.VIEW"
     },
     {
-      "key": "MODERATION.KICK_EXECUTE",
+      "key": "MODERATION.KICK.EXECUTE",
       "name": "Kicks ausführen",
       "description": "Berechtigung um User zu kicken",
       "category": "moderation",
@@ -35,7 +35,7 @@
       "requires": "MODERATION.VIEW"
     },
     {
-      "key": "MODERATION.MUTE_EXECUTE",
+      "key": "MODERATION.MUTE.EXECUTE",
       "name": "Mutes ausführen",
       "description": "Berechtigung um User zu muten/unmuten",
       "category": "moderation",
@@ -43,7 +43,7 @@
       "requires": "MODERATION.VIEW"
     },
     {
-      "key": "MODERATION.WARN_EXECUTE",
+      "key": "MODERATION.WARN.EXECUTE",
       "name": "Warnungen ausführen",
       "description": "Berechtigung um User zu warnen",
       "category": "moderation",
@@ -51,7 +51,7 @@
       "requires": "MODERATION.VIEW"
     },
     {
-      "key": "MODERATION.LOGS_VIEW",
+      "key": "MODERATION.LOGS.VIEW",
       "name": "Moderation-Logs anzeigen",
       "description": "Berechtigung um Moderation-Logs zu sehen (Bans, Kicks, Warns)",
       "category": "moderation",
@@ -59,7 +59,7 @@
       "requires": "MODERATION.VIEW"
     },
     {
-      "key": "MODERATION.CASES_MANAGE",
+      "key": "MODERATION.CASES.MANAGE",
       "name": "Cases verwalten",
       "description": "Berechtigung um Moderation-Cases zu bearbeiten/löschen",
       "category": "moderation",
@@ -67,7 +67,7 @@
       "requires": "MODERATION.VIEW"
     },
     {
-      "key": "MODERATION.NOTES_VIEW",
+      "key": "MODERATION.NOTES.VIEW",
       "name": "Mod-Notizen anzeigen",
       "description": "Berechtigung um interne Moderator-Notizen einzusehen",
       "category": "moderation",
@@ -75,29 +75,29 @@
       "requires": "MODERATION.VIEW"
     },
     {
-      "key": "MODERATION.NOTES_MANAGE",
+      "key": "MODERATION.NOTES.MANAGE",
       "name": "Mod-Notizen verwalten",
       "description": "Berechtigung um Moderator-Notizen zu erstellen und zu löschen",
       "category": "moderation",
       "is_dangerous": 0,
-      "requires": "MODERATION.NOTES_VIEW"
+      "requires": "MODERATION.NOTES.VIEW"
     },
     {
-      "key": "MODERATION.PROTECTED_ROLES_MANAGE",
+      "key": "MODERATION.PROTECTED.ROLES.MANAGE",
       "name": "Geschützte Rollen verwalten",
       "description": "Berechtigung um geschützte Rollen zu konfigurieren (kritische Aktion)",
       "category": "moderation",
       "is_dangerous": 1,
-      "requires": "MODERATION.SETTINGS_EDIT"
+      "requires": "MODERATION.SETTINGS.EDIT"
     },
     {
-      "key": "MODERATION.CHANNEL_RULES_MANAGE",
+      "key": "MODERATION.CHANNEL.RULES.MANAGE",
       "name": "Channel-Regeln verwalten",
       "description": "Berechtigung um channel-spezifische Moderationsregeln zu konfigurieren",
       "category": "moderation",
       "is_dangerous": 0,
-      "requires": "MODERATION.SETTINGS_EDIT"
+      "requires": "MODERATION.SETTINGS.EDIT"
     }
   ],
-  "default_groups": 1006
+  "default_groups": {}
 }

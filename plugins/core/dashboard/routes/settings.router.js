@@ -4,13 +4,13 @@ const { ServiceManager } = require("dunebot-core");
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
 
-router.get("/", requirePermission('SETTINGS.VIEW'), async (_req, res) => {
+router.get("/", requirePermission('CORE.SETTINGS.VIEW'), async (_req, res) => {
     const dbService = ServiceManager.get("dbService");
     const settings = await dbService.getSettings(res.locals.guild);
     res.render(path.join(__dirname, "views/settings.ejs"), { settings });
 });
 
-router.put("/", requirePermission('SETTINGS.EDIT'), async (req, res) => {
+router.put("/", requirePermission('CORE.SETTINGS.EDIT'), async (req, res) => {
     const dbService = ServiceManager.get("dbService");
     const i18n = ServiceManager.get("i18n");
     const Logger = ServiceManager.get("Logger");

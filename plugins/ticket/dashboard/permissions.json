@@ -11,7 +11,7 @@
       "requires": null
     },
     {
-      "key": "TICKET.SETTINGS_EDIT",
+      "key": "TICKET.SETTINGS.EDIT",
       "name": "Ticket-Einstellungen bearbeiten",
       "description": "Berechtigung um Ticket-Einstellungen zu konfigurieren (Log-Kanal, Limit, Farben)",
       "category": "ticket",
@@ -19,7 +19,7 @@
       "requires": "TICKET.VIEW"
     },
     {
-      "key": "TICKET.CATEGORIES_MANAGE",
+      "key": "TICKET.CATEGORIES.MANAGE",
       "name": "Ticket-Kategorien verwalten",
       "description": "Berechtigung um Ticket-Kategorien zu erstellen, bearbeiten und löschen",
       "category": "ticket",
@@ -27,7 +27,7 @@
       "requires": "TICKET.VIEW"
     },
     {
-      "key": "TICKET.TICKETS_VIEW",
+      "key": "TICKET.TICKETS.VIEW",
       "name": "Tickets anzeigen",
       "description": "Berechtigung um alle Tickets und Transkripte einzusehen",
       "category": "ticket",
@@ -36,7 +36,7 @@
     }
   ],
   "default_groups": {
-    "Administrator": ["TICKET.VIEW", "TICKET.SETTINGS_EDIT", "TICKET.CATEGORIES_MANAGE", "TICKET.TICKETS_VIEW"],
-    "Moderator": ["TICKET.VIEW", "TICKET.TICKETS_VIEW"]
+    "Administrator": ["TICKET.VIEW", "TICKET.SETTINGS.EDIT", "TICKET.CATEGORIES.MANAGE", "TICKET.TICKETS.VIEW"],
+    "Moderator": ["TICKET.VIEW", "TICKET.TICKETS.VIEW"]
   }
 }
