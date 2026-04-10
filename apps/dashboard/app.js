@@ -586,9 +586,13 @@ module.exports = class App {
         
         this.app.use(expressLayouts);
         
-        // Theme Assets (JS, CSS, Images, Fonts, Vendor)
+        // Theme Assets (JS, CSS, Images, Fonts)
         // Beispiel: /themes/default/assets/js/guild.js
         this.app.use('/themes', express.static(path.join(__dirname, 'themes')));
+
+        // Vendor-Assets (Theme-unabhängig: Bootstrap, TinyMCE, etc.)
+        // Beispiel: /public/vendor/bootstrap/css/bootstrap.min.css
+        this.app.use('/public', express.static(path.join(__dirname, 'public')));
 
         // robots.txt — Suchmaschinen von geschützten Bereichen fernhalten
         this.app.get('/robots.txt', (req, res) => {
