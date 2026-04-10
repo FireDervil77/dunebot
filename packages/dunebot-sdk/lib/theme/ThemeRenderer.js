@@ -31,6 +31,7 @@ class ThemeRenderer {
             // 1. Layout für den Bereich setzen
             const section = view.startsWith('guild/') ? 'guild' : 
                           view.startsWith('admin/') ? 'guild' :
+                          view.startsWith('auth/') ? 'auth' :
                           view.startsWith('frontend/') ? 'frontend' : 
                           'frontend'; // default
 
