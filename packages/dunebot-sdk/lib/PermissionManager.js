@@ -21,6 +21,10 @@ class PermissionManager {
     this.dbService = null;
     this.logger = null;
     this._initialized = false;
+    
+    // Permission-Cache: Map<"userId:guildId", { permissions, isOwner, timestamp }>
+    this._permissionCache = new Map();
+    this._CACHE_TTL = 5 * 60 * 1000; // 5 Minuten
   }
 
   /**
@@ -94,6 +98,117 @@ class PermissionManager {
     if (!this._initialized) {
       throw new Error('PermissionManager not initialized. Call initialize() first.');
     }
+  }
+
+  // ============================================================================
+  // PERMISSION CACHE (In-Memory, TTL-basiert)
+  // ============================================================================
+
+  /**
+   * Cache für einen bestimmten User+Guild invalidieren
+   * Aufrufen bei: Gruppen-Zuweisung, Direct-Permission-Änderung, User-Remove
+   */
+  invalidateCache(userId, guildId) {
+    const key = `${userId}:${guildId}`;
+    this._permissionCache.delete(key);
+    if (this._initialized) {
+      this.logger.debug(`[PermissionManager] Cache invalidiert: ${key}`);
+    }
+  }
+
+  /**
+   * Cache für eine ganze Guild invalidieren
+   * Aufrufen bei: Gruppen-Permission-Änderung, Gruppen-Löschung
+   */
+  invalidateGuildCache(guildId) {
+    let count = 0;
+    for (const key of this._permissionCache.keys()) {
+      if (key.endsWith(`:${guildId}`)) {
+        this._permissionCache.delete(key);
+        count++;
+      }
+    }
+    if (this._initialized && count > 0) {
+      this.logger.debug(`[PermissionManager] Guild-Cache invalidiert: ${guildId} (${count} Einträge)`);
+    }
+  }
+
+  /**
+   * Baut die vollständige Permission-Map für einen User auf (mit Hierarchie)
+   * und cached das Ergebnis.
+   * 
+   * Hierarchie-Logik:
+   *   1. Finde die höchste Gruppen-Priorität des Users (max_priority)
+   *   2. Lade ALLE Guild-Gruppen mit priority <= max_priority
+   *   3. Merge aufsteigend (niedrigste zuerst → höhere überschreiben)
+   *   4. Direct Permissions überschreiben Gruppen (allow + deny)
+   * 
+   * Beispiel: User ist "Moderator" (priority=50)
+   *   → erbt User(1) + Support(25) + Moderator(50) automatisch
+   */
+  async _buildAndCachePermissions(userId, guildId) {
+    const cacheKey = `${userId}:${guildId}`;
+
+    // Cache prüfen
+    const cached = this._permissionCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this._CACHE_TTL) {
+      return cached;
+    }
+
+    // 1. Guild-Owner?
+    const [guild] = await this.dbService.query(
+      'SELECT owner_id FROM guilds WHERE _id = ?', [guildId]
+    );
+    const isOwner = guild && guild.owner_id === userId;
+
+    if (isOwner) {
+      const result = { permissions: { wildcard: true }, isOwner: true, timestamp: Date.now() };
+      this._permissionCache.set(cacheKey, result);
+      return result;
+    }
+
+    // 2. User in Guild?
+    const user = await this.dbService.query(
+      'SELECT * FROM v_guild_user_permissions WHERE user_id = ? AND guild_id = ?',
+      [userId, guildId]
+    );
+
+    if (!user || !Array.isArray(user) || user.length === 0 || !user[0]) {
+      const result = { permissions: {}, isOwner: false, timestamp: Date.now() };
+      this._permissionCache.set(cacheKey, result);
+      return result;
+    }
+
+    const userData = user[0];
+
+    // 3. Hierarchie-Permissions laden
+    let permissions = {};
+    const maxPriority = userData.max_priority;
+
+    if (maxPriority !== null && maxPriority !== undefined) {
+      // HIERARCHIE: Alle Gruppen der Guild mit priority <= User's höchste Priorität
+      const groups = await this.dbService.query(
+        'SELECT permissions, priority FROM guild_groups WHERE guild_id = ? AND priority <= ? ORDER BY priority ASC',
+        [guildId, maxPriority]
+      );
+      for (const group of (groups || [])) {
+        const perms = this._normalizePerms(group.permissions);
+        permissions = { ...permissions, ...perms };
+      }
+    } else if (userData.group_permissions) {
+      // Fallback: Alte Logik (View ohne max_priority / User hat keine Gruppen)
+      permissions = this._normalizePerms(userData.group_permissions);
+    }
+
+    // 4. Direct Permissions überschreiben Gruppen (allow + deny)
+    if (userData.direct_permissions) {
+      const directPerms = this._normalizePerms(userData.direct_permissions);
+      permissions = { ...permissions, ...directPerms };
+    }
+
+    const result = { permissions, isOwner: false, timestamp: Date.now() };
+    this._permissionCache.set(cacheKey, result);
+    return result;
   }
 
   // ============================================================================
@@ -276,72 +391,26 @@ class PermissionManager {
     
     try {
       const normalizedKey = this._normalizeKey(permissionKey);
-      // 1. Prüfe ob User Guild-Owner ist
-      const [guild] = await this.dbService.query(
-        'SELECT owner_id FROM guilds WHERE _id = ?',
-        [guildId]
-      );
-      
-      if (guild && guild.owner_id === userId) {
+
+      // Permissions laden (mit Hierarchie + Cache)
+      const result = await this._buildAndCachePermissions(userId, guildId);
+
+      // Owner hat immer alle Rechte
+      if (result.isOwner) {
         this.logger.debug(`[Permission] ✅ User ${userId} ist Guild-Owner → Alle Permissions`);
-        return true; // Owner hat immer alle Rechte
+        return true;
       }
 
-      // 2. Hole User mit allen Permissions (View nutzt bereits die Aggregation)
-      const user = await this.dbService.query(
-        'SELECT * FROM v_guild_user_permissions WHERE user_id = ? AND guild_id = ?',
-        [userId, guildId]
-      );
+      const perms = result.permissions;
 
-      if (!user || !Array.isArray(user) || user.length === 0) {
-        return false; // User hat keinen Zugriff auf diese Guild
-      }
+      // Wildcard → alles erlaubt
+      if (perms.wildcard === true) return true;
 
-      const userData = user[0];
-      
-      // Safety-Check
-      if (!userData) {
-        return false;
-      }
+      // Explizit erlaubt
+      if (perms[normalizedKey] === true) return true;
 
-      // 3. Prüfe Direct Permissions (haben Vorrang)
-      if (userData.direct_permissions) {
-        const directPerms = this._normalizePerms(userData.direct_permissions);
-        // Wildcard in direct permissions
-        if (directPerms.wildcard === true) {
-          return true;
-        }
-        
-        // Explizite Permission in direct permissions
-        if (directPerms[normalizedKey] === true) {
-          return true;
-        }
-        
-        // Explizit verweigert in direct permissions
-        if (directPerms[normalizedKey] === false) {
-          return false;
-        }
-      }
-
-      // 4. Prüfe Gruppen-Permissions
-      if (userData.group_permissions) {
-        let groupPerms;
-        try {
-          groupPerms = this._normalizePerms(userData.group_permissions);
-        } catch (e) {
-          groupPerms = {};
-        }
-        
-        // Wildcard in Gruppen
-        if (groupPerms.wildcard === true) {
-          return true;
-        }
-        
-        // Explizite Permission in Gruppen
-        if (groupPerms[normalizedKey] === true) {
-          return true;
-        }
-      }
+      // Explizit verweigert (direct_permissions deny)
+      if (perms[normalizedKey] === false) return false;
 
       return false;
       
@@ -548,33 +617,23 @@ class PermissionManager {
         };
       }
 
-      // 3. Aggregiere Permissions
+      // 3. Permissions mit Hierarchie laden
       let permissions = {};
+      const maxPriority = userData.max_priority;
 
-      // Gruppen-Permissions (Basis)
-      // WICHTIG: group_permissions kann ein konkatenierter String "{}|||{}" oder JSON sein
-      if (userData && userData.group_permissions) {
-        const groupPermsRaw = userData.group_permissions;
-        
-        // Split und merge (höchste Priorität = zuerst)
-        if (groupPermsRaw && typeof groupPermsRaw === 'string') {
-          const permStrings = groupPermsRaw.split('|||').filter(Boolean);
-          
-          for (const permString of permStrings) {
-            try {
-              const perms = typeof permString === 'string' 
-                ? JSON.parse(permString) 
-                : permString;
-              
-              // Merge: Spätere (höhere Priorität) überschreiben frühere
-              permissions = { ...permissions, ...perms };
-            } catch (parseErr) {
-              // Ignore ungültige JSON-Strings
-            }
-          }
-        } else if (typeof groupPermsRaw === 'object') {
-          permissions = { ...permissions, ...groupPermsRaw };
+      if (maxPriority !== null && maxPriority !== undefined) {
+        // HIERARCHIE: Alle Gruppen der Guild mit priority <= User's höchste Priorität
+        const hierarchyGroups = await this.dbService.query(
+          'SELECT permissions, priority FROM guild_groups WHERE guild_id = ? AND priority <= ? ORDER BY priority ASC',
+          [guildId, maxPriority]
+        );
+        for (const group of (hierarchyGroups || [])) {
+          const perms = this._normalizePerms(group.permissions);
+          permissions = { ...permissions, ...perms };
         }
+      } else if (userData.group_permissions) {
+        // Fallback: Alte Logik (View ohne max_priority)
+        permissions = this._normalizePerms(userData.group_permissions);
       }
 
       // Direct Permissions (überschreiben Gruppen)
@@ -679,6 +738,9 @@ class PermissionManager {
       [userId, guildId]
     ))[0]?.id;
 
+    // Cache invalidieren
+    this.invalidateCache(userId, guildId);
+
     this.logger.info(`[PermissionManager] Upserted guild user ${userId} in guild ${guildId} (ID: ${guildUserId})`);
 
     return guildUserId;
@@ -724,6 +786,9 @@ class PermissionManager {
       // Session-Fehler nicht kritisch (User ist trotzdem aus DB entfernt)
       this.logger.warn(`[PermissionManager] Failed to destroy session for ${userId}:`, sessionError.message);
     }
+
+    // Cache invalidieren
+    this.invalidateCache(userId, guildId);
 
     this.logger.info(`[PermissionManager] Removed user ${userId} from guild ${guildId}`);
     return true;
@@ -771,6 +836,10 @@ class PermissionManager {
       );
     }
 
+    // Cache invalidieren (Gruppe → Guild ermitteln)
+    const assignedGroup = await this.dbService.query('SELECT guild_id FROM guild_groups WHERE id = ?', [groupId]);
+    if (assignedGroup?.[0]?.guild_id) this.invalidateCache(userId, assignedGroup[0].guild_id);
+
     this.logger.info(`[PermissionManager] Assigned user ${userId} to group ${groupId} by ${assignedBy}`);
     return true;
   }
@@ -791,6 +860,10 @@ class PermissionManager {
        AND group_id = ?`,
       [userId, groupId]
     );
+
+    // Cache invalidieren
+    const removedGroup = await this.dbService.query('SELECT guild_id FROM guild_groups WHERE id = ?', [groupId]);
+    if (removedGroup?.[0]?.guild_id) this.invalidateCache(userId, removedGroup[0].guild_id);
 
     this.logger.info(`[PermissionManager] Removed user ${userId} from group ${groupId}`);
     return true;
@@ -909,6 +982,9 @@ class PermissionManager {
       updateValues
     );
 
+    // Cache für die ganze Guild invalidieren (Gruppen-Änderung betrifft alle User)
+    this.invalidateGuildCache(group.guild_id);
+
     this.logger.info(`[PermissionManager] Updated group ${groupId} meta-data`);
     return true;
   }
@@ -982,7 +1058,7 @@ class PermissionManager {
     
     // Prüfe ob Gruppe protected ist
     const groups = await this.dbService.query(
-      'SELECT is_protected, name FROM guild_groups WHERE id = ?',
+      'SELECT is_protected, name, guild_id FROM guild_groups WHERE id = ?',
       [groupId]
     );
 
@@ -999,6 +1075,9 @@ class PermissionManager {
       'DELETE FROM guild_groups WHERE id = ?',
       [groupId]
     );
+
+    // Cache für die ganze Guild invalidieren
+    this.invalidateGuildCache(groups[0].guild_id);
 
     this.logger.info(`[PermissionManager] Deleted group ${groupId}`);
     return true;
@@ -1185,6 +1264,9 @@ class PermissionManager {
           }
         }
       }
+      
+      // Cache für die Guild invalidieren (Permissions haben sich geändert)
+      this.invalidateGuildCache(guildId);
       
       this.logger.success(
         `[PermissionManager] Unregistered plugin "${pluginName}": ` +
