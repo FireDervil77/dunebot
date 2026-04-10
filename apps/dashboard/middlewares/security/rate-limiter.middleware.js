@@ -12,12 +12,16 @@ const rateLimit = require('express-rate-limit');
 const { ServiceManager } = require('dunebot-core');
 
 /**
- * Strenge Rate Limits für Auth-Routes (Login, Register)
- * Verhindert Brute-Force-Angriffe auf Passwörter
+ * Rate Limits für Auth-Routes (Login, Register)
+ * Verhindert Brute-Force-Angriffe, aber flexibel genug für OAuth-Redirects
+ * 
+ * Hinweis: Jeder OAuth-Login verbraucht 2 Hits (login + callback),
+ * daher max=20 → erlaubt ~10 vollständige Login-Versuche
  */
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 Minuten
-    max: 5, // Max 5 Versuche pro IP
+    max: 20, // Max 20 Versuche pro IP (~10 vollständige OAuth-Zyklen)
+    skipSuccessfulRequests: true, // Erfolgreiche Logins zählen nicht mit!
     message: {
         success: false,
         message: 'Zu viele Login-Versuche. Bitte warte 15 Minuten.'
@@ -29,7 +33,7 @@ const authLimiter = rateLimit({
         Logger.warn(`[Security] Rate limit exceeded for auth route: ${req.ip} -> ${req.path}`);
         res.status(429).json({
             success: false,
-            message: 'Zu viele Anfragen. Bitte warte 15 Minuten.'
+            message: 'Zu viele Login-Versuche. Bitte warte 15 Minuten.'
         });
     }
 });
@@ -87,10 +91,11 @@ const guildActionLimiter = rateLimit({
  */
 const generalLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 Minute
-    max: process.env.NODE_ENV === 'production' ? 120 : 500, // Dev: 500 req/min, Prod: 120 req/min
+    max: process.env.NODE_ENV === 'production' ? 200 : 500, // Dev: 500 req/min, Prod: 200 req/min
     message: 'Zu viele Anfragen. Bitte verlangsame dich.',
     standardHeaders: true,
     legacyHeaders: false,
+    skipSuccessfulRequests: false,
     handler: (req, res) => {
         const Logger = ServiceManager.get('Logger');
         Logger.warn(`[Security] General rate limit exceeded: ${req.ip} -> ${req.path}`);
