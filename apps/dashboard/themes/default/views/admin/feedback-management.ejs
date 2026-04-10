@@ -105,22 +105,22 @@
         <div class="tab-content" id="feedbackTabContent">
             <!-- Alle -->
             <div class="tab-pane fade show active" id="all">
-                <%- include('./partials/feedback-table', { feedback: feedbackList }) %>
+                <%- include('../../partials/admin/feedback-table', { feedback: feedbackList }) %>
             </div>
             
             <!-- Bugs -->
             <div class="tab-pane fade" id="bugs">
-                <%- include('./partials/feedback-table', { feedback: feedbackList.filter(f => f.type === 'bug') }) %>
+                <%- include('../../partials/admin/feedback-table', { feedback: feedbackList.filter(f => f.type === 'bug') }) %>
             </div>
             
             <!-- Features -->
             <div class="tab-pane fade" id="features">
-                <%- include('./partials/feedback-table', { feedback: feedbackList.filter(f => f.type === 'feature') }) %>
+                <%- include('../../partials/admin/feedback-table', { feedback: feedbackList.filter(f => f.type === 'feature') }) %>
             </div>
             
             <!-- Offen -->
             <div class="tab-pane fade" id="open">
-                <%- include('./partials/feedback-table', { feedback: feedbackList.filter(f => f.status === 'open') }) %>
+                <%- include('../../partials/admin/feedback-table', { feedback: feedbackList.filter(f => f.status === 'open') }) %>
             </div>
         </div>
     </div>

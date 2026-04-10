@@ -5,7 +5,7 @@
     "description": "Neues Theme für den FireBot. neue Logos neues Design.",
     "author": "firedervil",
     "screenshot": "screenshot.png",
-    "parent": null,
+    "parent": "default",
     "tags": ["admin", "responsive"],
     "requires": "1.0.0",
     "supports": {

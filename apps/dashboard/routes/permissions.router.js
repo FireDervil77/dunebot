@@ -62,6 +62,7 @@ router.get('/users', requirePermission('PERMISSIONS.USERS.VIEW'), async (req, re
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const permissionManager = ServiceManager.get('permissionManager');
+    const themeManager = ServiceManager.get('themeManager');
     const guildId = res.locals.guildId;
     
     try {
@@ -157,10 +158,6 @@ router.get('/users', requirePermission('PERMISSIONS.USERS.VIEW'), async (req, re
             }
         });
         
-        // Guild-Layout setzen
-        const themeManager = ServiceManager.get('themeManager');
-        res.locals.layout = themeManager.getLayout('guild');
-        
         // Hole alle Gruppen für Dropdowns/Modals
         const availableGroups = await permissionManager.getGuildGroups(guildId);
         
@@ -180,7 +177,7 @@ router.get('/users', requirePermission('PERMISSIONS.USERS.VIEW'), async (req, re
             permissionsByCategory[perm.category].push(perm);
         });
         
-        res.render('guild/permissions/users', {
+        await themeManager.renderView(res, 'guild/permissions/users', {
             pageTitle: 'Benutzer-Verwaltung',
             users: users || [],
             availableGroups: availableGroups || [],
@@ -700,6 +697,7 @@ router.get('/groups', requirePermission('PERMISSIONS.GROUPS.VIEW'), async (req, 
     const Logger = ServiceManager.get('Logger');
     const permissionManager = ServiceManager.get('permissionManager');
     const dbService = ServiceManager.get('dbService');
+    const themeManager = ServiceManager.get('themeManager');
     const guildId = res.locals.guildId;
     
     try {
@@ -741,11 +739,7 @@ router.get('/groups', requirePermission('PERMISSIONS.GROUPS.VIEW'), async (req, 
             permissionsByCategory[perm.category].push(perm);
         });
         
-        // Guild-Layout setzen
-        const themeManager = ServiceManager.get('themeManager');
-        res.locals.layout = themeManager.getLayout('guild');
-        
-        res.render('guild/permissions/groups', {
+        await themeManager.renderView(res, 'guild/permissions/groups', {
             pageTitle: 'Gruppen-Verwaltung',
             groups: groups || [],
             permissions: permissionsByCategory,
@@ -910,6 +904,7 @@ router.get('/matrix', requireAnyPermission(['PERMISSIONS.GROUPS.VIEW', 'PERMISSI
     const Logger = ServiceManager.get('Logger');
     const permissionManager = ServiceManager.get('permissionManager');
     const dbService = ServiceManager.get('dbService');
+    const themeManager = ServiceManager.get('themeManager');
     const guildId = res.locals.guildId;
     
     try {
@@ -943,11 +938,7 @@ router.get('/matrix', requireAnyPermission(['PERMISSIONS.GROUPS.VIEW', 'PERMISSI
             permissionsByCategory[perm.category].push(perm);
         });
         
-        // Guild-Layout setzen
-        const themeManager = ServiceManager.get('themeManager');
-        res.locals.layout = themeManager.getLayout('guild');
-        
-        res.render('guild/permissions/matrix', {
+        await themeManager.renderView(res, 'guild/permissions/matrix', {
             pageTitle: 'Berechtigungsmatrix',
             groups: groups || [],
             permissions: permissionsByCategory,

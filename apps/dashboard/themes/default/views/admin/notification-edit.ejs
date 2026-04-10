@@ -1,5 +1,5 @@
 <% const _backUrl = typeof backUrl !== 'undefined' ? backUrl : '/admin/content?tab=notifications'; %>
-<%- include('./partials/content-nav', { contentTab: typeof contentTab !== 'undefined' ? contentTab : 'notifications' }) %>
+<%- include('../../partials/admin/content-nav', { contentTab: typeof contentTab !== 'undefined' ? contentTab : 'notifications' }) %>
 
 <%
     // Parse delivery_methods (backwards compat: string → array)

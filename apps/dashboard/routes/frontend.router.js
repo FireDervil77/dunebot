@@ -50,10 +50,7 @@ const getNewsDetails = async (req, res) => {
         const userLocale = res.locals.locale || 'de-DE';
         const localizedNews = NewsHelper.getLocalizedNews(rawNews[0], userLocale);
 
-        // Layout setzen
-        res.locals.layout = themeManager.getLayout('frontend');
-        
-        res.render('frontend/news-details', {
+        await themeManager.renderView(res, 'frontend/news-details', {
             news: {
                 ...localizedNews,
                 formattedDate: new Date(localizedNews.date).toLocaleString(
@@ -89,10 +86,7 @@ const getChangelogsList = async (req, res) => {
         const userLocale = res.locals.locale || 'de-DE';
         const localizedChangelogs = rawChangelogs.map(cl => ChangelogHelper.getLocalizedChangelog(cl, userLocale));
 
-        // Layout setzen
-        res.locals.layout = themeManager.getLayout('frontend');
-        
-        res.render('frontend/changelogs', {
+        await themeManager.renderView(res, 'frontend/changelogs', {
             changelogs: localizedChangelogs,
             currentLocale: userLocale
         });
@@ -128,10 +122,7 @@ const getChangelogDetails = async (req, res) => {
         // Parse hierarchische Struktur aus changes-Text
         const hierarchicalData = ChangelogHelper.parseHierarchicalChangelog(localizedChangelog.changes);
 
-        // Layout setzen
-        res.locals.layout = themeManager.getLayout('frontend');
-        
-        res.render('frontend/changelog-details', {
+        await themeManager.renderView(res, 'frontend/changelog-details', {
             changelog: localizedChangelog,
             hierarchicalData: hierarchicalData,
             currentLocale: userLocale
@@ -232,7 +223,7 @@ router.get('/blog', async (req, res) => {
         });
 
         res.locals.layout = themeManager.getLayout('frontend');
-        res.render('frontend/blog', {
+        await themeManager.renderView(res, 'frontend/blog', {
             blogPosts,
             currentCategory: category,
             currentLocale: userLocale,
@@ -275,7 +266,7 @@ router.get('/blog/:slug', async (req, res) => {
         };
 
         res.locals.layout = themeManager.getLayout('frontend');
-        res.render('frontend/blog-detail', {
+        await themeManager.renderView(res, 'frontend/blog-detail', {
             post,
             title: post.title,
             currentLocale: userLocale
@@ -299,9 +290,7 @@ router.get('/page/:slug', async (req, res) => {
             return res.status(404).render('frontend/404');
         }
 
-        res.locals.layout = themeManager.getLayout('frontend');
-
-        res.render('frontend/page', {
+        await themeManager.renderView(res, 'frontend/page', {
             page,
             title: page.meta_title || page.title,
             metaDescription: page.meta_description || ''
@@ -374,7 +363,7 @@ router.get('/docs', async (req, res) => {
         const nav = await buildDocsNav(DOCS_ROOT);
 
         res.locals.layout = themeManager.getLayout('frontend');
-        res.render('frontend/documentation', {
+        await themeManager.renderView(res, 'frontend/documentation', {
             title: 'Dokumentation',
             docTitle: 'Dokumentation',
             htmlContent,
@@ -428,7 +417,7 @@ router.get('/docs/{*docPath}', async (req, res) => {
         const docTitle = titleMatch ? titleMatch[1] : requestedPath.split('/').pop();
 
         res.locals.layout = themeManager.getLayout('frontend');
-        res.render('frontend/documentation', {
+        await themeManager.renderView(res, 'frontend/documentation', {
             title: docTitle + ' — Dokumentation',
             docTitle,
             htmlContent,

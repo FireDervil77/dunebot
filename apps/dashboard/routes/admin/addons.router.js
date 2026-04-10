@@ -141,7 +141,7 @@ router.get('/', async (req, res) => {
             docker_standalone: addons.filter(a => a.runtime_type === 'docker_standalone').length,
         };
 
-        res.render('admin/addons/index', { addons, stats, pageTitle: 'Addon Marketplace' });
+        await themeManager.renderView(res, 'admin/addons/index', { addons, stats, pageTitle: 'Addon Marketplace' });
 
     } catch (err) {
         Logger.error('[Addons] Fehler Übersicht:', err);
@@ -152,19 +152,17 @@ router.get('/', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /admin/addons/import — Import-UI (Pelican Repo-Browser)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/import', (req, res) => {
+router.get('/import', async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
-    res.locals.layout  = themeManager.getLayout('guild');
-    res.render('admin/addons/import', { pageTitle: 'Egg importieren' });
+    await themeManager.renderView(res, 'admin/addons/import', { pageTitle: 'Egg importieren' });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /admin/addons/create — Manuell erstellen / externe URL importieren
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/create', (req, res) => {
+router.get('/create', async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
-    res.locals.layout  = themeManager.getLayout('guild');
-    res.render('admin/addons/create', { pageTitle: 'Addon erstellen' });
+    await themeManager.renderView(res, 'admin/addons/create', { pageTitle: 'Addon erstellen' });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -429,7 +427,7 @@ router.get('/:id', async (req, res) => {
             catch { addon.tags = addon.tags.split(',').map(t => t.trim()).filter(Boolean); }
         }
 
-        res.render('admin/addons/edit', { addon, pageTitle: `Edit: ${addon.name}` });
+        await themeManager.renderView(res, 'admin/addons/edit', { addon, pageTitle: `Edit: ${addon.name}` });
 
     } catch (err) {
         Logger.error('[Addons] Detail laden fehlgeschlagen:', err);

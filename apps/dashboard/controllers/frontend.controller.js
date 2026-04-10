@@ -22,9 +22,6 @@ module.exports.getIndex = async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
 
     try {
-        // Frontend-Layout verwenden
-        res.locals.layout = themeManager.getLayout('frontend');
-        
         // User-Locale einmal bestimmen
         const userLocale = req.session?.locale || res.locals?.locale || 'de-DE';
         
@@ -158,8 +155,8 @@ module.exports.getIndex = async (req, res) => {
         }
         
         // Template rendern
-        res.render("frontend/index", {
-            title: "Willkommen bei FireBot",
+        await themeManager.renderView(res, 'frontend/index', {
+            title: 'Willkommen bei FireBot',
             user: req.session?.user || null,
             sections,
             newsList: localizedNewsList,
@@ -190,9 +187,6 @@ exports.getChangelog = async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
 
     try {
-        // Frontend-Layout verwenden
-        res.locals.layout = themeManager.getLayout('frontend');
-
         // Changelogs aus der Datenbank laden
         let changelogs = [];
         try {
@@ -221,8 +215,8 @@ exports.getChangelog = async (req, res) => {
         }
 
         // Template rendern
-        res.render("frontend/changelog", {
-            title: "FireBot Changelogs",
+        await themeManager.renderView(res, 'frontend/changelog', {
+            title: 'FireBot Changelogs',
             user: req.session?.user || null,
             changelogs
         });
@@ -245,10 +239,8 @@ exports.privacy = async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
 
     try {
-        res.locals.layout = themeManager?.getLayout('frontend');
-        
-        res.render("frontend/privacy", {
-            title: "Datenschutz - FireBot",
+        await themeManager.renderView(res, 'frontend/privacy', {
+            title: 'Datenschutz - FireBot',
             user: req.session.user || null,
             privacyContent: await getPrivacyContent(req.app)
         });
@@ -268,10 +260,8 @@ exports.tos = async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
 
     try {
-        res.locals.layout = themeManager?.getLayout('frontend');
-        
-        res.render("frontend/tos", {
-            title: "Terms of Service - FireBot",
+        await themeManager.renderView(res, 'frontend/tos', {
+            title: 'Terms of Service - FireBot',
             user: req.session.user || null,
             termsContent: await getTermsContent(req.app)
         });
