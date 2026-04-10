@@ -635,6 +635,50 @@ class FileManager {
     // ════════════════════════════════════════════════════════════════════════════
     
     /**
+     * New File Modal anzeigen
+     */
+    showNewFileModal() {
+        document.getElementById('new-file-name').value = '';
+        $('#new-file-modal').modal('show');
+    }
+
+    /**
+     * Leere Datei erstellen (via write-Endpoint)
+     */
+    async createFile() {
+        const name = document.getElementById('new-file-name').value.trim();
+
+        if (!name) {
+            this.showToast('error', 'Bitte einen Dateinamen eingeben');
+            return;
+        }
+
+        const filePath = this.currentPath === '/' ? `/${name}` : `${this.currentPath}/${name}`;
+
+        try {
+            const response = await fetch(`${this.config.baseUrl}/servers/${this.config.serverId}/files/write`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: filePath, content: '' })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Fehler beim Erstellen');
+            }
+
+            this.showToast('success', `Datei "${name}" erstellt`);
+            $('#new-file-modal').modal('hide');
+            await this.reload();
+
+        } catch (error) {
+            console.error('[FileManager] Create file error:', error);
+            this.showToast('error', `Fehler: ${error.message}`);
+        }
+    }
+
+    /**
      * New Folder Modal anzeigen
      */
     showNewFolderModal() {

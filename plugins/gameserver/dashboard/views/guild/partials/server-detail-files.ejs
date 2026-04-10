@@ -39,6 +39,9 @@
                     <!-- Actions -->
                     <div class="col-md-6 text-end">
                         <% if (canManage) { %>
+                            <button class="btn btn-sm btn-info" onclick="fileManager.showNewFileModal()">
+                                <i class="fas fa-file-plus me-1"></i> Neue Datei
+                            </button>
                             <button class="btn btn-sm btn-primary" onclick="fileManager.showNewFolderModal()">
                                 <i class="fas fa-folder-plus me-1"></i> Neuer Ordner
                             </button>
@@ -254,6 +257,45 @@
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
                 <button type="button" class="btn btn-primary" id="start-upload-btn" onclick="fileManager.startUpload()" disabled>
                     <i class="fas fa-upload mr-1"></i> Hochladen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<% } %>
+
+<!-- Rename Modal -->
+<% if (canManage) { %>
+
+<!-- New File Modal -->
+<div class="modal fade" id="new-file-modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-file-plus mr-2"></i>
+                    Neue Datei erstellen
+                </h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <form id="new-file-form" onsubmit="fileManager.createFile(); return false;">
+                    <div class="mb-3">
+                        <label for="new-file-name" class="form-label">Dateiname</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="new-file-name" 
+                               placeholder="z.B. config.yml"
+                               required
+                               pattern="[a-zA-Z0-9._\-]+"
+                               title="Nur Buchstaben, Zahlen, Punkte, Bindestriche und Unterstriche erlaubt">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-info" onclick="fileManager.createFile()">
+                    <i class="fas fa-check mr-1"></i> Erstellen
                 </button>
             </div>
         </div>
