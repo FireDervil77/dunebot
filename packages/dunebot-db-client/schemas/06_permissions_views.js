@@ -20,7 +20,6 @@ module.exports = async (dbService) => {
             GROUP_CONCAT(DISTINCT gg.id ORDER BY gg.priority DESC) AS group_ids,
             GROUP_CONCAT(DISTINCT gg.name ORDER BY gg.priority DESC SEPARATOR ', ') AS group_names,
             GROUP_CONCAT(DISTINCT gg.slug ORDER BY gg.priority DESC SEPARATOR ', ') AS group_slugs,
-            GROUP_CONCAT(DISTINCT gg.permissions ORDER BY gg.priority DESC SEPARATOR '|||') AS group_permissions,
             MAX(gg.priority) AS max_priority
         FROM guild_users gu
         LEFT JOIN guild_user_groups gug ON gu.id = gug.guild_user_id

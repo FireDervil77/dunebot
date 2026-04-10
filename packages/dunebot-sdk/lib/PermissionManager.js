@@ -195,9 +195,6 @@ class PermissionManager {
         const perms = this._normalizePerms(group.permissions);
         permissions = { ...permissions, ...perms };
       }
-    } else if (userData.group_permissions) {
-      // Fallback: Alte Logik (View ohne max_priority / User hat keine Gruppen)
-      permissions = this._normalizePerms(userData.group_permissions);
     }
 
     // 4. Direct Permissions überschreiben Gruppen (allow + deny)
@@ -324,6 +321,45 @@ class PermissionManager {
   }
 
   /**
+   * Auto-Create: Owner/BotAdmin in guild_users erstellen + Administrator-Gruppe zuweisen
+   * @private
+   */
+  async _autoCreateAdminUser(userId, guildId, isBotAdmin) {
+    this.logger.info(`[Permission] ${isBotAdmin ? 'Bot-Admin' : 'Guild-Owner'} ${userId} nicht in guild_users → Erstelle mit Administrator-Rechten...`);
+
+    await this.upsertGuildUser(userId, guildId, {
+      status: 'active',
+      direct_permissions: null
+    });
+
+    const adminGroup = await this.dbService.query(
+      'SELECT id FROM guild_groups WHERE guild_id = ? AND name = ?',
+      [guildId, 'Administrator']
+    );
+
+    if (adminGroup && adminGroup.length > 0) {
+      const guildUser = await this.dbService.query(
+        'SELECT id FROM guild_users WHERE guild_id = ? AND user_id = ?',
+        [guildId, userId]
+      );
+
+      if (guildUser && guildUser.length > 0) {
+        await this.dbService.query(
+          'INSERT IGNORE INTO guild_user_groups (guild_user_id, group_id) VALUES (?, ?)',
+          [guildUser[0].id, adminGroup[0].id]
+        );
+        this.logger.success(`[Permission] ${isBotAdmin ? 'Bot-Admin' : 'Owner'} ${userId} zur Administrator-Gruppe hinzugefügt`);
+      } else {
+        this.logger.error(`[Permission] guild_users.id nicht gefunden für User ${userId}!`);
+      }
+    } else {
+      this.logger.error(`[Permission] Administrator-Gruppe nicht gefunden in Guild ${guildId}!`);
+    }
+
+    this.invalidateCache(userId, guildId);
+  }
+
+  /**
    * Gibt alle Permissions eines Users zurück (Direct + Gruppen aggregiert)
    * 
    * @param {string} userId - Discord User ID
@@ -346,147 +382,36 @@ class PermissionManager {
       const botAdminIds = process.env.OWNER_IDS ? process.env.OWNER_IDS.split(',') : [];
       const isBotAdmin = botAdminIds.includes(userId);
 
-      // 2. Hole User-Daten aus View
-      const user = await this.dbService.query(
-        'SELECT * FROM v_guild_user_permissions WHERE user_id = ? AND guild_id = ?',
+      // 2. Auto-Create für Owner/BotAdmin falls nicht in guild_users
+      const userExists = await this.dbService.query(
+        'SELECT id FROM guild_users WHERE user_id = ? AND guild_id = ?',
         [userId, guildId]
       );
 
-      // User existiert nicht in guild_users?
-      if (!user || !Array.isArray(user) || user.length === 0) {
-        // FALL 1: Guild-Owner oder Bot-Admin → Automatisch erstellen!
+      if (!userExists || !Array.isArray(userExists) || userExists.length === 0) {
         if (isOwner || isBotAdmin) {
-          this.logger.info(`[Permission] ${isBotAdmin ? 'Bot-Admin' : 'Guild-Owner'} ${userId} nicht in guild_users → Erstelle mit Administrator-Rechten...`);
-          
           try {
-            // User erstellen (korrekte Signatur: userId, guildId, options)
-            await this.upsertGuildUser(userId, guildId, {
-              status: 'active',
-              direct_permissions: null
-            });
-            
-            // Zur Administrator-Gruppe hinzufügen
-            const adminGroup = await this.dbService.query(
-              'SELECT id FROM guild_groups WHERE guild_id = ? AND name = ?',
-              [guildId, 'Administrator']
-            );
-            
-            if (adminGroup && adminGroup.length > 0) {
-              // Hole guild_users.id für den User
-              const guildUser = await this.dbService.query(
-                'SELECT id FROM guild_users WHERE guild_id = ? AND user_id = ?',
-                [guildId, userId]
-              );
-              
-              if (guildUser && guildUser.length > 0) {
-                await this.dbService.query(
-                  'INSERT IGNORE INTO guild_user_groups (guild_user_id, group_id) VALUES (?, ?)',
-                  [guildUser[0].id, adminGroup[0].id]
-                );
-                this.logger.success(`[Permission] ${isBotAdmin ? 'Bot-Admin' : 'Owner'} ${userId} zur Administrator-Gruppe hinzugefügt`);
-              } else {
-                this.logger.error(`[Permission] guild_users.id nicht gefunden für User ${userId}!`);
-              }
-            } else {
-              this.logger.error(`[Permission] Administrator-Gruppe nicht gefunden in Guild ${guildId}!`);
-            }
-            
-            // Query nochmal ausführen
-            const userRetry = await this.dbService.query(
-              'SELECT * FROM v_guild_user_permissions WHERE user_id = ? AND guild_id = ?',
-              [userId, guildId]
-            );
-            
-            if (userRetry && userRetry.length > 0) {
-              const userData = userRetry[0];
-              
-              // Permissions aus View laden
-              let permissions = {};
-              
-              if (userData.group_permissions && typeof userData.group_permissions === 'string') {
-                const permStrings = userData.group_permissions.split('|||').filter(Boolean);
-                for (const permString of permStrings) {
-                  try {
-                    const perms = JSON.parse(permString);
-                    permissions = { ...permissions, ...perms };
-                  } catch (parseErr) {
-                    // Ignore
-                  }
-                }
-              }
-              
-              if (userData.direct_permissions) {
-                permissions = { ...permissions, ...userData.direct_permissions };
-              }
-              
-              return {
-                permissions,
-                groups: userData.groups ? userData.groups.split(',') : [],
-                is_owner: isOwner
-              };
-            }
+            await this._autoCreateAdminUser(userId, guildId, isBotAdmin);
           } catch (createErr) {
             this.logger.error('[Permission] Fehler beim Auto-Erstellen von Admin:', createErr);
           }
+        } else {
+          this.logger.debug(`[Permission] User ${userId} nicht in guild_users → Keine Permissions`);
+          return { permissions: {}, groups: [], is_owner: isOwner };
         }
-        
-        // FALL 2: Normaler User → Keine Permissions (muss vom Admin eingeladen werden)
-        this.logger.debug(`[Permission] User ${userId} nicht in guild_users → Keine Permissions (muss eingeladen werden)`);
-        return { 
-          permissions: {}, 
-          groups: [], 
-          is_owner: isOwner 
-        };
       }
 
-      const userData = user[0];
-      
-      // Safety-Check
-      if (!userData) {
-        this.logger.warn(`[Permission] userData ist undefined für User ${userId}`);
-        return { 
-          permissions: {}, 
-          groups: [], 
-          is_owner: isOwner 
-        };
-      }
+      // 3. Permissions über Hierarchie + Cache laden (nutzt _buildAndCachePermissions)
+      const cached = await this._buildAndCachePermissions(userId, guildId);
+      let permissions = { ...cached.permissions };
 
-      // 3. Permissions mit Hierarchie laden
-      let permissions = {};
-      const maxPriority = userData.max_priority;
-
-      if (maxPriority !== null && maxPriority !== undefined) {
-        // HIERARCHIE: Alle Gruppen der Guild mit priority <= User's höchste Priorität
-        const hierarchyGroups = await this.dbService.query(
-          'SELECT permissions, priority FROM guild_groups WHERE guild_id = ? AND priority <= ? ORDER BY priority ASC',
-          [guildId, maxPriority]
-        );
-        for (const group of (hierarchyGroups || [])) {
-          const perms = this._normalizePerms(group.permissions);
-          permissions = { ...permissions, ...perms };
-        }
-      } else if (userData.group_permissions) {
-        // Fallback: Alte Logik (View ohne max_priority)
-        permissions = this._normalizePerms(userData.group_permissions);
-      }
-
-      // Direct Permissions (überschreiben Gruppen)
-      if (userData.direct_permissions) {
-        const directPerms = this._normalizePerms(userData.direct_permissions);
-        permissions = { ...permissions, ...directPerms };
-      }
-
-      // Owner hat Wildcard UND alle expliziten Permissions
+      // 4. Owner: Alle registrierten Permissions explizit (für UI-Anzeige)
       if (isOwner) {
         permissions.wildcard = true;
-        
-        // ✅ FIX: Owner bekommt ALLE registrierten Permissions explizit
-        // Das ist wichtig für die UI (z.B. Permissions-Seite zeigt alle verfügbaren Rechte)
         const allPermissions = await this.dbService.query(
           'SELECT permission_key FROM permission_definitions WHERE is_active = 1',
           []
         );
-        
         if (allPermissions && allPermissions.length > 0) {
           for (const perm of allPermissions) {
             permissions[this._normalizeKey(perm.permission_key)] = true;
@@ -494,10 +419,9 @@ class PermissionManager {
         }
       }
 
-      // Keys final normalisieren (UPPERCASE), Werte → boolean
       permissions = this._normalizePerms(permissions);
 
-      // 4. Hole Gruppen-Details
+      // 5. Gruppen-Details laden
       const groups = await this.dbService.query(
         `SELECT gg.id, gg.name, gg.slug, gg.color, gg.icon, gg.priority
          FROM guild_user_groups gug
