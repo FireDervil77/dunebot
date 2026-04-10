@@ -18,11 +18,6 @@ exports.login = async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
     
     try {
-        // Auth-Layout und Weiterleitung zur Discord-Auth
-        res.locals.layout = themeManager?.getLayout ? 
-            themeManager.getLayout('auth') : 
-            'layouts/auth';
-        
         // Wenn der Benutzer nicht angemeldet ist, zeige die Login-Seite
         if (!req.session.user?.info?.id || !req.session.user?.guilds) {
             // Redirect-URL für nach der Anmeldung
@@ -39,8 +34,8 @@ exports.login = async (req, res) => {
             }
             
             // Login-Formular oder Weiterleitung anzeigen
-            res.render("auth/login", {
-                title: "Anmelden mit Discord",
+            await themeManager.renderView(res, 'auth/login', {
+                title: 'Anmelden mit Discord',
                 discordAuthURL,
                 redirectURL
             });
@@ -221,9 +216,9 @@ exports.callback = async (req, res) => {
         req.session.save((err) => {
             if (err) {
                 Logger.error("Fehler beim Speichern der Session:", err);
-                return res.render("auth/error", {
-                    title: "Anmeldung fehlgeschlagen",
-                    error: "Session konnte nicht gespeichert werden."
+                return themeManager.renderView(res, 'auth/error', {
+                    title: 'Anmeldung fehlgeschlagen',
+                    error: 'Session konnte nicht gespeichert werden.'
                 });
             }
             
@@ -253,9 +248,9 @@ exports.callback = async (req, res) => {
         
     } catch (error) {
         Logger.error("Fehler bei der Authentifizierung:", error);
-        res.render("auth/error", {
-            title: "Anmeldung fehlgeschlagen",
-            error: "Bei der Anmeldung ist ein Fehler aufgetreten."
+        await themeManager.renderView(res, 'auth/error', {
+            title: 'Anmeldung fehlgeschlagen',
+            error: 'Bei der Anmeldung ist ein Fehler aufgetreten.'
         });
     }
 };
@@ -315,11 +310,8 @@ exports.logout = async (req, res) => {
         // Aktuelle Session zerstören
         req.session.destroy();
         
-        // Auth-Layout für Logout-Bestätigung
-        res.locals.layout = themeManager?.getLayout ? themeManager.getLayout('auth') : 'layouts/auth';
-        
-        res.render("auth/logout", {
-            title: "Abgemeldet"
+        await themeManager.renderView(res, 'auth/logout', {
+            title: 'Abgemeldet'
         });
     } catch (error) {
         Logger.error("Fehler beim Logout:", error);
@@ -339,11 +331,6 @@ exports.getTokens = async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
 
     try {
-        // Auth-Layout
-        res.locals.layout = themeManager?.getLayout ? 
-            themeManager.getLayout('guild') : 
-            'layouts/guild';
-        
         // User mit Tokens aus der Datenbank laden
         const user = await dbService.query(
             "SELECT tokens FROM users WHERE _id = ?",
@@ -363,9 +350,9 @@ exports.getTokens = async (req, res) => {
             }];
         }
         
-        res.render("guild/profile/tokens", {
-            title: "API-Tokens",
-            activeMenu: "/guild/profile/tokens",
+        await themeManager.renderView(res, 'guild/profile/tokens', {
+            title: 'API-Tokens',
+            activeMenu: '/guild/profile/tokens',
             user: req.session.user,
             tokens: userTokens
         });
@@ -430,13 +417,13 @@ exports.getServerSelector = async (req, res) => {
 
         if (!botOnline) {
             Logger.warn("Bot ist offline – Server-Selector im ReadOnly-Modus.");
-            return res.render("auth/server-selector", {
-                title: "Server auswählen (Bot offline)",
+            return themeManager.renderView(res, 'auth/server-selector', {
+                title: 'Server auswählen (Bot offline)',
                 user: req.session.user,
                 guilds: [],
                 botOnline: false,
                 errorMessage: errorMessage,
-                offlineReason: "Der Bot ist derzeit offline oder wird neu gestartet. Ein Zugriff auf Server-Daten ist temporär nicht möglich."
+                offlineReason: 'Der Bot ist derzeit offline oder wird neu gestartet. Ein Zugriff auf Server-Daten ist temporär nicht möglich.'
             });
         }
 
@@ -572,9 +559,9 @@ exports.getServerSelector = async (req, res) => {
             Logger.debug(`  - ${g.name} (${g.id}): owner=${g.owner}, admin=${g.admin}, hasGuildUserAccess=${g.hasGuildUserAccess}, hasDashboardAccess=${g.hasDashboardAccess}, canManage=${g.canManage}, botInGuild=${g.botInGuild}`);
         });
         
-        return res.render("auth/server-selector", {
-            title: "Server auswählen",
-            activeMenu: "/auth/server-selector",
+        return themeManager.renderView(res, 'auth/server-selector', {
+            title: 'Server auswählen',
+            activeMenu: '/auth/server-selector',
             user: req.session.user,
             guilds: accessibleGuilds,
             botOnline: true,

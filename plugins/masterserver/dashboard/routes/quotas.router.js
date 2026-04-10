@@ -122,8 +122,7 @@ router.get('/', async (req, res) => {
             };
         }));
 
-        res.locals.layout = themeManager.getLayout('guild');
-        res.render('guild/quotas', { nodes, guildId, pageTitle: 'Ressourcen-Management' });
+        await themeManager.renderView(res, 'guild/quotas', { nodes, guildId, pageTitle: 'Ressourcen-Management' });
 
     } catch (error) {
         Logger.error('[Quotas] Fehler:', error);

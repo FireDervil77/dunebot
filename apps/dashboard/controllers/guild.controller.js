@@ -152,11 +152,7 @@ exports.getDashboard = async (req, res) => {
                 capabilities: ['manage_server'],
             }
         };
-        if (themeManager?.renderView) {
-            await themeManager.renderView(res, 'guild/dashboard', viewData);
-        } else {
-            res.render('guild/dashboard', viewData);
-        }
+        await themeManager.renderView(res, 'guild/dashboard', viewData);
     } catch (error) {
         Logger.error(`Fehler beim Rendern des Server-Dashboards für ${req.params.guildId}:`, error);
         res.status(500).render("error", {
@@ -456,20 +452,19 @@ exports.getPlugins = async (req, res) => {
         ];
 
         // Template rendern mit korrektem Titel
-        res.render("guild/plugins", {
-            title: `Plugins für ${guildName || 'Unbekannter Server'}`, // NEU: Fallback hinzugefügt
+        await themeManager.renderView(res, 'guild/plugins', {
+            title: `Plugins für ${guildName || 'Unbekannter Server'}`,
             activeMenu: `/guild/${guildId}/plugins`,
             user: res.locals.user || req.session?.user?.info || null,
             guild: {
                 ...guild,
-                name: guildName // NEU: Sicherstellen dass Name verfügbar ist
+                name: guildName
             },
             guildId,
             enabledPlugins,
             availablePlugins,
             pendingUpdates,
             breadcrumbs,
-            // Flash-Nachrichten für die View bereitstellen (immer als Arrays)
             success: Array.isArray(res.locals.success) ? res.locals.success : [],
             error: Array.isArray(res.locals.error) ? res.locals.error : [],
             meta: {
@@ -665,7 +660,7 @@ exports.getLocales = async (req, res) => {
         ];
 
         // Template rendern
-        res.render("guild/locales", {
+        await themeManager.renderView(res, 'guild/locales', {
             title: `Lokalisierung: ${guild.name}`,
             activeMenu: `/guild/${guildId}/locales`,
             user: res.locals.user || req.session?.user?.info || null,
@@ -673,7 +668,6 @@ exports.getLocales = async (req, res) => {
             guildId,
             availableLanguages,
             breadcrumbs,
-            // Flash-Nachrichten für die View bereitstellen
             success: Array.isArray(res.locals.success) ? res.locals.success : [],
             error: Array.isArray(res.locals.error) ? res.locals.error : [],
             meta: {

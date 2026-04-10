@@ -159,7 +159,7 @@ class AutoModPlugin extends DashboardPlugin {
                     }
                 }
 
-                res.render('guild/automod-settings', {
+                await themeManager.renderView(res, 'guild/automod-settings', {
                     tr: t,
                     settings,
                     guildChannels,
@@ -171,8 +171,7 @@ class AutoModPlugin extends DashboardPlugin {
                     keywordLists,
                     activeKeywordLists,
                     compoundRules,
-                    conditionTypes: AutoModCompoundRules.CONDITION_TYPES,
-                    layout: themeManager.getLayout('guild')
+                    conditionTypes: AutoModCompoundRules.CONDITION_TYPES
                 });
                 
             } catch (error) {
