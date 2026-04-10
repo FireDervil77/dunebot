@@ -6,7 +6,7 @@
  * @param {import('../lib/DBService')} dbService
  */
 module.exports = async (dbService) => {
-    // View: User mit ihren Gruppen und aggregierten Permissions
+    // View: User mit ihren Gruppen, aggregierten Permissions und max_priority für Hierarchie
     await dbService.rawQuery(`
         CREATE OR REPLACE VIEW v_guild_user_permissions AS
         SELECT
@@ -17,9 +17,11 @@ module.exports = async (dbService) => {
             gu.status,
             gu.direct_permissions,
             gu.last_login_at,
-            GROUP_CONCAT(gg.id) AS group_ids,
-            GROUP_CONCAT(gg.name SEPARATOR ', ') AS group_names,
-            GROUP_CONCAT(gg.slug SEPARATOR ', ') AS group_slugs
+            GROUP_CONCAT(DISTINCT gg.id ORDER BY gg.priority DESC) AS group_ids,
+            GROUP_CONCAT(DISTINCT gg.name ORDER BY gg.priority DESC SEPARATOR ', ') AS group_names,
+            GROUP_CONCAT(DISTINCT gg.slug ORDER BY gg.priority DESC SEPARATOR ', ') AS group_slugs,
+            GROUP_CONCAT(DISTINCT gg.permissions ORDER BY gg.priority DESC SEPARATOR '|||') AS group_permissions,
+            MAX(gg.priority) AS max_priority
         FROM guild_users gu
         LEFT JOIN guild_user_groups gug ON gu.id = gug.guild_user_id
         LEFT JOIN guild_groups gg ON gug.group_id = gg.id

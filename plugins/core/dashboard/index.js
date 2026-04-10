@@ -50,6 +50,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
         const PermissionManager = require('dunebot-sdk/lib/PermissionManager');
+        const GuildManager = ServiceManager.get('guildManager');
         const semver = require('semver');
         
         Logger.info(`[Core] Update-Hook: ${oldVersion} → ${newVersion}${guildId ? ' (Guild: ' + guildId + ')' : ' (global)'}`);
@@ -66,7 +67,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                 
                 if (!groups || groups.count === 0) {
                     Logger.warn(`[Core] Keine Gruppen für Guild ${guildId}, erstelle Standard-Gruppen...`);
-                    await PermissionManager.seedDefaultGroups(guildId);
+                    if (GuildManager) await GuildManager._seedDefaultGroups(guildId);
                 }
 
                 const [guild] = await dbService.query(
@@ -124,7 +125,7 @@ class CoreDashboardPlugin extends DashboardPlugin {
                     
                     if (!groups || groups.count === 0) {
                         Logger.warn(`[Core] Keine Gruppen für Guild ${guildId}, erstelle Standard-Gruppen...`);
-                        await PermissionManager.seedDefaultGroups(guildId);
+                        if (GuildManager) await GuildManager._seedDefaultGroups(guildId);
                     }
                     
                     // Owner zur Admin-Gruppe hinzufügen (falls nicht schon passiert)
