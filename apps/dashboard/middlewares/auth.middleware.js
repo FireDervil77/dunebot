@@ -23,6 +23,7 @@ module.exports.CheckAuth = async (req, res, next) => {
     }
     // User für alle Routen verfügbar machen (admin + guild)
     res.locals.user = req.session.user?.info || null;
+    res.locals.userGuilds = req.session.user?.guilds || [];
     return next();
 };
 
@@ -214,6 +215,7 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
         // User-Daten für Templates bereitstellen
         // WICHTIG: .info verwenden, damit isOwner/hasSystemAccess korrekt gesetzt ist!
         res.locals.user = req.session.user?.info || null;
+        res.locals.userGuilds = req.session.user?.guilds || [];
         res.locals.isServerOwner = guild.owner === true;
         res.locals.isServerAdmin = hasAccess;
         

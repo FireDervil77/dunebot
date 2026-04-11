@@ -34,18 +34,17 @@
                 return hasManageGuild || hasAdministrator;
               };
               
-              // WordPress-Stil: user ist direkt verfügbar, Fallback auf locals.user
-              const sessionUser = typeof user !== 'undefined' ? user : (typeof locals !== 'undefined' ? locals.user : null);
-              
-              // Nur Guilds anzeigen, auf denen der Bot vorhanden ist UND User Admin-Rechte hat
-              const allUserGuilds = sessionUser?.guilds || [];
-              const userGuilds = allUserGuilds.filter(hasGuildPermission);
+              // Guilds aus dem Render-Kontext (via Middleware res.locals.userGuilds → ThemeRenderer)
+              const allUserGuilds = (typeof userGuilds !== 'undefined' && Array.isArray(userGuilds)) 
+                ? userGuilds 
+                : [];
+              const managedGuilds = allUserGuilds.filter(hasGuildPermission);
               
               const currentGuildId = locals.guild?.id || locals.guildId;
-              const currentGuild = userGuilds.find(g => g.id === currentGuildId);
+              const currentGuild = managedGuilds.find(g => g.id === currentGuildId);
             %>
             <%# Nur anzeigen wenn User mehrere verwaltbare Guilds mit Bot hat %>
-            <% if (userGuilds.length > 1) { %>
+            <% if (managedGuilds.length > 1) { %>
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" id="guildSwitcher" role="button" data-toggle="dropdown" aria-expanded="false">
                 <% if (currentGuild?.icon) { %>
@@ -63,7 +62,7 @@
               <ul class="dropdown-menu dropdown-menu-right" aria-labelledby="guildSwitcher" style="max-height: 400px; overflow-y: auto;">
                 <li class="dropdown-header"><%= tr('GUILD_SWITCHER.TITLE') || 'Deine Server' %></li>
                 <li><hr class="dropdown-divider"></li>
-                <% userGuilds.forEach(guild => { %>
+                <% managedGuilds.forEach(guild => { %>
                   <li>
                     <a class="dropdown-item <%= guild.id === currentGuildId ? 'active' : '' %>" 
                        href="/guild/<%= guild.id %>/"
