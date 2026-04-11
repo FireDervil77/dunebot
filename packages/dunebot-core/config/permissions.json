@@ -334,9 +334,29 @@
       "is_dangerous": 1,
       "sort_order": 60,
       "requires": "CORE.ROLES.VIEW"
+    },
+    {
+      "key": "CORE.CHANNELS.VIEW",
+      "name": "CORE.PERM_CHANNELS_VIEW",
+      "description": "CORE.PERM_CHANNELS_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 61,
+      "requires": null
     }
   ],
   "default_groups": {
+    "user": [
+      "DASHBOARD.ACCESS",
+      "DASHBOARD.SETTINGS.VIEW",
+      "CORE.SETTINGS.VIEW",
+      "CORE.PLUGINS.VIEW",
+      "CORE.THEMES.VIEW",
+      "CORE.MEDIA.VIEW",
+      "CORE.MEDIA.UPLOAD",
+      "CORE.ROLES.VIEW",
+      "CORE.CHANNELS.VIEW"
+    ],
     "moderator": [
       "PERMISSIONS.VIEW",
       "PERMISSIONS.USERS.VIEW",

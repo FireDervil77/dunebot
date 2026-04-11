@@ -95,7 +95,9 @@
         "PERM_ROLES_VIEW": "Rollen ansehen",
         "PERM_ROLES_VIEW_DESC": "Erlaubt das Ansehen der Guild-Rollen",
         "PERM_ROLES_EDIT": "Rollen bearbeiten",
-        "PERM_ROLES_EDIT_DESC": "Erlaubt das Bearbeiten der Guild-Rollen"
+        "PERM_ROLES_EDIT_DESC": "Erlaubt das Bearbeiten der Guild-Rollen",
+        "PERM_CHANNELS_VIEW": "Channels ansehen",
+        "PERM_CHANNELS_VIEW_DESC": "Erlaubt das Ansehen der Guild-Channels"
     },
     
     "PERMISSIONS": {
