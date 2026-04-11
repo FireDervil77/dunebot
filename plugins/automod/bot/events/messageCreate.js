@@ -1,4 +1,5 @@
 const { MiscUtils, Logger, EmbedUtils } = require("dunebot-sdk/utils");
+const { parsePlaceholders } = require("dunebot-core");
 const { antispamCache, MESSAGE_SPAM_THRESHOLD, shouldModerate } = require("../utils");
 const { AutoModSettings, AutoModStrikes, AutoModLogs, AutoModEscalation, AutoModExemptions, AutoModRegexRules, AutoModCompoundRules } = require("../../shared/models");
 const { loadKeywordLists } = require("../keywordLoader");
@@ -323,18 +324,28 @@ module.exports = async (message) => {
         }
 
         // DM strike details
+        const dmDesc = settings.dm_message
+            ? parsePlaceholders(settings.dm_message, {
+                member,
+                guild,
+                extra: {
+                    strikes: String(strikesTotal),
+                    total_strikes: String(dbStrikes),
+                    max_strikes: String(settings.max_strikes)
+                }
+            })
+            : guild.getT("automod:HANDLER.AUTO_DM_DESC", {
+                guild: guild.name,
+                strikes: strikesTotal,
+                total: dbStrikes,
+                max: settings.max_strikes,
+            });
+
         const strikeEmbed = EmbedUtils.embed()
             .setThumbnail(guild.iconURL())
             .setAuthor({ name: guild.getT("automod:HANDLER.AUTO_DM_TITLE") })
             .addFields(fields)
-            .setDescription(
-                guild.getT("automod:HANDLER.AUTO_DM_DESC", {
-                    guild: guild.name,
-                    strikes: strikesTotal,
-                    total: dbStrikes,
-                    max: settings.max_strikes,
-                }),
-            );
+            .setDescription(dmDesc);
 
         if (settings.embed_colors.dm) {
             strikeEmbed.setColor(settings.embed_colors.dm);

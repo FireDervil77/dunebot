@@ -6,6 +6,7 @@ const BaseService = require("./lib/BaseService");
 const GuildManager = require("./lib/GuildManager");
 const SiteConfig = require("./lib/SiteConfig");
 const MigrationRunner = require("./lib/MigrationRunner");
+const { parsePlaceholders, buildEmbed } = require("./lib/PlaceholderParser");
 const languagesMeta = require("./languages-meta.json");
 
 module.exports = {
@@ -17,5 +18,7 @@ module.exports = {
     GuildManager,
     SiteConfig,
     MigrationRunner,
+    parsePlaceholders,
+    buildEmbed,
     languagesMeta,
 };

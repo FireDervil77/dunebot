@@ -219,6 +219,35 @@
     '#invite-tracking-pane': 'invite_tracking'
   };
 
+  // ──── Placeholder Preview Helper ────
+  function previewPlaceholders(text) {
+    if (!text) return '';
+    return text
+      .replace(/\{member:name\}/g, '<span class="text-info">ExampleUser</span>')
+      .replace(/\{member\.name\}/g, '<span class="text-info">ExampleUser</span>')
+      .replace(/\{member:nick\}/g, '<span class="text-info">ExampleUser</span>')
+      .replace(/\{member\.nick\}/g, '<span class="text-info">ExampleUser</span>')
+      .replace(/\{member:mention\}/g, '<span class="text-info">@ExampleUser</span>')
+      .replace(/\{member\.mention\}/g, '<span class="text-info">@ExampleUser</span>')
+      .replace(/\{member:tag\}/g, '<span class="text-info">ExampleUser#0001</span>')
+      .replace(/\{member\.tag\}/g, '<span class="text-info">ExampleUser#0001</span>')
+      .replace(/\{member:avatar\}/g, '<span class="text-muted">[Avatar-URL]</span>')
+      .replace(/\{member\.avatar\}/g, '<span class="text-muted">[Avatar-URL]</span>')
+      .replace(/\{member:dis\}/g, '<span class="text-info">0001</span>')
+      .replace(/\{member\.dis\}/g, '<span class="text-info">0001</span>')
+      .replace(/\{server\}/g, '<strong>My Server</strong>')
+      .replace(/\{guild:name\}/g, '<strong>My Server</strong>')
+      .replace(/\{guild\.name\}/g, '<strong>My Server</strong>')
+      .replace(/\{count\}/g, '42')
+      .replace(/\{guild:memberCount\}/g, '42')
+      .replace(/\{guild\.memberCount\}/g, '42')
+      .replace(/\{inviter:name\}/g, '<span class="text-warning">InviterName</span>')
+      .replace(/\{inviter\.name\}/g, '<span class="text-warning">InviterName</span>')
+      .replace(/\{inviter:tag\}/g, '<span class="text-warning">InviterName#0001</span>')
+      .replace(/\{inviter\.tag\}/g, '<span class="text-warning">InviterName#0001</span>')
+      .replace(/\{invites\}/g, '5');
+  }
+
   // ──── Live Preview ────
   function renderLivePreview() {
     const previewContent = document.getElementById('previewContent');
@@ -236,12 +265,7 @@
     const content = textarea ? textarea.value.trim() : '';
 
     // Replace placeholders for preview
-    const preview = content
-      .replace(/\{user\}/g, '<span class="text-info">@ExampleUser</span>')
-      .replace(/\{server\}/g, '<strong>My Server</strong>')
-      .replace(/\{memberCount\}/g, '42')
-      .replace(/\{user\.tag\}/g, 'ExampleUser#0001')
-      .replace(/\{user\.id\}/g, '123456789012345678');
+    const preview = previewPlaceholders(content);
 
     previewContent.innerHTML = preview || '<span class="text-muted">Kein Text</span>';
 
@@ -250,10 +274,10 @@
     if (embed && (embed.title || embed.description)) {
       const color = embed.color || '#5865f2';
       let html = `<div style="border-left: 4px solid ${escapeAttr(color)}; padding: 8px 12px; margin-top: 6px; background: #2f3136; border-radius: 0 4px 4px 0;">`;
-      if (embed.title) html += `<div style="font-weight:600; color: #fff; margin-bottom:4px;">${escapeHTML(embed.title)}</div>`;
-      if (embed.description) html += `<div style="color: #dcddde; font-size: 0.9em;">${escapeHTML(embed.description)}</div>`;
+      if (embed.title) html += `<div style="font-weight:600; color: #fff; margin-bottom:4px;">${previewPlaceholders(escapeHTML(embed.title))}</div>`;
+      if (embed.description) html += `<div style="color: #dcddde; font-size: 0.9em;">${previewPlaceholders(escapeHTML(embed.description))}</div>`;
       if (embed.image) html += `<div style="margin-top:6px;"><img src="${escapeAttr(embed.image)}" style="max-width:100%; border-radius:4px;" onerror="this.style.display='none'"></div>`;
-      if (embed.footer && embed.footer.text) html += `<div style="color:#72767d; font-size:0.75em; margin-top:6px;">${escapeHTML(embed.footer.text)}</div>`;
+      if (embed.footer && embed.footer.text) html += `<div style="color:#72767d; font-size:0.75em; margin-top:6px;">${previewPlaceholders(escapeHTML(embed.footer.text))}</div>`;
       if (embed.timestamp) html += `<div style="color:#72767d; font-size:0.75em;">Heute um ${new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})}</div>`;
       html += '</div>';
       previewEmbed.innerHTML = html;

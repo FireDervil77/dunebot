@@ -276,6 +276,24 @@
             </div>
             <small class="text-muted"><%= tr('automod:SETTINGS.DEBUG_MODE.HELP') %></small>
           </div>
+
+          <!-- DM Nachrichtenvorlage -->
+          <div class="mb-4">
+            <label class="form-label fw-bold">
+              <i class="fa-solid fa-pen-to-square me-2"></i>
+              DM Nachrichtenvorlage
+            </label>
+            <p class="text-muted small mb-2">Anpassbare DM-Nachricht an den User bei Strikes. Leer lassen für Standardtext.</p>
+            <textarea class="form-control" id="dm_message" name="dm_message" rows="3" placeholder="Du hast auf {guild:name} einen Strike erhalten. Strikes: {strikes}/{max_strikes}"><%= settings.dm_message || '' %></textarea>
+            <small class="form-text text-muted">
+              Platzhalter:
+              <code class="badge badge-light border" style="font-size: 0.75em;">{member:name}</code>
+              <code class="badge badge-light border" style="font-size: 0.75em;">{guild:name}</code>
+              <code class="badge badge-light border" style="font-size: 0.75em;">{strikes}</code>
+              <code class="badge badge-light border" style="font-size: 0.75em;">{total_strikes}</code>
+              <code class="badge badge-light border" style="font-size: 0.75em;">{max_strikes}</code>
+            </small>
+          </div>
             </div>
             <!-- END TAB 1 -->
 

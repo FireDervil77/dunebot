@@ -232,7 +232,8 @@ class AutoModPlugin extends DashboardPlugin {
                     raid_lockdown_enabled,
                     raid_alert_channel,
                     raid_alert_mention_mods,
-                    raid_trusted_invites
+                    raid_trusted_invites,
+                    dm_message
                 } = req.body;
                 
                 // Baue Update-Object
@@ -304,6 +305,9 @@ class AutoModPlugin extends DashboardPlugin {
                 if (raid_lockdown_enabled !== undefined) updates.raid_lockdown_enabled = toBool(raid_lockdown_enabled);
                 if (raid_alert_channel !== undefined) updates.raid_alert_channel = raid_alert_channel || null;
                 if (raid_alert_mention_mods !== undefined) updates.raid_alert_mention_mods = toBool(raid_alert_mention_mods);
+
+                // DM Message Template
+                if (dm_message !== undefined) updates.dm_message = dm_message || null;
                 
                 // Trusted Invites (Textarea → Array)
                 if (raid_trusted_invites !== undefined) {

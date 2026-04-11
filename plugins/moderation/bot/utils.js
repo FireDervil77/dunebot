@@ -1,6 +1,6 @@
 const { EmbedBuilder, GuildMember } = require("discord.js");
 const { MiscUtils, Logger } = require("dunebot-sdk/utils");
-const { ServiceManager } = require('dunebot-core');
+const { ServiceManager, parsePlaceholders } = require('dunebot-core');
 const path = require('path');
 const fs = require('fs');
 
@@ -383,10 +383,23 @@ const logModeration = async (issuer, target, reason, type, data = {}) => {
                 const userToNotify = target instanceof GuildMember ? target.user : target;
                 
                 // Erstelle DM Embed
+                const dmDescription = settings.dm_embed_description
+                    ? parsePlaceholders(settings.dm_embed_description, {
+                        member: target instanceof GuildMember ? target : undefined,
+                        user: target instanceof GuildMember ? target.user : target,
+                        guild,
+                        extra: {
+                            action: getActionVerb(type),
+                            reason: reason || "Kein Grund angegeben",
+                            case: String(caseNumber)
+                        }
+                    })
+                    : `Du wurdest auf **${guild.name}** ${getActionVerb(type)}.`;
+
                 const dmEmbed = new EmbedBuilder()
                     .setColor(embed.data.color || config["EMBED_COLORS"].DEFAULT)
                     .setTitle(`${getActionEmoji(type)} Moderation: ${type}`)
-                    .setDescription(`Du wurdest auf **${guild.name}** ${getActionVerb(type)}.`)
+                    .setDescription(dmDescription)
                     .addFields(
                         { name: "Grund", value: reason || "Kein Grund angegeben", inline: false }
                     )

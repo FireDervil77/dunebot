@@ -77,57 +77,58 @@ const buildGreeting = async (member, type, config, inviterData) => {
 
     const embed = new EmbedBuilder();
     let hasEmbed = false;
+    const embedData = config.embed || {};
 
-    if (config.embed.title) {
-        const parsed = await parse(config.embed.title, member, inviterData);
+    if (embedData.title) {
+        const parsed = await parse(embedData.title, member, inviterData);
         embed.setTitle(parsed);
         hasEmbed = true;
     }
-    if (config.embed.description) {
-        const parsed = await parse(config.embed.description, member, inviterData);
+    if (embedData.description) {
+        const parsed = await parse(embedData.description, member, inviterData);
         embed.setDescription(parsed);
         hasEmbed = true;
     }
-    if (config.embed.color) {
-        embed.setColor(config.embed.color);
+    if (embedData.color) {
+        embed.setColor(embedData.color);
     }
-    if (config.embed.thumbnail) {
+    if (embedData.thumbnail) {
         embed.setThumbnail(member.user.displayAvatarURL());
         hasEmbed = true;
     }
-    if (config.embed.footer?.text) {
-        const parsed = await parse(config.embed.footer.text, member, inviterData);
+    if (embedData.footer?.text) {
+        const parsed = await parse(embedData.footer.text, member, inviterData);
         if (parsed !== "") {
-            embed.setFooter({ text: parsed, iconURL: config.embed.footer.iconURL || null });
+            embed.setFooter({ text: parsed, iconURL: embedData.footer.iconURL || null });
             hasEmbed = true;
         }
     }
-    if (config.embed.image) {
-        const parsed = await parse(config.embed.image, member, inviterData);
+    if (embedData.image) {
+        const parsed = await parse(embedData.image, member, inviterData);
         embed.setImage(parsed);
         hasEmbed = true;
     }
-    if (config.embed.author?.name) {
-        const parsedName = await parse(config.embed.author.name, member, inviterData);
+    if (embedData.author?.name) {
+        const parsedName = await parse(embedData.author.name, member, inviterData);
         embed.setAuthor({
             name: parsedName,
-            iconURL: config.embed.author.iconURL || null,
+            iconURL: embedData.author.iconURL || null,
         });
         hasEmbed = true;
     }
     if (
-        config.embed.fields &&
-        Array.isArray(config.embed.fields) &&
-        config.embed.fields.length > 0
+        embedData.fields &&
+        Array.isArray(embedData.fields) &&
+        embedData.fields.length > 0
     ) {
-        for (const field of config.embed.fields) {
+        for (const field of embedData.fields) {
             const parsedName = await parse(field.name, member, inviterData);
             const parsedValue = await parse(field.value, member, inviterData);
             embed.addFields({ name: parsedName, value: parsedValue, inline: field.inline });
         }
         hasEmbed = true;
     }
-    if (config.embed.timestamp) {
+    if (embedData.timestamp) {
         embed.setTimestamp();
         hasEmbed = true;
     }

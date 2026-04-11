@@ -240,6 +240,25 @@
                   </div>
                 </div>
 
+                <!-- DM Nachrichtenvorlage -->
+                <div class="mb-4">
+                  <h5 class="mb-3">
+                    <i class="fa-solid fa-pen-to-square text-info me-2"></i>
+                    DM Nachrichtenvorlage
+                  </h5>
+                  <p class="text-muted small mb-3">Anpassbare Beschreibung für die DM an den betroffenen User. Leer lassen für Standardtext.</p>
+                  <textarea class="form-control" name="dm_embed_description" rows="3" placeholder="Du wurdest auf {guild:name} {action}. Grund: {reason}"><%= settings.dm_embed_description || '' %></textarea>
+                  <small class="form-text text-muted">
+                    Platzhalter:
+                    <code class="badge badge-light border" style="font-size: 0.75em;">{member:name}</code>
+                    <code class="badge badge-light border" style="font-size: 0.75em;">{member:mention}</code>
+                    <code class="badge badge-light border" style="font-size: 0.75em;">{guild:name}</code>
+                    <code class="badge badge-light border" style="font-size: 0.75em;">{action}</code>
+                    <code class="badge badge-light border" style="font-size: 0.75em;">{reason}</code>
+                    <code class="badge badge-light border" style="font-size: 0.75em;">{case}</code>
+                  </small>
+                </div>
+
                 <!-- Save Button -->
                 <div class="d-flex justify-content-end mt-4">
                   <button type="submit" class="btn btn-primary">

@@ -136,7 +136,8 @@ class ModerationPlugin extends DashboardPlugin {
                         dm_on_kick: req.body.dm_on_kick === '1' || req.body.dm_on_kick === 'on',
                         dm_on_ban: req.body.dm_on_ban === '1' || req.body.dm_on_ban === 'on',
                         dm_on_timeout: req.body.dm_on_timeout === '1' || req.body.dm_on_timeout === 'on',
-                        default_reason: req.body.default_reason || null
+                        default_reason: req.body.default_reason || null,
+                        dm_embed_description: req.body.dm_embed_description || null
                     };
                 }
                 
@@ -147,8 +148,8 @@ class ModerationPlugin extends DashboardPlugin {
                     const result = await dbService.query(`
                         INSERT INTO moderation_settings 
                         (guild_id, modlog_channel, max_warn_limit, max_warn_action, modlog_events, 
-                         dm_on_warn, dm_on_kick, dm_on_ban, dm_on_timeout, default_reason, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                         dm_on_warn, dm_on_kick, dm_on_ban, dm_on_timeout, default_reason, dm_embed_description, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                         ON DUPLICATE KEY UPDATE
                             modlog_channel = VALUES(modlog_channel),
                             max_warn_limit = VALUES(max_warn_limit),
@@ -159,6 +160,7 @@ class ModerationPlugin extends DashboardPlugin {
                             dm_on_ban = VALUES(dm_on_ban),
                             dm_on_timeout = VALUES(dm_on_timeout),
                             default_reason = VALUES(default_reason),
+                            dm_embed_description = VALUES(dm_embed_description),
                             updated_at = NOW()
                     `, [
                         guildId,
@@ -170,7 +172,8 @@ class ModerationPlugin extends DashboardPlugin {
                         data.dm_on_kick ? 1 : 0,
                         data.dm_on_ban ? 1 : 0,
                         data.dm_on_timeout ? 1 : 0,
-                        data.default_reason || null
+                        data.default_reason || null,
+                        data.dm_embed_description || null
                     ]);
                     
                     res.json({ success: true, message: 'Moderation-Einstellungen erfolgreich gespeichert' });
@@ -183,15 +186,15 @@ class ModerationPlugin extends DashboardPlugin {
             // PUT / - Save Moderation Settings (Legacy)
             this.guildRouter.put('/', requirePermission('MODERATION.SETTINGS.EDIT'), async (req, res) => {
                 const guildId = req.params.guildId || res.locals.guildId;
-                const { log_channel, maxwarn_count, maxwarn_action, modlog_events, dm_on_warn, dm_on_kick, dm_on_ban, dm_on_timeout, default_reason } = req.body;
+                const { log_channel, maxwarn_count, maxwarn_action, modlog_events, dm_on_warn, dm_on_kick, dm_on_ban, dm_on_timeout, default_reason, dm_embed_description } = req.body;
                 const Logger = ServiceManager.get('Logger');
                 
                 try {
                     const result = await dbService.query(`
                         INSERT INTO moderation_settings 
                         (guild_id, modlog_channel, max_warn_limit, max_warn_action, modlog_events, 
-                         dm_on_warn, dm_on_kick, dm_on_ban, dm_on_timeout, default_reason, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                         dm_on_warn, dm_on_kick, dm_on_ban, dm_on_timeout, default_reason, dm_embed_description, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                         ON DUPLICATE KEY UPDATE
                             modlog_channel = VALUES(modlog_channel),
                             max_warn_limit = VALUES(max_warn_limit),
@@ -202,6 +205,7 @@ class ModerationPlugin extends DashboardPlugin {
                             dm_on_ban = VALUES(dm_on_ban),
                             dm_on_timeout = VALUES(dm_on_timeout),
                             default_reason = VALUES(default_reason),
+                            dm_embed_description = VALUES(dm_embed_description),
                             updated_at = NOW()
                     `, [
                         guildId,
@@ -213,7 +217,8 @@ class ModerationPlugin extends DashboardPlugin {
                         dm_on_kick ? 1 : 0,
                         dm_on_ban ? 1 : 0,
                         dm_on_timeout ? 1 : 0,
-                        default_reason || null
+                        default_reason || null,
+                        dm_embed_description || null
                     ]);
                     
                     res.json({ success: true });
