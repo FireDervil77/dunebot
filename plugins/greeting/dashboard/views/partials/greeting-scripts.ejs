@@ -260,17 +260,29 @@
     const type = TAB_TYPE_MAP[activeTab.getAttribute('href')];
     if (!type) return;
 
-    // Get message text
-    const textarea = document.querySelector(`[name="${type}_content"]`);
-    const content = textarea ? textarea.value.trim() : '';
+    // Get message text – Verification hat eigene Textarea (id statt name)
+    let content = '';
+    if (type === 'verification') {
+      const vmsg = document.getElementById('verificationMessage');
+      content = vmsg ? vmsg.value.trim() : '';
+    } else {
+      const textarea = document.querySelector(`[name="${type}_content"]`);
+      content = textarea ? textarea.value.trim() : '';
+    }
 
     // Replace placeholders for preview
     const preview = previewPlaceholders(content);
 
     previewContent.innerHTML = preview || '<span class="text-muted">Kein Text</span>';
 
+    // Verification-Tab hat kein Embed-Builder-Formular → Embed-Bereich leeren
+    if (type === 'verification') {
+      previewEmbed.innerHTML = '';
+      return;
+    }
+
     // Embed preview
-    const embed = collectEmbed(type.replace('_', '_'));
+    const embed = collectEmbed(type);
     if (embed && (embed.title || embed.description)) {
       const color = embed.color || '#5865f2';
       let html = `<div style="border-left: 4px solid ${escapeAttr(color)}; padding: 8px 12px; margin-top: 6px; background: #2f3136; border-radius: 0 4px 4px 0;">`;
@@ -301,6 +313,11 @@
       el.addEventListener('input', renderLivePreview);
       el.addEventListener('change', renderLivePreview);
     });
+    // Verification-Textarea auch an Live-Preview binden
+    const vmsg = document.getElementById('verificationMessage');
+    if (vmsg) {
+      vmsg.addEventListener('input', renderLivePreview);
+    }
     initMessageModes();
     renderLivePreview();
   });

@@ -150,6 +150,9 @@
                   <div class="form-group">
                     <label><%= tr('greeting:VERIFICATION.MESSAGE') %></label>
                     <textarea id="verificationMessage" class="form-control" rows="3" placeholder="<%= tr('greeting:VERIFICATION.MESSAGE_PH') %>"><%= settings.verification.message %></textarea>
+                    <small class="text-muted">
+                      Platzhalter: <code>{guild:name}</code> <code>{server}</code> <code>{guild:memberCount}</code> <code>{count}</code>
+                    </small>
                   </div>
 
                   <!-- Info -->

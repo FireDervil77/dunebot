@@ -1,5 +1,5 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
-const { ServiceManager } = require('dunebot-core');
+const { ServiceManager, parsePlaceholders } = require('dunebot-core');
 
 // Simple math captcha cache: Map<`${guildId}-${userId}`, { answer: number, expires: number }>
 const captchaCache = new Map();
@@ -153,15 +153,17 @@ module.exports.sendVerificationPanel = async (guild, settings) => {
     const channel = guild.channels.cache.get(channelId);
     if (!channel) return;
 
-    let messageText = settings.verification_message || '✅ Klicke den Button um dich zu verifizieren!';
+    const rawMessage = settings.verification_message || '✅ Klicke den Button um dich zu verifizieren!';
+    const ctx = { guild, extra: {} };
+    let messageText = parsePlaceholders(rawMessage, ctx);
     let embed = null;
 
     try {
         const parsed = JSON.parse(messageText);
         if (parsed && parsed.title) {
             embed = new EmbedBuilder()
-                .setTitle(parsed.title)
-                .setDescription(parsed.description || null)
+                .setTitle(parsePlaceholders(parsed.title, ctx))
+                .setDescription(parsed.description ? parsePlaceholders(parsed.description, ctx) : null)
                 .setColor(parsed.color ? parseInt(parsed.color.replace('#', ''), 16) : 0x5865f2);
             messageText = null;
         }
