@@ -292,20 +292,35 @@
           </div>
           <hr>
           <h6><i class="fa-solid fa-code me-2"></i><%= tr('greeting:HELP.PLACEHOLDERS_TITLE') %></h6>
-          <div class="d-flex flex-wrap" style="gap: 4px;">
+
+          <p class="text-muted small mb-1"><i class="fa-solid fa-user me-1"></i> <strong>Member</strong></p>
+          <div class="d-flex flex-wrap mb-2" style="gap: 4px;">
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:name}</code>
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:nick}</code>
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:mention}</code>
+            <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:tag}</code>
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:avatar}</code>
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:id}</code>
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:joinedAt}</code>
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:createdAt}</code>
+          </div>
+
+          <p class="text-muted small mb-1"><i class="fa-solid fa-server me-1"></i> <strong>Server</strong></p>
+          <div class="d-flex flex-wrap mb-2" style="gap: 4px;">
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:name}</code>
+            <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{server}</code>
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:memberCount}</code>
+            <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{count}</code>
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:id}</code>
+            <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:icon}</code>
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:boostCount}</code>
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:boostLevel}</code>
+          </div>
+
+          <p class="text-muted small mb-1"><i class="fa-solid fa-envelope me-1"></i> <strong>Inviter</strong> <span class="text-muted">(nur Welcome)</span></p>
+          <div class="d-flex flex-wrap" style="gap: 4px;">
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{inviter:name}</code>
+            <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{inviter:tag}</code>
             <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{invites}</code>
           </div>
           <small class="text-muted d-block mt-1">Klicke zum Kopieren</small>
@@ -313,7 +328,7 @@
       </div>
 
       <!-- Live Preview Card -->
-      <div class="card card-outline card-dark" id="previewCard">
+      <div class="card card-outline card-dark mt-3" id="previewCard">
         <div class="card-header">
           <h3 class="card-title"><i class="fa-solid fa-eye me-2"></i><%= tr('greeting:PREVIEW.TITLE') %></h3>
         </div>
