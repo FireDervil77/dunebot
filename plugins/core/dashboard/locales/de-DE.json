@@ -91,10 +91,19 @@
         "PERM_MEDIA_UPLOAD": "Medien hochladen",
         "PERM_MEDIA_UPLOAD_DESC": "Erlaubt das Hochladen von Bildern und Dateien",
         "PERM_MEDIA_DELETE": "Medien löschen",
-        "PERM_MEDIA_DELETE_DESC": "Erlaubt das Löschen von Medien aus der Bibliothek (KRITISCH)"
+        "PERM_MEDIA_DELETE_DESC": "Erlaubt das Löschen von Medien aus der Bibliothek (KRITISCH)",
+        "PERM_ROLES_VIEW": "Rollen ansehen",
+        "PERM_ROLES_VIEW_DESC": "Erlaubt das Ansehen der Guild-Rollen",
+        "PERM_ROLES_EDIT": "Rollen bearbeiten",
+        "PERM_ROLES_EDIT_DESC": "Erlaubt das Bearbeiten der Guild-Rollen"
     },
     
     "PERMISSIONS": {
+        "VIEW": "Berechtigungen ansehen",
+        "VIEW_DESC": "Erlaubt das Ansehen der Berechtigungs-Übersicht",
+        "MATRIX_VIEW": "Berechtigungsmatrix ansehen",
+        "MATRIX_VIEW_DESC": "Erlaubt das Ansehen der Berechtigungsmatrix",
+        
         "DASHBOARD_ACCESS": "Dashboard-Zugriff",
         "DASHBOARD_ACCESS_DESC": "Erlaubt den grundlegenden Zugriff auf das Dashboard",
         "DASHBOARD_SETTINGS_VIEW": "Dashboard-Einstellungen ansehen",

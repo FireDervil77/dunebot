@@ -103,9 +103,9 @@
                 <tr data-permission="<%= perm.permission_key %>">
                   <td style="position: sticky; left: 0; z-index: 5; background-color: white;">
                     <div class="ps-3">
-                      <strong><%= tr(perm.name_translation_key) %></strong>
+                      <strong><%= perm.resolved_name || tr(perm.name_translation_key) %></strong>
                       <% if (perm.description_translation_key) { %>
-                      <br><small class="text-muted"><%= tr(perm.description_translation_key) %></small>
+                      <br><small class="text-muted"><%= perm.resolved_description || tr(perm.description_translation_key) %></small>
                       <% } %>
                       <% if (perm.is_dangerous) { %>
                       <br><span class="badge bg-danger">Kritisch</span>

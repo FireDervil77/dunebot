@@ -210,9 +210,14 @@ class GuildManager {
         let adminPermissions = {};
         try {
             const permDefs = await dbService.query(
-                'SELECT permission_key FROM permission_definitions WHERE is_active = 1'
+                'SELECT permission_key, category FROM permission_definitions WHERE is_active = 1'
             );
+            // SYSTEM & SUPERADMIN Permissions nur auf der Control-Guild vergeben
+            const isControlGuild = guildId === process.env.CONTROL_GUILD_ID;
             for (const p of (permDefs || [])) {
+                if (!isControlGuild && (p.category === 'system' || p.category === 'superadmin')) {
+                    continue;
+                }
                 adminPermissions[p.permission_key] = true;
             }
         } catch (err) {

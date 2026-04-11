@@ -928,10 +928,35 @@ router.get('/matrix', requireAnyPermission(['PERMISSIONS.GROUPS.VIEW', 'PERMISSI
             WHERE is_active = 1
             ORDER BY category, sort_order, permission_key
         `);
-        
+
+        // SYSTEM & SUPERADMIN Kategorien nur auf der Control-Guild anzeigen
+        const isControlGuild = guildId === process.env.CONTROL_GUILD_ID;
+        const filteredPermissions = isControlGuild
+            ? permissions
+            : permissions.filter(perm => perm.category !== 'system' && perm.category !== 'superadmin');
+
+        // Translation-Keys auflösen (Kern-Permissions nutzen 'core' Namespace)
+        const i18n = ServiceManager.get('i18n');
+        filteredPermissions.forEach(perm => {
+            if (perm.name_translation_key) {
+                let translated = i18n.tr(perm.name_translation_key);
+                if (translated === perm.name_translation_key) {
+                    translated = i18n.tr('core:' + perm.name_translation_key);
+                }
+                perm.resolved_name = translated;
+            }
+            if (perm.description_translation_key) {
+                let translated = i18n.tr(perm.description_translation_key);
+                if (translated === perm.description_translation_key) {
+                    translated = i18n.tr('core:' + perm.description_translation_key);
+                }
+                perm.resolved_description = translated;
+            }
+        });
+
         // Gruppiere nach Kategorie
         const permissionsByCategory = {};
-        permissions.forEach(perm => {
+        filteredPermissions.forEach(perm => {
             if (!permissionsByCategory[perm.category]) {
                 permissionsByCategory[perm.category] = [];
             }
@@ -975,6 +1000,10 @@ router.post('/matrix', requirePermission('PERMISSIONS.ASSIGN'), async (req, res)
         }
         
         // Für jede Gruppe: Permissions MERGEN (nicht ersetzen!)
+        // SYSTEM & SUPERADMIN Permissions nur auf der Control-Guild erlauben
+        const isControlGuild = guildId === process.env.CONTROL_GUILD_ID;
+        const restrictedPrefixes = ['SYSTEM.', 'SUPERADMIN.'];
+
         for (const [groupId, permissions] of Object.entries(updates)) {
             // Prüfe ob Gruppe zu dieser Guild gehört
             const groups = await dbService.query(
@@ -996,6 +1025,11 @@ router.post('/matrix', requirePermission('PERMISSIONS.ASSIGN'), async (req, res)
             // Merge: Änderungen auf bestehende Permissions anwenden
             const mergedPermissions = { ...existingPerms };
             for (const [permKey, value] of Object.entries(permissions)) {
+                // SYSTEM/SUPERADMIN Permissions auf Nicht-Control-Guilds blocken
+                if (!isControlGuild && restrictedPrefixes.some(prefix => permKey.startsWith(prefix))) {
+                    Logger.warn(`[Permissions] Blocked restricted permission ${permKey} for non-control guild ${guildId}`);
+                    continue;
+                }
                 if (value === true || value === 'true' || value === '1') {
                     mergedPermissions[permKey] = true;
                 } else {
