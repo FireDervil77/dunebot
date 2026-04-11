@@ -29,15 +29,38 @@ module.exports = async (interaction) => {
         const verifiedRoleId = settings.verification_role_id;
         const unverifiedRoleId = settings.verification_remove_role_id;
 
+        // ===== STATUS CHECK BUTTON =====
+        if (interaction.customId === 'greeting:VERIFY_STATUS') {
+            const isVerified = verifiedRoleId && member.roles.cache.has(verifiedRoleId);
+            const statusEmbed = new EmbedBuilder()
+                .setColor(isVerified ? 0x57F287 : 0xED4245)
+                .setTitle(isVerified ? '✅ Verifiziert' : '❌ Nicht verifiziert')
+                .setDescription(isVerified
+                    ? `Du bist auf **${guild.name}** verifiziert und hast vollen Zugang!`
+                    : `Du bist noch **nicht verifiziert**. Klicke auf den **Verifizieren**-Button, um Zugang zu erhalten.`)
+                .setThumbnail(member.user.displayAvatarURL({ size: 128 }))
+                .addFields({ name: 'Mitglied seit', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`, inline: true })
+                .setFooter({ text: guild.name, iconURL: guild.iconURL({ size: 64 }) })
+                .setTimestamp();
+            return interaction.reply({ embeds: [statusEmbed], ephemeral: true });
+        }
+
         // Already verified?
         if (verifiedRoleId && member.roles.cache.has(verifiedRoleId)) {
-            return interaction.reply({ content: '✅ Du bist bereits verifiziert!', ephemeral: true });
+            const alreadyEmbed = new EmbedBuilder()
+                .setColor(0x57F287)
+                .setTitle('✅ Bereits verifiziert')
+                .setDescription(`Du bist bereits auf **${guild.name}** verifiziert!`)
+                .setThumbnail(member.user.displayAvatarURL({ size: 128 }))
+                .setTimestamp();
+            return interaction.reply({ embeds: [alreadyEmbed], ephemeral: true });
         }
 
         // ===== BUTTON Verification =====
         if (settings.verification_type === 'button') {
             await assignVerification(member, verifiedRoleId, unverifiedRoleId, Logger);
-            return interaction.reply({ content: '✅ Du wurdest erfolgreich verifiziert!', ephemeral: true });
+            const successEmbed = buildSuccessEmbed(guild, member);
+            return interaction.reply({ embeds: [successEmbed], ephemeral: true });
         }
 
         // ===== CAPTCHA Verification =====
@@ -57,8 +80,15 @@ module.exports = async (interaction) => {
                     ...generateCaptchaButtons(answer)
                 );
 
+                const captchaEmbed = new EmbedBuilder()
+                    .setColor(0x5865F2)
+                    .setTitle('🔢 Captcha-Verifizierung')
+                    .setDescription(`Löse die folgende Aufgabe, um dich zu verifizieren:\n\n**Was ist ${a} + ${b}?**`)
+                    .setFooter({ text: 'Du hast 2 Minuten Zeit' })
+                    .setTimestamp();
+
                 return interaction.reply({
-                    content: `🔢 **Captcha:** Was ist **${a} + ${b}**?`,
+                    embeds: [captchaEmbed],
                     components: [row],
                     ephemeral: true
                 });
@@ -72,27 +102,36 @@ module.exports = async (interaction) => {
 
                 if (!captcha || Date.now() > captcha.expires) {
                     captchaCache.delete(cacheKey);
-                    return interaction.update({
-                        content: '⏰ Captcha abgelaufen. Bitte klicke erneut auf den Verifizieren-Button.',
-                        components: []
-                    });
+                    const expiredEmbed = new EmbedBuilder()
+                        .setColor(0xFEE75C)
+                        .setTitle('⏰ Captcha abgelaufen')
+                        .setDescription('Bitte klicke erneut auf den **Verifizieren**-Button für ein neues Captcha.');
+                    return interaction.update({ embeds: [expiredEmbed], components: [] });
                 }
 
                 if (selectedAnswer === captcha.answer) {
                     captchaCache.delete(cacheKey);
                     await assignVerification(member, verifiedRoleId, unverifiedRoleId, Logger);
-                    return interaction.update({
-                        content: '✅ Captcha korrekt! Du wurdest erfolgreich verifiziert!',
-                        components: []
-                    });
+                    const successEmbed = buildSuccessEmbed(guild, member);
+                    return interaction.update({ embeds: [successEmbed], components: [] });
                 } else {
                     captchaCache.delete(cacheKey);
-                    return interaction.update({
-                        content: '❌ Falsche Antwort! Bitte klicke erneut auf den Verifizieren-Button.',
-                        components: []
-                    });
+                    const wrongEmbed = new EmbedBuilder()
+                        .setColor(0xED4245)
+                        .setTitle('❌ Falsche Antwort')
+                        .setDescription('Bitte klicke erneut auf den **Verifizieren**-Button für ein neues Captcha.');
+                    return interaction.update({ embeds: [wrongEmbed], components: [] });
                 }
             }
+        }
+
+        // ===== REACTION type: Button still works as fallback entry point =====
+        if (settings.verification_type === 'reaction') {
+            const infoEmbed = new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('ℹ️ Reaction-Verifizierung')
+                .setDescription(`Reagiere mit ${settings.verification_emoji || '✅'} auf die Verifizierungs-Nachricht, um dich zu verifizieren!`);
+            return interaction.reply({ embeds: [infoEmbed], ephemeral: true });
         }
 
     } catch (error) {
@@ -102,6 +141,19 @@ module.exports = async (interaction) => {
         }
     }
 };
+
+/**
+ * Builds a success embed after verification
+ */
+function buildSuccessEmbed(guild, member) {
+    return new EmbedBuilder()
+        .setColor(0x57F287)
+        .setTitle('✅ Erfolgreich verifiziert!')
+        .setDescription(`Willkommen auf **${guild.name}**!\nDu hast jetzt vollen Zugang zum Server.`)
+        .setThumbnail(member.user.displayAvatarURL({ size: 128 }))
+        .setFooter({ text: guild.name, iconURL: guild.iconURL({ size: 64 }) })
+        .setTimestamp();
+}
 
 /**
  * Assigns verified role and removes unverified role
@@ -147,6 +199,7 @@ function generateCaptchaButtons(correctAnswer) {
  */
 module.exports.sendVerificationPanel = async (guild, settings) => {
     const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
     const channelId = settings.verification_channel;
     if (!channelId) return;
 
@@ -169,17 +222,41 @@ module.exports.sendVerificationPanel = async (guild, settings) => {
         }
     } catch { /* plain text */ }
 
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('greeting:VERIFY')
-            .setLabel(settings.verification_type === 'captcha' ? '🔢 Verifizieren (Captcha)' : '✅ Verifizieren')
-            .setStyle(ButtonStyle.Success)
-    );
-
-    const payload = { components: [row] };
+    const payload = {};
     if (messageText) payload.content = messageText;
     if (embed) payload.embeds = [embed];
 
-    await channel.send(payload);
-    Logger.info(`[Greeting] Verification panel sent to #${channel.name} in ${guild.name}`);
+    // For reaction type: no buttons, add reaction emoji instead
+    if (settings.verification_type === 'reaction') {
+        const emoji = settings.verification_emoji || '✅';
+        const reactionMsg = await channel.send(payload);
+        await reactionMsg.react(emoji);
+
+        // Store message ID for reaction tracking
+        await dbService.query(
+            'UPDATE greeting_settings SET verification_message_id = ? WHERE guild_id = ?',
+            [reactionMsg.id, guild.id]
+        );
+        Logger.info(`[Greeting] Reaction verification panel sent to #${channel.name} in ${guild.name} (emoji: ${emoji})`);
+    } else {
+        // Button/Captcha: add verify button + status button
+        const verifyLabel = settings.verification_type === 'captcha'
+            ? '🔢 Verifizieren (Captcha)'
+            : '✅ Verifizieren';
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('greeting:VERIFY')
+                .setLabel(verifyLabel)
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId('greeting:VERIFY_STATUS')
+                .setLabel('📋 Status prüfen')
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+        payload.components = [row];
+        await channel.send(payload);
+        Logger.info(`[Greeting] Verification panel sent to #${channel.name} in ${guild.name}`);
+    }
 };

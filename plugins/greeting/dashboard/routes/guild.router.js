@@ -209,7 +209,8 @@ router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => 
                 role_id: dbSettings.verification_role_id || '',
                 type: dbSettings.verification_type || 'button',
                 message: dbSettings.verification_message || '',
-                remove_role_id: dbSettings.verification_remove_role_id || ''
+                remove_role_id: dbSettings.verification_remove_role_id || '',
+                emoji: dbSettings.verification_emoji || '✅'
             }
         };
 
@@ -221,6 +222,28 @@ router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => 
                 [guildId]
             );
         } catch { /* table might not exist yet */ }
+
+        // Load reaction role panels with mappings
+        let reactionPanels = [];
+        try {
+            const panels = await dbService.query(
+                'SELECT * FROM greeting_reaction_panels WHERE guild_id = ? ORDER BY created_at DESC',
+                [guildId]
+            );
+            for (const panel of panels) {
+                const mappings = await dbService.query(
+                    'SELECT * FROM greeting_reaction_roles WHERE panel_id = ?',
+                    [panel.id]
+                );
+                // Resolve role names
+                const rolesData = (rolesResp && rolesResp.success) ? rolesResp.roles : [];
+                panel.mappings = mappings.map(m => ({
+                    ...m,
+                    role_name: rolesData.find(r => r.id === m.role_id)?.name || m.role_id
+                }));
+                reactionPanels.push(panel);
+            }
+        } catch { /* tables might not exist yet */ }
         
         await themeManager.renderView(res, 'guild/greeting-settings', {
             title: 'Greeting Settings',
@@ -230,7 +253,8 @@ router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => 
             roles: (rolesResp && rolesResp.success) ? rolesResp.roles : [],
             settings: greetingSettings,
             inviteMappings,
-            tabs: ['Welcome', 'Farewell', 'DM Welcome', 'Autorole', 'Boost', 'Verification', 'Invite Tracking']
+            reactionPanels,
+            tabs: ['Welcome', 'Farewell', 'DM Welcome', 'Autorole', 'Boost', 'Verification', 'Reaction Roles', 'Invite Tracking']
         });
         
     } catch (error) {
@@ -293,7 +317,8 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
             verification_role_id: null,
             verification_type: 'button',
             verification_message: null,
-            verification_remove_role_id: null
+            verification_remove_role_id: null,
+            verification_emoji: '✅'
         };
         
         // Parse existing JSON embeds
@@ -647,6 +672,7 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                 if (body.verification_type !== undefined) settings.verification_type = body.verification_type || 'button';
                 if (body.verification_message !== undefined) settings.verification_message = body.verification_message || null;
                 if (body.verification_remove_role_id !== undefined) settings.verification_remove_role_id = body.verification_remove_role_id || null;
+                if (body.verification_emoji !== undefined) settings.verification_emoji = body.verification_emoji || '✅';
             }
             if (body.action === 'enable') settings.verification_enabled = 1;
             if (body.action === 'disable') settings.verification_enabled = 0;
@@ -664,8 +690,8 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                 welcome_image_enabled, welcome_image_bg, welcome_image_text, welcome_image_color,
                 farewell_enabled, farewell_channel, farewell_content, farewell_embed,
                 boost_enabled, boost_channel, boost_content, boost_embed,
-                verification_enabled, verification_channel, verification_role_id, verification_type, verification_message, verification_remove_role_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                verification_enabled, verification_channel, verification_role_id, verification_type, verification_message, verification_remove_role_id, verification_emoji
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 autorole_id = VALUES(autorole_id),
                 autorole_ids = VALUES(autorole_ids),
@@ -694,6 +720,7 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                 verification_type = VALUES(verification_type),
                 verification_message = VALUES(verification_message),
                 verification_remove_role_id = VALUES(verification_remove_role_id),
+                verification_emoji = VALUES(verification_emoji),
                 updated_at = CURRENT_TIMESTAMP
         `, [
             guildId,
@@ -723,7 +750,8 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
             settings.verification_role_id,
             settings.verification_type,
             settings.verification_message,
-            settings.verification_remove_role_id
+            settings.verification_remove_role_id,
+            settings.verification_emoji || '✅'
         ]);
         
         Logger.info(`[Greeting] Settings für Guild ${guildId} gespeichert`);
@@ -821,6 +849,89 @@ router.post('/send-verification-panel', requirePermission('GREETING.SETTINGS.EDI
         }
     } catch (error) {
         Logger.error('[Greeting] Error sending verification panel:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ============================================================================
+// REACTION ROLE PANELS CRUD
+// ============================================================================
+
+router.post('/reaction-panels', requirePermission('GREETING.SETTINGS.EDIT'), async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const { title, description, color, channel_id, mappings } = req.body;
+
+    if (!channel_id) return res.status(400).json({ success: false, message: 'Channel is required' });
+    if (!mappings || !Array.isArray(mappings) || mappings.length === 0) {
+        return res.status(400).json({ success: false, message: 'At least one emoji-role mapping is required' });
+    }
+    if (mappings.length > 20) {
+        return res.status(400).json({ success: false, message: 'Maximum 20 mappings per panel' });
+    }
+
+    try {
+        // Create panel
+        const result = await dbService.query(`
+            INSERT INTO greeting_reaction_panels (guild_id, channel_id, title, description, color)
+            VALUES (?, ?, ?, ?, ?)
+        `, [guildId, channel_id, title || 'Reaction Roles', description || null, color || '#5865f2']);
+
+        const panelId = result.insertId;
+
+        // Insert mappings
+        for (const m of mappings) {
+            if (!m.emoji || !m.role_id) continue;
+            await dbService.query(`
+                INSERT INTO greeting_reaction_roles (panel_id, emoji, role_id, description)
+                VALUES (?, ?, ?, ?)
+            `, [panelId, m.emoji.substring(0, 100), m.role_id, m.description || null]);
+        }
+
+        Logger.info(`[Greeting] Reaction panel created (id=${panelId}) for guild ${guildId} with ${mappings.length} mappings`);
+        res.json({ success: true, panelId });
+    } catch (error) {
+        Logger.error('[Greeting] Error creating reaction panel:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/reaction-panels/:id/send', requirePermission('GREETING.SETTINGS.EDIT'), async (req, res) => {
+    const ipcServer = ServiceManager.get('ipcServer');
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const panelId = parseInt(req.params.id);
+    if (isNaN(panelId)) return res.status(400).json({ success: false, message: 'Invalid panel ID' });
+
+    try {
+        const responses = await ipcServer.broadcast('greeting:SEND_REACTION_ROLE_PANEL', { guildId, panelId });
+        const resp = responses && responses.length > 0 ? responses[0] : null;
+        if (resp && resp.success) {
+            res.json({ success: true });
+        } else {
+            res.json({ success: false, message: resp?.error || 'Bot did not respond' });
+        }
+    } catch (error) {
+        Logger.error('[Greeting] Error sending reaction panel:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.delete('/reaction-panels/:id', requirePermission('GREETING.SETTINGS.EDIT'), async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    const panelId = parseInt(req.params.id);
+    if (isNaN(panelId)) return res.status(400).json({ success: false, message: 'Invalid panel ID' });
+
+    try {
+        // CASCADE will delete mappings too
+        await dbService.query(
+            'DELETE FROM greeting_reaction_panels WHERE id = ? AND guild_id = ?',
+            [panelId, guildId]
+        );
+        res.json({ success: true });
+    } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 });

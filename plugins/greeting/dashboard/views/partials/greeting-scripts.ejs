@@ -216,6 +216,7 @@
     '#autorole-pane': 'autorole',
     '#boost-pane': 'boost',
     '#verification-pane': 'verification',
+    '#reaction-roles-pane': 'reaction_roles',
     '#invite-tracking-pane': 'invite_tracking'
   };
 
@@ -340,7 +341,8 @@
       verification_channel: document.getElementById('verificationChannel').value,
       verification_role_id: document.getElementById('verificationRoleId').value,
       verification_remove_role_id: document.getElementById('verificationRemoveRoleId').value,
-      verification_message: document.getElementById('verificationMessage').value
+      verification_message: document.getElementById('verificationMessage').value,
+      verification_emoji: document.getElementById('verificationEmoji')?.value || '✅'
     };
 
     try {
@@ -358,6 +360,15 @@
       }
     } catch(e) {
       console.error('[Greeting] saveVerification error:', e);
+    }
+  };
+
+  // Toggle emoji field visibility based on verification type
+  window.toggleVerificationEmoji = function() {
+    const type = document.getElementById('verificationType').value;
+    const emojiGroup = document.getElementById('verificationEmojiGroup');
+    if (emojiGroup) {
+      emojiGroup.style.display = type === 'reaction' ? '' : 'none';
     }
   };
 
@@ -423,5 +434,134 @@
       console.error('[Greeting] deleteInviteMapping error:', e);
     }
   };
+
+  // ==================== REACTION ROLES ====================
+  const rrMappings = []; // temp storage for new panel mappings
+
+  window.addRRMapping = function() {
+    const emoji = document.getElementById('rrNewEmoji').value.trim();
+    const roleId = document.getElementById('rrNewRole').value;
+    const roleName = document.getElementById('rrNewRole').selectedOptions[0]?.text || roleId;
+    const desc = document.getElementById('rrNewDesc').value.trim();
+
+    if (!emoji || !roleId) return alert('Emoji und Rolle sind erforderlich');
+
+    // Check for duplicates
+    if (rrMappings.some(m => m.emoji === emoji)) return alert('Dieses Emoji ist bereits zugeordnet');
+
+    rrMappings.push({ emoji, role_id: roleId, role_name: roleName, description: desc });
+    renderRRMappings();
+
+    // Clear inputs
+    document.getElementById('rrNewEmoji').value = '';
+    document.getElementById('rrNewRole').value = '';
+    document.getElementById('rrNewDesc').value = '';
+  };
+
+  function renderRRMappings() {
+    const container = document.getElementById('rrMappingsList');
+    if (!container) return;
+    if (rrMappings.length === 0) {
+      container.innerHTML = '<p class="text-muted small">Noch keine Zuordnungen hinzugefügt.</p>';
+      return;
+    }
+    let html = '<div class="d-flex flex-wrap mb-2" style="gap: 6px;">';
+    rrMappings.forEach((m, i) => {
+      html += `<span class="badge badge-light border p-2" style="font-size: 0.9em;">
+        ${escapeHTML(m.emoji)} → <strong>${escapeHTML(m.role_name)}</strong>
+        ${m.description ? '<small class="text-muted ml-1">(' + escapeHTML(m.description) + ')</small>' : ''}
+        <button type="button" class="btn btn-xs btn-link text-danger p-0 ml-1" onclick="removeRRMapping(${i})">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </span>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  window.removeRRMapping = function(index) {
+    rrMappings.splice(index, 1);
+    renderRRMappings();
+  };
+
+  window.createReactionPanel = async function() {
+    const title = document.getElementById('rrPanelTitle').value.trim();
+    const description = document.getElementById('rrPanelDesc').value.trim();
+    const color = document.getElementById('rrPanelColor').value;
+    const channel_id = document.getElementById('rrPanelChannel').value;
+
+    if (!channel_id) return alert('Bitte einen Channel auswählen');
+    if (rrMappings.length === 0) return alert('Bitte mindestens eine Emoji-Rolle hinzufügen');
+
+    try {
+      const resp = await fetch(verificationBasePath + '/reaction-panels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title || 'Reaction Roles',
+          description,
+          color,
+          channel_id,
+          mappings: rrMappings.map(m => ({ emoji: m.emoji, role_id: m.role_id, description: m.description }))
+        })
+      });
+      const result = await resp.json();
+      if (result.success) {
+        if (window.showToast) showToast('Panel erstellt!', 'success');
+        else alert('Panel erstellt!');
+        rrMappings.length = 0;
+        renderRRMappings();
+        setTimeout(() => location.reload(), 800);
+      } else {
+        alert(result.message || 'Fehler');
+      }
+    } catch(e) {
+      console.error('[Greeting] createReactionPanel error:', e);
+    }
+  };
+
+  window.sendReactionPanel = async function(panelId) {
+    try {
+      const resp = await fetch(verificationBasePath + '/reaction-panels/' + panelId + '/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const result = await resp.json();
+      if (result.success) {
+        if (window.showToast) showToast('Panel gesendet!', 'success');
+        else alert('Panel gesendet!');
+        setTimeout(() => location.reload(), 800);
+      } else {
+        alert(result.message || 'Fehler beim Senden');
+      }
+    } catch(e) {
+      console.error('[Greeting] sendReactionPanel error:', e);
+    }
+  };
+
+  window.deleteReactionPanel = async function(panelId) {
+    if (!confirm('Dieses Panel und alle Zuordnungen wirklich löschen?')) return;
+    try {
+      const resp = await fetch(verificationBasePath + '/reaction-panels/' + panelId, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const result = await resp.json();
+      if (result.success) {
+        const el = document.getElementById('rr-panel-' + panelId);
+        if (el) el.remove();
+        if (window.showToast) showToast('Panel gelöscht', 'success');
+      } else {
+        alert(result.message || 'Fehler');
+      }
+    } catch(e) {
+      console.error('[Greeting] deleteReactionPanel error:', e);
+    }
+  };
+
+  // Init reaction roles on load
+  document.addEventListener('DOMContentLoaded', function() {
+    renderRRMappings();
+  });
 })();
 </script>

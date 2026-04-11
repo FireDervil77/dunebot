@@ -18,6 +18,7 @@
     "TAB_BOOST": "Boost",
     "TAB_VERIFICATION": "Verification",
     "TAB_INVITE_TRACKING": "Invite Tracking",
+    "TAB_REACTION_ROLES": "Reaction Roles",
 
     "WELCOME": {
         "TITLE": "Welcome Messages",
@@ -139,7 +140,9 @@
         "BOOST_TITLE": "Boost Messages",
         "BOOST_TEXT": "Celebrate server boosters with a special message.",
         "VERIFICATION_TITLE": "Verification",
-        "VERIFICATION_TEXT": "New members must click a button or solve a captcha before roles are assigned.",
+        "VERIFICATION_TEXT": "New members must click a button, solve a captcha, or react with an emoji before roles are assigned.",
+        "REACTION_ROLES_TITLE": "Reaction Roles",
+        "REACTION_ROLES_TEXT": "Create emoji-role messages. Members react with emojis to receive roles.",
         "INVITE_TRACKING_TITLE": "Invite Tracking",
         "INVITE_TRACKING_TEXT": "Different welcome messages depending on the invite link used.",
         "IMAGE_TITLE": "Welcome Image",
@@ -154,6 +157,7 @@
         "TYPE": "Verification Type",
         "TYPE_BUTTON": "Button (Simple Click)",
         "TYPE_CAPTCHA": "Captcha (Math Problem)",
+        "TYPE_REACTION": "Reaction (Emoji Click)",
         "CHANNEL": "Verification Channel",
         "CHANNEL_DESC": "The channel where the verification button/captcha is displayed",
         "VERIFIED_ROLE": "Verified Role",
@@ -162,9 +166,40 @@
         "UNVERIFIED_ROLE_DESC": "This role is assigned on join and removed after verification",
         "MESSAGE": "Verification Message",
         "MESSAGE_PH": "Click the button to verify yourself!",
+        "EMOJI": "Verification Emoji",
+        "EMOJI_DESC": "The emoji used for reaction verification",
         "SEND_PANEL": "Send Verification Panel",
         "SEND_PANEL_DESC": "Sends the verification button to the selected channel",
-        "INFO": "Verification ensures that new members are not bots. With 'Button' a simple click suffices, with 'Captcha' a simple math problem must be solved."
+        "INFO": "Verification ensures that new members are not bots. With 'Button' a simple click suffices, with 'Captcha' a math problem must be solved, with 'Reaction' members react with an emoji."
+    },
+
+    "REACTION_ROLES": {
+        "TITLE": "Reaction Roles",
+        "DESC": "Create messages where users react with emojis to receive or lose roles.",
+        "CREATE_TITLE": "Create New Panel",
+        "PANEL_TITLE": "Panel Title",
+        "PANEL_TITLE_PH": "e.g. Choose your roles!",
+        "PANEL_DESC": "Panel Description",
+        "PANEL_DESC_PH": "e.g. React with the matching emoji to receive a role.",
+        "PANEL_COLOR": "Panel Colour",
+        "PANEL_CHANNEL": "Channel",
+        "ADD_MAPPING": "Add Emoji-Role",
+        "EMOJI": "Emoji",
+        "EMOJI_PH": "e.g. 🎮",
+        "ROLE": "Role",
+        "MAPPING_DESC": "Description (optional)",
+        "MAPPING_DESC_PH": "e.g. Gamer role",
+        "BTN_ADD_MAPPING": "Add",
+        "BTN_CREATE_PANEL": "Create Panel",
+        "BTN_SEND_PANEL": "Send Panel",
+        "BTN_DELETE_PANEL": "Delete",
+        "EXISTING_PANELS": "Existing Panels",
+        "EMPTY": "No reaction role panels found.",
+        "STATUS_SENT": "Sent",
+        "STATUS_DRAFT": "Draft",
+        "MAPPINGS": "Mappings",
+        "CONFIRM_DELETE": "Really delete this panel and all its mappings?",
+        "INFO": "After creating a panel, you can send it to a channel. Members can then react with emojis to receive the assigned roles."
     },
 
     "INVITE_TRACKING": {

@@ -2,7 +2,7 @@
   "name": "greeting",
   "displayName": "Greeting",
   "description": "FireBot Greetings Plugin",
-  "version": "1.8.7",
+  "version": "1.9.0",
   "author": "FireBot Team",
   "license": "MIT",
   "main": "index.js",
