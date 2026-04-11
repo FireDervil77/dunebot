@@ -378,6 +378,22 @@ router.post('/users/add-guild-member', requirePermission('PERMISSIONS.USERS.INVI
             VALUES (?, ?, 'active', false, ?)
         `, [user_id, guildId, JSON.stringify(defaultPermissions)]);
         
+        // Default-Gruppe ("User") automatisch zuweisen
+        const guildUser = await dbService.query(
+            'SELECT id FROM guild_users WHERE user_id = ? AND guild_id = ?',
+            [user_id, guildId]
+        );
+        const defaultGroup = await dbService.query(
+            'SELECT id FROM guild_groups WHERE guild_id = ? AND is_default = 1',
+            [guildId]
+        );
+        if (guildUser?.[0]?.id && defaultGroup?.[0]?.id) {
+            await dbService.query(
+                'INSERT IGNORE INTO guild_user_groups (guild_user_id, group_id, assigned_by) VALUES (?, ?, ?)',
+                [guildUser[0].id, defaultGroup[0].id, req.session.user.info.id]
+            );
+        }
+        
         // Cache invalidieren damit der User sofort seine Permissions sieht
         const permissionManager = ServiceManager.get('permissionManager');
         permissionManager.invalidateCache(user_id, guildId);
@@ -429,16 +445,29 @@ router.post('/users/invite', requirePermission('PERMISSIONS.USERS.INVITE'), asyn
         `, [user_id, guildId]);
         
         // Optional: Default-Gruppe zuweisen
-        if (default_group_id) {
-            const [guildUser] = await dbService.query(
-                'SELECT id FROM guild_users WHERE user_id = ? AND guild_id = ?',
-                [user_id, guildId]
-            );
-            
-            if (guildUser && guildUser[0]) {
+        const guildUser = await dbService.query(
+            'SELECT id FROM guild_users WHERE user_id = ? AND guild_id = ?',
+            [user_id, guildId]
+        );
+        
+        if (guildUser?.[0]?.id) {
+            if (default_group_id) {
+                // Explizit gewählte Gruppe zuweisen
                 await dbService.query(
                     'INSERT IGNORE INTO guild_user_groups (guild_user_id, group_id, assigned_by) VALUES (?, ?, ?)',
                     [guildUser[0].id, default_group_id, req.session.user.info.id]
+                );
+            }
+            
+            // Immer die Default-Gruppe ("User") zusätzlich zuweisen
+            const defaultGroup = await dbService.query(
+                'SELECT id FROM guild_groups WHERE guild_id = ? AND is_default = 1',
+                [guildId]
+            );
+            if (defaultGroup?.[0]?.id && (!default_group_id || defaultGroup[0].id !== parseInt(default_group_id))) {
+                await dbService.query(
+                    'INSERT IGNORE INTO guild_user_groups (guild_user_id, group_id, assigned_by) VALUES (?, ?, ?)',
+                    [guildUser[0].id, defaultGroup[0].id, req.session.user.info.id]
                 );
             }
         }
