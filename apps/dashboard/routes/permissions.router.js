@@ -378,6 +378,10 @@ router.post('/users/add-guild-member', requirePermission('PERMISSIONS.USERS.INVI
             VALUES (?, ?, 'active', false, ?)
         `, [user_id, guildId, JSON.stringify(defaultPermissions)]);
         
+        // Cache invalidieren damit der User sofort seine Permissions sieht
+        const permissionManager = ServiceManager.get('permissionManager');
+        permissionManager.invalidateCache(user_id, guildId);
+        
         Logger.info(`[Permissions] User ${user_id} added to guild ${guildId} with DASHBOARD.ACCESS`);
         
         res.json({
@@ -438,6 +442,10 @@ router.post('/users/invite', requirePermission('PERMISSIONS.USERS.INVITE'), asyn
                 );
             }
         }
+        
+        // Cache invalidieren damit der User sofort seine Permissions sieht
+        const permissionManager = ServiceManager.get('permissionManager');
+        permissionManager.invalidateCache(user_id, guildId);
         
         Logger.info(`[Permissions] User ${user_id} invited to guild ${guildId}`);
         
@@ -562,6 +570,9 @@ router.put('/users/:userId', requirePermission('PERMISSIONS.USERS.EDIT'), async 
                 Logger.error(`[Permissions] Guild user not found for user_id ${userId} in guild ${guildId}`);
             }
         }
+        
+        // Cache invalidieren damit Änderungen sofort wirksam werden
+        permissionManager.invalidateCache(userId, guildId);
         
         Logger.info(`[Permissions] User ${userId} updated in guild ${guildId}`);
         
