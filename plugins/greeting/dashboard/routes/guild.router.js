@@ -210,7 +210,8 @@ router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => 
                 type: dbSettings.verification_type || 'button',
                 message: dbSettings.verification_message || '',
                 remove_role_id: dbSettings.verification_remove_role_id || '',
-                emoji: dbSettings.verification_emoji || '✅'
+                emoji: dbSettings.verification_emoji || '✅',
+                success_message: dbSettings.verification_success_message || ''
             }
         };
 
@@ -318,7 +319,8 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
             verification_type: 'button',
             verification_message: null,
             verification_remove_role_id: null,
-            verification_emoji: '✅'
+            verification_emoji: '✅',
+            verification_success_message: null
         };
         
         // Parse existing JSON embeds
@@ -673,6 +675,7 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                 if (body.verification_message !== undefined) settings.verification_message = body.verification_message || null;
                 if (body.verification_remove_role_id !== undefined) settings.verification_remove_role_id = body.verification_remove_role_id || null;
                 if (body.verification_emoji !== undefined) settings.verification_emoji = body.verification_emoji || '✅';
+                if (body.verification_success_message !== undefined) settings.verification_success_message = body.verification_success_message || null;
             }
             if (body.action === 'enable') settings.verification_enabled = 1;
             if (body.action === 'disable') settings.verification_enabled = 0;
@@ -690,8 +693,8 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                 welcome_image_enabled, welcome_image_bg, welcome_image_text, welcome_image_color,
                 farewell_enabled, farewell_channel, farewell_content, farewell_embed,
                 boost_enabled, boost_channel, boost_content, boost_embed,
-                verification_enabled, verification_channel, verification_role_id, verification_type, verification_message, verification_remove_role_id, verification_emoji
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                verification_enabled, verification_channel, verification_role_id, verification_type, verification_message, verification_remove_role_id, verification_emoji, verification_success_message
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 autorole_id = VALUES(autorole_id),
                 autorole_ids = VALUES(autorole_ids),
@@ -721,6 +724,7 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                 verification_message = VALUES(verification_message),
                 verification_remove_role_id = VALUES(verification_remove_role_id),
                 verification_emoji = VALUES(verification_emoji),
+                verification_success_message = VALUES(verification_success_message),
                 updated_at = CURRENT_TIMESTAMP
         `, [
             guildId,
@@ -751,7 +755,8 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
             settings.verification_type,
             settings.verification_message,
             settings.verification_remove_role_id,
-            settings.verification_emoji || '✅'
+            settings.verification_emoji || '✅',
+            settings.verification_success_message
         ]);
         
         Logger.info(`[Greeting] Settings für Guild ${guildId} gespeichert`);

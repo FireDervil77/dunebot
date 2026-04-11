@@ -59,7 +59,7 @@ module.exports = async (interaction) => {
         // ===== BUTTON Verification =====
         if (settings.verification_type === 'button') {
             await assignVerification(member, verifiedRoleId, unverifiedRoleId, Logger);
-            const successEmbed = buildSuccessEmbed(guild, member);
+            const successEmbed = buildSuccessEmbed(guild, member, settings);
             return interaction.reply({ embeds: [successEmbed], ephemeral: true });
         }
 
@@ -112,7 +112,7 @@ module.exports = async (interaction) => {
                 if (selectedAnswer === captcha.answer) {
                     captchaCache.delete(cacheKey);
                     await assignVerification(member, verifiedRoleId, unverifiedRoleId, Logger);
-                    const successEmbed = buildSuccessEmbed(guild, member);
+                    const successEmbed = buildSuccessEmbed(guild, member, settings);
                     return interaction.update({ embeds: [successEmbed], components: [] });
                 } else {
                     captchaCache.delete(cacheKey);
@@ -145,11 +145,36 @@ module.exports = async (interaction) => {
 /**
  * Builds a success embed after verification
  */
-function buildSuccessEmbed(guild, member) {
+function buildSuccessEmbed(guild, member, settings) {
+    const defaultTitle = '✅ Erfolgreich verifiziert!';
+    const defaultDesc = `Willkommen auf **${guild.name}**!\nDu hast jetzt vollen Zugang zum Server.`;
+
+    let title = defaultTitle;
+    let description = defaultDesc;
+
+    if (settings.verification_success_message) {
+        const raw = settings.verification_success_message;
+        const placeholders = {
+            '{guild:name}': guild.name,
+            '{server}': guild.name,
+            '{user:name}': member.user.username,
+            '{user:tag}': member.user.tag,
+            '{user:mention}': `<@${member.user.id}>`,
+            '{member:name}': member.user.username,
+            '{member:mention}': `<@${member.user.id}>`,
+            '{guild:memberCount}': String(guild.memberCount),
+            '{count}': String(guild.memberCount)
+        };
+        description = raw;
+        for (const [key, val] of Object.entries(placeholders)) {
+            description = description.replaceAll(key, val);
+        }
+    }
+
     return new EmbedBuilder()
         .setColor(0x57F287)
-        .setTitle('✅ Erfolgreich verifiziert!')
-        .setDescription(`Willkommen auf **${guild.name}**!\nDu hast jetzt vollen Zugang zum Server.`)
+        .setTitle(title)
+        .setDescription(description)
         .setThumbnail(member.user.displayAvatarURL({ size: 128 }))
         .setFooter({ text: guild.name, iconURL: guild.iconURL({ size: 64 }) })
         .setTimestamp();

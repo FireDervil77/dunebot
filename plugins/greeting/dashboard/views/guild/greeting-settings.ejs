@@ -169,6 +169,13 @@
                     </small>
                   </div>
 
+                  <!-- Verification Success Message -->
+                  <div class="form-group">
+                    <label><%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE') %></label>
+                    <textarea id="verificationSuccessMessage" class="form-control" rows="3" placeholder="<%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE_PH') %>"><%= settings.verification.success_message %></textarea>
+                    <small class="text-muted"><%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE_DESC') %></small>
+                  </div>
+
                   <!-- Info -->
                   <div class="alert alert-info small mb-3">
                     <i class="fa-solid fa-info-circle me-1"></i> <%= tr('greeting:VERIFICATION.INFO') %>

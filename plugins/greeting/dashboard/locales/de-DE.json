@@ -170,6 +170,9 @@
         "EMOJI_DESC": "Das Emoji, das für die Reaktions-Verifizierung verwendet wird",
         "SEND_PANEL": "Verifizierungs-Panel senden",
         "SEND_PANEL_DESC": "Sendet den Verifizierungs-Button in den ausgewählten Channel",
+        "SUCCESS_MESSAGE": "Erfolgsnachricht nach Verifizierung",
+        "SUCCESS_MESSAGE_PH": "Willkommen auf {guild:name}! Du hast jetzt vollen Zugang zum Server.",
+        "SUCCESS_MESSAGE_DESC": "Diese Nachricht wird dem Mitglied nach erfolgreicher Verifizierung angezeigt. Platzhalter: {guild:name}, {user:name}, {user:tag}, {member:mention}, {guild:memberCount}",
         "INFO": "Die Verifizierung stellt sicher, dass neue Mitglieder kein Bot sind. Bei 'Button' genügt ein Klick, bei 'Captcha' muss eine einfache Mathe-Aufgabe gelöst werden, bei 'Reaktion' wird mit einem Emoji reagiert."
     },
 

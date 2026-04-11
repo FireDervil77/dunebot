@@ -69,10 +69,28 @@ module.exports = async (reaction, user) => {
 
                 // Send ephemeral-like DM (reactions can't do ephemeral)
                 try {
+                    let successDesc = `Du wurdest auf **${guild.name}** verifiziert und hast jetzt vollen Zugang!`;
+                    if (settings.verification_success_message) {
+                        const placeholders = {
+                            '{guild:name}': guild.name,
+                            '{server}': guild.name,
+                            '{user:name}': user.username,
+                            '{user:tag}': user.tag,
+                            '{user:mention}': `<@${user.id}>`,
+                            '{member:name}': user.username,
+                            '{member:mention}': `<@${user.id}>`,
+                            '{guild:memberCount}': String(guild.memberCount),
+                            '{count}': String(guild.memberCount)
+                        };
+                        successDesc = settings.verification_success_message;
+                        for (const [key, val] of Object.entries(placeholders)) {
+                            successDesc = successDesc.replaceAll(key, val);
+                        }
+                    }
                     const successEmbed = new EmbedBuilder()
                         .setColor(0x57F287)
                         .setTitle('✅ Erfolgreich verifiziert!')
-                        .setDescription(`Du wurdest auf **${guild.name}** verifiziert und hast jetzt vollen Zugang!`)
+                        .setDescription(successDesc)
                         .setThumbnail(guild.iconURL({ size: 128 }))
                         .setTimestamp();
                     await user.send({ embeds: [successEmbed] });
