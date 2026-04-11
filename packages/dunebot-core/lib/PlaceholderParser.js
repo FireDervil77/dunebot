@@ -28,10 +28,12 @@ function parsePlaceholders(content, context = {}) {
         result = result
             .replaceAll(/{server}/g, guildObj.name)
             .replaceAll(/{guild:name}/g, guildObj.name)
-            .replaceAll(/{guild\.name}/g, guildObj.name)
             .replaceAll(/{count}/g, String(guildObj.memberCount))
             .replaceAll(/{guild:memberCount}/g, String(guildObj.memberCount))
-            .replaceAll(/{guild\.memberCount}/g, String(guildObj.memberCount));
+            .replaceAll(/{guild:id}/g, guildObj.id)
+            .replaceAll(/{guild:icon}/g, guildObj.iconURL?.() || '')
+            .replaceAll(/{guild:boostCount}/g, String(guildObj.premiumSubscriptionCount || 0))
+            .replaceAll(/{guild:boostLevel}/g, String(guildObj.premiumTier || 0));
     }
 
     // Member Platzhalter
@@ -39,36 +41,26 @@ function parsePlaceholders(content, context = {}) {
         const userObj = member.user || user;
         result = result
             .replaceAll(/{member:nick}/g, member.displayName)
-            .replaceAll(/{member\.nick}/g, member.displayName)
             .replaceAll(/{member:name}/g, userObj.username)
-            .replaceAll(/{member\.name}/g, userObj.username)
             .replaceAll(/{member:dis}/g, userObj.discriminator || '0')
-            .replaceAll(/{member\.dis}/g, userObj.discriminator || '0')
             .replaceAll(/{member:tag}/g, userObj.tag)
-            .replaceAll(/{member\.tag}/g, userObj.tag)
             .replaceAll(/{member:mention}/g, member.toString())
-            .replaceAll(/{member\.mention}/g, member.toString())
             .replaceAll(/{member:avatar}/g, member.displayAvatarURL())
-            .replaceAll(/{member\.avatar}/g, member.displayAvatarURL())
             .replaceAll(/{member:id}/g, member.id)
-            .replaceAll(/{member\.id}/g, member.id);
+            .replaceAll(/{member:joinedAt}/g, member.joinedAt ? member.joinedAt.toLocaleDateString('de-DE') : '')
+            .replaceAll(/{member:createdAt}/g, userObj.createdAt ? userObj.createdAt.toLocaleDateString('de-DE') : '');
     } else if (user) {
         // Fallback: User ohne Member (z.B. gebannte User)
         result = result
             .replaceAll(/{member:nick}/g, user.username)
-            .replaceAll(/{member\.nick}/g, user.username)
             .replaceAll(/{member:name}/g, user.username)
-            .replaceAll(/{member\.name}/g, user.username)
             .replaceAll(/{member:dis}/g, user.discriminator || '0')
-            .replaceAll(/{member\.dis}/g, user.discriminator || '0')
             .replaceAll(/{member:tag}/g, user.tag)
-            .replaceAll(/{member\.tag}/g, user.tag)
             .replaceAll(/{member:mention}/g, `<@${user.id}>`)
-            .replaceAll(/{member\.mention}/g, `<@${user.id}>`)
             .replaceAll(/{member:avatar}/g, user.displayAvatarURL())
-            .replaceAll(/{member\.avatar}/g, user.displayAvatarURL())
             .replaceAll(/{member:id}/g, user.id)
-            .replaceAll(/{member\.id}/g, user.id);
+            .replaceAll(/{member:joinedAt}/g, '')
+            .replaceAll(/{member:createdAt}/g, user.createdAt ? user.createdAt.toLocaleDateString('de-DE') : '');
     }
 
     // Extra Platzhalter (plugin-spezifisch)

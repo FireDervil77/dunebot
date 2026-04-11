@@ -223,28 +223,28 @@
   function previewPlaceholders(text) {
     if (!text) return '';
     return text
+      // Member
       .replace(/\{member:name\}/g, '<span class="text-info">ExampleUser</span>')
-      .replace(/\{member\.name\}/g, '<span class="text-info">ExampleUser</span>')
       .replace(/\{member:nick\}/g, '<span class="text-info">ExampleUser</span>')
-      .replace(/\{member\.nick\}/g, '<span class="text-info">ExampleUser</span>')
       .replace(/\{member:mention\}/g, '<span class="text-info">@ExampleUser</span>')
-      .replace(/\{member\.mention\}/g, '<span class="text-info">@ExampleUser</span>')
       .replace(/\{member:tag\}/g, '<span class="text-info">ExampleUser#0001</span>')
-      .replace(/\{member\.tag\}/g, '<span class="text-info">ExampleUser#0001</span>')
       .replace(/\{member:avatar\}/g, '<span class="text-muted">[Avatar-URL]</span>')
-      .replace(/\{member\.avatar\}/g, '<span class="text-muted">[Avatar-URL]</span>')
       .replace(/\{member:dis\}/g, '<span class="text-info">0001</span>')
-      .replace(/\{member\.dis\}/g, '<span class="text-info">0001</span>')
+      .replace(/\{member:id\}/g, '<span class="text-info">123456789</span>')
+      .replace(/\{member:joinedAt\}/g, '<span class="text-info">11.04.2026</span>')
+      .replace(/\{member:createdAt\}/g, '<span class="text-info">15.03.2021</span>')
+      // Guild
       .replace(/\{server\}/g, '<strong>My Server</strong>')
       .replace(/\{guild:name\}/g, '<strong>My Server</strong>')
-      .replace(/\{guild\.name\}/g, '<strong>My Server</strong>')
       .replace(/\{count\}/g, '42')
       .replace(/\{guild:memberCount\}/g, '42')
-      .replace(/\{guild\.memberCount\}/g, '42')
+      .replace(/\{guild:id\}/g, '<span class="text-info">123456789</span>')
+      .replace(/\{guild:icon\}/g, '<span class="text-muted">[Icon-URL]</span>')
+      .replace(/\{guild:boostCount\}/g, '3')
+      .replace(/\{guild:boostLevel\}/g, '2')
+      // Inviter
       .replace(/\{inviter:name\}/g, '<span class="text-warning">InviterName</span>')
-      .replace(/\{inviter\.name\}/g, '<span class="text-warning">InviterName</span>')
       .replace(/\{inviter:tag\}/g, '<span class="text-warning">InviterName#0001</span>')
-      .replace(/\{inviter\.tag\}/g, '<span class="text-warning">InviterName#0001</span>')
       .replace(/\{invites\}/g, '5');
   }
 

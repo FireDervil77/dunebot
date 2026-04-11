@@ -34,31 +34,28 @@ const parse = async (content, member, inviterData = {}) => {
     }
     return content
         .replaceAll(/\\n/g, "\n")
-        // Server/Guild Placeholders (beide Formate unterstützen)
+        // Server/Guild Placeholders
         .replaceAll(/{server}/g, member.guild.name)
-        .replaceAll(/{guild\.name}/g, member.guild.name)
         .replaceAll(/{guild:name}/g, member.guild.name)
         .replaceAll(/{count}/g, member.guild.memberCount)
-        .replaceAll(/{guild\.memberCount}/g, member.guild.memberCount)
         .replaceAll(/{guild:memberCount}/g, member.guild.memberCount)
-        // Member Placeholders (beide Formate unterstützen)
+        .replaceAll(/{guild:id}/g, member.guild.id)
+        .replaceAll(/{guild:icon}/g, member.guild.iconURL() || '')
+        .replaceAll(/{guild:boostCount}/g, member.guild.premiumSubscriptionCount || 0)
+        .replaceAll(/{guild:boostLevel}/g, member.guild.premiumTier || 0)
+        // Member Placeholders
         .replaceAll(/{member:nick}/g, member.displayName)
-        .replaceAll(/{member\.nick}/g, member.displayName)
         .replaceAll(/{member:name}/g, member.user.username)
-        .replaceAll(/{member\.name}/g, member.user.username)
         .replaceAll(/{member:dis}/g, member.user.discriminator)
-        .replaceAll(/{member\.dis}/g, member.user.discriminator)
         .replaceAll(/{member:tag}/g, member.user.tag)
-        .replaceAll(/{member\.tag}/g, member.user.tag)
         .replaceAll(/{member:mention}/g, member.toString())
-        .replaceAll(/{member\.mention}/g, member.toString())
         .replaceAll(/{member:avatar}/g, member.displayAvatarURL())
-        .replaceAll(/{member\.avatar}/g, member.displayAvatarURL())
-        // Inviter Placeholders (beide Formate unterstützen)
+        .replaceAll(/{member:id}/g, member.user.id)
+        .replaceAll(/{member:joinedAt}/g, member.joinedAt ? member.joinedAt.toLocaleDateString('de-DE') : '')
+        .replaceAll(/{member:createdAt}/g, member.user.createdAt ? member.user.createdAt.toLocaleDateString('de-DE') : '')
+        // Inviter Placeholders
         .replaceAll(/{inviter:name}/g, inviteData.name)
-        .replaceAll(/{inviter\.name}/g, inviteData.name)
         .replaceAll(/{inviter:tag}/g, inviteData.tag)
-        .replaceAll(/{inviter\.tag}/g, inviteData.tag)
         .replaceAll(/{invites}/g, getEffectiveInvites(inviterData.invite_data));
 };
 
