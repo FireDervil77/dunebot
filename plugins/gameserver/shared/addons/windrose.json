@@ -250,9 +250,9 @@
     },
     {
       "name": "DISPLAY",
-      "description": "Virtueller Display für Wine/Proton (headless)",
+      "description": "Virtueller Display für Wine/Proton (headless – leer lassen für headless)",
       "env_variable": "DISPLAY",
-      "default_value": ":99",
+      "default_value": "",
       "user_viewable": false,
       "user_editable": false,
       "rules": "nullable|string",
