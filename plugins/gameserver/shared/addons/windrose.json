@@ -235,5 +235,17 @@
         "MAX_PLAYERS": "8"
       }
     }
+  ],
+  "platform": "windows",
+  "environment": [
+    {
+      "name": "WINEPREFIX",
+      "description": "Wine-Präfix-Verzeichnis (muss auf dem gemounteten Volume liegen)",
+      "default": "/home/container/.wine",
+      "required": false,
+      "user_viewable": false,
+      "user_editable": false,
+      "type": "text"
+    }
   ]
 }
