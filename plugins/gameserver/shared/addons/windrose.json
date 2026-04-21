@@ -57,12 +57,12 @@
       "R5/ServerDescription.json": {
         "parser": "json",
         "find": {
-          "InviteCode": "{{INVITE_CODE}}",
-          "IsPasswordProtected": "{{IS_PASSWORD_PROTECTED}}",
-          "Password": "{{SERVER_PASSWORD}}",
-          "ServerName": "{{SERVER_NAME}}",
-          "MaxPlayerCount": "{{MAX_PLAYERS}}",
-          "P2pProxyAddress": "{{SERVER_IP}}"
+          "ServerDescription_Persistent.InviteCode": "{{INVITE_CODE}}",
+          "ServerDescription_Persistent.IsPasswordProtected": "{{IS_PASSWORD_PROTECTED}}",
+          "ServerDescription_Persistent.Password": "{{SERVER_PASSWORD}}",
+          "ServerDescription_Persistent.ServerName": "{{SERVER_NAME}}",
+          "ServerDescription_Persistent.MaxPlayerCount": "{{MAX_PLAYERS}}",
+          "ServerDescription_Persistent.P2pProxyAddress": "{{SERVER_IP}}"
         }
       }
     },
@@ -237,5 +237,26 @@
     }
   ],
   "platform": "proton",
-  "environment": []
+  "environment": [
+    {
+      "name": "XALIA_DISABLE",
+      "description": "Xalia (Accessibility-UI) deaktivieren – nicht nötig für Headless-Server",
+      "env_variable": "XALIA_DISABLE",
+      "default_value": "1",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|in:1",
+      "field_type": "text"
+    },
+    {
+      "name": "DISPLAY",
+      "description": "Virtueller Display für Wine/Proton (headless)",
+      "env_variable": "DISPLAY",
+      "default_value": ":99",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "nullable|string",
+      "field_type": "text"
+    }
+  ]
 }
