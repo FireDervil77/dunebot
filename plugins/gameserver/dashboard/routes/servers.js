@@ -590,9 +590,9 @@ router.post('/', async (req, res) => {
         // FIREBOT_v2 speichert Docker und Script-Daten anders als der Daemon erwartet
         // =====================================
 
-        // 1. Runtime-Docker-Image: docker_images (Map) → docker_image (erster Wert)
+        // 1. Runtime-Docker-Image: docker_images (Map) → docker_image (erster KEY = Image-URL)
         if (!gameData.docker_image && gameData.docker_images) {
-            gameData.docker_image = Object.values(gameData.docker_images)[0] || '';
+            gameData.docker_image = Object.keys(gameData.docker_images)[0] || '';
         }
 
         // 2. Pterodactyl-Format: scripts.installation → installation (flach)
@@ -1667,7 +1667,7 @@ router.put('/:serverId/start', async (req, res) => {
                 // Docker-Image
                 const dockerImages = frozenData.docker_images || {};
                 const imgKeys = Object.keys(dockerImages);
-                if (imgKeys.length > 0) startGameData.docker_image = dockerImages[imgKeys[0]];
+                if (imgKeys.length > 0) startGameData.docker_image = imgKeys[0]; // KEY = Image-URL, nicht Value (Beschreibung)
 
                 // Runtime (stop, done_string)
                 const rt = { stop_mode: 'sigterm', stop_command: '', stop_timeout_sec: 30, done_string: '' };
@@ -2458,11 +2458,11 @@ router.post('/:serverId/start', async (req, res) => {
                 : server.frozen_game_data;
 
             if (frozenData) {
-                // docker_image: erster Wert aus docker_images-Objekt
+                // docker_image: erster KEY aus docker_images-Objekt (KEY = Image-URL, Value = Beschreibung)
                 const dockerImages = frozenData.docker_images || {};
                 const imageKeys = Object.keys(dockerImages);
                 if (imageKeys.length > 0) {
-                    dockerImage = dockerImages[imageKeys[0]];
+                    dockerImage = imageKeys[0];
                 }
 
                 // stop-Info aus startup.stop (z.B. "^C" → sigint)
