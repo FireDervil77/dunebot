@@ -61,7 +61,8 @@
           "ServerDescription_Persistent.IsPasswordProtected": "{{IS_PASSWORD_PROTECTED}}",
           "ServerDescription_Persistent.Password": "{{SERVER_PASSWORD}}",
           "ServerDescription_Persistent.ServerName": "{{SERVER_NAME}}",
-          "ServerDescription_Persistent.MaxPlayerCount": "{{MAX_PLAYERS}}"
+          "ServerDescription_Persistent.MaxPlayerCount": "{{MAX_PLAYERS}}",
+          "ServerDescription_Persistent.UserSelectedRegion": "{{USER_SELECTED_REGION}}"
         }
       }
     },
@@ -170,6 +171,34 @@
       "user_editable": true,
       "rules": "required|integer|min:1|max:8",
       "field_type": "text"
+    },
+    {
+      "name": "Server-Region",
+      "description": "Bevorzugte Region für den Server (EU = Europa, SEA = Südostasien, CIS = GUS-Staaten). Leer lassen für automatische Auswahl.",
+      "env_variable": "USER_SELECTED_REGION",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string|in:,EU,SEA,CIS",
+      "field_type": "select",
+      "select_options": [
+        {
+          "value": "",
+          "label": "Automatisch"
+        },
+        {
+          "value": "EU",
+          "label": "Europa (EU)"
+        },
+        {
+          "value": "SEA",
+          "label": "Südostasien (SEA)"
+        },
+        {
+          "value": "CIS",
+          "label": "GUS-Staaten (CIS)"
+        }
+      ]
     },
     {
       "name": "Server-Port",
