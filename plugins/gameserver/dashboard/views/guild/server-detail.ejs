@@ -117,12 +117,11 @@
                                     </button>
                                 <% } %>
                                 
-                                <!-- Reinstall Button (nur bei error) -->
+<!-- Reinstall Button -->
                                 <% if (userPermissions.permissions['GAMESERVER.CREATE']) { %>
                                     <button class="btn btn-primary" 
-                                            onclick="reinstallServer('<%= server.id %>', '<%= server.name %>')"
-                                            title="Server neu installieren"
-                                            style="display: <%= displayStatus === 'error' ? '' : 'none' %>;">
+                                            onclick="reinstallServer('<%= server.id %>', '<%= server.name %>')" 
+                                            title="Server neu installieren">
                                         <i class="fas fa-wrench me-1"></i> Reinstall
                                     </button>
                                 <% } %>
@@ -542,7 +541,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (startBtn) startBtn.style.display = (normalized === 'offline' || normalized === 'error' || normalized === 'installed') ? '' : 'none';
             if (stopBtn) stopBtn.style.display = (normalized === 'online' || normalized === 'starting') ? '' : 'none';
             if (restartBtn) restartBtn.style.display = (normalized === 'online') ? '' : 'none';
-            if (reinstallBtn) reinstallBtn.style.display = (normalized === 'error') ? '' : 'none';
+            // Reinstall-Button immer anzeigen
+            if (reinstallBtn) reinstallBtn.style.display = '';
             if (deleteBtn) deleteBtn.style.display = (normalized === 'offline' || normalized === 'error' || normalized === 'installed') ? '' : 'none';
         }
     };
