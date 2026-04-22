@@ -257,6 +257,16 @@
       "user_editable": false,
       "rules": "nullable|string",
       "field_type": "text"
+    },
+    {
+      "name": "PROTON_USE_XALIA",
+      "description": "Xalia komplett deaktivieren (verhindert 'Video driver not supported' Crash)",
+      "env_variable": "PROTON_USE_XALIA",
+      "default_value": "0",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|in:0",
+      "field_type": "text"
     }
   ]
 }
