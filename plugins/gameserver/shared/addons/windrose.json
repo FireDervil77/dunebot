@@ -61,8 +61,7 @@
           "ServerDescription_Persistent.IsPasswordProtected": "{{IS_PASSWORD_PROTECTED}}",
           "ServerDescription_Persistent.Password": "{{SERVER_PASSWORD}}",
           "ServerDescription_Persistent.ServerName": "{{SERVER_NAME}}",
-          "ServerDescription_Persistent.MaxPlayerCount": "{{MAX_PLAYERS}}",
-          "ServerDescription_Persistent.P2pProxyAddress": "{{SERVER_IP}}"
+          "ServerDescription_Persistent.MaxPlayerCount": "{{MAX_PLAYERS}}"
         }
       }
     },
