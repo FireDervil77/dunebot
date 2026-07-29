@@ -247,6 +247,10 @@ class GameserverOverview {
                     status: 'error'
                 });
                 break;
+            case 'status':
+                // Live-Snapshot vom StatusPoller (Spielerzahl, Map, Ping)
+                this.updateLiveStatus(payload);
+                break;
             default:
                 console.log(`[GameserverOverview] Unbekannte Action: ${action}`, payload);
         }
@@ -525,6 +529,45 @@ class GameserverOverview {
             reinstallBtn: !!reinstallBtn,
             deleteBtn: !!deleteBtn 
         });
+    }
+
+    /**
+     * Aktualisiert die Live-Werte aus dem Status-Snapshot.
+     *
+     * Deckt alle Ansichten ab, in denen Spielerzahlen stehen: Server-Karten
+     * (.server-players), Dashboard-Tabelle ([data-players-display]) und
+     * Detailseite ([data-current-players] + Fortschrittsbalken).
+     *
+     * @param {Object} payload - { server_id, online, current_players, max_players, map, ping_ms }
+     */
+    updateLiveStatus(payload) {
+        const { server_id, current_players, max_players, map } = payload;
+        if (current_players === undefined) return;
+
+        const text = `${current_players ?? 0} / ${max_players || '?'}`;
+
+        const card = document.querySelector(`[data-server-id="${server_id}"]`);
+        if (card) {
+            const playersText = card.querySelector('.server-players');
+            if (playersText) playersText.textContent = text;
+
+            const cell = card.querySelector('[data-players-display]');
+            if (cell) cell.textContent = `${current_players ?? 0}/${max_players || 0}`;
+        }
+
+        // Detailseite: dort gibt es genau einen Server, daher dokumentweit
+        const currentEl = document.querySelector('[data-current-players]');
+        if (currentEl) currentEl.textContent = text;
+
+        const barEl = document.querySelector('[data-players-bar]');
+        if (barEl && max_players > 0) {
+            const pct = Math.round(((current_players ?? 0) / max_players) * 100);
+            barEl.style.width = `${pct}%`;
+            barEl.textContent = `${pct}%`;
+        }
+
+        const mapEl = document.querySelector('[data-current-map]');
+        if (mapEl && map) mapEl.textContent = map;
     }
 
     /**

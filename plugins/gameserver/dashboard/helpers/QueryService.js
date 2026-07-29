@@ -21,75 +21,8 @@ const QUERY_TIMEOUT_MS = 5000;
 /** Maximale Verbindungsversuche */
 const QUERY_MAX_ATTEMPTS = 2;
 
-// ============================================================================
-// Pro-Spiel Query-Aufbereitung: Spieltyp-spezifische Post-Processing-Regeln
-// ============================================================================
-const GAME_PROCESSORS = {
-    /**
-     * CS2: GOTV-Bot filtern, Tags parsen (Version, VAC, etc.)
-     */
-    cs2(result, state) {
-        // GOTV-Bot aus Spielerliste filtern
-        result.players = result.players.filter(p => {
-            if (p.name === 'GOTV' || p.name === 'SourceTV') return false;
-            // Leere Spieler mit Score=0 und Time=0 sind oft Phantom-Einträge
-            if (!p.name && p.score === 0 && (p.time === 0 || p.time == null)) return false;
-            return true;
-        });
-        // Bot-Zählung korrigieren (GOTV ist kein echter Bot)
-        const gotvBots = (state.bots || []).filter(b => b.name === 'GOTV' || b.name === 'SourceTV');
-        result.bots = Math.max(0, result.bots - gotvBots.length);
-        // Tags parsen → extra Felder
-        result.extra.vac = (state.raw?.tags || '').includes('secure');
-        const versionMatch = (state.raw?.version || '').match(/[\d.]+/);
-        if (versionMatch) result.extra.gameVersion = versionMatch[0];
-    },
-
-    /**
-     * Minecraft: MOTD bereinigen, Spieler-Avatare via Crafthead
-     */
-    minecraft(result, state) {
-        // MOTD bereinigen (Minecraft Farb-Codes §x entfernen)
-        if (result.name) {
-            result.name = result.name.replace(/§[0-9a-fk-or]/gi, '');
-        }
-        // Spieler-UUIDs für Avatar-URLs
-        result.players = result.players.map(p => ({
-            ...p,
-            avatar: p.raw?.id ? `https://crafthead.net/avatar/${p.raw.id}/32` : null,
-        }));
-    },
-
-    /**
-     * Valheim: Spieler haben keine Namen über A2S → Platzhalter setzen
-     */
-    valheim(result) {
-        result.players = result.players.map((p, i) => ({
-            ...p,
-            name: p.name || `Wikinger ${i + 1}`,
-        }));
-    },
-
-    /**
-     * Rust: Tags enthalten viele nützliche Infos
-     */
-    rust(result, state) {
-        const tags = state.raw?.tags || '';
-        result.extra.wipeDate = tags.match(/born(\d+)/)?.[1] || null;
-        result.extra.pve = tags.includes('pve');
-        result.extra.oxide = tags.includes('oxide');
-    },
-
-    /**
-     * ARK: Spieler-Score = Level
-     */
-    arkse(result) {
-        result.players = result.players.map(p => ({
-            ...p,
-            level: p.score,
-        }));
-    },
-};
+const { resolveStatusConfig } = require('./StatusSchema');
+const { applyQueryRules } = require('./StatusTransforms');
 
 class QueryService {
     /**
@@ -102,7 +35,10 @@ class QueryService {
      * @returns {Promise<QueryResult>}
      */
     static async query({ host, ports, gameData }) {
-        const queryConfig = gameData?.query;
+        // Regeln kommen aus dem Addon (game_data.status.query), mit Rückfall auf
+        // game_data.query plus den eingebauten Vorgaben des jeweiligen Spiels.
+        const { query: queryConfig } = resolveStatusConfig(gameData || {});
+
         if (!queryConfig?.gamedig_type) {
             return { success: false, error: 'Dieses Spiel unterstützt keine Live-Query (kein gamedig_type konfiguriert)' };
         }
@@ -173,15 +109,12 @@ class QueryService {
                     game:       state.raw?.game      || null,
                     appId:      state.raw?.appId     ?? null,
                 },
-                // Extra-Feld für spielspezifische Daten (wird von GAME_PROCESSORS befüllt)
+                // Extra-Feld für spielspezifische Daten (wird von den Regeln befüllt)
                 extra: {},
             };
 
-            // Pro-Spiel Post-Processing anwenden
-            const processor = GAME_PROCESSORS[gameType];
-            if (processor) {
-                processor(result, state);
-            }
+            // Deklarative Aufbereitung: Filter, Transformationen, Extras
+            applyQueryRules(result, state, queryConfig);
 
             return result;
 

@@ -1,0 +1,358 @@
+<%#
+ * Cronjob-Tab Partial
+ * Geplante Aufgaben (Start, Stop, Restart, Backup, Command) mit Cron-Expressions
+ * @author FireBot Team
+%>
+
+<div class="row mb-3">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Geplante Aufgaben (Cronjobs)</h5>
+        <div>
+            <button class="btn btn-secondary btn-sm me-2" onclick="loadCronjobs()">
+                <i class="fas fa-sync-alt me-1"></i> Aktualisieren
+            </button>
+            <% if (userPermissions.permissions['GAMESERVER.CRONJOBS.MANAGE']) { %>
+                <button class="btn btn-primary btn-sm" onclick="openCronjobModal()">
+                    <i class="fas fa-plus me-1"></i> Neuer Cronjob
+                </button>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<!-- Info-Box Cron-Syntax -->
+<div class="alert alert-secondary py-2 mb-3">
+    <i class="fas fa-info-circle me-1"></i>
+    <strong>Cron-Syntax:</strong>
+    <code>Minute Stunde Tag Monat Wochentag</code>
+    — Beispiele:
+    <code>0 4 * * *</code> (täglich 4:00 Uhr),
+    <code>*/30 * * * *</code> (alle 30 Min.),
+    <code>0 6 * * 1</code> (Mo 6:00 Uhr)
+</div>
+
+<% if (userPermissions.permissions['GAMESERVER.CRONJOBS.MANAGE']) { %>
+<!-- Cronjob Modal (Erstellen / Bearbeiten) -->
+<div class="modal fade" id="cronjobModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cronjobModalTitle"><i class="fas fa-clock me-2"></i>Cronjob erstellen</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="cronjobEditId" value="">
+
+                <div class="form-group">
+                    <label for="cronjobName">Name <span class="text-danger">*</span></label>
+                    <input type="text" id="cronjobName" class="form-control" placeholder="z.B. Nächtlicher Neustart" maxlength="128" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="cronjobExpr">Cron-Expression <span class="text-danger">*</span></label>
+                    <input type="text" id="cronjobExpr" class="form-control" placeholder="0 4 * * *" maxlength="64" required>
+                    <small class="form-text text-muted" id="cronjobExprDesc">Gib eine gültige 5-feldige Cron-Expression ein.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="cronjobAction">Aktion <span class="text-danger">*</span></label>
+                    <select id="cronjobAction" class="form-control" onchange="toggleCommandField()">
+                        <option value="restart">Server neu starten</option>
+                        <option value="start">Server starten</option>
+                        <option value="stop">Server stoppen</option>
+                        <option value="backup">Backup erstellen</option>
+                        <option value="command">Konsolen-Befehl ausführen</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="cronjobCommandGroup" style="display:none;">
+                    <label for="cronjobCommand">Befehl <span class="text-danger">*</span></label>
+                    <input type="text" id="cronjobCommand" class="form-control" placeholder="say Server startet in 5 Minuten neu" maxlength="500">
+                    <small class="form-text text-muted">Wird direkt an die Konsole des Gameservers gesendet.</small>
+                </div>
+
+                <div class="form-check mt-2">
+                    <input type="checkbox" class="form-check-input" id="cronjobRunOnce">
+                    <label class="form-check-label" for="cronjobRunOnce">Einmalig ausführen</label>
+                    <small class="form-text text-muted">Job wird nach der ersten Ausführung automatisch deaktiviert.</small>
+                </div>
+
+                <div class="form-check mt-2" id="cronjobEnabledGroup">
+                    <input type="checkbox" class="form-check-input" id="cronjobEnabled" checked>
+                    <label class="form-check-label" for="cronjobEnabled">Cronjob aktiv</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" id="cronjobSaveBtn" onclick="saveCronjob()">
+                    <i class="fas fa-save me-1"></i> Speichern
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<% } %>
+
+<!-- Cronjob-Tabelle -->
+<div id="cronjobs-container">
+    <div id="cronjobs-loading" class="text-center text-muted py-5">
+        <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
+        <p>Cronjobs werden geladen...</p>
+    </div>
+    <div id="cronjobs-empty" class="text-center text-muted py-5" style="display:none;">
+        <i class="fas fa-clock fa-3x mb-3 text-muted"></i>
+        <p>Keine Cronjobs konfiguriert.</p>
+        <% if (userPermissions.permissions['GAMESERVER.CRONJOBS.MANAGE']) { %>
+            <button class="btn btn-primary" onclick="openCronjobModal()">
+                <i class="fas fa-plus me-1"></i> Ersten Cronjob erstellen
+            </button>
+        <% } %>
+    </div>
+    <div id="cronjobs-table-wrapper" style="display:none;">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Cron-Expression</th>
+                        <th>Aktion</th>
+                        <th>Letzter Lauf</th>
+                        <th>Status</th>
+                        <th>Einmalig</th>
+                        <th>Aktiv</th>
+                        <% if (userPermissions.permissions['GAMESERVER.CRONJOBS.MANAGE']) { %>
+                            <th>Aktionen</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody id="cronjobs-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const GUILD_ID  = '<%= guildId %>';
+    const SERVER_ID = '<%= server.id %>';
+    const BASE_URL  = `/guild/${GUILD_ID}/plugins/gameserver/servers/${SERVER_ID}/cronjobs`;
+    const CAN_MANAGE = <%= userPermissions.permissions['GAMESERVER.CRONJOBS.MANAGE'] ? 'true' : 'false' %>;
+
+    const ACTION_LABELS = {
+        start:   '<span class="badge badge-success"><i class="fas fa-play me-1"></i>Start</span>',
+        stop:    '<span class="badge badge-secondary"><i class="fas fa-stop me-1"></i>Stop</span>',
+        restart: '<span class="badge badge-warning"><i class="fas fa-redo me-1"></i>Neustart</span>',
+        backup:  '<span class="badge badge-info"><i class="fas fa-save me-1"></i>Backup</span>',
+        command: '<span class="badge badge-dark"><i class="fas fa-terminal me-1"></i>Befehl</span>',
+    };
+
+    const STATUS_LABELS = {
+        pending: '<span class="badge badge-secondary">Ausstehend</span>',
+        success: '<span class="badge badge-success"><i class="fas fa-check me-1"></i>Erfolg</span>',
+        failed:  '<span class="badge badge-danger"><i class="fas fa-times me-1"></i>Fehler</span>',
+    };
+
+    function escHtml(s) {
+        if (!s) return '';
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function fmtDate(d) {
+        if (!d) return '—';
+        return new Date(d).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    window.toggleCommandField = function() {
+        const action = document.getElementById('cronjobAction').value;
+        document.getElementById('cronjobCommandGroup').style.display = action === 'command' ? '' : 'none';
+    };
+
+    window.loadCronjobs = async function() {
+        document.getElementById('cronjobs-loading').style.display = '';
+        document.getElementById('cronjobs-empty').style.display = 'none';
+        document.getElementById('cronjobs-table-wrapper').style.display = 'none';
+
+        try {
+            const resp = await fetch(BASE_URL);
+            const data = await resp.json();
+            if (!data.success) throw new Error(data.message);
+
+            const jobs = data.cronjobs || [];
+            document.getElementById('cronjobs-loading').style.display = 'none';
+
+            if (jobs.length === 0) {
+                document.getElementById('cronjobs-empty').style.display = '';
+                return;
+            }
+
+            const tbody = document.getElementById('cronjobs-tbody');
+            tbody.innerHTML = jobs.map(j => `
+                <tr data-job-id="${j.id}">
+                    <td>
+                        <strong>${escHtml(j.name)}</strong>
+                        ${j.action === 'command' ? `<br><small class="text-muted"><code>${escHtml(j.command)}</code></small>` : ''}
+                    </td>
+                    <td><code>${escHtml(j.cron_expr)}</code></td>
+                    <td>${ACTION_LABELS[j.action] || j.action}</td>
+                    <td><small>${fmtDate(j.last_run_at)}</small></td>
+                    <td>${STATUS_LABELS[j.last_status] || j.last_status}</td>
+                    <td>${j.run_once ? '<span class="badge badge-info" title="Wird nach Ausführung deaktiviert"><i class="fas fa-bolt me-1"></i>Einmalig</span>' : '—'}</td>
+                    <td>
+                        ${CAN_MANAGE ? `
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="jobEnabled_${j.id}"
+                                   ${j.enabled ? 'checked' : ''}
+                                   onchange="toggleCronjob(${j.id}, this.checked)">
+                            <label class="custom-control-label" for="jobEnabled_${j.id}"></label>
+                        </div>` : (j.enabled
+                            ? '<span class="badge badge-success">Ja</span>'
+                            : '<span class="badge badge-secondary">Nein</span>')}
+                    </td>
+                    ${CAN_MANAGE ? `
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-secondary btn-sm" onclick='editCronjob(${JSON.stringify(j)})' title="Bearbeiten">
+                                <i class="fas fa-pencil-alt"></i>
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteCronjob(${j.id}, '${escHtml(j.name)}')" title="Löschen">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>` : ''}
+                </tr>
+            `).join('');
+
+            document.getElementById('cronjobs-table-wrapper').style.display = '';
+        } catch (err) {
+            document.getElementById('cronjobs-loading').innerHTML =
+                `<div class="text-center text-danger py-4"><i class="fas fa-exclamation-triangle me-1"></i> Fehler: ${escHtml(err.message)}</div>`;
+        }
+    };
+
+    window.openCronjobModal = function() {
+        if (!CAN_MANAGE) return;
+        document.getElementById('cronjobEditId').value = '';
+        document.getElementById('cronjobModalTitle').textContent = 'Cronjob erstellen';
+        document.getElementById('cronjobName').value = '';
+        document.getElementById('cronjobExpr').value = '';
+        document.getElementById('cronjobAction').value = 'restart';
+        document.getElementById('cronjobCommand').value = '';
+        document.getElementById('cronjobRunOnce').checked = false;
+        document.getElementById('cronjobEnabled').checked = true;
+        toggleCommandField();
+        $('#cronjobModal').modal('show');
+    };
+
+    window.editCronjob = function(job) {
+        if (!CAN_MANAGE) return;
+        document.getElementById('cronjobEditId').value = job.id;
+        document.getElementById('cronjobModalTitle').textContent = 'Cronjob bearbeiten';
+        document.getElementById('cronjobName').value = job.name || '';
+        document.getElementById('cronjobExpr').value = job.cron_expr || '';
+        document.getElementById('cronjobAction').value = job.action || 'restart';
+        document.getElementById('cronjobCommand').value = job.command || '';
+        document.getElementById('cronjobRunOnce').checked = !!job.run_once;
+        document.getElementById('cronjobEnabled').checked = !!job.enabled;
+        toggleCommandField();
+        $('#cronjobModal').modal('show');
+    };
+
+    window.saveCronjob = async function() {
+        const btn = document.getElementById('cronjobSaveBtn');
+        const editId = document.getElementById('cronjobEditId').value;
+        const name = document.getElementById('cronjobName').value.trim();
+        const cron_expr = document.getElementById('cronjobExpr').value.trim();
+        const action = document.getElementById('cronjobAction').value;
+        const command = document.getElementById('cronjobCommand').value.trim();
+        const run_once = document.getElementById('cronjobRunOnce').checked;
+        const enabled = document.getElementById('cronjobEnabled').checked;
+
+        if (!name || !cron_expr || !action) {
+            alert('Bitte Name, Cron-Expression und Aktion ausfüllen.');
+            return;
+        }
+        if (cron_expr.split(/\s+/).length !== 5) {
+            alert('Cron-Expression muss genau 5 Felder haben (z.B. "0 4 * * *")');
+            return;
+        }
+        if (action === 'command' && !command) {
+            alert('Bitte einen Befehl angeben.');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Speichere...';
+
+        try {
+            const url  = editId ? `${BASE_URL}/${editId}` : BASE_URL;
+            const method = editId ? 'PUT' : 'POST';
+            const resp = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, cron_expr, action, command, run_once, enabled })
+            });
+            const data = await resp.json();
+            $('#cronjobModal').modal('hide');
+            if (data.success) {
+                if (typeof showToast === 'function') showToast('success', editId ? 'Cronjob aktualisiert' : 'Cronjob erstellt');
+                loadCronjobs();
+            } else {
+                if (typeof showToast === 'function') showToast('error', data.message || 'Fehler');
+            }
+        } catch (err) {
+            if (typeof showToast === 'function') showToast('error', 'Netzwerkfehler');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save me-1"></i> Speichern';
+        }
+    };
+
+    window.toggleCronjob = async function(jobId, enabled) {
+        try {
+            const resp = await fetch(`${BASE_URL}/${jobId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled })
+            });
+            const data = await resp.json();
+            if (!data.success) {
+                if (typeof showToast === 'function') showToast('error', data.message || 'Fehler');
+                loadCronjobs();
+            }
+        } catch (err) {
+            if (typeof showToast === 'function') showToast('error', 'Netzwerkfehler');
+        }
+    };
+
+    window.deleteCronjob = async function(jobId, jobName) {
+        if (!confirm(`Cronjob "${jobName}" wirklich löschen?`)) return;
+        try {
+            const resp = await fetch(`${BASE_URL}/${jobId}`, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) {
+                if (typeof showToast === 'function') showToast('success', 'Cronjob gelöscht');
+                loadCronjobs();
+            } else {
+                if (typeof showToast === 'function') showToast('error', data.message || 'Fehler');
+            }
+        } catch (err) {
+            if (typeof showToast === 'function') showToast('error', 'Netzwerkfehler');
+        }
+    };
+
+    // Beim Tab-Aktivieren automatisch laden
+    const cronjobsTabLink = document.getElementById('cronjobs-tab') ||
+                             document.querySelector('a[href="#cronjobs"]');
+    if (cronjobsTabLink) cronjobsTabLink.addEventListener('shown.bs.tab', loadCronjobs);
+
+    // Initiales Laden wenn Tab bereits aktiv
+    if (document.querySelector('#cronjobs.active')) {
+        loadCronjobs();
+    } else {
+        // Daten im Hintergrund vorladen damit der Tab sofort anzeigt
+        setTimeout(loadCronjobs, 1200);
+    }
+})();
+</script>

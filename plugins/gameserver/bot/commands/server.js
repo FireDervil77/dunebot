@@ -16,6 +16,7 @@ const { ServiceManager } = require('dunebot-core');
  *   start <id>                             — Gameserver starten (Autocomplete)
  *   stop <id>                              — Gameserver stoppen (Autocomplete)
  *   restart <id>                           — Gameserver neustarten (Autocomplete)
+ *   move <server> <target_rootserver>      — Server zwischen RootServern verschieben
  *
  * @type {import('dunebot-sdk').CommandType}
  */
@@ -152,6 +153,27 @@ module.exports = {
                         name: 'id',
                         type: ApplicationCommandOptionType.Integer,
                         description: 'gameserver:SERVER.OPT_ID',
+                        required: true,
+                        autocomplete: true,
+                    },
+                ],
+            },            // ── move ──────────────────────────────────────────────────────────
+            {
+                name: 'move',
+                type: ApplicationCommandOptionType.Subcommand,
+                description: 'gameserver:SERVER.SUB_MOVE',
+                options: [
+                    {
+                        name: 'server',
+                        type: ApplicationCommandOptionType.Integer,
+                        description: 'gameserver:SERVER.OPT_SERVER',
+                        required: true,
+                        autocomplete: true,
+                    },
+                    {
+                        name: 'target_rootserver',
+                        type: ApplicationCommandOptionType.Integer,
+                        description: 'gameserver:SERVER.OPT_TARGET_ROOTSERVER',
                         required: true,
                         autocomplete: true,
                     },
@@ -338,6 +360,34 @@ module.exports = {
                         embeds: [_infoEmbed('🔄 Server neustart', `**${res.data?.name}** wurde neu gestartet.`)],
                     });
                 }
+                // ── /server move <server> <target_rootserver> ───────────────────────
+                case 'move': {
+                    const serverId = interaction.options.getInteger('server');
+                    const targetRootServerId = interaction.options.getInteger('target_rootserver');
+                    const userId = interaction.user.id;
+
+                    const res = await ipcClient.sendToDashboard('gameserver:SERVER_MIGRATE', {
+                        guild_id: guildId,
+                        server_id: serverId,
+                        target_rootserver_id: targetRootServerId,
+                        user_id: userId,
+                    });
+
+                    if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
+
+                    const embed = new EmbedBuilder()
+                        .setTitle('📦 Server-Migration gestartet')
+                        .setDescription(
+                            `Server **#${serverId}** wird verschoben.\n\n` +
+                            `📊 **Live-Status:** Besuche das Dashboard für Echtzeit-Updates\n` +
+                            `🔑 **Migration-ID:** ${res.data?.migration_id}\n\n` +
+                            `⚠️ Der Server wird während der Migration **nicht verfügbar** sein.`
+                        )
+                        .setColor(0x3498db)
+                        .setTimestamp();
+
+                    return interaction.followUp({ embeds: [embed] });
+                }
             }
         } catch (err) {
             Logger.error('[Bot/server] Command-Fehler:', err);
@@ -506,8 +556,8 @@ module.exports = {
                 return interaction.respond(choices);
             }
 
-            // ── id-Feld (Gameserver) ──────────────────────────────────────────────────
-            if (focused.name === 'id') {
+            // ── id-Feld (Gameserver) oder server-Feld (für move) ─────────────────────
+            if (focused.name === 'id' || focused.name === 'server') {
                 const sub = interaction.options.getSubcommand(false);
                 const statusFilter = null;
 
@@ -523,6 +573,26 @@ module.exports = {
                         value: s.id,
                     }))
                     .slice(0, 25);
+                return interaction.respond(choices);
+            }
+
+            // ── target_rootserver-Feld (für move) ─────────────────────────────────────
+            if (focused.name === 'target_rootserver') {
+                const res = await ipcClient.sendToDashboard(
+                    'masterserver:DAEMON_LIST', { guild_id: guildId }, 2000
+                );
+                const query = focused.value?.toLowerCase() ?? '';
+                const choices = (res?.data || [])
+                    .filter(s => s.isOnline) // Nur online RootServer anzeigen
+                    .filter(s => !query || s.name.toLowerCase().includes(query) || String(s.id).startsWith(query))
+                    .map(s => {
+                        const ramInfo  = s.freeRamMB  != null ? ` • ${Math.round(s.freeRamMB / 1024 * 10) / 10}GB RAM frei` : '';
+                        const diskInfo = s.freeDiskGB != null ? ` • ${s.freeDiskGB}GB Disk frei` : '';
+                        return {
+                            name:  `🟢 ${s.name}${ramInfo}${diskInfo}`,
+                            value: s.id,
+                        };
+                    }).slice(0, 25);
                 return interaction.respond(choices);
             }
 

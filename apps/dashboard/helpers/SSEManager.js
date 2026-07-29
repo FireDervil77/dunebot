@@ -169,27 +169,35 @@ class SSEManager extends EventEmitter {
 
   /**
    * Broadcast an alle Clients einer Guild
-   * 
+   *
    * @param {string} guildId - Guild ID
    * @param {string} namespace - Event-Namespace (z.B. 'gameserver')
    * @param {Object} data - Event-Daten
+   * @param {Object} [options] - Optionen
+   * @param {Function} [options.transform] - (data, connection) => Nutzlast für genau
+   *   diese Verbindung. Erlaubt es, einzelne Felder nur an berechtigte Empfänger zu
+   *   geben, statt das Event komplett zu unterdrücken (dafür gibt es den Filter).
+   *   Gibt die Funktion `null` zurück, überspringt der Broadcast die Verbindung.
+   *   Die Funktion darf `data` nicht verändern – sie wird pro Verbindung aufgerufen.
    */
-  broadcast(guildId, namespace, data) {
+  broadcast(guildId, namespace, data, options = {}) {
     const guildClients = this.clients.get(guildId);
     if (!guildClients || guildClients.size === 0) {
       this.Logger.debug(`[SSEManager] Keine Clients für Guild ${guildId}`);
       return;
     }
-    
+
     const message = {
       namespace,
       data,
       timestamp: Date.now()
     };
-    
+
+    const transform = typeof options.transform === 'function' ? options.transform : null;
+
     let sentCount = 0;
     let filteredCount = 0;
-    
+
     for (const [clientId, connection] of guildClients.entries()) {
       // Filter prüfen (falls vorhanden)
       const filter = this.filters.get(clientId);
@@ -197,10 +205,28 @@ class SSEManager extends EventEmitter {
         filteredCount++;
         continue;
       }
-      
+
+      // Nutzlast ggf. pro Verbindung zuschneiden
+      let payload = data;
+      if (transform) {
+        try {
+          payload = transform(data, connection);
+        } catch (error) {
+          // Im Zweifel nichts senden: ein defekter Transform darf keine
+          // ungefilterten Daten durchlassen.
+          this.Logger.error(`[SSEManager] Transform-Fehler für Client ${clientId}:`, error);
+          filteredCount++;
+          continue;
+        }
+        if (payload === null || payload === undefined) {
+          filteredCount++;
+          continue;
+        }
+      }
+
       // Event senden
       try {
-        this._sendEvent(connection.res, namespace, data);
+        this._sendEvent(connection.res, namespace, payload);
         connection.lastMessageAt = Date.now();
         connection.messageCount++;
         sentCount++;

@@ -48,11 +48,29 @@ class ConsoleManager {
      */
     _registerEventHandlers() {
         // Console-Output Events vom Daemon abonnieren
-        this.eventRouter.register(NS_CONSOLE, 'output', this._handleConsoleOutput.bind(this), {
+        // Unregister-Funktion aufbewahren, damit dispose() den Handler wieder
+        // entfernen kann (sonst stapeln sich Handler bei Plugin-Reload → doppelte Zeilen)
+        this._unregisterOutputHandler = this.eventRouter.register(NS_CONSOLE, 'output', this._handleConsoleOutput.bind(this), {
             priority: 1
         });
-        
+
         this.Logger.info('[ConsoleManager] Event-Handler registriert');
+    }
+
+    /**
+     * Instanz sauber abbauen (Plugin-Reload): Event-Handler aus dem
+     * IPMEventRouter entfernen, damit keine verwaisten Handler weiterbroadcasten.
+     */
+    dispose() {
+        if (this._unregisterOutputHandler) {
+            try {
+                this._unregisterOutputHandler();
+                this.Logger.info('[ConsoleManager] Event-Handler deregistriert (dispose)');
+            } catch (err) {
+                this.Logger.warn('[ConsoleManager] dispose: Unregister fehlgeschlagen:', err?.message || err);
+            }
+            this._unregisterOutputHandler = null;
+        }
     }
 
     /**
@@ -525,7 +543,10 @@ class ConsoleManager {
      */
     async shutdown() {
         this.Logger.info('[ConsoleManager] Shutdown initiated...');
-        
+
+        // Event-Handler abmelden
+        this.dispose();
+
         // Alle aktiven Sessions detachen
         for (const [serverId, clients] of this.activeClients.entries()) {
             this.Logger.info(`[ConsoleManager] Cleanup: Server ${serverId}, ${clients.size} clients`);

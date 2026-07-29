@@ -144,6 +144,20 @@ class GameserverSSEClient {
                 }
             });
 
+            // Migration-Events (Server-Umzug zwischen RootServern)
+            // Dispatch unter fester Action 'gameserver_migration' — der Untertyp
+            // (migration_started/progress/completed/failed) steckt in message.type
+            this.eventSource.addEventListener('gameserver_migration', (e) => {
+                try {
+                    const message = JSON.parse(e.data);
+                    console.log('[GameserverSSE] Migration Event empfangen:', message);
+                    message.action = 'gameserver_migration';
+                    this._handleEvent(message);
+                } catch (error) {
+                    console.error('[GameserverSSE] Fehler beim Parsen der Migration-Message:', error);
+                }
+            });
+
             // Error-Handler
             this.eventSource.onerror = (error) => {
                 console.error('[GameserverSSE] Connection error:', error);

@@ -10,7 +10,9 @@ const router = express.Router();
 const path = require('path');
 const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
-const QueryService = require('../helpers/QueryService');
+const StatusService = require('../helpers/StatusService');
+const { buildStartPayload, loadServerForStart } = require('../helpers/StartPayload');
+const { resolveStatusConfig } = require('../helpers/StatusSchema');
 // const TemplateEngine = require('../helpers/TemplateEngine'); // ENTFERNT - existiert nicht mehr
 // const PortValidator = require('../helpers/PortValidator'); // ENTFERNT - existiert nicht mehr
 
@@ -19,6 +21,25 @@ const { requirePermission, loadUserPermissions } = require('../../../../apps/das
 
 // ✅ WICHTIG: Permission-Middleware für ALLE Guild-Routes laden!
 router.use(loadUserPermissions);
+
+/**
+ * Formular-Wert in einen Boolean übersetzen.
+ *
+ * Selects/Hidden-Felder liefern Strings – "0", "false" und "" sind in JS aber
+ * truthy bzw. uneinheitlich. Ohne diese Normalisierung landen Schalter falsch
+ * in der DB (auto_update stand deshalb immer auf 1).
+ *
+ * @param {*} value
+ * @param {boolean} [fallback=false] - Wert wenn nichts übergeben wurde
+ * @returns {boolean}
+ */
+function toBool(value, fallback = false) {
+    if (value === undefined || value === null || value === '') return fallback;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    const v = String(value).trim().toLowerCase();
+    return v === '1' || v === 'true' || v === 'on' || v === 'yes';
+}
 
 /**
  * GET /guild/:guildId/plugins/gameserver/servers
@@ -958,8 +979,10 @@ router.post('/', async (req, res) => {
             JSON.stringify(envVariables),
             typeof addon.game_data === 'string' ? addon.game_data : JSON.stringify(addon.game_data),
             startup_command,
-            auto_restart ? 1 : 0,  // ✅ NEU: auto_restart aus Step 3
-            auto_update ? 1 : 0,   // ✅ NEU: auto_update aus Step 3
+            // Das Formular schickt die Strings "0"/"1" – und "0" ist in JS truthy.
+            // Vorher landete deshalb IMMER 1 in der DB, egal was gewählt wurde.
+            toBool(auto_restart, true) ? 1 : 0,
+            toBool(auto_update, false) ? 1 : 0,
             allocated_ram_mb || null,      // ✅ NEU: Resource Limits
             allocated_cpu_percent || null,
             allocated_disk_gb || null
@@ -1036,8 +1059,8 @@ router.post('/', async (req, res) => {
                     game_data: gameData,
                     // platform als eigenständiges Feld (Belt-and-suspenders neben game_data.platform)
                     platform: gameData.platform || 'linux',
-                    run_install: run_install === true || run_install === 'true',
-                    start_after: start_after === true || start_after === 'true',
+                    run_install: toBool(run_install, true),
+                    start_after: toBool(start_after, false),
                     resource_limits: {
                         ram_mb: allocated_ram_mb ? parseInt(allocated_ram_mb) : null,
                         cpu_percent: allocated_cpu_percent ? parseInt(allocated_cpu_percent) : null,
@@ -1149,8 +1172,13 @@ router.post('/', async (req, res) => {
  * - Status-Änderungen (starting, running, stopping, stopped, crashed)
  * - Resource-Usage (CPU, RAM, Disk)
  * - Player-Count-Updates
+ *
+ * ⚠️ Der Stream transportiert dieselben Daten wie die geschützten Ansichten
+ * (Status, Auslastung, Spielerzahlen) und braucht deshalb dieselbe Berechtigung
+ * wie sie. Ohne GAMESERVER.VIEW konnte bis dahin jedes eingeloggte Guild-Mitglied
+ * mitlesen – als einzige Gameserver-Route.
  */
-router.get('/events', (req, res) => {
+router.get('/events', requirePermission('GAMESERVER.VIEW'), (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const sseManager = ServiceManager.get('sseManager');
     
@@ -1263,7 +1291,7 @@ router.get('/:serverId/query', requirePermission('GAMESERVER.VIEW'), async (req,
 
         const [server] = await dbService.query(`
             SELECT
-                gs.id, gs.ports, gs.bind_ip,
+                gs.id, gs.guild_id, gs.status, gs.ports, gs.env_variables, gs.bind_ip,
                 r.host AS rootserver_ip,
                 am.game_data
             FROM gameservers gs
@@ -1276,15 +1304,34 @@ router.get('/:serverId/query', requirePermission('GAMESERVER.VIEW'), async (req,
             return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
         }
 
-        const { ports, gameData } = QueryService.parseServerData(server);
-        const result = await QueryService.query({
-            host:     server.bind_ip || server.rootserver_ip,
-            ports,
-            gameData,
-        });
+        ServiceManager.get('gameserverStatusPoller')?.markInterest(server.id);
+
+        // Frisches Ergebnis wiederverwenden statt den Gameserver erneut abzufragen –
+        // der Poller hält den Wert ohnehin aktuell, solange die Seite offen ist.
+        // Zwei Abfragen kurz hintereinander beantworten die meisten Spiele nicht.
+        let result   = StatusService.getRecentQuery(serverId);
+        let snapshot = null;
+
+        if (!result) {
+            // Über den StatusService, damit das Ergebnis im Snapshot landet und
+            // Serverliste, Karten und Discord dieselbe Wahrheit sehen.
+            snapshot = await StatusService.refresh(server);
+            result = snapshot.query || { success: false, error: 'Server ist nicht online' };
+        }
+
+        // Die Query ist nur eine von zwei Quellen. Bleibt sie stumm, während RCON
+        // antwortet, stehen die Spieler trotzdem im Snapshot – dann gewinnt der.
+        // Ohne das zeigte die Detailseite bei Palworld dauerhaft den Query-Fehler,
+        // obwohl ShowPlayers längst Namen lieferte.
+        if (!result.success) {
+            snapshot = snapshot || await StatusService.getSnapshot(serverId);
+            if (snapshot?.online) {
+                result = StatusService.toQueryShape(snapshot);
+            }
+        }
 
         if (!result.success) {
-            Logger.debug(`[Gameserver] Query fehlgeschlagen für Server ${serverId}: ${result.error}`);
+            Logger.debug(`[Gameserver] Keine Quelle erreichbar für Server ${serverId}: ${result.error}`);
         }
 
         return res.json(result);
@@ -1310,7 +1357,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         const serverId = req.params.serverId;
         const user = res.locals.user;
 
-        Logger.debug(`[Gameserver] Detail-View für Server ${serverId}, Guild ${guildId}`);
+        Logger.info(`[Gameserver] ===== Detail-View START für Server ${serverId}, Guild ${guildId} =====`);
 
         // Server mit allen relevanten JOINs laden
         const [server] = await dbService.query(`
@@ -1353,6 +1400,8 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
             WHERE gs.id = ? AND gs.guild_id = ?
         `, [serverId, guildId]);
+
+        Logger.info(`[Gameserver] DB-Query abgeschlossen, Server gefunden: ${!!server}`);
 
         // 404 wenn Server nicht gefunden
         if (!server) {
@@ -1397,6 +1446,8 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         }
         server.env_variables_parsed = envVariables;
 
+        Logger.info(`[Gameserver] JSON-Parsing abgeschlossen (ports, game_data, env_variables)`);
+
         // Ports zum Server-Objekt hinzufügen (für einfacheren Zugriff in View)
         server.ip_address = server.rootserver_ip || 'N/A';
         server.port_game = ports.game?.external || ports.game?.internal || ports.main?.external || null;
@@ -1412,20 +1463,34 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         server.port_rcon = ports.rcon?.external || ports.rcon?.internal || null;
         server.ports_parsed = ports; // Original-Struktur für erweiterte Ansicht
 
-        // RCON verfügbar wenn das Egg eine config.rcon-Sektion hat
-        const frozenGameData = typeof server.game_data === 'string'
-            ? JSON.parse(server.game_data) : (server.game_data || {});
-        server.rcon_available = !!(frozenGameData?.config?.rcon);
+        // RCON-Verfügbarkeit prüfen statt raten: Port muss auflösbar, Passwort gesetzt
+        // und das Protokoll vom Daemon unterstützt sein. Vorher galt allein die
+        // Existenz eines config.rcon-Blocks als "verfügbar" — die RCON-Konsole
+        // erschien dadurch auch bei Servern, bei denen sie nicht funktionieren kann.
+        const rcon = StatusService.resolveRcon({ gameData, ports, envVars: envVariables });
+        server.rcon_available = rcon.available;
+        server.rcon_configured = rcon.configured;
+        server.rcon_reason = rcon.reason;
+        server.rcon_protocol = rcon.protocol;
+        server.port_rcon = server.port_rcon || rcon.port;
 
-        // RCON-Port Fallback: Wenn port_var auf "game" zeigt, nutzt RCON den Game-Port
-        if (!server.port_rcon && frozenGameData?.config?.rcon) {
-            const rconPortVar = frozenGameData.config.rcon.port_var || '';
-            if (rconPortVar === 'game' && server.port_game) {
-                server.port_rcon = server.port_game;
-            } else if (rconPortVar && ports[rconPortVar]) {
-                server.port_rcon = ports[rconPortVar]?.external || ports[rconPortVar]?.internal || null;
-            }
+        // Letztes tatsächliches RCON-Ergebnis (aus Snapshot) für die Anzeige
+        const statusSnapshot = await StatusService.getSnapshot(server.id);
+        server.status_snapshot = statusSnapshot;
+        server.rcon_last_ok = statusSnapshot?.rcon_ok ?? null;
+        if (statusSnapshot) {
+            // Live-Werte gewinnen über die Registry-Spalten
+            server.current_players = statusSnapshot.players_current ?? server.current_players;
+            server.max_players     = statusSnapshot.players_max     ?? server.max_players;
+            server.current_map     = statusSnapshot.map             ?? server.current_map;
         }
+
+        // Anzeige-Konfiguration (Spalten, Felder, Badges) aus dem Addon auflösen –
+        // ersetzt die fest verdrahteten Tabellenspalten in der View
+        server.status_display = resolveStatusConfig(gameData).display;
+
+        // Detailseite offen → Poller darf diesen Server häufiger abfragen
+        ServiceManager.get('gameserverStatusPoller')?.markInterest(server.id);
 
         // SFTP-Credentials: Normally set at creation time. Lazy-fallback only if missing.
         if (!server.sftp_username && server.system_user) {
@@ -1452,7 +1517,19 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         server.sftp_host = server.rootserver_ip || server.rootserver_hostname || 'N/A';
         server.sftp_port = 2022;
 
+        Logger.info(`[Gameserver] SFTP-Config gesetzt, lade RootServers...`);
         Logger.success(`[Gameserver] Server ${server.name} (${server.id}) geladen für Detail-View`);
+
+        // RootServers für Migration-Modal laden
+        const rootServers = await dbService.query(
+            `SELECT r.id, r.name, r.daemon_id, r.daemon_status
+             FROM rootserver r
+             WHERE r.guild_id = ?
+             ORDER BY r.name ASC`,
+            [guildId]
+        );
+
+        Logger.info(`[Gameserver] RootServers geladen (${rootServers.length}), registriere Assets...`);
 
         // Assets für Detail-View einreihen
         // monaco-loader + gameserver-file-manager werden vom Files-Partial eingereiht
@@ -1462,6 +1539,8 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             assetManager.enqueueScript('gameserver-sse');
             assetManager.enqueueScript('gameserver-actions');
         }
+
+        Logger.info(`[Gameserver] Assets eingereiht, rendere View...`);
 
         // View rendern
         // gamedig_type für Live-Query-Panel in der View bereitstellen
@@ -1473,11 +1552,16 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             server,
             gameData,
             guildId,
-            user
+            user,
+            rootServers
         });
 
     } catch (error) {
-        Logger.error('[Gameserver] Fehler beim Laden der Server-Details:', error);
+        Logger.error('[Gameserver] ===== FEHLER beim Laden der Server-Details =====');
+        Logger.error('[Gameserver] Error Message:', error.message);
+        Logger.error('[Gameserver] Error Stack:', error.stack);
+        Logger.error('[Gameserver] Error Object:', error);
+        
         res.status(500).render('error', {
             message: 'Fehler beim Laden der Server-Details',
             error: process.env.NODE_ENV === 'development' ? error : {}
@@ -2095,8 +2179,8 @@ router.put('/:serverId', async (req, res) => {
             WHERE id = ? AND guild_id = ?
         `, [
             name.trim(),
-            auto_restart === '1' || auto_restart === true ? 1 : 0,
-            auto_update === '1' || auto_update === true ? 1 : 0,
+            toBool(auto_restart) ? 1 : 0,
+            toBool(auto_update) ? 1 : 0,
             maxPlayersInt,
             JSON.stringify(envVarsJson),
             serverId,
@@ -2298,18 +2382,8 @@ router.post('/:serverId/start', async (req, res) => {
 
         Logger.info(`[Gameserver] Start angefordert (ID: ${serverId})`);
 
-        // Server-Daten laden
-        const [server] = await dbService.query(
-            `SELECT 
-                gs.*,
-                r.daemon_id,
-                r.id as rootserver_id,
-                r.system_user
-             FROM gameservers gs
-             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
-             WHERE gs.id = ? AND gs.guild_id = ?`,
-            [serverId, guildId]
-        );
+        // Server-Daten laden (identisch zum Neustart-Pfad)
+        const server = await loadServerForStart(dbService, serverId, guildId);
 
         if (!server) {
             return res.status(404).json({
@@ -2383,144 +2457,16 @@ router.post('/:serverId/start', async (req, res) => {
         
         Logger.debug(`[Gameserver] Alle Ports verfügbar ✓`);
 
-        // 🔥 TEMPLATE-OVERRIDE: Wenn ein Template gewählt wurde, Variablen-Overrides VOR Substitution einmergen
-        try {
-            const frozenForTemplate = typeof server.frozen_game_data === 'string'
-                ? JSON.parse(server.frozen_game_data)
-                : server.frozen_game_data;
-            if (server.template_name && Array.isArray(frozenForTemplate?.templates)) {
-                const tpl = frozenForTemplate.templates.find(t => t.name === server.template_name);
-                if (tpl?.variables) {
-                    Object.assign(envVariables, tpl.variables);
-                    Logger.debug(`[Gameserver] Template "${server.template_name}" Variablen-Overrides angewendet`);
-                }
-            }
-        } catch (_) { /* frozen_game_data wird unten erneut geparst */ }
+        // Payload zentral bauen: Template-Overrides, Variablen-Substitution,
+        // Docker-Image, Runtime, Config-Patching und Auto-Update.
+        // Dieselbe Funktion nutzen Neustart und Cronjob – sonst driften die Pfade
+        // auseinander, wie es beim Restart bereits passiert war.
+        const { payload: startPayload, error: payloadError, dockerImage } =
+            buildStartPayload(server, guildId, Logger);
 
-        // 🔥 VARIABLE-SUBSTITUTION: {{WORLD}} → "BoomTown", {{PASSWORD}} → "einstein", etc.
-        // envVariables nutzt env_variable-Keys (z.B. "SERVER_NAME", "WORLD")
-        let startupCommand = server.launch_params;
-        
-        try {
-            const frozenVars = typeof server.frozen_game_data === 'string'
-                ? JSON.parse(server.frozen_game_data)
-                : server.frozen_game_data;
-            if (frozenVars?.variables && Array.isArray(frozenVars.variables)) {
-                for (const varDef of frozenVars.variables) {
-                    const envKey = varDef.env_variable;     // z.B. "WORLD"
-                    const displayName = varDef.name;        // z.B. "World Name"
-                    const value = envVariables[envKey] ?? envVariables[displayName] ?? varDef.default_value ?? '';
-                    startupCommand = startupCommand.replace(new RegExp(`{{${envKey}}}`, 'g'), String(value));
-                }
-            } else {
-                // Fallback: direkte Substitution mit den gespeicherten Keys (Altdaten ohne frozen_game_data)
-                for (const [key, value] of Object.entries(envVariables)) {
-                    startupCommand = startupCommand.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                }
-            }
-        } catch (e) {
-            Logger.warn(`[Gameserver] Variable-Substitution fehlgeschlagen: ${e.message}`);
-        }
-        
-        // Ersetze Port-Variablen (ports = {"game": {"internal": 27030, ...}})
-        for (const [key, portData] of Object.entries(ports)) {
-            const portValue = typeof portData === 'object' ? (portData.internal || portData.external) : portData;
-            if (portValue !== undefined) {
-                // z.B. GAME_PORT
-                const envKey = key.toUpperCase() + '_PORT';
-                startupCommand = startupCommand.replace(new RegExp(`{{${envKey}}}`, 'g'), String(portValue));
-                // SERVER_PORT für game/main Port
-                if (key === 'game' || key === 'main') {
-                    startupCommand = startupCommand.replace(/\{\{SERVER_PORT\}\}/g, String(portValue));
-                }
-            }
-        }
-
-        Logger.debug(`[Gameserver] Startup-Command nach Variable-Substitution:`, {
-            original: server.launch_params,
-            substituted: startupCommand
-        });
-
-        const installPath = server.install_path || `${serverId}-${server.addon_slug}`;
-        
-        Logger.debug(`[Gameserver] Install-Path: ${installPath}`);
-
-        // Docker-Image und Runtime-Info aus frozen_game_data extrahieren
-        let dockerImage = null;
-        let gameDataRuntime = { stop_mode: 'sigterm', stop_command: '', stop_timeout_sec: 30, done_string: '' };
-        let gameDataConfig = null; // config.files für Config-Patching vor Start
-        let fileDenylist = []; // File-Denylist für File-Manager
-        let gameDataPlatform = null; // Platform (linux/windows) für Proton-GE
-
-        try {
-            const frozenData = typeof server.frozen_game_data === 'string'
-                ? JSON.parse(server.frozen_game_data)
-                : server.frozen_game_data;
-
-            if (frozenData) {
-                // docker_image: erster KEY aus docker_images-Objekt (KEY = Image-URL, Value = Beschreibung)
-                const dockerImages = frozenData.docker_images || {};
-                const imageKeys = Object.keys(dockerImages);
-                if (imageKeys.length > 0) {
-                    dockerImage = imageKeys[0];
-                }
-
-                // stop-Info aus startup.stop (z.B. "^C" → sigint)
-                const stopSignal = frozenData.startup?.stop || '';
-                if (stopSignal === '^C') {
-                    gameDataRuntime.stop_mode = 'sigint';
-                } else if (stopSignal && stopSignal !== '') {
-                    gameDataRuntime.stop_mode = 'console_command';
-                    gameDataRuntime.stop_command = stopSignal;
-                }
-
-                // done_string: Konsolen-String der signalisiert dass der Server bereit ist
-                if (frozenData.startup?.done) {
-                    gameDataRuntime.done_string = frozenData.startup.done;
-                }
-
-                // config.files: Config-Patching Definition (Parser + Find-Keys)
-                if (frozenData.config?.files && Object.keys(frozenData.config.files).length > 0) {
-                    gameDataConfig = frozenData.config;
-                    Logger.debug(`[Gameserver] ${Object.keys(frozenData.config.files).length} Config-Dateien für Patching geladen`);
-                }
-
-                // File-Denylist für File-Manager
-                if (Array.isArray(frozenData.file_denylist)) {
-                    fileDenylist = frozenData.file_denylist;
-                }
-
-                // Platform (linux/windows) für Proton-GE-Wrapping
-                if (frozenData.platform) {
-                    gameDataPlatform = frozenData.platform;
-                }
-
-                // Template-Config-Overrides mergen
-                if (server.template_name && Array.isArray(frozenData.templates)) {
-                    const tpl = frozenData.templates.find(t => t.name === server.template_name);
-                    if (tpl?.config_overrides) {
-                        if (!gameDataConfig) gameDataConfig = { files: {} };
-                        if (!gameDataConfig.files) gameDataConfig.files = {};
-                        for (const [fname, overrides] of Object.entries(tpl.config_overrides)) {
-                            if (!gameDataConfig.files[fname]) {
-                                gameDataConfig.files[fname] = { parser: 'file', find: {} };
-                            }
-                            Object.assign(gameDataConfig.files[fname].find, overrides);
-                        }
-                        Logger.debug(`[Gameserver] Template "${server.template_name}" Config-Overrides angewendet`);
-                    }
-                }
-            }
-        } catch (e) {
-            Logger.warn(`[Gameserver] frozen_game_data parsen fehlgeschlagen: ${e.message}`);
-        }
-
-        if (!dockerImage) {
-            Logger.error(`[Gameserver] Kein Docker-Image in frozen_game_data für Server ${serverId}`);
-            return res.status(500).json({
-                success: false,
-                message: 'Kein Docker-Image konfiguriert. Server muss neu installiert werden.'
-            });
+        if (payloadError) {
+            Logger.error(`[Gameserver] ${payloadError} (Server ${serverId})`);
+            return res.status(500).json({ success: false, message: payloadError });
         }
 
         Logger.debug(`[Gameserver] Docker-Image: ${dockerImage}`);
@@ -2548,29 +2494,14 @@ router.post('/:serverId/start', async (req, res) => {
             ['starting', serverId]
         );
 
-        // IPM-Command an Daemon senden
-        Logger.info(`[Gameserver] Sende Start-Command an Daemon ${server.daemon_id} (Image: ${dockerImage})`);
+        if (server.auto_update && !startPayload.steam_app_id) {
+            Logger.warn(`[Gameserver] auto_update aktiv, aber keine Steam-AppID für Server ${serverId} – Update wird übersprungen`);
+        }
 
-        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.start', {
-            server_id: serverId,
-            daemon_id: server.daemon_id,
-            rootserver_id: server.rootserver_id,
-            system_user: server.system_user || 'gameserver',
-            install_path: installPath,
-            startup_command: startupCommand,
-            ports,
-            env_variables: envVariables,
-            guild_id: guildId,
-            bind_ip: server.bind_ip || null,
-            file_denylist: fileDenylist,
-            // Docker-spezifische Felder die der Daemon für StartContainer() braucht:
-            game_data: {
-                docker_image: dockerImage,
-                runtime: gameDataRuntime,
-                ...(gameDataConfig ? { config: gameDataConfig } : {}),
-                ...(gameDataPlatform ? { platform: gameDataPlatform } : {})
-            }
-        }, 30000);
+        // IPM-Command an Daemon senden
+        Logger.info(`[Gameserver] Sende Start-Command an Daemon ${server.daemon_id} (Image: ${dockerImage}${startPayload.auto_update ? ', mit Auto-Update' : ''})`);
+
+        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.start', startPayload, 30000);
 
         if (response.success) {
             if (response.task_id) {
@@ -2756,14 +2687,9 @@ router.post('/:serverId/restart', async (req, res) => {
 
         Logger.info(`[Gameserver] Restart angefordert (ID: ${serverId})`);
 
-        // Server-Daten laden
-        const [server] = await dbService.query(
-            `SELECT gs.*, r.daemon_id
-             FROM gameservers gs
-             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
-             WHERE gs.id = ? AND gs.guild_id = ?`,
-            [serverId, guildId]
-        );
+        // Server-Daten laden (gleiche Felder wie beim Start – der Daemon braucht
+        // beim Neustart dieselbe Konfiguration)
+        const server = await loadServerForStart(dbService, serverId, guildId);
 
         if (!server) {
             return res.status(404).json({
@@ -2804,10 +2730,16 @@ router.post('/:serverId/restart', async (req, res) => {
         // IPM-Command an Daemon senden
         Logger.info(`[Gameserver] Sende Restart-Command an Daemon ${server.daemon_id}`);
 
-        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.restart', {
-            server_id: serverId,
-            guild_id: guildId  // ✅ Guild-ID für Event-Broadcasting
-        }, 30000);
+        // Vollständiges Payload wie beim Start: Image, Startup-Command, Ports und
+        // Config leben nur im Speicher des Daemons. Nach einem Daemon-Neustart
+        // stoppte ein Restart den Server sonst und scheiterte dann mit
+        // "docker image not set".
+        const { payload: restartPayload, error: payloadError } = buildStartPayload(server, guildId, Logger);
+        if (payloadError) {
+            return res.status(500).json({ success: false, message: payloadError });
+        }
+
+        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.restart', restartPayload, 30000);
 
         if (response.success) {
             // Status auf 'online' setzen
@@ -3257,6 +3189,112 @@ router.put('/:serverId/variables', requirePermission('GAMESERVER.EDIT'), async (
 });
 
 // ============================================================
+// MIGRATION: Server zwischen RootServern verschieben
+// POST /guild/:guildId/plugins/gameserver/servers/:serverId/migrate
+// ============================================================
+router.post('/:serverId/migrate', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const guildId = res.locals.guildId;
+        const serverId = req.params.serverId;
+        const { target_rootserver_id } = req.body;
+
+        if (!target_rootserver_id) {
+            return res.status(400).json({ success: false, message: 'target_rootserver_id erforderlich' });
+        }
+
+        const userId = req.user?.id || res.locals.userId || 'DASHBOARD';
+
+        Logger.info(`[Gameserver] Migration-Request: Server ${serverId} -> RootServer ${target_rootserver_id} (User: ${userId})`);
+
+        const MigrationManager = require('../helpers/MigrationManager.js');
+        const result = await MigrationManager.startMigration(
+            parseInt(serverId, 10),
+            parseInt(target_rootserver_id, 10),
+            String(userId),
+            guildId
+        );
+
+        if (!result.success) {
+            return res.status(400).json({ success: false, message: result.error });
+        }
+
+        return res.json({
+            success: true,
+            migration_id: result.migrationId,
+            message: 'Migration gestartet. Du erhältst Live-Updates via SSE.'
+        });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Starten der Migration:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler beim Starten der Migration' });
+    }
+});
+
+// ============================================================
+// MIGRATION STATUS: Abrufen des aktuellen Migration-Status
+// GET /guild/:guildId/plugins/gameserver/servers/:serverId/migration/status
+// ============================================================
+router.get('/:serverId/migration/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const guildId = res.locals.guildId;
+        const serverId = req.params.serverId;
+
+        // Letzte Migration für diesen Server finden
+        const [migration] = await dbService.query(
+            `SELECT * FROM gameserver_migrations 
+             WHERE server_id = ? 
+             ORDER BY started_at DESC 
+             LIMIT 1`,
+            [serverId]
+        );
+
+        if (!migration) {
+            return res.status(404).json({ success: false, message: 'Keine Migration gefunden' });
+        }
+
+        // Server-Infos hinzufügen
+        const [server] = await dbService.query(
+            'SELECT id, name, status FROM gameservers WHERE id = ? AND guild_id = ?',
+            [serverId, guildId]
+        );
+
+        if (!server) {
+            return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+        }
+
+        return res.json({
+            success: true,
+            migration: {
+                id: migration.id,
+                status: migration.status,
+                progress_percent: migration.progress_percent,
+                current_step: migration.current_step,
+                error_message: migration.error_message,
+                started_at: migration.started_at,
+                completed_at: migration.completed_at,
+                source_rootserver_id: migration.source_rootserver_id,
+                target_rootserver_id: migration.target_rootserver_id
+            },
+            server: {
+                id: server.id,
+                name: server.name,
+                status: server.status
+            }
+        });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Fehler beim Abrufen des Migration-Status:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+// ============================================================
 // SFTP: Passwort zurücksetzen
 // POST /guild/:guildId/plugins/gameserver/servers/:serverId/sftp/reset-password
 // ============================================================
@@ -3359,50 +3397,48 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
                 ? JSON.parse(server.game_data) : (server.game_data || {});
         } catch (_) { /* ignorieren */ }
 
-        const rconConfig = gameData?.config?.rcon;
-        if (!rconConfig) {
-            return res.status(400).json({ success: false, message: 'Dieser Gameserver unterstützt kein RCON' });
-        }
-
         // ports + env_variables parsen
         let ports = {};
         try { ports = typeof server.ports === 'string' ? JSON.parse(server.ports) : (server.ports || {}); } catch (_) { /* */ }
         let envVars = {};
         try { envVars = typeof server.env_variables === 'string' ? JSON.parse(server.env_variables) : (server.env_variables || {}); } catch (_) { /* */ }
 
-        // RCON-Port bestimmen: port_var in Kleinbuchstaben → ports[portVar].external
-        //                      port_var in Großbuchstaben → env_variables[portVar]
-        const portVar = rconConfig.port_var || '';
-        let rconPort = null;
-        if (portVar === portVar.toLowerCase()) {
-            // Kleinbuchstaben → Port-Key
-            rconPort = ports[portVar]?.external || ports[portVar]?.internal || null;
-        } else {
-            // Großbuchstaben → ENV-Variable
-            rconPort = parseInt(envVars[portVar], 10) || null;
-        }
-
-        const passwordVar = rconConfig.password_var || '';
-        const rconPassword = envVars[passwordVar] || '';
-
-        if (!rconPort) {
-            return res.status(400).json({ success: false, message: `RCON-Port (${portVar}) nicht gefunden` });
-        }
-        if (!rconPassword) {
-            return res.status(400).json({ success: false, message: `RCON-Passwort (${passwordVar}) nicht konfiguriert` });
+        // Port, Passwort und Protokoll zentral auflösen (gleiche Prüfung wie in der View)
+        const rcon = StatusService.resolveRcon({ gameData, ports, envVars });
+        if (!rcon.available) {
+            return res.status(400).json({ success: false, message: rcon.reason || 'RCON ist für diesen Gameserver nicht verfügbar' });
         }
         if (!server.daemon_id) {
             return res.status(400).json({ success: false, message: 'Kein Daemon für diesen Server konfiguriert' });
         }
 
-        const result = await ipmServer.sendCommand(server.daemon_id, 'gameserver.rcon', {
-            guild_id: guildId,
-            server_id: String(server.id),
-            rcon_host: server.bind_ip || server.rootserver_ip || '127.0.0.1',
-            rcon_port: rconPort,
-            rcon_password: rconPassword,
-            rcon_command: command
-        }, 15000);
+        const rconPassword = envVars[gameData.config.rcon.password_var] || '';
+
+        // sendCommand wirft, wenn der Daemon success:false meldet – die eigentliche
+        // Meldung ("Verbindung abgelehnt", "falsches Passwort", …) steckt dann in
+        // der Exception. Ohne dieses catch landete alles im generischen
+        // "Serverfehler" und der Grund war nirgends sichtbar.
+        let result;
+        try {
+            result = await ipmServer.sendCommand(server.daemon_id, 'gameserver.rcon', {
+                guild_id: guildId,
+                server_id: String(server.id),
+                rcon_host: server.bind_ip || server.rootserver_ip || '127.0.0.1',
+                rcon_port: rcon.port,
+                rcon_password: rconPassword,
+                rcon_protocol: rcon.protocol || 'srcds',
+                rcon_command: command
+            }, 15000);
+        } catch (cmdError) {
+            const reason = cmdError?.message || 'RCON-Befehl fehlgeschlagen';
+            Logger.warn(`[Gameserver] RCON-Fehler für Server ${serverId}: ${reason}`);
+            StatusService.recordRconResult(server.id, guildId, false, reason).catch(() => {});
+            return res.json({ success: false, message: reason });
+        }
+
+        // Tatsächliches Ergebnis festhalten – davon lebt die RCON-Anzeige
+        StatusService.recordRconResult(server.id, guildId, !!result?.success, result?.error)
+            .catch(() => { /* Anzeige-Detail, kein Grund den Befehl scheitern zu lassen */ });
 
         if (!result?.success) {
             Logger.warn(`[Gameserver] RCON-Fehler für Server ${serverId}: ${result?.error}`);
@@ -3415,6 +3451,429 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
     } catch (error) {
         Logger.error('[Gameserver] RCON-Route Fehler:', error);
         return res.status(500).json({ success: false, message: 'Serverfehler beim Ausführen des RCON-Befehls' });
+    }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// BACKUP ROUTEN
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /guild/:guildId/plugins/gameserver/servers/:serverId/backups
+ * Backup-Liste für einen Server
+ */
+router.get('/:serverId/backups', requirePermission('GAMESERVER.BACKUPS.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId } = req.params;
+        const guildId = res.locals.guildId;
+
+        // Prüfen ob Server zur Guild gehört
+        const [server] = await dbService.query(
+            'SELECT id, name FROM gameservers WHERE id = ? AND guild_id = ?',
+            [serverId, guildId]
+        );
+        if (!server) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const backups = await dbService.query(
+            `SELECT id, name, size_bytes, status, note, created_by, created_at, completed_at, error_message
+             FROM gameserver_backups
+             WHERE server_id = ?
+             ORDER BY created_at DESC`,
+            [serverId]
+        );
+
+        return res.json({ success: true, backups: backups || [] });
+    } catch (error) {
+        Logger.error('[Gameserver/Backups] Fehler beim Laden der Backup-Liste:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+/**
+ * POST /guild/:guildId/plugins/gameserver/servers/:serverId/backups
+ * Neues Backup erstellen
+ */
+router.post('/:serverId/backups', requirePermission('GAMESERVER.BACKUPS.CREATE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId } = req.params;
+        const guildId = res.locals.guildId;
+        const userId = res.locals.user?.id || req.session?.user?.info?.id || 'unknown';
+        const note = (req.body.note || '').substring(0, 500);
+
+        // Server validieren
+        const [server] = await dbService.query(
+            'SELECT id, name, install_path FROM gameservers WHERE id = ? AND guild_id = ?',
+            [serverId, guildId]
+        );
+        if (!server) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        // Backup-Namen generieren: server-name_YYYY-MM-DD_HH-MM
+        const now = new Date();
+        const timestamp = now.toISOString().replace('T', '_').replace(/:/g, '-').slice(0, 16);
+        const safeName = server.name.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 40);
+        const backupName = `${safeName}_${timestamp}`;
+
+        // Backup-Eintrag in DB erstellen
+        const result = await dbService.query(
+            `INSERT INTO gameserver_backups (server_id, guild_id, name, status, note, created_by)
+             VALUES (?, ?, ?, 'pending', ?, ?)`,
+            [serverId, guildId, backupName, note, userId]
+        );
+        const backupId = result.insertId;
+
+        // Backup über IPM starten (asynchron – Status wird per SSE gemeldet)
+        const ipmServer = ServiceManager.get('ipmServer');
+        const [rootserver] = await dbService.query(
+            'SELECT daemon_id FROM rootserver r JOIN gameservers gs ON gs.rootserver_id = r.id WHERE gs.id = ?',
+            [serverId]
+        );
+
+        if (rootserver && ipmServer?.isDaemonOnline(rootserver.daemon_id)) {
+            // Status auf 'running' setzen
+            await dbService.query(
+                "UPDATE gameserver_backups SET status = 'running' WHERE id = ?",
+                [backupId]
+            );
+
+            ipmServer.sendCommand(rootserver.daemon_id, 'gameserver.backup', {
+                server_id: String(serverId),
+                backup_id: String(backupId),
+                backup_name: backupName,
+                install_path: server.install_path
+            }, 300000)
+                .then(async (r) => {
+                    const size = r?.size_bytes || 0;
+                    await dbService.query(
+                        "UPDATE gameserver_backups SET status = 'completed', size_bytes = ?, completed_at = NOW() WHERE id = ?",
+                        [size, backupId]
+                    );
+                    // SSE-Broadcast
+                    const sseManager = ServiceManager.get('sseManager');
+                    sseManager?.broadcast(guildId, 'gameserver', {
+                        action: 'backup_completed', server_id: serverId, backup_id: backupId, backup_name: backupName
+                    });
+                })
+                .catch(async (err) => {
+                    await dbService.query(
+                        "UPDATE gameserver_backups SET status = 'failed', error_message = ? WHERE id = ?",
+                        [err.message || 'Backup fehlgeschlagen', backupId]
+                    );
+                    Logger.error(`[Gameserver/Backups] Backup ${backupId} fehlgeschlagen:`, err);
+                });
+        } else {
+            // Daemon offline → als fehlgeschlagen markieren
+            await dbService.query(
+                "UPDATE gameserver_backups SET status = 'failed', error_message = 'Daemon offline' WHERE id = ?",
+                [backupId]
+            );
+            Logger.warn(`[Gameserver/Backups] Daemon offline für Server ${serverId} – Backup ${backupId} fehlgeschlagen`);
+        }
+
+        return res.json({ success: true, message: 'Backup gestartet', backup_id: backupId, backup_name: backupName });
+    } catch (error) {
+        Logger.error('[Gameserver/Backups] Fehler beim Erstellen des Backups:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler beim Erstellen des Backups' });
+    }
+});
+
+/**
+ * DELETE /guild/:guildId/plugins/gameserver/servers/:serverId/backups/:backupId
+ * Backup löschen
+ */
+router.delete('/:serverId/backups/:backupId', requirePermission('GAMESERVER.BACKUPS.DELETE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId, backupId } = req.params;
+        const guildId = res.locals.guildId;
+
+        const [backup] = await dbService.query(
+            'SELECT id, name FROM gameserver_backups WHERE id = ? AND server_id = ? AND guild_id = ?',
+            [backupId, serverId, guildId]
+        );
+        if (!backup) return res.status(404).json({ success: false, message: 'Backup nicht gefunden' });
+
+        await dbService.query('DELETE FROM gameserver_backups WHERE id = ?', [backupId]);
+
+        Logger.info(`[Gameserver/Backups] Backup ${backupId} (${backup.name}) gelöscht`);
+        return res.json({ success: true, message: 'Backup gelöscht' });
+    } catch (error) {
+        Logger.error('[Gameserver/Backups] Fehler beim Löschen des Backups:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+/**
+ * POST /guild/:guildId/plugins/gameserver/servers/:serverId/backups/:backupId/restore
+ * Backup wiederherstellen
+ */
+router.post('/:serverId/backups/:backupId/restore', requirePermission('GAMESERVER.BACKUPS.RESTORE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId, backupId } = req.params;
+        const guildId = res.locals.guildId;
+
+        const [backup] = await dbService.query(
+            "SELECT id, name FROM gameserver_backups WHERE id = ? AND server_id = ? AND guild_id = ? AND status = 'completed'",
+            [backupId, serverId, guildId]
+        );
+        if (!backup) return res.status(404).json({ success: false, message: 'Backup nicht gefunden oder nicht abgeschlossen' });
+
+        const [server] = await dbService.query(
+            'SELECT gs.id, gs.install_path, gs.status, r.daemon_id FROM gameservers gs LEFT JOIN rootserver r ON gs.rootserver_id = r.id WHERE gs.id = ? AND gs.guild_id = ?',
+            [serverId, guildId]
+        );
+        if (!server) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        if (server.status === 'online' || server.status === 'starting') {
+            return res.status(400).json({ success: false, message: 'Server muss gestoppt sein bevor ein Backup wiederhergestellt werden kann' });
+        }
+
+        const ipmServer = ServiceManager.get('ipmServer');
+        if (!ipmServer?.isDaemonOnline(server.daemon_id)) {
+            return res.status(503).json({ success: false, message: 'Daemon ist offline' });
+        }
+
+        await dbService.query(
+            "UPDATE gameserver_backups SET status = 'restoring' WHERE id = ?",
+            [backupId]
+        );
+
+        ipmServer.sendCommand(server.daemon_id, 'gameserver.restore', {
+            server_id: String(serverId),
+            backup_id: String(backupId),
+            backup_name: backup.name,
+            install_path: server.install_path
+        }, 300000)
+            .then(async () => {
+                await dbService.query(
+                    "UPDATE gameserver_backups SET status = 'completed' WHERE id = ?",
+                    [backupId]
+                );
+                const sseManager = ServiceManager.get('sseManager');
+                sseManager?.broadcast(guildId, 'gameserver', {
+                    action: 'restore_completed', server_id: serverId, backup_id: backupId
+                });
+            })
+            .catch(async (err) => {
+                await dbService.query(
+                    "UPDATE gameserver_backups SET status = 'completed' WHERE id = ?",
+                    [backupId]
+                );
+                Logger.error(`[Gameserver/Backups] Restore ${backupId} fehlgeschlagen:`, err);
+            });
+
+        return res.json({ success: true, message: 'Wiederherstellung gestartet' });
+    } catch (error) {
+        Logger.error('[Gameserver/Backups] Fehler beim Restore:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler beim Wiederherstellen' });
+    }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// CRONJOB ROUTEN
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /guild/:guildId/plugins/gameserver/servers/:serverId/cronjobs
+ * Cronjob-Liste für einen Server
+ */
+router.get('/:serverId/cronjobs', requirePermission('GAMESERVER.CRONJOBS.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId } = req.params;
+        const guildId = res.locals.guildId;
+
+        const [server] = await dbService.query(
+            'SELECT id, name FROM gameservers WHERE id = ? AND guild_id = ?',
+            [serverId, guildId]
+        );
+        if (!server) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const cronjobs = await dbService.query(
+            `SELECT id, name, cron_expr, action, command, run_once, enabled, last_run_at, next_run_at, last_status, created_at
+             FROM gameserver_cronjobs
+             WHERE server_id = ?
+             ORDER BY created_at DESC`,
+            [serverId]
+        );
+
+        return res.json({ success: true, cronjobs: cronjobs || [] });
+    } catch (error) {
+        Logger.error('[Gameserver/Cronjobs] Fehler beim Laden:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+/**
+ * POST /guild/:guildId/plugins/gameserver/servers/:serverId/cronjobs
+ * Neuen Cronjob erstellen
+ */
+router.post('/:serverId/cronjobs', requirePermission('GAMESERVER.CRONJOBS.MANAGE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId } = req.params;
+        const guildId = res.locals.guildId;
+        const userId = res.locals.user?.id || req.session?.user?.info?.id || 'unknown';
+
+        const [server] = await dbService.query(
+            'SELECT id FROM gameservers WHERE id = ? AND guild_id = ?',
+            [serverId, guildId]
+        );
+        if (!server) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const { name, cron_expr, action, command, run_once } = req.body;
+
+        // Validierung
+        if (!name || !cron_expr || !action) {
+            return res.status(400).json({ success: false, message: 'name, cron_expr und action sind Pflichtfelder' });
+        }
+        const allowedActions = ['start', 'stop', 'restart', 'backup', 'command'];
+        if (!allowedActions.includes(action)) {
+            return res.status(400).json({ success: false, message: 'Ungültige Aktion' });
+        }
+        if (action === 'command' && !command?.trim()) {
+            return res.status(400).json({ success: false, message: 'command ist Pflichtfeld wenn action=command' });
+        }
+        // Einfache Cron-Validierung: 5 Felder
+        if (cron_expr.trim().split(/\s+/).length !== 5) {
+            return res.status(400).json({ success: false, message: 'Ungültige Cron-Expression (5 Felder erwartet, z.B. "0 4 * * *")' });
+        }
+
+        const result = await dbService.query(
+            `INSERT INTO gameserver_cronjobs (server_id, guild_id, name, cron_expr, action, command, run_once, enabled, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+            [serverId, guildId, name.substring(0, 128), cron_expr.trim(), action, action === 'command' ? command.trim() : null, run_once ? 1 : 0, userId]
+        );
+
+        Logger.info(`[Gameserver/Cronjobs] Cronjob ${result.insertId} erstellt für Server ${serverId}`);
+
+        // CronWorker benachrichtigen
+        const cronWorker = ServiceManager.get('gameserverCronWorker');
+        if (cronWorker) {
+            const [newJob] = await dbService.query(
+                `SELECT cj.*, gs.name AS server_name, gs.install_path, r.daemon_id AS rootserver_daemon_id
+                 FROM gameserver_cronjobs cj
+                 JOIN gameservers gs ON gs.id = cj.server_id
+                 LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+                 WHERE cj.id = ?`,
+                [result.insertId]
+            );
+            if (newJob) cronWorker.add(newJob);
+        }
+
+        return res.json({ success: true, message: 'Cronjob erstellt', cronjob_id: result.insertId });
+    } catch (error) {
+        Logger.error('[Gameserver/Cronjobs] Fehler beim Erstellen:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+/**
+ * PUT /guild/:guildId/plugins/gameserver/servers/:serverId/cronjobs/:cronjobId
+ * Cronjob aktualisieren (Name, Cron-Expr, Enabled-State)
+ */
+router.put('/:serverId/cronjobs/:cronjobId', requirePermission('GAMESERVER.CRONJOBS.MANAGE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId, cronjobId } = req.params;
+        const guildId = res.locals.guildId;
+
+        const [job] = await dbService.query(
+            'SELECT id FROM gameserver_cronjobs WHERE id = ? AND server_id = ? AND guild_id = ?',
+            [cronjobId, serverId, guildId]
+        );
+        if (!job) return res.status(404).json({ success: false, message: 'Cronjob nicht gefunden' });
+
+        const { name, cron_expr, action, command, enabled, run_once } = req.body;
+
+        if (cron_expr && cron_expr.trim().split(/\s+/).length !== 5) {
+            return res.status(400).json({ success: false, message: 'Ungültige Cron-Expression' });
+        }
+        if (action) {
+            const allowedActions = ['start', 'stop', 'restart', 'backup', 'command'];
+            if (!allowedActions.includes(action)) {
+                return res.status(400).json({ success: false, message: 'Ungültige Aktion' });
+            }
+        }
+
+        await dbService.query(
+            `UPDATE gameserver_cronjobs
+             SET name = COALESCE(?, name),
+                 cron_expr = COALESCE(?, cron_expr),
+                 action = COALESCE(?, action),
+                 command = COALESCE(?, command),
+                 run_once = COALESCE(?, run_once),
+                 enabled = COALESCE(?, enabled)
+             WHERE id = ?`,
+            [name?.substring(0, 128) || null, cron_expr?.trim() || null, action || null, command?.trim() || null, run_once !== undefined ? (run_once ? 1 : 0) : null, enabled !== undefined ? (enabled ? 1 : 0) : null, cronjobId]
+        );
+
+        // CronWorker benachrichtigen
+        const cronWorker = ServiceManager.get('gameserverCronWorker');
+        if (cronWorker) {
+            const [updatedJob] = await dbService.query(
+                `SELECT cj.*, gs.name AS server_name, gs.install_path, r.daemon_id AS rootserver_daemon_id
+                 FROM gameserver_cronjobs cj
+                 JOIN gameservers gs ON gs.id = cj.server_id
+                 LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+                 WHERE cj.id = ?`,
+                [cronjobId]
+            );
+            if (updatedJob) cronWorker.update(updatedJob);
+        }
+
+        return res.json({ success: true, message: 'Cronjob aktualisiert' });
+    } catch (error) {
+        Logger.error('[Gameserver/Cronjobs] Fehler beim Aktualisieren:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+/**
+ * DELETE /guild/:guildId/plugins/gameserver/servers/:serverId/cronjobs/:cronjobId
+ * Cronjob löschen
+ */
+router.delete('/:serverId/cronjobs/:cronjobId', requirePermission('GAMESERVER.CRONJOBS.MANAGE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId, cronjobId } = req.params;
+        const guildId = res.locals.guildId;
+
+        const [job] = await dbService.query(
+            'SELECT id, name FROM gameserver_cronjobs WHERE id = ? AND server_id = ? AND guild_id = ?',
+            [cronjobId, serverId, guildId]
+        );
+        if (!job) return res.status(404).json({ success: false, message: 'Cronjob nicht gefunden' });
+
+        await dbService.query('DELETE FROM gameserver_cronjobs WHERE id = ?', [cronjobId]);
+
+        // CronWorker benachrichtigen
+        const cronWorker = ServiceManager.get('gameserverCronWorker');
+        if (cronWorker) cronWorker.remove(Number(cronjobId));
+
+        Logger.info(`[Gameserver/Cronjobs] Cronjob ${cronjobId} (${job.name}) gelöscht`);
+        return res.json({ success: true, message: 'Cronjob gelöscht' });
+    } catch (error) {
+        Logger.error('[Gameserver/Cronjobs] Fehler beim Löschen:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
     }
 });
 

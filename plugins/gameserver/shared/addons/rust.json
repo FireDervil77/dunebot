@@ -61,7 +61,7 @@
     "logs": {},
     "stop": "quit",
     "rcon": {
-      "protocol": "srcds",
+      "protocol": "webrcon",
       "port_var": "RCON_PORT",
       "password_var": "RCON_PASSWORD"
     }

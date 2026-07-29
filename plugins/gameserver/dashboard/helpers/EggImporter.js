@@ -141,7 +141,13 @@ class EggImporter {
                 res.on('data', chunk => { raw += chunk; });
                 res.on('end', () => {
                     if (res.statusCode !== 200) {
-                        return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+                        let hint = '';
+                        if (res.statusCode === 401) {
+                            hint = ' — GITHUB_API_TOKEN ist ungültig/abgelaufen. Neuen Token erstellen und in apps/dashboard/.env eintragen.';
+                        } else if (res.statusCode === 403) {
+                            hint = ' — GitHub-Rate-Limit erreicht (ohne gültigen GITHUB_API_TOKEN nur 60 Requests/Stunde).';
+                        }
+                        return reject(new Error(`HTTP ${res.statusCode} for ${url}${hint}`));
                     }
                     try { resolve(JSON.parse(raw)); } catch { resolve(raw); }
                 });

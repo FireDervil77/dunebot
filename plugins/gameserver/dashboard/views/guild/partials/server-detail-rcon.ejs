@@ -1,7 +1,9 @@
 <%
 // server-detail-rcon.ejs
 // RCON-Konsole für Gameserver (CS2, Rust, ARK etc.)
-// Wird nur gerendert wenn server.rcon_available == true
+// Wird gerendert wenn das Addon RCON konfiguriert hat (server.rcon_configured).
+// Ob RCON auch wirklich nutzbar ist, sagt server.rcon_available – ist es das
+// nicht, steht hier der Grund statt einer Konsole, die nur Fehler produziert.
 %>
 <div class="rcon-console-wrapper" data-server-id="<%= server.id %>" data-guild-id="<%= guildId %>">
 
@@ -9,14 +11,31 @@
     <div class="d-flex align-items-center mb-3">
         <div>
             <h6 class="mb-0"><i class="fas fa-terminal text-success me-2"></i> RCON-Konsole</h6>
-            <small class="text-muted">Sendet Befehle direkt über das Source RCON-Protokoll an den Gameserver.</small>
+            <small class="text-muted">Sendet Befehle direkt über das <%= (server.rcon_protocol || 'Source') %> RCON-Protokoll an den Gameserver.</small>
         </div>
         <div class="ms-auto">
-            <span class="badge badge-secondary" id="rcon-status-badge">
-                <i class="fas fa-circle"></i> Bereit
-            </span>
+            <% if (!server.rcon_available) { %>
+                <span class="badge badge-warning" id="rcon-status-badge">
+                    <i class="fas fa-triangle-exclamation"></i> Nicht verfügbar
+                </span>
+            <% } else if (server.rcon_last_ok === 0) { %>
+                <span class="badge badge-warning" id="rcon-status-badge">
+                    <i class="fas fa-circle"></i> Letzter Befehl fehlgeschlagen
+                </span>
+            <% } else { %>
+                <span class="badge badge-secondary" id="rcon-status-badge">
+                    <i class="fas fa-circle"></i> Bereit
+                </span>
+            <% } %>
         </div>
     </div>
+
+    <% if (!server.rcon_available) { %>
+        <div class="alert alert-warning">
+            <i class="fas fa-triangle-exclamation me-2"></i>
+            <%= server.rcon_reason || 'RCON ist für diesen Gameserver nicht nutzbar.' %>
+        </div>
+    <% } %>
 
     <!-- Output-Bereich -->
     <div class="card bg-dark mb-3" style="min-height: 300px;">
@@ -53,9 +72,10 @@
                maxlength="512"
                autocomplete="off"
                autocorrect="off"
-               spellcheck="false">
+               spellcheck="false"
+               <%= server.rcon_available ? '' : 'disabled' %>>
         <div class="input-group-append">
-            <button class="btn btn-success" id="rcon-send-btn" type="button">
+            <button class="btn btn-success" id="rcon-send-btn" type="button" <%= server.rcon_available ? '' : 'disabled' %>>
                 <i class="fas fa-paper-plane me-1"></i> Senden
             </button>
         </div>

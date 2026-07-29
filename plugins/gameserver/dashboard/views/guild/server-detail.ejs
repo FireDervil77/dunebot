@@ -126,6 +126,21 @@
                                     </button>
                                 <% } %>
                                 
+<!-- Move Button (Server-Migration) -->
+                                <%# Auch bei 'online' sichtbar: Die Migration stoppt den Server
+                                    selbst als ersten Schritt (siehe MigrationManager) und das Modal
+                                    warnt explizit davor. Nur während laufender Aktionen
+                                    (installing/updating/starting/stopping) ausblenden. %>
+                                <% if (userPermissions.permissions['GAMESERVER.EDIT']) { %>
+                                    <button class="btn btn-info"
+                                            data-toggle="modal"
+                                            data-target="#migrationModal"
+                                            title="Server zu anderem RootServer verschieben"
+                                            style="display: <%= ['offline', 'error', 'installed', 'online'].includes(displayStatus) ? '' : 'none' %>;">
+                                        <i class="fas fa-exchange-alt me-1"></i> Move
+                                    </button>
+                                <% } %>
+                                
                                 <!-- Edit Button -->
                                 <% if (userPermissions.permissions['GAMESERVER.EDIT']) { %>
                                     <a href="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/edit" 
@@ -229,6 +244,20 @@
                             </li>
                         <% } %>
 
+                        <!-- Cronjobs Tab (nur mit Permission) -->
+                        <% if (userPermissions.permissions['GAMESERVER.CRONJOBS.VIEW']) { %>
+                            <li class="nav-item">
+                                <a class="nav-link"
+                                   id="cronjobs-tab"
+                                   data-toggle="tab"
+                                   href="#cronjobs"
+                                   role="tab">
+                                    <i class="fas fa-clock me-1"></i>
+                                    Cronjobs
+                                </a>
+                            </li>
+                        <% } %>
+
                         <!-- Variablen Tab (nur mit EDIT-Permission) -->
                         <% if (userPermissions.permissions['GAMESERVER.EDIT'] && gameData && gameData.variables && (Array.isArray(gameData.variables) ? gameData.variables.length > 0 : Object.keys(gameData.variables).length > 0)) { %>
                             <li class="nav-item">
@@ -244,7 +273,7 @@
                         <% } %>
 
                         <!-- RCON Tab (nur wenn Egg RCON unterstützt + RCON-Permission) -->
-                        <% if (server.rcon_available && userPermissions.permissions['GAMESERVER.RCON']) { %>
+                        <% if (server.rcon_configured && userPermissions.permissions['GAMESERVER.RCON']) { %>
                             <li class="nav-item">
                                 <a class="nav-link"
                                    id="rcon-tab"
@@ -432,14 +461,21 @@
                              TAB: BACKUPS
                              ======================================== -->
                         <% if (userPermissions.permissions['GAMESERVER.BACKUPS.VIEW']) { %>
-                            <div class="tab-pane fade" 
-                                 id="backups" 
+                            <div class="tab-pane fade"
+                                 id="backups"
                                  role="tabpanel">
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle me-2"></i>
-                                    <strong>Backup-Verwaltung</strong> - Wird in Milestone 4 implementiert
-                                </div>
-                                <!-- TODO Milestone 4: Backup-Liste, Erstellen, Restore, Download -->
+                                <%- include('partials/server-detail-backups', { server, guildId, userPermissions }) %>
+                            </div>
+                        <% } %>
+
+                        <!-- ========================================
+                             TAB: CRONJOBS
+                             ======================================== -->
+                        <% if (userPermissions.permissions['GAMESERVER.CRONJOBS.VIEW']) { %>
+                            <div class="tab-pane fade"
+                                 id="cronjobs"
+                                 role="tabpanel">
+                                <%- include('partials/server-detail-cronjobs', { server, guildId, userPermissions }) %>
                             </div>
                         <% } %>
 
@@ -457,7 +493,7 @@
                         <!-- ========================================
                              TAB: RCON
                              ======================================== -->
-                        <% if (server.rcon_available && userPermissions.permissions['GAMESERVER.RCON']) { %>
+                        <% if (server.rcon_configured && userPermissions.permissions['GAMESERVER.RCON']) { %>
                             <div class="tab-pane fade"
                                  id="rcon"
                                  role="tabpanel">
@@ -713,10 +749,455 @@ document.addEventListener('DOMContentLoaded', function() {
         if (lastUpdate) lastUpdate.textContent = new Date().toLocaleTimeString('de-DE');
     });
 
+    // Live-Status vom StatusPoller (Spielerzahl, Map, Ping, Version).
+    // Versorgt sowohl die Kacheln oben als auch die "Live-Status"-Karte – die wurde
+    // vorher nur beim Seitenaufruf und beim Klick auf "Aktualisieren" gefüllt und
+    // zeigte dazwischen einen veralteten Stand.
+    sse.on('status', (msg) => {
+        if (String(msg.server_id) !== String(serverId)) return;
+
+        const setText = (selectorOrId, value, { byId = false } = {}) => {
+            const el = byId ? document.getElementById(selectorOrId) : document.querySelector(selectorOrId);
+            if (el && value != null && value !== '') el.textContent = value;
+        };
+
+        // Kacheln oben
+        if (msg.current_players != null) {
+            setText('[data-current-players]', msg.current_players + ' / ' + (msg.max_players || '?'));
+        }
+        const playersBar = document.querySelector('[data-players-bar]');
+        if (playersBar && msg.max_players > 0) {
+            const pct = (msg.current_players / msg.max_players) * 100;
+            playersBar.style.width = pct + '%';
+            playersBar.textContent = pct.toFixed(0) + '%';
+        }
+        setText('[data-current-map]', msg.map);
+
+        // Live-Status-Karte
+        if (msg.current_players != null) {
+            setText('qry-players', msg.current_players + ' / ' + (msg.max_players ?? '?'), { byId: true });
+        }
+        setText('qry-map', msg.map, { byId: true });
+        if (msg.ping_ms != null) setText('qry-ping', msg.ping_ms + ' ms', { byId: true });
+        if (msg.version) {
+            setText('qry-version', msg.version, { byId: true });
+            const versionCol = document.getElementById('qry-version-col');
+            if (versionCol) versionCol.style.display = '';
+        }
+
+        // Spielerliste mitziehen, wenn der Poller sie geliefert hat
+        if (Array.isArray(msg.players) && typeof window.renderQueryPlayers === 'function') {
+            window.renderQueryPlayers(msg.players);
+        }
+
+        const stamp = document.getElementById('qry-last-update');
+        if (stamp) stamp.textContent = new Date().toLocaleTimeString('de-DE');
+    });
+
     sse.connect();
     window.addEventListener('beforeunload', () => sse.disconnect());
 
     // Expose für Debugging
     window.gameserverDetailSSE = sse;
 });
+</script>
+
+<!-- ========================================
+     MIGRATION MODAL
+     ======================================== -->
+<div class="modal fade" id="migrationModal" tabindex="-1" aria-labelledby="migrationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="migrationModalLabel">
+                    <i class="fas fa-exchange-alt me-2"></i>
+                    Server verschieben
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Migration Form (Initial) -->
+                <div id="migration-form">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Hinweis:</strong> Der Server wird während der Migration gestoppt und ist vorübergehend nicht verfügbar.
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="target-rootserver" class="form-label">Ziel-RootServer auswählen</label>
+                        <select class="form-select" id="target-rootserver" required>
+                            <option value="">-- Bitte wählen --</option>
+                            <% if (rootServers && rootServers.length > 0) { %>
+                                <% rootServers.forEach(rs => { %>
+                                    <% if (rs.id !== server.rootserver_id) { %>
+                                        <% 
+                                        const isOnline = rs.daemon_status === 'online';
+                                        const isUnknown = !rs.daemon_status || rs.daemon_status === 'offline';
+                                        const icon = isOnline ? '🟢' : isUnknown ? '🟡' : '🔴';
+                                        const label = isOnline ? '' : isUnknown ? '(Status unbekannt)' : '(Offline)';
+                                        %>
+                                        <option value="<%= rs.id %>">
+                                            <%= icon %> <%= rs.name %> <%= label %>
+                                        </option>
+                                    <% } %>
+                                <% }); %>
+                            <% } else { %>
+                                <option disabled>Keine anderen RootServers verfügbar</option>
+                            <% } %>
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Wichtig:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Der Server wird automatisch gestoppt</li>
+                            <li>Alle Dateien werden kopiert (kann einige Minuten dauern)</li>
+                            <li>Ports werden automatisch angepasst falls nötig</li>
+                            <li>Der Server startet NICHT automatisch nach der Migration</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Migration Progress (Hidden initially) -->
+                <div id="migration-progress" style="display: none;">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong id="migration-step-text">Initialisierung...</strong>
+                            <span id="migration-percentage" class="badge bg-primary">0%</span>
+                        </div>
+                        <div class="progress" style="height: 30px;">
+                            <div id="migration-progress-bar"
+                                 class="progress-bar progress-bar-striped progress-bar-animated"
+                                 role="progressbar"
+                                 style="width: 0%;">
+                            </div>
+                        </div>
+                        <!-- Detailzeile: Laufzeit / übertragene MB, damit lange Schritte nicht eingefroren wirken -->
+                        <small id="migration-detail" class="text-muted d-block mt-2">
+                            <i class="fas fa-circle-notch fa-spin me-1"></i>Migration wird vorbereitet...
+                        </small>
+                        <small class="text-muted d-block mt-1">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Du kannst dieses Fenster schließen – die Migration läuft im Hintergrund weiter.
+                        </small>
+                    </div>
+                    
+                    <!-- Phase Indicators -->
+                    <div class="row text-center mb-3">
+                        <div class="col" data-phase="stopping_server">
+                            <i class="fas fa-stop-circle fa-2x text-muted"></i>
+                            <p class="small mb-0">Stoppen</p>
+                        </div>
+                        <div class="col" data-phase="backing_up">
+                            <i class="fas fa-archive fa-2x text-muted"></i>
+                            <p class="small mb-0">Backup</p>
+                        </div>
+                        <div class="col" data-phase="transferring">
+                            <i class="fas fa-exchange-alt fa-2x text-muted"></i>
+                            <p class="small mb-0">Transfer</p>
+                        </div>
+                        <div class="col" data-phase="restoring">
+                            <i class="fas fa-box-open fa-2x text-muted"></i>
+                            <p class="small mb-0">Restore</p>
+                        </div>
+                        <div class="col" data-phase="updating_db">
+                            <i class="fas fa-database fa-2x text-muted"></i>
+                            <p class="small mb-0">DB-Update</p>
+                        </div>
+                        <div class="col" data-phase="completed">
+                            <i class="fas fa-check-circle fa-2x text-muted"></i>
+                            <p class="small mb-0">Fertig</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Error Display -->
+                    <div id="migration-error" class="alert alert-danger" style="display: none;">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <strong>Fehler:</strong>
+                        <p id="migration-error-message" class="mb-0 mt-2"></p>
+                    </div>
+                    
+                    <!-- Success Display -->
+                    <div id="migration-success" class="alert alert-success" style="display: none;">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Migration erfolgreich!</strong>
+                        <p class="mb-0 mt-2">Der Server wurde erfolgreich verschoben. Du kannst ihn jetzt starten.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="migration-close-btn">Schließen</button>
+                <button type="button" class="btn btn-primary" onclick="startMigration()" id="migration-start-btn">
+                    <i class="fas fa-rocket me-1"></i> Migration starten
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Migration starten
+function startMigration() {
+    const targetRootServerId = document.getElementById('target-rootserver').value;
+    
+    if (!targetRootServerId) {
+        alert('Bitte wähle einen Ziel-RootServer aus');
+        return;
+    }
+    
+    // UI umschalten
+    document.getElementById('migration-form').style.display = 'none';
+    document.getElementById('migration-progress').style.display = 'block';
+    document.getElementById('migration-start-btn').disabled = true;
+    // Schließen bleibt erlaubt: Die Migration läuft serverseitig weiter und der
+    // Fortschritt wird beim erneuten Öffnen wiederhergestellt.
+    document.getElementById('migration-close-btn').disabled = false;
+
+    // API-Call
+    fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/migrate`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            target_rootserver_id: parseInt(targetRootServerId, 10)
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (!data.success) {
+            showMigrationError(data.message || 'Unbekannter Fehler');
+            return;
+        }
+        
+        // Migration-ID speichern
+        window.currentMigrationId = data.migration_id;
+        
+        // SSE für Updates vorbereiten
+        setupMigrationSSE();
+    })
+    .catch(err => {
+        showMigrationError('Netzwerkfehler: ' + err.message);
+    });
+}
+
+// SSE für Migration-Updates
+// WICHTIG: gameserverDetailSSE ist ein GameserverSSEClient (kein EventSource) —
+// die API heißt on(action, handler), NICHT addEventListener!
+let migrationSSERegistered = false;
+function setupMigrationSSE() {
+    if (!window.gameserverDetailSSE) return;
+    if (migrationSSERegistered) return; // Handler nur einmal registrieren (nicht pro Migration-Start)
+    migrationSSERegistered = true;
+
+    window.gameserverDetailSSE.on('gameserver_migration', (data) => {
+        console.log('[Migration SSE]', data);
+
+        if (data.type === 'migration_progress') {
+            updateMigrationProgress(data.step, data.progress, data.detail);
+        } else if (data.type === 'migration_completed') {
+            showMigrationSuccess();
+        } else if (data.type === 'migration_failed') {
+            showMigrationError(data.error || 'Migration fehlgeschlagen');
+        }
+    });
+}
+
+// Reihenfolge der Phasen — bestimmt, welche Icons als "erledigt" markiert werden.
+// Die Keys entsprechen den data-phase-Attributen der Indikatoren.
+const MIGRATION_PHASES = ['stopping_server', 'backing_up', 'transferring', 'restoring', 'updating_db', 'completed'];
+
+// Backend-Schritte → Phase-Indikator (Backend sendet z.B. 'stopping'/'uploading')
+const STEP_TO_PHASE = {
+    pending: 'stopping_server',
+    stopping: 'stopping_server',
+    stopping_server: 'stopping_server',
+    backing_up: 'backing_up',
+    transferring: 'transferring',
+    uploading: 'transferring',
+    restoring: 'restoring',
+    updating_db: 'updating_db',
+    completed: 'completed'
+};
+
+// Progress aktualisieren
+function updateMigrationProgress(step, progress, detail) {
+    const progressBar = document.getElementById('migration-progress-bar');
+    const percentage = document.getElementById('migration-percentage');
+    const stepText = document.getElementById('migration-step-text');
+    const detailEl = document.getElementById('migration-detail');
+
+    // Progress Bar
+    progressBar.style.width = progress + '%';
+    percentage.textContent = progress + '%';
+
+    // Step-Text
+    const stepNames = {
+        pending: '⏳ Migration wird vorbereitet...',
+        stopping: '⏹ Server wird gestoppt...',
+        stopping_server: '⏹ Server wird gestoppt...',
+        backing_up: '📦 Backup wird erstellt...',
+        transferring: '🔄 Daten werden übertragen...',
+        uploading: '🔄 Daten werden übertragen...',
+        restoring: '📥 Server wird wiederhergestellt...',
+        updating_db: '💾 Datenbank wird aktualisiert...',
+        completed: '✅ Migration abgeschlossen'
+    };
+    stepText.textContent = stepNames[step] || step;
+
+    // Detailzeile (Laufzeit / übertragene MB) — zeigt, dass etwas passiert
+    if (detailEl) {
+        detailEl.innerHTML = detail
+            ? '<i class="fas fa-circle-notch fa-spin me-1"></i>' + detail
+            : '<i class="fas fa-circle-notch fa-spin me-1"></i>Bitte warten...';
+    }
+
+    // Phase-Indikatoren: erledigte grün, aktuelle blau, kommende grau
+    const phase = STEP_TO_PHASE[step] || step;
+    const currentIndex = MIGRATION_PHASES.indexOf(phase);
+
+    document.querySelectorAll('[data-phase]').forEach(el => {
+        const icon = el.querySelector('i');
+        if (!icon) return;
+        const elIndex = MIGRATION_PHASES.indexOf(el.dataset.phase);
+        icon.classList.remove('text-muted', 'text-primary', 'text-success');
+
+        if (currentIndex >= 0 && elIndex >= 0 && elIndex < currentIndex) {
+            icon.classList.add('text-success');   // erledigt
+        } else if (elIndex === currentIndex) {
+            icon.classList.add('text-primary');   // läuft gerade
+        } else {
+            icon.classList.add('text-muted');     // steht noch aus
+        }
+    });
+}
+
+// Fehler anzeigen
+function showMigrationError(message) {
+    document.getElementById('migration-error').style.display = 'block';
+    document.getElementById('migration-error-message').textContent = message;
+    document.getElementById('migration-start-btn').disabled = true;
+    document.getElementById('migration-close-btn').disabled = false;
+    
+    const progressBar = document.getElementById('migration-progress-bar');
+    progressBar.classList.remove('progress-bar-animated');
+    progressBar.classList.add('bg-danger');
+}
+
+// Erfolg anzeigen
+function showMigrationSuccess() {
+    document.getElementById('migration-success').style.display = 'block';
+    document.getElementById('migration-close-btn').disabled = false;
+    
+    const progressBar = document.getElementById('migration-progress-bar');
+    progressBar.style.width = '100%';
+    progressBar.classList.remove('progress-bar-animated');
+    progressBar.classList.add('bg-success');
+    
+    document.getElementById('migration-percentage').textContent = '100%';
+    document.getElementById('migration-step-text').textContent = '✅ Migration abgeschlossen';
+    
+    // Alle Phasen als erfolgreich markieren
+    document.querySelectorAll('[data-phase]').forEach(el => {
+        el.querySelector('i').classList.remove('text-muted', 'text-primary');
+        el.querySelector('i').classList.add('text-success');
+    });
+    
+    // Page reload nach 3 Sekunden
+    setTimeout(() => {
+        window.location.reload();
+    }, 3000);
+}
+
+// ============================================================
+// Laufende Migration wiederaufnehmen
+// Die Migration läuft serverseitig weiter, auch wenn das Modal geschlossen
+// oder die Seite neu geladen wird. Beim Öffnen wird deshalb geprüft, ob für
+// diesen Server gerade eine Migration läuft — und der Fortschritt wiederhergestellt.
+// ============================================================
+const MIGRATION_RUNNING_STATES = ['pending', 'stopping_server', 'backing_up', 'transferring', 'restoring', 'updating_db'];
+
+async function fetchMigrationStatus() {
+    try {
+        const res = await fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/migration/status`);
+        if (!res.ok) return null;                 // 404 = noch nie migriert
+        const data = await res.json();
+        return (data && data.success && data.migration) ? data.migration : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+// Modal in den "läuft gerade"-Zustand versetzen
+function showMigrationRunningState(migration) {
+    document.getElementById('migration-form').style.display = 'none';
+    document.getElementById('migration-progress').style.display = 'block';
+    document.getElementById('migration-error').style.display = 'none';
+    document.getElementById('migration-success').style.display = 'none';
+    document.getElementById('migration-start-btn').disabled = true;
+    document.getElementById('migration-close-btn').disabled = false; // Schließen erlaubt!
+
+    updateMigrationProgress(
+        migration.status,
+        migration.progress_percent || 0,
+        migration.current_step || 'Migration läuft...'
+    );
+
+    setupMigrationSSE(); // Live-Updates ab jetzt wieder empfangen
+}
+
+// Beim Öffnen des Modals: läuft gerade eine Migration?
+$('#migrationModal').on('shown.bs.modal', async function () {
+    const migration = await fetchMigrationStatus();
+    if (migration && MIGRATION_RUNNING_STATES.includes(migration.status)) {
+        showMigrationRunningState(migration);
+    }
+});
+
+// Modal-Reset beim Schließen (Bootstrap 4 nutzt jQuery)
+// Der Reset ist unkritisch: Läuft die Migration noch, stellt der
+// 'shown'-Handler den Fortschritt beim nächsten Öffnen wieder her.
+$('#migrationModal').on('hidden.bs.modal', function () {
+    document.getElementById('migration-form').style.display = 'block';
+    document.getElementById('migration-progress').style.display = 'none';
+    document.getElementById('migration-error').style.display = 'none';
+    document.getElementById('migration-success').style.display = 'none';
+    document.getElementById('migration-start-btn').disabled = false;
+    document.getElementById('migration-close-btn').disabled = false;
+    document.getElementById('target-rootserver').value = '';
+});
+
+// Beim Laden der Seite prüfen: läuft eine Migration? Dann Button kennzeichnen,
+// damit der Nutzer sieht, dass im Hintergrund etwas passiert.
+async function initMigrationPageState() {
+    const migration = await fetchMigrationStatus();
+    if (!migration || !MIGRATION_RUNNING_STATES.includes(migration.status)) return;
+
+    const moveBtn = document.querySelector('[data-target="#migrationModal"]');
+    if (moveBtn) {
+        moveBtn.classList.remove('btn-info');
+        moveBtn.classList.add('btn-warning');
+        moveBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i> Migration läuft';
+        moveBtn.style.display = '';
+    }
+
+    // SSE-Handler registrieren, damit auch ohne geöffnetes Modal der Abschluss
+    // mitbekommen wird. Der SSE-Client wird in einem früheren DOMContentLoaded
+    // aufgebaut — falls er noch nicht bereitsteht, kurz erneut versuchen.
+    if (window.gameserverDetailSSE) {
+        setupMigrationSSE();
+    } else {
+        setTimeout(() => { if (window.gameserverDetailSSE) setupMigrationSSE(); }, 1000);
+    }
+}
+
+// Läuft auch, wenn das DOM zum Zeitpunkt der Skriptausführung schon fertig ist
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMigrationPageState);
+} else {
+    initMigrationPageState();
+}
 </script>

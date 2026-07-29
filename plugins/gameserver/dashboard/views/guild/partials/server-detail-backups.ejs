@@ -1,0 +1,258 @@
+<%#
+ * Backup-Tab Partial
+ * Zeigt Backup-Liste mit Erstellen, Löschen und Restore-Funktionalität
+ * @author FireBot Team
+%>
+
+<div class="row mb-3">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-save me-2"></i>Backups</h5>
+        <div>
+            <button class="btn btn-secondary btn-sm me-2" onclick="loadBackups()">
+                <i class="fas fa-sync-alt me-1"></i> Aktualisieren
+            </button>
+            <% if (userPermissions.permissions['GAMESERVER.BACKUPS.CREATE']) { %>
+                <button class="btn btn-primary btn-sm" onclick="createBackup()">
+                    <i class="fas fa-plus me-1"></i> Neues Backup
+                </button>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<!-- Backup-Notiz Modal -->
+<% if (userPermissions.permissions['GAMESERVER.BACKUPS.CREATE']) { %>
+<div class="modal fade" id="backupNoteModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-save me-2"></i>Backup erstellen</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group mb-0">
+                    <label for="backupNote">Notiz (optional)</label>
+                    <textarea id="backupNote" class="form-control" rows="3" placeholder="z.B. Vor Update auf v2.5 erstellt..." maxlength="500"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" id="confirmBackupBtn" onclick="confirmCreateBackup()">
+                    <i class="fas fa-save me-1"></i> Backup erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<% } %>
+
+<!-- Backup-Tabelle -->
+<div id="backups-container">
+    <div id="backups-loading" class="text-center text-muted py-5">
+        <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
+        <p>Backups werden geladen...</p>
+    </div>
+    <div id="backups-empty" class="text-center text-muted py-5" style="display:none;">
+        <i class="fas fa-archive fa-3x mb-3 text-muted"></i>
+        <p>Keine Backups vorhanden.</p>
+        <% if (userPermissions.permissions['GAMESERVER.BACKUPS.CREATE']) { %>
+            <button class="btn btn-primary" onclick="createBackup()">
+                <i class="fas fa-plus me-1"></i> Erstes Backup erstellen
+            </button>
+        <% } %>
+    </div>
+    <div id="backups-table-wrapper" style="display:none;">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Größe</th>
+                        <th>Status</th>
+                        <th>Notiz</th>
+                        <th>Erstellt</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody id="backups-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const GUILD_ID    = '<%= guildId %>';
+    const SERVER_ID   = '<%= server.id %>';
+    const BASE_URL    = `/guild/${GUILD_ID}/plugins/gameserver/servers/${SERVER_ID}/backups`;
+
+    const CAN_CREATE  = <%= userPermissions.permissions['GAMESERVER.BACKUPS.CREATE'] ? 'true' : 'false' %>;
+    const CAN_DELETE  = <%= userPermissions.permissions['GAMESERVER.BACKUPS.DELETE'] ? 'true' : 'false' %>;
+    const CAN_RESTORE = <%= userPermissions.permissions['GAMESERVER.BACKUPS.RESTORE'] ? 'true' : 'false' %>;
+
+    function formatBytes(bytes) {
+        if (!bytes || bytes === 0) return '—';
+        const units = ['B','KB','MB','GB'];
+        let i = 0;
+        let val = parseInt(bytes, 10);
+        while (val >= 1024 && i < units.length - 1) { val /= 1024; i++; }
+        return `${val.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+    }
+
+    function statusBadge(status) {
+        const map = {
+            pending:    '<span class="badge badge-secondary"><i class="fas fa-clock me-1"></i>Ausstehend</span>',
+            running:    '<span class="badge badge-info"><i class="fas fa-spinner fa-spin me-1"></i>Läuft</span>',
+            completed:  '<span class="badge badge-success"><i class="fas fa-check me-1"></i>Fertig</span>',
+            failed:     '<span class="badge badge-danger"><i class="fas fa-times me-1"></i>Fehlgeschlagen</span>',
+            restoring:  '<span class="badge badge-warning"><i class="fas fa-undo me-1"></i>Wiederherstellung</span>',
+        };
+        return map[status] || `<span class="badge badge-secondary">${status}</span>`;
+    }
+
+    function fmtDate(d) {
+        if (!d) return '—';
+        return new Date(d).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function escHtml(s) {
+        if (!s) return '';
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    window.loadBackups = async function() {
+        document.getElementById('backups-loading').style.display = '';
+        document.getElementById('backups-empty').style.display = 'none';
+        document.getElementById('backups-table-wrapper').style.display = 'none';
+
+        try {
+            const resp = await fetch(BASE_URL);
+            const data = await resp.json();
+
+            if (!data.success) throw new Error(data.message);
+
+            const backups = data.backups || [];
+            document.getElementById('backups-loading').style.display = 'none';
+
+            if (backups.length === 0) {
+                document.getElementById('backups-empty').style.display = '';
+                return;
+            }
+
+            const tbody = document.getElementById('backups-tbody');
+            tbody.innerHTML = backups.map(b => `
+                <tr data-backup-id="${b.id}">
+                    <td><strong>${escHtml(b.name)}</strong></td>
+                    <td>${formatBytes(b.size_bytes)}</td>
+                    <td>${statusBadge(b.status)}</td>
+                    <td class="text-muted small">${escHtml(b.note) || '—'}</td>
+                    <td><small>${fmtDate(b.created_at)}</small></td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            ${CAN_RESTORE && b.status === 'completed' ? `
+                                <button class="btn btn-warning btn-sm" onclick="restoreBackup(${b.id}, '${escHtml(b.name)}')" title="Wiederherstellen">
+                                    <i class="fas fa-undo"></i>
+                                </button>` : ''}
+                            ${CAN_DELETE ? `
+                                <button class="btn btn-danger btn-sm" onclick="deleteBackup(${b.id}, '${escHtml(b.name)}')" title="Löschen">
+                                    <i class="fas fa-trash"></i>
+                                </button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('backups-table-wrapper').style.display = '';
+        } catch (err) {
+            document.getElementById('backups-loading').innerHTML =
+                `<div class="text-center text-danger py-4"><i class="fas fa-exclamation-triangle me-1"></i> Fehler: ${escHtml(err.message)}</div>`;
+        }
+    };
+
+    window.createBackup = function() {
+        if (!CAN_CREATE) return;
+        document.getElementById('backupNote').value = '';
+        $('#backupNoteModal').modal('show');
+    };
+
+    window.confirmCreateBackup = async function() {
+        const btn = document.getElementById('confirmBackupBtn');
+        const note = document.getElementById('backupNote').value;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Erstelle...';
+
+        try {
+            const resp = await fetch(BASE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note })
+            });
+            const data = await resp.json();
+
+            $('#backupNoteModal').modal('hide');
+
+            if (data.success) {
+                if (typeof showToast === 'function') showToast('success', 'Backup gestartet');
+                loadBackups();
+            } else {
+                if (typeof showToast === 'function') showToast('error', data.message || 'Fehler');
+            }
+        } catch (err) {
+            if (typeof showToast === 'function') showToast('error', 'Netzwerkfehler');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save me-1"></i> Backup erstellen';
+        }
+    };
+
+    window.deleteBackup = async function(backupId, backupName) {
+        if (!CAN_DELETE) return;
+        if (!confirm(`Backup "${backupName}" wirklich löschen?`)) return;
+
+        try {
+            const resp = await fetch(`${BASE_URL}/${backupId}`, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) {
+                if (typeof showToast === 'function') showToast('success', 'Backup gelöscht');
+                loadBackups();
+            } else {
+                if (typeof showToast === 'function') showToast('error', data.message || 'Fehler');
+            }
+        } catch (err) {
+            if (typeof showToast === 'function') showToast('error', 'Netzwerkfehler');
+        }
+    };
+
+    window.restoreBackup = async function(backupId, backupName) {
+        if (!CAN_RESTORE) return;
+        if (!confirm(`Backup "${backupName}" wiederherstellen?\n\nACHTUNG: Aktuelle Serverdaten werden überschrieben! Der Server muss gestoppt sein.`)) return;
+
+        try {
+            const resp = await fetch(`${BASE_URL}/${backupId}/restore`, { method: 'POST' });
+            const data = await resp.json();
+            if (data.success) {
+                if (typeof showToast === 'function') showToast('success', 'Wiederherstellung gestartet');
+            } else {
+                if (typeof showToast === 'function') showToast('error', data.message || 'Fehler');
+            }
+        } catch (err) {
+            if (typeof showToast === 'function') showToast('error', 'Netzwerkfehler');
+        }
+    };
+
+    // Beim Tab-Aktivieren automatisch laden (einmalige Registrierung via ID)
+    const backupsTabLink = document.getElementById('backups-tab') ||
+                           document.querySelector('a[href="#backups"]');
+    if (backupsTabLink) backupsTabLink.addEventListener('shown.bs.tab', loadBackups);
+
+    // Initiales Laden wenn Tab bereits aktiv
+    if (document.querySelector('#backups.active')) {
+        loadBackups();
+    } else {
+        // Daten im Hintergrund vorladen damit der Tab sofort anzeigt
+        setTimeout(loadBackups, 800);
+    }
+})();
+</script>

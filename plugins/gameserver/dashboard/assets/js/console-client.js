@@ -575,8 +575,14 @@ class GameserverConsoleClient {
 
             // Detach-Request an API (nur wenn clientId existiert)
             if (this.clientId) {
+                // keepalive: Detach wird aus dem beforeunload-Handler ausgelöst.
+                // Ohne dieses Flag brechen Browser den Request beim Seitenwechsel
+                // ab — die Console-Subscription bleibt dann serverseitig als
+                // Leiche zurück (ConsoleManager räumt nicht selbst auf).
+                // Das CSRF-Token hängt der globale csrf-helper.js automatisch an.
                 const response = await fetch(`${this.config.apiBase}/detach`, {
                     method: 'POST',
+                    keepalive: true,
                     headers: {
                         'Content-Type': 'application/json'
                     },

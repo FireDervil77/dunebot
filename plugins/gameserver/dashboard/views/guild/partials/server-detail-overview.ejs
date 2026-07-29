@@ -30,9 +30,25 @@
                             <th>Spiel:</th>
                             <td>
                                 <%= server.game_name || 'Unbekannt' %>
-                                <% if (server.addon_version) { %>
-                                    <span class="badge bg-secondary ms-2">v<%= server.addon_version %></span>
+                                <%
+                                    // Die Spielversion kommt aus der Live-Abfrage, nicht aus dem Addon.
+                                    // Das Badge zeigte bisher addon_version ("v1.0.0" = Version des
+                                    // Addons im Marketplace) direkt neben dem Spielnamen – das las
+                                    // sich wie die Spielversion und passte deshalb nie zum Installierten.
+                                    const liveVersion = server.status_snapshot?.version || null;
+                                %>
+                                <% if (liveVersion) { %>
+                                    <span class="badge bg-success ms-2" title="Vom laufenden Server gemeldet">
+                                        <%= liveVersion %>
+                                    </span>
                                 <% } %>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Addon-Version:</th>
+                            <td>
+                                <span class="badge bg-secondary"><%= server.addon_version || '–' %></span>
+                                <small class="text-muted ms-1">Version des Marketplace-Addons</small>
                             </td>
                         </tr>
                         <tr>
@@ -297,14 +313,23 @@ async function savePorts() {
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span>Aktuelle Spieler:</span>
+                        <%
+                            // NULL heißt "unbekannt" (Abfrage fehlgeschlagen), nicht "null Spieler".
+                            // Eine erfundene 0 sah vorher aus wie eine gesicherte Aussage.
+                            const playersKnown = server.current_players !== null && server.current_players !== undefined;
+                        %>
                         <strong class="text-primary" data-current-players>
-                            <%= server.current_players || 0 %> / <%= server.max_players || '?' %>
+                            <%= playersKnown ? server.current_players : '–' %> / <%= server.max_players || '?' %>
                         </strong>
+                        <% if (!playersKnown && server.status === 'online') { %>
+                            <i class="fas fa-circle-question text-muted ms-1"
+                               title="Spielerzahl unbekannt – die Live-Abfrage erreicht den Server nicht"></i>
+                        <% } %>
                     </div>
                     <div class="progress">
-                        <% 
-                        const playerPercent = server.max_players > 0 
-                            ? (server.current_players / server.max_players) * 100 
+                        <%
+                        const playerPercent = (playersKnown && server.max_players > 0)
+                            ? (server.current_players / server.max_players) * 100
                             : 0;
                         %>
                         <div class="progress-bar bg-primary" 
@@ -393,9 +418,14 @@ async function savePorts() {
                         Live-Status
                         <span class="badge bg-secondary ms-2" id="query-ping-badge" style="display:none"></span>
                     </h3>
-                    <button class="btn btn-sm btn-outline-primary" id="btn-refresh-query" onclick="refreshLiveQuery()">
-                        <i class="fas fa-sync-alt me-1"></i>Aktualisieren
-                    </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <small class="text-muted">
+                            Stand: <span id="qry-last-update">–</span>
+                        </small>
+                        <button class="btn btn-sm btn-outline-primary" id="btn-refresh-query" onclick="refreshLiveQuery()">
+                            <i class="fas fa-sync-alt me-1"></i>Aktualisieren
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div id="live-query-loading" class="text-center text-muted py-3">
@@ -441,12 +471,19 @@ async function savePorts() {
                             <div class="d-flex flex-wrap gap-2" id="qry-extras-badges"></div>
                         </div>
                         <div id="qry-player-list" class="mt-2" style="display:none">
+                            <%
+                                // Spalten kommen aus dem Addon (game_data.status.display.columns),
+                                // mit eingebauten Vorgaben je Spiel als Rückfall. Vorher waren
+                                // Spielername/Score/Spielzeit fest verdrahtet und der Header
+                                // wurde per Sonderfall auf "Level" umgebogen.
+                                const playerColumns = server.status_display?.columns || [];
+                            %>
                             <table class="table table-sm table-striped mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Spielername</th>
-                                        <th class="text-end" id="qry-score-header">Score</th>
-                                        <th class="text-end">Spielzeit</th>
+                                        <% playerColumns.forEach(col => { %>
+                                            <th class="<%= col.align === 'end' ? 'text-end' : '' %>"><%= col.label %></th>
+                                        <% }); %>
                                     </tr>
                                 </thead>
                                 <tbody id="qry-player-tbody"></tbody>
@@ -463,6 +500,47 @@ async function savePorts() {
             <script>
             (function () {
                 const QUERY_URL = '/guild/<%= server.guild_id %>/plugins/gameserver/servers/<%= server.id %>/query';
+                // Spaltendefinition aus dem Addon – identisch zu der im Tabellenkopf
+                const PLAYER_COLUMNS = <%- JSON.stringify(server.status_display?.columns || []) %>;
+
+                /**
+                 * Rendert die Spielerliste anhand der Addon-Spalten.
+                 * Global, damit auch der SSE-Handler der Detailseite sie aktualisieren
+                 * kann – ohne dafür eine neue Abfrage auszulösen.
+                 */
+                window.renderQueryPlayers = function (players) {
+                    const list = document.getElementById('qry-player-list');
+                    if (!list) return;
+
+                    if (!players || players.length === 0) {
+                        list.style.display = 'none';
+                        return;
+                    }
+
+                    document.getElementById('qry-player-tbody').innerHTML = players.map((p, i) => {
+                        const cells = PLAYER_COLUMNS.map(col => {
+                            // "player.name" → p.name, "player.raw.id" → p.raw.id
+                            const path = String(col.source || '').replace(/^player\./, '');
+                            let value = path.split('.').reduce((acc, k) => (acc == null ? acc : acc[k]), p);
+
+                            if (col.key === 'name') {
+                                value = value || ('Spieler ' + (i + 1));
+                                if (p.avatar) {
+                                    value = `<img src="${p.avatar}" width="20" height="20" class="rounded me-2" alt="">` + value;
+                                }
+                            } else if (col.format === 'duration') {
+                                value = secondsToHMS(value);
+                            } else if (value == null || value === '') {
+                                value = '–';
+                            }
+
+                            return `<td class="${col.align === 'end' ? 'text-end' : ''}">${value}</td>`;
+                        }).join('');
+                        return `<tr>${cells}</tr>`;
+                    }).join('');
+
+                    list.style.display = '';
+                };
 
                 function secondsToHMS(s) {
                     if (!s && s !== 0) return '–';
@@ -573,34 +651,11 @@ async function savePorts() {
                         badge.textContent = data.ping != null ? data.ping + ' ms' : '';
                         badge.style.display = data.ping != null ? '' : 'none';
 
-                        // Score-Header anpassen (ARK: "Level" statt "Score")
-                        const scoreHeader = document.getElementById('qry-score-header');
-                        if (data.gameType === 'arkse') {
-                            scoreHeader.textContent = 'Level';
-                        } else {
-                            scoreHeader.textContent = 'Score';
-                        }
+                        // Spielerliste – Zeilen folgen denselben Spalten wie der Header
+                        window.renderQueryPlayers(data.players || []);
 
-                        // Spielerliste
-                        const players = data.players || [];
-                        if (players.length > 0) {
-                            const tbody = document.getElementById('qry-player-tbody');
-                            tbody.innerHTML = players.map((p, i) => {
-                                const avatar = p.avatar
-                                    ? `<img src="${p.avatar}" width="20" height="20" class="rounded me-2" alt="">`
-                                    : '';
-                                const name = p.name || ('Spieler ' + (i + 1));
-                                const scoreVal = p.level ?? p.score;
-                                return `<tr>
-                                    <td>${avatar}${name}</td>
-                                    <td class="text-end">${scoreVal ?? '–'}</td>
-                                    <td class="text-end">${secondsToHMS(p.time)}</td>
-                                </tr>`;
-                            }).join('');
-                            document.getElementById('qry-player-list').style.display = '';
-                        } else {
-                            document.getElementById('qry-player-list').style.display = 'none';
-                        }
+                        const stamp = document.getElementById('qry-last-update');
+                        if (stamp) stamp.textContent = new Date().toLocaleTimeString('de-DE');
 
                         document.getElementById('live-query-content').style.display = '';
                         document.getElementById('live-query-loading').style.display = 'none';

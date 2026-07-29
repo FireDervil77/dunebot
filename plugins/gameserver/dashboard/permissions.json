@@ -99,6 +99,14 @@
       "requires": "GAMESERVER.VIEW"
     },
     {
+      "key": "GAMESERVER.BACKUPS.VIEW",
+      "name": "Backups anzeigen",
+      "description": "Berechtigung um Backup-Liste zu sehen",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
       "key": "GAMESERVER.BACKUPS.CREATE",
       "name": "Backups erstellen",
       "description": "Berechtigung um Server-Backups anzulegen",
@@ -161,6 +169,22 @@
       "category": "gameserver",
       "is_dangerous": 1,
       "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.CRONJOBS.VIEW",
+      "name": "Cronjobs anzeigen",
+      "description": "Berechtigung um geplante Aufgaben (Cronjobs) anzusehen",
+      "category": "gameserver",
+      "is_dangerous": 0,
+      "requires": "GAMESERVER.VIEW"
+    },
+    {
+      "key": "GAMESERVER.CRONJOBS.MANAGE",
+      "name": "Cronjobs verwalten",
+      "description": "Cronjobs erstellen, bearbeiten und löschen (kritisch – löst Server-Aktionen aus)",
+      "category": "gameserver",
+      "is_dangerous": 1,
+      "requires": "GAMESERVER.CRONJOBS.VIEW"
     }
   ]
 }

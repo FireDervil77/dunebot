@@ -169,7 +169,11 @@ if (startupTemplate) {
 <script>
 // ═══════ Startup-Command Live-Vorschau ═══════
 (function() {
-    const startupTemplate = `<%= startupTemplate.replace(/`/g, '\\`').replace(/\\/g, '\\\\') %>`;
+    <%# JSON.stringify statt Backtick-String: Der Startup-Command enthält Shell-Syntax
+        wie ${SERVER_PASSWORD} — in einem JS-Template-Literal wäre das eine Interpolation
+        (ReferenceError im Browser). JSON.stringify escapet alles korrekt;
+        < verhindert </script>-Breakout. %>
+    const startupTemplate = <%- JSON.stringify(startupTemplate).replace(/</g, '\\u003c') %>;
     const preview = document.getElementById('startup-command-preview');
     const form = document.getElementById('variables-form');
     if (!preview || !form || !startupTemplate) return;

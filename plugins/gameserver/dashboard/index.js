@@ -179,11 +179,56 @@ class GameserverPlugin extends DashboardPlugin {
         // DB-Migrationen → jetzt via MigrationRunner (plugins/gameserver/migrations/)
         
         // ConsoleManager initialisieren und registrieren
+        // WICHTIG: Bei Plugin-Reload zuerst die alte Instanz disposen, sonst
+        // bleibt deren Event-Handler im IPMEventRouter hängen → jede
+        // Console-Zeile wird pro Reload einmal mehr gebroadcastet (doppelt/dreifach)
+        try {
+            const oldConsoleManager = ServiceManager.get('consoleManager');
+            if (oldConsoleManager && typeof oldConsoleManager.dispose === 'function') {
+                oldConsoleManager.dispose();
+                Logger.debug('[Gameserver] Alte ConsoleManager-Instanz disposed (Plugin-Reload)');
+            }
+        } catch (_) { /* noch keine Instanz registriert */ }
         const ConsoleManager = require('./helpers/ConsoleManager');
         const consoleManager = new ConsoleManager();
         ServiceManager.register('consoleManager', consoleManager);
         Logger.debug('[Gameserver] ConsoleManager registriert und initialisiert');
-        
+
+        // CronWorker initialisieren und registrieren
+        // Verwaiste Migrationen aufräumen (Dashboard-Neustart bricht laufende
+        // Migrationen ab — sie hingen sonst ewig als "läuft" in der DB)
+        setTimeout(() => {
+            try {
+                require('./helpers/MigrationManager').cleanupOrphanedMigrations();
+            } catch (err) {
+                Logger.warn('[Gameserver] Migration-Cleanup fehlgeschlagen:', err?.message || err);
+            }
+        }, 5000);
+
+        const CronWorker = require('./helpers/CronWorker');
+        const cronWorker = new CronWorker();
+        ServiceManager.register('gameserverCronWorker', cronWorker);
+        // Startet asynchron nach kurzem Delay (DB muss bereit sein)
+        setTimeout(() => {
+            cronWorker.start(dbService).catch(err =>
+                Logger.error('[Gameserver] CronWorker-Start fehlgeschlagen:', err.message)
+            );
+        }, 5000);
+        Logger.debug('[Gameserver] CronWorker registriert (Start in 5s)');
+
+        // StatusPoller: hält gameserver_status aktuell (Spielerzahlen, Map, Ping)
+        const StatusPoller = require('./helpers/StatusPoller');
+        const statusPoller = new StatusPoller();
+        ServiceManager.register('gameserverStatusPoller', statusPoller);
+        setTimeout(() => {
+            try {
+                statusPoller.start(dbService);
+            } catch (err) {
+                Logger.error('[Gameserver] StatusPoller-Start fehlgeschlagen:', err.message);
+            }
+        }, 5000);
+        Logger.debug('[Gameserver] StatusPoller registriert (Start in 5s)');
+
         // ✅ Static Assets bereitstellen (WICHTIG!)
         const assetsPath = path.join(__dirname, 'assets');
         this.app.use('/assets/plugins/gameserver', express.static(assetsPath, {
@@ -247,7 +292,7 @@ class GameserverPlugin extends DashboardPlugin {
                          category, runtime_type, source_type, steam_app_id, steam_server_app_id,
                          icon_url, banner_url, tags, version, game_data)
                     VALUES (?, ?, ?, '544578232704565262', 'official', 'approved', 'official',
-                            ?, 'native', 'native', ?, ?,
+                            ?, 'native_steamcmd', 'native_steamcmd', ?, ?,
                             ?, ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE
                         name               = VALUES(name),
@@ -256,8 +301,8 @@ class GameserverPlugin extends DashboardPlugin {
                         status             = 'approved',
                         trust_level        = 'official',
                         category           = VALUES(category),
-                        runtime_type       = 'native',
-                        source_type        = 'native',
+                        runtime_type       = 'native_steamcmd',
+                        source_type        = 'native_steamcmd',
                         steam_app_id       = VALUES(steam_app_id),
                         steam_server_app_id = VALUES(steam_server_app_id),
                         icon_url           = VALUES(icon_url),
@@ -298,7 +343,12 @@ class GameserverPlugin extends DashboardPlugin {
     async onDisable() {
         const Logger = ServiceManager.get('Logger');
         Logger.info('Deaktiviere [Gameserver] Dashboard-Plugin...');
-        // Cleanup bei Bedarf
+        // CronWorker stoppen
+        const cronWorker = ServiceManager.get('gameserverCronWorker');
+        if (cronWorker) cronWorker.stop();
+        // StatusPoller stoppen
+        const statusPoller = ServiceManager.get('gameserverStatusPoller');
+        if (statusPoller) statusPoller.stop();
         return true;
     }
     
@@ -319,6 +369,25 @@ class GameserverPlugin extends DashboardPlugin {
         await this._registerNavigation(guildId);
         
         Logger.success(`[Gameserver] Guild-spezifische Aktivierung abgeschlossen für ${guildId}`);
+    }
+
+    /**
+     * Wird bei Versions-Bump automatisch aufgerufen.
+     * Stellt sicher dass neue Permissions in bestehenden Administrator-Gruppen landen.
+     */
+    async onUpdate(oldVersion, newVersion, guildId) {
+        const Logger = ServiceManager.get('Logger');
+        const pluginManager = ServiceManager.get('pluginManager');
+        Logger.info(`[Gameserver] Update ${oldVersion} → ${newVersion} für Guild ${guildId}, aktualisiere Permissions...`);
+        try {
+            const plugin = pluginManager.getPlugin('gameserver');
+            if (plugin) {
+                await pluginManager.registerPluginPermissionsForGuild(plugin, guildId);
+            }
+        } catch (err) {
+            Logger.error(`[Gameserver] Fehler beim Permission-Update für Guild ${guildId}:`, err.message);
+        }
+        await this._registerNavigation(guildId);
     }
 
 
@@ -582,22 +651,17 @@ class GameserverPlugin extends DashboardPlugin {
                 { priority: 1 }
             );
             
-            // ════════════════════════════════════════════════════════════
-            // Console Output (Live Console)
-            // ════════════════════════════════════════════════════════════
-            eventRouter.register(
-                MessageTypes.NS_CONSOLE, 
-                MessageTypes.CONSOLE_OUTPUT, 
-                this._handleConsoleOutput.bind(this),
-                { priority: 10 }  // Low priority, high frequency
-            );
+            // HINWEIS: KEIN Handler für NS_CONSOLE/CONSOLE_OUTPUT hier!
+            // Der ConsoleManager registriert sich selbst auf 'console:output'
+            // (ConsoleManager._registerEventHandlers). Eine zweite Registrierung
+            // hier führte dazu, dass jede Console-Zeile doppelt gebroadcastet wurde.
 
             // Install-Handler (completed, failed, output, status) werden
             // autoritativ in IPMServer._registerEventHandlers() registriert
             // und broadcasten dort mit dem korrekten SSE-Namespace 'install'.
-            
+
             this._handlersRegistered = true;
-            Logger.success('[Gameserver] Event-Handler registriert (4 Handler)');
+            Logger.success('[Gameserver] Event-Handler registriert (3 Handler)');
         } catch (error) {
             Logger.error('[Gameserver] Fehler beim Registrieren der Event-Handler:', error);
             throw error;
