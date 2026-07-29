@@ -56,7 +56,20 @@ class DBService extends DBClient {
             try {
                 if (file.endsWith('.sql')) {
                     const sql = fs.readFileSync(filePath, 'utf8');
-                    await this.query(sql);
+                    
+                    // SQL-Datei in einzelne Statements splitten (getrennt durch Semikolon + Newline)
+                    // Ignoriere Kommentare und leere Zeilen
+                    const statements = sql
+                        .split(/;\s*\n/)
+                        .map(stmt => stmt.trim())
+                        .filter(stmt => stmt && !stmt.startsWith('--'));
+                    
+                    // Jedes Statement einzeln ausführen
+                    for (const statement of statements) {
+                        if (statement) {
+                            await this.query(statement);
+                        }
+                    }
                 } else {
                     delete require.cache[require.resolve(filePath)];
                     const schema = require(filePath);

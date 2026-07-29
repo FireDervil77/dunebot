@@ -23,6 +23,33 @@ const App = require("./app");
 const IPCServer = require("./helpers/IPCServer");
 const IPMServer = require('./helpers/IPMServer');
 
+// ============================================================================
+// FAIL-FAST: Kritische Secrets MÜSSEN gesetzt sein — sonst kein Start.
+// Verhindert, dass die App mit öffentlich bekannten Fallback-Secrets
+// (z. B. "change-me") aus dem Quellcode läuft.
+// ============================================================================
+const REQUIRED_SECRETS = ['SESSION_SECRET', 'CSRF_SECRET', 'JWT_SECRET'];
+const missingSecrets = REQUIRED_SECRETS.filter(name => !process.env[name]);
+if (missingSecrets.length > 0) {
+    Logger.error(`❌ FATAL: Fehlende kritische ENV-Variablen: ${missingSecrets.join(', ')}`);
+    Logger.error('   Dashboard startet NICHT mit unsicheren Fallback-Secrets. Bitte .env prüfen.');
+    process.exit(1);
+}
+
+// ============================================================================
+// CRASH-NETZ: Unbehandelte Fehler loggen statt stillschweigend zu sterben.
+// - unhandledRejection: nur loggen (Prozess läuft weiter, pm2 muss nicht neu starten)
+// - uncaughtException: loggen und beenden (Prozess-Zustand ist undefiniert; pm2 startet neu)
+// ============================================================================
+process.on('unhandledRejection', (reason, promise) => {
+    Logger.error('❌ Unhandled Promise Rejection:', reason instanceof Error ? reason.stack : reason);
+});
+
+process.on('uncaughtException', (error) => {
+    Logger.error('❌ Uncaught Exception — Prozess wird beendet (pm2 startet neu):', error.stack || error);
+    process.exit(1);
+});
+
 /**
  * Hauptfunktion zum Starten des Dashboards
  */
@@ -100,9 +127,12 @@ const IPMServer = require('./helpers/IPMServer');
 
         // Dashboard-App initialisieren
         Logger.info("Initialisiere Dashboard-App...");
+        Logger.debug("📦 Erstelle App-Instanz...");
         const app = new App(ipcServer, dbService);
+        Logger.debug("✅ App-Instanz erstellt");
         
         // Die neue initialize()-Methode ruft loadTranslations() und loadPlugins() intern auf
+        Logger.debug("🚀 Starte app.initialize()...");
         await app.initialize();
         Logger.success("Dashboard-App erfolgreich initialisiert");
 

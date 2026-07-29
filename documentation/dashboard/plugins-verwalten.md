@@ -38,16 +38,22 @@ Jedes Plugin hat eigene Einstellungsseiten, die nach der Aktivierung in der Side
 | [Greeting](../plugins/greeting.md) | Willkommens- und Abschiedsnachrichten |
 | [Tickets](../plugins/tickets.md) | Support-Ticketsystem |
 | [Giveaway](../plugins/giveaway.md) | Gewinnspiele mit Anforderungen |
-| [Economy](../plugins/economy.md) | Währungs- und Wirtschaftssystem |
-| [Leveling](../plugins/leveling.md) | XP und Level-System |
 | [Information](../plugins/information.md) | Server- und User-Infos |
 | [Statistik](../plugins/statistik.md) | Server-Statistiken und Tracking |
-| [Social Alerts](../plugins/social-alerts.md) | Twitch/YouTube Benachrichtigungen |
 | [DuneMap](../plugins/dunemap.md) | Dune: Deep Desert Karte |
-| [Clan Manager](../plugins/clan-manager.md) | Clan-/Gildenverwaltung |
 | [Gameserver](../plugins/gameserver.md) | Gameserver erstellen und verwalten |
 | [Masterserver](../plugins/masterserver.md) | Daemon- und RootServer-Verwaltung |
+
+## Geplante Plugins / Plugins in arbeit
+
+| Plugin | Beschreibung |
+|--------|-------------|
+| [Economy](../plugins/economy.md) | Währungs- und Wirtschaftssystem |
+| [Leveling](../plugins/leveling.md) | XP und Level-System |
+| [Social Alerts](../plugins/social-alerts.md) | Twitch/YouTube Benachrichtigungen |
+| [Clan Manager](../plugins/clan-manager.md) | Clan-/Gildenverwaltung |
 | [Voice Server](../plugins/voiceserver.md) | Voice-Server Management |
+
 
 ## Plugin-Berechtigungen
 

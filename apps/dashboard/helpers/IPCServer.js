@@ -400,7 +400,11 @@ class IPCServer {
                     const { status_filter, rootserver_filter, search } = payload;
                     let query = `
                         SELECT gs.id, gs.name, gs.status,
-                               gs.current_players, gs.max_players,
+                               COALESCE(st.players_current, gs.current_players) AS current_players,
+                               COALESCE(st.players_max,     gs.max_players)     AS max_players,
+                               st.map     AS live_map,
+                               st.online  AS live_online,
+                               st.queried_at,
                                gs.rootserver_id,
                                am.name  AS game_name,
                                am.slug  AS game_slug,
@@ -409,6 +413,7 @@ class IPCServer {
                         FROM gameservers gs
                         LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
                         LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+                        LEFT JOIN gameserver_status st ON st.server_id = gs.id
                         WHERE gs.guild_id = ?`;
                     const params = [guildId];
                     if (status_filter && status_filter !== 'all') { query += ' AND gs.status = ?'; params.push(status_filter); }
@@ -422,12 +427,20 @@ class IPCServer {
                 // ── Einzelner Gameserver-Status ─────────────────────────────────────────
                 case 'SERVER_STATUS': {
                     if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
+                    // Die Snapshot-Spalten stehen bewusst NACH gs.* – bei gleichem
+                    // Alias gewinnt die letzte Spalte, der Live-Wert überschreibt
+                    // also den Registry-Wert aus gameservers.
                     const [srv] = await dbService.query(
                         `SELECT gs.*, am.name AS game_name, am.slug AS game_slug,
-                                r.name AS rootserver_name, r.daemon_id, r.host
+                                r.name AS rootserver_name, r.daemon_id, r.host,
+                                COALESCE(st.players_current, gs.current_players) AS current_players,
+                                COALESCE(st.players_max,     gs.max_players)     AS max_players,
+                                COALESCE(st.map,             gs.current_map)     AS current_map,
+                                st.ping_ms, st.online AS live_online, st.queried_at
                          FROM gameservers gs
                          LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
                          LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+                         LEFT JOIN gameserver_status st ON st.server_id = gs.id
                          WHERE gs.id = ? AND gs.guild_id = ? LIMIT 1`,
                         [serverId, guildId]
                     );
@@ -867,6 +880,43 @@ class IPCServer {
                     }
                     await dbService.query("UPDATE gameservers SET status = 'online', last_started_at = NOW() WHERE id = ?", [serverId]);
                     return message.reply({ success: true, data: { name: srv.name } });
+                }
+
+                // ── Server-Migration zwischen RootServern ────────────────────────────────
+                case 'SERVER_MIGRATE': {
+                    if (!guildId || !serverId) {
+                        return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
+                    }
+
+                    const { target_rootserver_id, user_id } = payload;
+                    if (!target_rootserver_id) {
+                        return message.reply({ success: false, error: 'target_rootserver_id erforderlich' });
+                    }
+                    if (!user_id) {
+                        return message.reply({ success: false, error: 'user_id erforderlich' });
+                    }
+
+                    this.Logger.info(`[IPCServer] SERVER_MIGRATE request: Server ${serverId} -> RootServer ${target_rootserver_id} (User: ${user_id})`);
+
+                    try {
+                        const MigrationManager = require(path.join(__dirname, '../../../plugins/gameserver/dashboard/helpers/MigrationManager.js'));
+                        const result = await MigrationManager.startMigration(serverId, target_rootserver_id, user_id, guildId);
+
+                        if (!result.success) {
+                            return message.reply({ success: false, error: result.error });
+                        }
+
+                        return message.reply({
+                            success: true,
+                            data: {
+                                migration_id: result.migrationId,
+                                message: 'Migration gestartet. Du erhältst Updates via SSE.'
+                            }
+                        });
+                    } catch (error) {
+                        this.Logger.error('[IPCServer] SERVER_MIGRATE error:', error);
+                        return message.reply({ success: false, error: error.message });
+                    }
                 }
 
                 // ── Addon-Liste (für Server-Erstellung per Autocomplete) ────────────────

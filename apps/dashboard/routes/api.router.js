@@ -82,13 +82,13 @@ router.get('/sessions/stats', CheckAuth, async (req, res) => {
     try {
         // Nur für Admins (OWNER_IDS)
         const { isAdminUser } = require('../middlewares/admin.middleware');
-        if (!isAdminUser(req.session?.user?.id || req.session?.user?.info?.id)) {
+        if (!isAdminUser(req.session?.user)) {
             return res.status(403).json({
                 success: false,
                 message: 'Zugriff verweigert'
             });
         }
-        
+
         const stats = await sessionManager.getSessionStats();
         
         if (!stats) {
@@ -125,13 +125,13 @@ router.post('/sessions/cleanup', CheckAuth, async (req, res) => {
     try {
         // Nur für Admins (OWNER_IDS)
         const { isAdminUser } = require('../middlewares/admin.middleware');
-        if (!isAdminUser(req.session?.user?.id || req.session?.user?.info?.id)) {
+        if (!isAdminUser(req.session?.user)) {
             return res.status(403).json({
                 success: false,
                 message: 'Zugriff verweigert'
             });
         }
-        
+
         const cleanedCount = await sessionManager.cleanupExpiredSessions();
         
         Logger.info(`🧹 Manuelles Session-Cleanup: ${cleanedCount} Sessions bereinigt`);
@@ -247,6 +247,117 @@ router.post('/notifications/dismiss/:id', CheckAuth, async (req, res) => {
 });
 
 // Plugin-spezifische API-Endpunkte (AM ENDE!)
+// ============================================================================
+// Migration-Streaming (Daemon ↔ Dashboard) — Token-Auth, KEINE Session!
+// Der Quell-Daemon streamt das Migrations-Backup hoch (PUT), der Ziel-Daemon
+// lädt es herunter (GET). Ersetzt den Base64-über-WebSocket-Transfer, der am
+// ws-maxPayload-Limit (~100 MiB) scheiterte. Auth: pro Migration generierter
+// Einmal-Token (MigrationManager), als Bearer-Header.
+// ============================================================================
+
+function getMigrationManager() {
+    try {
+        const path = require('path');
+        return require(path.join(__dirname, '../../../plugins/gameserver/dashboard/helpers/MigrationManager.js'));
+    } catch (err) {
+        return null;
+    }
+}
+
+function getTransferAuth(req) {
+    const migrationManager = getMigrationManager();
+    if (!migrationManager || typeof migrationManager.validateTransfer !== 'function') return { error: 'MigrationManager nicht verfügbar', status: 503 };
+
+    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    const transfer = migrationManager.validateTransfer(req.params.migrationId, token);
+    if (!transfer) return { error: 'Ungültiger oder abgelaufener Transfer-Token', status: 403 };
+
+    return { transfer };
+}
+
+// Upload: Quell-Daemon → Dashboard (Body wird direkt auf Platte gestreamt)
+router.put('/migration/:migrationId/stream', (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const fs = require('fs');
+
+    const auth = getTransferAuth(req);
+    if (auth.error) return res.status(auth.status).json({ success: false, message: auth.error });
+    const { filePath } = auth.transfer;
+
+    Logger.info(`[MigrationStream] Upload startet: Migration ${req.params.migrationId} → ${filePath}`);
+
+    const writeStream = fs.createWriteStream(filePath);
+    let failed = false;
+
+    // Fortschritt melden (max. alle 2 s), damit das UI bei großen Dateien
+    // nicht minutenlang eingefroren wirkt
+    const migrationManager = getMigrationManager();
+    let received = 0;
+    let lastReport = 0;
+    req.on('data', (chunk) => {
+        received += chunk.length;
+        const now = Date.now();
+        if (now - lastReport > 2000) {
+            lastReport = now;
+            try { migrationManager?.reportTransferProgress?.(req.params.migrationId, received, 'upload'); } catch (_) {}
+        }
+    });
+
+    const fail = (status, msg, err) => {
+        if (failed) return;
+        failed = true;
+        Logger.error(`[MigrationStream] Upload fehlgeschlagen (Migration ${req.params.migrationId}): ${err?.message || msg}`);
+        try { writeStream.destroy(); } catch (_) {}
+        try { fs.unlinkSync(filePath); } catch (_) {}
+        if (!res.headersSent) res.status(status).json({ success: false, message: msg });
+    };
+
+    req.on('error', (err) => fail(400, 'Upload-Stream abgebrochen', err));
+    writeStream.on('error', (err) => fail(500, 'Schreiben fehlgeschlagen', err));
+    writeStream.on('finish', () => {
+        if (failed) return;
+        try {
+            const size = fs.statSync(filePath).size;
+            Logger.success(`[MigrationStream] Upload komplett: Migration ${req.params.migrationId} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+            res.json({ success: true, bytes: size });
+        } catch (err) {
+            fail(500, 'Upload-Verifikation fehlgeschlagen', err);
+        }
+    });
+
+    req.pipe(writeStream);
+});
+
+// Download: Dashboard → Ziel-Daemon (Datei wird gestreamt)
+router.get('/migration/:migrationId/stream', (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const fs = require('fs');
+
+    const auth = getTransferAuth(req);
+    if (auth.error) return res.status(auth.status).json({ success: false, message: auth.error });
+    const { filePath } = auth.transfer;
+
+    let stat;
+    try {
+        stat = fs.statSync(filePath);
+    } catch (err) {
+        return res.status(404).json({ success: false, message: 'Backup-Datei (noch) nicht vorhanden' });
+    }
+
+    Logger.info(`[MigrationStream] Download startet: Migration ${req.params.migrationId} (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);
+
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Length', stat.size);
+
+    const readStream = fs.createReadStream(filePath);
+    readStream.on('error', (err) => {
+        Logger.error(`[MigrationStream] Download fehlgeschlagen (Migration ${req.params.migrationId}):`, err.message);
+        if (!res.headersSent) res.status(500).json({ success: false, message: 'Lesen fehlgeschlagen' });
+        else res.destroy();
+    });
+    readStream.pipe(res);
+});
+
 // HINWEIS: Plugins MÜSSEN CheckAuth selbst in ihren Routen verwenden!
 // Das Base-API-System schützt nicht automatisch alle Plugin-Endpunkte
 router.use("/:pluginName", pluginMiddleware.loadPlugin, (req, res, next) => {

@@ -158,7 +158,7 @@ try {
     
     // Admin-Status für Templates (OWNER_IDS aus ENV)
     const { isAdminUser } = require('../admin.middleware');
-    res.locals.isAdmin = isAdminUser(req.session?.user?.id || req.session?.user?.info?.id);
+    res.locals.isAdmin = isAdminUser(req.session?.user);
 
     // Guild Custom CSS (Theme-Editor) laden
     try {

@@ -38,30 +38,44 @@ const adminRouter = require("./routes/admin.router");
 
 module.exports = class App {
     constructor(ipcServer, dbService) {
+        console.log('[DEBUG] App Constructor START');
         if (!ipcServer) throw new Error("IPC Server required");
         if (!dbService) throw new Error("DB Service required");
+        console.log('[DEBUG] App Constructor - IPC & DB checked');
         
         this.app = express();
+        console.log('[DEBUG] App Constructor - Express initialized');
         // WebSocket-Unterstützung für Express aktivieren (router.ws())
+        // TEMPORÄR DEAKTIVIERT - blockiert Dashboard-Start (express-ws Issue)
+        // TODO: express-ws korrekt initialisieren oder durch alternative Lösung ersetzen
+        /*
         try {
             require('express-ws')(this.app);
+            console.log('[DEBUG] express-ws loaded');
         } catch (e) {
             // Fallback: Wenn express-ws nicht installiert ist, loggen wir nur
             console.warn('[WS] express-ws konnte nicht initialisiert werden. WebSocket-Routen sind deaktiviert.');
         }
+        */
+        console.log('[DEBUG] express-ws skipped (temporary fix)');
         this.app.set('trust proxy', 1);
+        console.log('[DEBUG] Trust proxy set');
         
         const Logger = ServiceManager.get("Logger");
+        console.log('[DEBUG] Logger retrieved');
 
         // SiteConfig ZUERST registrieren — cached alle statischen ENV-Variablen einmalig
         this.app.siteConfig = new SiteConfig();
         ServiceManager.register('siteConfig', this.app.siteConfig);
+        console.log('[DEBUG] SiteConfig registered');
 
         // RouterManager ZUERST initialisieren
         this.routerManager = new RouterManager(this.app);
         ServiceManager.register('routerManager', this.routerManager);
+        console.log('[DEBUG] RouterManager registered');
 
         // DANN erst die Router importieren
+        console.log('[DEBUG] Loading routers...');
         this.routers = {
             frontend: require("./routes/frontend.router"),
             auth: require("./routes/auth.router"),
@@ -69,6 +83,7 @@ module.exports = class App {
             api: require("./routes/api.router"),
             downloads: require("./routes/downloads.router")
         };
+        console.log('[DEBUG] Routers loaded');
 
         // Weitere Manager initialisieren...
         this.app.navigationManager = new NavigationManager();
@@ -110,9 +125,12 @@ module.exports = class App {
 
         // Shortcode-Parser initialisieren
         this.app.shortcodeParser = new ShortcodeParser();
+        Logger.debug("📌 Shortcode Parser initialisiert");
         
         // Middleware und Routen initialisieren
+        Logger.debug("🔧 Initialisiere Middlewares...");
         this.#initializeMiddlewares();
+        Logger.debug("✅ Middlewares initialisiert");
     }
 
     // Und in der initialize()-Methode den Aufruf entfernen:
@@ -477,9 +495,13 @@ module.exports = class App {
      */
     listen(port) {
         const Logger = ServiceManager.get("Logger");
-        this.app.listen(port, () => {
+        const server = this.app.listen(port, () => {
             Logger.success(`Dashboard läuft auf Port ${port}`);
         });
+        // Migration-Uploads (10+ GB Streams von Daemons) dauern länger als Nodes
+        // Default-requestTimeout (300 s) — auf 2 h anheben, headersTimeout bleibt.
+        server.requestTimeout = 2 * 60 * 60 * 1000;
+        return server;
     }
 
     /**
@@ -668,9 +690,11 @@ module.exports = class App {
         this.app.use(sessionMiddleware);
         
         // 4. CSRF Protection (nach Session und Cookie-Parser!)
-        const { csrfMiddleware, csrfProtection } = require('./middlewares/security/csrf-protection.middleware');
+        const { csrfMiddleware, csrfGlobalProtection } = require('./middlewares/security/csrf-protection.middleware');
         this.app.use(csrfMiddleware); // Token generieren
-        // csrfProtection wird pro-Route angewendet (siehe unten)
+        // Globale Verifikation für alle POST/PUT/DELETE/PATCH:
+        // Report-Only bis CSRF_ENFORCE=true gesetzt ist (siehe csrf-protection.middleware.js)
+        this.app.use(csrfGlobalProtection);
         
         // Rest of the middlewares
         this.app.use(hookMiddleware);

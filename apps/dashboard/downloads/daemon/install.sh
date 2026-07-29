@@ -12,7 +12,7 @@
 # - Health-Check & Dashboard-Registrierung
 #
 # Usage:
-#   curl -fsSL https://dev.firenetworks.de/downloads/daemon/install.sh | sudo bash
+#   curl -fsSL https://firenetworks.de/downloads/daemon/install.sh | sudo bash
 #   oder: ./install.sh
 #
 # Author: FireNetworks 2025
@@ -32,7 +32,7 @@ CONFIG_FILE="daemon.yaml"
 SYSTEMD_SERVICE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 # Download-URLs werden dynamisch basierend auf Architektur erstellt
-# Format: https://dev.firenetworks.de/downloads/daemon/binaries/{os}-{arch}/firebot-daemon
+# Format: https://firenetworks.de/downloads/daemon/binaries/{os}-{arch}/firebot-daemon
 DOWNLOAD_BASE_URL="https://firenetworks.de/downloads/daemon/binaries"
 DOWNLOAD_BASE_URL_DEV="https://dev.firenetworks.de/downloads/daemon/binaries"
 
@@ -225,13 +225,8 @@ check_docker() {
     fi
 
     log_warn "Docker nicht gefunden!"
-    if prompt_yes_no "Docker Engine jetzt installieren?" "y"; then
-        install_docker
-    else
-        log_error "Docker ist zwingend erforderlich für den FireBot Daemon!"
-        log_info "Bitte Docker manuell installieren: https://docs.docker.com/engine/install/"
-        exit 1
-    fi
+    log_info "Docker ist zwingend erforderlich - starte automatische Installation..."
+    install_docker
 }
 
 install_docker() {
@@ -376,10 +371,10 @@ get_binary() {
         fi
     done
     
-    # Wenn kein lokales Binary gefunden, vom Dev-Server laden
+    # Wenn kein lokales Binary gefunden, von Prod-Server laden
     if ! $found_local; then
-        log_info "Kein lokales Binary gefunden, lade von Dev-Server..."
-        download_binary "$DOWNLOAD_BASE_URL_DEV" "$platform"
+        log_info "Kein lokales Binary gefunden, lade von Prod-Server..."
+        download_binary "$DOWNLOAD_BASE_URL" "$platform"
     fi
 }
 
@@ -679,7 +674,7 @@ show_post_install_info() {
     echo ""
     echo -e "${CYAN}�📊 Dashboard:${NC}"
     echo -e "   Öffne das Dashboard um den Daemon zu sehen:"
-    echo -e "   ${BLUE}https://dev.firenetworks.de${NC}"
+    echo -e "   ${BLUE}https://firenetworks.de${NC}"
     echo ""
     echo -e "${CYAN}🔍 Next Steps:${NC}"
     echo -e "   1. Setup-Wizard ausführen (siehe unten)"
@@ -962,7 +957,7 @@ main() {
     echo -e "   Gameserver laufen als isolierte Docker-Container (kein gs-User mehr)"
     echo -e "   Docker-Network: firebot | Volumes: /var/lib/firebot-daemon/volumes/"
     echo ""
-    echo -e "${CYAN}📊 Dashboard:${NC} ${BLUE}https://dev.firenetworks.de${NC}"
+    echo -e "${CYAN}📊 Dashboard:${NC} ${BLUE}https://firenetworks.de${NC}"
     echo -e "${CYAN}📋 Logs:${NC} journalctl -u ${SERVICE_NAME} -f"
     echo ""
 }

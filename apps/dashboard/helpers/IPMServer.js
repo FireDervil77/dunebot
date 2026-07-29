@@ -16,9 +16,14 @@
 const WebSocket = require('ws');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const path = require('path');
 const { ServiceManager } = require('dunebot-core');
 const { MessageValidator, MessageBuilder } = require('dunebot-sdk');
 const eventRouter = require('./IPMEventRouter');
+
+// Pfad zur version.json (Dashboard-Download-Verzeichnis)
+const VERSION_JSON_PATH = path.join(__dirname, '..', 'downloads', 'daemon', 'version.json');
 
 class IPMServer {
     /**
@@ -39,6 +44,66 @@ class IPMServer {
         
         // ✅ SECURITY: Connection-Limits
         this.maxConnectionsPerDaemon = 3; // Max 3 parallele Verbindungen pro Daemon
+
+        // ✅ SECURITY: Brute-Force-Bremse für Registrierungsversuche
+        // Key: Client-IP (bzw. daemon_id als Fallback, wenn nur die Proxy-Loopback-IP sichtbar ist)
+        this.registerFailures = new Map(); // key -> { count, firstFailure, lockedUntil }
+        this.maxRegisterFailures = 5;                    // Fehlversuche pro Fenster
+        this.registerFailureWindowMs = 15 * 60 * 1000;   // Zähl-Fenster: 15 Minuten
+        this.registerLockoutMs = 15 * 60 * 1000;         // Lockout-Dauer: 15 Minuten
+    }
+
+    /**
+     * Rate-Limit-Key für Registrierungsversuche.
+     * Hinter dem Apache-Proxy (/ws) ist remoteAddress oft 127.0.0.1 — dann
+     * würde ein IP-basierter Lockout ALLE Daemons gleichzeitig sperren.
+     * In dem Fall wird stattdessen pro daemon_id gezählt.
+     * @private
+     */
+    _registerRateKey(clientIp, daemonId) {
+        const isLoopback = !clientIp || clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1';
+        return isLoopback ? `daemon:${daemonId}` : `ip:${clientIp}`;
+    }
+
+    /**
+     * Prüft ob Registrierungen für diesen Key aktuell gesperrt sind
+     * @private
+     */
+    _isRegisterLocked(key) {
+        const entry = this.registerFailures.get(key);
+        if (!entry) return false;
+
+        if (entry.lockedUntil && Date.now() < entry.lockedUntil) {
+            return true;
+        }
+
+        // Abgelaufene Lockouts/Fenster aufräumen
+        if ((entry.lockedUntil && Date.now() >= entry.lockedUntil)
+            || Date.now() - entry.firstFailure > this.registerFailureWindowMs) {
+            this.registerFailures.delete(key);
+        }
+        return false;
+    }
+
+    /**
+     * Registriert einen fehlgeschlagenen Registrierungsversuch, setzt ggf. Lockout
+     * @private
+     */
+    _recordRegisterFailure(key, clientIp) {
+        const now = Date.now();
+        let entry = this.registerFailures.get(key);
+
+        if (!entry || now - entry.firstFailure > this.registerFailureWindowMs) {
+            entry = { count: 0, firstFailure: now, lockedUntil: null };
+        }
+
+        entry.count++;
+        if (entry.count >= this.maxRegisterFailures) {
+            entry.lockedUntil = now + this.registerLockoutMs;
+            this.Logger.warn(`[IPMServer Security] 🔒 Registrierung gesperrt für ${key} (IP: ${clientIp}) — ${entry.count} Fehlversuche, Lockout ${Math.round(this.registerLockoutMs / 60000)} min`);
+        }
+
+        this.registerFailures.set(key, entry);
     }
 
     /**
@@ -95,7 +160,9 @@ class IPMServer {
      * @private
      */
     _handleConnection(ws, req) {
-        const clientIp = req.socket.remoteAddress;
+        // Hinter dem Apache-Proxy steht die echte Client-IP im X-Forwarded-For Header
+        const forwarded = req.headers['x-forwarded-for'];
+        const clientIp = (forwarded && forwarded.split(',')[0].trim()) || req.socket.remoteAddress;
         this.Logger.debug(`[IPMServer] Neue Verbindung von ${clientIp}`);
 
         let daemonId = null;
@@ -107,8 +174,18 @@ class IPMServer {
                 
                 // Registrierung (erste Nachricht)
                 if (message.type === 'register' && !authenticated) {
+                    // ✅ SECURITY: Brute-Force-Bremse — gesperrte Keys sofort abweisen
+                    const rateKey = this._registerRateKey(clientIp, message.payload?.daemon_id);
+                    if (this._isRegisterLocked(rateKey)) {
+                        this.Logger.warn(`[IPMServer Security] Registrierung abgelehnt (Lockout aktiv): ${rateKey} (IP: ${clientIp})`);
+                        ws.send(JSON.stringify({ type: 'error', error: 'Too many failed registration attempts. Try again later.' }));
+                        ws.close(4429, 'Too many failed registration attempts');
+                        return;
+                    }
+
                     const result = await this._handleRegister(ws, message.payload, clientIp);
                     if (result.success) {
+                        this.registerFailures.delete(rateKey);
                         daemonId = result.daemonId;
                         authenticated = true;
                         
@@ -147,6 +224,8 @@ class IPMServer {
                             });
                         }
                     } else {
+                        // ✅ SECURITY: Fehlversuch zählen (Brute-Force-Bremse)
+                        this._recordRegisterFailure(rateKey, clientIp);
                         ws.send(JSON.stringify({ type: 'error', error: result.error }));
                         ws.close(4001, result.error);
                     }
@@ -348,7 +427,12 @@ class IPMServer {
                             guild_id: daemon.guild_id,
                             display_name: daemon.name,
                             version: version || daemon.daemon_version,
-                            hardware: hardware || null
+                            hardware: hardware || null,
+                            updateAvailable: (() => {
+                                const latest = this._getLatestDaemonVersion();
+                                return latest ? latest !== (version || daemon.daemon_version) : false;
+                            })(),
+                            latestVersion: this._getLatestDaemonVersion()
                         }
                     };
                     
@@ -431,7 +515,12 @@ class IPMServer {
                     guild_id: rootserverByToken.guild_id,
                     display_name: rootserverByToken.name,
                     version,
-                    hardware: hardware || null
+                    hardware: hardware || null,
+                    updateAvailable: (() => {
+                        const latest = this._getLatestDaemonVersion();
+                        return latest ? latest !== version : false;
+                    })(),
+                    latestVersion: this._getLatestDaemonVersion()
                 }
             };
 
@@ -1027,6 +1116,21 @@ class IPMServer {
      */
     isDaemonOnline(daemonId) {
         return this.connections.has(daemonId);
+    }
+
+    /**
+     * Neueste Daemon-Version aus version.json lesen (immer frisch von Disk).
+     * @returns {string|null}
+     */
+    _getLatestDaemonVersion() {
+        try {
+            const raw = fs.readFileSync(VERSION_JSON_PATH, 'utf8');
+            const parsed = JSON.parse(raw);
+            return parsed.version || null;
+        } catch (_) {
+            // version.json nicht vorhanden — kein Problem
+            return null;
+        }
     }
 
     /**
