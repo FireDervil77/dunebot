@@ -1,195 +1,197 @@
 {
   "meta": {
     "version": "FIREBOT_v2",
-    "author": "FireBot Official",
-    "update_url": null
+    "name": "Satisfactory",
+    "author": "rehlmgaming@gmail.com",
+    "description": "Satisfactory is a first-person open-world factory building game with a dash of exploration and combat. Play alone or with friends, explore an alien planet, create multi-story factories, and enter conveyor belt heaven!"
   },
-  "exported_at": "2026-03-25T00:00:00+00:00",
-  "name": "Satisfactory",
-  "slug": "satisfactory",
-  "description": "Satisfactory Dedicated Server – Build-basiertes Fabrik-Aufbauspiel von Coffee Stain Studios. Unterstützt bis zu 4 Spieler im Koop-Modus.",
-  "category": "survival",
-  "tags": [
-    "steam",
-    "factory",
-    "building",
-    "coop",
-    "automation"
-  ],
-  "visibility": "official",
-  "trust_level": "official",
-  "status": "approved",
-  "features": [],
-  "steam": {
-    "app_id": 526870,
-    "server_app_id": 1690800,
-    "install_dir": "satisfactory"
-  },
-  "installation": {
-    "method": "steamcmd",
-    "app_id": "1690800",
-    "validate": true,
-    "script": "#!/bin/bash\ncd \"${INSTALL_DIR}\"\n\"${STEAMCMD}\" +force_install_dir \"${INSTALL_DIR}\" +login anonymous +app_update 1690800 validate +quit"
+  "docker_images": {
+    "ghcr.io/parkervcp/games:source": "ghcr.io/parkervcp/games:source"
   },
   "startup": {
-    "command": "./FactoryServer.sh -Port={{SERVER_PORT}} -BeaconPort={{BEACON_PORT}} -ServerQueryPort={{QUERY_PORT}} -MultiHome={{SERVER_IP}} -log -unattended",
-    "done": "Server started",
+    "command": "./Engine/Binaries/Linux/*-Linux-Shipping FactoryGame ?listen -Port={{SERVER_PORT}} -ServerQueryPort={{QUERY_PORT}} -BeaconPort={{BEACON_PORT}} -ReliablePort={{STREAMING_PORT}} -multihome=0.0.0.0 $(if {{DISABLE_SEASONAL}}; then echo \"-DisableSeasonalEvents\"; fi)",
+    "done": "Online",
     "stop": "^C"
   },
   "config": {
     "files": {},
-    "startup": {
-      "done": "Server started"
-    },
-    "logs": {},
-    "stop": "^C"
+    "logs": "{}"
+  },
+  "scripts": {
+    "installation": {
+      "container": "ghcr.io/parkervcp/installers:debian",
+      "entrypoint": "/bin/bash",
+      "script": "#!/bin/bash\n\n# File: Pterodactyl Satisfactory Egg - egg-satisfactory.json\n# Authors: Red-Thirten, Kubi, matthewp, Software-Noob, and Zarklord\n# Date: 2023/06/13\n# License: MIT License\n\n## Download and install SteamCMD\ncd /tmp\ncurl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz\nmkdir -p /mnt/server/steamcmd\ntar -xzvf steamcmd.tar.gz -C /mnt/server/steamcmd\ncd /mnt/server/steamcmd\n\n# SteamCMD fails otherwise for some reason, even running as root.\nchown -R root:root /mnt\nexport HOME=/mnt/server\n\n# Install game server using SteamCMD\n./steamcmd.sh +force_install_dir /mnt/server +login anonymous +app_update ${SRCDS_APPID} $( [[ -z ${SRCDS_BETAID} ]] || printf %s \"-beta ${SRCDS_BETAID}\" ) $( [[ -z ${SRCDS_BETAPASS} ]] || printf %s \"-betapassword ${SRCDS_BETAPASS}\" ) validate +exit\n\n# Set up 32 and 64 bit libraries\nmkdir -p /mnt/server/.steam/sdk{32,64}\ncp -v linux32/steamclient.so /mnt/server/.steam/sdk32/steamclient.so\ncp -v linux64/steamclient.so /mnt/server/.steam/sdk64/steamclient.so\n\n## Satisfactory setup\n# Check for successful installation and make the server binary executable.\n# Use `find` to see if a valid server binary exists using a wildcard, because\n# the binary name can differ between UE4 and UE5.\ncd /mnt/server/Engine/Binaries/Linux\ncount=$(find . -maxdepth 1 -name '*-Linux-Shipping' -type f -executable | wc -l)\nif [[ $count -eq 0 ]]; then\n    echo -e \"\\n\\nSteamCMD failed to install the Satisfactory Dedicated Server!\"\n    echo -e \"\\tTry reinstalling the server again.\\n\"\n    exit 1\nelse\n    chmod +x *-Linux-Shipping\nfi\n\n# Make Config directory and default .ini files (since they are not initially present before first server start)\nmkdir -p /mnt/server/FactoryGame/Saved/Config/LinuxServer/ && cd \"$_\"\n# Currently, this will delete & re-create certain .ini files during a re-install if they are already present.\n# While undesirable, this is required due to a current Pterodactyl ini config parser limitation.\n# When the patch to this limitation hits the production branch, this will be updated.\nrm -f Engine.ini Game.ini GameUserSettings.ini\n\necho -e '\\nCreating default \"Engine.ini\" configuration file...'\ncat > Engine.ini << EOF\n[/Script/FactoryGame.FGSaveSession]\nmNumRotatingAutosaves=${NUM_AUTOSAVES}\n\n[CrashReportClient]\nbImplicitSend=${UPLOAD_CRASH_REPORT}\n\n[/Script/OnlineSubsystemUtils.IpNetDriver]\nInitialConnectTimeout=${INIT_CONNECT_TIMEOUT}\nConnectionTimeout=${CONNECT_TIMEOUT}\nEOF\n\necho -e 'Creating default \"Game.ini\" configuration file...'\ncat > Game.ini << EOF\n[/Script/Engine.GameSession]\nMaxPlayers=${MAX_PLAYERS}\nEOF\n\necho -e 'Creating default \"GameUserSettings.ini\" configuration file...'\ncat > GameUserSettings.ini << EOF\n[/Script/FactoryGame.FGGameUserSettings]\nmIntValues=((\"FG.NetworkQuality\", ${NETWORK_QUALITY}))\nmFloatValues=((\"FG.AutosaveInterval\", ${AUTOSAVE_INTERVAL}))\nmAutoDetectSettingsHandled=False\nmPrimaryLanguage=\nCurrentFGGameUserSettingsVersion=0\nbUseVSync=False\nbUseDynamicResolution=False\nResolutionSizeX=1280\nResolutionSizeY=720\nLastUserConfirmedResolutionSizeX=1280\nLastUserConfirmedResolutionSizeY=720\nWindowPosX=-1\nWindowPosY=-1\nFullscreenMode=1\nLastConfirmedFullscreenMode=1\nPreferredFullscreenMode=1\nVersion=5\nAudioQualityLevel=0\nLastConfirmedAudioQualityLevel=0\nFrameRateLimit=0.000000\nDesiredScreenWidth=1280\nDesiredScreenHeight=720\nLastUserConfirmedDesiredScreenWidth=1280\nLastUserConfirmedDesiredScreenHeight=720\nLastRecommendedScreenWidth=-1.000000\nLastRecommendedScreenHeight=-1.000000\nLastCPUBenchmarkResult=-1.000000\nLastGPUBenchmarkResult=-1.000000\nLastGPUBenchmarkMultiplier=1.000000\nbUseHDRDisplayOutput=False\nHDRDisplayOutputNits=1000\n\n[ScalabilityGroups]\nsg.ResolutionQuality=100.000000\nsg.ViewDistanceQuality=3\nsg.AntiAliasingQuality=3\nsg.ShadowQuality=3\nsg.PostProcessQuality=3\nsg.TextureQuality=3\nsg.EffectsQuality=3\nsg.FoliageQuality=3\nsg.ShadingQuality=3\n\n[/Script/Engine.GameUserSettings]\nbUseDesiredScreenHeight=False\n\n\nEOF\n\necho -e \"\\nSatisfactory Dedicated Server successfully installed!\\n\""
+    }
   },
   "variables": [
     {
-      "name": "Server Name",
-      "description": "Name deines Satisfactory-Servers",
-      "env_variable": "SERVER_NAME",
-      "default_value": "My Satisfactory Server",
-      "user_viewable": true,
-      "user_editable": true,
-      "rules": "required|string|max:100",
-      "field_type": "text"
-    },
-    {
-      "name": "Max Players",
-      "description": "Maximale Spieleranzahl",
-      "env_variable": "MAX_PLAYERS",
-      "default_value": "4",
-      "user_viewable": true,
-      "user_editable": true,
-      "rules": "required|integer|min:1|max:16",
-      "field_type": "number"
-    },
-    {
-      "name": "Server Port",
-      "description": "Hauptport des Servers (UDP)",
-      "env_variable": "SERVER_PORT",
-      "default_value": "7777",
-      "user_viewable": true,
-      "user_editable": false,
-      "rules": "required|integer",
-      "field_type": "text",
-      "daemon_auto_assign": true
-    },
-    {
-      "name": "Beacon Port",
-      "description": "Beacon Port für Server Discovery (UDP)",
-      "env_variable": "BEACON_PORT",
-      "default_value": "15000",
-      "user_viewable": true,
-      "user_editable": false,
-      "rules": "required|integer",
-      "field_type": "text",
-      "daemon_auto_assign": true
-    },
-    {
-      "name": "Query Port",
-      "description": "Query Port für Server-Status-Abfragen (UDP)",
+      "name": "[REQUIRED] Server Query Port",
+      "description": "This is the port that your clients will type in and use to connect to the lobby (not the game world). Ensure this port matches your externally forwarded port, and is distanced from other running Satisfactory servers in Pterodactyl (increments of 100 are recommended). This is also true for the Primary/Game Port!",
       "env_variable": "QUERY_PORT",
       "default_value": "15777",
       "user_viewable": true,
       "user_editable": false,
-      "rules": "required|integer",
-      "field_type": "text",
-      "daemon_auto_assign": true
+      "rules": "required|integer|between:1024,65536",
+      "field_type": "text"
     },
     {
-      "name": "Server IP",
-      "description": "IP-Adresse, an die der Server gebunden wird (MultiHome)",
-      "env_variable": "SERVER_IP",
-      "default_value": "0.0.0.0",
+      "name": "[REQUIRED] Beacon Port",
+      "description": "This port provides a lightweight way for clients to contact a server and interact with it without committing to a normal game connection (likely used for client administration). Ensure this port matches your externally forwarded port, and is distanced from other running Satisfactory servers in Pterodactyl (increments of 100 are recommended).",
+      "env_variable": "BEACON_PORT",
+      "default_value": "15000",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer|between:1024,65536",
+      "field_type": "text"
+    },
+    {
+      "name": "[REQUIRED] Streaming Port",
+      "description": "TCP port for ReliableMessaging streaming connections (Satisfactory 1.0+)",
+      "env_variable": "STREAMING_PORT",
+      "default_value": "8888",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer|between:1024,65536",
+      "field_type": "text"
+    },
+    {
+      "name": "Automatic Updates",
+      "description": "Quickly checks for any server updates on startup, and updates if necessary. (1 Enable | 0 Disable)",
+      "env_variable": "AUTO_UPDATE",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "boolean",
+      "field_type": "boolean"
+    },
+    {
+      "name": "[Repair] Validate Server Files",
+      "description": "Leave empty (no value) for OFF or type \"true\" or \"1\" for ON. Validates all server files when Automatic Updates is enabled. Note: This will significantly increase server startup times, so it is recommended to only enable this when needed.",
+      "env_variable": "VALIDATE",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "string|nullable",
+      "field_type": "text"
+    },
+    {
+      "name": "Autosave Interval",
+      "description": "How often, in seconds, the server should generate a new autosave (ex. 300 = 5 min). Keep in mind that shorter times mean that while the server will save the game more often, it also means a potential drop in server performance. NOTE: This overrides any \"FG.AutosaveInterval\" commands made to the console!",
+      "env_variable": "AUTOSAVE_INTERVAL",
+      "default_value": "300",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|min:1",
+      "field_type": "text"
+    },
+    {
+      "name": "Number of Rotating Autosaves",
+      "description": "Number of session auto-saves for the server to keep before the oldest save is deleted and the others are moved down the list.",
+      "env_variable": "NUM_AUTOSAVES",
+      "default_value": "3",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:0",
+      "field_type": "text"
+    },
+    {
+      "name": "Upload Crash Reports",
+      "description": "Accepted values are \"true\" or \"false\". Determines if the server should upload any crash reports to the developer to help pinpoint issues for future patches.",
+      "env_variable": "UPLOAD_CRASH_REPORT",
+      "default_value": "true",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|in:true,false",
+      "field_type": "text"
+    },
+    {
+      "name": "Disable Seasonal Events",
+      "description": "Accepted values are \"true\" or \"false\". Setting to \"true\" will disable any currently active seasonal events.",
+      "env_variable": "DISABLE_SEASONAL",
+      "default_value": "false",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|in:true,false",
+      "field_type": "text"
+    },
+    {
+      "name": "[Experimental] Max Players",
+      "description": "[Requires server re-install to change default value!] The server and client are currently not optimized to support more than 4 players. However, you can override this value here at your own risk of poor performance.",
+      "env_variable": "MAX_PLAYERS",
+      "default_value": "4",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:1",
+      "field_type": "text"
+    },
+    {
+      "name": "[Advanced] Client Initial Connection Timeout",
+      "description": "Time in seconds to wait for a new client connection to be established before destroying the connection.",
+      "env_variable": "INIT_CONNECT_TIMEOUT",
+      "default_value": "30",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|min:1",
+      "field_type": "text"
+    },
+    {
+      "name": "[Advanced] Client Established Connection Timeout",
+      "description": "Time in seconds to wait before considering an established client connection timed out. Typically shorter than the time to wait on an initial connection because this connection should already have been setup and any interruption should be trapped quicker.",
+      "env_variable": "CONNECT_TIMEOUT",
+      "default_value": "20",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|min:1",
+      "field_type": "text"
+    },
+    {
+      "name": "[Advanced] Network Quality",
+      "description": "[0 = Low, 1 = Medium, 2 = High, 3 = Ultra] Sets the network configuration for the game server (shouldn't need to be changed). NOTE: This overrides any \"FG.NetworkQuality\" commands made to the console!",
+      "env_variable": "NETWORK_QUALITY",
+      "default_value": "3",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|between:0,3",
+      "field_type": "text"
+    },
+    {
+      "name": "[Advanced] Branch Name",
+      "description": "[Accepted Values: \"public\", \"experimental\", or leave empty to use the primary branch of the server] Used to download or switch to a non-primary branch of the game server. \"Automatic Updates\" and \"Validate Server Files\" must be set to \"1\" to switch branches if the server is already installed. NOTE: Any non-primary branches may not be fully compatible/stable!",
+      "env_variable": "SRCDS_BETAID",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "string|nullable|in:public,experimental",
+      "field_type": "text"
+    },
+    {
+      "name": "[Advanced] Satisfactory Dedicated Server App ID",
+      "description": "Steam App ID used for installation and updates. Rarely needs to be changed.",
+      "env_variable": "SRCDS_APPID",
+      "default_value": "1690800",
       "user_viewable": false,
       "user_editable": false,
-      "rules": "required|string",
-      "field_type": "text",
-      "daemon_auto_assign": true
-    },
-    {
-      "name": "Auto Pause",
-      "description": "Server pausiert wenn keine Spieler verbunden sind",
-      "env_variable": "AUTO_PAUSE",
-      "default_value": "true",
-      "user_viewable": true,
-      "user_editable": true,
-      "rules": "required|in:true,false",
-      "field_type": "select",
-      "select_options": {
-        "true": "Ja",
-        "false": "Nein"
-      }
-    },
-    {
-      "name": "Auto Save on Disconnect",
-      "description": "Automatisch speichern wenn letzter Spieler disconnectet",
-      "env_variable": "AUTO_SAVE_ON_DISCONNECT",
-      "default_value": "true",
-      "user_viewable": true,
-      "user_editable": true,
-      "rules": "required|in:true,false",
-      "field_type": "select",
-      "select_options": {
-        "true": "Ja",
-        "false": "Nein"
-      }
-    }
-  ],
-  "templates": [
-    {
-      "name": "default",
-      "label": "Standard",
-      "description": "Standard Satisfactory Server für bis zu 4 Spieler",
-      "icon": "fa-industry",
-      "variables": {
-        "MAX_PLAYERS": "4",
-        "AUTO_PAUSE": "true",
-        "AUTO_SAVE_ON_DISCONNECT": "true"
-      }
+      "rules": "required|integer|min:1",
+      "field_type": "text"
     }
   ],
   "ports": {
     "game": {
       "default": 7777,
-      "protocol": "udp",
-      "description": "Game Port"
-    },
-    "beacon": {
-      "default": 15000,
-      "protocol": "udp",
-      "description": "Beacon Port (Server Discovery)"
-    },
-    "query": {
-      "default": 15777,
-      "protocol": "udp",
-      "description": "Query Port"
+      "protocol": "udp"
     }
   },
   "query": {
     "gamedig_type": "satisfactory",
-    "port_var": "query"
+    "port_var": "game"
   },
-  "requirements": {
-    "ram_min_mb": 4096,
-    "ram_recommended_mb": 8192,
-    "cpu_cores_min": 2,
-    "disk_min_gb": 5,
-    "disk_recommended_gb": 15
-  },
-  "assets": {
-    "icon_url": "https://cdn.akamai.steamstatic.com/steam/apps/526870/header.jpg",
-    "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/526870/library_hero.jpg",
-    "screenshots": []
-  },
-  "file_denylist": [
-    ".env",
-    "start.sh",
-    "firebot.lock",
-    "firebot.pid",
-    "*.log"
-  ],
-  "changelog": "Initial release - Satisfactory mit 3 Ports (Game, Beacon, Query) und MultiHome-Support"
+  "templates": [],
+  "name": "Satisfactory",
+  "slug": "satisfactory",
+  "description": "Satisfactory is a first-person open-world factory building game with a dash of exploration and combat. Play alone or with friends, explore an alien planet, create multi-story factories, and enter conveyor belt heaven!",
+  "category": "sandbox",
+  "runtime_type": "docker_steam",
+  "source_type": "native",
+  "version": "1.0.0"
 }

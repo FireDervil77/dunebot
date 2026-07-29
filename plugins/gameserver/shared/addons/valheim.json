@@ -1,149 +1,186 @@
 {
   "meta": {
     "version": "FIREBOT_v2",
-    "author": "FireBot Official",
-    "update_url": null
+    "name": "Valheim",
+    "author": "magi1053@outlook.com",
+    "description": "A brutal exploration and survival game for 1-10 players, set in a procedurally-generated purgatory inspired by viking culture."
   },
-  "exported_at": "2025-10-19T00:00:00+00:00",
-  "name": "Valheim",
-  "slug": "valheim",
-  "description": "Valheim Dedicated Server - Survival-Koop für bis zu 10 Spieler. Einfache Einrichtung mit Vanilla und Modded Templates.",
-  "category": "survival",
-  "tags": [
-    "steam",
-    "survival",
-    "coop",
-    "viking",
-    "pve"
-  ],
-  "visibility": "official",
-  "trust_level": "official",
-  "status": "approved",
-  "features": [
-    "steam_workshop",
-    "mods"
-  ],
-  "steam": {
-    "app_id": 892970,
-    "server_app_id": 896660,
-    "install_dir": "valheim"
-  },
-  "installation": {
-    "method": "steamcmd",
-    "app_id": "896660",
-    "validate": true,
-    "script": "#!/bin/bash\ncd \"${INSTALL_DIR}\"\n\"${STEAMCMD}\" +force_install_dir \"${INSTALL_DIR}\" +login anonymous +app_update 896660 validate +quit"
+  "docker_images": {
+    "ghcr.io/parkervcp/games:valheim": "ghcr.io/parkervcp/games:valheim"
   },
   "startup": {
-    "command": "./valheim_server.x86_64 -name \"{{SERVER_NAME}}\" -port {{SERVER_PORT}} -world \"{{WORLD_NAME}}\" -password \"{{SERVER_PASSWORD}}\" -public {{PUBLIC}} -savedir /mnt/server/saves",
-    "done": "Game server connected",
+    "command": "./valheim_server.x86_64 -nographics -batchmode -name \"{{SERVER_NAME}}\" -port {{SERVER_PORT}} -world \"{{WORLD}}\" -password \"{{PASSWORD}}\" -public {{PUBLIC_SERVER}} -saveinterval {{BACKUP_INTERVAL}} -backups {{BACKUP_COUNT}} -backupshort {{BACKUP_SHORTTIME}} -backuplong {{BACKUP_LONGTIME}} $( [[ {{ENABLE_CROSSPLAY}} -eq 1 ]] && echo \" -crossplay \") > >(sed -uE \"{{CONSOLE_FILTER}}\")",
+    "done": "ready",
     "stop": "^C"
   },
   "config": {
     "files": {},
-    "startup": {
-      "done": "Game server connected"
-    },
-    "logs": {},
-    "stop": "^C"
+    "logs": []
+  },
+  "scripts": {
+    "installation": {
+      "container": "ghcr.io/parkervcp/installers:debian",
+      "entrypoint": "bash",
+      "script": "#!/bin/bash\n# steamcmd Base Installation Script\n#\n# Server Files: /mnt/server\n# Image to install with is 'ghcr.io/parkervcp/installers:debian'\n\n##\n#\n# Variables\n# STEAM_USER, STEAM_PASS, STEAM_AUTH - Steam user setup. If a user has 2fa enabled it will most likely fail due to timeout. Leave blank for anon install.\n# WINDOWS_INSTALL - if it's a windows server you want to install set to 1\n# SRCDS_APPID - steam app id found here - https://developer.valvesoftware.com/wiki/Dedicated_Servers_List\n# SRCDS_BETAID - beta branch of a steam app. Leave blank to install normal branch\n# SRCDS_BETAPASS - password for a beta branch should one be required during private or closed testing phases.. Leave blank for no password.\n# INSTALL_FLAGS - Any additional SteamCMD  flags to pass during install.. Keep in mind that steamcmd auto update process in the docker image might overwrite or ignore these when it performs update on server boot.\n# AUTO_UPDATE - Adding this variable to the egg allows disabling or enabling automated updates on boot. Boolean value. 0 to disable and 1 to enable.\n#\n ##\n\n# Install packages. Default packages below are not required if using our existing install image thus speeding up the install process.\napt -y update\napt -y --no-install-recommends install curl lib32gcc-s1 ca-certificates\n\n## just in case someone removed the defaults.\nif [[ \"${STEAM_USER}\" == \"\" ]] || [[ \"${STEAM_PASS}\" == \"\" ]]; then\n    echo -e \"steam user is not set.\\n\"\n    echo -e \"Using anonymous user.\\n\"\n    STEAM_USER=anonymous\n    STEAM_PASS=\"\"\n    STEAM_AUTH=\"\"\nelse\n    echo -e \"user set to ${STEAM_USER}\"\nfi\n\n## download and install steamcmd\ncd /tmp\nmkdir -p /mnt/server/steamcmd\ncurl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz\ntar -xzvf steamcmd.tar.gz -C /mnt/server/steamcmd\nmkdir -p /mnt/server/steamapps # Fix steamcmd disk write error when this folder is missing\ncd /mnt/server/steamcmd\n\n# SteamCMD fails otherwise for some reason, even running as root.\n# This is changed at the end of the install process anyways.\nchown -R root:root /mnt\nexport HOME=/mnt/server\n\n## install game using steamcmd\n./steamcmd.sh +force_install_dir /mnt/server +login ${STEAM_USER} ${STEAM_PASS} ${STEAM_AUTH} $( [[ \"${WINDOWS_INSTALL}\" == \"1\" ]] && printf %s '+@sSteamCmdForcePlatformType windows' ) +app_update ${SRCDS_APPID} $( [[ -z ${SRCDS_BETAID} ]] || printf %s \"-beta ${SRCDS_BETAID}\" ) $( [[ -z ${SRCDS_BETAPASS} ]] || printf %s \"-betapassword ${SRCDS_BETAPASS}\" ) ${INSTALL_FLAGS} validate +quit ## other flags may be needed depending on install.\n\n## set up 32 bit libraries\nmkdir -p /mnt/server/.steam/sdk32\ncp -v linux32/steamclient.so ../.steam/sdk32/steamclient.so\n\n## set up 64 bit libraries\nmkdir -p /mnt/server/.steam/sdk64\ncp -v linux64/steamclient.so ../.steam/sdk64/steamclient.so"
+    }
   },
   "variables": [
     {
-      "name": "Server Name",
-      "description": "Der Name deines Valheim-Servers",
-      "env_variable": "SERVER_NAME",
-      "default_value": "My Valheim Server",
-      "user_viewable": true,
-      "user_editable": true,
-      "rules": "required|string|max:50",
-      "field_type": "text"
-    },
-    {
-      "name": "World Name",
-      "description": "Name der Welt (Speicherstand-Identifier)",
-      "env_variable": "WORLD_NAME",
-      "default_value": "Dedicated",
-      "user_viewable": true,
-      "user_editable": true,
-      "rules": "required|string|alpha_dash|max:30",
-      "field_type": "text"
-    },
-    {
-      "name": "Server Password",
-      "description": "Passwort zum Betreten des Servers (min. 5 Zeichen)",
-      "env_variable": "SERVER_PASSWORD",
-      "default_value": "AUTOGENERATE",
-      "user_viewable": true,
-      "user_editable": true,
-      "rules": "required|string|min:5",
-      "field_type": "password"
-    },
-    {
-      "name": "Server Port",
-      "description": "Hauptport des Servers",
-      "env_variable": "SERVER_PORT",
-      "default_value": "2456",
-      "user_viewable": true,
-      "user_editable": false,
-      "rules": "required|integer",
-      "field_type": "text"
-    },
-    {
-      "name": "Public Server",
-      "description": "Server in der öffentlichen Serverliste anzeigen?",
-      "env_variable": "PUBLIC",
+      "name": "Auto Update",
+      "description": "Enable automatic updates.",
+      "env_variable": "AUTO_UPDATE",
       "default_value": "1",
       "user_viewable": true,
       "user_editable": true,
-      "rules": "required|boolean",
+      "rules": "boolean",
       "field_type": "boolean"
     },
     {
-      "name": "Crossplay",
-      "description": "Crossplay mit Xbox aktivieren?",
-      "env_variable": "CROSSPLAY",
-      "default_value": "0",
+      "name": "Backup Count",
+      "description": "Sets how many automatic backups will be kept. The first is the 'short' backup length, and the rest are the 'long' backup length. When default values are used means one backup that is 2 hours old, and 3 backups that are 12 hours apart. Default: 4.",
+      "env_variable": "BACKUP_COUNT",
+      "default_value": "4",
       "user_viewable": true,
       "user_editable": true,
-      "rules": "required|boolean",
+      "rules": "required|numeric|min:0",
+      "field_type": "text"
+    },
+    {
+      "name": "Backup Interval",
+      "description": "Change how often the world will save in seconds. Default: 1800 (30 minutes).",
+      "env_variable": "BACKUP_INTERVAL",
+      "default_value": "1800",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|min:0",
+      "field_type": "text"
+    },
+    {
+      "name": "Backup Longtime",
+      "description": "Sets the interval between the subsequent automatic backups in seconds. Default: 43200 (12 hours).",
+      "env_variable": "BACKUP_LONGTIME",
+      "default_value": "43200",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|min:0",
+      "field_type": "text"
+    },
+    {
+      "name": "Backup Shorttime",
+      "description": "Sets the interval between the first automatic backups in seconds. Default: 7200 (2 hours).",
+      "env_variable": "BACKUP_SHORTTIME",
+      "default_value": "7200",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|min:0",
+      "field_type": "text"
+    },
+    {
+      "name": "Console Filter",
+      "description": "Remove unwanted outputs from the console.",
+      "env_variable": "CONSOLE_FILTER",
+      "default_value": "/^\\(Filename:.*Line:[[:space:]]+[[:digit:]]+\\)$/d; /^([[:space:]]+)?$/d",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "string",
+      "field_type": "text"
+    },
+    {
+      "name": "Enable Crossplay",
+      "description": "Enable crossplay support.",
+      "env_variable": "ENABLE_CROSSPLAY",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "boolean",
       "field_type": "boolean"
     },
     {
       "name": "LD Library Path",
-      "description": "Zusätzliche Bibliotheks-Suchpfade (relativ zum Server-Verzeichnis). Valheim benötigt ./linux64 für libsteam_api.so.",
+      "description": "Required to load server libraries.",
       "env_variable": "LD_LIBRARY_PATH",
       "default_value": "./linux64",
       "user_viewable": false,
       "user_editable": false,
-      "rules": "nullable|string",
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Server Password",
+      "description": "Server password.",
+      "env_variable": "PASSWORD",
+      "default_value": "secret",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|min:5|max:20",
+      "field_type": "text"
+    },
+    {
+      "name": "Public Server",
+      "description": "Public visibility of your server. Set it to false to make the server invisible and only joinable via the 'Join IP'-button.",
+      "env_variable": "PUBLIC_SERVER",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "boolean",
+      "field_type": "boolean"
+    },
+    {
+      "name": "Server Name",
+      "description": "Name that appears in server browser.",
+      "env_variable": "SERVER_NAME",
+      "default_value": "My Server",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:60",
+      "field_type": "text"
+    },
+    {
+      "name": "App ID",
+      "description": "Valheim steam app id for auto updates.",
+      "env_variable": "SRCDS_APPID",
+      "default_value": "896660",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "nullable|numeric",
+      "field_type": "text"
+    },
+    {
+      "name": "Beta Branch",
+      "description": "Beta branch of a steam app. Leave blank to install normal branch.",
+      "env_variable": "SRCDS_BETAID",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "max:30",
+      "field_type": "text"
+    },
+    {
+      "name": "Beta Password",
+      "description": "Password for a beta branch should one be required during private or closed testing phases. Leave blank for no password.",
+      "env_variable": "SRCDS_BETAPASS",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "max:30",
+      "field_type": "text"
+    },
+    {
+      "name": "World Name",
+      "description": "Name to load if switching between multiple saved worlds.",
+      "env_variable": "WORLD",
+      "default_value": "Dedicated",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:20",
       "field_type": "text"
     }
   ],
-  "templates": [
-    {
-      "name": "vanilla",
-      "label": "Vanilla Server",
-      "description": "Reiner Vanilla Valheim Server ohne Mods",
-      "icon": "fa-leaf",
-      "variables": {
-        "PUBLIC": "1",
-        "CROSSPLAY": "0"
-      },
-      "config_overrides": {}
-    },
-    {
-      "name": "modded",
-      "label": "Modded (Valheim Plus)",
-      "description": "Server mit Valheim Plus Mod (muss manuell installiert werden)",
-      "icon": "fa-plus-circle",
-      "variables": {
-        "PUBLIC": "0",
-        "CROSSPLAY": "0"
-      },
-      "config_overrides": {},
-      "post_install_info": "Achtung: Valheim Plus muss manuell über BepInEx installiert werden. Anleitung: https://valheim.thunderstore.io/package/ValheimModding/ValheimPlus/"
-    }
-  ],
+  "templates": [],
+  "query": {
+    "gamedig_type": "valheim",
+    "port_var": "game_plus_1"
+  },
   "ports": {
     "game": {
       "default": 2456,
@@ -153,36 +190,14 @@
     "game_plus_1": {
       "default": 2457,
       "protocol": "udp",
-      "description": "Game Port +1"
-    },
-    "game_plus_2": {
-      "default": 2458,
-      "protocol": "udp",
-      "description": "Game Port +2"
+      "description": "Query Port (Game +1)"
     }
   },
-  "query": {
-    "gamedig_type": "valheim",
-    "port_var": "game_plus_1"
-  },
-  "requirements": {
-    "ram_min_mb": 2048,
-    "ram_recommended_mb": 4096,
-    "cpu_cores_min": 2,
-    "disk_min_gb": 5,
-    "disk_recommended_gb": 10
-  },
-  "assets": {
-    "icon_url": "https://cdn.akamai.steamstatic.com/steam/apps/892970/header.jpg",
-    "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/892970/library_hero.jpg",
-    "screenshots": []
-  },
-  "file_denylist": [
-    ".env",
-    "start.sh",
-    "firebot.lock",
-    "firebot.pid",
-    "*.log"
-  ],
-  "changelog": "Initial release - Valheim with Vanilla and Modded templates"
+  "name": "Valheim",
+  "slug": "valheim",
+  "description": "A brutal exploration and survival game for 1-10 players, set in a procedurally-generated purgatory inspired by viking culture.",
+  "category": "survival",
+  "runtime_type": "docker_steam",
+  "source_type": "native",
+  "version": "1.0.0"
 }

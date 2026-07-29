@@ -257,10 +257,24 @@ class GameserverPlugin extends DashboardPlugin {
     }
 
     /**
-     * Liest alle shared/addons/*.json ein und sichert sie in addon_marketplace.
+     * Legt fehlende offizielle Addons aus shared/addons/*.json an.
+     *
+     * **Vorhandene Addons werden bewusst NICHT überschrieben.** In der Datenbank
+     * hängen die installierten Server, ihre Port-Allokationen und die per Egg
+     * importierten Definitionen – sie ist die Wahrheit, die Datei nur ihr Abbild
+     * (Gegenrichtung: `scripts/export-addons.js`).
+     *
+     * Vorher stand hier ein vollständiges Upsert samt `game_data = VALUES(...)`.
+     * Das hätte z.B. das Valheim-Addon, dessen Variablen `PUBLIC_SERVER` und
+     * `ENABLE_CROSSPLAY` heißen, durch eine ältere Fassung mit `PUBLIC` ersetzt –
+     * die Variablen der laufenden Server hätten danach zu nichts mehr gehört.
+     *
+     * Aufgefallen ist das nur, weil das Upsert nie lief: Es schrieb
+     * `source_type = 'native_steamcmd'`, ein Wert, den diese Spalte gar nicht
+     * kennt (der gehört in `runtime_type`). Jeder INSERT scheiterte an
+     * WARN_DATA_TRUNCATED.
+     *
      * Läuft asynchron im Hintergrund – Fehler sind unkritisch.
-     * ON DUPLICATE KEY UPDATE sorgt dafür, dass bereits vorhandene Addons nur
-     * aktualisiert werden wenn sich game_data geändert hat.
      */
     async _syncOfficialAddons(dbService) {
         const Logger = ServiceManager.get('Logger');
@@ -273,7 +287,8 @@ class GameserverPlugin extends DashboardPlugin {
         const files = fs.readdirSync(sharedDir).filter(f => f.endsWith('.json'));
         if (!files.length) return;
 
-        let synced = 0;
+        let created = 0;
+        let existing = 0;
         for (const file of files) {
             try {
                 const raw   = fs.readFileSync(path.join(sharedDir, file), 'utf8');
@@ -286,36 +301,32 @@ class GameserverPlugin extends DashboardPlugin {
 
                 const gameData = JSON.stringify(addon);
 
-                await dbService.query(`
+                // "ON DUPLICATE KEY UPDATE id = id" ist ein bewusster Leerlauf:
+                // Es verhindert den Duplicate-Key-Fehler bei bereits vorhandenem
+                // slug, ohne irgendeine Spalte anzufassen. INSERT IGNORE wäre
+                // verlockender, würde aber auch echte Fehler verschlucken – genau
+                // dadurch blieb der kaputte source_type so lange unbemerkt.
+                // dbService.query() liefert die Zeilen entpackt – bei INSERT also
+                // direkt das OkPacket, nicht [OkPacket, fields].
+                const res = await dbService.query(`
                     INSERT INTO addon_marketplace
                         (name, slug, description, author_user_id, visibility, status, trust_level,
                          category, runtime_type, source_type, steam_app_id, steam_server_app_id,
                          icon_url, banner_url, tags, version, game_data)
                     VALUES (?, ?, ?, '544578232704565262', 'official', 'approved', 'official',
-                            ?, 'native_steamcmd', 'native_steamcmd', ?, ?,
+                            ?, ?, ?, ?, ?,
                             ?, ?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE
-                        name               = VALUES(name),
-                        description        = VALUES(description),
-                        visibility         = 'official',
-                        status             = 'approved',
-                        trust_level        = 'official',
-                        category           = VALUES(category),
-                        runtime_type       = 'native_steamcmd',
-                        source_type        = 'native_steamcmd',
-                        steam_app_id       = VALUES(steam_app_id),
-                        steam_server_app_id = VALUES(steam_server_app_id),
-                        icon_url           = VALUES(icon_url),
-                        banner_url         = VALUES(banner_url),
-                        tags               = VALUES(tags),
-                        version            = VALUES(version),
-                        game_data          = VALUES(game_data),
-                        updated_at         = NOW()
+                    ON DUPLICATE KEY UPDATE id = id
                 `, [
                     addon.name,
                     addon.slug,
                     addon.description || '',
                     addon.category    || 'other',
+                    // Beide Spalten sind ENUMs mit unterschiedlichen Wertebereichen;
+                    // "native_steamcmd" ist nur für runtime_type gültig. Die Datei
+                    // darf beides setzen, sonst gilt, was alle Bestandsaddons nutzen.
+                    addon.runtime_type || 'docker_steam',
+                    addon.source_type  || 'native',
                     addon.steam?.app_id        || addon.steam_app_id        || null,
                     addon.steam?.server_app_id || addon.steam_server_app_id || null,
                     addon.assets?.icon_url     || addon.icon_url            || null,
@@ -325,14 +336,24 @@ class GameserverPlugin extends DashboardPlugin {
                     gameData,
                 ]);
 
-                synced++;
+                // affectedRows taugt hier nicht: mysql2 zählt getroffene statt
+                // geänderte Zeilen und meldet auch für den Leerlauf 1. insertId
+                // ist eindeutig – 0, wenn der slug bereits existierte.
+                if (res?.insertId > 0) {
+                    created++;
+                    Logger.info(`[Gameserver] syncOfficialAddons: ${addon.slug} neu angelegt (#${res.insertId})`);
+                } else {
+                    existing++;
+                }
             } catch (err) {
                 Logger.error(`[Gameserver] syncOfficialAddons: Fehler bei ${file}:`, err.message);
             }
         }
 
-        if (synced > 0) {
-            Logger.info(`[Gameserver] syncOfficialAddons: ${synced}/${files.length} offizielle Addons synchronisiert`);
+        if (created > 0) {
+            Logger.info(`[Gameserver] syncOfficialAddons: ${created} Addon(s) neu angelegt, ${existing} bereits vorhanden (unverändert)`);
+        } else {
+            Logger.debug(`[Gameserver] syncOfficialAddons: alle ${existing} offiziellen Addons bereits vorhanden`);
         }
     }
     

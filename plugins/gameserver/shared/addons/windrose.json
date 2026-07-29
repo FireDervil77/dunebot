@@ -1,51 +1,12 @@
 {
   "meta": {
     "version": "FIREBOT_v2",
+    "name": "Windrose",
     "author": "FireDervil77",
-    "update_url": null
-  },
-  "exported_at": "2026-04-21T00:00:00+00:00",
-  "name": "Windrose",
-  "slug": "windrose",
-  "description": "Windrose Dedicated Server – Piraten-Survival-Adventure mit optionalem Ko-op für bis zu 4 Spieler. Läuft via Proton auf Linux. Server App ID: 4129620.",
-  "category": "survival",
-  "tags": [
-    "steam",
-    "survival",
-    "coop",
-    "pirates",
-    "adventure",
-    "pve",
-    "proton"
-  ],
-  "visibility": "official",
-  "trust_level": "official",
-  "status": "approved",
-  "features": [
-    "password_protection",
-    "invite_code"
-  ],
-  "steam": {
-    "app_id": 3041230,
-    "server_app_id": 4129620,
-    "install_dir": "windrose"
+    "description": "Windrose. A Priate Advanture / Suvival COOP Game"
   },
   "docker_images": {
     "ghcr.io/parkervcp/steamcmd:proton": "Proton"
-  },
-  "scripts": {
-    "installation": {
-      "container": "ghcr.io/parkervcp/installers:debian",
-      "entrypoint": "bash",
-      "script": "#!/bin/bash\n\n## Windrose Dedicated Server Installer\n## Install container: ghcr.io/parkervcp/installers:debian\n\nif [[ \"${STEAM_USER}\" == \"\" ]] || [[ \"${STEAM_PASS}\" == \"\" ]]; then\n    echo \"Steam user not set, using anonymous login.\"\n    STEAM_USER=anonymous\n    STEAM_PASS=\"\"\n    STEAM_AUTH=\"\"\nfi\n\n## SteamCMD herunterladen\ncd /tmp\nmkdir -p /mnt/server/steamcmd\ncurl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz\ntar -xzvf steamcmd.tar.gz -C /mnt/server/steamcmd\nmkdir -p /mnt/server/steamapps\ncd /mnt/server/steamcmd\n\nchown -R root:root /mnt\nexport HOME=/mnt/server\n\n## Windrose Dedicated Server (Windows-Only via Wine) installieren\n## SteamCMD erst initialisieren (laedt Updates + Config – verhindert 'Missing configuration' beim ersten Run)\n./steamcmd.sh +quit\n\n## Windrose Dedicated Server installieren\n./steamcmd.sh +force_install_dir /mnt/server +login ${STEAM_USER} ${STEAM_PASS} ${STEAM_AUTH} +@sSteamCmdForcePlatformType windows +@sSteamCmdForcePlatformBitness 64 +app_update ${SRCDS_APPID} validate +quit\n\n## Steam SDK Libraries einrichten (benoetigt von Wine/SteamAPI)\necho \">>> Richte Steam SDK Libraries ein...\"\nSTEAMCMD_DIR=\"/mnt/server/steamcmd\"\n\nmkdir -p /mnt/server/.steam/sdk32\nmkdir -p /mnt/server/.steam/sdk64\n\n# 32-bit steamclient.so\nif [ -f \"${STEAMCMD_DIR}/linux32/steamclient.so\" ]; then\n    cp -v \"${STEAMCMD_DIR}/linux32/steamclient.so\" /mnt/server/.steam/sdk32/steamclient.so\n    echo \"OK SDK32 Library kopiert\"\nelse\n    LIB32=$(find \"${STEAMCMD_DIR}\" -name \"steamclient.so\" 2>/dev/null | grep -i \"32\" | head -1)\n    if [ -n \"${LIB32}\" ]; then\n        cp -v \"${LIB32}\" /mnt/server/.steam/sdk32/steamclient.so\n        echo \"OK SDK32 Library gefunden (${LIB32}) und kopiert\"\n    else\n        echo \"WARN: steamclient.so (32-bit) nicht gefunden in ${STEAMCMD_DIR}\"\n    fi\nfi\n\n# 64-bit steamclient.so\nif [ -f \"${STEAMCMD_DIR}/linux64/steamclient.so\" ]; then\n    cp -v \"${STEAMCMD_DIR}/linux64/steamclient.so\" /mnt/server/.steam/sdk64/steamclient.so\n    echo \"OK SDK64 Library kopiert\"\nelse\n    LIB64=$(find \"${STEAMCMD_DIR}\" -name \"steamclient.so\" 2>/dev/null | grep -i \"64\" | head -1)\n    if [ -n \"${LIB64}\" ]; then\n        cp -v \"${LIB64}\" /mnt/server/.steam/sdk64/steamclient.so\n        echo \"OK SDK64 Library gefunden (${LIB64}) und kopiert\"\n    else\n        echo \"WARN: steamclient.so (64-bit) nicht gefunden in ${STEAMCMD_DIR}\"\n    fi\nfi\n\n## Standard ServerDescription.json anlegen\nSERVER_JSON=/mnt/server/R5/ServerDescription.json\nmkdir -p \"$(dirname \"${SERVER_JSON}\")\"\nif [ ! -f \"${SERVER_JSON}\" ]; then\n    cat > \"${SERVER_JSON}\" << 'EOF'\n{\n  \"Version\": 1,\n  \"DeploymentId\": \"\",\n  \"ServerDescription_Persistent\": {\n    \"PersistentServerId\": \"\",\n    \"InviteCode\": \"change-me\",\n    \"IsPasswordProtected\": false,\n    \"Password\": \"\",\n    \"ServerName\": \"My Windrose Server\",\n    \"WorldIslandId\": \"\",\n    \"MaxPlayerCount\": 4,\n    \"UserSelectedRegion\": \"\",\n    \"P2pProxyAddress\": \"0.0.0.0\",\n    \"UseDirectConnection\": false,\n    \"DirectConnectionServerAddress\": \"\",\n    \"DirectConnectionServerPort\": 7777,\n    \"DirectConnectionProxyAddress\": \"0.0.0.0\"\n  }\n}\nEOF\nfi\n\necho \"-----------------------------------------\"\necho \"Installation completed...\"\necho \"-----------------------------------------\""
-    }
-  },
-  "installation": {
-    "method": "steamcmd",
-    "app_id": "4129620",
-    "validate": true,
-    "docker_image": "ghcr.io/parkervcp/installers:debian",
-    "script": "#!/bin/bash\n\n## Windrose Dedicated Server Installer\n## Install container: ghcr.io/parkervcp/installers:debian\n\nif [[ \"${STEAM_USER}\" == \"\" ]] || [[ \"${STEAM_PASS}\" == \"\" ]]; then\n    echo \"Steam user not set, using anonymous login.\"\n    STEAM_USER=anonymous\n    STEAM_PASS=\"\"\n    STEAM_AUTH=\"\"\nfi\n\n## SteamCMD herunterladen\ncd /tmp\nmkdir -p /mnt/server/steamcmd\ncurl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz\ntar -xzvf steamcmd.tar.gz -C /mnt/server/steamcmd\nmkdir -p /mnt/server/steamapps\ncd /mnt/server/steamcmd\n\nchown -R root:root /mnt\nexport HOME=/mnt/server\n\n## Windrose Dedicated Server (Windows-Only via Wine) installieren\n## SteamCMD erst initialisieren (laedt Updates + Config – verhindert 'Missing configuration' beim ersten Run)\n./steamcmd.sh +quit\n\n## Windrose Dedicated Server installieren\n./steamcmd.sh +force_install_dir /mnt/server +login ${STEAM_USER} ${STEAM_PASS} ${STEAM_AUTH} +@sSteamCmdForcePlatformType windows +@sSteamCmdForcePlatformBitness 64 +app_update ${SRCDS_APPID} validate +quit\n\n## Steam SDK Libraries einrichten (benoetigt von Wine/SteamAPI)\necho \">>> Richte Steam SDK Libraries ein...\"\nSTEAMCMD_DIR=\"/mnt/server/steamcmd\"\n\nmkdir -p /mnt/server/.steam/sdk32\nmkdir -p /mnt/server/.steam/sdk64\n\n# 32-bit steamclient.so\nif [ -f \"${STEAMCMD_DIR}/linux32/steamclient.so\" ]; then\n    cp -v \"${STEAMCMD_DIR}/linux32/steamclient.so\" /mnt/server/.steam/sdk32/steamclient.so\n    echo \"OK SDK32 Library kopiert\"\nelse\n    LIB32=$(find \"${STEAMCMD_DIR}\" -name \"steamclient.so\" 2>/dev/null | grep -i \"32\" | head -1)\n    if [ -n \"${LIB32}\" ]; then\n        cp -v \"${LIB32}\" /mnt/server/.steam/sdk32/steamclient.so\n        echo \"OK SDK32 Library gefunden (${LIB32}) und kopiert\"\n    else\n        echo \"WARN: steamclient.so (32-bit) nicht gefunden in ${STEAMCMD_DIR}\"\n    fi\nfi\n\n# 64-bit steamclient.so\nif [ -f \"${STEAMCMD_DIR}/linux64/steamclient.so\" ]; then\n    cp -v \"${STEAMCMD_DIR}/linux64/steamclient.so\" /mnt/server/.steam/sdk64/steamclient.so\n    echo \"OK SDK64 Library kopiert\"\nelse\n    LIB64=$(find \"${STEAMCMD_DIR}\" -name \"steamclient.so\" 2>/dev/null | grep -i \"64\" | head -1)\n    if [ -n \"${LIB64}\" ]; then\n        cp -v \"${LIB64}\" /mnt/server/.steam/sdk64/steamclient.so\n        echo \"OK SDK64 Library gefunden (${LIB64}) und kopiert\"\n    else\n        echo \"WARN: steamclient.so (64-bit) nicht gefunden in ${STEAMCMD_DIR}\"\n    fi\nfi\n\n## Standard ServerDescription.json anlegen\nSERVER_JSON=/mnt/server/R5/ServerDescription.json\nmkdir -p \"$(dirname \"${SERVER_JSON}\")\"\nif [ ! -f \"${SERVER_JSON}\" ]; then\n    cat > \"${SERVER_JSON}\" << 'EOF'\n{\n  \"Version\": 1,\n  \"DeploymentId\": \"\",\n  \"ServerDescription_Persistent\": {\n    \"PersistentServerId\": \"\",\n    \"InviteCode\": \"change-me\",\n    \"IsPasswordProtected\": false,\n    \"Password\": \"\",\n    \"ServerName\": \"My Windrose Server\",\n    \"WorldIslandId\": \"\",\n    \"MaxPlayerCount\": 4,\n    \"UserSelectedRegion\": \"\",\n    \"P2pProxyAddress\": \"0.0.0.0\",\n    \"UseDirectConnection\": false,\n    \"DirectConnectionServerAddress\": \"\",\n    \"DirectConnectionServerPort\": 7777,\n    \"DirectConnectionProxyAddress\": \"0.0.0.0\"\n  }\n}\nEOF\nfi\n\necho \"-----------------------------------------\"\necho \"Installation completed...\"\necho \"-----------------------------------------\""
   },
   "startup": {
     "command": "proton run /home/container/R5/Binaries/Win64/WindroseServer-Win64-Shipping.exe -log -PORT={{SERVER_PORT}} -QUERYPORT={{QUERY_PORT}}",
@@ -72,24 +33,12 @@
     "logs": {},
     "stop": "^C"
   },
-  "ports": {
-    "game": {
-      "default": 7777,
-      "protocol": "udp",
-      "description": "Game Port"
-    },
-    "query": {
-      "default": 7778,
-      "protocol": "udp",
-      "description": "Query Port"
+  "scripts": {
+    "installation": {
+      "container": "ghcr.io/parkervcp/installers:debian",
+      "entrypoint": "bash",
+      "script": "#!/bin/bash\n\n## Windrose Dedicated Server Installer\n## Install container: ghcr.io/parkervcp/installers:debian\n\nif [[ \"${STEAM_USER}\" == \"\" ]] || [[ \"${STEAM_PASS}\" == \"\" ]]; then\n    echo \"Steam user not set, using anonymous login.\"\n    STEAM_USER=anonymous\n    STEAM_PASS=\"\"\n    STEAM_AUTH=\"\"\nfi\n\n## SteamCMD herunterladen\ncd /tmp\nmkdir -p /mnt/server/steamcmd\ncurl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz\ntar -xzvf steamcmd.tar.gz -C /mnt/server/steamcmd\nmkdir -p /mnt/server/steamapps\ncd /mnt/server/steamcmd\n\nchown -R root:root /mnt\nexport HOME=/mnt/server\n\n## Windrose Dedicated Server (Windows-Only via Wine) installieren\n## SteamCMD erst initialisieren (laedt Updates + Config – verhindert 'Missing configuration' beim ersten Run)\n./steamcmd.sh +quit\n\n## Windrose Dedicated Server installieren\n./steamcmd.sh +force_install_dir /mnt/server +login ${STEAM_USER} ${STEAM_PASS} ${STEAM_AUTH} +@sSteamCmdForcePlatformType windows +@sSteamCmdForcePlatformBitness 64 +app_update ${SRCDS_APPID} validate +quit\n\n## Steam SDK Libraries einrichten (benoetigt von Wine/SteamAPI)\necho \">>> Richte Steam SDK Libraries ein...\"\nSTEAMCMD_DIR=\"/mnt/server/steamcmd\"\n\nmkdir -p /mnt/server/.steam/sdk32\nmkdir -p /mnt/server/.steam/sdk64\n\n# 32-bit steamclient.so\nif [ -f \"${STEAMCMD_DIR}/linux32/steamclient.so\" ]; then\n    cp -v \"${STEAMCMD_DIR}/linux32/steamclient.so\" /mnt/server/.steam/sdk32/steamclient.so\n    echo \"OK SDK32 Library kopiert\"\nelse\n    LIB32=$(find \"${STEAMCMD_DIR}\" -name \"steamclient.so\" 2>/dev/null | grep -i \"32\" | head -1)\n    if [ -n \"${LIB32}\" ]; then\n        cp -v \"${LIB32}\" /mnt/server/.steam/sdk32/steamclient.so\n        echo \"OK SDK32 Library gefunden (${LIB32}) und kopiert\"\n    else\n        echo \"WARN: steamclient.so (32-bit) nicht gefunden in ${STEAMCMD_DIR}\"\n    fi\nfi\n\n# 64-bit steamclient.so\nif [ -f \"${STEAMCMD_DIR}/linux64/steamclient.so\" ]; then\n    cp -v \"${STEAMCMD_DIR}/linux64/steamclient.so\" /mnt/server/.steam/sdk64/steamclient.so\n    echo \"OK SDK64 Library kopiert\"\nelse\n    LIB64=$(find \"${STEAMCMD_DIR}\" -name \"steamclient.so\" 2>/dev/null | grep -i \"64\" | head -1)\n    if [ -n \"${LIB64}\" ]; then\n        cp -v \"${LIB64}\" /mnt/server/.steam/sdk64/steamclient.so\n        echo \"OK SDK64 Library gefunden (${LIB64}) und kopiert\"\n    else\n        echo \"WARN: steamclient.so (64-bit) nicht gefunden in ${STEAMCMD_DIR}\"\n    fi\nfi\n\n## Standard ServerDescription.json anlegen\nSERVER_JSON=/mnt/server/R5/ServerDescription.json\nmkdir -p \"$(dirname \"${SERVER_JSON}\")\"\nif [ ! -f \"${SERVER_JSON}\" ]; then\n    cat > \"${SERVER_JSON}\" << 'EOF'\n{\n  \"Version\": 1,\n  \"DeploymentId\": \"\",\n  \"ServerDescription_Persistent\": {\n    \"PersistentServerId\": \"\",\n    \"InviteCode\": \"change-me\",\n    \"IsPasswordProtected\": false,\n    \"Password\": \"\",\n    \"ServerName\": \"My Windrose Server\",\n    \"WorldIslandId\": \"\",\n    \"MaxPlayerCount\": 4,\n    \"UserSelectedRegion\": \"\",\n    \"P2pProxyAddress\": \"0.0.0.0\",\n    \"UseDirectConnection\": false,\n    \"DirectConnectionServerAddress\": \"\",\n    \"DirectConnectionServerPort\": 7777,\n    \"DirectConnectionProxyAddress\": \"0.0.0.0\"\n  }\n}\nEOF\nfi\n\necho \"-----------------------------------------\"\necho \"Installation completed...\"\necho \"-----------------------------------------\""
     }
-  },
-  "requirements": {
-    "ram_min_mb": 8192,
-    "ram_recommended_mb": 12288,
-    "cpu_cores_min": 2,
-    "disk_min_gb": 35,
-    "disk_recommended_gb": 45
   },
   "variables": [
     {
@@ -163,18 +112,8 @@
       "field_type": "password"
     },
     {
-      "name": "Maximale Spieler",
-      "description": "Maximale Anzahl gleichzeitiger Spieler. Empfohlen: max. 4 für stabile Performance.",
-      "env_variable": "MAX_PLAYERS",
-      "default_value": "4",
-      "user_viewable": true,
-      "user_editable": true,
-      "rules": "required|integer|min:1|max:8",
-      "field_type": "text"
-    },
-    {
       "name": "Server-Region",
-      "description": "Bevorzugte Region für den Server (EU = Europa, SEA = Südostasien, CIS = GUS-Staaten). Leer lassen für automatische Auswahl.",
+      "description": "Bevorzugte Region für den Server. Leer lassen für automatische Auswahl.",
       "env_variable": "USER_SELECTED_REGION",
       "default_value": "",
       "user_viewable": true,
@@ -199,6 +138,16 @@
           "label": "GUS-Staaten (CIS)"
         }
       ]
+    },
+    {
+      "name": "Maximale Spieler",
+      "description": "Maximale Anzahl gleichzeitiger Spieler. Empfohlen: max. 4 für stabile Performance.",
+      "env_variable": "MAX_PLAYERS",
+      "default_value": "4",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:1|max:8",
+      "field_type": "text"
     },
     {
       "name": "Server-Port",
@@ -231,19 +180,18 @@
       "field_type": "text"
     }
   ],
-  "assets": {
-    "icon_url": "https://cdn.akamai.steamstatic.com/steam/apps/3041230/header.jpg",
-    "banner_url": "https://cdn.akamai.steamstatic.com/steam/apps/3041230/library_hero.jpg",
-    "screenshots": []
+  "ports": {
+    "game": {
+      "default": 7777,
+      "protocol": "udp",
+      "description": "Game Port"
+    },
+    "query": {
+      "default": 7778,
+      "protocol": "udp",
+      "description": "Query Port"
+    }
   },
-  "file_denylist": [
-    ".env",
-    "start.sh",
-    "firebot.lock",
-    "firebot.pid",
-    "*.log"
-  ],
-  "changelog": "Initial release - Windrose Dedicated Server via Wine on Linux",
   "templates": [
     {
       "name": "small",
@@ -252,7 +200,8 @@
       "icon": "fa-ship",
       "variables": {
         "MAX_PLAYERS": "4"
-      }
+      },
+      "config_overrides": {}
     },
     {
       "name": "medium",
@@ -261,40 +210,16 @@
       "icon": "fa-anchor",
       "variables": {
         "MAX_PLAYERS": "8"
-      }
+      },
+      "config_overrides": {}
     }
   ],
   "platform": "proton",
-  "environment": [
-    {
-      "name": "XALIA_DISABLE",
-      "description": "Xalia (Accessibility-UI) deaktivieren – nicht nötig für Headless-Server",
-      "env_variable": "XALIA_DISABLE",
-      "default_value": "1",
-      "user_viewable": false,
-      "user_editable": false,
-      "rules": "required|in:1",
-      "field_type": "text"
-    },
-    {
-      "name": "DISPLAY",
-      "description": "Virtueller Display für Wine/Proton (headless – leer lassen für headless)",
-      "env_variable": "DISPLAY",
-      "default_value": "",
-      "user_viewable": false,
-      "user_editable": false,
-      "rules": "nullable|string",
-      "field_type": "text"
-    },
-    {
-      "name": "PROTON_USE_XALIA",
-      "description": "Xalia komplett deaktivieren (verhindert 'Video driver not supported' Crash)",
-      "env_variable": "PROTON_USE_XALIA",
-      "default_value": "0",
-      "user_viewable": false,
-      "user_editable": false,
-      "rules": "required|in:0",
-      "field_type": "text"
-    }
-  ]
+  "name": "Windrose",
+  "slug": "windrose",
+  "description": "Windrose. A Priate Advanture / Suvival COOP Game",
+  "category": "survival",
+  "runtime_type": "docker_steam",
+  "source_type": "native",
+  "version": "1.0.0"
 }
