@@ -148,6 +148,14 @@
                                             title="Port kopieren">
                                         <i class="fas fa-copy"></i>
                                     </button>
+                                <% } else if (server.port_query_expected) { %>
+                                    <span class="text-warning">Nicht allokiert</span>
+                                    <small class="text-muted d-block">
+                                        <i class="fas fa-triangle-exclamation me-1"></i>
+                                        Das Spiel erwartet <code><%= server.port_query_expected %></code>/UDP,
+                                        der Port ist aber nicht angelegt – die Statusabfrage bleibt deshalb leer.
+                                        Über „Ports bearbeiten“ hinzufügen und den Server neu starten.
+                                    </small>
                                 <% } else { %>
                                     <span class="text-muted">Nicht konfiguriert</span>
                                     <small class="text-muted d-block">

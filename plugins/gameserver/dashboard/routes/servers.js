@@ -1452,14 +1452,29 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // Ports zum Server-Objekt hinzufügen (für einfacheren Zugriff in View)
         server.ip_address = server.rootserver_ip || 'N/A';
         server.port_game = ports.game?.external || ports.game?.internal || ports.main?.external || null;
-        // Query-Port: erst explizite "query"-Sektion, dann port_var aus Addon-Konfiguration auflösen
-        // "game_plus_1" ist eine spezielle Convention: Query-Port = Game-Port + 1 (z.B. Valheim 27030 → 27031)
+        // Query-Port: nur zeigen, was tatsächlich allokiert ist.
+        //
+        // Der Daemon mappt ausschließlich Ports aus der ports-Spalte
+        // (docker/container.go → BuildPortMap). Ein aus dem Addon errechneter Wert
+        // ("game_plus_1" = Game-Port + 1) beschreibt also nur, was das Spiel
+        // *erwartet* – nicht, was von außen erreichbar ist. Früher stand er
+        // trotzdem als fertiger Port da, und die Abfrage lief ins Leere, während
+        // die Oberfläche alles in Ordnung meldete.
         const queryPortVar = gameData?.query?.port_var || null;
-        if (queryPortVar === 'game_plus_1' && server.port_game) {
-            server.port_query = server.port_game + 1;
-        } else {
-            server.port_query = ports.query?.external || ports.query?.internal ||
-                (queryPortVar && ports[queryPortVar] ? (ports[queryPortVar].external || ports[queryPortVar].internal) : null) || null;
+        server.port_query = ports.query?.external || ports.query?.internal ||
+            (queryPortVar && ports[queryPortVar]
+                ? (ports[queryPortVar].external || ports[queryPortVar].internal)
+                : null) || null;
+
+        // Erwartet das Addon einen Port, der nicht allokiert ist, wird das benannt
+        // statt verschwiegen – inklusive der Nummer, die angelegt werden muss.
+        server.port_query_expected = null;
+        if (!server.port_query && queryPortVar) {
+            const plus = /^(.+)_plus_(\d+)$/.exec(queryPortVar);
+            if (plus && ports[plus[1]]) {
+                const base = ports[plus[1]].external || ports[plus[1]].internal;
+                if (base) server.port_query_expected = base + parseInt(plus[2], 10);
+            }
         }
         server.port_rcon = ports.rcon?.external || ports.rcon?.internal || null;
         server.ports_parsed = ports; // Original-Struktur für erweiterte Ansicht
