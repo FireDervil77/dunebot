@@ -367,7 +367,16 @@ class StatusService {
         if (!rcon.available) return { ...untouched, error: rcon.reason };
 
         const ipmServer = ServiceManager.get('ipmServer');
-        if (!ipmServer || !server.daemon_id) {
+        if (!ipmServer) {
+            return { ...untouched, error: 'Kein IPM-Server verfügbar' };
+        }
+
+        // Die daemon_id hängt an rootserver, nicht an gameservers – wer den Server
+        // ohne diesen JOIN lädt, hätte hier sonst stillschweigend kein RCON und
+        // würde einen guten Snapshot mit "keine Quelle" überschreiben. Deshalb holt
+        // der Service sie notfalls selbst, statt sich auf den Aufrufer zu verlassen.
+        const daemonId = server.daemon_id || await StatusService._resolveDaemonId(server.id);
+        if (!daemonId) {
             return { ...untouched, error: 'Kein Daemon für diesen Server verbunden' };
         }
 
@@ -378,7 +387,7 @@ class StatusService {
         try {
             // sendCommand wirft bei success:false – ohne dieses catch verschwände
             // die Daemon-Meldung hinter einem generischen Fehler.
-            result = await ipmServer.sendCommand(server.daemon_id, 'gameserver.rcon_status', {
+            result = await ipmServer.sendCommand(daemonId, 'gameserver.rcon_status', {
                 guild_id:      String(server.guild_id),
                 server_id:     String(server.id),
                 rcon_host:     server.bind_ip || server.rootserver_ip || '127.0.0.1',
@@ -408,6 +417,30 @@ class StatusService {
             raw:       result?.raw ?? null,
             error:     null,
         };
+    }
+
+    /**
+     * Holt die daemon_id eines Servers nach, wenn der Aufrufer sie nicht mitbringt.
+     *
+     * @private
+     * @param {number|string} serverId
+     * @returns {Promise<string|null>}
+     */
+    static async _resolveDaemonId(serverId) {
+        const dbService = ServiceManager.get('dbService');
+        const Logger    = ServiceManager.get('Logger');
+        try {
+            const [row] = await dbService.query(`
+                SELECT r.daemon_id
+                FROM gameservers gs
+                LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+                WHERE gs.id = ?
+            `, [serverId]);
+            return row?.daemon_id || null;
+        } catch (err) {
+            Logger?.warn?.(`[StatusService] daemon_id nicht ermittelbar (Server ${serverId}): ${err.message}`);
+            return null;
+        }
     }
 
     /**

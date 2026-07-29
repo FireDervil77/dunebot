@@ -1293,7 +1293,8 @@ router.get('/:serverId/query', requirePermission('GAMESERVER.VIEW'), async (req,
             SELECT
                 gs.id, gs.guild_id, gs.status, gs.ports, gs.env_variables, gs.bind_ip,
                 r.host AS rootserver_ip,
-                am.game_data
+                r.daemon_id,
+                COALESCE(am.game_data, gs.frozen_game_data) AS game_data
             FROM gameservers gs
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
