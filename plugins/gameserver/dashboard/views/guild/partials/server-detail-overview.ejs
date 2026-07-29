@@ -186,7 +186,11 @@
                         </tr>
                         <%
                             // Dynamisch alle zusätzlichen Ports anzeigen (beacon, etc.)
+                            // Der Eintrag, der oben schon als Query-Port steht, gehört
+                            // dazu – er heißt je nach Spiel anders als "query"
+                            // (bei Valheim "game_plus_1") und erschiene sonst doppelt.
                             const knownPorts = ['game', 'query', 'rcon', 'main'];
+                            if (server.port_query_key) knownPorts.push(server.port_query_key);
                             const extraPortEntries = server.ports_parsed
                                 ? Object.entries(server.ports_parsed).filter(([k]) => !knownPorts.includes(k))
                                 : [];

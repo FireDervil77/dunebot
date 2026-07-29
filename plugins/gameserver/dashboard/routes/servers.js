@@ -1461,10 +1461,16 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // trotzdem als fertiger Port da, und die Abfrage lief ins Leere, während
         // die Oberfläche alles in Ordnung meldete.
         const queryPortVar = gameData?.query?.port_var || null;
-        server.port_query = ports.query?.external || ports.query?.internal ||
-            (queryPortVar && ports[queryPortVar]
-                ? (ports[queryPortVar].external || ports[queryPortVar].internal)
-                : null) || null;
+        server.port_query = ports.query?.external || ports.query?.internal || null;
+        // Merken, aus welchem Eintrag der Query-Port stammt: Die Ansicht listet
+        // darunter alle übrigen Ports auf und würde ihn sonst ein zweites Mal
+        // zeigen – bei Valheim als "Game_plus_1-Port" neben "Query-Port".
+        server.port_query_key = server.port_query ? 'query' : null;
+
+        if (!server.port_query && queryPortVar && ports[queryPortVar]) {
+            server.port_query = ports[queryPortVar].external || ports[queryPortVar].internal || null;
+            if (server.port_query) server.port_query_key = queryPortVar;
+        }
 
         // Erwartet das Addon einen Port, der nicht allokiert ist, wird das benannt
         // statt verschwiegen – inklusive der Nummer, die angelegt werden muss.
