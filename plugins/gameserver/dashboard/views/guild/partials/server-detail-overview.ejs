@@ -444,39 +444,25 @@ async function savePorts() {
                         <i class="fas fa-spinner fa-spin me-2"></i>Lade Live-Status…
                     </div>
                     <div id="live-query-content" style="display:none">
+                        <%
+                            // Kacheln kommen aus dem Addon (game_data.status.display.fields),
+                            // mit den Standardvorgaben als Rückfall. Vorher war jede Kachel
+                            // fest verdrahtet und hatte ihre eigene Ein-/Ausblend-Logik im
+                            // JavaScript – deshalb zeigte Palworld dauerhaft "Map: –" für
+                            // einen Wert, den es dort prinzipiell nicht gibt.
+                            const statusFields = server.status_display?.fields || [];
+                        %>
                         <div class="row g-3 mb-3">
                             <div class="col-6 col-md-3 text-center">
                                 <div class="fw-bold text-primary fs-4" id="qry-players">–</div>
                                 <div class="small text-muted">Spieler</div>
                             </div>
-                            <div class="col-6 col-md-3 text-center">
-                                <div class="fw-bold fs-4" id="qry-map">–</div>
-                                <div class="small text-muted">Map</div>
-                            </div>
-                            <div class="col-6 col-md-3 text-center">
-                                <div class="fw-bold fs-4" id="qry-ping">–</div>
-                                <div class="small text-muted">Ping (ms)</div>
-                            </div>
-                            <div class="col-6 col-md-3 text-center">
-                                <div id="qry-password" class="fw-bold fs-4">–</div>
-                                <div class="small text-muted">Passwort</div>
-                            </div>
-                            <div class="col-6 col-md-3 text-center" id="qry-version-col" style="display:none">
-                                <div class="fw-bold fs-4" id="qry-version">–</div>
-                                <div class="small text-muted">Spielversion</div>
-                            </div>
-                            <div class="col-6 col-md-3 text-center" id="qry-bots-col" style="display:none">
-                                <div class="fw-bold fs-4" id="qry-bots">–</div>
-                                <div class="small text-muted">Bots</div>
-                            </div>
-                            <div class="col-6 col-md-3 text-center" id="qry-vac-col" style="display:none">
-                                <div class="fw-bold fs-4" id="qry-vac">–</div>
-                                <div class="small text-muted">VAC</div>
-                            </div>
-                            <div class="col-6 col-md-3 text-center" id="qry-connect-col" style="display:none">
-                                <div class="fw-bold fs-6" id="qry-connect">–</div>
-                                <div class="small text-muted">Verbinden</div>
-                            </div>
+                            <% statusFields.forEach(field => { %>
+                                <div class="col-6 col-md-3 text-center" id="qry-field-<%= field.key %>" style="display:none">
+                                    <div class="fw-bold <%= field.format === 'code' ? 'fs-6' : 'fs-4' %>" data-field-value></div>
+                                    <div class="small text-muted"><%= field.label %></div>
+                                </div>
+                            <% }); %>
                         </div>
                         <!-- Spiel-spezifische Extras (Rust wipe, PVE etc.) -->
                         <div id="qry-extras" class="mb-3" style="display:none">
@@ -514,6 +500,80 @@ async function savePorts() {
                 const QUERY_URL = '/guild/<%= server.guild_id %>/plugins/gameserver/servers/<%= server.id %>/query';
                 // Spaltendefinition aus dem Addon – identisch zu der im Tabellenkopf
                 const PLAYER_COLUMNS = <%- JSON.stringify(server.status_display?.columns || []) %>;
+                // Kacheldefinition aus demselben Block
+                const STATUS_FIELDS  = <%- JSON.stringify(server.status_display?.fields || []) %>;
+
+                /**
+                 * Wert über einen Punktpfad aus dem Abfrageergebnis holen.
+                 * `source` darf eine Liste sein – der erste belegte Pfad gewinnt.
+                 * Die Spielversion steht je nach Spiel in extra.gameVersion oder
+                 * direkt in version.
+                 */
+                function fieldValue(data, source) {
+                    for (const path of [].concat(source || [])) {
+                        const value = String(path).split('.')
+                            .reduce((acc, key) => (acc == null ? acc : acc[key]), data);
+                        if (value != null && value !== '') return value;
+                    }
+                    return null;
+                }
+
+                /**
+                 * Füllt die Statistik-Kacheln aus der Addon-Beschreibung.
+                 *
+                 * Eine Kachel ohne Wert wird ausgeblendet statt mit "–" gefüllt.
+                 * Vorher war jede Kachel fest verdrahtet: Palworld zeigte dauerhaft
+                 * "Map: –" und ein grünes offenes Schloss bei "Passwort" – letzteres
+                 * behauptete sogar, der Server sei ohne Passwort, obwohl es dort
+                 * schlicht keine Abfrage gibt, die das beantworten könnte.
+                 */
+                function renderStatusFields(data) {
+                    STATUS_FIELDS.forEach(field => {
+                        const col = document.getElementById('qry-field-' + field.key);
+                        if (!col) return;
+                        const target = col.querySelector('[data-field-value]');
+
+                        let value = fieldValue(data, field.source || field.key);
+                        let html  = null;
+
+                        switch (field.format) {
+                            case 'ms':
+                                if (value != null && value !== '') html = value + ' ms';
+                                break;
+                            case 'lock':
+                                // Nur zeigen, wenn die Quelle die Frage wirklich beantwortet hat
+                                if (typeof value === 'boolean') {
+                                    html = value
+                                        ? '<i class="fas fa-lock text-warning"></i>'
+                                        : '<i class="fas fa-lock-open text-success"></i>';
+                                }
+                                break;
+                            case 'onoff':
+                                if (value != null) {
+                                    html = value
+                                        ? '<i class="fas fa-shield-alt text-success"></i> An'
+                                        : '<i class="fas fa-shield-alt text-muted"></i> Aus';
+                                }
+                                break;
+                            case 'code':
+                                if (value) html = '<code class="user-select-all">' + value + '</code>';
+                                break;
+                            default:
+                                if (value != null && value !== '') html = String(value);
+                        }
+
+                        if (html !== null && field.hide_when === 'zero' && Number(value) === 0) {
+                            html = null;
+                        }
+
+                        if (html === null) {
+                            col.style.display = 'none';
+                        } else {
+                            target.innerHTML = html;
+                            col.style.display = '';
+                        }
+                    });
+                }
 
                 /**
                  * Rendert die Spielerliste anhand der Addon-Spalten.
@@ -605,53 +665,7 @@ async function savePorts() {
                             barEl.textContent = pct + '%';
                         }
 
-                        document.getElementById('qry-map').textContent  = data.map  || '–';
-                        document.getElementById('qry-ping').textContent = data.ping != null ? data.ping + ' ms' : '–';
-                        document.getElementById('qry-password').innerHTML = data.password
-                            ? '<i class="fas fa-lock text-warning"></i>' : '<i class="fas fa-lock-open text-success"></i>';
-
-                        // Version (aus extra oder tags oder raw)
-                        const gameVersion = data.extra?.gameVersion
-                            || data.version
-                            || ((data.tags || []).find(t => typeof t === 'string' && t.startsWith('g=')) || '').slice(2)
-                            || null;
-                        const verCol = document.getElementById('qry-version-col');
-                        if (gameVersion) {
-                            document.getElementById('qry-version').textContent = gameVersion;
-                            verCol.style.display = '';
-                        } else {
-                            verCol.style.display = 'none';
-                        }
-
-                        // Bots
-                        const botsCol = document.getElementById('qry-bots-col');
-                        if (data.bots > 0) {
-                            document.getElementById('qry-bots').textContent = data.bots;
-                            botsCol.style.display = '';
-                        } else {
-                            botsCol.style.display = 'none';
-                        }
-
-                        // VAC (CS2/Source)
-                        const vacCol = document.getElementById('qry-vac-col');
-                        if (data.extra?.vac != null) {
-                            document.getElementById('qry-vac').innerHTML = data.extra.vac
-                                ? '<i class="fas fa-shield-alt text-success"></i> An'
-                                : '<i class="fas fa-shield-alt text-muted"></i> Aus';
-                            vacCol.style.display = '';
-                        } else {
-                            vacCol.style.display = 'none';
-                        }
-
-                        // Connect-Adresse
-                        const connectCol = document.getElementById('qry-connect-col');
-                        if (data.connect) {
-                            const connectEl = document.getElementById('qry-connect');
-                            connectEl.innerHTML = '<code class="user-select-all">' + data.connect + '</code>';
-                            connectCol.style.display = '';
-                        } else {
-                            connectCol.style.display = 'none';
-                        }
+                        renderStatusFields(data);
 
                         // Spiel-spezifische Extras (Badges)
                         const extrasDiv = document.getElementById('qry-extras');

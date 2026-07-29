@@ -67,7 +67,9 @@ const BUILTIN = {
                 { key: 'name',        label: 'Spieler',   source: 'player.name' },
                 { key: 'level',       label: 'Level',     source: 'player.level',       align: 'end' },
                 { key: 'ping',        label: 'Ping',      source: 'player.ping',        format: 'ms', align: 'end' },
-                { key: 'platform_id', label: 'Plattform', source: 'player.platform_id', format: 'platform' },
+                // Rechtsbündig wie Level und Ping – sonst klebt die Plattform
+                // direkt an der Ping-Zahl statt am Zeilenrand zu stehen.
+                { key: 'platform_id', label: 'Plattform', source: 'player.platform_id', format: 'platform', align: 'end' },
             ],
         },
     },
@@ -151,12 +153,26 @@ const BUILTIN_RCON = {
     },
 };
 
-/** Standard-Spalten der Spielerliste, wenn das Addon nichts anderes sagt */
+/**
+ * Standard-Kacheln und -Spalten, wenn das Addon nichts anderes sagt.
+ *
+ * `fields` beschreibt die Kacheln über dem Spielerliste. `source` ist ein Pfad
+ * in das Abfrageergebnis (Punktschreibweise). Eine Kachel ohne Wert wird
+ * ausgeblendet statt mit "–" gefüllt: Bei Palworld gibt es weder Map noch Ping,
+ * weil die Query dort tot ist – eine leere Kachel behauptet, der Wert fehle
+ * gerade, dabei kann er nie kommen.
+ */
 const DEFAULT_DISPLAY = {
     fields: [
-        { key: 'map',     label: 'Map' },
-        { key: 'ping',    label: 'Ping',     format: 'ms' },
-        { key: 'version', label: 'Version' },
+        { key: 'map',      label: 'Map',          source: 'map' },
+        { key: 'ping',     label: 'Ping',         source: 'ping',       format: 'ms' },
+        { key: 'password', label: 'Passwort',     source: 'password',   format: 'lock' },
+        // Je nach Spiel liefert GameDig die Version im extra-Block oder direkt;
+        // der erste belegte Pfad gewinnt.
+        { key: 'version',  label: 'Spielversion', source: ['extra.gameVersion', 'version'] },
+        { key: 'bots',     label: 'Bots',         source: 'bots',       hide_when: 'zero' },
+        { key: 'vac',      label: 'VAC',          source: 'extra.vac',  format: 'onoff' },
+        { key: 'connect',  label: 'Verbinden',    source: 'connect',    format: 'code' },
     ],
     columns: [
         { key: 'name',  label: 'Spielername', source: 'player.name' },
