@@ -85,12 +85,41 @@ const BUILTIN = {
  * Die Named Groups folgen der Go-Schreibweise `(?P<name>…)`.
  */
 const BUILTIN_RCON = {
-    // Palworld: "ShowPlayers" liefert CSV mit Kopfzeile – name,playeruid,steamid
+    // Palworld: über die eigene Admin-REST-API statt über RCON.
+    //
+    // RCON "ShowPlayers" funktioniert auch und liefert CSV (name,playeruid,steamid),
+    // aber die REST-API gibt zusätzlich Level, Ping und die Plattform – der
+    // Präfix von userId verrät sie (steam_… bzw. gdk_… für Xbox). Das ist die
+    // reichhaltigste Spielerliste aller angebundenen Spiele.
+    //
+    // Port 8212 steht fest und wird bewusst nicht allokiert: Der Daemon erreicht
+    // die API über die Container-IP, es muss nichts nach außen offen sein und
+    // mehrere Palworld-Server auf einem Node kollidieren nicht.
+    //
+    // Voraussetzung ist RESTAPIEnabled=True in der PalWorldSettings.ini. Fehlt es,
+    // antwortet der Server mit 404 und der Treiber sagt genau das.
+    //
+    // Zurück auf RCON: protocol/port/command/format/json_path/fields durch
+    //   { command: 'ShowPlayers', format: 'regex', skip_lines: 1,
+    //     row_regex: '^(?P<name>[^,]*),(?P<uid>[^,]*),(?P<steamid>[^,]*)$' }
+    // ersetzen – die Verbindungsangaben aus config.rcon greifen dann wieder.
     palworld: {
-        command:    'ShowPlayers',
-        format:     'regex',
-        skip_lines: 1,
-        row_regex:  '^(?P<name>[^,]*),(?P<uid>[^,]*),(?P<steamid>[^,]*)$',
+        protocol:     'palworld_rest',
+        port:         8212,
+        password_var: 'ADMIN_PASSWORD',
+        command:      '/v1/api/players',
+        format:       'json',
+        json_path:    '$.players[*]',
+        // Feldabbildung nach Abschnitt 15 des Konzepts. location_x/y und vor allem
+        // iP fehlen hier bewusst – die IP-Adresse des Spielers ist ein
+        // personenbezogenes Datum und wird schon beim Parsen verworfen.
+        fields: {
+            name:        'name',
+            uid:         'playerId',
+            platform_id: 'userId',
+            ping:        'ping',
+            level:       'level',
+        },
     },
 
     // ARK: "ListPlayers" liefert "0. Spielername, 76561198…"

@@ -25,8 +25,14 @@ const { resolveStatusConfig } = require('./StatusSchema');
 /** ENV-Variablen, die als Slot-Anzahl in Frage kommen (Reihenfolge = Priorität) */
 const MAX_PLAYER_VARS = ['MAX_PLAYERS', 'MAXPLAYERS', 'SERVER_MAXPLAYERS', 'SLOTS'];
 
-/** Vom Daemon aktuell unterstützte RCON-Protokolle */
-const SUPPORTED_RCON_PROTOCOLS = ['srcds'];
+/**
+ * Vom Daemon unterstützte Protokolle für die Fernabfrage.
+ *
+ * "palworld_rest" ist kein RCON im engeren Sinn, sondern Palworlds eigene
+ * Admin-API über HTTP. Für die Aufrufer verhält sie sich gleich – Befehl rein,
+ * Text raus –, deshalb liegt sie im selben Treiber-Register wie srcds.
+ */
+const SUPPORTED_RCON_PROTOCOLS = ['srcds', 'palworld_rest'];
 
 /**
  * Felder, die eine normalisierte Spielerangabe tragen darf.
@@ -99,11 +105,16 @@ class StatusService {
      * @param {object} opts.gameData - geparste game_data (Addon)
      * @param {object} opts.ports    - geparste ports-Spalte
      * @param {object} opts.envVars  - geparste env_variables-Spalte
+     * @param {object} [opts.cfg]    - Verbindungsblock; ohne Angabe config.rcon.
+     *                                 Der Status-Abruf reicht hier den aufgelösten
+     *                                 status.rcon-Block herein, weil er ein anderes
+     *                                 Protokoll fahren kann als die Konsole – bei
+     *                                 Palworld die REST-API statt srcds.
      * @returns {{available: boolean, configured: boolean, protocol: string|null,
      *            port: number|null, hasPassword: boolean, reason: string|null}}
      */
-    static resolveRcon({ gameData, ports = {}, envVars = {} }) {
-        const cfg = gameData?.config?.rcon;
+    static resolveRcon({ gameData, ports = {}, envVars = {}, cfg: explicitCfg = null }) {
+        const cfg = explicitCfg || gameData?.config?.rcon;
         const result = {
             available:   false,
             configured:  !!cfg,
@@ -118,8 +129,18 @@ class StatusService {
             return result;
         }
 
+        // Fester Port schlägt die Variablen-Auflösung. Palworlds REST-API lauscht
+        // containerintern auf 8212 und wird bewusst nicht allokiert – es gäbe
+        // also keinen ports-Eintrag und keine ENV-Variable, auf die man zeigen könnte.
+        const literalPort = Number(cfg.port);
+        if (Number.isFinite(literalPort) && literalPort > 0) {
+            result.port = literalPort;
+        }
+
         const portVar = cfg.port_var || '';
-        if (portVar === portVar.toLowerCase()) {
+        if (result.port) {
+            // bereits gesetzt
+        } else if (portVar === portVar.toLowerCase()) {
             const entry = ports[portVar];
             result.port = entry?.external ?? entry?.internal ?? null;
             // Manche Spiele fahren RCON über den Game-Port
@@ -363,7 +384,10 @@ class StatusService {
         const spec = statusCfg?.rcon;
         if (!spec?.command) return untouched;
 
-        const rcon = StatusService.resolveRcon({ gameData, ports, envVars });
+        // Verbindung aus demselben Block wie der Befehl auflösen: Der Status-Kanal
+        // kann ein anderes Protokoll fahren als die Konsole. Bei Palworld holt die
+        // Konsole weiter über srcds, die Spielerliste aber über die REST-API.
+        const rcon = StatusService.resolveRcon({ gameData, ports, envVars, cfg: spec });
         if (!rcon.available) return { ...untouched, error: rcon.reason };
 
         const ipmServer = ServiceManager.get('ipmServer');
@@ -380,7 +404,7 @@ class StatusService {
             return { ...untouched, error: 'Kein Daemon für diesen Server verbunden' };
         }
 
-        const password = String(envVars[gameData?.config?.rcon?.password_var] || '');
+        const password = String(envVars[spec.password_var] || '');
         const Logger   = ServiceManager.get('Logger');
 
         let result;
