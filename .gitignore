@@ -72,10 +72,15 @@ plugins/clan-manager/
 
 # Daemon Binaries (separat laden)
 apps/dashboard/downloads/daemon/binaries/
-downloads/binarys/
 *.exe
 firebot-daemon
 firebot-daemon-*
+
+# Spiel-Client- & Launcher-Binaries (1,7+ GB — dürfen NIE ins Repo)
+apps/dashboard/downloads/client/
+apps/dashboard/downloads/client-alpha/
+apps/dashboard/downloads/client-beta/
+apps/dashboard/downloads/launcher/
 
 #docs and docs folder
 docs/

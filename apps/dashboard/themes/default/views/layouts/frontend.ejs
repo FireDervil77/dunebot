@@ -16,6 +16,8 @@
     
     <!-- Meta & SEO -->
     <%- includePartial('frontend/header', locals) %>
+    <%- locals.csrfMetaTag || '' %>
+    <script src="/themes/default/assets/js/csrf-helper.js"></script>
     
     <!-- Stylesheets (Fonts, Icons, Vendor CSS, Theme CSS) -->
     <%- includePartial('frontend/stylesheets', locals) %>

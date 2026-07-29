@@ -12,9 +12,10 @@
     <meta name="title" content="<%= tr('DASHBOARD.BOTNAME') %> - <%= tr('DASHBOARD_COMMON.ADMIN_AREA') %>" />
 <% } %>
 <meta name="author" content="FireDervil" />
+<%- locals.csrfMetaTag || '' %>
+<script src="/themes/default/assets/js/csrf-helper.js"></script>
 <meta name="description" content="<%= tr('DASHBOARD_COMMON.DESCRIPTION_META') %>"/>
 <meta name="keywords" content="TODO:KEYWORDS"/>
-<link rel="canonical" href="{{ .Permalink }}" />
 
 <!-- Google Font: Source Sans Pro -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">

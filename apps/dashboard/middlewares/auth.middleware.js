@@ -134,7 +134,7 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
         if (!hasAccess) {
             Logger.warn(`⚠️ User ${req.session.user.info.id} hat KEINE ausreichenden Rechte für Guild ${guildId}`);
             Logger.warn(`   - isAdmin: ${isAdmin}, isManager: ${isManager}, isOwner: ${isOwner}`);
-            Logger.warn(`   - isBotOwner: ${isBotOwner}, hasCustomAccess: ${hasCustomAccess}`);
+            Logger.warn(`   - isBotOwner: ${isBotOwner}`);
             Logger.warn(`   - hasGuildUserAccess: ${hasGuildUserAccess}`);
             return res.status(403).render("error", {
                 message: "Du benötigst Administrator-Rechte, um diesen Server zu verwalten",

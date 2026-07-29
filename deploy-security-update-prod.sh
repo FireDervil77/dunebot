@@ -7,6 +7,9 @@
 
 set -e
 
+# Configs immer aus dem Repo laden, in dem dieses Skript liegt
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "🔒 Security Update: Apache .env Protection (PRODUCTION)"
 echo "======================================================="
 echo ""
@@ -28,7 +31,7 @@ echo ""
 
 # Neue Config kopieren
 echo "📋 Kopiere neue Apache-Config..."
-cp /home/firedervil/dunebot_dev/apache-security-update-prod.conf /etc/apache2/sites-available/firenetworks-dashboard.conf
+cp "$SCRIPT_DIR/apache-security-update-prod.conf" /etc/apache2/sites-available/firenetworks-dashboard.conf
 echo "✅ Config kopiert"
 echo ""
 

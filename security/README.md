@@ -1,5 +1,14 @@
 # FireBot Security - Fail2Ban Integration
 
+> ⚠️ **Architektur-Update (2026-07):** Die drei parallelen IP-Block-Mechanismen
+> werden konsolidiert — siehe **[KONSOLIDIERUNG-RUNBOOK.md](KONSOLIDIERUNG-RUNBOOK.md)**.
+> Kurzfassung: Es bleiben Express-Blocker (App-Ebene) + fail2ban-Jails
+> `dunebot-exploits`/`dunebot-ddos` (Netzwerk-Ebene). Das `dunebot-db`-Jail,
+> der DB-Reader-Cron und `sync-blocked-ips-to-firewall.js` werden stillgelegt.
+> Entsperren geht jetzt zentral: `sudo "$(which node)" manage-blocked-ips.js whitelist <ip> "Grund"`
+> (`"$(which node)"` nötig, weil Node per nvm installiert ist und sudo ihn sonst nicht findet).
+> Die untenstehende Doku zu DB-Integration/Firewall-Sync ist damit historisch.
+
 Dieses Verzeichnis enthält alle Fail2Ban-Konfigurationsdateien und Setup-Scripts für FireBot.
 
 ## 📁 Dateien

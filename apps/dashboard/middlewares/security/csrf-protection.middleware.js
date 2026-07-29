@@ -61,38 +61,86 @@ const csrfMiddleware = (req, res, next) => {
 };
 
 /**
- * CSRF-Validierung für POST/PUT/DELETE/PATCH Requests
+ * Rollout-Schalter für die GLOBALE CSRF-Verifikation:
+ * CSRF_ENFORCE=true  → ungültige Tokens werden geblockt (403)
+ * sonst              → Report-Only: nur Logging, Request läuft weiter
+ * (Per-Route eingesetztes csrfProtection blockt IMMER, unabhängig vom Flag.)
+ */
+const CSRF_ENFORCE = process.env.CSRF_ENFORCE === 'true';
+
+/**
+ * Prüft ob dieser Request von der CSRF-Verifikation ausgenommen ist
+ */
+const isCsrfExempt = (req) => {
+    // API-Routes mit Token-Auth (haben eigene Security)
+    if (req.path.startsWith('/api/') && req.headers.authorization) return true;
+    // Webhooks (haben eigene Signature-Verification)
+    if (req.path.includes('/webhook')) return true;
+    // Downloads (One-Line-Installer via curl, keine Browser-Session)
+    if (req.path === '/downloads' || req.path.startsWith('/downloads/')) return true;
+    return false;
+};
+
+/**
+ * Einheitliche 403-Antwort bei ungültigem Token
+ */
+const sendCsrfError = (req, res) => {
+    // JSON-Response für AJAX-Requests
+    if (req.xhr || req.headers.accept?.includes('application/json')) {
+        return res.status(403).json({
+            success: false,
+            message: 'Ungültiges CSRF-Token. Bitte lade die Seite neu.'
+        });
+    }
+
+    // HTML-Response für normale Requests
+    return res.status(403).send('CSRF-Token ungültig. Bitte lade die Seite neu.');
+};
+
+/**
+ * CSRF-Validierung für POST/PUT/DELETE/PATCH Requests (per-Route, blockt immer)
  * Nutzt die eingebaute Middleware von csrf-csrf
  */
 const csrfProtection = (req, res, next) => {
-    // Skip für API-Routes mit Token-Auth (haben eigene Security)
-    if (req.path.startsWith('/api/') && req.headers.authorization) {
+    if (isCsrfExempt(req)) {
         return next();
     }
-    
-    // Skip für Webhooks (haben eigene Signature-Verification)
-    if (req.path.includes('/webhook')) {
-        return next();
-    }
-    
+
     // Nutze die eingebaute doubleCsrfProtection Middleware
     doubleCsrfProtection(req, res, (error) => {
         if (error) {
             const Logger = ServiceManager.get('Logger');
             Logger.warn(`[CSRF] Invalid token from ${req.ip} -> ${req.path}`);
-            
-            // JSON-Response für AJAX-Requests
-            if (req.xhr || req.headers.accept?.includes('application/json')) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Ungültiges CSRF-Token. Bitte lade die Seite neu.'
-                });
-            }
-            
-            // HTML-Response für normale Requests
-            return res.status(403).send('CSRF-Token ungültig. Bitte lade die Seite neu.');
+            return sendCsrfError(req, res);
         }
-        
+
+        next();
+    });
+};
+
+/**
+ * GLOBALE CSRF-Validierung für alle state-ändernden Requests.
+ * Läuft standardmäßig im Report-Only-Modus (nur Logging), damit der
+ * Rollout beobachtet werden kann, bevor CSRF_ENFORCE=true scharf schaltet.
+ */
+const csrfGlobalProtection = (req, res, next) => {
+    if (isCsrfExempt(req)) {
+        return next();
+    }
+
+    doubleCsrfProtection(req, res, (error) => {
+        if (error) {
+            const Logger = ServiceManager.get('Logger');
+
+            if (!CSRF_ENFORCE) {
+                Logger.warn(`[CSRF][report-only] Würde blocken: ${req.method} ${req.path} von ${req.ip} — CSRF_ENFORCE=true aktiviert die Durchsetzung`);
+                return next();
+            }
+
+            Logger.warn(`[CSRF] Invalid token from ${req.ip} -> ${req.method} ${req.path}`);
+            return sendCsrfError(req, res);
+        }
+
         next();
     });
 };
@@ -116,5 +164,6 @@ const csrfErrorHandler = (err, req, res, next) => {
 module.exports = {
     csrfMiddleware,
     csrfProtection,
+    csrfGlobalProtection,
     csrfErrorHandler
 };
