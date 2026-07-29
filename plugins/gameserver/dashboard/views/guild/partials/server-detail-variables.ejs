@@ -109,12 +109,29 @@ if (startupTemplate) {
                     </select>
 
                 <% } else if (varType === 'boolean') { %>
+                    <%
+                        // Das Wertformat kommt aus dem Addon, nicht aus dieser Ansicht.
+                        // Eggs stammen aus der Pterodactyl-Welt und rechnen im Startbefehl
+                        // mit Zahlen ("-public {{PUBLIC_SERVER}}", "[[ {{X}} -eq 1 ]]").
+                        // Ein fest verdrahtetes true/false machte daraus "-public true"
+                        // und "[[ true -eq 1 ]]" – beides still falsch. Der Default des
+                        // Addons verrät, welche Schreibweise das Egg erwartet.
+                        const boolDefault = String(variable.default_value ?? '').trim().toLowerCase();
+                        const usesWords   = boolDefault === 'true' || boolDefault === 'false';
+                        const onValue     = usesWords ? 'true'  : '1';
+                        const offValue    = usesWords ? 'false' : '0';
+
+                        // Beim Einlesen großzügig sein: Bestandsdaten können durch den
+                        // früheren Fehler in der jeweils anderen Schreibweise vorliegen.
+                        const rawValue = String(currentValue ?? '').trim().toLowerCase();
+                        const isOn     = ['1', 'true', 'yes', 'on'].includes(rawValue);
+                    %>
                     <select class="form-control form-control-sm"
                             id="env_<%= varName %>"
                             name="<%= varName %>"
                             <%= isRequired ? 'required' : '' %>>
-                        <option value="true"  <%= currentValue === 'true'  || currentValue === true  ? 'selected' : '' %>>Ja</option>
-                        <option value="false" <%= currentValue === 'false' || currentValue === false ? 'selected' : '' %>>Nein</option>
+                        <option value="<%= onValue %>"  <%= isOn  ? 'selected' : '' %>>Ja</option>
+                        <option value="<%= offValue %>" <%= !isOn ? 'selected' : '' %>>Nein</option>
                     </select>
 
                 <% } else if (varType === 'number') { %>
