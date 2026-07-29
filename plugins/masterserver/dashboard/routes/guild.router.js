@@ -128,17 +128,24 @@ router.get('/daemon/update-info', async (req, res) => {
         }
 
         const connection = ipmServer.connections.get(daemon.daemon_id);
-        if (!connection || !connection.metadata.updateInfo) {
+        if (!connection) {
             return res.json({
                 success: true,
-                updateInfo: null, // Daemon offline oder keine Update-Info vorhanden
-                daemonOnline: !!connection
+                updateInfo: null,
+                daemonOnline: false
             });
         }
 
+        const meta = connection.metadata;
+        const updateInfo = meta.updateAvailable ? {
+            available: true,
+            currentVersion: meta.version || daemon.daemon_version,
+            latestVersion: meta.latestVersion
+        } : null;
+
         res.json({
             success: true,
-            updateInfo: connection.metadata.updateInfo,
+            updateInfo,
             daemonOnline: true
         });
 
@@ -160,8 +167,27 @@ router.post('/daemon/trigger-update', async (req, res) => {
     const guildId = res.locals.guildId;
 
     try {
-        // Daemon-Daten laden
-        const daemon = await getDaemonForGuild(guildId);
+        // Daemon-Daten laden.
+        // WICHTIG: Wenn der Client eine daemon_id mitsendet (RootServer-Übersicht hat
+        // einen Update-Button PRO RootServer), muss genau DIESER Daemon geupdatet
+        // werden — vorher wurde die daemon_id ignoriert und immer der erste
+        // RootServer der Guild genommen (weitere Daemons waren nie updatebar).
+        let daemon = null;
+        const requestedDaemonId = req.body?.daemon_id;
+
+        if (requestedDaemonId) {
+            const rootservers = await RootServer.getByGuild(guildId);
+            daemon = rootservers.find(rs => rs.daemon_id === requestedDaemonId) || null;
+            if (!daemon) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'RootServer mit dieser daemon_id nicht gefunden (oder gehört nicht zu dieser Guild)'
+                });
+            }
+        } else {
+            daemon = await getDaemonForGuild(guildId);
+        }
+
         if (!daemon) {
             return res.status(404).json({
                 success: false,

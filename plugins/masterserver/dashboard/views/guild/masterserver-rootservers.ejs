@@ -123,7 +123,15 @@
                                 <% if (rs.daemon_version) { %>
                                 <div class="d-flex justify-content-between text-sm mb-2">
                                     <span class="text-muted"><i class="fa-solid fa-tag mr-1"></i>Version</span>
-                                    <span>v<%= rs.daemon_version %></span>
+                                    <span>
+                                        v<%= rs.daemon_version %>
+                                        <% if (rs.updateAvailable && rs.latestVersion) { %>
+                                            <span class="badge badge-warning ml-1"
+                                                  title="Update verfügbar: v<%= rs.latestVersion %>">
+                                                <i class="fa-solid fa-arrow-up mr-1" style="font-size:.7em;"></i>v<%= rs.latestVersion %>
+                                            </span>
+                                        <% } %>
+                                    </span>
                                 </div>
                                 <% } %>
 
@@ -176,10 +184,19 @@
                                         Noch nie verbunden
                                     <% } %>
                                 </small>
-                                <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rs.id %>"
-                                   class="btn btn-sm btn-outline-primary">
-                                    <i class="fa-solid fa-arrow-right mr-1"></i>Details
-                                </a>
+                                <div class="d-flex align-items-center" style="gap:.4rem;">
+                                    <% if (rs.updateAvailable && rs.isOnline) { %>
+                                        <button class="btn btn-sm btn-warning"
+                                                onclick="triggerDaemonUpdate('<%= rs.daemon_id %>', '<%= rs.id %>', this)"
+                                                title="Update auf v<%= rs.latestVersion %> durchführen">
+                                            <i class="fa-solid fa-arrow-up mr-1"></i>Update
+                                        </button>
+                                    <% } %>
+                                    <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rs.id %>"
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="fa-solid fa-arrow-right mr-1"></i>Details
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -278,4 +295,83 @@
     pollAll();
     setInterval(pollAll, INTERVAL);
 })();
+</script>
+
+<script>
+async function triggerDaemonUpdate(daemonId, rootserverId, btn) {
+    if (!confirm('Daemon-Update jetzt durchführen? Der Daemon startet danach automatisch neu.')) return;
+
+    const GUILD_ID = '<%= guildId %>';
+    const statusUrl = `/guild/${GUILD_ID}/plugins/masterserver/rootservers/${rootserverId}/status`;
+
+    // Aktuelle Version merken — daran erkennen wir, wann der Neustart durch ist
+    let oldVersion = null;
+    try {
+        const r = await fetch(statusUrl);
+        const j = await r.json();
+        oldVersion = j?.data?.version ?? null;
+    } catch (_) { /* nicht kritisch, dann wird nur auf 'wieder online' gewartet */ }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Update läuft...';
+    }
+    showToast('info', 'Update wird gestartet – Daemon startet gleich neu...');
+
+    try {
+        const res = await fetch(`/guild/${GUILD_ID}/plugins/masterserver/daemon/trigger-update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ daemon_id: daemonId })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast('error', data.message || 'Update fehlgeschlagen');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-arrow-up mr-1"></i>Update';
+            }
+            return;
+        }
+
+        // Auf den Neustart warten: Der Daemon lädt das Binary, tauscht sich aus und
+        // verbindet sich neu (dauert typisch 10–30 s). Erst dann Seite neu laden,
+        // damit die neue Version auch wirklich angezeigt wird.
+        showToast('success', 'Update läuft – warte auf Neustart des Daemons...');
+
+        const TIMEOUT_MS = 120000;
+        const INTERVAL_MS = 3000;
+        const startedAt = Date.now();
+
+        while (Date.now() - startedAt < TIMEOUT_MS) {
+            await new Promise(r => setTimeout(r, INTERVAL_MS));
+            try {
+                const r = await fetch(statusUrl);
+                const j = await r.json();
+                const d = j?.data;
+                if (!d) continue;
+
+                // Fertig, wenn der Daemon wieder online ist UND eine neue Version meldet
+                if (d.isOnline && d.version && d.version !== oldVersion) {
+                    showToast('success', `Update abgeschlossen – Daemon läuft jetzt auf v${d.version}`);
+                    setTimeout(() => window.location.reload(), 1200);
+                    return;
+                }
+            } catch (_) { /* Daemon gerade offline → weiter pollen */ }
+        }
+
+        // Timeout: Update lief evtl. trotzdem durch — Seite neu laden, damit der
+        // Nutzer den tatsächlichen Stand sieht
+        showToast('warning', 'Update dauert länger als erwartet – Seite wird neu geladen');
+        setTimeout(() => window.location.reload(), 1500);
+
+    } catch (e) {
+        showToast('error', 'Netzwerkfehler beim Update-Trigger');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrow-up mr-1"></i>Update';
+        }
+    }
+}
 </script>

@@ -52,7 +52,9 @@ router.get('/', async (req, res) => {
         // Online-Status für jeden RootServer prüfen
         const rootserversWithStatus = rootservers.map(rs => ({
             ...rs,
-            isOnline: ipmServer.isDaemonOnline(rs.daemon_id)
+            isOnline: ipmServer.isDaemonOnline(rs.daemon_id),
+            updateAvailable: ipmServer.connections.get(rs.daemon_id)?.metadata?.updateAvailable || false,
+            latestVersion:   ipmServer.connections.get(rs.daemon_id)?.metadata?.latestVersion   || null
         }));
 
         // Status-Zusammenfassung berechnen

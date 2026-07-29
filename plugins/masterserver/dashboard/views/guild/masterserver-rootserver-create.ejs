@@ -141,12 +141,43 @@
                     </h3>
                 </div>
                 <div class="card-body">
+                    <% if (daemonHardware && daemonHardware.network && daemonHardware.network.interfaces) { %>
+                        <!-- Server-Typ Auswahl (nur wenn bereits ein Daemon online ist) -->
+                        <div class="form-group">
+                            <label>Server-Typ <span class="text-danger">*</span></label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="custom-control custom-radio">
+                                        <input type="radio" id="serverTypeExisting" name="serverType" value="existing" 
+                                               class="custom-control-input" checked>
+                                        <label class="custom-control-label" for="serverTypeExisting">
+                                            <strong>Virtueller RootServer</strong><br>
+                                            <small class="text-muted">Auf bestehendem Daemon (shared Host)</small>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="custom-control custom-radio">
+                                        <input type="radio" id="serverTypeNew" name="serverType" value="new" 
+                                               class="custom-control-input">
+                                        <label class="custom-control-label" for="serverTypeNew">
+                                            <strong>Neuer physischer RootServer</strong><br>
+                                            <small class="text-muted">Eigener Daemon (dedizierter Host)</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <% } %>
+
                     <div class="row">
                         <div class="col-md-8">
                             <div class="form-group">
                                 <label for="host">IP-Adresse / Host <span class="text-danger">*</span></label>
+                                
                                 <% if (daemonHardware && daemonHardware.network && daemonHardware.network.interfaces) { %>
-                                    <select class="form-control" id="host" name="host">
+                                    <!-- Dropdown für bestehenden Daemon (default) -->
+                                    <select class="form-control" id="hostDropdown" name="host" style="display: block;">
                                         <option value="">Automatisch (erste verfügbare)</option>
                                         <% daemonHardware.network.interfaces.forEach(iface => { %>
                                             <% if (!iface.is_loopback && iface.addresses) { %>
@@ -158,15 +189,31 @@
                                             <% } %>
                                         <% }); %>
                                     </select>
+                                    
+                                    <!-- Textfeld für neuen RootServer (initially hidden) -->
+                                    <input type="text"
+                                           class="form-control"
+                                           id="hostInput"
+                                           name="hostCustom"
+                                           placeholder="z.B. 192.168.1.100 oder node2.example.com"
+                                           style="display: none;">
+                                    
+                                    <small class="form-text text-muted" id="hostHelpExisting">
+                                        IP-Adresse des bestehenden Daemons
+                                    </small>
+                                    <small class="form-text text-muted" id="hostHelpNew" style="display: none;">
+                                        IP-Adresse oder Hostname des neuen Root-Servers
+                                    </small>
                                 <% } else { %>
+                                    <!-- Fallback: Nur Textfeld wenn kein Daemon online -->
                                     <input type="text"
                                            class="form-control"
                                            id="host"
                                            name="host"
                                            placeholder="z.B. 192.168.1.100"
                                            required>
+                                    <small class="form-text text-muted">IP-Adresse, auf der der Daemon lauscht</small>
                                 <% } %>
-                                <small class="form-text text-muted">IP-Adresse, auf der der Daemon lauscht</small>
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -412,4 +459,45 @@ function copyFieldValue(id) {
 document.getElementById('fastdlEnabled').addEventListener('change', function() {
     document.getElementById('fastdlUrlRow').style.display = this.checked ? '' : 'none';
 });
+
+// ==========================================
+// Server-Typ Toggle: Dropdown vs. Textfeld
+// ==========================================
+const serverTypeExisting = document.getElementById('serverTypeExisting');
+const serverTypeNew = document.getElementById('serverTypeNew');
+
+if (serverTypeExisting && serverTypeNew) {
+    const hostDropdown = document.getElementById('hostDropdown');
+    const hostInput = document.getElementById('hostInput');
+    const hostHelpExisting = document.getElementById('hostHelpExisting');
+    const hostHelpNew = document.getElementById('hostHelpNew');
+
+    function toggleHostInput() {
+        if (serverTypeNew.checked) {
+            // Neuer physischer RootServer → Textfeld anzeigen
+            hostDropdown.style.display = 'none';
+            hostDropdown.removeAttribute('name'); // nicht submitten
+            hostInput.style.display = 'block';
+            hostInput.setAttribute('name', 'host'); // dieses Feld submitten
+            hostInput.setAttribute('required', 'required');
+            hostHelpExisting.style.display = 'none';
+            hostHelpNew.style.display = 'block';
+        } else {
+            // Virtueller RootServer auf bestehendem Daemon → Dropdown
+            hostDropdown.style.display = 'block';
+            hostDropdown.setAttribute('name', 'host'); // dieses Feld submitten
+            hostInput.style.display = 'none';
+            hostInput.removeAttribute('name'); // nicht submitten
+            hostInput.removeAttribute('required');
+            hostHelpExisting.style.display = 'block';
+            hostHelpNew.style.display = 'none';
+        }
+    }
+
+    serverTypeExisting.addEventListener('change', toggleHostInput);
+    serverTypeNew.addEventListener('change', toggleHostInput);
+
+    // Initial state (default: existing)
+    toggleHostInput();
+}
 </script>
