@@ -542,6 +542,16 @@ async function savePorts() {
                                 }
                             } else if (col.format === 'duration') {
                                 value = secondsToHMS(value);
+                            } else if (col.format === 'ms') {
+                                value = (value == null || value === '') ? '–' : (value + ' ms');
+                            } else if (col.format === 'platform') {
+                                // Palworld liefert die Plattform als Präfix der userId
+                                // ("steam_7656…", "gdk_2533…" für Xbox). Die ID selbst
+                                // gehört nicht in die Anzeige – der Präfix genügt.
+                                const raw = String(value || '');
+                                const prefix = raw.split('_')[0].toLowerCase();
+                                value = { steam: 'Steam', gdk: 'Xbox', xbl: 'Xbox', psn: 'PlayStation' }[prefix]
+                                        || (prefix ? prefix.charAt(0).toUpperCase() + prefix.slice(1) : '–');
                             } else if (value == null || value === '') {
                                 value = '–';
                             }

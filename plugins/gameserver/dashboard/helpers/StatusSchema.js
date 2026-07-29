@@ -58,6 +58,20 @@ const BUILTIN = {
         ],
     },
 
+    palworld: {
+        // Palworld kennt weder Score noch Spielzeit – die Standard-Spalten blieben
+        // deshalb leer. Über die REST-API kommen stattdessen Level, Ping und die
+        // Plattform, und genau die gehören in die Liste.
+        display: {
+            columns: [
+                { key: 'name',        label: 'Spieler',   source: 'player.name' },
+                { key: 'level',       label: 'Level',     source: 'player.level',       align: 'end' },
+                { key: 'ping',        label: 'Ping',      source: 'player.ping',        format: 'ms', align: 'end' },
+                { key: 'platform_id', label: 'Plattform', source: 'player.platform_id', format: 'platform' },
+            ],
+        },
+    },
+
     arkse: {
         transforms: [
             { field: 'players[].level', fn: 'copy_from', args: { from: 'score' } },
