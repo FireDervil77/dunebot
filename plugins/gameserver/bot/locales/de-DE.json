@@ -31,6 +31,8 @@
         "OPT_PANEL_CHANNEL": "Kanal, in dem das Panel stehen soll",
         "OPT_PANEL_PLAYERS": "Spielernamen anzeigen (Standard: nein)",
         "OPT_PANEL_CONTROLS": "Buttons zum Starten und Stoppen (Standard: ja)",
-        "OPT_PANEL_INTERVAL": "Mindestabstand zwischen Aktualisierungen in Sekunden (Standard 60)"
+        "OPT_PANEL_INTERVAL": "Mindestabstand zwischen Aktualisierungen in Sekunden (Standard 60)",
+        "SUB_PANEL_EDIT": "Einstellungen eines Status-Panels ändern",
+        "OPT_PANEL_REFRESH": "'Neu laden'-Button anzeigen (Standard: ja)"
     }
 }

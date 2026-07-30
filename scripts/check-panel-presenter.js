@@ -95,7 +95,7 @@ console.log('\nPanel-Nutzlast');
 
 const PANEL = {
     id: 1, guild_id: '123', channel_id: '456', message_id: null,
-    show_players: false, show_controls: true, min_interval_s: 60,
+    show_players: false, show_controls: true, show_refresh: true, min_interval_s: 60,
 };
 const SERVER   = { id: 152, name: 'Palworld', status: 'online' };
 const SNAPSHOT = {
@@ -129,11 +129,46 @@ check('Buttons spiegeln den Zustand: online = starten aus, stoppen an', () => {
     assert.deepStrictEqual({ start: off.controls.can_start, stop: off.controls.can_stop }, { start: true, stop: false });
 });
 
-check('ohne show_controls gibt es keine Buttons', () => {
+check('nur "Neu laden": kein Start/Stop, aber Buttons bleiben', () => {
+    // Der Fall für einen öffentlichen Kanal: aktualisieren darf jeder,
+    // durchschalten niemand.
     const payload = buildPanelPayload({
-        panel: { ...PANEL, show_controls: false }, server: SERVER, snapshot: SNAPSHOT, display: {},
+        panel: { ...PANEL, show_controls: false, show_refresh: true },
+        server: SERVER, snapshot: SNAPSHOT, display: {},
+    });
+    assert.ok(payload.controls, 'controls fehlt – dann verschwindet auch der Neu-laden-Button');
+    assert.strictEqual(payload.controls.show_controls, false);
+    assert.strictEqual(payload.controls.show_refresh, true);
+    // can_start/can_stop dürfen nie true werden, wenn die Steuerung aus ist
+    assert.strictEqual(payload.controls.can_start, false);
+    assert.strictEqual(payload.controls.can_stop, false);
+});
+
+check('nur Start/Stop ohne Neu laden', () => {
+    const payload = buildPanelPayload({
+        panel: { ...PANEL, show_controls: true, show_refresh: false },
+        server: SERVER, snapshot: SNAPSHOT, display: {},
+    });
+    assert.strictEqual(payload.controls.show_refresh, false);
+    assert.strictEqual(payload.controls.can_stop, true);
+});
+
+check('beides aus → gar keine Buttons', () => {
+    const payload = buildPanelPayload({
+        panel: { ...PANEL, show_controls: false, show_refresh: false },
+        server: SERVER, snapshot: SNAPSHOT, display: {},
     });
     assert.strictEqual(payload.controls, null);
+});
+
+check('ein umgelegter Button-Schalter ändert den Hash', () => {
+    // Sonst bliebe die Nachricht mit den alten Buttons stehen, bis sich
+    // zufällig die Spielerzahl ändert.
+    const mit  = buildPanelPayload({ panel: PANEL, server: SERVER, snapshot: SNAPSHOT, display: {} });
+    const ohne = buildPanelPayload({
+        panel: { ...PANEL, show_controls: false }, server: SERVER, snapshot: SNAPSHOT, display: {},
+    });
+    assert.notStrictEqual(payloadHash(mit), payloadHash(ohne));
 });
 
 console.log('\nHash (Bremse 2: kein Edit ohne Änderung)');

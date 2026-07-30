@@ -70,7 +70,20 @@
                 </div>
                 <div class="form-text mb-3">
                     Wer klickt, braucht <code>GAMESERVER.START</code> bzw. <code>GAMESERVER.STOP</code> –
-                    geprüft wird mit demselben Rechtesystem wie im Dashboard.
+                    geprüft wird mit demselben Rechtesystem wie im Dashboard. Sichtbar sind die
+                    Buttons für jeden, der den Kanal sieht: Discord kann Buttons nicht pro Nutzer
+                    ausblenden.
+                </div>
+
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="panel-refresh" checked>
+                    <label class="form-check-label" for="panel-refresh">
+                        „Neu laden"-Button
+                    </label>
+                </div>
+                <div class="form-text mb-3">
+                    Getrennt schaltbar, weil Aktualisieren nur liest. Für einen öffentlichen Kanal
+                    ist das die übliche Kombination: Neu laden an, Starten und Stoppen aus.
                 </div>
 
                 <div class="form-check form-switch mb-2">
@@ -121,7 +134,8 @@
         list.innerHTML = panels.map(p => {
             const flags = [];
             if (p.show_players)  flags.push('<span class="badge bg-warning text-dark">Namen sichtbar</span>');
-            if (p.show_controls) flags.push('<span class="badge bg-info">Buttons</span>');
+            if (p.show_controls) flags.push('<span class="badge bg-info">Start/Stop</span>');
+            if (p.show_refresh)  flags.push('<span class="badge bg-secondary">Neu laden</span>');
             if (!p.enabled)      flags.push('<span class="badge bg-secondary">stillgelegt</span>');
 
             const pushed = p.last_pushed_at
@@ -200,6 +214,7 @@
                     channel_id:     channelId,
                     show_players:   document.getElementById('panel-players').checked,
                     show_controls:  document.getElementById('panel-controls').checked,
+                    show_refresh:   document.getElementById('panel-refresh').checked,
                     min_interval_s: Number(document.getElementById('panel-interval').value) || 60,
                 }),
             });

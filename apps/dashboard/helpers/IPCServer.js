@@ -987,6 +987,7 @@ class IPCServer {
                         channelId:    String(channelId),
                         showPlayers:  !!show_players,
                         showControls: show_controls === undefined ? true : !!show_controls,
+                        showRefresh:  payload.show_refresh === undefined ? true : !!payload.show_refresh,
                         minIntervalS: Number(min_interval_s) || 60,
                         createdBy:    payload.actor_user_id || null,
                     });
@@ -997,7 +998,42 @@ class IPCServer {
                             panel_id:      panel?.id,
                             show_players:  !!panel?.show_players,
                             show_controls: !!panel?.show_controls,
+                            show_refresh:  !!panel?.show_refresh,
                             last_error:    panel?.last_error || null,
+                        },
+                    });
+                }
+
+                // ── Status-Panel ändern (/server panel-edit) ──────────────────────────────
+                case 'PANEL_UPDATE': {
+                    if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
+                    if (await actorMayNot('GAMESERVER.EDIT')) return;
+
+                    if (!payload.channel_id) return message.reply({ success: false, error: 'channel_id erforderlich' });
+
+                    const PanelService = require('../../../plugins/gameserver/dashboard/helpers/PanelService');
+                    const panel = await PanelService.update({
+                        guildId,
+                        serverId:     Number(serverId),
+                        channelId:    String(payload.channel_id),
+                        // null/undefined heißt "unverändert lassen" – der Bot schickt
+                        // für nicht angegebene Optionen null.
+                        showPlayers:  payload.show_players,
+                        showControls: payload.show_controls,
+                        showRefresh:  payload.show_refresh,
+                        minIntervalS: payload.min_interval_s,
+                    });
+
+                    if (!panel) return message.reply({ success: false, error: 'Für diesen Server und Kanal gibt es kein Panel' });
+
+                    return message.reply({
+                        success: true,
+                        data: {
+                            panel_id:       panel.id,
+                            show_players:   !!panel.show_players,
+                            show_controls:  !!panel.show_controls,
+                            show_refresh:   !!panel.show_refresh,
+                            min_interval_s: panel.min_interval_s,
                         },
                     });
                 }
@@ -1033,7 +1069,8 @@ class IPCServer {
 
                     const panels = await dbService.query(
                         `SELECT p.id, p.server_id, p.channel_id, p.enabled, p.min_interval_s,
-                                p.show_players, p.show_controls, p.last_pushed_at, p.last_error,
+                                p.show_players, p.show_controls, p.show_refresh,
+                                p.last_pushed_at, p.last_error,
                                 gs.name AS server_name
                          FROM gameserver_status_panels p
                          LEFT JOIN gameservers gs ON gs.id = p.server_id

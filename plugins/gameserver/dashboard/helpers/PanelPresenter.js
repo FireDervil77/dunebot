@@ -199,8 +199,18 @@ function buildPanelPayload({ panel, server, snapshot, display, gameName }) {
             footer:      `Stand · Quelle: ${snapshot.source || 'none'}`,
             timestamp:   new Date().toISOString(),
         },
-        controls: panel.show_controls
-            ? { server_id: server.id, online, can_start: !online, can_stop: online }
+        // "Neu laden" ist lesend, "Starten/Stoppen" ist es nicht – deshalb zwei
+        // Schalter. Ein öffentliches Panel darf aktualisierbar sein, ohne dass
+        // jemand den Server durchschalten kann.
+        controls: (panel.show_controls || panel.show_refresh)
+            ? {
+                server_id:     server.id,
+                online,
+                show_controls: !!panel.show_controls,
+                show_refresh:  !!panel.show_refresh,
+                can_start:     !!panel.show_controls && !online,
+                can_stop:      !!panel.show_controls && online,
+            }
             : null,
     };
 }

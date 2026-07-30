@@ -291,6 +291,7 @@ class PanelService {
             ...panel,
             show_players:  !!panel.show_players,
             show_controls: !!panel.show_controls,
+            show_refresh:  !!panel.show_refresh,
         };
     }
 
@@ -312,21 +313,24 @@ class PanelService {
      * @returns {Promise<object>} angelegtes Panel
      */
     static async create({ guildId, serverId, channelId, showPlayers = false,
-                          showControls = true, minIntervalS = 60, createdBy = null }) {
+                          showControls = true, showRefresh = true,
+                          minIntervalS = 60, createdBy = null }) {
         const dbService = ServiceManager.get('dbService');
 
         await dbService.query(
             `INSERT INTO gameserver_status_panels
-                (guild_id, server_id, channel_id, show_players, show_controls, min_interval_s, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
+                (guild_id, server_id, channel_id, show_players, show_controls, show_refresh,
+                 min_interval_s, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 show_players   = VALUES(show_players),
                 show_controls  = VALUES(show_controls),
+                show_refresh   = VALUES(show_refresh),
                 min_interval_s = VALUES(min_interval_s),
                 enabled        = 1,
                 last_error     = NULL`,
             [guildId, serverId, channelId, showPlayers ? 1 : 0, showControls ? 1 : 0,
-             Math.max(15, Number(minIntervalS) || 60), createdBy]
+             showRefresh ? 1 : 0, Math.max(15, Number(minIntervalS) || 60), createdBy]
         );
 
         PanelService.invalidateIndex();
@@ -337,6 +341,62 @@ class PanelService {
             [serverId, channelId]
         );
         return panel;
+    }
+
+    /**
+     * Ändert die Einstellungen eines bestehenden Panels.
+     *
+     * Nur übergebene Felder werden angefasst – wer nur die Buttons abschalten
+     * will, soll nicht versehentlich die Spielernamen mit umlegen.
+     *
+     * Danach wird sofort geschoben: Die Buttons ändern sich mit, ohne dass
+     * jemand auf die nächste Statusänderung warten muss. Die Nachricht bleibt
+     * dieselbe, es wird editiert.
+     *
+     * @param {object} args
+     * @param {string} args.guildId
+     * @param {number} args.serverId
+     * @param {string} args.channelId
+     * @param {boolean} [args.showPlayers]
+     * @param {boolean} [args.showControls]
+     * @param {boolean} [args.showRefresh]
+     * @param {number}  [args.minIntervalS]
+     * @returns {Promise<object|null>} geändertes Panel oder null
+     */
+    static async update({ guildId, serverId, channelId, showPlayers, showControls,
+                          showRefresh, minIntervalS }) {
+        const dbService = ServiceManager.get('dbService');
+
+        const [panel] = await dbService.query(
+            `SELECT * FROM gameserver_status_panels
+             WHERE server_id = ? AND channel_id = ? AND guild_id = ? LIMIT 1`,
+            [serverId, String(channelId), guildId]
+        );
+        if (!panel) return null;
+
+        const sets = [], values = [];
+        if (showPlayers  !== undefined && showPlayers  !== null) { sets.push('show_players = ?');  values.push(showPlayers  ? 1 : 0); }
+        if (showControls !== undefined && showControls !== null) { sets.push('show_controls = ?'); values.push(showControls ? 1 : 0); }
+        if (showRefresh  !== undefined && showRefresh  !== null) { sets.push('show_refresh = ?');  values.push(showRefresh  ? 1 : 0); }
+        if (minIntervalS !== undefined && minIntervalS !== null) {
+            sets.push('min_interval_s = ?');
+            values.push(Math.max(15, Number(minIntervalS) || 60));
+        }
+        if (!sets.length) return panel;
+
+        values.push(panel.id);
+        await dbService.query(
+            `UPDATE gameserver_status_panels SET ${sets.join(', ')} WHERE id = ?`,
+            values
+        );
+
+        await PanelService.refreshNow(serverId);
+
+        const [updated] = await dbService.query(
+            'SELECT * FROM gameserver_status_panels WHERE id = ? LIMIT 1',
+            [panel.id]
+        );
+        return updated;
     }
 
     /**

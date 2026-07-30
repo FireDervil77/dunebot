@@ -210,6 +210,60 @@ module.exports = {
                         required: false,
                     },
                     {
+                        name: 'neu_laden',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_PANEL_REFRESH',
+                        required: false,
+                    },
+                    {
+                        name: 'spielernamen',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_PANEL_PLAYERS',
+                        required: false,
+                    },
+                    {
+                        name: 'abstand',
+                        type: ApplicationCommandOptionType.Integer,
+                        description: 'gameserver:SERVER.OPT_PANEL_INTERVAL',
+                        required: false,
+                        minValue: 15,
+                        maxValue: 3600,
+                    },
+                ],
+            },
+            {
+                name: 'panel-edit',
+                type: ApplicationCommandOptionType.Subcommand,
+                description: 'gameserver:SERVER.SUB_PANEL_EDIT',
+                options: [
+                    {
+                        name: 'server',
+                        type: ApplicationCommandOptionType.Integer,
+                        description: 'gameserver:SERVER.OPT_SERVER',
+                        required: true,
+                        autocomplete: true,
+                    },
+                    {
+                        name: 'kanal',
+                        type: ApplicationCommandOptionType.Channel,
+                        description: 'gameserver:SERVER.OPT_PANEL_CHANNEL',
+                        required: true,
+                        channelTypes: [ChannelType.GuildText],
+                    },
+                    // Alle optional: Was nicht angegeben wird, bleibt wie es ist.
+                    {
+                        name: 'buttons',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_PANEL_CONTROLS',
+                        required: false,
+                    },
+                    {
+                        name: 'neu_laden',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_PANEL_REFRESH',
+                        required: false,
+                    },
+                    {
                         name: 'spielernamen',
                         type: ApplicationCommandOptionType.Boolean,
                         description: 'gameserver:SERVER.OPT_PANEL_PLAYERS',
@@ -480,6 +534,7 @@ module.exports = {
                         server_id:      serverId,
                         channel_id:     channel.id,
                         show_controls:  interaction.options.getBoolean('buttons')      ?? true,
+                        show_refresh:   interaction.options.getBoolean('neu_laden')    ?? true,
                         show_players:   interaction.options.getBoolean('spielernamen') ?? false,
                         min_interval_s: interaction.options.getInteger('abstand')      ?? 60,
                         actor_user_id:  interaction.user.id,
@@ -504,6 +559,42 @@ module.exports = {
                         embeds: [new EmbedBuilder()
                             .setTitle('✅ Status-Panel angelegt')
                             .setDescription(hints.join('\n\n'))
+                            .setColor(0x57F287)
+                            .setTimestamp()],
+                    });
+                }
+
+                // ── /server panel-edit ────────────────────────────────────────────────
+                case 'panel-edit': {
+                    const channel = interaction.options.getChannel('kanal');
+
+                    // getBoolean liefert null, wenn die Option fehlt – und null
+                    // heißt hier "nicht anfassen". Wer nur die Buttons abschaltet,
+                    // soll nicht versehentlich die Spielernamen mit umlegen.
+                    const res = await ipcClient.sendToDashboard('gameserver:PANEL_UPDATE', {
+                        guild_id:       guildId,
+                        server_id:      interaction.options.getInteger('server'),
+                        channel_id:     channel.id,
+                        show_controls:  interaction.options.getBoolean('buttons'),
+                        show_refresh:   interaction.options.getBoolean('neu_laden'),
+                        show_players:   interaction.options.getBoolean('spielernamen'),
+                        min_interval_s: interaction.options.getInteger('abstand'),
+                        actor_user_id:  interaction.user.id,
+                    }, 30_000);
+
+                    if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
+
+                    const d = res.data || {};
+                    return interaction.followUp({
+                        embeds: [new EmbedBuilder()
+                            .setTitle('✅ Panel geändert')
+                            .setDescription(`Panel in ${channel} – die Nachricht wurde direkt aktualisiert.`)
+                            .addFields(
+                                { name: 'Start/Stop',    value: d.show_controls ? 'an' : 'aus',                 inline: true },
+                                { name: 'Neu laden',     value: d.show_refresh  ? 'an' : 'aus',                 inline: true },
+                                { name: 'Spielernamen',  value: d.show_players  ? '⚠️ sichtbar' : 'verborgen',  inline: true },
+                                { name: 'Mindestabstand', value: `${d.min_interval_s} s`,                        inline: true },
+                            )
                             .setColor(0x57F287)
                             .setTimestamp()],
                     });
@@ -549,8 +640,13 @@ module.exports = {
                         .setTimestamp();
 
                     for (const p of panels) {
+                        const buttons = [
+                            p.show_controls ? 'Start/Stop' : null,
+                            p.show_refresh  ? 'Neu laden'  : null,
+                        ].filter(Boolean);
+
                         const flags = [
-                            p.show_controls ? 'Buttons' : 'nur Anzeige',
+                            buttons.length ? buttons.join(' + ') : 'nur Anzeige',
                             p.show_players  ? '⚠️ Namen sichtbar' : 'ohne Namen',
                             p.enabled ? `alle ${p.min_interval_s} s` : '⛔ stillgelegt',
                         ];

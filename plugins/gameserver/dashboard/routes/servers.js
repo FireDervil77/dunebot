@@ -1368,7 +1368,7 @@ router.get('/:serverId/panels', requirePermission('GAMESERVER.VIEW'), async (req
 
         const panels = await dbService.query(
             `SELECT id, channel_id, message_id, enabled, min_interval_s,
-                    show_players, show_controls, last_pushed_at, last_error
+                    show_players, show_controls, show_refresh, last_pushed_at, last_error
              FROM gameserver_status_panels
              WHERE server_id = ? AND guild_id = ?
              ORDER BY id`,
@@ -1408,7 +1408,7 @@ router.post('/:serverId/panels', requirePermission('GAMESERVER.EDIT'), async (re
     try {
         const guildId  = res.locals.guildId;
         const serverId = Number(req.params.serverId);
-        const { channel_id: channelId, show_players, show_controls, min_interval_s } = req.body;
+        const { channel_id: channelId, show_players, show_controls, show_refresh, min_interval_s } = req.body;
 
         if (!channelId) {
             return res.status(400).json({ success: false, error: 'Kanal fehlt' });
@@ -1429,6 +1429,7 @@ router.post('/:serverId/panels', requirePermission('GAMESERVER.EDIT'), async (re
             channelId:    String(channelId),
             showPlayers:  toBool(show_players),
             showControls: show_controls === undefined ? true : toBool(show_controls),
+            showRefresh:  show_refresh  === undefined ? true : toBool(show_refresh),
             minIntervalS: Number(min_interval_s) || 60,
             createdBy:    res.locals.user?.id || null,
         });

@@ -57,27 +57,41 @@ function buildComponents(controls) {
     if (!controls) return [];
 
     const id = controls.server_id;
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`gspanel:start:${id}`)
-            .setLabel('Starten')
-            .setEmoji('▶️')
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(!controls.can_start),
-        new ButtonBuilder()
-            .setCustomId(`gspanel:stop:${id}`)
-            .setLabel('Stoppen')
-            .setEmoji('⏹️')
-            .setStyle(ButtonStyle.Danger)
-            .setDisabled(!controls.can_stop),
-        new ButtonBuilder()
-            .setCustomId(`gspanel:refresh:${id}`)
-            .setLabel('Neu laden')
-            .setEmoji('🔄')
-            .setStyle(ButtonStyle.Secondary)
-    );
+    const buttons = [];
 
-    return [row];
+    // Start/Stop und Neu laden sind getrennt schaltbar: Das eine greift ein,
+    // das andere liest nur. Ein öffentliches Panel bekommt oft nur Letzteres.
+    if (controls.show_controls) {
+        buttons.push(
+            new ButtonBuilder()
+                .setCustomId(`gspanel:start:${id}`)
+                .setLabel('Starten')
+                .setEmoji('▶️')
+                .setStyle(ButtonStyle.Success)
+                .setDisabled(!controls.can_start),
+            new ButtonBuilder()
+                .setCustomId(`gspanel:stop:${id}`)
+                .setLabel('Stoppen')
+                .setEmoji('⏹️')
+                .setStyle(ButtonStyle.Danger)
+                .setDisabled(!controls.can_stop),
+        );
+    }
+
+    if (controls.show_refresh) {
+        buttons.push(
+            new ButtonBuilder()
+                .setCustomId(`gspanel:refresh:${id}`)
+                .setLabel('Neu laden')
+                .setEmoji('🔄')
+                .setStyle(ButtonStyle.Secondary)
+        );
+    }
+
+    // Discord lehnt eine ActionRow ohne Komponenten ab – lieber gar keine Zeile.
+    if (!buttons.length) return [];
+
+    return [new ActionRowBuilder().addComponents(...buttons)];
 }
 
 module.exports = async (data, discordClient) => {
