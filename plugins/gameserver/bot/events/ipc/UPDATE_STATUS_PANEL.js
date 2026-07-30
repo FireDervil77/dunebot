@@ -17,7 +17,7 @@
  * verschiedener Bedeutung, und der Aufrufer läse zuverlässig das falsche.
  */
 
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
 const { ServiceManager } = require('dunebot-core');
 
 /** Discord-Fehlercodes, die sich nicht von selbst reparieren */
@@ -94,6 +94,39 @@ function buildComponents(controls) {
     return [new ActionRowBuilder().addComponents(...buttons)];
 }
 
+/**
+ * Prüft, ob der Bot im Kanal alles darf, was ein Panel braucht.
+ *
+ * Der Grund für diese Prüfung ist ein stiller Fehler: Fehlt „Links einbetten",
+ * nimmt Discord die Nachricht **an** und liefert sie **ohne Embed** aus. Übrig
+ * bleiben nackte Buttons, die API meldet keinen Fehler, und das Dashboard hält
+ * den Push für gelungen. Genau so ist es am 30.07. passiert, nachdem der Kanal
+ * von privat auf öffentlich umgestellt wurde.
+ *
+ * @param {import('discord.js').GuildChannel} channel
+ * @param {boolean} needsSend - true, wenn eine neue Nachricht entstehen soll
+ * @returns {string|null} Fehlertext oder null
+ */
+function missingPermission(channel, needsSend) {
+    const me = channel.guild.members.me;
+    if (!me) return null; // Ohne eigenes Mitglied nicht prüfbar – dann eben versuchen
+
+    const perms = channel.permissionsFor(me);
+    if (!perms) return null;
+
+    if (!perms.has(PermissionsBitField.Flags.ViewChannel)) {
+        return 'Dem Bot fehlt im Kanal das Recht „Kanal ansehen".';
+    }
+    if (needsSend && !perms.has(PermissionsBitField.Flags.SendMessages)) {
+        return 'Dem Bot fehlt im Kanal das Recht „Nachrichten senden".';
+    }
+    if (!perms.has(PermissionsBitField.Flags.EmbedLinks)) {
+        return 'Dem Bot fehlt im Kanal das Recht „Links einbetten" – Discord würde die Nachricht '
+             + 'ohne Embed ausliefern, es blieben nur die Buttons stehen.';
+    }
+    return null;
+}
+
 module.exports = async (data, discordClient) => {
     const Logger = ServiceManager.get('Logger');
     const { guild_id: guildId, channel_id: channelId, message_id: messageId, embed, controls } = data || {};
@@ -112,6 +145,16 @@ module.exports = async (data, discordClient) => {
         });
         if (!channel) {
             return { ok: false, error: 'Kanal nicht gefunden oder kein Zugriff', disable: true };
+        }
+
+        // Vor dem Senden prüfen, nicht danach: Discord quittiert eine Nachricht
+        // ohne "Links einbetten" mit Erfolg und verschluckt nur das Embed.
+        // Nicht stilllegen – ein Recht kann jederzeit erteilt werden, und der
+        // nächste Poll repariert das Panel dann von selbst.
+        const permissionError = missingPermission(channel, !messageId);
+        if (permissionError) {
+            Logger?.warn?.(`[Gameserver] Panel in Kanal ${channelId}: ${permissionError}`);
+            return { ok: false, error: permissionError, disable: false };
         }
 
         const payload = { embeds: [buildEmbed(embed)], components: buildComponents(controls) };
