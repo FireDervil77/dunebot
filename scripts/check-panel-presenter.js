@@ -171,6 +171,34 @@ check('ein umgelegter Button-Schalter ändert den Hash', () => {
     assert.notStrictEqual(payloadHash(mit), payloadHash(ohne));
 });
 
+console.log('\nSpiele ohne Live-Quelle (Quelle: daemon)');
+
+check('laufender Server ohne Quelle gilt als online', () => {
+    // Hytale und Windrose bieten weder Query noch RCON - ohne diesen Fall
+    // zeigte das Panel dauerhaft "offline", obwohl der Container lief.
+    const payload = buildPanelPayload({
+        panel: PANEL, server: SERVER, display: {},
+        snapshot: { online: true, players_current: null, players_max: 10, source: 'daemon', extra: {}, players: [] },
+    });
+    assert.ok(payload.embed.title.includes('Online'));
+});
+
+check('die Spielerzahl heißt "nicht abfragbar", nicht "? / 10"', () => {
+    const text = playerCountText({ players_current: null, players_max: 10, source: 'daemon' });
+    assert.strictEqual(text, 'nicht abfragbar (max. 10)');
+    // Zum Vergleich: bei einem Spiel MIT Quelle bleibt es beim Fragezeichen,
+    // denn dort ist der Wert wirklich nur gerade unbekannt.
+    assert.strictEqual(playerCountText({ players_current: null, players_max: 10, source: 'query' }), '? / 10');
+});
+
+check('die Fußzeile erklärt, warum keine Spielerzahl dasteht', () => {
+    const payload = buildPanelPayload({
+        panel: PANEL, server: SERVER, display: {},
+        snapshot: { online: true, players_current: null, players_max: 10, source: 'daemon', extra: {}, players: [] },
+    });
+    assert.ok(payload.embed.footer.includes('keine Spielerabfrage möglich'), payload.embed.footer);
+});
+
 console.log('\nHash (Bremse 2: kein Edit ohne Änderung)');
 
 check('der Zeitstempel verändert den Hash nicht', () => {

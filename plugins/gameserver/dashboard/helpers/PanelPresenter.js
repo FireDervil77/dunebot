@@ -26,6 +26,21 @@ const COLOR_ERROR   = 0xED4245;
 const MAX_PLAYER_NAMES = 40;
 
 /**
+ * Lesbare Namen der Statusquellen.
+ *
+ * `daemon` heißt: Das Spiel bietet weder Query noch RCON (Hytale, Windrose) –
+ * dann gilt, ob der Container läuft. Das steht bewusst im Panel, damit ein
+ * fehlender Spielerzähler erklärt ist und nicht wie ein Defekt aussieht.
+ */
+const SOURCE_LABELS = {
+    query:  'Query',
+    rcon:   'RCON',
+    merged: 'Query + RCON',
+    daemon: 'Daemon (keine Spielerabfrage möglich)',
+    none:   'keine',
+};
+
+/**
  * Wert über einen Punktpfad holen; `source` darf eine Liste sein, der erste
  * belegte Pfad gewinnt.
  *
@@ -121,6 +136,14 @@ function buildFields(fields, data) {
 function playerCountText(snapshot) {
     const current = snapshot.players_current;
     const max     = snapshot.players_max;
+
+    // Bei Spielen ohne Abfragemöglichkeit ist die Zahl nicht "gerade unbekannt",
+    // sondern grundsätzlich nicht ermittelbar. Ein "? / 10" ließe auf eine
+    // Störung schließen, die es nicht gibt.
+    if (snapshot.source === 'daemon') {
+        return max ? `nicht abfragbar (max. ${max})` : 'nicht abfragbar';
+    }
+
     if (current == null) return max ? `? / ${max}` : 'unbekannt';
     return max ? `${current} / ${max}` : String(current);
 }
@@ -196,7 +219,7 @@ function buildPanelPayload({ panel, server, snapshot, display, gameName }) {
             // Der Zeitstempel ist die Antwort auf "ist das noch aktuell?" – ohne
             // ihn müsste das Panel bei jedem Poll editiert werden, nur um zu
             // zeigen, dass es lebt.
-            footer:      `Stand · Quelle: ${snapshot.source || 'none'}`,
+            footer:      `Stand · Quelle: ${SOURCE_LABELS[snapshot.source] || snapshot.source || 'keine'}`,
             timestamp:   new Date().toISOString(),
         },
         // "Neu laden" ist lesend, "Starten/Stoppen" ist es nicht – deshalb zwei

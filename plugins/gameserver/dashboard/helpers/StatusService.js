@@ -276,6 +276,20 @@ class StatusService {
         return players.map(p => StatusService.normalizePlayer(p));
     }
 
+    /**
+     * Gibt es für dieses Spiel überhaupt etwas abzufragen?
+     *
+     * Query zählt nur mit `gamedig_type` (sonst weiß GameDig nicht, was es
+     * sprechen soll), RCON nur mit einem Status-Befehl – ein RCON-Block ohne
+     * `command` dient allein der Konsole und liefert keine Statusdaten.
+     *
+     * @param {object} statusCfg - Ergebnis von resolveStatusConfig()
+     * @returns {boolean}
+     */
+    static hasLiveSource(statusCfg) {
+        return !!statusCfg?.query?.gamedig_type || !!statusCfg?.rcon?.command;
+    }
+
     /** @private */
     static async _refreshNow(server) {
         const Logger = ServiceManager.get('Logger');
@@ -317,6 +331,38 @@ class StatusService {
         // Nur wenn beide Quellen stumm bleiben, wissen wir wirklich nichts.
         if (!queryOk && !rconOk) {
             const reason = queryResult.error || rconResult.error || 'Query fehlgeschlagen';
+
+            // Es gibt Spiele, bei denen es nichts zu fragen gibt: Hytale kennt
+            // keine Query und keinen RCON, Windrose öffnet überhaupt keinen Port
+            // und verbindet ausgehend zu einem Relay. Für die ist "beide Quellen
+            // stumm" kein Befund, sondern der Normalzustand – und der Daemon ist
+            // die einzige Instanz, die es wirklich weiß.
+            //
+            // Bewusst nur in diesem Fall: Bei einem Spiel MIT Query würde
+            // "Container läuft" ein abgestürztes Spiel als online ausweisen.
+            if (!StatusService.hasLiveSource(statusCfg)) {
+                const runningPerDaemon = server.status === 'online';
+                Logger?.debug?.(`[StatusService] Server ${server.id} ohne Live-Quelle – Daemon-Status gilt (${server.status})`);
+
+                return StatusService._withQuery(await StatusService._persist(server, {
+                    online: runningPerDaemon,
+                    // Niemand kann die Spielerzahl kennen. NULL heißt "wir wissen
+                    // es nicht" und wird als "–" angezeigt, 0 wäre erfunden.
+                    players_current: null,
+                    players_max: maxFromVars,
+                    map: null, version: null, ping_ms: null,
+                    players_json: null,
+                    extra_json: { no_live_source: true },
+                    source: 'daemon',
+                    query_ok: false,
+                    rcon_ok: rconResult.attempted ? false : null,
+                    last_error: null,
+                    // Kein Fehlversuch: Hier kommt nie eine Antwort, ein Backoff
+                    // würde den Takt sinnlos auf 300 s ziehen.
+                    resetFailCount: true,
+                }), queryResult);
+            }
+
             Logger?.debug?.(`[StatusService] Keine Quelle erreichbar (Server ${server.id}): ${reason}`);
             return StatusService._withQuery(await StatusService._persist(server, {
                 online: false, players_current: null, players_max: maxFromVars,
