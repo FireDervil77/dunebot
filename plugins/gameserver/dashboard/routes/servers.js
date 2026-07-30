@@ -1443,6 +1443,41 @@ router.post('/:serverId/panels', requirePermission('GAMESERVER.EDIT'), async (re
 });
 
 /**
+ * PATCH …/servers/:serverId/panels/:panelId
+ * Ändert die Schalter eines bestehenden Panels und aktualisiert die Nachricht.
+ *
+ * Nur mitgeschickte Felder werden angefasst – die Oberfläche schickt immer nur
+ * den einen Schalter, den jemand umgelegt hat.
+ *
+ * @permission GAMESERVER.EDIT
+ */
+router.patch('/:serverId/panels/:panelId', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+
+    try {
+        const { show_players, show_controls, show_refresh, min_interval_s } = req.body;
+
+        const panel = await PanelService.update({
+            guildId:      res.locals.guildId,
+            panelId:      Number(req.params.panelId),
+            showPlayers:  show_players   === undefined ? undefined : toBool(show_players),
+            showControls: show_controls  === undefined ? undefined : toBool(show_controls),
+            showRefresh:  show_refresh   === undefined ? undefined : toBool(show_refresh),
+            minIntervalS: min_interval_s === undefined ? undefined : Number(min_interval_s),
+        });
+
+        if (!panel) {
+            return res.status(404).json({ success: false, error: 'Panel nicht gefunden' });
+        }
+        return res.json({ success: true, panel });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Panel nicht geändert:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * DELETE …/servers/:serverId/panels/:panelId
  * Entfernt das Panel und löscht die Discord-Nachricht.
  * @permission GAMESERVER.EDIT

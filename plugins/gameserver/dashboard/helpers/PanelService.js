@@ -363,15 +363,22 @@ class PanelService {
      * @param {number}  [args.minIntervalS]
      * @returns {Promise<object|null>} geändertes Panel oder null
      */
-    static async update({ guildId, serverId, channelId, showPlayers, showControls,
+    static async update({ guildId, panelId, serverId, channelId, showPlayers, showControls,
                           showRefresh, minIntervalS }) {
         const dbService = ServiceManager.get('dbService');
 
-        const [panel] = await dbService.query(
-            `SELECT * FROM gameserver_status_panels
-             WHERE server_id = ? AND channel_id = ? AND guild_id = ? LIMIT 1`,
-            [serverId, String(channelId), guildId]
-        );
+        // Zwei Wege zum selben Panel: Das Dashboard kennt die id, der Bot-Befehl
+        // kennt Server und Kanal. Die guild_id steht in beiden Bedingungen –
+        // sonst könnte eine fremde Guild über eine geratene id mitschreiben.
+        const [panel] = panelId
+            ? await dbService.query(
+                'SELECT * FROM gameserver_status_panels WHERE id = ? AND guild_id = ? LIMIT 1',
+                [panelId, guildId])
+            : await dbService.query(
+                `SELECT * FROM gameserver_status_panels
+                 WHERE server_id = ? AND channel_id = ? AND guild_id = ? LIMIT 1`,
+                [serverId, String(channelId), guildId]);
+
         if (!panel) return null;
 
         const sets = [], values = [];
@@ -390,7 +397,9 @@ class PanelService {
             values
         );
 
-        await PanelService.refreshNow(serverId);
+        // Die Server-ID aus der Zeile, nicht aus dem Aufruf: Beim Weg über die
+        // panelId ist sie gar nicht mitgekommen.
+        await PanelService.refreshNow(panel.server_id);
 
         const [updated] = await dbService.query(
             'SELECT * FROM gameserver_status_panels WHERE id = ? LIMIT 1',
