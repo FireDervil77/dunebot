@@ -356,11 +356,18 @@ class StatusService {
             players_json:    players,
             extra_json:      queryOk
                 ? { ...(queryResult.extra || {}), bots: queryResult.bots ?? 0, connect: queryResult.connect || null }
-                : null,
+                // Läuft der Server über RCON, während die Query stumm bleibt, ist
+                // deren Fehler eine Diagnose und kein Defekt. Er bleibt erhalten,
+                // aber an einer Stelle, die nicht "Server kaputt" bedeutet.
+                : (queryResult.error ? { query_error: queryResult.error } : null),
             source,
             query_ok:        queryOk,
             rcon_ok:         rconResult.attempted ? rconOk : null,
-            last_error:      queryOk ? null : (queryResult.error || null),
+            // Antwortet irgendeine Quelle, ist der Status bekannt – dann gibt es
+            // keinen Fehler zu melden. Vorher stand hier der Query-Fehler
+            // ('Failed all 2 attempts'), obwohl Palworld über RCON gesund war;
+            // dass die Query schwieg, sagt bereits query_ok = 0.
+            last_error:      null,
             // Solange irgendeine Quelle antwortet, ist das kein Fehlversuch.
             // Sonst baute Palworld dauerhaft Backoff auf, obwohl RCON liefert.
             resetFailCount:  true,

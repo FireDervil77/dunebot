@@ -267,65 +267,6 @@ class IPMServer {
     }
 
     /**
-     * Message-Routing (Commands, Events, Responses)
-     * @private
-     */
-    async _routeMessage(daemonId, message) {
-        try {
-            const { type, namespace, action } = message;
-            
-            // Response-Handling (für Commands von Dashboard → Daemon)
-            if (type === 'response' || type === 'command_response') {
-                this._resolveCommand(message.id, message);
-                return;
-            }
-            
-            // ✅ NEU: Event-Routing über IPMEventRouter
-            if (type === 'event' && namespace && action) {
-                this.Logger.debug(`[IPMServer] Event empfangen: ${namespace}.${action} von Daemon ${daemonId}`);
-                
-                // An EventRouter weiterleiten
-                await eventRouter.route(message, { daemonId });
-                // ⚠️  KEIN return hier - Legacy-Handler sollen auch laufen!
-            }
-            
-            // ════════════════════════════════════════════════════════════
-            // ⚠️  DEPRECATED: Legacy Event-Handling (für Backwards-Compat)
-            // ════════════════════════════════════════════════════════════
-            // TODO: Entfernen wenn Daemon vollständig auf protocol.Message umgestellt ist
-            
-            // Legacy-Format: message.event ODER namespace.action kombinieren
-            const event = message.event || (namespace && action ? `${namespace}.${action}` : null);
-            
-            // Payload-Mapping: Neues Format nutzt message.payload, Legacy nutzt message.data
-            const eventData = message.payload || message.data;
-            
-            if (!event) {
-                this.Logger.warn('[IPMServer] Message ohne event/namespace:', message);
-                return;
-            }
-
-            // Legacy-Event-Mapping (nur Events die NICHT vom EventRouter gehandled werden)
-            switch (event) {
-                case 'heartbeat':
-                    this._handleHeartbeat(daemonId, message.data);
-                    break;
-
-                // install.progress, install.completed, install.failed → EventRouter handles these
-                // gameserver.status_changed → EventRouter handles this
-
-                default:
-                    // Nur loggen wenn es kein Event ist, das der EventRouter handled
-                    if (!namespace || !action) {
-                        this.Logger.debug(`[IPMServer] Unbekanntes Event: ${event}`);
-                    }
-            }
-        } catch (error) {
-            this.Logger.error('[IPMServer] Fehler beim Message-Routing:', error);
-        }
-    }
-
-    /**
      * Daemon-Registrierung mit 2-Token-System (Setup-Token + JWT Session-Token)
      * 
      * Flow:
