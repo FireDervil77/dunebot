@@ -13,6 +13,7 @@ const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
 const { buildStartPayload, loadServerForStart } = require('../helpers/StartPayload');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
+const PanelService = require('../helpers/PanelService');
 // const TemplateEngine = require('../helpers/TemplateEngine'); // ENTFERNT - existiert nicht mehr
 // const PortValidator = require('../helpers/PortValidator'); // ENTFERNT - existiert nicht mehr
 
@@ -1340,6 +1341,124 @@ router.get('/:serverId/query', requirePermission('GAMESERVER.VIEW'), async (req,
     } catch (error) {
         Logger.error('[Gameserver] Fehler bei Live-Query:', error);
         return res.status(500).json({ success: false, error: 'Interner Serverfehler' });
+    }
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// Discord-Status-Panels (E4)
+//
+// Wichtig: Diese Routen stehen VOR `router.get('/:serverId')`. Express nimmt
+// die erste passende Route, und `/:serverId` würde `/:serverId/panels` sonst
+// nie erreichen lassen – dieselbe Falle wie früher bei den Migration-Routen
+// hinter dem Catch-All in api.router.js.
+// ════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET …/servers/:serverId/panels
+ * Panels des Servers samt Textkanal-Liste der Guild.
+ * @permission GAMESERVER.VIEW
+ */
+router.get('/:serverId/panels', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
+    const Logger    = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const guildId  = res.locals.guildId;
+        const serverId = req.params.serverId;
+
+        const panels = await dbService.query(
+            `SELECT id, channel_id, message_id, enabled, min_interval_s,
+                    show_players, show_controls, last_pushed_at, last_error
+             FROM gameserver_status_panels
+             WHERE server_id = ? AND guild_id = ?
+             ORDER BY id`,
+            [serverId, guildId]
+        );
+
+        // Kanalnamen kennt nur der Bot. Dafür gibt es den Kern-Handler
+        // GET_GUILD_CHANNELS – ein plugin-eigener wäre eine Dublette. Fällt der
+        // Bot aus, bleibt die Liste leer; die vorhandenen Panels sind dann
+        // trotzdem sichtbar und löschbar.
+        let channels = [];
+        if (ServiceManager.has('ipcServer')) {
+            const responses = await ServiceManager.get('ipcServer')
+                .broadcast('dashboard:GET_GUILD_CHANNELS', { guildId })
+                .catch(() => []);
+            const hit = (responses || []).find(r => r && r.success);
+            if (hit) channels = hit.channels || [];
+        }
+
+        return res.json({ success: true, panels, channels });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Panels nicht geladen:', error);
+        return res.status(500).json({ success: false, error: 'Interner Serverfehler' });
+    }
+});
+
+/**
+ * POST …/servers/:serverId/panels
+ * Legt ein Panel an und postet es sofort.
+ * @permission GAMESERVER.EDIT
+ */
+router.post('/:serverId/panels', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
+    const Logger    = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const guildId  = res.locals.guildId;
+        const serverId = Number(req.params.serverId);
+        const { channel_id: channelId, show_players, show_controls, min_interval_s } = req.body;
+
+        if (!channelId) {
+            return res.status(400).json({ success: false, error: 'Kanal fehlt' });
+        }
+
+        // Server muss zur Guild gehören – die serverId kommt aus der URL.
+        const [server] = await dbService.query(
+            'SELECT id FROM gameservers WHERE id = ? AND guild_id = ? LIMIT 1',
+            [serverId, guildId]
+        );
+        if (!server) {
+            return res.status(404).json({ success: false, error: 'Server nicht gefunden' });
+        }
+
+        const panel = await PanelService.create({
+            guildId,
+            serverId,
+            channelId:    String(channelId),
+            showPlayers:  toBool(show_players),
+            showControls: show_controls === undefined ? true : toBool(show_controls),
+            minIntervalS: Number(min_interval_s) || 60,
+            createdBy:    res.locals.user?.id || null,
+        });
+
+        return res.json({ success: true, panel });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Panel nicht angelegt:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * DELETE …/servers/:serverId/panels/:panelId
+ * Entfernt das Panel und löscht die Discord-Nachricht.
+ * @permission GAMESERVER.EDIT
+ */
+router.delete('/:serverId/panels/:panelId', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+
+    try {
+        const removed = await PanelService.remove(Number(req.params.panelId), res.locals.guildId);
+        if (!removed) {
+            return res.status(404).json({ success: false, error: 'Panel nicht gefunden' });
+        }
+        return res.json({ success: true });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Panel nicht entfernt:', error);
+        return res.status(500).json({ success: false, error: error.message });
     }
 });
 

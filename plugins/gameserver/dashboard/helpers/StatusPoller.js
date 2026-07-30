@@ -21,6 +21,7 @@
 
 const { ServiceManager } = require('dunebot-core');
 const StatusService = require('./StatusService');
+const PanelService = require('./PanelService');
 
 /** Takt, in dem geprüft wird, welche Server fällig sind */
 const TICK_MS = 5_000;
@@ -170,6 +171,10 @@ class StatusPoller {
         try {
             const snapshot = await StatusService.refresh(server);
             this._broadcast(server.guild_id, snapshot);
+            // Discord-Panels hängen an derselben Stelle wie die Browser: ein
+            // Snapshot, alle Konsumenten. Ein eigener Timer im Bot wäre eine
+            // weitere Wahrheit über denselben Server.
+            await PanelService.onSnapshot(server, snapshot);
         } catch (err) {
             Logger.warn(`[StatusPoller] Abfrage fehlgeschlagen (Server ${server.id}): ${err.message}`);
         } finally {
@@ -198,6 +203,11 @@ class StatusPoller {
         } else if (this._interest.has(key)) {
             interval = INTERVAL_WATCHED;
         } else if (this._guildHasViewers(server.guild_id)) {
+            interval = INTERVAL_GUILD_ACTIVE;
+        } else if (PanelService.hasPanel(key)) {
+            // Ein Discord-Panel ist ein Zuschauer, der nie den Tab schließt.
+            // Ohne diesen Zweig wäre es nachts 300 s alt, egal wie oft der Bot
+            // editiert – die Bremse sitzt dann nicht am Bot, sondern hier.
             interval = INTERVAL_GUILD_ACTIVE;
         } else {
             interval = INTERVAL_IDLE;

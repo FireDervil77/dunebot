@@ -285,6 +285,20 @@
                                 </a>
                             </li>
                         <% } %>
+
+                        <!-- Discord-Panels (Konfiguration ist eine Verwaltungsaufgabe) -->
+                        <% if (userPermissions.permissions['GAMESERVER.EDIT']) { %>
+                            <li class="nav-item">
+                                <a class="nav-link"
+                                   id="panels-tab"
+                                   data-toggle="tab"
+                                   href="#panels"
+                                   role="tab">
+                                    <i class="fab fa-discord me-1"></i>
+                                    Discord
+                                </a>
+                            </li>
+                        <% } %>
                     </ul>
                 </div>
 
@@ -498,6 +512,17 @@
                                  id="rcon"
                                  role="tabpanel">
                                 <%- include('partials/server-detail-rcon', { server, guildId, userPermissions }) %>
+                            </div>
+                        <% } %>
+
+                        <!-- ========================================
+                             TAB: DISCORD-PANELS
+                             ======================================== -->
+                        <% if (userPermissions.permissions['GAMESERVER.EDIT']) { %>
+                            <div class="tab-pane fade"
+                                 id="panels"
+                                 role="tabpanel">
+                                <%- include('partials/server-detail-panels', { server, guildId, userPermissions }) %>
                             </div>
                         <% } %>
                     </div>

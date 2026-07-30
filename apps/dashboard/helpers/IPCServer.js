@@ -391,6 +391,47 @@ class IPCServer {
 
         const { guild_id: guildId, server_id: serverId, rootserver_id: rootserverId } = payload;
 
+        /**
+         * Prüft die Berechtigung des Auslösers, wenn einer mitgeschickt wurde.
+         *
+         * Hintergrund: Der Slash-Befehl `/server` ist über
+         * `userPermissions: ['ManageGuild']` gesperrt, ein Panel-Button dagegen
+         * steht in einem Kanal, den jeder sehen kann. Kommt eine
+         * `actor_user_id` mit, entscheidet derselbe PermissionManager, der das
+         * Web-UI absichert – damit kann eine Guild "Starten" an eine
+         * Moderatorenrolle geben, ohne ManageGuild zu verschenken.
+         *
+         * Ohne `actor_user_id` bleibt es beim bisherigen Verhalten (der
+         * Slash-Pfad prüft auf Befehlsebene). Das ist bewusst kein
+         * Pflichtfeld: Es scharf zu schalten würde Nutzer aussperren, die heute
+         * `/server start` benutzen, ohne im Rechtesystem GAMESERVER.START zu
+         * haben – das ist eine Entscheidung des Betreibers, kein Nebeneffekt.
+         *
+         * @param {string} permissionKey
+         * @returns {Promise<boolean>} false = Antwort wurde schon gesendet
+         */
+        const actorMayNot = async (permissionKey) => {
+            const actorId = payload.actor_user_id;
+            if (!actorId) return false;
+
+            const permissionManager = ServiceManager.get('permissionManager');
+            if (!permissionManager) {
+                // Kein Rechtesystem erreichbar → nicht durchlassen. Bei einer
+                // Aktion, die einen Gameserver stoppt, ist Verweigern die
+                // richtige Antwort auf Unwissenheit.
+                await message.reply({ success: false, error: 'Rechteprüfung nicht verfügbar' });
+                return true;
+            }
+
+            const allowed = await permissionManager.hasPermission(actorId, guildId, permissionKey);
+            if (!allowed) {
+                Logger.warn(`[IPC/Gameserver] ${action} abgelehnt: User ${actorId} ohne ${permissionKey} in Guild ${guildId}`);
+                await message.reply({ success: false, error: `Dir fehlt die Berechtigung ${permissionKey}.` });
+                return true;
+            }
+            return false;
+        };
+
         try {
             switch (action) {
 
@@ -743,6 +784,7 @@ class IPCServer {
                 // ── Gameserver starten ──────────────────────────────────────────────────
                 case 'SERVER_START': {
                     if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
+                    if (await actorMayNot('GAMESERVER.START')) return;
                     const [srv] = await dbService.query(
                         `SELECT gs.id, gs.name, gs.status, gs.rootserver_id,
                                 gs.install_path, gs.launch_params, gs.ports, gs.env_variables,
@@ -833,6 +875,7 @@ class IPCServer {
                 // ── Gameserver stoppen ──────────────────────────────────────────────────
                 case 'SERVER_STOP': {
                     if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
+                    if (await actorMayNot('GAMESERVER.STOP')) return;
                     const [srv] = await dbService.query(
                         `SELECT gs.id, gs.name, gs.status, r.daemon_id
                          FROM gameservers gs
@@ -859,6 +902,7 @@ class IPCServer {
                 // ── Gameserver neustarten ───────────────────────────────────────────────
                 case 'SERVER_RESTART': {
                     if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
+                    if (await actorMayNot('GAMESERVER.RESTART')) return;
                     const [srv] = await dbService.query(
                         `SELECT gs.id, gs.name, gs.status, r.daemon_id
                          FROM gameservers gs
@@ -880,6 +924,38 @@ class IPCServer {
                     }
                     await dbService.query("UPDATE gameservers SET status = 'online', last_started_at = NOW() WHERE id = ?", [serverId]);
                     return message.reply({ success: true, data: { name: srv.name } });
+                }
+
+                // ── Status-Panel: sofortige Abfrage (Button "Neu laden") ─────────────────
+                case 'PANEL_REFRESH': {
+                    if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
+                    // Wer den Status im Dashboard nicht sehen darf, darf ihn auch
+                    // nicht über einen Button neu abrufen.
+                    if (await actorMayNot('GAMESERVER.VIEW')) return;
+
+                    const [srv] = await dbService.query(
+                        'SELECT id FROM gameservers WHERE id = ? AND guild_id = ? LIMIT 1',
+                        [serverId, guildId]
+                    );
+                    if (!srv) return message.reply({ success: false, error: 'Gameserver nicht gefunden' });
+
+                    // Der Poller merkt sich das Interesse, damit die nächsten
+                    // Minuten im 10-Sekunden-Takt laufen – jemand schaut ja hin.
+                    // ServiceManager.get() wirft bei unbekanntem Namen, deshalb
+                    // has(): ist das Gameserver-Plugin nicht geladen, ist das
+                    // kein Grund, die Abfrage scheitern zu lassen.
+                    if (ServiceManager.has('gameserverStatusPoller')) {
+                        ServiceManager.get('gameserverStatusPoller').markInterest?.(serverId);
+                    }
+
+                    const PanelService = require('../../../plugins/gameserver/dashboard/helpers/PanelService');
+                    const snapshot = await PanelService.refreshNow(serverId);
+                    if (!snapshot) return message.reply({ success: false, error: 'Abfrage fehlgeschlagen' });
+
+                    return message.reply({
+                        success: true,
+                        data: { online: snapshot.online, players_current: snapshot.players_current },
+                    });
                 }
 
                 // ── Server-Migration zwischen RootServern ────────────────────────────────

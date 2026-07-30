@@ -1,0 +1,225 @@
+<%
+/**
+ * Discord-Status-Panels eines Gameservers (E4)
+ *
+ * Ein Panel ist eine Nachricht in einem Discord-Kanal, die das Dashboard
+ * aktuell hält. Angelegt wird sie hier – ohne Eintrag erfährt der Bot vom
+ * Server nichts.
+ */
+%>
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="fab fa-discord me-2"></i>Status-Panels
+                </h3>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Ein Panel zeigt den Status dieses Servers in einem Discord-Kanal und
+                    aktualisiert sich selbst. Solange kein Panel besteht, taucht der Server
+                    nirgends in Discord auf.
+                </p>
+
+                <div id="panels-list">
+                    <div class="text-center text-muted py-3">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Lade …
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0"><i class="fas fa-plus me-2"></i>Panel hinzufügen</h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label" for="panel-channel">Kanal</label>
+                    <select class="form-select" id="panel-channel">
+                        <option value="">– Kanal wählen –</option>
+                    </select>
+                    <div class="form-text" id="panel-channel-hint"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="panel-interval">Mindestabstand (Sekunden)</label>
+                    <input type="number" class="form-control" id="panel-interval" value="60" min="15" max="3600">
+                    <div class="form-text">
+                        Kleinster Abstand zwischen zwei Aktualisierungen der Nachricht.
+                        Unter 60 s wird es bei vielen Panels eng mit Discords Limits.
+                    </div>
+                </div>
+
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="panel-controls" checked>
+                    <label class="form-check-label" for="panel-controls">
+                        Buttons zum Starten und Stoppen
+                    </label>
+                </div>
+                <div class="form-text mb-3">
+                    Wer klickt, braucht <code>GAMESERVER.START</code> bzw. <code>GAMESERVER.STOP</code> –
+                    geprüft wird mit demselben Rechtesystem wie im Dashboard.
+                </div>
+
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="panel-players">
+                    <label class="form-check-label" for="panel-players">Spielernamen anzeigen</label>
+                </div>
+                <div class="form-text mb-3">
+                    Aus gutem Grund standardmäßig aus: Namen sind personenbezogen, und ein
+                    Discord-Kanal ist meist öffentlich und dauerhaft lesbar. Die Spielerzahl
+                    steht ohnehin immer im Panel.
+                </div>
+
+                <button class="btn btn-primary w-100" id="panel-create">
+                    <i class="fab fa-discord me-1"></i>Panel anlegen und posten
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const SERVER_ID = '<%= server.id %>';
+    const BASE = '/guild/<%= guildId %>/plugins/gameserver/servers/' + SERVER_ID + '/panels';
+
+    let channels = [];
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text == null ? '' : String(text);
+        return div.innerHTML;
+    }
+
+    function channelName(id) {
+        const found = channels.find(c => c.id === id);
+        return found ? '#' + found.name : id;
+    }
+
+    function renderPanels(panels) {
+        const list = document.getElementById('panels-list');
+
+        if (!panels.length) {
+            list.innerHTML = '<div class="alert alert-light border mb-0">'
+                + 'Noch kein Panel. Rechts einen Kanal wählen und anlegen.</div>';
+            return;
+        }
+
+        list.innerHTML = panels.map(p => {
+            const flags = [];
+            if (p.show_players)  flags.push('<span class="badge bg-warning text-dark">Namen sichtbar</span>');
+            if (p.show_controls) flags.push('<span class="badge bg-info">Buttons</span>');
+            if (!p.enabled)      flags.push('<span class="badge bg-secondary">stillgelegt</span>');
+
+            const pushed = p.last_pushed_at
+                ? new Date(p.last_pushed_at).toLocaleString('de-DE')
+                : 'noch nicht gepostet';
+
+            const error = p.last_error
+                ? '<div class="text-danger small mt-1"><i class="fas fa-exclamation-triangle me-1"></i>'
+                  + escapeHtml(p.last_error) + '</div>'
+                : '';
+
+            return '<div class="d-flex justify-content-between align-items-start border rounded p-2 mb-2">'
+                 +   '<div>'
+                 +     '<strong>' + escapeHtml(channelName(p.channel_id)) + '</strong> '
+                 +     flags.join(' ')
+                 +     '<div class="text-muted small">Alle ' + p.min_interval_s + ' s · Stand: ' + pushed + '</div>'
+                 +     error
+                 +   '</div>'
+                 +   '<button class="btn btn-sm btn-outline-danger" data-remove="' + p.id + '">'
+                 +     '<i class="fas fa-trash"></i>'
+                 +   '</button>'
+                 + '</div>';
+        }).join('');
+
+        list.querySelectorAll('[data-remove]').forEach(btn => {
+            btn.addEventListener('click', () => removePanel(btn.dataset.remove));
+        });
+    }
+
+    function renderChannels() {
+        const select = document.getElementById('panel-channel');
+        const hint   = document.getElementById('panel-channel-hint');
+
+        if (!channels.length) {
+            hint.textContent = 'Keine Kanäle geladen – läuft der Bot?';
+            return;
+        }
+        hint.textContent = '';
+        select.insertAdjacentHTML('beforeend', channels
+            .map(c => '<option value="' + escapeHtml(c.id) + '">#' + escapeHtml(c.name) + '</option>')
+            .join(''));
+    }
+
+    async function load() {
+        try {
+            const res  = await fetch(BASE);
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Laden fehlgeschlagen');
+
+            channels = data.channels || [];
+            renderChannels();
+            renderPanels(data.panels || []);
+        } catch (err) {
+            document.getElementById('panels-list').innerHTML =
+                '<div class="alert alert-danger mb-0">' + escapeHtml(err.message) + '</div>';
+        }
+    }
+
+    async function createPanel() {
+        const button    = document.getElementById('panel-create');
+        const channelId = document.getElementById('panel-channel').value;
+
+        if (!channelId) {
+            alert('Bitte einen Kanal wählen.');
+            return;
+        }
+
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Poste …';
+
+        try {
+            const res = await fetch(BASE, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    channel_id:     channelId,
+                    show_players:   document.getElementById('panel-players').checked,
+                    show_controls:  document.getElementById('panel-controls').checked,
+                    min_interval_s: Number(document.getElementById('panel-interval').value) || 60,
+                }),
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Anlegen fehlgeschlagen');
+            await load();
+        } catch (err) {
+            alert('Fehler: ' + err.message);
+        } finally {
+            button.disabled = false;
+            button.innerHTML = '<i class="fab fa-discord me-1"></i>Panel anlegen und posten';
+        }
+    }
+
+    async function removePanel(panelId) {
+        if (!confirm('Panel entfernen? Die Nachricht in Discord wird gelöscht.')) return;
+
+        try {
+            const res  = await fetch(BASE + '/' + panelId, { method: 'DELETE' });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Entfernen fehlgeschlagen');
+            await load();
+        } catch (err) {
+            alert('Fehler: ' + err.message);
+        }
+    }
+
+    document.getElementById('panel-create').addEventListener('click', createPanel);
+    load();
+})();
+</script>
