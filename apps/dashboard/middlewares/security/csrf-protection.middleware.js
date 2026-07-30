@@ -82,6 +82,41 @@ const isCsrfExempt = (req) => {
 };
 
 /**
+ * Beschreibt, woran ein abgelehnter Request scheiterte.
+ *
+ * "Invalid token" allein ist als Fehlermeldung wertlos: Es kann bedeuten, dass
+ * gar kein Token mitkam (Formular ohne verstecktes Feld, Skript ohne Header),
+ * dass das Cookie fehlt (Browser hat es verworfen) oder dass Token und Cookie
+ * nicht zusammenpassen (Seite älter als die Session). Das sind drei völlig
+ * verschiedene Ursachen mit drei verschiedenen Reparaturen.
+ *
+ * @param {object} req
+ * @returns {string} Kurzdiagnose für das Log
+ */
+const describeCsrfFailure = (req) => {
+    const headerToken = req.headers['x-csrf-token'];
+    const bodyToken   = req.body?._csrf;
+    const cookie      = req.cookies?.['__Host-dunebot.x-csrf-token'];
+
+    const parts = [];
+    if (headerToken)      parts.push('Header-Token');
+    else if (bodyToken)   parts.push('Body-Token (_csrf)');
+    else                  parts.push('KEIN Token mitgeschickt');
+
+    parts.push(cookie ? 'Cookie vorhanden' : 'KEIN Cookie');
+    parts.push(req.session?.id ? 'Session ok' : 'KEINE Session');
+
+    // Nur die ersten Zeichen: Das Token ist kein Geheimnis im Sinne eines
+    // Passworts, aber es gehört trotzdem nicht vollständig ins Log.
+    const shown = headerToken || bodyToken;
+    if (shown && cookie) {
+        parts.push(shown === cookie ? 'Token == Cookie' : 'Token != Cookie');
+    }
+
+    return parts.join(', ');
+};
+
+/**
  * Einheitliche 403-Antwort bei ungültigem Token
  */
 const sendCsrfError = (req, res) => {
@@ -110,7 +145,7 @@ const csrfProtection = (req, res, next) => {
     doubleCsrfProtection(req, res, (error) => {
         if (error) {
             const Logger = ServiceManager.get('Logger');
-            Logger.warn(`[CSRF] Invalid token from ${req.ip} -> ${req.path}`);
+            Logger.warn(`[CSRF] Invalid token from ${req.ip} -> ${req.path} — ${describeCsrfFailure(req)}`);
             return sendCsrfError(req, res);
         }
 
@@ -133,11 +168,11 @@ const csrfGlobalProtection = (req, res, next) => {
             const Logger = ServiceManager.get('Logger');
 
             if (!CSRF_ENFORCE) {
-                Logger.warn(`[CSRF][report-only] Würde blocken: ${req.method} ${req.path} von ${req.ip} — CSRF_ENFORCE=true aktiviert die Durchsetzung`);
+                Logger.warn(`[CSRF][report-only] Würde blocken: ${req.method} ${req.path} von ${req.ip} (${describeCsrfFailure(req)}) — CSRF_ENFORCE=true aktiviert die Durchsetzung`);
                 return next();
             }
 
-            Logger.warn(`[CSRF] Invalid token from ${req.ip} -> ${req.method} ${req.path}`);
+            Logger.warn(`[CSRF] Invalid token from ${req.ip} -> ${req.method} ${req.path} — ${describeCsrfFailure(req)}`);
             return sendCsrfError(req, res);
         }
 

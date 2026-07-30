@@ -13,6 +13,11 @@
         <% } %>
 
         <form action="/admin/content/changelogs/save" method="POST">
+            <%# Serverseitig gerendert statt nur über csrf-helper.js: Ein Formular,
+                das ohne JavaScript nicht mehr speicherbar ist, hat eine
+                Abhängigkeit zu viel. Der Helper überspringt ein bereits
+                vorhandenes _csrf-Feld. %>
+            <input type="hidden" name="_csrf" value="<%= locals.csrfToken || '' %>">
             <input type="hidden" name="guildId" value="<%= guildId %>">
             <% if (changelog && changelog.id) { %>
                 <input type="hidden" name="changelogId" value="<%= changelog.id %>">
