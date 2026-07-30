@@ -429,6 +429,12 @@ class IPCServer {
                 await message.reply({ success: false, error: `Dir fehlt die Berechtigung ${permissionKey}.` });
                 return true;
             }
+
+            // Auch die erlaubten Fälle protokollieren: Ein Panel-Button steht in
+            // einem Kanal, und wer dort Rechte hat, kann einen Server auch aus
+            // Langeweile durchschalten. Ohne diese Zeile ließe sich hinterher
+            // nicht sagen, wer den Server um 3 Uhr gestoppt hat.
+            Logger.info(`[IPC/Gameserver] ${action} durch User ${actorId} (Server ${serverId}, Guild ${guildId})`);
             return false;
         };
 
@@ -956,6 +962,87 @@ class IPCServer {
                         success: true,
                         data: { online: snapshot.online, players_current: snapshot.players_current },
                     });
+                }
+
+                // ── Status-Panel anlegen (/server panel-add) ──────────────────────────────
+                case 'PANEL_CREATE': {
+                    if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
+                    // Gleiche Hürde wie die Dashboard-Route: Ein Panel entscheidet,
+                    // was in Discord öffentlich sichtbar ist.
+                    if (await actorMayNot('GAMESERVER.EDIT')) return;
+
+                    const { channel_id: channelId, show_players, show_controls, min_interval_s } = payload;
+                    if (!channelId) return message.reply({ success: false, error: 'channel_id erforderlich' });
+
+                    const [srv] = await dbService.query(
+                        'SELECT id FROM gameservers WHERE id = ? AND guild_id = ? LIMIT 1',
+                        [serverId, guildId]
+                    );
+                    if (!srv) return message.reply({ success: false, error: 'Gameserver nicht gefunden' });
+
+                    const PanelService = require('../../../plugins/gameserver/dashboard/helpers/PanelService');
+                    const panel = await PanelService.create({
+                        guildId,
+                        serverId:     Number(serverId),
+                        channelId:    String(channelId),
+                        showPlayers:  !!show_players,
+                        showControls: show_controls === undefined ? true : !!show_controls,
+                        minIntervalS: Number(min_interval_s) || 60,
+                        createdBy:    payload.actor_user_id || null,
+                    });
+
+                    return message.reply({
+                        success: true,
+                        data: {
+                            panel_id:      panel?.id,
+                            show_players:  !!panel?.show_players,
+                            show_controls: !!panel?.show_controls,
+                            last_error:    panel?.last_error || null,
+                        },
+                    });
+                }
+
+                // ── Status-Panel entfernen (/server panel-remove) ─────────────────────────
+                case 'PANEL_DELETE': {
+                    if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
+                    if (await actorMayNot('GAMESERVER.EDIT')) return;
+
+                    const { channel_id: channelId } = payload;
+                    if (!channelId) return message.reply({ success: false, error: 'channel_id erforderlich' });
+
+                    const [panel] = await dbService.query(
+                        `SELECT id FROM gameserver_status_panels
+                         WHERE server_id = ? AND channel_id = ? AND guild_id = ? LIMIT 1`,
+                        [serverId, String(channelId), guildId]
+                    );
+                    if (!panel) return message.reply({ success: false, error: 'Für diesen Server und Kanal gibt es kein Panel' });
+
+                    const PanelService = require('../../../plugins/gameserver/dashboard/helpers/PanelService');
+                    await PanelService.remove(panel.id, guildId);
+                    return message.reply({ success: true });
+                }
+
+                // ── Status-Panels auflisten (/server panel-list) ──────────────────────────
+                case 'PANEL_LIST': {
+                    if (!guildId) return message.reply({ success: false, error: 'guild_id fehlt' });
+                    if (await actorMayNot('GAMESERVER.VIEW')) return;
+
+                    const params = [guildId];
+                    let where = 'p.guild_id = ?';
+                    if (serverId) { where += ' AND p.server_id = ?'; params.push(serverId); }
+
+                    const panels = await dbService.query(
+                        `SELECT p.id, p.server_id, p.channel_id, p.enabled, p.min_interval_s,
+                                p.show_players, p.show_controls, p.last_pushed_at, p.last_error,
+                                gs.name AS server_name
+                         FROM gameserver_status_panels p
+                         LEFT JOIN gameservers gs ON gs.id = p.server_id
+                         WHERE ${where}
+                         ORDER BY p.server_id, p.id
+                         LIMIT 25`,
+                        params
+                    );
+                    return message.reply({ success: true, data: panels });
                 }
 
                 // ── Server-Migration zwischen RootServern ────────────────────────────────

@@ -152,6 +152,15 @@ class PanelService {
                 continue;
             }
 
+            // Erst den Push beanspruchen, dann senden. Ohne diesen Schritt
+            // erschien das Panel beim Anlegen zweimal: Der erzwungene Push aus
+            // create() und der reguläre aus dem Poller lasen beide
+            // `message_id = NULL` und posteten beide eine neue Nachricht.
+            if (!await PanelService._claim(panel)) {
+                skipped++;
+                continue;
+            }
+
             await PanelService._send(panel, payload, hash);
             pushed++;
         }
@@ -180,6 +189,28 @@ class PanelService {
             if (age < Number(panel.min_interval_s || 60) * 1000) return false;
         }
         return true;
+    }
+
+    /**
+     * Beansprucht das Recht, dieses Panel jetzt zu schreiben.
+     *
+     * Optimistische Sperre über `push_seq`: Wer den Zähler von dem Wert
+     * hochsetzt, den er gelesen hat, hat gewonnen – alle anderen treffen keine
+     * Zeile mehr und lassen es. Ein Zähler statt `last_pushed_at`, weil zwei
+     * Pushes in derselben Sekunde denselben DATETIME schreiben würden und MySQL
+     * dann keine geänderte Zeile meldet, obwohl die Bedingung zutraf.
+     *
+     * @private
+     * @param {object} panel
+     * @returns {Promise<boolean>}
+     */
+    static async _claim(panel) {
+        const dbService = ServiceManager.get('dbService');
+        const result = await dbService.query(
+            'UPDATE gameserver_status_panels SET push_seq = push_seq + 1 WHERE id = ? AND push_seq = ?',
+            [panel.id, Number(panel.push_seq) || 0]
+        );
+        return (result?.affectedRows ?? 0) === 1;
     }
 
     /**
@@ -229,12 +260,26 @@ class PanelService {
         // Der Bot meldet die message_id zurück – auch dann, wenn er die alte
         // Nachricht nicht mehr fand und eine neue gepostet hat.
         const messageId = result.message_id || panel.message_id || null;
-        await dbService.query(
-            `UPDATE gameserver_status_panels
-             SET message_id = ?, last_hash = ?, last_pushed_at = NOW(), last_error = NULL
-             WHERE id = ?`,
-            [messageId, hash, panel.id]
-        );
+
+        // Diese Zeile ist die wichtigste im ganzen Ablauf: Nur weil die
+        // message_id gespeichert ist, editiert der nächste Push dieselbe
+        // Nachricht statt eine neue zu posten. Scheitert sie nach einem
+        // erfolgreichen Versand, steht die Nachricht in Discord, ohne dass wir
+        // sie kennen – dann postet der nächste Poll eine zweite. Darum laut.
+        try {
+            await dbService.query(
+                `UPDATE gameserver_status_panels
+                 SET message_id = ?, last_hash = ?, last_pushed_at = NOW(), last_error = NULL
+                 WHERE id = ?`,
+                [messageId, hash, panel.id]
+            );
+        } catch (err) {
+            Logger?.error?.(
+                `[PanelService] Panel ${panel.id}: Nachricht ${messageId} gepostet, aber nicht gespeichert `
+                + `(${err.message}). Der nächste Push postet erneut – message_id von Hand nachtragen.`
+            );
+            throw err;
+        }
     }
 
     /**

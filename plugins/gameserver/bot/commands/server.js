@@ -1,7 +1,7 @@
 'use strict';
 
 const {
-    ApplicationCommandOptionType, EmbedBuilder, MessageFlags,
+    ApplicationCommandOptionType, ChannelType, EmbedBuilder, MessageFlags,
     ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle,
 } = require('discord.js');
 const { ServiceManager } = require('dunebot-core');
@@ -175,6 +175,87 @@ module.exports = {
                         type: ApplicationCommandOptionType.Integer,
                         description: 'gameserver:SERVER.OPT_TARGET_ROOTSERVER',
                         required: true,
+                        autocomplete: true,
+                    },
+                ],
+            },
+
+            // ── panel-add / panel-remove / panel-list ─────────────────────────────────
+            // Flache Subcommands statt einer Gruppe: Die Autocomplete-Weiche unten
+            // hängt an `focused.name === 'server'` und funktioniert damit hier
+            // unverändert weiter.
+            {
+                name: 'panel-add',
+                type: ApplicationCommandOptionType.Subcommand,
+                description: 'gameserver:SERVER.SUB_PANEL_ADD',
+                options: [
+                    {
+                        name: 'server',
+                        type: ApplicationCommandOptionType.Integer,
+                        description: 'gameserver:SERVER.OPT_SERVER',
+                        required: true,
+                        autocomplete: true,
+                    },
+                    {
+                        name: 'kanal',
+                        type: ApplicationCommandOptionType.Channel,
+                        description: 'gameserver:SERVER.OPT_PANEL_CHANNEL',
+                        required: true,
+                        channelTypes: [ChannelType.GuildText],
+                    },
+                    {
+                        name: 'buttons',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_PANEL_CONTROLS',
+                        required: false,
+                    },
+                    {
+                        name: 'spielernamen',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_PANEL_PLAYERS',
+                        required: false,
+                    },
+                    {
+                        name: 'abstand',
+                        type: ApplicationCommandOptionType.Integer,
+                        description: 'gameserver:SERVER.OPT_PANEL_INTERVAL',
+                        required: false,
+                        minValue: 15,
+                        maxValue: 3600,
+                    },
+                ],
+            },
+            {
+                name: 'panel-remove',
+                type: ApplicationCommandOptionType.Subcommand,
+                description: 'gameserver:SERVER.SUB_PANEL_REMOVE',
+                options: [
+                    {
+                        name: 'server',
+                        type: ApplicationCommandOptionType.Integer,
+                        description: 'gameserver:SERVER.OPT_SERVER',
+                        required: true,
+                        autocomplete: true,
+                    },
+                    {
+                        name: 'kanal',
+                        type: ApplicationCommandOptionType.Channel,
+                        description: 'gameserver:SERVER.OPT_PANEL_CHANNEL',
+                        required: true,
+                        channelTypes: [ChannelType.GuildText],
+                    },
+                ],
+            },
+            {
+                name: 'panel-list',
+                type: ApplicationCommandOptionType.Subcommand,
+                description: 'gameserver:SERVER.SUB_PANEL_LIST',
+                options: [
+                    {
+                        name: 'server',
+                        type: ApplicationCommandOptionType.Integer,
+                        description: 'gameserver:SERVER.OPT_SERVER',
+                        required: false,
                         autocomplete: true,
                     },
                 ],
@@ -385,6 +466,101 @@ module.exports = {
                         )
                         .setColor(0x3498db)
                         .setTimestamp();
+
+                    return interaction.followUp({ embeds: [embed] });
+                }
+
+                // ── /server panel-add ─────────────────────────────────────────────────
+                case 'panel-add': {
+                    const serverId = interaction.options.getInteger('server');
+                    const channel  = interaction.options.getChannel('kanal');
+
+                    const res = await ipcClient.sendToDashboard('gameserver:PANEL_CREATE', {
+                        guild_id:       guildId,
+                        server_id:      serverId,
+                        channel_id:     channel.id,
+                        show_controls:  interaction.options.getBoolean('buttons')      ?? true,
+                        show_players:   interaction.options.getBoolean('spielernamen') ?? false,
+                        min_interval_s: interaction.options.getInteger('abstand')      ?? 60,
+                        actor_user_id:  interaction.user.id,
+                    }, 30_000);
+
+                    if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
+
+                    const hints = [`Panel steht in ${channel}.`];
+                    if (res.data?.show_players) {
+                        hints.push('⚠️ **Spielernamen sind sichtbar** – jeder im Kanal sieht, wer online ist.');
+                    }
+                    if (res.data?.show_controls) {
+                        hints.push(
+                            'Die Buttons prüfen bei jedem Klick `GAMESERVER.START` bzw. `GAMESERVER.STOP`. '
+                            + 'Sichtbar sind sie für alle, die den Kanal sehen – Discord kann Buttons nicht '
+                            + 'pro Nutzer ausblenden. Für einen öffentlichen Kanal lieber ein zweites Panel '
+                            + 'mit `buttons: false`.'
+                        );
+                    }
+
+                    return interaction.followUp({
+                        embeds: [new EmbedBuilder()
+                            .setTitle('✅ Status-Panel angelegt')
+                            .setDescription(hints.join('\n\n'))
+                            .setColor(0x57F287)
+                            .setTimestamp()],
+                    });
+                }
+
+                // ── /server panel-remove ──────────────────────────────────────────────
+                case 'panel-remove': {
+                    const res = await ipcClient.sendToDashboard('gameserver:PANEL_DELETE', {
+                        guild_id:      guildId,
+                        server_id:     interaction.options.getInteger('server'),
+                        channel_id:    interaction.options.getChannel('kanal').id,
+                        actor_user_id: interaction.user.id,
+                    }, 30_000);
+
+                    if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
+
+                    return interaction.followUp({
+                        embeds: [_infoEmbed('Panel entfernt', 'Die Nachricht in Discord ist gelöscht.')],
+                    });
+                }
+
+                // ── /server panel-list ────────────────────────────────────────────────
+                case 'panel-list': {
+                    const res = await ipcClient.sendToDashboard('gameserver:PANEL_LIST', {
+                        guild_id:      guildId,
+                        server_id:     interaction.options.getInteger('server') ?? null,
+                        actor_user_id: interaction.user.id,
+                    });
+
+                    if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
+
+                    const panels = res.data || [];
+                    if (!panels.length) {
+                        return interaction.followUp({
+                            embeds: [_infoEmbed('Keine Panels', 'Lege eines mit `/server panel-add` an.')],
+                        });
+                    }
+
+                    const embed = new EmbedBuilder()
+                        .setTitle('📋 Status-Panels')
+                        .setColor(0x5865F2)
+                        .setFooter({ text: `${panels.length} Panel(s)` })
+                        .setTimestamp();
+
+                    for (const p of panels) {
+                        const flags = [
+                            p.show_controls ? 'Buttons' : 'nur Anzeige',
+                            p.show_players  ? '⚠️ Namen sichtbar' : 'ohne Namen',
+                            p.enabled ? `alle ${p.min_interval_s} s` : '⛔ stillgelegt',
+                        ];
+                        embed.addFields({
+                            name:  `#${p.server_id} — ${p.server_name || 'unbekannt'}`,
+                            value: `<#${p.channel_id}> · ${flags.join(' · ')}`
+                                 + (p.last_error ? `\n❌ ${p.last_error}` : ''),
+                            inline: false,
+                        });
+                    }
 
                     return interaction.followUp({ embeds: [embed] });
                 }

@@ -24,6 +24,13 @@
         "LIST_EMPTY_TITLE": "No gameservers found",
         "LIST_EMPTY_DESC": "Create one with `/server create`.",
         "CREATE_SUCCESS": "Gameserver is being installed",
-        "CREATE_HINT": "Once the daemon finishes installation, start it with `/server start`."
+        "CREATE_HINT": "Once the daemon finishes installation, start it with `/server start`.",
+        "SUB_PANEL_ADD": "Create a Discord status panel for a gameserver",
+        "SUB_PANEL_REMOVE": "Remove a gameserver's status panel",
+        "SUB_PANEL_LIST": "List the status panels of this guild",
+        "OPT_PANEL_CHANNEL": "Channel the panel should live in",
+        "OPT_PANEL_PLAYERS": "Show player names (default: no)",
+        "OPT_PANEL_CONTROLS": "Buttons to start and stop (default: yes)",
+        "OPT_PANEL_INTERVAL": "Minimum seconds between updates (default 60)"
     }
 }
