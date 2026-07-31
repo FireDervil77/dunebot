@@ -1345,6 +1345,140 @@ router.get('/:serverId/query', requirePermission('GAMESERVER.VIEW'), async (req,
 });
 
 // ════════════════════════════════════════════════════════════════════════
+// Öffentlicher Status (E5)
+//
+// Wie bei den Panels gilt: Ohne ausdrückliches Einschalten gibt es nichts zu
+// sehen. Das Token wird erst beim Einschalten erzeugt – ein Server, der nie
+// veröffentlicht wurde, hat auch keine Adresse, die irgendwo auftauchen könnte.
+// ════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET …/servers/:serverId/public-status
+ * @permission GAMESERVER.VIEW
+ */
+router.get('/:serverId/public-status', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const [server] = await dbService.query(
+            `SELECT public_status_token, public_status_enabled, public_status_players
+             FROM gameservers WHERE id = ? AND guild_id = ? LIMIT 1`,
+            [req.params.serverId, res.locals.guildId]
+        );
+        if (!server) return res.status(404).json({ success: false, error: 'Server nicht gefunden' });
+
+        return res.json({
+            success: true,
+            enabled:      !!server.public_status_enabled,
+            show_players: !!server.public_status_players,
+            token:        server.public_status_token || null,
+        });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Öffentlicher Status nicht geladen:', error);
+        return res.status(500).json({ success: false, error: 'Interner Serverfehler' });
+    }
+});
+
+/**
+ * PATCH …/servers/:serverId/public-status
+ * Schaltet die öffentliche Seite und die Spielernamen. Nur mitgeschickte Felder
+ * werden geändert.
+ * @permission GAMESERVER.EDIT
+ */
+router.patch('/:serverId/public-status', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const { neuesToken } = require('../helpers/PublicStatus');
+
+    try {
+        const guildId = res.locals.guildId;
+        const serverId = Number(req.params.serverId);
+        const { enabled, show_players } = req.body;
+
+        const [server] = await dbService.query(
+            'SELECT id, public_status_token FROM gameservers WHERE id = ? AND guild_id = ? LIMIT 1',
+            [serverId, guildId]
+        );
+        if (!server) return res.status(404).json({ success: false, error: 'Server nicht gefunden' });
+
+        const sets = [], werte = [];
+
+        if (enabled !== undefined) {
+            sets.push('public_status_enabled = ?');
+            werte.push(toBool(enabled) ? 1 : 0);
+
+            // Token erst beim Einschalten erzeugen, nicht auf Vorrat.
+            if (toBool(enabled) && !server.public_status_token) {
+                sets.push('public_status_token = ?');
+                werte.push(neuesToken());
+            }
+        }
+        if (show_players !== undefined) {
+            sets.push('public_status_players = ?');
+            werte.push(toBool(show_players) ? 1 : 0);
+        }
+
+        if (sets.length) {
+            werte.push(serverId);
+            await dbService.query(`UPDATE gameservers SET ${sets.join(', ')} WHERE id = ?`, werte);
+        }
+
+        const [neu] = await dbService.query(
+            `SELECT public_status_token, public_status_enabled, public_status_players
+             FROM gameservers WHERE id = ? LIMIT 1`,
+            [serverId]
+        );
+
+        Logger.info(`[Gameserver] Öffentlicher Status für Server ${serverId} geändert `
+            + `(an: ${!!neu.public_status_enabled}, Namen: ${!!neu.public_status_players})`);
+
+        return res.json({
+            success: true,
+            enabled:      !!neu.public_status_enabled,
+            show_players: !!neu.public_status_players,
+            token:        neu.public_status_token || null,
+        });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Öffentlicher Status nicht geändert:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST …/servers/:serverId/public-status/regenerate
+ * Würfelt das Token neu – alte Einbindungen sind danach tot.
+ * @permission GAMESERVER.EDIT
+ */
+router.post('/:serverId/public-status/regenerate', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const { neuesToken } = require('../helpers/PublicStatus');
+
+    try {
+        const token = neuesToken();
+        const ergebnis = await dbService.query(
+            'UPDATE gameservers SET public_status_token = ? WHERE id = ? AND guild_id = ?',
+            [token, req.params.serverId, res.locals.guildId]
+        );
+        if (!ergebnis?.affectedRows) {
+            return res.status(404).json({ success: false, error: 'Server nicht gefunden' });
+        }
+
+        Logger.warn(`[Gameserver] Öffentliches Token für Server ${req.params.serverId} neu gewürfelt – `
+            + 'bestehende Einbindungen zeigen ab jetzt 404');
+
+        return res.json({ success: true, token });
+
+    } catch (error) {
+        Logger.error('[Gameserver] Token nicht erneuert:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ════════════════════════════════════════════════════════════════════════
 // Discord-Status-Panels (E4)
 //
 // Wichtig: Diese Routen stehen VOR `router.get('/:serverId')`. Express nimmt

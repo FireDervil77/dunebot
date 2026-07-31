@@ -298,6 +298,16 @@
                                     Discord
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link"
+                                   id="public-tab"
+                                   data-toggle="tab"
+                                   href="#public"
+                                   role="tab">
+                                    <i class="fas fa-globe me-1"></i>
+                                    Öffentlich
+                                </a>
+                            </li>
                         <% } %>
                     </ul>
                 </div>
@@ -523,6 +533,15 @@
                                  id="panels"
                                  role="tabpanel">
                                 <%- include('partials/server-detail-panels', { server, guildId, userPermissions }) %>
+                            </div>
+
+                            <!-- ========================================
+                                 TAB: ÖFFENTLICHER STATUS
+                                 ======================================== -->
+                            <div class="tab-pane fade"
+                                 id="public"
+                                 role="tabpanel">
+                                <%- include('partials/server-detail-public', { server, guildId, userPermissions }) %>
                             </div>
                         <% } %>
                     </div>

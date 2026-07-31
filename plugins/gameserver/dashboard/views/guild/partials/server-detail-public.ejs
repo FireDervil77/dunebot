@@ -1,0 +1,177 @@
+<%
+/**
+ * Öffentliche Statusseite eines Gameservers (E5)
+ *
+ * Ohne Einschalten gibt es keine Adresse – das Token entsteht erst beim ersten
+ * Aktivieren.
+ */
+%>
+<div class="row">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title mb-0"><i class="fas fa-globe me-2"></i>Öffentlicher Status</h3>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Gibt den Status dieses Servers ohne Anmeldung frei – für die eigene Website,
+          ein Wiki oder ein Forum. Solange der Schalter aus ist, existiert keine
+          öffentliche Adresse.
+        </p>
+
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="public-enabled">
+          <label class="form-check-label" for="public-enabled">Öffentliche Statusseite</label>
+        </div>
+
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="public-players">
+          <label class="form-check-label" for="public-players">Spielernamen öffentlich zeigen</label>
+        </div>
+        <div class="form-text mb-3">
+          Bewusst getrennt schaltbar und standardmäßig aus: Namen sind personenbezogen,
+          und eine Website wird von Suchmaschinen gelesen – anders als ein Discord-Kanal.
+          Die Spielerzahl steht ohnehin immer dabei.
+        </div>
+
+        <div id="public-details" style="display:none">
+          <hr>
+          <label class="form-label small text-muted mb-1">Widget zum Einbetten</label>
+          <div class="input-group input-group-sm mb-2">
+            <input type="text" class="form-control font-monospace" id="public-embed" readonly>
+            <button class="btn btn-outline-secondary" type="button" data-copy="public-embed">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+
+          <label class="form-label small text-muted mb-1">Direkte Adresse (JSON)</label>
+          <div class="input-group input-group-sm mb-3">
+            <input type="text" class="form-control font-monospace" id="public-api" readonly>
+            <button class="btn btn-outline-secondary" type="button" data-copy="public-api">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+
+          <button class="btn btn-sm btn-outline-warning" id="public-regenerate">
+            <i class="fas fa-rotate me-1"></i>Adresse neu vergeben
+          </button>
+          <div class="form-text">
+            Danach zeigen alle bestehenden Einbindungen ins Leere. Sinnvoll, wenn die
+            Adresse irgendwo gelandet ist, wo sie nicht hingehört.
+          </div>
+        </div>
+
+        <div id="public-status-meldung" class="small mt-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title mb-0"><i class="fas fa-eye me-2"></i>Vorschau</h3>
+      </div>
+      <div class="card-body">
+        <div id="public-vorschau" class="text-muted small">
+          Schalte die öffentliche Statusseite ein, um die Vorschau zu sehen.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const SERVER_ID = '<%= server.id %>';
+  const BASE = '/guild/<%= guildId %>/plugins/gameserver/servers/' + SERVER_ID + '/public-status';
+
+  const anAus      = document.getElementById('public-enabled');
+  const namen      = document.getElementById('public-players');
+  const details    = document.getElementById('public-details');
+  const einbetten  = document.getElementById('public-embed');
+  const apiFeld    = document.getElementById('public-api');
+  const vorschau   = document.getElementById('public-vorschau');
+  const meldung    = document.getElementById('public-status-meldung');
+
+  function zeige(text, art) {
+    meldung.className = 'small mt-2 text-' + (art || 'muted');
+    meldung.textContent = text || '';
+    if (text) setTimeout(() => { meldung.textContent = ''; }, 4000);
+  }
+
+  function uebernehmen(daten) {
+    anAus.checked = !!daten.enabled;
+    namen.checked = !!daten.show_players;
+
+    if (daten.enabled && daten.token) {
+      const widgetUrl = location.origin + '/plugin/gameserver/widget/' + daten.token;
+      einbetten.value = '<iframe src="' + widgetUrl + '" width="320" height="220" '
+                      + 'style="border:0" loading="lazy"></iframe>';
+      apiFeld.value = location.origin + '/api/gameserver/status/' + daten.token;
+      details.style.display = '';
+      vorschau.innerHTML = '<iframe src="' + widgetUrl + '" width="100%" height="240" '
+                         + 'style="border:1px solid rgba(0,0,0,.1);border-radius:6px"></iframe>';
+    } else {
+      details.style.display = 'none';
+      vorschau.innerHTML = '<div class="text-muted small">Schalte die öffentliche Statusseite ein, '
+                         + 'um die Vorschau zu sehen.</div>';
+    }
+  }
+
+  async function laden() {
+    try {
+      const res = await fetch(BASE);
+      const daten = await res.json();
+      if (daten.success) uebernehmen(daten);
+    } catch (err) {
+      zeige('Konnte den Zustand nicht laden: ' + err.message, 'danger');
+    }
+  }
+
+  async function speichern(feld, wert) {
+    const rumpf = {};
+    rumpf[feld] = wert;
+    try {
+      const res = await fetch(BASE, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rumpf),
+      });
+      const daten = await res.json();
+      if (!daten.success) throw new Error(daten.error || 'Speichern fehlgeschlagen');
+      uebernehmen(daten);
+      zeige('Gespeichert', 'success');
+    } catch (err) {
+      zeige('Fehler: ' + err.message, 'danger');
+      laden();
+    }
+  }
+
+  anAus.addEventListener('change', () => speichern('enabled', anAus.checked));
+  namen.addEventListener('change', () => speichern('show_players', namen.checked));
+
+  document.getElementById('public-regenerate').addEventListener('click', async () => {
+    if (!confirm('Neue Adresse vergeben? Bestehende Einbindungen zeigen danach ins Leere.')) return;
+    try {
+      const res = await fetch(BASE + '/regenerate', { method: 'POST' });
+      const daten = await res.json();
+      if (!daten.success) throw new Error(daten.error || 'Fehlgeschlagen');
+      await laden();
+      zeige('Neue Adresse vergeben', 'success');
+    } catch (err) {
+      zeige('Fehler: ' + err.message, 'danger');
+    }
+  });
+
+  document.querySelectorAll('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const feld = document.getElementById(btn.dataset.copy);
+      feld.select();
+      navigator.clipboard?.writeText(feld.value);
+      zeige('In die Zwischenablage kopiert', 'success');
+    });
+  });
+
+  laden();
+})();
+</script>

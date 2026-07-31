@@ -20,6 +20,17 @@ class GameserverPlugin extends DashboardPlugin {
         this.guildRouter = require('express').Router();
         this.baseRouter = require('express').Router();
 
+        // Öffentlicher Status (E5): haengt bewusst NICHT am guildRouter, denn der
+        // steht hinter der Anmeldung. Der PluginManager haengt den apiRouter
+        // unter /api/gameserver ein - ohne Auth, dafuer nur ueber ein Token
+        // erreichbar, das der Betreiber je Server einschalten muss.
+        this.apiRouter = require('express').Router();
+        this.apiRouter.use('/', require('./routes/public'));
+
+        // Das einbettbare Widget unter /plugin/gameserver/widget/:token.
+        this.frontendRouter = require('express').Router();
+        this.frontendRouter.use('/', require('./routes/widget'));
+
         // Guard: Event-Handler nur einmal registrieren
         this._handlersRegistered = false;
     }
