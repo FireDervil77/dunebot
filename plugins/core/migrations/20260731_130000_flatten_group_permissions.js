@@ -1,5 +1,7 @@
+'use strict';
+
 /**
- * Migration 6.8.1: Gruppen flach klopfen
+ * Gruppen flach klopfen
  *
  * Bereitet den Umstieg vom vererbenden auf das flache Rechtemodell vor
  * (WordPress-Linie: eine Gruppe zeigt, was in ihr eingetragen ist – Punkt).
@@ -35,9 +37,14 @@
  * werden sie für alle anderen Guilds entfernt – falls je etwas durchgerutscht
  * ist, endet es hier.
  *
- * @author FireBot Team
- * @version 6.8.1
- * @date 31. Juli 2026
+ * ── Ablageort ─────────────────────────────────────────────────────────────
+ *
+ * Diese Datei gehoert nach `plugins/core/migrations/`. Der erste Anlauf lag in
+ * `plugins/core/dashboard/migrations/` – dort liegen zwar die alten
+ * 6.6.x/6.7.x/6.8.0-Dateien, aber `MigrationRunner.runPlugin()` liest
+ * ausschliesslich `plugins/<name>/migrations/`. Der Ordner wird vom aktuellen
+ * Runner nicht mehr angefasst; ein Neustart fuehrte die Migration schlicht nicht
+ * aus, ohne dass irgendwo etwas gemeldet wurde.
  */
 
 /** Slugs der mitgelieferten Standardgruppen – nur sie bilden die Leiter. */
@@ -55,28 +62,21 @@ const parsePerms = (value) => {
 };
 
 module.exports = {
-    version: '6.8.1',
-    name: 'Flatten Group Permissions (Vorbereitung flaches Rechtemodell)',
+    description: 'flatten-group-permissions',
 
     /**
-     * @param {object} dbService
-     * @param {string|null} guildId - global: nur der Aufruf ohne Guild arbeitet
+     * @param {object} db - dbService, vom MigrationRunner uebergeben
      */
-    async up(dbService, guildId) {
+    async up(db) {
         const { ServiceManager } = require('dunebot-core');
-        const Logger = ServiceManager.get('Logger');
+        const Logger = ServiceManager.has('Logger') ? ServiceManager.get('Logger') : console;
 
-        if (guildId) {
-            Logger.debug(`[Migration 6.8.1] Guild-spezifischer Call für ${guildId} → Skip`);
-            return { success: true, skipped: true };
-        }
-
-        Logger.info('[Migration 6.8.1] Klopfe Gruppen-Rechte flach (Standardleiter)...');
+        Logger.info('[Migration] Klopfe Gruppen-Rechte flach (Standardleiter)...');
 
         // Ohne Sicherung wäre der Schritt nicht umkehrbar: Aus dem flachen
         // Zustand lässt sich nicht mehr ablesen, was eine Gruppe selbst
         // mitbrachte und was sie geerbt hat.
-        await dbService.query(`
+        await db.query(`
             CREATE TABLE IF NOT EXISTS guild_groups_permissions_backup (
                 group_id    INT UNSIGNED NOT NULL PRIMARY KEY,
                 guild_id    VARCHAR(20) NOT NULL,
@@ -87,12 +87,12 @@ module.exports = {
         `);
 
         const controlGuildId = process.env.CONTROL_GUILD_ID || null;
-        const guilds = await dbService.query('SELECT DISTINCT guild_id FROM guild_groups');
+        const guilds = await db.query('SELECT DISTINCT guild_id FROM guild_groups');
 
         let gruppen = 0, ergaenzt = 0, geerbt = 0, entfernt = 0;
 
         for (const { guild_id: gid } of guilds) {
-            const groups = await dbService.query(
+            const groups = await db.query(
                 'SELECT id, name, slug, priority, permissions FROM guild_groups WHERE guild_id = ? ORDER BY priority ASC',
                 [gid]
             );
@@ -107,7 +107,7 @@ module.exports = {
 
                 // INSERT IGNORE: Ein zweiter Lauf darf den bereits flachen
                 // Zustand nicht als "Original" festschreiben.
-                await dbService.query(
+                await db.query(
                     `INSERT IGNORE INTO guild_groups_permissions_backup (group_id, guild_id, permissions)
                      VALUES (?, ?, ?)`,
                     [group.id, gid, JSON.stringify(eigene)]
@@ -128,7 +128,7 @@ module.exports = {
                         if (isRestrictedKey(key)) {
                             delete neu[key];
                             entfernt++;
-                            Logger.warn(`[Migration 6.8.1] ${gid} · "${group.name}": ${key} entfernt (nur Control-Guild)`);
+                            Logger.warn(`[Migration] ${gid} · "${group.name}": ${key} entfernt (nur Control-Guild)`);
                         }
                     }
                 }
@@ -137,19 +137,19 @@ module.exports = {
                 if (dazu > 0) {
                     ergaenzt++;
                     geerbt += dazu;
-                    Logger.info(`[Migration 6.8.1] ${gid} · "${group.name}" (Prio ${group.priority}, `
+                    Logger.info(`[Migration] ${gid} · "${group.name}" (Prio ${group.priority}, `
                         + `${istStandard ? 'Standard' : 'eigene'}): `
                         + `${Object.keys(eigene).length} → ${Object.keys(neu).length} Rechte (+${dazu})`);
                 }
 
-                await dbService.query(
+                await db.query(
                     'UPDATE guild_groups SET permissions = ? WHERE id = ?',
                     [JSON.stringify(neu), group.id]
                 );
             }
         }
 
-        Logger.success(`[Migration 6.8.1] Fertig: ${gruppen} Gruppen, ${ergaenzt} ergänzt, `
+        Logger.success(`[Migration] Fertig: ${gruppen} Gruppen, ${ergaenzt} ergänzt, `
             + `${geerbt} geerbte Rechte eingeschrieben, ${entfernt} SYSTEM/SUPERADMIN entfernt.`);
 
         return { success: true, gruppen, ergaenzt, geerbt, entfernt };
@@ -158,30 +158,28 @@ module.exports = {
     /**
      * Stellt die Rechte aus der Sicherung wieder her.
      */
-    async down(dbService, guildId) {
+    async down(db) {
         const { ServiceManager } = require('dunebot-core');
-        const Logger = ServiceManager.get('Logger');
+        const Logger = ServiceManager.has('Logger') ? ServiceManager.get('Logger') : console;
 
-        if (guildId) return { success: true, skipped: true };
-
-        const [vorhanden] = await dbService.query(`
+        const [vorhanden] = await db.query(`
             SELECT COUNT(*) AS n FROM information_schema.TABLES
             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'guild_groups_permissions_backup'
         `);
         if (!Number(vorhanden?.n)) {
-            Logger.warn('[Migration 6.8.1] Keine Sicherung vorhanden – nichts wiederherzustellen.');
+            Logger.warn('[Migration] Keine Sicherung vorhanden – nichts wiederherzustellen.');
             return { success: true };
         }
 
-        const rows = await dbService.query('SELECT group_id, permissions FROM guild_groups_permissions_backup');
+        const rows = await db.query('SELECT group_id, permissions FROM guild_groups_permissions_backup');
         for (const row of rows) {
-            await dbService.query(
+            await db.query(
                 'UPDATE guild_groups SET permissions = ? WHERE id = ?',
                 [typeof row.permissions === 'string' ? row.permissions : JSON.stringify(row.permissions), row.group_id]
             );
         }
 
-        Logger.success(`[Migration 6.8.1] ${rows.length} Gruppen aus der Sicherung wiederhergestellt.`);
+        Logger.success(`[Migration] ${rows.length} Gruppen aus der Sicherung wiederhergestellt.`);
         return { success: true, wiederhergestellt: rows.length };
     }
 };
