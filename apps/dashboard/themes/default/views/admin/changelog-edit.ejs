@@ -759,3 +759,53 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<script>
+/**
+ * Pflichtfelder in versteckten Reitern sichtbar machen.
+ *
+ * Vier Pflichtfelder (status, slug, author, release_date) liegen im Reiter
+ * „Einstellungen", der beim Öffnen nicht aktiv ist. Ist eines davon leer, will
+ * der Browser es anspringen, kann es aber nicht – die Konsole meldet nur
+ * „An invalid form control with name='slug' is not focusable", das Formular wird
+ * NICHT abgeschickt, und auf der Seite passiert sichtbar gar nichts.
+ *
+ * Warum das über `invalid` läuft und nicht über `submit`: Bei ungültigen Feldern
+ * feuert `submit` überhaupt nicht – die native Prüfung greift davor. Das
+ * `invalid`-Ereignis dagegen feuert an jedem betroffenen Feld, auch an
+ * verborgenen. Es steigt nicht auf, deshalb wird in der Capture-Phase gelauscht.
+ */
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.querySelector('form[action*="/changelogs/save"]');
+    if (!form) return;
+
+    let bereitsGewechselt = false;
+
+    form.addEventListener('invalid', function (event) {
+        // Nur beim ersten ungültigen Feld den Reiter wechseln, sonst springt es
+        // bei mehreren Fehlern durch die Reiter.
+        if (bereitsGewechselt) return;
+
+        const pane = event.target.closest('.tab-pane');
+        if (!pane || pane.classList.contains('active')) return;
+
+        const tabLink = document.querySelector('a[data-toggle="tab"][href="#' + pane.id + '"]');
+        if (!tabLink) return;
+
+        bereitsGewechselt = true;
+        tabLink.click();
+
+        // Der Reiter blendet sich mit Übergang ein; erst danach ist das Feld
+        // fokussierbar und der Browser kann seinen Hinweis anzeigen.
+        setTimeout(function () {
+            event.target.focus();
+            if (typeof event.target.reportValidity === 'function') {
+                event.target.reportValidity();
+            }
+            bereitsGewechselt = false;
+        }, 200);
+    }, true);
+
+    console.log('[ChangelogEdit] Reiter-Wechsel bei versteckten Pflichtfeldern aktiv');
+});
+</script>
