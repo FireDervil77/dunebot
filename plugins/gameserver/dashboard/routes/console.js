@@ -187,7 +187,9 @@ router.post('/:serverId/send',
  * 
  * Body: { client_id: string }
  */
-router.post('/:serverId/detach', async (req, res) => {
+router.post('/:serverId/detach',
+    requirePermission('GAMESERVER.CONSOLE.VIEW'),
+    async (req, res) => {
     const { serverId } = req.params;
     const { client_id } = req.body;
     const { guildId } = res.locals;

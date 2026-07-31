@@ -198,7 +198,7 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
  * GET /guild/:guildId/plugins/gameserver/servers/create
  * Server-Erstellungs-Wizard (3 Steps)
  */
-router.get('/create', async (req, res) => {
+router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const themeManager = ServiceManager.get('themeManager');
@@ -497,7 +497,7 @@ router.get('/create', async (req, res) => {
  * POST /guild/:guildId/plugins/gameserver/servers
  * Server erstellen (Final Step)
  */
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     
@@ -585,7 +585,7 @@ router.post('/', async (req, res) => {
 
         // Addon abrufen
         const [addon] = await dbService.query(`
-            SELECT id, name, slug, game_data, steam_app_id, steam_server_app_id
+            SELECT id, name, slug, game_data, steam_app_id, steam_server_app_id, version
             FROM addon_marketplace 
             WHERE slug = ?
         `, [addon_slug]);
@@ -967,7 +967,7 @@ router.post('/', async (req, res) => {
                 addon_version,
                 status,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '1.0.0', 'installing', NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installing', NOW())
         `, [
             guildId,
             userId,
@@ -986,7 +986,10 @@ router.post('/', async (req, res) => {
             toBool(auto_update, false) ? 1 : 0,
             allocated_ram_mb || null,      // ✅ NEU: Resource Limits
             allocated_cpu_percent || null,
-            allocated_disk_gb || null
+            allocated_disk_gb || null,
+            // Vorher stand '1.0.0' fest im VALUES-Teil: jeder Server merkte sich
+            // diese Version, egal welche das Addon wirklich hatte.
+            addon.version || '1.0.0'
         ]);
 
         const serverId = result.insertId;
@@ -1249,7 +1252,7 @@ router.get('/events', requirePermission('GAMESERVER.VIEW'), (req, res) => {
  * Gibt aktuelle Status aller Server einer Guild zurück
  * WICHTIG: Muss VOR /:serverId Route definiert werden!
  */
-router.get('/status', async (req, res) => {
+router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     
@@ -1884,7 +1887,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
  * GET /guild/:guildId/plugins/gameserver/servers/:serverId/edit
  * Server-Bearbeitungs-Formular anzeigen
  */
-router.get('/:serverId/edit', async (req, res) => {
+router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const themeManager = ServiceManager.get('themeManager');
@@ -1957,7 +1960,7 @@ router.get('/:serverId/edit', async (req, res) => {
  * PUT /guild/:guildId/plugins/gameserver/servers/:serverId/start
  * Server starten
  */
-router.put('/:serverId/start', async (req, res) => {
+router.put('/:serverId/start', requirePermission('GAMESERVER.START'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const ipmServer = ServiceManager.get('ipmServer');
@@ -2165,7 +2168,7 @@ router.put('/:serverId/start', async (req, res) => {
  * PUT /guild/:guildId/plugins/gameserver/servers/:serverId/stop
  * Server stoppen
  */
-router.put('/:serverId/stop', async (req, res) => {
+router.put('/:serverId/stop', requirePermission('GAMESERVER.STOP'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     
@@ -2219,7 +2222,7 @@ router.put('/:serverId/stop', async (req, res) => {
  * DELETE /guild/:guildId/plugins/gameserver/servers/:serverId
  * Server löschen (inkl. Dateien vom Daemon)
  */
-router.delete('/:serverId', async (req, res) => {
+router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const ipmServer = ServiceManager.get('ipmServer');
@@ -2366,65 +2369,10 @@ router.delete('/:serverId', async (req, res) => {
 });
 
 /**
- * GET /guild/:guildId/plugins/gameserver/servers/:serverId/edit
- * Server-Edit-Formular anzeigen
- */
-router.get('/:serverId/edit', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
-    const themeManager = ServiceManager.get('themeManager');
-    
-    try {
-        const guildId = res.locals.guildId;
-        const user = res.locals.user;
-        const { serverId } = req.params;
-
-        Logger.debug(`[Gameserver] Edit-Formular aufgerufen für Server ${serverId}`);
-
-        // Server-Daten laden
-        const [server] = await dbService.query(`
-            SELECT 
-                gs.id,
-                gs.name,
-                gs.status,
-                gs.max_players,
-                gs.auto_restart,
-                gs.auto_update,
-                gs.env_variables,
-                gs.addon_marketplace_id,
-                gs.template_name,
-                am.name as game_name
-            FROM gameservers gs
-            LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
-            WHERE gs.id = ? AND gs.guild_id = ?
-        `, [serverId, guildId]);
-
-        if (!server) {
-            return res.status(404).send('Server nicht gefunden');
-        }
-
-        // JSON-Daten parsen
-        if (typeof server.env_variables === 'string') {
-            server.env_variables = JSON.parse(server.env_variables);
-        }
-
-        themeManager.renderView(res, 'gameserver-edit', {
-            guildId,
-            user,
-            server,
-            layout: themeManager.getLayout('guild')
-        });
-    } catch (error) {
-        Logger.error('[Gameserver] Fehler beim Laden des Edit-Formulars:', error);
-        res.status(500).send('Serverfehler beim Laden der Seite');
-    }
-});
-
-/**
  * PUT /guild/:guildId/plugins/gameserver/servers/:serverId
  * Server-Einstellungen aktualisieren
  */
-router.put('/:serverId', async (req, res) => {
+router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     
@@ -2517,7 +2465,7 @@ router.put('/:serverId', async (req, res) => {
  * POST /guild/:guildId/plugins/gameserver/servers/:serverId/retry-installation
  * Installation für Server mit Status 'error' erneut versuchen
  */
-router.post('/:serverId/retry-installation', async (req, res) => {
+router.post('/:serverId/retry-installation', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     
@@ -2683,7 +2631,7 @@ router.post('/:serverId/retry-installation', async (req, res) => {
  * POST /guild/:guildId/plugins/gameserver/servers/:serverId/start
  * Startet einen Gameserver
  */
-router.post('/:serverId/start', async (req, res) => {
+router.post('/:serverId/start', requirePermission('GAMESERVER.START'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     
@@ -2877,7 +2825,7 @@ router.post('/:serverId/start', async (req, res) => {
  * POST /guild/:guildId/plugins/gameserver/servers/:serverId/stop
  * Stoppt einen laufenden Gameserver
  */
-router.post('/:serverId/stop', async (req, res) => {
+router.post('/:serverId/stop', requirePermission('GAMESERVER.STOP'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     
@@ -2988,7 +2936,7 @@ router.post('/:serverId/stop', async (req, res) => {
  * POST /guild/:guildId/plugins/gameserver/servers/:serverId/restart
  * Startet einen Gameserver neu
  */
-router.post('/:serverId/restart', async (req, res) => {
+router.post('/:serverId/restart', requirePermission('GAMESERVER.RESTART'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     

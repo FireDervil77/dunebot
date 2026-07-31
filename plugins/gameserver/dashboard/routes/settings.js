@@ -8,12 +8,13 @@
 const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
 /**
  * GET /guild/:guildId/plugins/gameserver/settings
  * Gameserver Plugin-Einstellungen
  */
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const themeManager = ServiceManager.get('themeManager');
@@ -57,7 +58,7 @@ router.get('/', async (req, res) => {
  * PUT /guild/:guildId/plugins/gameserver/settings
  * Gameserver Settings speichern
  */
-router.put('/', async (req, res) => {
+router.put('/', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     

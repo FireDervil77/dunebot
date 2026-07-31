@@ -147,29 +147,6 @@ class GameserverPlugin extends DashboardPlugin {
         Logger.debug('[Gameserver] Assets registriert (8 Scripts + 1 Style: xterm.js, Monaco, Console, Actions, Overview, File-Manager)');
     }
 
-    /**
-     * Routes registrieren
-     * Express-Router für Guild und Base-Endpoints
-     */
-    _setupRoutes() {
-        const Logger = ServiceManager.get('Logger');
-        
-        // Guild-spezifische Routes (aus separaten Files)
-        const serversRoutes = require('./routes/servers');
-        const addonsRoutes = require('./routes/addons');
-        const filesRoutes = require('./routes/files');  // ← NEU: File-Manager
-        const consoleRoutes = require('./routes/console');
-        const settingsRoutes = require('./routes/settings');
-        
-        // Guild-Router mounten
-        this.guildRouter.use('/servers', serversRoutes);
-        this.guildRouter.use('/addons', addonsRoutes);
-        this.guildRouter.use('/', filesRoutes);  // ← Files-Routes unter / (weil /servers/:serverId/files)
-        this.guildRouter.use('/console', consoleRoutes);
-        this.guildRouter.use('/settings', settingsRoutes);
-        
-        Logger.debug('[Gameserver] Routes registriert (Servers, Addons, Files, Console, Settings)');
-    }
 
     
     /**

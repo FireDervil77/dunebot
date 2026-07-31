@@ -11,6 +11,7 @@ const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const multer = require('multer');
 const path = require('path');
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
 // File-Upload konfigurieren (Max 500MB, Memory-Storage)
 const upload = multer({
@@ -98,7 +99,7 @@ function isDenied(filePath, denylist) {
 }
 
 // ROUTES
-router.get('/servers/:serverId/files', async (req, res) => {
+router.get('/servers/:serverId/files', requirePermission('GAMESERVER.FILES.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {
@@ -140,7 +141,7 @@ router.get('/servers/:serverId/files', async (req, res) => {
     }
 });
 
-router.get('/servers/:serverId/files/read', async (req, res) => {
+router.get('/servers/:serverId/files/read', requirePermission('GAMESERVER.FILES.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {
@@ -176,7 +177,7 @@ router.get('/servers/:serverId/files/read', async (req, res) => {
     }
 });
 
-router.post('/servers/:serverId/files/write', async (req, res) => {
+router.post('/servers/:serverId/files/write', requirePermission('GAMESERVER.FILES.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {
@@ -216,7 +217,7 @@ router.post('/servers/:serverId/files/write', async (req, res) => {
     }
 });
 
-router.delete('/servers/:serverId/files', async (req, res) => {
+router.delete('/servers/:serverId/files', requirePermission('GAMESERVER.FILES.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {
@@ -251,7 +252,7 @@ router.delete('/servers/:serverId/files', async (req, res) => {
     }
 });
 
-router.post('/servers/:serverId/files/bulk-delete', async (req, res) => {
+router.post('/servers/:serverId/files/bulk-delete', requirePermission('GAMESERVER.FILES.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {
@@ -280,7 +281,7 @@ router.post('/servers/:serverId/files/bulk-delete', async (req, res) => {
     }
 });
 
-router.post('/servers/:serverId/files/mkdir', async (req, res) => {
+router.post('/servers/:serverId/files/mkdir', requirePermission('GAMESERVER.FILES.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {
@@ -308,7 +309,7 @@ router.post('/servers/:serverId/files/mkdir', async (req, res) => {
     }
 });
 
-router.delete('/servers/:serverId/files/rmdir', async (req, res) => {
+router.delete('/servers/:serverId/files/rmdir', requirePermission('GAMESERVER.FILES.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {
@@ -336,7 +337,7 @@ router.delete('/servers/:serverId/files/rmdir', async (req, res) => {
     }
 });
 
-router.post('/servers/:serverId/files/rename', async (req, res) => {
+router.post('/servers/:serverId/files/rename', requirePermission('GAMESERVER.FILES.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {
@@ -367,7 +368,7 @@ router.post('/servers/:serverId/files/rename', async (req, res) => {
     }
 });
 
-router.post('/servers/:serverId/files/move', async (req, res) => {
+router.post('/servers/:serverId/files/move', requirePermission('GAMESERVER.FILES.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {
@@ -398,7 +399,7 @@ router.post('/servers/:serverId/files/move', async (req, res) => {
     }
 });
 
-router.post('/servers/:serverId/files/bulk-move', async (req, res) => {
+router.post('/servers/:serverId/files/bulk-move', requirePermission('GAMESERVER.FILES.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {
@@ -432,7 +433,7 @@ router.post('/servers/:serverId/files/bulk-move', async (req, res) => {
     }
 });
 
-router.post('/servers/:serverId/files/upload', upload.single('file'), async (req, res) => {
+router.post('/servers/:serverId/files/upload', requirePermission('GAMESERVER.FILES.MANAGE'), upload.single('file'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {
@@ -477,7 +478,7 @@ router.post('/servers/:serverId/files/upload', upload.single('file'), async (req
  * Datei herunterladen (als Attachment)
  * Query: ?path=/server.properties
  */
-router.get('/servers/:serverId/files/download', async (req, res) => {
+router.get('/servers/:serverId/files/download', requirePermission('GAMESERVER.FILES.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {

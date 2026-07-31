@@ -22,6 +22,7 @@
 const express = require('express');
 const router  = express.Router();
 const { ServiceManager } = require('dunebot-core');
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hilfsfunktionen
@@ -72,7 +73,7 @@ function detectPlatform(gameData) {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET / — Marketplace
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) => {
     const Logger       = ServiceManager.get('Logger');
     const dbService    = ServiceManager.get('dbService');
     const themeManager = ServiceManager.get('themeManager');
@@ -137,7 +138,7 @@ router.get('/', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /my-addons
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/my-addons', async (req, res) => {
+router.get('/my-addons', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) => {
     const Logger       = ServiceManager.get('Logger');
     const dbService    = ServiceManager.get('dbService');
     const themeManager = ServiceManager.get('themeManager');
@@ -170,7 +171,7 @@ router.get('/my-addons', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /create — Addon-Editor (neu)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/create', async (req, res) => {
+router.get('/create', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
     const Logger       = ServiceManager.get('Logger');
     const dbService    = ServiceManager.get('dbService');
     const themeManager = ServiceManager.get('themeManager');
@@ -222,7 +223,7 @@ router.get('/create', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /edit/:id — Addon-Editor (bearbeiten)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/edit/:id', async (req, res) => {
+router.get('/edit/:id', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
     const Logger       = ServiceManager.get('Logger');
     const dbService    = ServiceManager.get('dbService');
     const themeManager = ServiceManager.get('themeManager');
@@ -260,7 +261,7 @@ router.get('/edit/:id', async (req, res) => {
 // GET /:slug — Addon-Detail
 // WICHTIG: Muss nach /my-addons, /create und /edit/:id stehen!
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/:slug', async (req, res) => {
+router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) => {
     const Logger       = ServiceManager.get('Logger');
     const dbService    = ServiceManager.get('dbService');
     const themeManager = ServiceManager.get('themeManager');
@@ -318,7 +319,7 @@ router.get('/:slug', async (req, res) => {
 // POST / — Eigenes Addon anlegen
 // Erwartet game_data als FIREBOT_v2 JSON-String
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
     const Logger    = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId   = res.locals.guildId;
@@ -401,7 +402,7 @@ router.post('/', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /:id — Eigenes Addon aktualisieren
 // ─────────────────────────────────────────────────────────────────────────────
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
     const Logger    = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId   = res.locals.guildId;
@@ -495,7 +496,7 @@ router.put('/:id', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /:id — Eigenes Addon löschen
 // ─────────────────────────────────────────────────────────────────────────────
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
     const Logger    = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId   = res.locals.guildId;
