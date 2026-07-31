@@ -150,6 +150,7 @@ class StatusPoller {
     async _loadServers() {
         return this._dbService.query(`
             SELECT gs.id, gs.guild_id, gs.status, gs.ports, gs.env_variables, gs.bind_ip,
+                   gs.public_status_enabled,
                    COALESCE(am.game_data, gs.frozen_game_data) AS game_data,
                    r.host AS rootserver_ip,
                    r.daemon_id,
@@ -204,10 +205,14 @@ class StatusPoller {
             interval = INTERVAL_WATCHED;
         } else if (this._guildHasViewers(server.guild_id)) {
             interval = INTERVAL_GUILD_ACTIVE;
-        } else if (PanelService.hasPanel(key)) {
+        } else if (PanelService.hasPanel(key) || server.public_status_enabled) {
             // Ein Discord-Panel ist ein Zuschauer, der nie den Tab schließt.
             // Ohne diesen Zweig wäre es nachts 300 s alt, egal wie oft der Bot
             // editiert – die Bremse sitzt dann nicht am Bot, sondern hier.
+            //
+            // Für die öffentliche Statusseite (E5) gilt dasselbe: Eine fremde
+            // Website fragt alle 30 s, und Daten von vor fünf Minuten hätten den
+            // Endpunkt zur Attrappe gemacht.
             interval = INTERVAL_GUILD_ACTIVE;
         } else {
             interval = INTERVAL_IDLE;
