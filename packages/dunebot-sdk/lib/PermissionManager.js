@@ -181,19 +181,39 @@ class PermissionManager {
 
     const userData = user[0];
 
-    // 3. Hierarchie-Permissions laden
+    // 3. Rechte der zugewiesenen Gruppen vereinigen
+    //
+    // Früher lud diese Stelle ALLE Gruppen mit `priority <= max_priority` und
+    // legte sie übereinander. Priorität war damit eine Stufe auf einer Leiter:
+    // Wer oben stand, erbte alles darunter – auch aus Gruppen, in denen er nie
+    // war. Eine selbst angelegte Gruppe unterhalb der Standardgruppe galt
+    // dadurch für die ganze Guild, ohne dass es irgendwo sichtbar wurde.
+    //
+    // Jetzt zählt, was tatsächlich zugewiesen ist – wie eine WordPress-Rolle,
+    // die alles enthält, was sie braucht. Migration 20260731_130000 hat den
+    // Gruppen vorher eingeschrieben, was sie bis dahin geerbt haben, damit
+    // niemand beim Umschalten Rechte verliert.
     let permissions = {};
-    const maxPriority = userData.max_priority;
 
-    if (maxPriority !== null && maxPriority !== undefined) {
-      // HIERARCHIE: Alle Gruppen der Guild mit priority <= User's höchste Priorität
-      const groups = await this.dbService.query(
-        'SELECT permissions, priority FROM guild_groups WHERE guild_id = ? AND priority <= ? ORDER BY priority ASC',
-        [guildId, maxPriority]
-      );
-      for (const group of (groups || [])) {
-        const perms = this._normalizePerms(group.permissions);
-        permissions = { ...permissions, ...perms };
+    const groups = await this.dbService.query(
+      `SELECT gg.permissions
+       FROM guild_users gu
+       JOIN guild_user_groups gug ON gug.guild_user_id = gu.id
+       JOIN guild_groups gg       ON gg.id = gug.group_id
+       WHERE gu.user_id = ? AND gu.guild_id = ?
+       ORDER BY gg.priority ASC`,
+      [userId, guildId]
+    );
+
+    for (const group of (groups || [])) {
+      const perms = this._normalizePerms(group.permissions);
+      for (const [key, value] of Object.entries(perms)) {
+        // Reine Vereinigung: Erteilt eine Gruppe ein Recht, gilt es. Ein `false`
+        // in einer Gruppe heißt nur "diese Gruppe erteilt es nicht" und darf
+        // nicht überstimmen, was eine andere Gruppe erlaubt – sonst hinge das
+        // Ergebnis an der Reihenfolge. Verweigern kann nur eine Direct
+        // Permission (Schritt 4), die zuletzt gesetzt wird.
+        if (value === true) permissions[key] = true;
       }
     }
 
