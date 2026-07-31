@@ -670,23 +670,36 @@ router.put('/users/:userId', requirePermission('PERMISSIONS.USERS.EDIT'), async 
         
         // Update Direct Permissions
         if (direct_permissions !== undefined) {
-            // Konvertiere String "true" zu boolean true
             const cleanedPerms = {};
             const isControlGuild = guildId === process.env.CONTROL_GUILD_ID;
             if (direct_permissions && typeof direct_permissions === 'object') {
                 Object.keys(direct_permissions).forEach(key => {
                     // SYSTEM/SUPERADMIN auf Nicht-Control-Guilds blocken
                     if (!isControlGuild && isRestrictedPermKey(key)) return;
-                    cleanedPerms[key] = direct_permissions[key] === 'true' || direct_permissions[key] === true;
+
+                    // Nur erteilte Rechte speichern. Ein abgewähltes Kästchen
+                    // heißt in dieser Oberfläche "kein Extrarecht", nicht
+                    // "ausdrücklich verboten" – für Letzteres gibt es keine
+                    // Darstellung. Würden abgewählte als `false` gespeichert,
+                    // bliebe der Schlüssel stehen und die Marke zählte ihn
+                    // weiter mit ("8 Custom", obwohl nichts mehr erteilt ist).
+                    if (direct_permissions[key] === 'true' || direct_permissions[key] === true) {
+                        cleanedPerms[key] = true;
+                    }
                 });
             }
-            
+
             // Niemand vergibt Rechte, die er selbst nicht hat – hier besonders
             // wichtig, weil Direct Permissions alles andere ueberstimmen.
             const gefiltertDirect = await stripUngrantable(cleanedPerms, res.locals.user?.id, guildId, Logger);
             const wirksamePerms = gefiltertDirect.permissions;
 
-            const directPermsJson = Object.keys(wirksamePerms).length > 0 ? JSON.stringify(wirksamePerms) : null;
+            // Leeres Ergebnis → NULL, damit die Spalte wirklich leer ist und die
+            // Anzeige keine Geisterrechte zählt.
+            const erteilte = Object.keys(wirksamePerms).filter(k => wirksamePerms[k] === true);
+            const directPermsJson = erteilte.length > 0
+                ? JSON.stringify(Object.fromEntries(erteilte.map(k => [k, true])))
+                : null;
             await dbService.query(`
                 UPDATE guild_users 
                 SET direct_permissions = ?, updated_at = NOW()

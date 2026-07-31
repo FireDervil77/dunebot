@@ -78,28 +78,21 @@ class GuildAjaxHandler {
             // Problem: Checkboxen werden nur als FormData aufgenommen wenn checked!
             // Lösung: Alle Checkboxen manuell sammeln (checked = true, unchecked = false)
             // ========================================
-            console.log('[GuildAjax] DEBUG: formType =', formType, 'checking if edit-group or create-group...');
-            if (formType === 'edit-group' || formType === 'create-group') {
-                console.log('[GuildAjax] DEBUG: Inside group edit block, searching for checkboxes...');
-                const allCheckboxes = form.querySelectorAll('.permission-checkbox');
-                console.log('[GuildAjax] DEBUG: Found', allCheckboxes.length, 'checkboxes');
-                
-                let serializedCount = 0;
-                allCheckboxes.forEach(checkbox => {
-                    const permKey = checkbox.dataset.permissionKey;
-                    console.log('[GuildAjax] DEBUG: Processing checkbox, permKey =', permKey, 'checked =', checkbox.checked);
-                    if (permKey) {
-                        // Überschreibe FormData mit aktuellem Checked-State
-                        const fieldName = `permissions[${permKey}]`;
-                        formData.delete(fieldName); // Lösche alte Werte
-                        // Setze explizit true/false (NICHT "true"/"false" als String!)
-                        formData.set(fieldName, checkbox.checked ? 'true' : 'false');
-                        serializedCount++;
-                    }
-                });
-                console.log('[GuildAjax] Permissions manuell serialisiert:', serializedCount, 'von', allCheckboxes.length, 'Checkboxen');
-            } else {
-                console.log('[GuildAjax] DEBUG: NOT a group form, skipping checkbox serialization');
+            // Gilt fuer JEDES Kontrollkaestchen mit data-permission-key, nicht nur
+            // fuer Gruppen-Formulare. Vorher war die Sonderbehandlung an
+            // formType === 'edit-group' gebunden, wodurch das Benutzer-Formular
+            // durchfiel: Wer dort alle Direct Permissions abwaehlte, schickte gar
+            // kein direct_permissions mehr mit - der Server ueberspringt das Feld
+            // dann und der alte Stand blieb stehen. Die Oberflaeche meldete
+            // "gespeichert", geaendert hatte sich nichts.
+            const permCheckboxes = form.querySelectorAll('input[type="checkbox"][data-permission-key]');
+            permCheckboxes.forEach(checkbox => {
+                if (!checkbox.name) return;
+                formData.delete(checkbox.name);
+                formData.set(checkbox.name, checkbox.checked ? 'true' : 'false');
+            });
+            if (permCheckboxes.length) {
+                console.log('[GuildAjax]', permCheckboxes.length, 'Rechte-Kaestchen explizit serialisiert');
             }
 
             // Konvertiere FormData zu Object (behandelt Arrays korrekt)
