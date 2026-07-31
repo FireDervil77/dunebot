@@ -908,6 +908,22 @@ router.post('/groups', requirePermission('PERMISSIONS.GROUPS.CREATE'), async (re
             });
         }
         
+        // SYSTEM/SUPERADMIN gehören ausschließlich in die Control-Guild. Der
+        // PUT-Zweig entfernt sie längst, der POST-Zweig bisher nicht – über
+        // einen direkten API-Aufruf ließe sich also eine Gruppe damit anlegen.
+        // Zugang verschafft das zwar nicht (hasSystemPermission() schaut nur auf
+        // OWNER_IDS und die Control-Guild), aber gespeichert gehört es trotzdem
+        // nicht: In der Gruppenliste sähe es nach echtem Recht aus.
+        const sauberePermissions = { ...(permissions || {}) };
+        if (guildId !== process.env.CONTROL_GUILD_ID) {
+            for (const key of Object.keys(sauberePermissions)) {
+                if (isRestrictedPermKey(key)) {
+                    Logger.warn(`[Permissions] ${key} beim Anlegen von "${name}" in Guild ${guildId} verworfen – nur Control-Guild`);
+                    delete sauberePermissions[key];
+                }
+            }
+        }
+
         // Ohne Angabe knapp ÜBER die Standardgruppe statt auf 0. Die 0 war der
         // gefährlichste denkbare Standardwert: Sie legt eine neue Gruppe unter
         // die Standardgruppe, womit jedes Mitglied der Guild ihre Rechte erbt.
@@ -923,13 +939,13 @@ router.post('/groups', requirePermission('PERMISSIONS.GROUPS.CREATE'), async (re
             description,
             color: color || '#6c757d',
             icon: icon || 'fa-users',
-            permissions: permissions || {},
+            permissions: sauberePermissions,
             priority: effectivePriority
         });
 
         Logger.info(`[Permissions] Group "${name}" created in guild ${guildId} (ID: ${groupId}, priority ${effectivePriority})`);
 
-        const warning = warnIfBelowDefault(effectivePriority, defaultPriority, permissions);
+        const warning = warnIfBelowDefault(effectivePriority, defaultPriority, sauberePermissions);
         if (warning) {
             Logger.warn(`[Permissions] Gruppe "${name}" (Guild ${guildId}): ${warning}`);
         }
