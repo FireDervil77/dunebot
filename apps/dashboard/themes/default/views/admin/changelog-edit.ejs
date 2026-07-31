@@ -355,8 +355,14 @@ console.log('[TinyMCE] Script geladen, warte auf DOMContentLoaded...');
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[TinyMCE] DOM geladen, initialisiere Editor...');
     
-    // Prüfe ob Textareas existieren
-    const textareas = document.querySelectorAll('#changes_de, #changes_en, #description_de, #description_en');
+    // Nur die Beschreibungsfelder bekommen den WYSIWYG-Editor.
+    //
+    // Die Aenderungsfelder (#changes_de/#changes_en) bewusst NICHT: Ihr Inhalt ist
+    // eine zeilenbasierte Sprache (# Gruppe, ## Untergruppe, ! + - *), und ein
+    // WYSIWYG-Editor formt sie konstruktionsbedingt um. Aus "# FireNetworks" wurde
+    // "<h1># FireNetworks</h1>" - Ueberschrift UND Marker -, aus mehreren Zeilen ein
+    // einziger Absatz mit <br>. Der Parser sah danach Gruppen ohne Inhalt.
+    const textareas = document.querySelectorAll('#description_de, #description_en');
     console.log('[TinyMCE] Gefundene Textareas:', textareas.length);
     
     if (textareas.length === 0) {
@@ -366,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Konfiguration für beide Sprachen
     const tinymceConfig = {
-        selector: '#changes_de, #changes_en, #description_de, #description_en',
+        selector: '#description_de, #description_en',
         height: 500,
         menubar: true,
         plugins: [

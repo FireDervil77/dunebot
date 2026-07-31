@@ -208,14 +208,26 @@ function parseHierarchicalChangelog(changesText) {
     });
     
     // SCHRITT 1: Überschriften normalisieren (HTML → Plain-Text für Parsing)
-    // <h2>Header</h2> → # Header
-    processedText = processedText.replace(/<h2[^>]*>(.*?)<\/h2>/gi, (match, content) => {
-        return '\n# ' + content.trim() + '\n';
+    //
+    // Ein WYSIWYG-Editor macht aus getipptem "# FireNetworks" ein
+    // `<h1># FireNetworks</h1>` – Überschrift UND Marker. Deshalb wird der
+    // Marker aus dem Inhalt entfernt, sonst hieße die Gruppe "# FireNetworks".
+    const ohneMarker = (text) => String(text).replace(/^\s*#{1,3}\s*/, '').trim();
+
+    // <h1> fehlte bisher ganz: TinyMCE erzeugt es fuer die oberste Ebene, und
+    // ohne diese Zeile verschwand die komplette Hauptgruppe beim Parsen.
+    processedText = processedText.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (match, content) => {
+        return '\n# ' + ohneMarker(content) + '\n';
     });
-    
-    // <h3>Subheader</h3> → ## Subheader  
-    processedText = processedText.replace(/<h3[^>]*>(.*?)<\/h3>/gi, (match, content) => {
-        return '\n## ' + content.trim() + '\n';
+
+    // <h2>Header</h2> → # Header
+    processedText = processedText.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (match, content) => {
+        return '\n# ' + ohneMarker(content) + '\n';
+    });
+
+    // <h3>Subheader</h3> → ## Subheader
+    processedText = processedText.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (match, content) => {
+        return '\n## ' + ohneMarker(content) + '\n';
     });
     
     // SCHRITT 1.5: Markdown-Header in <p>-Tags erkennen
@@ -229,8 +241,15 @@ function parseHierarchicalChangelog(changesText) {
     });
     
     // SCHRITT 2: Items mit Symbolen extrahieren (BEHALTE HTML im Text!)
-    // <p>! Bugfix: <strong>Server crash</strong> fixed</p> → ! Bugfix: <strong>Server crash</strong> fixed
-    processedText = processedText.replace(/<p[^>]*>([!+\-*])\s+(.*?)<\/p>/gi, (match, symbol, content) => {
+    // <p>! Bugfix: <strong>Server crash</strong> fixed</p> → ! Bugfix: …
+    //
+    // Nach dem Marker ist ein Doppelpunkt ODER Leerzeichen erlaubt. Vorher
+    // verlangte die Regel zwingend ein Leerzeichen, wodurch die verbreitete
+    // Schreibweise `!: Text` stillschweigend verworfen wurde – in Changelog 11
+    // blieben dadurch vier von fünf Gruppen leer, obwohl der Text dastand.
+    // Irgendein Trennzeichen bleibt Pflicht, sonst würde "*wichtig*" als
+    // Änderungseintrag gelesen.
+    processedText = processedText.replace(/<p[^>]*>([!+\-*])[:\s]\s*(.*?)<\/p>/gi, (match, symbol, content) => {
         return '\n' + symbol + ' ' + content.trim() + '\n';
     });
     
@@ -369,7 +388,9 @@ function parseHierarchicalChangelog(changesText) {
         if (itemTypeMap[firstChar]) {
             const itemMeta = itemTypeMap[firstChar];
             // ✅ WICHTIG: Text BEHÄLT HTML-Tags (strong, em, code, a, etc.)
-            const text = line.substring(1).trim();
+            // Ein führender Doppelpunkt gehört zum Marker, nicht zum Text:
+            // Wer `!: Fehler behoben` schreibt, meint nicht ": Fehler behoben".
+            const text = line.substring(1).replace(/^\s*:\s*/, '').trim();
 
             const item = {
                 type: itemMeta.type,
