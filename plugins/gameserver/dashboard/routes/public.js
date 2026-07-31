@@ -97,6 +97,12 @@ router.get('/status/:token', bremse, async (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Cache-Control', 'public, max-age=15');
 
+    // Helmet setzt global `Cross-Origin-Resource-Policy: same-origin`. Der
+    // Header hat mit CORS nichts zu tun und wirkt zusätzlich: Er verbietet
+    // fremden Seiten, die Ressource zu laden – auch dann, wenn CORS es erlaubt.
+    // Für einen ausdrücklich öffentlichen Endpunkt ist das genau falsch herum.
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+
     try {
         const daten = await ladeStatus(req.params.token);
         if (!daten) {

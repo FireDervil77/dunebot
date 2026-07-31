@@ -68,6 +68,9 @@ router.get('/widget/:token', bremse, async (req, res) => {
             "frame-ancestors *; default-src 'none'; style-src 'unsafe-inline'; "
             + "script-src 'unsafe-inline'; connect-src 'self'");
         res.set('Cache-Control', 'public, max-age=60');
+        // Siehe public.js: Helmets `same-origin` verbietet fremdes Einbetten
+        // unabhängig von CORS und frame-ancestors.
+        res.set('Cross-Origin-Resource-Policy', 'cross-origin');
         res.type('html');
 
         return res.send(`<!DOCTYPE html>
