@@ -8,6 +8,7 @@
  * @author FireBot Team
  */
 
+const crypto = require('node:crypto');
 const { doubleCsrf } = require('csrf-csrf');
 const { ServiceManager } = require('dunebot-core');
 
@@ -111,10 +112,51 @@ const describeCsrfFailure = (req) => {
     const shown = headerToken || bodyToken;
     if (shown && cookie) {
         parts.push(shown === cookie ? 'Token == Cookie' : 'Token != Cookie');
+        // Sind Token und Cookie identisch und trotzdem ungültig, liegt es an der
+        // HMAC-Prüfung: Das Token ist an eine Sitzungskennung gebunden. Hier wird
+        // ausprobiert, mit welcher Kennung es damals ausgestellt wurde.
+        if (shown === cookie) parts.push(identifyTokenOwner(req, shown));
     }
 
     return parts.join(', ');
 };
+
+/**
+ * Rechnet nach, zu welcher Sitzungskennung ein Token passt.
+ *
+ * csrf-csrf bildet das Token als `HMAC(secret, "<len>!<kennung>!<len>!<zufall>").<zufall>`,
+ * wobei die Kennung aus `getSessionIdentifier()` stammt. Passt keine der beiden
+ * möglichen Kennungen, wurde das Token unter einer dritten ausgestellt – dann ist
+ * die Sitzung zwischenzeitlich gewechselt.
+ *
+ * @param {object} req
+ * @param {string} token
+ * @returns {string} Kurzbefund fürs Log
+ */
+function identifyTokenOwner(req, token) {
+    try {
+        const [hmac, randomValue] = String(token).split('.');
+        if (!hmac || !randomValue) return 'Token-Format unerwartet';
+
+        const secret = process.env.CSRF_SECRET || 'dunebot-csrf-secret-change-in-production';
+        const matches = (identifier) => {
+            const message = [identifier.length, identifier, randomValue.length, randomValue].join('!');
+            return crypto.createHmac('sha256', secret).update(message).digest('hex') === hmac;
+        };
+
+        if (req.session?.id && matches(req.session.id)) {
+            // Dürfte nicht vorkommen – dann hätte die Bibliothek akzeptiert.
+            return 'HMAC passt zur AKTUELLEN Session (unerwartet)';
+        }
+        if (matches(`${req.ip}-${req.headers['user-agent']}`)) {
+            return 'HMAC passt zur IP+Browser-Kennung → beim Ausstellen gab es KEINE Session';
+        }
+        return 'HMAC passt zu keiner aktuellen Kennung → Session hat seit dem Ausstellen gewechselt';
+
+    } catch (err) {
+        return `HMAC-Vergleich fehlgeschlagen: ${err.message}`;
+    }
+}
 
 /**
  * Einheitliche 403-Antwort bei ungültigem Token
