@@ -262,17 +262,34 @@ class PermissionManager {
 
       const perms = result.permissions;
 
-      // Wildcard → alles erlaubt
-      if (perms.wildcard === true) return true;
+      // Auflösung von stark nach schwach: Je genauer die Angabe, desto mehr
+      // gilt sie. Nur so lässt sich "alles zum Gameserver, außer Löschen"
+      // ausdrücken:  { "GAMESERVER.*": true, "GAMESERVER.DELETE": false }
 
-      // Explizit erlaubt
+      // 1. Der genaue Schlüssel – erlaubt UND verweigert.
+      //    Ein `false` kann hier nur aus den Direct Permissions stammen: Gruppen
+      //    tragen seit dem flachen Modell ausschließlich Erteilungen bei.
       if (perms[normalizedKey] === true) return true;
-
-      // Explizit verweigert (direct_permissions deny)
       if (perms[normalizedKey] === false) return false;
 
+      // 2. Bereichs-Wildcards, vom engsten zum weitesten:
+      //    GAMESERVER.CONSOLE.VIEW → GAMESERVER.CONSOLE.* → GAMESERVER.*
+      //    Damit erfasst eine Gruppe auch Rechte, die ein Plugin-Update erst
+      //    später hinzufügt – ohne Wildcards müsste ein Admin nach jedem Update
+      //    jede Gruppe nachpflegen.
+      const teile = normalizedKey.split('.');
+      for (let i = teile.length - 1; i > 0; i--) {
+        const bereich = `${teile.slice(0, i).join('.')}.*`;
+        if (perms[bereich] === true) return true;
+        if (perms[bereich] === false) return false;
+      }
+
+      // 3. Globales Wildcard zuletzt – die schwächste Aussage, weil sie nichts
+      //    über das einzelne Recht weiß.
+      if (perms.wildcard === true) return true;
+
       return false;
-      
+
     } catch (error) {
       this.logger.error(`[PermissionManager] Error checking permission ${permissionKey} for user ${userId} in guild ${guildId}:`, error);
       return false; // Im Fehlerfall: Kein Zugriff

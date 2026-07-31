@@ -47,6 +47,55 @@ function isRestrictedPermKey(key) {
     return key.startsWith('SYSTEM.') || key.startsWith('SUPERADMIN.');
 }
 
+/**
+ * Entfernt Rechte, die der Handelnde selbst nicht besitzt.
+ *
+ * Ohne diese Regel kann sich jeder mit PERMISSIONS.GROUPS.EDIT selbst
+ * hochstufen: Ein Moderator legt eine Gruppe an, hakt GAMESERVER.DELETE an und
+ * weist sie sich zu. Das Rechtesystem prüft heute nur, ob er Gruppen bearbeiten
+ * darf – nicht, was er da hineinschreibt.
+ *
+ * WordPress löst das genauso: `promote_users` erlaubt Rollenvergabe, aber
+ * niemand kann Capabilities weiterreichen, die er nicht hat.
+ *
+ * Entzug (`false`) bleibt immer erlaubt – damit lässt sich nichts erschleichen.
+ * Der Guild-Owner hat `wildcard` und kommt überall durch.
+ *
+ * @param {object} permissions - gewünschte Rechte {key: bool}
+ * @param {string} actorId - Discord-ID des Handelnden
+ * @param {string} guildId
+ * @param {object} Logger
+ * @returns {Promise<{permissions: object, verweigert: string[]}>}
+ */
+async function stripUngrantable(permissions, actorId, guildId, Logger) {
+    const permissionManager = ServiceManager.get('permissionManager');
+    const bereinigt = {};
+    const verweigert = [];
+
+    for (const [key, value] of Object.entries(permissions || {})) {
+        const erteilt = value === true || value === 'true';
+
+        // Wegnehmen darf jeder, der die Gruppe bearbeiten darf.
+        if (!erteilt) {
+            bereinigt[key] = false;
+            continue;
+        }
+
+        if (await permissionManager.hasPermission(actorId, guildId, key)) {
+            bereinigt[key] = true;
+        } else {
+            verweigert.push(key);
+        }
+    }
+
+    if (verweigert.length) {
+        Logger.warn(`[Permissions] User ${actorId} wollte ${verweigert.length} Recht(e) vergeben, `
+            + `die er selbst nicht hat (Guild ${guildId}): ${verweigert.join(', ')}`);
+    }
+
+    return { permissions: bereinigt, verweigert };
+}
+
 // ============================================================================
 // ROOT REDIRECT
 // ============================================================================
@@ -544,7 +593,12 @@ router.put('/users/:userId', requirePermission('PERMISSIONS.USERS.EDIT'), async 
                 });
             }
             
-            const directPermsJson = Object.keys(cleanedPerms).length > 0 ? JSON.stringify(cleanedPerms) : null;
+            // Niemand vergibt Rechte, die er selbst nicht hat – hier besonders
+            // wichtig, weil Direct Permissions alles andere ueberstimmen.
+            const gefiltertDirect = await stripUngrantable(cleanedPerms, res.locals.user?.id, guildId, Logger);
+            const wirksamePerms = gefiltertDirect.permissions;
+
+            const directPermsJson = Object.keys(wirksamePerms).length > 0 ? JSON.stringify(wirksamePerms) : null;
             await dbService.query(`
                 UPDATE guild_users 
                 SET direct_permissions = ?, updated_at = NOW()
@@ -924,6 +978,9 @@ router.post('/groups', requirePermission('PERMISSIONS.GROUPS.CREATE'), async (re
             }
         }
 
+        // Niemand vergibt Rechte, die er selbst nicht hat.
+        const gefiltert = await stripUngrantable(sauberePermissions, res.locals.user?.id, guildId, Logger);
+
         // Ohne Angabe knapp ÜBER die Standardgruppe statt auf 0. Die 0 war der
         // gefährlichste denkbare Standardwert: Sie legt eine neue Gruppe unter
         // die Standardgruppe, womit jedes Mitglied der Guild ihre Rechte erbt.
@@ -939,13 +996,19 @@ router.post('/groups', requirePermission('PERMISSIONS.GROUPS.CREATE'), async (re
             description,
             color: color || '#6c757d',
             icon: icon || 'fa-users',
-            permissions: sauberePermissions,
+            permissions: gefiltert.permissions,
             priority: effectivePriority
         });
 
         Logger.info(`[Permissions] Group "${name}" created in guild ${guildId} (ID: ${groupId}, priority ${effectivePriority})`);
 
-        const warning = warnIfBelowDefault(effectivePriority, defaultPriority, sauberePermissions);
+        let warning = warnIfBelowDefault(effectivePriority, defaultPriority, gefiltert.permissions);
+        if (gefiltert.verweigert.length) {
+            const hinweis = `${gefiltert.verweigert.length} Recht(e) wurden nicht übernommen, weil du sie selbst nicht hast: `
+                + gefiltert.verweigert.slice(0, 5).join(', ')
+                + (gefiltert.verweigert.length > 5 ? ' …' : '');
+            warning = warning ? `${warning} — ${hinweis}` : hinweis;
+        }
         if (warning) {
             Logger.warn(`[Permissions] Gruppe "${name}" (Guild ${guildId}): ${warning}`);
         }
@@ -995,6 +1058,14 @@ router.put('/groups/:groupId', requirePermission('PERMISSIONS.GROUPS.EDIT'), asy
             }
         }
         
+        // Niemand vergibt Rechte, die er selbst nicht hat.
+        let nichtUebernommen = [];
+        if (updates.permissions && typeof updates.permissions === 'object') {
+            const gefiltert = await stripUngrantable(updates.permissions, res.locals.user?.id, guildId, Logger);
+            updates.permissions = gefiltert.permissions;
+            nichtUebernommen = gefiltert.verweigert;
+        }
+
         await permissionManager.updateGroup(groupId, updates);
 
         Logger.info(`[Permissions] Group ${groupId} updated successfully`);
@@ -1014,10 +1085,14 @@ router.put('/groups/:groupId', requirePermission('PERMISSIONS.GROUPS.EDIT'), asy
             Logger.warn(`[Permissions] Gruppe ${groupId} (Guild ${guildId}): ${warning}`);
         }
 
+        const hinweise = [warning, nichtUebernommen.length
+            ? `${nichtUebernommen.length} Recht(e) nicht übernommen (hast du selbst nicht): ${nichtUebernommen.slice(0, 5).join(', ')}`
+            : null].filter(Boolean).join(' — ');
+
         res.json({
             success: true,
-            message: 'Gruppe wurde aktualisiert' + (warning ? ` — ⚠️ ${warning}` : ''),
-            warning: warning || null
+            message: 'Gruppe wurde aktualisiert' + (hinweise ? ` — ⚠️ ${hinweise}` : ''),
+            warning: hinweise || null
         });
         
     } catch (error) {
