@@ -520,100 +520,122 @@ class PluginManager extends BasePluginManager {
             Logger.success(`✅ ${registeredCount} Permissions für Plugin ${plugin.name} registriert`);
             
             // ════════════════════════════════════════════════════════════
-            // NEU: Administrator-Gruppe automatisch alle Permissions geben
-            // ════════════════════════════════════════════════════════════
-            try {
-                // Administrator-Gruppe finden (KORREKTUR: guild_groups statt permission_groups)
-                const adminGroups = await dbService.query(
-                    'SELECT id, permissions FROM guild_groups WHERE guild_id = ? AND slug = ?',
-                    [guildId, 'administrator']
-                );
-                
-                if (adminGroups && adminGroups.length > 0) {
-                    const adminGroup = adminGroups[0];
-                    Logger.debug(`Administrator-Gruppe gefunden (ID: ${adminGroup.id}), weise neue Permissions zu...`);
-                    
-                    // Alle Permission-Keys des Plugins aus permissions.json holen
-                    const permissionsData = JSON.parse(fs.readFileSync(permissionsFile, 'utf8'));
-                    // Lade aktuelle Permissions (JSON)
-                    const currentPerms = adminGroup.permissions ? JSON.parse(adminGroup.permissions) : {};
-                    let addedCount = 0;
-                    
-                    for (const perm of permissionsData.permissions) {
-                        // WICHTIG: permission_key ist OHNE Plugin-Prefix gespeichert!
-                        const permKey = perm.key; // z.B. "GAMESERVER.VIEW" (nicht "gameserver:GAMESERVER.VIEW")
-                        
-                        try {
-                            // Prüfe ob Permission bereits existiert
-                            if (currentPerms[permKey] === true) {
-                                Logger.debug(`  ℹ️  Permission ${permKey} bereits in Administrator-Gruppe vorhanden`);
-                                continue;
-                            }
-                            
-                            // Füge Permission zum JSON hinzu
-                            currentPerms[permKey] = true;
-                            addedCount++;
-                            Logger.debug(`  ✅ Permission ${permKey} zu Administrator-Gruppe hinzugefügt`);
-                            
-                        } catch (permError) {
-                            Logger.error(`  ❌ Fehler bei Permission ${permKey}:`, permError.message);
-                        }
-                    }
-                    
-                    // Schreibe aktualisiertes JSON zurück in DB
-                    if (addedCount > 0) {
-                        await dbService.query(
-                            'UPDATE guild_groups SET permissions = ?, updated_at = NOW() WHERE id = ?',
-                            [JSON.stringify(currentPerms), adminGroup.id]
-                        );
-                    }
-                    
-                    if (addedCount > 0) {
-                        Logger.success(`✅ ${addedCount} neue Permissions automatisch zur Administrator-Gruppe hinzugefügt (RELATIONAL)`);
-                    } else {
-                        Logger.debug('Alle Permissions bereits in Administrator-Gruppe vorhanden');
-                    }
-                } else {
-                    Logger.warn(`⚠️  Administrator-Gruppe nicht gefunden für Guild ${guildId} - Permissions nicht automatisch zugewiesen`);
-                }
-            } catch (adminError) {
-                Logger.error(`Fehler beim automatischen Zuweisen der Permissions zur Administrator-Gruppe:`, adminError);
-            }
-            
-            // ════════════════════════════════════════════════════════════
-            // Default-Gruppen-Permissions aus permissions.json verarbeiten
-            // Jedes Plugin kann via "default_groups": { "moderator": [...] }
-            // festlegen, welche Permissions Moderator/Support/User erhalten.
+            // Neue Rechte EINMAL in die vorgesehenen Gruppen eintragen
+            //
+            // Frueher liefen hier zwei Bloecke: Der eine gab der
+            // Administrator-Gruppe pauschal alle Rechte des Plugins, der andere
+            // verteilte `default_groups` aus der permissions.json. Beide trugen
+            // bei JEDEM Start nach, was nicht auf `true` stand - wer ein Recht
+            // bewusst entfernt hatte, bekam es beim naechsten Deploy zurueck.
+            //
+            // Jetzt merkt sich guild_permission_seeds, was einer Guild schon
+            // einmal angeboten wurde. Danach gehoert die Entscheidung dem
+            // Betreiber. Das ist WordPress' add_cap: beim Aktivieren eintragen,
+            // danach nie wieder hineinreden.
             // ════════════════════════════════════════════════════════════
             try {
                 const permissionsData = JSON.parse(fs.readFileSync(permissionsFile, 'utf8'));
-                const defaultGroupsMap = permissionsData.default_groups || {};
+                const alleKeys = (permissionsData.permissions || []).map(p => p.key).filter(Boolean);
 
-                for (const [groupSlug, permKeys] of Object.entries(defaultGroupsMap)) {
-                    if (!Array.isArray(permKeys) || permKeys.length === 0) continue;
+                // Was diese Guild schon kennt
+                const bekannt = new Set(
+                    (await dbService.query(
+                        'SELECT permission_key FROM guild_permission_seeds WHERE guild_id = ?',
+                        [guildId]
+                    ) || []).map(r => r.permission_key)
+                );
 
-                    const groupRows = await dbService.query(
-                        'SELECT id, permissions FROM guild_groups WHERE guild_id = ? AND slug = ?',
-                        [guildId, groupSlug]
-                    );
-                    if (!groupRows || groupRows.length === 0) continue;
+                // Nur verteilen, was auch wirklich registriert ist. Manche
+                // permissions.json sind veraltet: core deklariert SETTINGS.VIEW,
+                // das System benutzt CORE.SETTINGS.VIEW. Solche Karteileichen
+                // landen sonst als `true` in der Administrator-Gruppe, obwohl sie
+                // keine Zeile Code je abfragt.
+                const registriert = new Set(
+                    (await dbService.query(
+                        'SELECT permission_key FROM permission_definitions WHERE is_active = 1'
+                    ) || []).map(r => r.permission_key)
+                );
 
-                    const group = groupRows[0];
-                    const currentPerms = group.permissions ? JSON.parse(group.permissions) : {};
-                    let addedCount = 0;
-                    for (const permKey of permKeys) {
-                        if (!currentPerms[permKey]) { currentPerms[permKey] = true; addedCount++; }
-                    }
-                    if (addedCount > 0) {
-                        await dbService.query(
-                            'UPDATE guild_groups SET permissions = ?, updated_at = NOW() WHERE id = ?',
-                            [JSON.stringify(currentPerms), group.id]
-                        );
-                        Logger.debug(`  ✅ ${addedCount} Default-Permissions für Gruppe '${groupSlug}' in Guild ${guildId}`);
-                    }
+                const unbekannt = alleKeys.filter(k => !registriert.has(k));
+                if (unbekannt.length) {
+                    Logger.warn(`${plugin.name}: ${unbekannt.length} Schluessel aus permissions.json sind nicht registriert `
+                        + `und werden nicht verteilt: ${unbekannt.slice(0, 5).join(', ')}${unbekannt.length > 5 ? ' …' : ''}`);
                 }
-            } catch (defaultGroupsError) {
-                Logger.error(`Fehler beim Verarbeiten der default_groups für ${plugin.name}:`, defaultGroupsError);
+
+                const neueKeys = alleKeys.filter(k => !bekannt.has(k) && registriert.has(k));
+
+                if (neueKeys.length === 0) {
+                    Logger.debug(`Keine neuen Rechte fuer ${plugin.name} in Guild ${guildId}`);
+                } else {
+                    // SYSTEM/SUPERADMIN gehoeren ausschliesslich in die Control-Guild.
+                    const istControlGuild = guildId === process.env.CONTROL_GUILD_ID;
+                    const verteilbar = neueKeys.filter(k => {
+                        const heikel = k.startsWith('SYSTEM.') || k.startsWith('SUPERADMIN.');
+                        if (heikel && !istControlGuild) {
+                            Logger.warn(`  ${k} nicht verteilt (nur Control-Guild)`);
+                            return false;
+                        }
+                        return true;
+                    });
+
+                    // Zielgruppen bestimmen: administrator bekommt alles, der Rest
+                    // nur, was die permissions.json ihm ausdruecklich zuweist.
+                    // Slugs werden kleingeschrieben verglichen - giveaway und ticket
+                    // schreiben "Administrator"/"Moderator" gross, wodurch ihre
+                    // default_groups bisher stillschweigend wirkungslos waren.
+                    const zuweisung = new Map();
+                    zuweisung.set('administrator', new Set(verteilbar));
+
+                    for (const [slug, keys] of Object.entries(permissionsData.default_groups || {})) {
+                        if (!Array.isArray(keys) || keys.length === 0) continue;
+                        const ziel = String(slug).toLowerCase();
+                        const menge = zuweisung.get(ziel) || new Set();
+                        keys.filter(k => verteilbar.includes(k)).forEach(k => menge.add(k));
+                        zuweisung.set(ziel, menge);
+                    }
+
+                    for (const [slug, keys] of zuweisung) {
+                        if (keys.size === 0) continue;
+                        const gruppen = await dbService.query(
+                            'SELECT id, permissions FROM guild_groups WHERE guild_id = ? AND LOWER(slug) = ?',
+                            [guildId, slug]
+                        );
+                        if (!gruppen || gruppen.length === 0) {
+                            Logger.debug(`  Gruppe '${slug}' existiert nicht in Guild ${guildId} - uebersprungen`);
+                            continue;
+                        }
+
+                        const gruppe = gruppen[0];
+                        const aktuell = gruppe.permissions
+                            ? (typeof gruppe.permissions === 'string' ? JSON.parse(gruppe.permissions) : gruppe.permissions)
+                            : {};
+
+                        let dazu = 0;
+                        for (const key of keys) {
+                            if (aktuell[key] !== true) { aktuell[key] = true; dazu++; }
+                        }
+
+                        if (dazu > 0) {
+                            await dbService.query(
+                                'UPDATE guild_groups SET permissions = ?, updated_at = NOW() WHERE id = ?',
+                                [JSON.stringify(aktuell), gruppe.id]
+                            );
+                            Logger.success(`  ${dazu} neue Recht(e) fuer Gruppe '${slug}' in Guild ${guildId}`);
+                        }
+                    }
+
+                    // Erst nach dem Verteilen vermerken - bricht etwas ab, wird es
+                    // beim naechsten Start erneut versucht.
+                    for (const key of neueKeys) {
+                        await dbService.query(
+                            'INSERT IGNORE INTO guild_permission_seeds (guild_id, permission_key) VALUES (?, ?)',
+                            [guildId, key]
+                        );
+                    }
+                    Logger.info(`${neueKeys.length} neue Recht(e) von ${plugin.name} in Guild ${guildId} verteilt und vermerkt`);
+                }
+            } catch (seedError) {
+                Logger.error(`Fehler beim Verteilen neuer Rechte fuer ${plugin.name}:`, seedError);
             }
 
             // ════════════════════════════════════════════════════════════
