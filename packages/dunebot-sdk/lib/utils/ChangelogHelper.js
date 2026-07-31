@@ -366,6 +366,12 @@ function parseHierarchicalChangelog(changesText) {
                     generalSubgroup = {
                         type: 'subgroup',
                         title: 'Allgemein',
+                        // Erfunden, nicht vom Autor geschrieben: Eintraege muessen
+                        // in einer Untergruppe liegen, also braucht es eine, wenn
+                        // direkt unter "# Gruppe" schon Eintraege stehen. Die
+                        // Anzeige laesst die Ueberschrift deshalb weg - sonst
+                        // stuende ueberall ein "Allgemein", das niemand getippt hat.
+                        synthetic: true,
                         level: 2,
                         description: descText,
                         items: []
@@ -412,6 +418,12 @@ function parseHierarchicalChangelog(changesText) {
                     generalSubgroup = {
                         type: 'subgroup',
                         title: 'Allgemein',
+                        // Erfunden, nicht vom Autor geschrieben: Eintraege muessen
+                        // in einer Untergruppe liegen, also braucht es eine, wenn
+                        // direkt unter "# Gruppe" schon Eintraege stehen. Die
+                        // Anzeige laesst die Ueberschrift deshalb weg - sonst
+                        // stuende ueberall ein "Allgemein", das niemand getippt hat.
+                        synthetic: true,
                         level: 2,
                         items: []
                     };
@@ -431,6 +443,7 @@ function parseHierarchicalChangelog(changesText) {
                 currentSubgroup = {
                     type: 'subgroup',
                     title: 'Allgemein',
+                    synthetic: true,
                     level: 2,
                     items: []
                 };

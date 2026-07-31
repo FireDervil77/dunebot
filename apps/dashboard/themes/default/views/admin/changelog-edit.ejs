@@ -454,10 +454,16 @@ function renderHierarchicalHTML(hierarchicalData) {
             
             (group.children || []).forEach(subgroup => {
                 if (subgroup.type === 'subgroup') {
-                    html += `<div class="changelog-subgroup mb-3 ml-3">
-                        <h5 class="text-muted mb-2">
+                    html += `<div class="changelog-subgroup mb-3 ml-3">`;
+                    // Erfundene Untergruppen ohne Ueberschrift – siehe Kommentar
+                    // in changelog-details.ejs. Die Vorschau muss dieselbe
+                    // Entscheidung treffen wie die Website, sonst zeigt sie wieder
+                    // etwas anderes an als das, was der Leser spaeter sieht.
+                    if (!subgroup.synthetic) {
+                        html += `<h5 class="text-muted mb-2">
                             <i class="fas fa-folder-open mr-2"></i>${subgroup.title}
                         </h5>`;
+                    }
                     
                     // ✅ Description anzeigen (falls vorhanden)
                     if (subgroup.description) {
