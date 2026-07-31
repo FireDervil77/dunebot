@@ -96,6 +96,94 @@ async function stripUngrantable(permissions, actorId, guildId, Logger) {
     return { permissions: bereinigt, verweigert };
 }
 
+/**
+ * Lädt die Voraussetzungen aller Rechte: Schlüssel → Liste benötigter Rechte.
+ *
+ * 91 der 112 Rechte tragen ein `requires` (GAMESERVER.CREATE setzt
+ * GAMESERVER.VIEW voraus). Das steht seit jeher in der Datenbank und wurde
+ * nirgends verwendet – eine Gruppe ließ sich halbgar konfigurieren, und der
+ * Fehler fiel erst auf, wenn jemand vor einer leeren Seite stand.
+ *
+ * @returns {Promise<Map<string, string[]>>}
+ */
+async function ladeVoraussetzungen() {
+    const dbService = ServiceManager.get('dbService');
+    const defs = await dbService.query(
+        'SELECT permission_key, requires_permissions FROM permission_definitions WHERE is_active = 1'
+    );
+
+    const map = new Map();
+    for (const def of defs || []) {
+        let liste = def.requires_permissions;
+        if (typeof liste === 'string') {
+            try { liste = JSON.parse(liste); } catch (_) { liste = null; }
+        }
+        if (Array.isArray(liste) && liste.length) map.set(def.permission_key, liste);
+    }
+    return map;
+}
+
+/**
+ * Ergänzt fehlende Voraussetzungen. Transitiv: Braucht A das Recht B und B
+ * wiederum C, kommen beide dazu.
+ *
+ * @param {object} permissions
+ * @returns {Promise<{permissions: object, ergaenzt: string[]}>}
+ */
+async function addRequiredPermissions(permissions) {
+    const voraussetzungen = await ladeVoraussetzungen();
+    const ergebnis = { ...(permissions || {}) };
+    const ergaenzt = new Set();
+
+    let nochmal = true;
+    while (nochmal) {
+        nochmal = false;
+        for (const [key, value] of Object.entries({ ...ergebnis })) {
+            if (value !== true && value !== 'true') continue;
+            for (const dep of voraussetzungen.get(key) || []) {
+                if (ergebnis[dep] !== true) {
+                    ergebnis[dep] = true;
+                    ergaenzt.add(dep);
+                    nochmal = true;
+                }
+            }
+        }
+    }
+
+    return { permissions: ergebnis, ergaenzt: [...ergaenzt] };
+}
+
+/**
+ * Entfernt Rechte, deren Voraussetzungen fehlen.
+ *
+ * Nötig als letzter Schritt: `stripUngrantable()` kann eine Voraussetzung
+ * wegstreichen, die der Handelnde selbst nicht hat. Ohne diesen Durchgang bliebe
+ * ein Recht ohne Fundament stehen.
+ *
+ * @param {object} permissions
+ * @returns {Promise<{permissions: object, entfernt: string[]}>}
+ */
+async function dropUnsatisfied(permissions) {
+    const voraussetzungen = await ladeVoraussetzungen();
+    const ergebnis = { ...(permissions || {}) };
+    const entfernt = new Set();
+
+    let nochmal = true;
+    while (nochmal) {
+        nochmal = false;
+        for (const [key, value] of Object.entries({ ...ergebnis })) {
+            if (value !== true) continue;
+            if ((voraussetzungen.get(key) || []).some(dep => ergebnis[dep] !== true)) {
+                delete ergebnis[key];
+                entfernt.add(key);
+                nochmal = true;
+            }
+        }
+    }
+
+    return { permissions: ergebnis, entfernt: [...entfernt] };
+}
+
 // ============================================================================
 // ROOT REDIRECT
 // ============================================================================
@@ -833,26 +921,11 @@ async function getDefaultGroupPriority(guildId) {
  * @param {object|string} permissions
  * @returns {number}
  */
-/**
- * Warnt, wenn eine Gruppe ihre Rechte an die ganze Guild verteilen würde.
- *
- * Bewusst nur eine Warnung, kein Verbot: Es kann gewollt sein, allen etwas zu
- * geben (eine Basisgruppe „darf Server ansehen" etwa). Es darf nur nicht
- * unbemerkt passieren.
- *
- * @param {number} priority
- * @param {number} defaultPriority
- * @param {object|string} permissions
- * @returns {string|null} Warntext oder null
- */
-function warnIfBelowDefault(priority, defaultPriority, permissions) {
-    const granted = countGrantedPermissions(permissions);
-    if (!Number.isFinite(priority) || priority > defaultPriority || granted === 0) return null;
-
-    return `Priorität ${priority} liegt auf oder unter der Standardgruppe (${defaultPriority}) – `
-         + `damit erbt JEDES Mitglied der Guild diese ${granted} Berechtigung(en), auch ohne in der `
-         + `Gruppe zu sein. Für eine Sondergruppe eine Priorität über ${defaultPriority} wählen.`;
-}
+// Die Warnung „Priorität unter der Standardgruppe – jedes Mitglied erbt diese
+// Rechte" ist mit dem flachen Modell hinfällig und wäre ab jetzt schlicht
+// falsch: Es wird nichts mehr vererbt, eine Gruppe gilt ausschließlich für ihre
+// Mitglieder. Sie war ein Pflaster für einen Konstruktionsfehler, den der Umbau
+// beseitigt hat.
 
 /**
  * Zählt die tatsächlich erteilten Rechte einer Gruppe.
@@ -917,13 +990,10 @@ router.get('/groups', requirePermission('PERMISSIONS.GROUPS.VIEW'), async (req, 
             permissionsByCategory[perm.category].push(perm);
         });
         
-        // Gruppen markieren, die ihre Rechte unbeabsichtigt an alle verteilen.
+        // Wieviele Mitglieder eine Gruppe wirklich betrifft, ist seit dem flachen
+        // Modell die einzige Zahl, die zählt – vorher war sie irreführend, weil
+        // die Rechte über die Priorität auch an Nichtmitglieder gingen.
         const defaultPriority = await getDefaultGroupPriority(guildId);
-        for (const group of groups) {
-            group.grantsToEveryone = !group.is_default
-                && Number(group.priority) <= defaultPriority
-                && countGrantedPermissions(group.permissions) > 0;
-        }
 
         await themeManager.renderView(res, 'guild/permissions/groups', {
             pageTitle: 'Gruppen-Verwaltung',
@@ -978,12 +1048,17 @@ router.post('/groups', requirePermission('PERMISSIONS.GROUPS.CREATE'), async (re
             }
         }
 
-        // Niemand vergibt Rechte, die er selbst nicht hat.
-        const gefiltert = await stripUngrantable(sauberePermissions, res.locals.user?.id, guildId, Logger);
+        // Reihenfolge mit Bedacht: erst Voraussetzungen ergänzen, dann prüfen,
+        // was der Handelnde vergeben darf, und zuletzt aufräumen. Streicht der
+        // mittlere Schritt eine Voraussetzung weg, darf das Recht darüber nicht
+        // ohne Fundament stehen bleiben.
+        const ergaenzt = await addRequiredPermissions(sauberePermissions);
+        const gefiltert = await stripUngrantable(ergaenzt.permissions, res.locals.user?.id, guildId, Logger);
+        const bereinigt = await dropUnsatisfied(gefiltert.permissions);
 
-        // Ohne Angabe knapp ÜBER die Standardgruppe statt auf 0. Die 0 war der
-        // gefährlichste denkbare Standardwert: Sie legt eine neue Gruppe unter
-        // die Standardgruppe, womit jedes Mitglied der Guild ihre Rechte erbt.
+        // Priorität wirkt seit dem flachen Modell nicht mehr auf die Rechte –
+        // sie ordnet nur noch. Der Standardwert bleibt über der Standardgruppe,
+        // damit die Sortierung in der Übersicht sinnvoll bleibt.
         const defaultPriority = await getDefaultGroupPriority(guildId);
         const effectivePriority = (priority === undefined || priority === null || priority === '')
             ? defaultPriority + 1
@@ -996,19 +1071,24 @@ router.post('/groups', requirePermission('PERMISSIONS.GROUPS.CREATE'), async (re
             description,
             color: color || '#6c757d',
             icon: icon || 'fa-users',
-            permissions: gefiltert.permissions,
+            permissions: bereinigt.permissions,
             priority: effectivePriority
         });
 
         Logger.info(`[Permissions] Group "${name}" created in guild ${guildId} (ID: ${groupId}, priority ${effectivePriority})`);
 
-        let warning = warnIfBelowDefault(effectivePriority, defaultPriority, gefiltert.permissions);
-        if (gefiltert.verweigert.length) {
-            const hinweis = `${gefiltert.verweigert.length} Recht(e) wurden nicht übernommen, weil du sie selbst nicht hast: `
-                + gefiltert.verweigert.slice(0, 5).join(', ')
-                + (gefiltert.verweigert.length > 5 ? ' …' : '');
-            warning = warning ? `${warning} — ${hinweis}` : hinweis;
-        }
+        const hinweise = [
+            ergaenzt.ergaenzt.length
+                ? `${ergaenzt.ergaenzt.length} Voraussetzung(en) automatisch ergänzt: ${ergaenzt.ergaenzt.slice(0, 5).join(', ')}`
+                : null,
+            gefiltert.verweigert.length
+                ? `${gefiltert.verweigert.length} Recht(e) nicht übernommen (hast du selbst nicht): ${gefiltert.verweigert.slice(0, 5).join(', ')}`
+                : null,
+            bereinigt.entfernt.length
+                ? `${bereinigt.entfernt.length} Recht(e) entfernt, weil ihre Voraussetzung fehlt: ${bereinigt.entfernt.slice(0, 5).join(', ')}`
+                : null,
+        ].filter(Boolean);
+        const warning = hinweise.join(' — ') || null;
         if (warning) {
             Logger.warn(`[Permissions] Gruppe "${name}" (Guild ${guildId}): ${warning}`);
         }
@@ -1058,36 +1138,36 @@ router.put('/groups/:groupId', requirePermission('PERMISSIONS.GROUPS.EDIT'), asy
             }
         }
         
-        // Niemand vergibt Rechte, die er selbst nicht hat.
-        let nichtUebernommen = [];
+        // Gleiche Reihenfolge wie beim Anlegen: Voraussetzungen ergänzen, dann
+        // prüfen was der Handelnde vergeben darf, zuletzt Rechte ohne Fundament
+        // entfernen.
+        let nichtUebernommen = [], ergaenzteRechte = [], entfernteRechte = [];
         if (updates.permissions && typeof updates.permissions === 'object') {
-            const gefiltert = await stripUngrantable(updates.permissions, res.locals.user?.id, guildId, Logger);
-            updates.permissions = gefiltert.permissions;
+            const ergaenzt  = await addRequiredPermissions(updates.permissions);
+            const gefiltert = await stripUngrantable(ergaenzt.permissions, res.locals.user?.id, guildId, Logger);
+            const bereinigt = await dropUnsatisfied(gefiltert.permissions);
+
+            updates.permissions = bereinigt.permissions;
+            ergaenzteRechte  = ergaenzt.ergaenzt;
             nichtUebernommen = gefiltert.verweigert;
+            entfernteRechte  = bereinigt.entfernt;
         }
 
         await permissionManager.updateGroup(groupId, updates);
 
         Logger.info(`[Permissions] Group ${groupId} updated successfully`);
 
-        // Nach dem Speichern den tatsächlichen Zustand prüfen, nicht nur die
-        // Eingabe: Wer allein die Rechte ändert, schickt keine Priorität mit –
-        // die Gruppe kann aber längst zu tief liegen.
-        const dbService = ServiceManager.get('dbService');
-        const [group] = await dbService.query(
-            'SELECT priority, permissions, is_default FROM guild_groups WHERE id = ? LIMIT 1',
-            [groupId]
-        );
-        const warning = (group && !group.is_default)
-            ? warnIfBelowDefault(Number(group.priority), await getDefaultGroupPriority(guildId), group.permissions)
-            : null;
-        if (warning) {
-            Logger.warn(`[Permissions] Gruppe ${groupId} (Guild ${guildId}): ${warning}`);
-        }
-
-        const hinweise = [warning, nichtUebernommen.length
-            ? `${nichtUebernommen.length} Recht(e) nicht übernommen (hast du selbst nicht): ${nichtUebernommen.slice(0, 5).join(', ')}`
-            : null].filter(Boolean).join(' — ');
+        const hinweise = [
+            ergaenzteRechte.length
+                ? `${ergaenzteRechte.length} Voraussetzung(en) automatisch ergänzt: ${ergaenzteRechte.slice(0, 5).join(', ')}`
+                : null,
+            nichtUebernommen.length
+                ? `${nichtUebernommen.length} Recht(e) nicht übernommen (hast du selbst nicht): ${nichtUebernommen.slice(0, 5).join(', ')}`
+                : null,
+            entfernteRechte.length
+                ? `${entfernteRechte.length} Recht(e) entfernt, weil ihre Voraussetzung fehlt: ${entfernteRechte.slice(0, 5).join(', ')}`
+                : null,
+        ].filter(Boolean).join(' — ');
 
         res.json({
             success: true,

@@ -108,21 +108,19 @@
           
           <div class="d-flex align-items-center">
             <i class="fa-solid fa-arrow-up text-muted me-2"></i>
-            <span class="text-muted">Priorität: <%= group.priority || 0 %></span>
+            <span class="text-muted">Rang: <%= group.priority || 0 %></span>
           </div>
 
-          <%# Eine Gruppe unterhalb der Standardgruppe liegt im Fundament der
-              Hierarchie: Jedes Mitglied erbt sie, auch wer nie hinzugefuegt
-              wurde. Ohne diesen Hinweis ist das nirgends zu sehen. %>
-          <% if (group.grantsToEveryone) { %>
-            <div class="alert alert-warning mt-3 mb-0 py-2 px-3 small">
-              <i class="fa-solid fa-triangle-exclamation me-1"></i>
-              <strong>Gilt für alle:</strong>
-              Die Priorität liegt auf oder unter der Standardgruppe
-              (<%= typeof defaultPriority !== 'undefined' ? defaultPriority : 1 %>).
-              Rechte werden von unten nach oben vererbt – <strong>jedes Mitglied der Guild</strong>
-              erbt diese Berechtigungen, auch ohne in der Gruppe zu sein.
-              Für eine Sondergruppe eine höhere Priorität wählen.
+          <%# Die frühere Warnung "Gilt für alle" ist entfallen: Seit dem flachen
+              Modell wird nichts mehr vererbt, eine Gruppe gilt ausschließlich für
+              ihre Mitglieder. Statt einer Warnung steht hier jetzt die Aussage,
+              die tatsächlich zählt. %>
+          <% if (group.is_default) { %>
+            <div class="alert alert-info mt-3 mb-0 py-2 px-3 small">
+              <i class="fa-solid fa-user-plus me-1"></i>
+              <strong>Standardgruppe:</strong>
+              Neu eingeladene Nutzer landen hier. Diese Rechte sind der Ausgangspunkt
+              für jeden im Dashboard.
             </div>
           <% } %>
         </div>
@@ -238,7 +236,7 @@
             </div>
             
             <div class="col-md-4 mb-3">
-              <label for="create_priority" class="form-label">Priorität</label>
+              <label for="create_priority" class="form-label">Rang</label>
               <input type="number" 
                      class="form-control" 
                      id="create_priority" 
@@ -246,12 +244,9 @@
                      value="<%= (typeof defaultPriority !== 'undefined' ? defaultPriority + 1 : 2) %>"
                      min="0">
               <div class="form-text">
-                Höhere Zahl = höhere Priorität. Rechte werden von unten nach oben
-                <strong>vererbt</strong>: Wer Priorität X hat, erbt alle Gruppen mit Priorität ≤ X.
-                Ab <%= (typeof defaultPriority !== 'undefined' ? defaultPriority + 1 : 2) %>
-                gilt die Gruppe nur für ihre Mitglieder – auf oder unter
-                <%= typeof defaultPriority !== 'undefined' ? defaultPriority : 1 %>
-                (Standardgruppe) bekommt sie <strong>jedes</strong> Guild-Mitglied.
+                Nur zur Sortierung. Der Rang hat <strong>keinen</strong> Einfluss darauf,
+                wer welche Rechte bekommt: Eine Gruppe gilt ausschließlich für ihre
+                Mitglieder.
               </div>
             </div>
           </div>
@@ -266,16 +261,42 @@
           <div id="create_permissions_tree">
             <% if (permissions) { 
               Object.keys(permissions).forEach(category => { %>
+              <%
+                // Der Wildcard-Schlüssel leitet sich aus den Rechten selbst ab,
+                // nicht aus dem Kategorienamen: Die Kategorie "core" trägt
+                // Rechte wie CORE.SETTINGS.VIEW – das muss zusammenpassen.
+                const bereich = ((permissions[category][0] || {}).permission_key || '').split('.')[0];
+              %>
               <div class="permission-category mb-3">
-                <h6 class="text-uppercase text-muted mb-2">
-                  <i class="fa-solid fa-folder-open me-2"></i>
-                  <%= category %>
-                </h6>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h6 class="text-uppercase text-muted mb-0">
+                    <i class="fa-solid fa-folder-open me-2"></i>
+                    <%= category %>
+                  </h6>
+                  <% if (bereich) { %>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           name="permissions[<%= bereich %>.*]"
+                           id="create_wild_<%= bereich %>"
+                           value="true">
+                    <label class="form-check-label small" for="create_wild_<%= bereich %>">
+                      alles &amp; künftiges <code><%= bereich %>.*</code>
+                    </label>
+                  </div>
+                  <% } %>
+                </div>
+                <% if (bereich) { %>
+                <div class="form-text ps-3 mb-2">
+                  Der Schalter deckt alle Rechte dieser Kategorie ab – auch solche, die ein
+                  Update später hinzufügt. Ohne ihn muss nach jedem Update nachgepflegt werden.
+                </div>
+                <% } %>
                 <div class="ps-3">
                   <% permissions[category].forEach(perm => { %>
                   <div class="form-check mb-2">
-                    <input class="form-check-input" 
-                           type="checkbox" 
+                    <input class="form-check-input"
+                           type="checkbox"
                            name="permissions[<%= perm.permission_key %>]"
                            id="create_perm_<%= perm.permission_key.replace(/\./g, '_') %>"
                            value="true">
@@ -382,7 +403,7 @@
             </div>
             
             <div class="col-md-4 mb-3">
-              <label for="edit_priority" class="form-label">Priorität</label>
+              <label for="edit_priority" class="form-label">Rang</label>
               <input type="number" 
                      class="form-control" 
                      id="edit_priority" 
@@ -401,15 +422,41 @@
           <div id="edit_permissions_tree">
             <% if (permissions) { 
               Object.keys(permissions).forEach(category => { %>
+              <%
+                const bereich = ((permissions[category][0] || {}).permission_key || '').split('.')[0];
+              %>
               <div class="permission-category mb-3">
-                <h6 class="text-uppercase text-muted mb-2">
-                  <i class="fa-solid fa-folder-open me-2"></i>
-                  <%= category %>
-                </h6>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h6 class="text-uppercase text-muted mb-0">
+                    <i class="fa-solid fa-folder-open me-2"></i>
+                    <%= category %>
+                  </h6>
+                  <% if (bereich) { %>
+                  <div class="form-check form-switch mb-0">
+                    <%# Gleiche Klasse und data-Attribut wie die Einzelrechte, damit
+                        die vorhandene Vorbelegungs-Schleife den Schalter mitnimmt. %>
+                    <input class="form-check-input permission-checkbox edit-permission-checkbox"
+                           type="checkbox"
+                           name="permissions[<%= bereich %>.*]"
+                           id="edit_wild_<%= bereich %>"
+                           value="true"
+                           data-permission-key="<%= bereich %>.*">
+                    <label class="form-check-label small" for="edit_wild_<%= bereich %>">
+                      alles &amp; künftiges <code><%= bereich %>.*</code>
+                    </label>
+                  </div>
+                  <% } %>
+                </div>
+                <% if (bereich) { %>
+                <div class="form-text ps-3 mb-2">
+                  Der Schalter deckt alle Rechte dieser Kategorie ab – auch solche, die ein
+                  Update später hinzufügt.
+                </div>
+                <% } %>
                 <div class="ps-3">
                   <% permissions[category].forEach(perm => { %>
                   <div class="form-check mb-2">
-                    <input class="form-check-input permission-checkbox edit-permission-checkbox" 
+                    <input class="form-check-input permission-checkbox edit-permission-checkbox"
                            type="checkbox" 
                            name="permissions[<%= perm.permission_key %>]"
                            id="edit_perm_<%= perm.permission_key.replace(/\./g, '_') %>"
