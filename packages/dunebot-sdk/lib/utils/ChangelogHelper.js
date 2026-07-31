@@ -148,9 +148,56 @@ function getComponentBadge(component) {
     return badges[component] || badges.system;
 }
 
+/** Entities, die TinyMCE in die Beschreibung schreibt. */
+const ENTITIES = {
+    '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'",
+    '&uuml;': 'ü', '&ouml;': 'ö', '&auml;': 'ä', '&Uuml;': 'Ü', '&Ouml;': 'Ö',
+    '&Auml;': 'Ä', '&szlig;': 'ß', '&eacute;': 'é', '&ndash;': '–', '&mdash;': '—',
+};
+
+/**
+ * Macht aus der HTML-Beschreibung einen einzeiligen Textauszug.
+ *
+ * Die Beschreibung ist bewusst HTML (dort läuft weiterhin ein WYSIWYG-Editor). Auf
+ * der Detailseite wird sie deshalb unescaped ausgegeben. In der Kachel-Übersicht
+ * geht das nicht: Ein <h1> oder ein Dutzend <br> sprengen die Karte. Escapen ist aber
+ * auch falsch – dann liest der Besucher die Tags. Also: Auszeichnung entfernen,
+ * Entities auflösen, kürzen.
+ *
+ * @param {string} html
+ * @param {number} maxLaenge - 0 schaltet das Kürzen ab
+ * @returns {string} Reintext ohne Auszeichnung
+ */
+function zuTextauszug(html, maxLaenge = 220) {
+    if (!html) return '';
+
+    let text = String(html)
+        .replace(/<br\s*\/?>/gi, ' ')
+        .replace(/<\/(p|div|h[1-6]|li)>/gi, ' ')
+        .replace(/<[^>]+>/g, '');
+
+    // Zweimal, weil der Bestand doppelt kodierte Entities enthält (&amp;ouml;).
+    for (let durchgang = 0; durchgang < 2; durchgang++) {
+        for (const [entity, zeichen] of Object.entries(ENTITIES)) {
+            text = text.split(entity).join(zeichen);
+        }
+    }
+
+    text = text.replace(/\s+/g, ' ').trim();
+
+    if (maxLaenge > 0 && text.length > maxLaenge) {
+        // An der letzten Wortgrenze davor abschneiden, nicht mitten im Wort.
+        const gekuerzt = text.slice(0, maxLaenge);
+        const grenze = gekuerzt.lastIndexOf(' ');
+        text = (grenze > maxLaenge * 0.6 ? gekuerzt.slice(0, grenze) : gekuerzt).trimEnd() + '…';
+    }
+
+    return text;
+}
+
 /**
  * Parst hierarchische Changelog-Struktur mit # Header und ## Sub-Header
- * 
+ *
  * Format:
  * # PLUGINS
  * ## DuneMap
@@ -510,7 +557,8 @@ const ChangelogHelper = {
     getTypeBadge,
     getComponentBadge,
     parseHierarchicalChangelog,
-    hierarchicalChangelogToMarkdown
+    hierarchicalChangelogToMarkdown,
+    zuTextauszug
 };
 
 module.exports = ChangelogHelper;

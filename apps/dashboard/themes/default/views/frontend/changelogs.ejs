@@ -13,13 +13,11 @@
             const titleTranslations = typeof changelog.title_translations === 'string' 
               ? JSON.parse(changelog.title_translations) 
               : changelog.title_translations;
-            const descTranslations = typeof changelog.description_translations === 'string' 
-              ? JSON.parse(changelog.description_translations) 
-              : changelog.description_translations;
-            
             const title = titleTranslations?.[currentLocale] || titleTranslations?.['de-DE'] || 'Untitled';
-            const description = descTranslations?.[currentLocale] || descTranslations?.['de-DE'] || '';
-            
+            // Reintext-Auszug kommt aus dem Router (ChangelogHelper.zuTextauszug).
+            // Das Rohfeld ist HTML und darf hier weder escaped noch roh landen.
+            const description = changelog.excerpt || '';
+
             const typeColors = {
               major: 'danger',
               minor: 'warning', 

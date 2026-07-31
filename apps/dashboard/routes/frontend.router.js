@@ -84,7 +84,13 @@ const getChangelogsList = async (req, res) => {
 
         // Changelogs lokalisieren (nutze res.locals.locale statt Session-Zugriff)
         const userLocale = res.locals.locale || 'de-DE';
-        const localizedChangelogs = rawChangelogs.map(cl => ChangelogHelper.getLocalizedChangelog(cl, userLocale));
+        // Die Beschreibung ist HTML (WYSIWYG). In der Kachel wird daraus ein
+        // Reintext-Auszug - sonst steht dort entweder ein <h1>, das die Karte
+        // sprengt, oder das escapte Markup als lesbarer Text.
+        const localizedChangelogs = rawChangelogs.map(cl => {
+            const localized = ChangelogHelper.getLocalizedChangelog(cl, userLocale);
+            return { ...localized, excerpt: ChangelogHelper.zuTextauszug(localized.description) };
+        });
 
         await themeManager.renderView(res, 'frontend/changelogs', {
             changelogs: localizedChangelogs,
