@@ -576,6 +576,37 @@ router.get('/notifications/api/channel-config', async (req, res) => {
 // CHANGELOGS: Save (Create / Update)
 // ================================================================
 
+/**
+ * POST /admin/content/changelogs/preview
+ *
+ * Zerlegt einen Änderungstext mit **demselben** Parser, den auch die öffentliche
+ * Seite benutzt, und gibt die Struktur zurück.
+ *
+ * Vorher hatte die Vorschau eine eigene Kopie des Parsers im Browser. Zwei
+ * Kopien driften auseinander: Die Kopie kannte die Schreibweise `!: Text` nicht,
+ * zeigte deshalb weniger an als die Website – und wer das sah, hielt seinen Text
+ * für fehlerhaft, obwohl er es nicht war.
+ *
+ * Reines Lesen: nimmt Text entgegen, gibt Struktur zurück, speichert nichts.
+ */
+router.post('/changelogs/preview', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+
+    try {
+        const { changes_de = '', changes_en = '' } = req.body || {};
+
+        return res.json({
+            success: true,
+            de: ChangelogHelper.parseHierarchicalChangelog(String(changes_de)),
+            en: ChangelogHelper.parseHierarchicalChangelog(String(changes_en)),
+        });
+
+    } catch (error) {
+        Logger.error('[Changelog] Vorschau fehlgeschlagen:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 router.post('/changelogs/save', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');

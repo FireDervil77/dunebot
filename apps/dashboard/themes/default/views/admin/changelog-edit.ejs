@@ -433,179 +433,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <script>
 // Hierarchisches Parsing für Vorschau (✅ MIT HTML-SUPPORT!)
-function parseHierarchicalChangelog(changesText) {
-    if (!changesText || typeof changesText !== 'string') return [];
-    
-    // ✅ HTML-Tags konvertieren (wie im Server-Parser)
-    let processedText = changesText;
-    
-    // ⚡ KRITISCH: <br> Tags in Newlines umwandeln (ZUERST!)
-    // TinyMCE speichert mehrere Items in EINEM <p>-Tag mit <br>-Trennung!
-    processedText = processedText.replace(/<br\s*\/?>/gi, '\n');
-    
-    // ⚡ Multi-line <p>-Tags aufteilen
-    // Nach <br>→\n kann ein <p> mehrere Zeilen enthalten → einzelne <p>-Tags daraus machen
-    processedText = processedText.replace(/<p([^>]*)>([\s\S]*?)<\/p>/gi, (match, attrs, content) => {
-        if (!content.includes('\n')) return match;
-        return content.split('\n').filter(l => l.trim()).map(l => '<p>' + l.trim() + '</p>').join('\n');
-    });
-    
-    // <h2>Header</h2> → # Header
-    processedText = processedText.replace(/<h2[^>]*>(.*?)<\/h2>/gi, (match, content) => {
-        return '\n# ' + content.trim() + '\n';
-    });
-    
-    // <h3>Subheader</h3> → ## Subheader
-    processedText = processedText.replace(/<h3[^>]*>(.*?)<\/h3>/gi, (match, content) => {
-        return '\n## ' + content.trim() + '\n';
-    });
-    
-    // Markdown-Header in <p>-Tags: <p># Header</p> → # Header
-    processedText = processedText.replace(/<p[^>]*>##\s+(.*?)<\/p>/gi, (match, content) => {
-        return '\n## ' + content.trim() + '\n';
-    });
-    processedText = processedText.replace(/<p[^>]*>#\s+(.*?)<\/p>/gi, (match, content) => {
-        return '\n# ' + content.trim() + '\n';
-    });
-    
-    // <p>! Bugfix...</p> → ! Bugfix... (BEHALTE HTML im Text!)
-    processedText = processedText.replace(/<p[^>]*>([!+\-*])\s+(.*?)<\/p>/gi, (match, symbol, content) => {
-        return '\n' + symbol + ' ' + content.trim() + '\n';
-    });
-    
-    // ✅ Description-Support: <p>Normal text</p> → DESC: Normal text
-    processedText = processedText.replace(/<p[^>]*>((?![!+\-*]\s).*?)<\/p>/gi, (match, content) => {
-        const trimmed = content.trim();
-        if (trimmed.length > 0 && !/^[!+\-*]\s/.test(trimmed)) {
-            return '\nDESC: ' + trimmed + '\n';
-        }
-        return '';
-    });
-    
-    // <ul>/<li> Listen → * Items
-    processedText = processedText.replace(/<li[^>]*>(.*?)<\/li>/gi, (match, content) => {
-        const trimmed = content.trim();
-        if (/^[!+\-*]\s/.test(trimmed)) {
-            return '\n' + trimmed + '\n';
-        }
-        return '\n* ' + trimmed + '\n';
-    });
-    processedText = processedText.replace(/<\/?ul[^>]*>/gi, '');
-    processedText = processedText.replace(/<\/?ol[^>]*>/gi, '');
-    
-    // HTML-Entities dekodieren
-    processedText = processedText.replace(/&nbsp;/g, ' ');
-    processedText = processedText.replace(/&lt;/g, '<');
-    processedText = processedText.replace(/&gt;/g, '>');
-    processedText = processedText.replace(/&amp;/g, '&');
-    processedText = processedText.replace(/&quot;/g, '"');
-    processedText = processedText.replace(/&uuml;/g, 'ü');
-    processedText = processedText.replace(/&ouml;/g, 'ö');
-    processedText = processedText.replace(/&auml;/g, 'ä');
-    processedText = processedText.replace(/&Uuml;/g, 'Ü');
-    processedText = processedText.replace(/&Ouml;/g, 'Ö');
-    processedText = processedText.replace(/&Auml;/g, 'Ä');
-    processedText = processedText.replace(/&szlig;/g, 'ß');
-    
-    console.log('[Parser] 🔧 Processed Text (nach <br> → \\n):', processedText.substring(0, 500));
-    
-    const lines = processedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    const result = [];
-    let currentGroup = null;
-    let currentSubgroup = null;
+// Der fruehere Browser-Parser stand hier. Er war eine zweite Kopie von
+// ChangelogHelper.parseHierarchicalChangelog() und driftete davon ab - unter
+// anderem kannte er die Schreibweise `!: Text` nicht. Die Vorschau fragt jetzt
+// den Server, damit es genau einen Parser gibt.
 
-    const itemTypeMap = {
-        '!': { type: 'fix', icon: 'fa-bug', class: 'text-danger', category: 'Fixes' },
-        '+': { type: 'feature', icon: 'fa-plus', class: 'text-success', category: 'Features' },
-        '-': { type: 'removed', icon: 'fa-minus', class: 'text-warning', category: 'Removed' },
-        '*': { type: 'change', icon: 'fa-edit', class: 'text-info', category: 'Changes' }
-    };
-
-    for (const line of lines) {
-        if (line.startsWith('# ')) {
-            const title = line.substring(2).trim();
-            currentGroup = { type: 'group', title, level: 1, children: [] };
-            result.push(currentGroup);
-            currentSubgroup = null;
-            continue;
-        }
-
-        if (line.startsWith('## ')) {
-            const title = line.substring(3).trim();
-            currentSubgroup = { type: 'subgroup', title, level: 2, description: null, items: [] };
-            
-            if (!currentGroup) {
-                currentGroup = { type: 'group', title: 'Änderungen', level: 1, children: [] };
-                result.push(currentGroup);
-            }
-            
-            currentGroup.children.push(currentSubgroup);
-            continue;
-        }
-        
-        // ✅ Description-Zeilen
-        if (line.startsWith('DESC: ')) {
-            const descText = line.substring(6).trim();
-            
-            if (currentSubgroup) {
-                if (currentSubgroup.description) {
-                    currentSubgroup.description += '<br>' + descText;
-                } else {
-                    currentSubgroup.description = descText;
-                }
-            } else if (currentGroup) {
-                let generalSubgroup = currentGroup.children.find(sg => sg.title === 'Allgemein');
-                if (!generalSubgroup) {
-                    generalSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, description: descText, items: [] };
-                    currentGroup.children.push(generalSubgroup);
-                    currentSubgroup = generalSubgroup;
-                } else {
-                    if (generalSubgroup.description) {
-                        generalSubgroup.description += '<br>' + descText;
-                    } else {
-                        generalSubgroup.description = descText;
-                    }
-                }
-            }
-            continue;
-        }
-
-        const firstChar = line.charAt(0);
-        if (itemTypeMap[firstChar]) {
-            const itemMeta = itemTypeMap[firstChar];
-            const text = line.substring(1).trim(); // ✅ Text BEHÄLT HTML!
-            const item = {
-                type: itemMeta.type,
-                icon: itemMeta.icon,
-                class: itemMeta.class,
-                category: itemMeta.category,
-                text
-            };
-
-            if (currentSubgroup) {
-                currentSubgroup.items.push(item);
-            } else if (currentGroup) {
-                let generalSubgroup = currentGroup.children.find(sg => sg.title === 'Allgemein');
-                if (!generalSubgroup) {
-                    generalSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, description: null, items: [] };
-                    currentGroup.children.push(generalSubgroup);
-                }
-                generalSubgroup.items.push(item);
-                currentSubgroup = generalSubgroup;
-            } else {
-                currentGroup = { type: 'group', title: 'Änderungen', level: 1, children: [] };
-                currentSubgroup = { type: 'subgroup', title: 'Allgemein', level: 2, description: null, items: [] };
-                currentGroup.children.push(currentSubgroup);
-                result.push(currentGroup);
-                currentSubgroup.items.push(item);
-            }
-        }
-    }
-
-    return result;
-}
-
-// Render Hierarchie als HTML
 function renderHierarchicalHTML(hierarchicalData) {
     if (!hierarchicalData || hierarchicalData.length === 0) {
         return '<p class="text-muted"><em>Keine Änderungen dokumentiert</em></p>';
@@ -687,31 +519,46 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    previewBtn.addEventListener('click', function(e) {
+    previewBtn.addEventListener('click', async function(e) {
         e.preventDefault();
-        
-        // ✅ NEU: Content von TinyMCE-Editoren holen (nicht von Textarea!)
-        const changesDeContent = tinymce.get('changes_de') ? tinymce.get('changes_de').getContent() : changesDe.value;
-        const changesEnContent = tinymce.get('changes_en') ? tinymce.get('changes_en').getContent() : changesEn.value;
-        
-        console.log('[Preview] 🔍 DE RAW HTML (KOMPLETT):');
-        console.log(changesDeContent); // ✅ VOLLSTÄNDIGES HTML anzeigen
-        console.log('[Preview] 🔍 EN RAW HTML (KOMPLETT):');
-        console.log(changesEnContent);
-        
-        // Parse und rendere Deutsch
-        const hierarchyDe = parseHierarchicalChangelog(changesDeContent);
-        console.log('[Preview] ✅ DE Hierarchy (parsed):', hierarchyDe);
-        previewDe.innerHTML = renderHierarchicalHTML(hierarchyDe);
-        
-        // Parse und rendere English
-        const hierarchyEn = parseHierarchicalChangelog(changesEnContent);
-        console.log('[Preview] ✅ EN Hierarchy (parsed):', hierarchyEn);
-        previewEn.innerHTML = renderHierarchicalHTML(hierarchyEn);
-        
-        // Zeige Vorschau
+
+        // Der Text kommt direkt aus den Feldern – Speichern ist nicht nötig.
+        // Zerlegt wird er auf dem Server, mit demselben Parser wie auf der
+        // öffentlichen Seite. Vorher lief hier eine zweite Kopie des Parsers im
+        // Browser; die kannte die Schreibweise `!: Text` nicht und zeigte
+        // deshalb weniger an als die Website. Wer das sah, hielt seinen Text für
+        // fehlerhaft, obwohl er in Ordnung war.
+        previewDe.innerHTML = '<div class="text-muted">Zerlege …</div>';
+        previewEn.innerHTML = '';
         previewCard.style.display = 'block';
         previewCard.scrollIntoView({ behavior: 'smooth' });
+
+        try {
+            const antwort = await fetch('/admin/content/changelogs/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    changes_de: changesDe ? changesDe.value : '',
+                    changes_en: changesEn ? changesEn.value : '',
+                }),
+            });
+            const daten = await antwort.json();
+            if (!daten.success) throw new Error(daten.message || 'Vorschau fehlgeschlagen');
+
+            previewDe.innerHTML = renderHierarchicalHTML(daten.de);
+            previewEn.innerHTML = renderHierarchicalHTML(daten.en);
+
+            const anzahl = (daten.de || []).reduce(function (summe, gruppe) {
+                return summe + (gruppe.children || []).reduce(function (s, sub) {
+                    return s + (sub.items || []).length;
+                }, 0);
+            }, 0);
+            console.log('[Vorschau] ' + (daten.de || []).length + ' Gruppe(n), ' + anzahl + ' Eintraege (DE)');
+
+        } catch (err) {
+            previewDe.innerHTML = '<div class="text-danger">Vorschau fehlgeschlagen: '
+                + (err && err.message ? err.message : 'unbekannt') + '</div>';
+        }
     });
 
     closePreviewBtn.addEventListener('click', function() {
