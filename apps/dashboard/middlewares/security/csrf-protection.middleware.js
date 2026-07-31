@@ -16,6 +16,7 @@ const { ServiceManager } = require('dunebot-core');
 const {
     generateCsrfToken, // Funktion: (req, res, overwrite?) => string
     doubleCsrfProtection, // Middleware für Validierung
+    validateRequest, // dieselbe Prüfung, einzeln aufrufbar – für die Diagnose
 } = doubleCsrf({
     getSecret: () => process.env.CSRF_SECRET || 'dunebot-csrf-secret-change-in-production',
     cookieName: '__Host-dunebot.x-csrf-token',
@@ -27,9 +28,16 @@ const {
     },
     size: 64,
     ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-    getTokenFromRequest: (req) => {
+    // ACHTUNG: In csrf-csrf v4 heißt diese Option `getCsrfTokenFromRequest`.
+    // Unter dem v3-Namen `getTokenFromRequest` wird sie stillschweigend
+    // ignoriert, und der Standard greift: `req.headers['x-csrf-token']`. Die
+    // Bibliothek schaut dann NIE in den Body – jedes klassische Formular
+    // scheitert, egal wie korrekt sein Token ist, während alles über fetch/XHR
+    // weiterläuft (der csrf-helper setzt dort den Header). Genau dieses Muster
+    // hat den Changelog-Speichern-Fehler erzeugt.
+    getCsrfTokenFromRequest: (req) => {
         // Token kann aus Header ODER Body kommen
-        return req.headers['x-csrf-token'] || req.body._csrf;
+        return req.headers['x-csrf-token'] || req.body?._csrf;
     },
     getSessionIdentifier: (req) => {
         // Session-ID als eindeutiger Identifier
@@ -118,6 +126,22 @@ const describeCsrfFailure = (req) => {
         if (shown === cookie) parts.push(identifyTokenOwner(req, shown));
     }
 
+    // Die Bibliothek noch einmal urteilen lassen. Sagt sie jetzt „gültig",
+    // obwohl sie eben abgelehnt hat, hat sich der Zustand zwischen beiden
+    // Aufrufen geändert – dann suchen wir nicht am Token, sondern an dem, was
+    // dazwischen passiert.
+    try {
+        parts.push(`Zweitprüfung der Bibliothek: ${validateRequest(req) ? 'GÜLTIG (!)' : 'ungültig'}`);
+    } catch (err) {
+        parts.push(`Zweitprüfung warf: ${err.message}`);
+    }
+
+    // Fingerabdrücke statt Klartext: Genug, um Ungleichheit zu erkennen, zu
+    // wenig, um im Log Schaden anzurichten.
+    const fp = (value) => crypto.createHash('sha256').update(String(value)).digest('hex').slice(0, 8);
+    parts.push(`Session-Kennung ${req.session?.id ? fp(req.session.id) : '—'}`);
+    parts.push(`Secret ${fp(process.env.CSRF_SECRET || 'dunebot-csrf-secret-change-in-production')}`);
+
     return parts.join(', ');
 };
 
@@ -145,8 +169,11 @@ function identifyTokenOwner(req, token) {
         };
 
         if (req.session?.id && matches(req.session.id)) {
-            // Dürfte nicht vorkommen – dann hätte die Bibliothek akzeptiert.
-            return 'HMAC passt zur AKTUELLEN Session (unerwartet)';
+            // Das Token ist einwandfrei und wird trotzdem abgelehnt: Dann liest
+            // die Bibliothek es gar nicht erst. Genau so fiel am 31.07. auf, dass
+            // die Option `getTokenFromRequest` (v3) hieß statt
+            // `getCsrfTokenFromRequest` (v4) und der Body nie geprüft wurde.
+            return 'HMAC passt zur AKTUELLEN Session → Token ist gültig, die Bibliothek liest es nicht: Konfiguration prüfen';
         }
         if (matches(`${req.ip}-${req.headers['user-agent']}`)) {
             return 'HMAC passt zur IP+Browser-Kennung → beim Ausstellen gab es KEINE Session';
