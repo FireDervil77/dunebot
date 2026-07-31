@@ -183,7 +183,11 @@ class SSEManager extends EventEmitter {
   broadcast(guildId, namespace, data, options = {}) {
     const guildClients = this.clients.get(guildId);
     if (!guildClients || guildClients.size === 0) {
-      this.Logger.debug(`[SSEManager] Keine Clients für Guild ${guildId}`);
+      // Bewusst ohne Logzeile: "Kein Browser verbunden" ist der Ruhezustand,
+      // kein Ereignis. StatusPoller und Hardware-Stats laufen weiter, auch wenn
+      // niemand zuschaut – der Snapshot muss für die Discord-Panels frisch
+      // bleiben. Eine Meldung je Broadcast ergab dadurch rund 13 Zeilen pro
+      // Minute, die nichts aussagen.
       return;
     }
 
