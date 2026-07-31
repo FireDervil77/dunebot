@@ -749,6 +749,71 @@ router.delete('/users/:userId/groups/:groupId', requirePermission('PERMISSIONS.A
  * GET /permissions/groups
  * Zeigt die Gruppen-Verwaltungs-Seite
  */
+/**
+ * Priorität der Standardgruppe – die Schwelle, unter der eine Gruppe ihre
+ * Rechte an die gesamte Guild verteilt.
+ *
+ * Hintergrund: `PermissionManager._buildAndCachePermissions()` lädt **alle**
+ * Gruppen mit `priority <= max_priority` des Nutzers und legt sie übereinander.
+ * Das System denkt also in Stufen, nicht in Rollen. Eine Gruppe unterhalb der
+ * Standardgruppe liegt damit im Fundament: Jedes Mitglied erbt sie, auch wer nie
+ * hinzugefügt wurde.
+ *
+ * Genau so hat eine Gruppe „Gameserver" mit Priorität 0 einer ganzen Guild
+ * GAMESERVER.START/STOP gegeben, ohne dass es irgendwo sichtbar war.
+ *
+ * @param {string} guildId
+ * @returns {Promise<number>} Priorität der Standardgruppe (1, wenn keine existiert)
+ */
+async function getDefaultGroupPriority(guildId) {
+    const dbService = ServiceManager.get('dbService');
+    const [row] = await dbService.query(
+        'SELECT priority FROM guild_groups WHERE guild_id = ? AND is_default = 1 ORDER BY priority ASC LIMIT 1',
+        [guildId]
+    );
+    return row ? Number(row.priority) : 1;
+}
+
+/**
+ * Zählt die tatsächlich erteilten Rechte einer Gruppe.
+ * @param {object|string} permissions
+ * @returns {number}
+ */
+/**
+ * Warnt, wenn eine Gruppe ihre Rechte an die ganze Guild verteilen würde.
+ *
+ * Bewusst nur eine Warnung, kein Verbot: Es kann gewollt sein, allen etwas zu
+ * geben (eine Basisgruppe „darf Server ansehen" etwa). Es darf nur nicht
+ * unbemerkt passieren.
+ *
+ * @param {number} priority
+ * @param {number} defaultPriority
+ * @param {object|string} permissions
+ * @returns {string|null} Warntext oder null
+ */
+function warnIfBelowDefault(priority, defaultPriority, permissions) {
+    const granted = countGrantedPermissions(permissions);
+    if (!Number.isFinite(priority) || priority > defaultPriority || granted === 0) return null;
+
+    return `Priorität ${priority} liegt auf oder unter der Standardgruppe (${defaultPriority}) – `
+         + `damit erbt JEDES Mitglied der Guild diese ${granted} Berechtigung(en), auch ohne in der `
+         + `Gruppe zu sein. Für eine Sondergruppe eine Priorität über ${defaultPriority} wählen.`;
+}
+
+/**
+ * Zählt die tatsächlich erteilten Rechte einer Gruppe.
+ * @param {object|string} permissions
+ * @returns {number}
+ */
+function countGrantedPermissions(permissions) {
+    let parsed = permissions;
+    if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch (_) { return 0; }
+    }
+    if (!parsed || typeof parsed !== 'object') return 0;
+    return Object.values(parsed).filter(v => v === true).length;
+}
+
 router.get('/groups', requirePermission('PERMISSIONS.GROUPS.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const permissionManager = ServiceManager.get('permissionManager');
@@ -798,11 +863,20 @@ router.get('/groups', requirePermission('PERMISSIONS.GROUPS.VIEW'), async (req, 
             permissionsByCategory[perm.category].push(perm);
         });
         
+        // Gruppen markieren, die ihre Rechte unbeabsichtigt an alle verteilen.
+        const defaultPriority = await getDefaultGroupPriority(guildId);
+        for (const group of groups) {
+            group.grantsToEveryone = !group.is_default
+                && Number(group.priority) <= defaultPriority
+                && countGrantedPermissions(group.permissions) > 0;
+        }
+
         await themeManager.renderView(res, 'guild/permissions/groups', {
             pageTitle: 'Gruppen-Verwaltung',
             groups: groups || [],
             permissions: permissionsByCategory,
             userPermissions: res.locals.userPermissions, // ← WICHTIG: Übergabe an View!
+            defaultPriority,
             guildId
         });
         
@@ -834,6 +908,14 @@ router.post('/groups', requirePermission('PERMISSIONS.GROUPS.CREATE'), async (re
             });
         }
         
+        // Ohne Angabe knapp ÜBER die Standardgruppe statt auf 0. Die 0 war der
+        // gefährlichste denkbare Standardwert: Sie legt eine neue Gruppe unter
+        // die Standardgruppe, womit jedes Mitglied der Guild ihre Rechte erbt.
+        const defaultPriority = await getDefaultGroupPriority(guildId);
+        const effectivePriority = (priority === undefined || priority === null || priority === '')
+            ? defaultPriority + 1
+            : Number(priority);
+
         // Erstelle Gruppe
         const groupId = await permissionManager.createGroup(guildId, {
             name,
@@ -842,14 +924,20 @@ router.post('/groups', requirePermission('PERMISSIONS.GROUPS.CREATE'), async (re
             color: color || '#6c757d',
             icon: icon || 'fa-users',
             permissions: permissions || {},
-            priority: priority || 0
+            priority: effectivePriority
         });
-        
-        Logger.info(`[Permissions] Group "${name}" created in guild ${guildId} (ID: ${groupId})`);
-        
+
+        Logger.info(`[Permissions] Group "${name}" created in guild ${guildId} (ID: ${groupId}, priority ${effectivePriority})`);
+
+        const warning = warnIfBelowDefault(effectivePriority, defaultPriority, permissions);
+        if (warning) {
+            Logger.warn(`[Permissions] Gruppe "${name}" (Guild ${guildId}): ${warning}`);
+        }
+
         res.json({
             success: true,
-            message: 'Gruppe wurde erstellt',
+            message: 'Gruppe wurde erstellt' + (warning ? ` — ⚠️ ${warning}` : ''),
+            warning: warning || null,
             groupId
         });
         
@@ -892,12 +980,28 @@ router.put('/groups/:groupId', requirePermission('PERMISSIONS.GROUPS.EDIT'), asy
         }
         
         await permissionManager.updateGroup(groupId, updates);
-        
+
         Logger.info(`[Permissions] Group ${groupId} updated successfully`);
-        
+
+        // Nach dem Speichern den tatsächlichen Zustand prüfen, nicht nur die
+        // Eingabe: Wer allein die Rechte ändert, schickt keine Priorität mit –
+        // die Gruppe kann aber längst zu tief liegen.
+        const dbService = ServiceManager.get('dbService');
+        const [group] = await dbService.query(
+            'SELECT priority, permissions, is_default FROM guild_groups WHERE id = ? LIMIT 1',
+            [groupId]
+        );
+        const warning = (group && !group.is_default)
+            ? warnIfBelowDefault(Number(group.priority), await getDefaultGroupPriority(guildId), group.permissions)
+            : null;
+        if (warning) {
+            Logger.warn(`[Permissions] Gruppe ${groupId} (Guild ${guildId}): ${warning}`);
+        }
+
         res.json({
             success: true,
-            message: 'Gruppe wurde aktualisiert'
+            message: 'Gruppe wurde aktualisiert' + (warning ? ` — ⚠️ ${warning}` : ''),
+            warning: warning || null
         });
         
     } catch (error) {

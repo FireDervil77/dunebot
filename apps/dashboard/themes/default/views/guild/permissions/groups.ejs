@@ -110,6 +110,21 @@
             <i class="fa-solid fa-arrow-up text-muted me-2"></i>
             <span class="text-muted">Priorität: <%= group.priority || 0 %></span>
           </div>
+
+          <%# Eine Gruppe unterhalb der Standardgruppe liegt im Fundament der
+              Hierarchie: Jedes Mitglied erbt sie, auch wer nie hinzugefuegt
+              wurde. Ohne diesen Hinweis ist das nirgends zu sehen. %>
+          <% if (group.grantsToEveryone) { %>
+            <div class="alert alert-warning mt-3 mb-0 py-2 px-3 small">
+              <i class="fa-solid fa-triangle-exclamation me-1"></i>
+              <strong>Gilt für alle:</strong>
+              Die Priorität liegt auf oder unter der Standardgruppe
+              (<%= typeof defaultPriority !== 'undefined' ? defaultPriority : 1 %>).
+              Rechte werden von unten nach oben vererbt – <strong>jedes Mitglied der Guild</strong>
+              erbt diese Berechtigungen, auch ohne in der Gruppe zu sein.
+              Für eine Sondergruppe eine höhere Priorität wählen.
+            </div>
+          <% } %>
         </div>
         
         <div class="card-footer bg-light">
@@ -228,9 +243,16 @@
                      class="form-control" 
                      id="create_priority" 
                      name="priority" 
-                     value="0"
+                     value="<%= (typeof defaultPriority !== 'undefined' ? defaultPriority + 1 : 2) %>"
                      min="0">
-              <div class="form-text">Höhere Zahl = höhere Priorität</div>
+              <div class="form-text">
+                Höhere Zahl = höhere Priorität. Rechte werden von unten nach oben
+                <strong>vererbt</strong>: Wer Priorität X hat, erbt alle Gruppen mit Priorität ≤ X.
+                Ab <%= (typeof defaultPriority !== 'undefined' ? defaultPriority + 1 : 2) %>
+                gilt die Gruppe nur für ihre Mitglieder – auf oder unter
+                <%= typeof defaultPriority !== 'undefined' ? defaultPriority : 1 %>
+                (Standardgruppe) bekommt sie <strong>jedes</strong> Guild-Mitglied.
+              </div>
             </div>
           </div>
           
