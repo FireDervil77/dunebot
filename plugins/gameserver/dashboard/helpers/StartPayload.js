@@ -29,6 +29,47 @@ function parseJson(value, fallback, onError) {
 }
 
 /**
+ * Sieht der Text nach einer Docker-Image-Adresse aus?
+ * @private
+ */
+function siehtNachImageAus(text) {
+    const s = String(text || '').trim();
+    if (!s || /\s/.test(s)) return false;      // "Wine Latest" ist ein Etikett
+    return s.includes('/') || s.includes(':'); // ghcr.io/…  bzw.  image:tag
+}
+
+/**
+ * Wählt aus `docker_images` die tatsächliche Image-Adresse.
+ *
+ * Pterodactyl-Eggs sind sich über die Richtung nicht einig, und beide Varianten
+ * liegen in unserem Bestand nebeneinander:
+ *
+ *   factorio-arm64    { "Box64": "ghcr.io/parkervcp/yolks:box64" }   Etikett → Image
+ *   windrose          { "ghcr.io/parkervcp/steamcmd:proton": "Proton" }  Image → Etikett
+ *
+ * Wer stur den Schlüssel nimmt, startet Factorio mit dem Image „Box64"; wer stur
+ * den Wert nimmt, startet Windrose mit „Proton". Deshalb wird die Seite genommen,
+ * die nach einer Image-Adresse aussieht, und der Schlüssel entscheidet nur, wenn
+ * beide passen (der Normalfall: Schlüssel und Wert sind identisch).
+ *
+ * @param {object} dockerImages
+ * @returns {string|null}
+ * @private
+ */
+function waehleDockerImage(dockerImages) {
+    const eintraege = Object.entries(dockerImages || {});
+    if (!eintraege.length) return null;
+
+    for (const [schluessel, wert] of eintraege) {
+        if (siehtNachImageAus(schluessel)) return schluessel;
+        if (siehtNachImageAus(wert)) return String(wert);
+    }
+
+    // Nichts sieht nach einem Image aus – dann der Schlüssel, wie bisher.
+    return eintraege[0][0];
+}
+
+/**
  * Baut das vollständige Start-Payload für den Daemon.
  *
  * @param {object} server   - Zeile aus gameservers (inkl. frozen_game_data, ports,
@@ -91,9 +132,7 @@ function buildStartPayload(server, guildId, Logger = null) {
     let platform = null;
 
     if (frozenData) {
-        // docker_image: erster KEY aus docker_images (KEY = Image-URL)
-        const imageKeys = Object.keys(frozenData.docker_images || {});
-        if (imageKeys.length > 0) dockerImage = imageKeys[0];
+        dockerImage = waehleDockerImage(frozenData.docker_images);
 
         const stopSignal = frozenData.startup?.stop || '';
         if (stopSignal === '^C') {
@@ -193,4 +232,4 @@ async function loadServerForStart(dbService, serverId, guildId = null) {
     return row || null;
 }
 
-module.exports = { buildStartPayload, loadServerForStart };
+module.exports = { buildStartPayload, loadServerForStart, waehleDockerImage };

@@ -788,88 +788,43 @@ class IPCServer {
                 }
 
                 // ── Gameserver starten ──────────────────────────────────────────────────
+                // Baut das Payload **nicht** selbst, sondern über `buildStartPayload` –
+                // dieselbe Funktion, die Dashboard-Start, Neustart und Cronjob benutzen.
+                //
+                // Bis zum 2026-08-01 stand hier eine eigene Kopie, und sie war die letzte
+                // abweichende. Ihre Port-Ersetzung suchte nach `{{game}}` und `{{query}}`,
+                // weil das die Schlüssel der Portkarte sind – im Startbefehl stehen aber
+                // `{{SERVER_PORT}}` und `{{QUERY_PORT}}`. Es passte nichts, also wurde
+                // nichts ersetzt: Palworld startete über /server start mit literalem
+                // `-port={{SERVER_PORT}}` auf der Kommandozeile. (Zweiter Fehler in
+                // derselben Schleife: Ein Porteintrag ist ein Objekt, `String(...)` daraus
+                // hätte `[object Object]` ergeben.) Nebenbei fehlten der Kopie auch
+                // Template-Overrides, Config-Patching und Auto-Update.
                 case 'SERVER_START': {
                     if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
                     if (await actorMayNot('GAMESERVER.START')) return;
-                    const [srv] = await dbService.query(
-                        `SELECT gs.id, gs.name, gs.status, gs.rootserver_id,
-                                gs.install_path, gs.launch_params, gs.ports, gs.env_variables,
-                                gs.frozen_game_data, gs.bind_ip,
-                                am.slug AS addon_slug, r.daemon_id, r.system_user
-                         FROM gameservers gs
-                         JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
-                         LEFT JOIN rootserver r ON gs.rootserver_id = r.id
-                         WHERE gs.id = ? AND gs.guild_id = ? LIMIT 1`,
-                        [serverId, guildId]
-                    );
+
+                    const { buildStartPayload, loadServerForStart } =
+                        require('../../../plugins/gameserver/dashboard/helpers/StartPayload');
+
+                    const srv = await loadServerForStart(dbService, serverId, guildId);
                     if (!srv) return message.reply({ success: false, error: 'Gameserver nicht gefunden' });
                     if (srv.status === 'online') return message.reply({ success: false, error: 'Server läuft bereits' });
                     if (!srv.daemon_id) return message.reply({ success: false, error: 'Kein Daemon zugewiesen' });
                     if (!ipmServer?.isDaemonOnline(srv.daemon_id)) return message.reply({ success: false, error: 'Daemon ist offline' });
 
-                    // ports / env_variables parsen
-                    let srvPorts = {};
-                    let srvEnv = {};
-                    try { srvPorts = typeof srv.ports === 'string' ? JSON.parse(srv.ports) : (srv.ports || {}); } catch (_) {}
-                    try { srvEnv = typeof srv.env_variables === 'string' ? JSON.parse(srv.env_variables) : (srv.env_variables || {}); } catch (_) {}
+                    const { payload: startPayload, error: payloadError, dockerImage } =
+                        buildStartPayload(srv, guildId, Logger);
 
-                    // frozen_game_data: docker_image + runtime auslesen
-                    let dockerImage = null;
-                    let gameDataRuntime = { stop_mode: 'sigterm', stop_command: '', stop_timeout_sec: 30, done_string: '' };
-                    let startupCommand = srv.launch_params || './start.sh';
-                    try {
-                        const frozenData = typeof srv.frozen_game_data === 'string' ? JSON.parse(srv.frozen_game_data) : srv.frozen_game_data;
-                        if (frozenData) {
-                            const dockerImages = frozenData.docker_images || {};
-                            const imageKeys = Object.keys(dockerImages);
-                            if (imageKeys.length > 0) dockerImage = dockerImages[imageKeys[0]];
-
-                            const stopSignal = frozenData.startup?.stop || '';
-                            if (stopSignal === '^C') { gameDataRuntime.stop_mode = 'sigint'; }
-                            else if (stopSignal) { gameDataRuntime.stop_mode = 'console_command'; gameDataRuntime.stop_command = stopSignal; }
-                            if (frozenData.startup?.done) gameDataRuntime.done_string = frozenData.startup.done;
-
-                            // Variable-Substitution im startup command
-                            if (frozenData.variables && Array.isArray(frozenData.variables)) {
-                                for (const varDef of frozenData.variables) {
-                                    const envKey = varDef.env_variable;
-                                    const value = srvEnv[envKey] ?? srvEnv[varDef.name] ?? varDef.default_value ?? '';
-                                    startupCommand = startupCommand.replace(new RegExp(`{{${envKey}}}`, 'g'), String(value));
-                                }
-                            }
-                            for (const [key, value] of Object.entries(srvPorts)) {
-                                startupCommand = startupCommand.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                            }
-                        }
-                    } catch (_) {}
-
-                    if (!dockerImage) return message.reply({ success: false, error: 'Kein Docker-Image konfiguriert – Server muss neu installiert werden' });
+                    if (payloadError) {
+                        Logger.error(`[IPC/Gameserver] ${payloadError} (Server ${serverId})`);
+                        return message.reply({ success: false, error: payloadError });
+                    }
 
                     await dbService.query("UPDATE gameservers SET status = 'starting', last_started_at = NOW() WHERE id = ?", [serverId]);
-                    // Platform aus frozen_game_data extrahieren (Proton GE Wrapping)
-                    let gameDataPlatform = null;
-                    try {
-                        const fd = typeof srv.frozen_game_data === 'string' ? JSON.parse(srv.frozen_game_data) : srv.frozen_game_data;
-                        if (fd?.platform) gameDataPlatform = fd.platform;
-                    } catch (_) {}
 
-                    const startPayload = {
-                        server_id:      String(serverId),
-                        rootserver_id:  srv.rootserver_id,
-                        addon_slug:     srv.addon_slug,
-                        startup_command: startupCommand,
-                        install_path:   srv.install_path || `${serverId}-${srv.addon_slug}`,
-                        system_user:    srv.system_user || 'gameserver',
-                        ports:          srvPorts,
-                        env_variables:  srvEnv,
-                        guild_id:       guildId,
-                        bind_ip:        srv.bind_ip || null,
-                        game_data: {
-                            docker_image: dockerImage,
-                            runtime:      gameDataRuntime,
-                            ...(gameDataPlatform ? { platform: gameDataPlatform } : {}),
-                        },
-                    };
+                    Logger.info(`[IPC/Gameserver] Start-Command an Daemon ${srv.daemon_id} (Image: ${dockerImage}${startPayload.auto_update ? ', mit Auto-Update' : ''})`);
+
                     const startR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.start', startPayload, 30000);
                     if (!startR?.success) {
                         await dbService.query("UPDATE gameservers SET status = 'error' WHERE id = ?", [serverId]);
