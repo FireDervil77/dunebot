@@ -115,20 +115,28 @@
                                     </small>
                                 </div>
 
-                                <!-- Max Players -->
+                                <!-- Max Players: abgeleitet, nicht eingebbar (Konzept 23.1) -->
                                 <div class="form-group">
-                                    <label for="max_players">
+                                    <label>
                                         <%= tr('gameserver:SERVER.MAX_PLAYERS') %>
                                     </label>
-                                    <input type="number" 
-                                           class="form-control" 
-                                           id="max_players" 
-                                           name="max_players" 
-                                           value="<%= server.max_players %>"
-                                           min="1"
-                                           max="200">
+                                    <div class="form-control-plaintext">
+                                        <% if (locals.slots) { %>
+                                            <strong><%= slots %></strong>
+                                            <% if (locals.slotVariable) { %>
+                                                <span class="text-muted">
+                                                    &mdash; aus <code><%= slotVariable %></code>
+                                                </span>
+                                            <% } %>
+                                        <% } else { %>
+                                            <span class="text-muted">&ndash; keine Slot-Variable gesetzt</span>
+                                        <% } %>
+                                    </div>
                                     <small class="form-text text-muted">
-                                        <%= tr('gameserver:SERVER.MAX_PLAYERS_DESC') %>
+                                        Die Slot-Anzahl steht in den Environment Variables weiter unten
+                                        &ndash; nur die landet im Startbefehl des Spiels. Ein eigenes
+                                        Feld gab es hier bis zum 01.08.2026; es schrieb in eine reine
+                                        Anzeigespalte und änderte am Server nichts.
                                     </small>
                                 </div>
 
@@ -145,6 +153,39 @@
                                     <small class="form-text text-muted">
                                         <%= tr('gameserver:SERVER.ENV_VARIABLES_DESC') %>
                                     </small>
+
+                                    <%
+                                        /*
+                                         * Kennzeichnen statt verstecken (Konzept 23.2): Diese Variablen
+                                         * kommen weder im Startbefehl noch im Installationsskript noch in
+                                         * den Konfigurationsvorlagen des Addons vor. Sie bleiben trotzdem
+                                         * im Editor stehen - man braucht sie vielleicht noch, und was man
+                                         * nicht sieht, findet man nicht wieder.
+                                         */
+                                        const ungenutzt = locals.unbenutzteVariablen || [];
+                                    %>
+                                    <% if (ungenutzt.length) { %>
+                                        <div class="alert alert-warning mt-2 mb-0 py-2">
+                                            <div class="mb-1">
+                                                <i class="fas fa-triangle-exclamation me-1"></i>
+                                                <strong>Diese Variablen werden von der Addon-Vorlage nicht eingesetzt:</strong>
+                                            </div>
+                                            <div class="mb-1">
+                                                <% ungenutzt.forEach(function (v) { %>
+                                                    <code class="me-2"
+                                                          title="<%= v.beschreibung || 'Keine Beschreibung im Addon' %>"><%= v.name %></code>
+                                                <% }); %>
+                                            </div>
+                                            <div class="small text-muted">
+                                                Geprüft wurden Startbefehl, Stoppbefehl, Installationsskript und
+                                                Konfigurationsvorlagen &ndash; in den drei Schreibweisen
+                                                <code>{{NAME}}</code>, <code>${NAME}</code> und <code>$NAME</code>.
+                                                Ein Wert hier bleibt also voraussichtlich wirkungslos. Gelöscht
+                                                wird nichts: Falls das Container-Abbild die Variable selbst liest,
+                                                sieht diese Prüfung das nicht.
+                                            </div>
+                                        </div>
+                                    <% } %>
                                 </div>
 
                                 <!-- Server Status Info -->

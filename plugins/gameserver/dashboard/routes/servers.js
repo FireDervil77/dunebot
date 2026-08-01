@@ -16,6 +16,7 @@ const { resolveStatusConfig } = require('../helpers/StatusSchema');
 const PanelService = require('../helpers/PanelService');
 const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');
 const { resolveConsoleTransport } = require('../helpers/ConsoleTransport');
+const { beurteileVariablen } = require('../helpers/EggVariables');
 // const TemplateEngine = require('../helpers/TemplateEngine'); // ENTFERNT - existiert nicht mehr
 // const PortValidator = require('../helpers/PortValidator'); // ENTFERNT - existiert nicht mehr
 
@@ -1916,6 +1917,7 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
                 gs.auto_restart,
                 gs.auto_update,
                 gs.env_variables,
+                gs.frozen_game_data,
                 gs.rootserver_id,
                 am.name as game_name,
                 am.slug as game_slug
@@ -1945,11 +1947,37 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
             server.env_variables = {};
         }
 
+        // frozen_game_data ist die Vorlage, gegen die der Server wirklich läuft –
+        // nicht das Addon im Marktplatz, das inzwischen weitergezogen sein kann.
+        let frozenData = {};
+        try {
+            frozenData = typeof server.frozen_game_data === 'string'
+                ? JSON.parse(server.frozen_game_data) : (server.frozen_game_data || {});
+        } catch (_) { /* unlesbar zählt als "nichts deklariert" */ }
+
+        // Slot-Anzahl kommt aus der Addon-Variable, nicht aus der Spalte (Konzept 23.1).
+        // Der Name der Variable wird nach derselben Reihenfolge gesucht wie der Wert,
+        // Addon-Übersteuerung eingeschlossen – sonst zeigte die Anzeige einen Wert aus
+        // der einen und einen Namen aus einer anderen Variable.
+        const slots = StatusService.resolveMaxPlayers(server.env_variables, frozenData);
+        const slotOverride = frozenData?.status?.merge?.max_players;
+        const slotKandidaten = typeof slotOverride === 'string' && slotOverride.startsWith('variable:')
+            ? [slotOverride.slice('variable:'.length), 'MAX_PLAYERS', 'MAXPLAYERS', 'SERVER_MAXPLAYERS', 'SLOTS']
+            : ['MAX_PLAYERS', 'MAXPLAYERS', 'SERVER_MAXPLAYERS', 'SLOTS'];
+        const slotVariable = slotKandidaten
+            .find(k => parseInt(server.env_variables?.[k], 10) > 0) || null;
+
+        // Welche Variablen kommen nirgends vor? (Konzept 23.2 – kennzeichnen, nicht verstecken)
+        const variablen = beurteileVariablen(frozenData, server.env_variables);
+
         return await themeManager.renderView(res, 'guild/gameserver-edit', {
             title: `Server bearbeiten: ${server.name}`,
             activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
             server,
-            guildId
+            guildId,
+            slots,
+            slotVariable,
+            unbenutzteVariablen: variablen.filter(v => !v.verwendet)
         });
     } catch (error) {
         Logger.error('[Gameserver] Fehler beim Laden des Edit-Formulars:', error);
@@ -2383,7 +2411,13 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
     try {
         const guildId = res.locals.guildId;
         const { serverId } = req.params;
-        const { name, auto_restart, auto_update, max_players, env_variables } = req.body;
+        // `max_players` wird bewusst NICHT mehr aus dem Formular übernommen
+        // (Konzept 23.1): Die Slot-Anzahl steht in der Addon-Variable MAX_PLAYERS,
+        // nur die landet im Startbefehl. Die Spalte ist eine abgeleitete Anzeige,
+        // die der StatusPoller aus dem Snapshot pflegt. Wer sie hier von Hand
+        // überschrieb, änderte am Spiel nichts - der Wert wanderte lautlos zurück,
+        // sobald die nächste Abfrage durchlief.
+        const { name, auto_restart, auto_update, env_variables } = req.body;
 
         Logger.info(`[Gameserver] Server-Update angefordert (ID: ${serverId})`);
 
@@ -2421,30 +2455,19 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
             }
         }
 
-        // Max Players validieren
-        const maxPlayersInt = parseInt(max_players) || 10;
-        if (maxPlayersInt < 1 || maxPlayersInt > 200) {
-            return res.status(400).json({
-                success: false,
-                message: 'Max Players muss zwischen 1 und 200 liegen'
-            });
-        }
-
         // Update ausführen
         await dbService.query(`
-            UPDATE gameservers 
-            SET 
+            UPDATE gameservers
+            SET
                 name = ?,
                 auto_restart = ?,
                 auto_update = ?,
-                max_players = ?,
                 env_variables = ?
             WHERE id = ? AND guild_id = ?
         `, [
             name.trim(),
             toBool(auto_restart) ? 1 : 0,
             toBool(auto_update) ? 1 : 0,
-            maxPlayersInt,
             JSON.stringify(envVarsJson),
             serverId,
             guildId
