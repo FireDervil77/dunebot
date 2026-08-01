@@ -64,6 +64,17 @@
                         </a>
                     </li>
                     <li class="nav-item ml-auto">
+                        <a class="nav-link <%= activeTab === 'analytics' ? 'active' : '' %>"
+                           href="/admin/content?tab=analytics" data-tab="analytics">
+                            <i class="fas fa-chart-line mr-1"></i> Analyse &amp; Cookies
+                            <% if (locals.analytics && analytics.aktiv && analytics.gtmId) { %>
+                                <span class="badge badge-success ml-1">aktiv</span>
+                            <% } else { %>
+                                <span class="badge badge-secondary ml-1">aus</span>
+                            <% } %>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link <%= activeTab === 'settings' ? 'active' : '' %>"
                            href="/admin/content?tab=settings" data-tab="settings">
                             <i class="fas fa-cog mr-1"></i> Einstellungen
@@ -339,6 +350,131 @@
                         <% } %>
                     </div>
 
+                    <%# ====== ANALYSE & COOKIES TAB ====== %>
+                    <div class="tab-pane fade <%= activeTab === 'analytics' ? 'show active' : '' %>" id="tab-analytics">
+                        <% const _an = locals.analytics || { gtmId: '', aktiv: false, version: 1, kategorien: [] }; %>
+
+                        <h4 class="mb-3"><i class="fas fa-chart-line mr-2"></i>Google Tag Manager</h4>
+
+                        <div class="callout callout-warning">
+                            <h5><i class="fas fa-triangle-exclamation mr-1"></i> Was GTM lädt, siehst du hier nicht</h5>
+                            <p class="mb-0">
+                                Die Tags verwaltest du im GTM-Container bei Google. Ergänzt dort jemand ein
+                                Marketing-Tag, ändern sich die gesetzten Cookies &mdash; ohne dass in diesem
+                                Dashboard etwas davon steht. <strong>Die Kategorien unten und der Text auf der
+                                Datenschutzseite musst du dann von Hand nachziehen.</strong>
+                            </p>
+                        </div>
+
+                        <form id="analyticsForm">
+                            <div class="form-group">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" class="custom-control-input" id="analytics_aktiv"
+                                           name="aktiv" <%= _an.aktiv ? 'checked' : '' %>>
+                                    <label class="custom-control-label" for="analytics_aktiv">
+                                        Tag Manager und Cookie-Abfrage aktiv
+                                    </label>
+                                </div>
+                                <small class="form-text text-muted">
+                                    Aus heißt: kein GTM, kein Banner, keine Cookies außer der Sitzung.
+                                    Die Container-ID bleibt dabei gespeichert.
+                                </small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="analytics_gtm_id">GTM-Container-ID</label>
+                                <input type="text" class="form-control" id="analytics_gtm_id" name="gtmId"
+                                       value="<%= _an.gtmId %>" placeholder="GTM-XXXXXXX"
+                                       pattern="GTM-[A-Za-z0-9]{4,10}">
+                                <small class="form-text text-muted">
+                                    Format <code>GTM-XXXXXXX</code>. Leer lassen schaltet die Einbindung ab &mdash;
+                                    eine falsche ID erzeugt keinen Fehler, es passiert dann einfach nichts.
+                                </small>
+                            </div>
+
+                            <hr>
+                            <h5 class="mb-3">Kategorien der Abfrage</h5>
+                            <p class="text-muted">
+                                „Notwendig" lässt sich nicht abwählen &mdash; darin stecken die Sitzung und die
+                                Speicherung dieser Auswahl selbst. Alles andere ist standardmäßig <strong>aus</strong>.
+                            </p>
+
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr><th style="width:12rem">Kategorie</th><th>Beschreibung für den Besucher</th><th style="width:8rem">Pflicht</th></tr>
+                                </thead>
+                                <tbody>
+                                <% (_an.kategorien || []).forEach(function (k, i) { %>
+                                    <tr>
+                                        <td>
+                                            <input type="hidden" name="kat_key_<%= i %>" value="<%= k.key %>">
+                                            <input type="text" class="form-control form-control-sm"
+                                                   name="kat_label_<%= i %>" value="<%= k.label %>">
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm"
+                                                   name="kat_desc_<%= i %>" value="<%= k.beschreibung %>">
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            <% if (k.pflicht) { %>
+                                                <span class="badge badge-secondary">Pflicht</span>
+                                            <% } else { %>
+                                                <span class="text-muted">abwählbar</span>
+                                            <% } %>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                                </tbody>
+                            </table>
+
+                            <hr>
+                            <div class="form-group">
+                                <label for="analytics_version">Fassung des Einwilligungstextes</label>
+                                <div class="input-group" style="max-width:22rem">
+                                    <input type="number" class="form-control" id="analytics_version"
+                                           name="version" value="<%= _an.version %>" min="1" step="1">
+                                    <div class="input-group-append">
+                                        <button type="button" class="btn btn-outline-secondary" id="versionHoch">
+                                            +1 &amp; erneut fragen
+                                        </button>
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted">
+                                    Erhöhen, wenn sich der Text wesentlich ändert: Alle bisherigen Einwilligungen
+                                    verlieren damit ihre Gültigkeit und die Abfrage erscheint erneut.
+                                    <strong>Ohne diesen Schritt gilt eine veraltete Einwilligung weiter.</strong>
+                                </small>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save mr-1"></i> Speichern
+                            </button>
+                            <span id="analyticsStatus" class="ml-2 small"></span>
+                        </form>
+
+                        <hr>
+                        <h5><i class="fas fa-clipboard-check mr-2"></i>Nachweis</h5>
+                        <p class="text-muted mb-2">
+                            Erteilte Einwilligungen werden protokolliert &mdash; die DSGVO verlangt, dass du sie
+                            belegen kannst. Gespeichert werden Zeitpunkt, Auswahl und Fassung;
+                            <strong>keine IP im Klartext</strong>, nur ein gesalzener Hash.
+                        </p>
+                        <p>
+                            <span class="badge badge-info"><%= locals.consentAnzahl || 0 %></span>
+                            Einträge insgesamt<% if (locals.consentLetzter) { %>,
+                            zuletzt am <%= new Date(consentLetzter).toLocaleString('de-DE') %><% } %>.
+                        </p>
+
+                        <div class="callout callout-danger">
+                            <h5><i class="fas fa-scale-balanced mr-1"></i> Was ich nicht abnehmen kann</h5>
+                            <p class="mb-0">
+                                Der Mechanismus hier ist gebaut. <strong>Die Formulierungen im Banner und auf
+                                der Datenschutzseite gehören von jemandem geprüft, der dafür haftet</strong> &mdash;
+                                sie hängen daran, welche Tags du einsetzt und wohin die Daten fließen.
+                            </p>
+                        </div>
+                    </div>
+
                     <%# ====== EINSTELLUNGEN TAB ====== %>
                     <div class="tab-pane fade <%= activeTab === 'settings' ? 'show active' : '' %>" id="tab-settings">
                         <h4 class="mb-3"><i class="fas fa-cog mr-2"></i>Channel-Konfiguration</h4>
@@ -457,6 +593,64 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+
+    // ====== ANALYSE & COOKIES: Speichern ======
+    const analyticsForm = document.getElementById('analyticsForm');
+    if (analyticsForm) {
+        const status = document.getElementById('analyticsStatus');
+
+        // "+1 & erneut fragen" - der einzige Weg, eine erteilte Einwilligung
+        // ungueltig zu machen. Deshalb ein eigener Knopf und kein stilles Feld.
+        document.getElementById('versionHoch')?.addEventListener('click', function () {
+            const feld = document.getElementById('analytics_version');
+            feld.value = (parseInt(feld.value, 10) || 1) + 1;
+        });
+
+        analyticsForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            status.textContent = 'Speichere …';
+            status.className = 'ml-2 small text-muted';
+
+            const kategorien = [];
+            analyticsForm.querySelectorAll('input[name^="kat_key_"]').forEach(function (feld) {
+                const i = feld.name.replace('kat_key_', '');
+                kategorien.push({
+                    key:          feld.value,
+                    label:        analyticsForm.querySelector('[name="kat_label_' + i + '"]')?.value || feld.value,
+                    beschreibung: analyticsForm.querySelector('[name="kat_desc_' + i + '"]')?.value || '',
+                    pflicht:      feld.value === 'notwendig'
+                });
+            });
+
+            try {
+                const resp = await fetch('/admin/content/analytics/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    },
+                    body: JSON.stringify({
+                        gtmId:   document.getElementById('analytics_gtm_id').value,
+                        aktiv:   document.getElementById('analytics_aktiv').checked,
+                        version: parseInt(document.getElementById('analytics_version').value, 10) || 1,
+                        kategorien: kategorien
+                    })
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    status.textContent = '✓ ' + (result.message || 'Gespeichert');
+                    status.className = 'ml-2 small text-success';
+                } else {
+                    status.textContent = '✗ ' + (result.message || 'Fehlgeschlagen');
+                    status.className = 'ml-2 small text-danger';
+                }
+            } catch (err) {
+                status.textContent = '✗ ' + err.message;
+                status.className = 'ml-2 small text-danger';
+            }
+        });
+    }
 
     // ====== SETTINGS: Channel-Loader ======
     const activeTab = '<%= activeTab %>';

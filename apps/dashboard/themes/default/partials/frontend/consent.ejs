@@ -1,0 +1,159 @@
+<%#
+ * Cookie-Einwilligung + Google Tag Manager
+ *
+ * Die Reihenfolge in dieser Datei ist der ganze Mechanismus:
+ *
+ *   1. Consent Mode v2 auf "denied" setzen   <- muss VOR GTM stehen
+ *   2. GTM einbinden
+ *   3. gespeicherte Auswahl als "update" nachschicken
+ *
+ * Andersherum laedt GTM seine Tags, bevor irgendjemand gefragt wurde. Genau
+ * deshalb steht der Block im <head> und nicht bei den uebrigen Skripten am
+ * Seitenende.
+ *
+ * Ohne Einwilligung passiert nichts: kein GTM-Laden von Tags, keine Cookies
+ * ausser der Sitzung und dem Consent-Cookie selbst.
+ *
+ * @param {object} consent - { aktiv, gtmId, version, kategorien, auswahl }
+%>
+<% const _c = locals.consent; %>
+<% if (_c && _c.aktiv) { %>
+<script>
+(function () {
+    'use strict';
+
+    var VERSION    = <%- JSON.stringify(_c.version) %>;
+    var KATEGORIEN = <%- JSON.stringify(_c.kategorien) %>;
+    var GESPEICHERT = <%- JSON.stringify(_c.auswahl || null) %>;
+    var COOKIE     = '<%= _c.cookieName %>';
+
+    // ── 1. Standard: alles verweigert ────────────────────────────────────
+    // wait_for_update gibt dem Update 500 ms Vorsprung, bevor GTM ohne
+    // Einwilligung weiterarbeitet. Ohne diese Zeile entsteht ein Wettlauf
+    // zwischen dem Laden von GTM und dem Auslesen des Cookies.
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { window.dataLayer.push(arguments); }
+    window.gtag = window.gtag || gtag;
+
+    gtag('consent', 'default', {
+        ad_storage:               'denied',
+        ad_user_data:             'denied',
+        ad_personalization:       'denied',
+        analytics_storage:        'denied',
+        functionality_storage:    'denied',
+        personalization_storage:  'denied',
+        security_storage:         'granted',
+        wait_for_update:          500
+    });
+
+    // ── 3. Vorhandene Auswahl sofort nachreichen ─────────────────────────
+    if (GESPEICHERT && GESPEICHERT.signale) {
+        gtag('consent', 'update', GESPEICHERT.signale);
+    }
+
+    // ── Banner ───────────────────────────────────────────────────────────
+    function zeigeBanner(alsEinstellungen) {
+        if (document.getElementById('consent-banner')) {
+            document.getElementById('consent-banner').hidden = false;
+            return;
+        }
+
+        var box = document.createElement('div');
+        box.id = 'consent-banner';
+        box.setAttribute('role', 'dialog');
+        box.setAttribute('aria-label', 'Cookie-Einstellungen');
+        box.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;' +
+            'background:#1b1f24;color:#f3f4f6;padding:1.25rem;box-shadow:0 -2px 12px rgba(0,0,0,.4);' +
+            'font-size:.95rem;line-height:1.5;max-height:90vh;overflow:auto';
+
+        var html = '<div style="max-width:60rem;margin:0 auto">' +
+            '<p style="margin:0 0 .75rem"><strong>Cookies und Reichweitenmessung</strong><br>' +
+            'Wir setzen nur, was du hier erlaubst. Deine Auswahl kannst du jederzeit ' +
+            'über „Cookie-Einstellungen" in der Fußzeile ändern.</p>' +
+            '<div id="consent-optionen" style="margin:.75rem 0">';
+
+        KATEGORIEN.forEach(function (k) {
+            var erlaubt = GESPEICHERT ? GESPEICHERT.gewaehlt.indexOf(k.key) !== -1 : false;
+            html += '<label style="display:block;margin:.35rem 0;cursor:' + (k.pflicht ? 'default' : 'pointer') + '">' +
+                '<input type="checkbox" value="' + k.key + '"' +
+                (k.pflicht ? ' checked disabled' : (erlaubt ? ' checked' : '')) +
+                ' style="margin-right:.5rem"> <strong>' + k.label + '</strong>' +
+                '<span style="opacity:.75"> &mdash; ' + k.beschreibung + '</span></label>';
+        });
+
+        // Ablehnen steht bewusst gleichrangig neben Zustimmen: gleiche Groesse,
+        // gleiche Auffaelligkeit, kein vorausgewaehltes Haekchen. Ein Banner, bei
+        // dem "Alle ablehnen" versteckt ist, ist keine freiwillige Einwilligung.
+        html += '</div><div style="display:flex;flex-wrap:wrap;gap:.5rem">' +
+            '<button type="button" id="consent-alle" class="btn btn-primary">Alle erlauben</button>' +
+            '<button type="button" id="consent-keine" class="btn btn-primary">Alle ablehnen</button>' +
+            '<button type="button" id="consent-auswahl" class="btn btn-outline-light">Auswahl speichern</button>' +
+            '<a href="/privacy" style="align-self:center;margin-left:auto;color:#9ecbff">Datenschutz</a>' +
+            '</div></div>';
+
+        box.innerHTML = html;
+        document.body.appendChild(box);
+
+        function alleKeys(nurPflicht) {
+            return KATEGORIEN.filter(function (k) { return nurPflicht ? k.pflicht : true; })
+                             .map(function (k) { return k.key; });
+        }
+        function gewaehlteAusFormular() {
+            var keys = [];
+            box.querySelectorAll('#consent-optionen input[type=checkbox]').forEach(function (feld) {
+                if (feld.checked) keys.push(feld.value);
+            });
+            return keys;
+        }
+
+        document.getElementById('consent-alle').onclick    = function () { speichere(alleKeys(false), alsEinstellungen); };
+        document.getElementById('consent-keine').onclick   = function () { speichere(alleKeys(true),  alsEinstellungen); };
+        document.getElementById('consent-auswahl').onclick = function () { speichere(gewaehlteAusFormular(), alsEinstellungen); };
+    }
+
+    function speichere(gewaehlt, alsEinstellungen) {
+        fetch('/consent', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') || {}).content || ''
+            },
+            body: JSON.stringify({
+                gewaehlt: gewaehlt,
+                version:  VERSION,
+                herkunft: alsEinstellungen ? 'einstellungen' : 'banner'
+            })
+        }).then(function (r) { return r.json(); }).then(function (antwort) {
+            if (antwort && antwort.signale) gtag('consent', 'update', antwort.signale);
+            var el = document.getElementById('consent-banner');
+            if (el) el.hidden = true;
+        }).catch(function () {
+            // Bleibt das Speichern aus, bleibt es beim "denied" von oben.
+            // Lieber nicht tracken als ungefragt tracken.
+            var el = document.getElementById('consent-banner');
+            if (el) el.hidden = true;
+        });
+    }
+
+    // Fragen, wenn nichts gespeichert ist oder die Fassung veraltet ist.
+    if (!GESPEICHERT || GESPEICHERT.version !== VERSION) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () { zeigeBanner(false); });
+        } else {
+            zeigeBanner(false);
+        }
+    }
+
+    // Widerruf: muss so leicht sein wie die Zustimmung. Der Link liegt in der Fußzeile.
+    window.cookieEinstellungenOeffnen = function () { zeigeBanner(true); return false; };
+})();
+</script>
+
+<%# ── 2. GTM, erst NACH dem Standard oben ───────────────────────────── %>
+<script>
+(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});
+var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';
+j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','<%= _c.gtmId %>');
+</script>
+<% } %>

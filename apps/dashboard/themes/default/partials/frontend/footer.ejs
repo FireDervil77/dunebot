@@ -75,6 +75,19 @@
     </div>
 
     <div class="container copyright text-center mt-4">
+      <%#
+        Widerruf muss so leicht sein wie die Zustimmung - deshalb steht der Link
+        auf jeder Seite und nicht nur in der Datenschutzerklaerung. Er erscheint
+        nur, wenn die Abfrage ueberhaupt aktiv ist; sonst waere es ein Knopf, der
+        nichts zu widerrufen hat.
+      %>
+      <% if (locals.consent && consent.aktiv) { %>
+        <p>
+          <a href="#" onclick="return cookieEinstellungenOeffnen();">
+            <%= typeof tr === 'function' ? (tr('FOOTER.COOKIE_SETTINGS') === 'FOOTER.COOKIE_SETTINGS' ? 'Cookie-Einstellungen' : tr('FOOTER.COOKIE_SETTINGS')) : 'Cookie-Einstellungen' %>
+          </a>
+        </p>
+      <% } %>
       <p>© <span>Copyright</span> <strong class="px-1 sitename"><%= tr('LANDING.BOTNAME') %></strong> <span>All Rights Reserved</span></p>
       <p>BOT-Version: <%= coreConfig.botVersion %> | Dashboard Version: <%= coreConfig.dashboardVersion %></p>
       <div class="credits">

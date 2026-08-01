@@ -107,6 +107,21 @@ router.get('/', async (req, res) => {
     try {
         const data = await loadHubData(dbService, userLocale);
 
+        // Analyse & Cookies: Einstellungen und Umfang des Nachweises.
+        const AnalyticsConsent = require('../../helpers/AnalyticsConsent');
+        const analytics = await AnalyticsConsent.ladeEinstellungen(dbService);
+
+        let consentAnzahl = 0, consentLetzter = null;
+        try {
+            const [nachweis] = await dbService.query(
+                'SELECT COUNT(*) AS anzahl, MAX(erteilt_am) AS letzter FROM consent_log'
+            );
+            consentAnzahl  = nachweis?.anzahl || 0;
+            consentLetzter = nachweis?.letzter || null;
+        } catch (_) {
+            // Tabelle gibt es erst nach der Migration - kein Grund, den Hub zu verweigern.
+        }
+
         await themeManager.renderView(res, 'admin/content', {
             title: 'Content Management',
             activeMenu: '/admin/content',
@@ -118,7 +133,10 @@ router.get('/', async (req, res) => {
             notifications: data.notifications,
             channelConfig: data.channelConfig,
             categories: CONTENT_CATEGORIES,
-            controlGuildId: process.env.CONTROL_GUILD_ID || ''
+            controlGuildId: process.env.CONTROL_GUILD_ID || '',
+            analytics,
+            consentAnzahl,
+            consentLetzter
         });
     } catch (error) {
         Logger.error('[Content] Fehler beim Laden des Content Hub:', error);
@@ -282,6 +300,53 @@ router.post('/settings/channels/save', async (req, res) => {
     } catch (error) {
         Logger.error('[Content] Fehler beim Speichern der Channel-Config:', error);
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ================================================================
+// ANALYSE & COOKIES: Einstellungen speichern
+// ================================================================
+
+router.post('/analytics/save', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const AnalyticsConsent = require('../../helpers/AnalyticsConsent');
+
+    try {
+        const { gtmId, aktiv, version, kategorien } = req.body;
+        const id = String(gtmId || '').trim();
+
+        // Eine falsche ID erzeugt keinen Fehler - es passiert einfach nichts.
+        // Deshalb wird sie hier geprueft und nicht erst im Browser des Besuchers.
+        if (id && !AnalyticsConsent.istGtmId(id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Das sieht nicht nach einer GTM-Container-ID aus (erwartet: GTM-XXXXXXX).'
+            });
+        }
+
+        // Ohne ID kann nichts aktiv sein - sonst stuende im Adminbereich "aktiv",
+        // waehrend auf der Seite nichts passiert.
+        const wirklichAktiv = Boolean(aktiv) && Boolean(id);
+
+        await AnalyticsConsent.speichereEinstellungen(dbService, {
+            gtmId: id,
+            aktiv: wirklichAktiv,
+            version,
+            kategorien
+        });
+
+        Logger.info(`[Content] Analyse-Einstellungen gespeichert (GTM: ${id || 'keine'}, aktiv: ${wirklichAktiv}, Fassung: ${Number(version) || 1})`);
+
+        return res.json({
+            success: true,
+            message: aktiv && !id
+                ? 'Gespeichert – ohne Container-ID bleibt die Einbindung allerdings aus.'
+                : 'Gespeichert.'
+        });
+    } catch (error) {
+        Logger.error('[Content] Fehler beim Speichern der Analyse-Einstellungen:', error);
+        return res.status(500).json({ success: false, message: error.message });
     }
 });
 

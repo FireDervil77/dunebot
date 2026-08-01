@@ -27,8 +27,61 @@ router.use(async (req, res, next) => {
         res.locals.menuItems = [];
         res.locals.footerColumns = [];
     }
+
+    // Einwilligung + Tag Manager für das Layout bereitstellen.
+    // Eigenes try: Ein Fehler hier darf die Seite nicht kosten – er führt dann
+    // dazu, dass nichts eingebunden wird, und das ist die sichere Richtung.
+    try {
+        res.locals.consent = await ladeConsentKontext(req);
+    } catch (_) {
+        res.locals.consent = null;
+    }
+
     next();
 });
+
+/**
+ * Baut den Kontext, den `partials/frontend/consent.ejs` braucht.
+ *
+ * Die gespeicherte Auswahl kommt aus dem Cookie – sie muss serverseitig gelesen
+ * werden, damit das `consent`-Update im selben Seitenaufbau mitgeht. Würde man
+ * erst im Browser nachsehen, liefe GTM einen Wimpernschlag ohne Einwilligung.
+ *
+ * @param {object} req
+ * @returns {Promise<object|null>}
+ */
+async function ladeConsentKontext(req) {
+    const AnalyticsConsent = require('../helpers/AnalyticsConsent');
+    const dbService = ServiceManager.get('dbService');
+
+    const einstellungen = await AnalyticsConsent.ladeEinstellungen(dbService);
+    if (!AnalyticsConsent.istAktiv(einstellungen)) return null;
+
+    let auswahl = null;
+    const roh = req.cookies?.[AnalyticsConsent.COOKIE_NAME];
+    if (roh) {
+        try {
+            const gespeichert = JSON.parse(roh);
+            const gewaehlt = AnalyticsConsent.bereinigeAuswahl(gespeichert.gewaehlt, einstellungen.kategorien);
+            auswahl = {
+                gewaehlt,
+                version: Number(gespeichert.version) || 0,
+                signale: AnalyticsConsent.signaleFuer(gewaehlt),
+            };
+        } catch (_) {
+            // Unlesbares Cookie zählt als "nicht gefragt" – dann erscheint das Banner.
+        }
+    }
+
+    return {
+        aktiv:      true,
+        gtmId:      einstellungen.gtmId,
+        version:    einstellungen.version,
+        kategorien: einstellungen.kategorien,
+        cookieName: AnalyticsConsent.COOKIE_NAME,
+        auswahl,
+    };
+}
 
 // News-Details Handler
 const getNewsDetails = async (req, res) => {
@@ -442,5 +495,70 @@ router.get('/docs/{*docPath}', async (req, res) => {
  * @author firedervil
  */
 router.post('/language/guest', apiController.updateGuestLanguage);
+
+/**
+ * Cookie-Einwilligung entgegennehmen.
+ *
+ * Setzt das Cookie beim Besucher **und** schreibt den Nachweis in `consent_log` –
+ * die DSGVO verlangt, dass der Verantwortliche eine Einwilligung belegen kann,
+ * und ein Cookie im fremden Browser ist kein Beleg bei uns.
+ *
+ * Antwortet mit den Consent-Mode-Signalen, damit die Seite sie ohne Neuladen
+ * an GTM weiterreichen kann.
+ *
+ * @route POST /consent
+ */
+router.post('/consent', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const AnalyticsConsent = require('../helpers/AnalyticsConsent');
+    const crypto = require('crypto');
+
+    try {
+        const einstellungen = await AnalyticsConsent.ladeEinstellungen(dbService);
+        const gewaehlt = AnalyticsConsent.bereinigeAuswahl(req.body?.gewaehlt, einstellungen.kategorien);
+        const signale  = AnalyticsConsent.signaleFuer(gewaehlt);
+
+        // Die Fassung kommt vom Server, nicht aus dem Formular: Sonst könnte ein
+        // veralteter Tab eine Einwilligung unter einer Nummer ablegen, die für
+        // einen längst geänderten Text steht.
+        const version = einstellungen.version;
+
+        res.cookie(AnalyticsConsent.COOKIE_NAME, JSON.stringify({ gewaehlt, version }), {
+            maxAge:   AnalyticsConsent.COOKIE_MAX_AGE_MS,
+            httpOnly: false,   // die Seite liest es selbst, es steht nichts Schützenswertes drin
+            sameSite: 'lax',
+            secure:   req.protocol === 'https',
+            path:     '/',
+        });
+
+        // Nachweis: gesalzener Hash statt IP im Klartext. Ein Nachweis, für den
+        // man IP-Adressen sammelt, tauscht ein Risiko gegen ein größeres.
+        const salz = process.env.SESSION_SECRET || 'firebot';
+        const hash = crypto.createHash('sha256')
+            .update(`${salz}:${req.ip || ''}:${req.get('user-agent') || ''}`)
+            .digest('hex');
+
+        const herkunft = ['banner', 'einstellungen', 'widerruf'].includes(req.body?.herkunft)
+            ? req.body.herkunft : 'banner';
+
+        try {
+            await dbService.query(
+                `INSERT INTO consent_log (kategorien, version, herkunft, besucher_hash, user_agent)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [gewaehlt.join(','), version, herkunft, hash, String(req.get('user-agent') || '').slice(0, 255)]
+            );
+        } catch (err) {
+            // Der Besucher hat entschieden – das darf nicht daran scheitern, dass
+            // der Nachweis nicht geschrieben werden konnte. Gemeldet wird es aber.
+            Logger.warn(`[Consent] Nachweis nicht gespeichert: ${err.message}`);
+        }
+
+        return res.json({ success: true, signale, version });
+    } catch (error) {
+        Logger.error('[Consent] Fehler beim Speichern der Einwilligung:', error);
+        return res.status(500).json({ success: false });
+    }
+});
 
 module.exports = router;

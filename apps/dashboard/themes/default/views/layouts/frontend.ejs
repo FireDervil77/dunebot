@@ -21,6 +21,13 @@
     
     <!-- Stylesheets (Fonts, Icons, Vendor CSS, Theme CSS) -->
     <%- includePartial('frontend/stylesheets', locals) %>
+
+    <!--
+      Einwilligung + Tag Manager. Steht bewusst hier im <head> und nicht bei den
+      Skripten am Seitenende: Der Consent-Mode-Standard muss vor GTM gesetzt sein,
+      sonst laedt GTM seine Tags, bevor jemand gefragt wurde.
+    -->
+    <%- includePartial('frontend/consent', locals) %>
     
     <!-- Hook: frontend_head -->
     <% if (locals.hooks && hooks.getViewHooks) { %>
