@@ -1058,6 +1058,37 @@ class IPCServer {
                     return message.reply({ success: true });
                 }
 
+                // ── Panel-Nachricht wurde in Discord gelöscht ─────────────────────────────
+                //
+                // Bis dahin fiel das erst beim nächsten Edit-Versuch auf (Fehlercode
+                // 10008). In einem stillen Kanal kann das lange dauern: Die Hash-Bremse
+                // verhindert Edits, solange sich am Status nichts ändert – ein nachts
+                // gelöschtes Panel wäre also bis zum Morgen verschwunden gewesen.
+                //
+                // Kein `actorMayNot` hier: Auslöser ist ein Discord-Ereignis, kein
+                // Nutzerbefehl. Wer die Nachricht löschen durfte, hat das Recht dazu
+                // bereits von Discord bekommen. Geschrieben wird nur `message_id = NULL`,
+                // also die Feststellung „die Nachricht gibt es nicht mehr".
+                case 'PANEL_MESSAGE_GONE': {
+                    const { channel_id: channelId, message_id: messageId } = payload;
+                    if (!guildId || !channelId || !messageId) {
+                        return message.reply({ success: false, error: 'guild_id, channel_id und message_id erforderlich' });
+                    }
+
+                    const result = await dbService.query(
+                        `UPDATE gameserver_status_panels
+                            SET message_id = NULL
+                          WHERE guild_id = ? AND channel_id = ? AND message_id = ?`,
+                        [guildId, String(channelId), String(messageId)]
+                    );
+
+                    const betroffen = result?.affectedRows ?? result?.changedRows ?? 0;
+                    if (betroffen > 0) {
+                        Logger.info(`[IPC/Gameserver] Panel-Nachricht ${messageId} in Guild ${guildId} gelöscht – wird neu gepostet`);
+                    }
+                    return message.reply({ success: true, data: { panels: betroffen } });
+                }
+
                 // ── Status-Panels auflisten (/server panel-list) ──────────────────────────
                 case 'PANEL_LIST': {
                     if (!guildId) return message.reply({ success: false, error: 'guild_id fehlt' });
