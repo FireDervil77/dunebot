@@ -33,16 +33,31 @@
     <!-- Terminal (xterm.js) -->
     <div id="xterm-terminal" class="border rounded" style="background-color: #000; padding: 10px; height: 500px; width: 100%; overflow: hidden;"></div>
 
+    <%
+        /*
+         * Ob hier ein Eingabefeld steht, entscheidet der stdin-Transport des Spiels
+         * (Konzept 23.3). Bei Palworld ist stdin nur eine Brücke zu RCON – ein
+         * zweites Eingabefeld für denselben Weg, nur mit anderen Schutzregeln.
+         * Befehle gehören dann in den RCON-Tab, den es dafür gibt.
+         */
+        const transport = locals.consoleTransport || { stdin: 'native', begruendung: '' };
+    %>
+
     <!-- Command Input -->
-    <% if (userPermissions.permissions['GAMESERVER.CONSOLE.EXECUTE']) { %>
+    <% if (!userPermissions.permissions['GAMESERVER.CONSOLE.EXECUTE']) { %>
+        <div class="alert alert-warning mt-3">
+            <i class="fas fa-lock me-2"></i>
+            Du hast keine Berechtigung, Commands zu senden (benötigt: <code>GAMESERVER.CONSOLE.EXECUTE</code>)
+        </div>
+    <% } else if (transport.stdin === 'native') { %>
         <div class="mt-3">
             <div class="input-group">
                 <span class="input-group-text">
                     <i class="fas fa-chevron-right"></i>
                 </span>
-                <input type="text" 
-                       id="console-input" 
-                       class="form-control" 
+                <input type="text"
+                       id="console-input"
+                       class="form-control"
                        placeholder="Command eingeben... (z.B. 'say Hello World')"
                        autocomplete="off">
                 <button class="btn btn-primary" onclick="gameserverConsole.sendCommand()">
@@ -54,10 +69,20 @@
                 Tipp: Drücke <kbd>↑</kbd> / <kbd>↓</kbd> für Command-History
             </small>
         </div>
+    <% } else if (transport.stdin === 'bridge_to_rcon') { %>
+        <div class="alert alert-info mt-3 mb-0">
+            <i class="fas fa-terminal me-2"></i>
+            <strong>Befehle laufen bei diesem Spiel über RCON.</strong>
+            Die Konsole reicht Eingaben nur an RCON weiter – benutze den
+            <strong>RCON-Tab</strong>, dort landen sie ohnehin.
+            <div class="small text-muted mt-1"><%= transport.begruendung %></div>
+        </div>
     <% } else { %>
-        <div class="alert alert-warning mt-3">
-            <i class="fas fa-lock me-2"></i>
-            Du hast keine Berechtigung, Commands zu senden (benötigt: <code>GAMESERVER.CONSOLE.EXECUTE</code>)
+        <div class="alert alert-secondary mt-3 mb-0">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Dieses Spiel nimmt über die Konsole keine Befehle entgegen.</strong>
+            Hier siehst du nur die Ausgabe.
+            <div class="small text-muted mt-1"><%= transport.begruendung %></div>
         </div>
     <% } %>
 </div>

@@ -14,6 +14,7 @@ const router = express.Router({ mergeParams: true });
 const ServiceManager = require('dunebot-core').ServiceManager;
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');
+const { resolveConsoleTransport, NATIVE } = require('../helpers/ConsoleTransport');
 
 // ========================================
 // WebSocket-Support für Router aktivieren
@@ -128,6 +129,40 @@ router.post('/:serverId/send',
                 });
             }
             
+            // ✅ STEP 1b: Nimmt dieses Spiel über stdin überhaupt Befehle entgegen?
+            //
+            // Ohne diese Prüfung bliebe der Weg offen, auch wenn die Oberfläche
+            // kein Eingabefeld mehr zeigt (Konzept 23.3). Bei Palworld ist stdin
+            // nur eine Brücke zu RCON – ein Befehl hier umginge den Rate-Limit-
+            // Zähler und das Protokoll der RCON-Route.
+            const dbService = ServiceManager.get('dbService');
+            const [eintrag] = await dbService.query(`
+                SELECT am.game_data
+                FROM gameservers gs
+                LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
+                WHERE gs.id = ? AND gs.guild_id = ?
+            `, [serverId, guildId]);
+
+            let gameData = {};
+            try {
+                gameData = typeof eintrag?.game_data === 'string'
+                    ? JSON.parse(eintrag.game_data) : (eintrag?.game_data || {});
+            } catch (_) { /* unlesbares game_data zählt als "nichts deklariert" */ }
+
+            const transport = resolveConsoleTransport(gameData);
+            if (transport.stdin !== NATIVE) {
+                Logger.warn(`[Console API] Befehl abgelehnt, stdin ist "${transport.stdin}"`, {
+                    userId, serverId, guildId
+                });
+
+                return res.status(400).json({
+                    success: false,
+                    message: transport.stdin === 'bridge_to_rcon'
+                        ? 'Bei diesem Spiel laufen Befehle über RCON – bitte den RCON-Tab benutzen.'
+                        : 'Dieses Spiel nimmt über die Konsole keine Befehle entgegen.'
+                });
+            }
+
             // ✅ STEP 2: Command-Validierung (Blacklist + Pattern-Check)
             const validation = validateCommand(command, {
                 userId,

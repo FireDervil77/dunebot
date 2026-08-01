@@ -14,6 +14,8 @@ const StatusService = require('../helpers/StatusService');
 const { buildStartPayload, loadServerForStart } = require('../helpers/StartPayload');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
 const PanelService = require('../helpers/PanelService');
+const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');
+const { resolveConsoleTransport } = require('../helpers/ConsoleTransport');
 // const TemplateEngine = require('../helpers/TemplateEngine'); // ENTFERNT - existiert nicht mehr
 // const PortValidator = require('../helpers/PortValidator'); // ENTFERNT - existiert nicht mehr
 
@@ -1867,7 +1869,9 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             gameData,
             guildId,
             user,
-            rootServers
+            rootServers,
+            // Entscheidet, ob der Konsolen-Tab ein Eingabefeld zeigt (Konzept 23.3)
+            consoleTransport: resolveConsoleTransport(gameData)
         });
 
     } catch (error) {
@@ -3628,11 +3632,22 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
         const serverId = req.params.serverId;
         const command = (req.body.command || '').trim();
 
+        // Discord-User für Rate-Limit und Protokoll - dieselbe Quelle wie in
+        // routes/console.js, damit beide Wege auf denselben Zähler laufen.
+        const userId = req.session?.user?.info?.id || res.locals.user?.info?.id || 'unknown';
+
         if (!command) {
             return res.status(400).json({ success: false, message: 'Befehl darf nicht leer sein' });
         }
         if (command.length > 512) {
             return res.status(400).json({ success: false, message: 'Befehl zu lang (max. 512 Zeichen)' });
+        }
+
+        // Rate-Limit vor der Datenbankarbeit: Ein Spammer soll keine Abfragen auslösen.
+        const rateLimitCheck = rateLimiter.check(userId);
+        if (!rateLimitCheck.allowed) {
+            Logger.warn(`[RCON] Rate-Limit erreicht: User ${userId}`, { serverId, guildId });
+            return res.status(429).json({ success: false, message: rateLimitCheck.error });
         }
 
         const [server] = await dbService.query(`
@@ -3671,6 +3686,25 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
             return res.status(400).json({ success: false, message: 'Kein Daemon für diesen Server konfiguriert' });
         }
 
+        // Blacklist und Muster prüfen - erst hier, weil die Ausnahme aus dem Addon
+        // kommt: Palworld stoppt per `shutdown 15`, und `shutdown` steht auf der
+        // Blacklist. Der vom Spiel selbst deklarierte Stoppbefehl darf durch,
+        // sonst sperrte der Schutzwall den regulären Weg.
+        const stoppBefehl = String(gameData.startup?.stop || '').trim().split(/\s+/)[0];
+        const validation = validateCommand(command, {
+            userId,
+            serverId,
+            guildId,
+            zusaetzlichErlaubt: stoppBefehl ? [stoppBefehl] : []
+        });
+
+        if (!validation.valid) {
+            Logger.warn(`[RCON] Befehl blockiert: ${command}`, {
+                userId, serverId, guildId, reason: validation.error
+            });
+            return res.status(400).json({ success: false, message: validation.error });
+        }
+
         const rconPassword = envVars[gameData.config.rcon.password_var] || '';
 
         // sendCommand wirft, wenn der Daemon success:false meldet – die eigentliche
@@ -3686,7 +3720,7 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
                 rcon_port: rcon.port,
                 rcon_password: rconPassword,
                 rcon_protocol: rcon.protocol || 'srcds',
-                rcon_command: command
+                rcon_command: validation.sanitized
             }, 15000);
         } catch (cmdError) {
             const reason = cmdError?.message || 'RCON-Befehl fehlgeschlagen';
@@ -3704,7 +3738,9 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
             return res.json({ success: false, message: result?.error || 'RCON-Befehl fehlgeschlagen' });
         }
 
-        Logger.info(`[Gameserver] RCON-Befehl ausgeführt (Server ${serverId}): ${command}`);
+        Logger.info(`[Gameserver] RCON-Befehl ausgeführt (Server ${serverId}): ${validation.sanitized}`, {
+            userId, remaining: rateLimitCheck.remaining
+        });
         return res.json({ success: true, output: result.output || '' });
 
     } catch (error) {

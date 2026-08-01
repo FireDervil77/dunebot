@@ -461,10 +461,17 @@ module.exports = {
                 }
 
                 // ── /server start <id> ────────────────────────────────────────────────
+                //
+                // `actor_user_id` ist hier die ganze Rechteprüfung: `actorMayNot()`
+                // im Dashboard lässt durch, solange niemand genannt ist. Bis zum
+                // 2026-08-01 kam das Feld nur von den Panel-Buttons, der Slash-Befehl
+                // begnügte sich mit `ManageGuild`. Betreiber-Entscheidung: scharf
+                // schalten (Konzept 23.5) – wer startet, braucht GAMESERVER.START.
                 case 'start': {
                     const id  = interaction.options.getInteger('id');
                     const res = await ipcClient.sendToDashboard('gameserver:SERVER_START', {
                         guild_id: guildId, server_id: id,
+                        actor_user_id: interaction.user.id,
                     });
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
                     return interaction.followUp({
@@ -477,6 +484,7 @@ module.exports = {
                     const id  = interaction.options.getInteger('id');
                     const res = await ipcClient.sendToDashboard('gameserver:SERVER_STOP', {
                         guild_id: guildId, server_id: id,
+                        actor_user_id: interaction.user.id,
                     });
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
                     return interaction.followUp({
@@ -489,6 +497,7 @@ module.exports = {
                     const id  = interaction.options.getInteger('id');
                     const res = await ipcClient.sendToDashboard('gameserver:SERVER_RESTART', {
                         guild_id: guildId, server_id: id,
+                        actor_user_id: interaction.user.id,
                     });
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
                     return interaction.followUp({

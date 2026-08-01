@@ -144,17 +144,9 @@ class RootServer {
     // Daemon-Verbindungs-Management
     // =========================================================
 
-    static async updateStatus(daemonId, status, version = null) {
-        const dbService = ServiceManager.get('dbService');
-        const fields = ['daemon_status = ?', 'last_seen = NOW()'];
-        const values = [status];
-        if (version) { fields.push('daemon_version = ?'); values.push(version); }
-        if (status === 'offline' || status === 'error') { fields.push('last_disconnect = NOW()'); }
-        values.push(daemonId);
-        await dbService.query(
-            `UPDATE rootserver SET ${fields.join(', ')}, updated_at = NOW() WHERE daemon_id = ?`, values
-        );
-    }
+    // `updateStatus()` stand hier bis zum 2026-08-01 und wurde von keiner Zeile
+    // aufgerufen. Den Verbindungszustand pflegen `processHeartbeat()` und der
+    // IPMServer beim Disconnect - beide schreiben `daemon_status` direkt.
 
     static async processHeartbeat(daemonId, latencyMs = null) {
         const dbService = ServiceManager.get('dbService');

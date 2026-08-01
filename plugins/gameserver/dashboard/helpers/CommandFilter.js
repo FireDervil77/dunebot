@@ -81,22 +81,27 @@ const DANGEROUS_PATTERNS = [
 
 /**
  * Validiert einen Command gegen Blacklist und Patterns
- * 
- * WICHTIG: Diese Funktion wird NUR für RCON-Commands genutzt!
- * PTY stdin ist Read-Only (keine Command-Filterung nötig).
- * 
- * Commands gehen über RCON → Gameserver (nicht über PTY stdin).
- * RCON kennt nur Game-Commands, Shell-Commands funktionieren dort nicht.
- * 
- * Diese Blacklist ist ein zusätzlicher Sicherheits-Layer falls RCON
- * kompromittiert wird oder falsch konfiguriert ist.
- * 
+ *
+ * Gilt seit 2026-08-01 für **beide** Befehlswege: die Konsolen-Route
+ * (`routes/console.js`) und die RCON-Route (`POST /:serverId/rcon` in
+ * `routes/servers.js`). Bis dahin behauptete der Kommentar an dieser Stelle, die
+ * Funktion werde „NUR für RCON-Commands genutzt" – verdrahtet war es genau
+ * andersherum, und die RCON-Route prüfte nichts außer der Länge.
+ *
+ * RCON kennt nur Game-Commands, Shell-Commands funktionieren dort nicht. Die
+ * Blacklist ist ein zusätzlicher Schutzwall, falls RCON kompromittiert oder
+ * falsch konfiguriert ist.
+ *
  * @param {string} command - Der zu validierende Command
  * @param {object} options - Optionen
  * @param {string} options.userId - User-ID für Audit-Log
  * @param {string} options.serverId - Server-ID
  * @param {string} options.guildId - Guild-ID
  * @param {boolean} options.rconSupported - Hat der Server RCON? (optional)
+ * @param {string[]} options.zusaetzlichErlaubt - Befehlsnamen, die trotz Blacklist
+ *        durchgehen. Gedacht für den Stoppbefehl, den das Addon selbst deklariert:
+ *        Palworld stoppt per `shutdown 15`, und `shutdown` steht auf der Blacklist.
+ *        Ohne diese Ausnahme wäre der reguläre Stoppweg des Spiels gesperrt.
  * @returns {object} { valid: boolean, error?: string, sanitized?: string }
  */
 function validateCommand(command, options = {}) {
@@ -143,8 +148,12 @@ function validateCommand(command, options = {}) {
         // Entferne Pfad (falls Command als /bin/rm angegeben)
         const cmdBase = cmdName.split('/').pop();
         
-        // 5. Prüfe Blacklist
-        if (COMMAND_BLACKLIST.includes(cmdBase)) {
+        // 5. Prüfe Blacklist – der vom Addon deklarierte Stoppbefehl darf vorbei
+        const erlaubt = (options.zusaetzlichErlaubt || [])
+            .map(name => String(name).trim().toLowerCase())
+            .filter(Boolean);
+
+        if (COMMAND_BLACKLIST.includes(cmdBase) && !erlaubt.includes(cmdBase)) {
             Logger.warn(`[CommandFilter] Blockierter Command: ${cmdBase}`, {
                 command: trimmed,
                 ...options
