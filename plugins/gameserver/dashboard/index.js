@@ -684,7 +684,11 @@ class GameserverPlugin extends DashboardPlugin {
     async _handleStatusChanged(payload, message, context) {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
-        
+        // Spät geladen, wie an den übrigen Stellen im Plugin: Beim Modul-Laden
+        // steht der ServiceManager noch nicht, den diese Helfer brauchen.
+        const StatusService = require('./helpers/StatusService');
+        const PanelService  = require('./helpers/PanelService');
+
         const { server_id, status, timestamp } = payload;
         const { daemonId } = context;
         
@@ -726,7 +730,21 @@ class GameserverPlugin extends DashboardPlugin {
                     status: dbStatus,  // ← WICHTIG: Gemappten Status senden (online statt running, offline statt stopped)
                     timestamp
                 });
-                
+
+                // ✅ Discord-Panels nachziehen – der Browser erfuhr es bisher als
+                //    Einziger. Ein Panel hing bis zu 5 Minuten hinterher, weil der
+                //    StatusPoller jeden nicht-laufenden Server auf das Leerlauf-
+                //    Intervall (300 s) setzt, bevor er überhaupt prüft, ob ein
+                //    Panel daran hängt.
+                //    Beim Aus-Zustand muss zusätzlich der Snapshot nachgezogen
+                //    werden: Das Panel rendert "online" aus dem Snapshot, nicht
+                //    aus gameservers.status. Ohne diese Zeile stünde dort weiter
+                //    "🟢 Online" für einen Server, den der Daemon gerade beendet hat.
+                if (dbStatus === 'offline' || dbStatus === 'error') {
+                    await StatusService.markiereAus(server_id, server.guild_id, dbStatus);
+                }
+                PanelService.pushZustandswechsel(server_id);
+
                 Logger.info(`[Gameserver] Status-Update gespeichert & gebroadcastet: ${server.name} (${server_id}) → ${dbStatus} (original: ${status})`);
             }
         } catch (error) {

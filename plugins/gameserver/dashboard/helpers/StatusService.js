@@ -658,6 +658,48 @@ class StatusService {
     }
 
     /**
+     * Hält im Snapshot fest, dass der Server aus ist – auf Ansage des Daemons.
+     *
+     * Der Daemon weiß es besser als jede Abfrage: Er hat den Container gestoppt.
+     * Ohne diesen Weg bliebe im Snapshot `online = 1` stehen, bis der Poller das
+     * nächste Mal vorbeikommt – und ein Panel, das aus dem Snapshot rendert,
+     * zeigte so lange „🟢 Online" für einen Server, der längst aus ist.
+     *
+     * `fail_count` wird bewusst auf 0 gesetzt: Ein planmäßig gestoppter Server
+     * ist kein Fehlversuch. Ohne das würde der Backoff beim nächsten Start als
+     * Erstes das Abfrageintervall strecken.
+     *
+     * @param {number|string} serverId
+     * @param {string} guildId
+     * @param {'offline'|'error'} [zustand]
+     * @returns {Promise<void>}
+     */
+    static async markiereAus(serverId, guildId, zustand = 'offline') {
+        const dbService = ServiceManager.get('dbService');
+        const Logger    = ServiceManager.get('Logger');
+        try {
+            await dbService.query(`
+                INSERT INTO gameserver_status
+                    (server_id, guild_id, online, players_current, players_json,
+                     source, query_ok, rcon_ok, fail_count, last_error, queried_at)
+                VALUES (?, ?, 0, 0, '[]', 'daemon', 0, 0, 0, ?, NOW())
+                ON DUPLICATE KEY UPDATE
+                    online          = 0,
+                    players_current = 0,
+                    players_json    = '[]',
+                    source          = 'daemon',
+                    query_ok        = 0,
+                    rcon_ok         = 0,
+                    fail_count      = 0,
+                    last_error      = VALUES(last_error),
+                    queried_at      = NOW()
+            `, [serverId, guildId, zustand === 'error' ? 'Server abgestürzt' : null]);
+        } catch (err) {
+            Logger?.warn?.(`[StatusService] Aus-Zustand nicht gespeichert (Server ${serverId}): ${err.message}`);
+        }
+    }
+
+    /**
      * Rendert einen Snapshot in die Form, die die Detailseite von der Query kennt.
      *
      * Die Seite wurde gebaut, als die Query die einzige Quelle war, und liest
