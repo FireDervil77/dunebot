@@ -139,10 +139,25 @@
         "SECTION7_TITLE": "7. Changes to This Privacy Policy",
         "SECTION7_TEXT": "We reserve the right to update this privacy policy at any time. Changes will be published on this page.",
         
-        "SECTION8_TITLE": "8. Contact",
+        "COOKIES_TITLE": "8. Cookies and Audience Measurement",
+        "COOKIES_INTRO": "Without your consent we set nothing beyond what is required to operate the site. We ask you on your first visit; you can change or fully withdraw your choice at any time via “Cookie settings” in the footer.",
+        "COOKIES_CONSENT_TITLE": "Cookie storing your choice",
+        "COOKIES_CONSENT_TEXT": "We store your decision in a cookie named “firebot_consent”. It contains only the categories you selected and the version number of the consent notice — no identifier that makes you recognisable. Lifetime: 180 days, after which we ask again.",
+        "COOKIES_NACHWEIS_TITLE": "Record of consent",
+        "COOKIES_NACHWEIS_TEXT": "We are required to be able to demonstrate that consent was given (Art. 7(1) GDPR). We therefore record the time, the selected categories, the version number, how consent was given, and your browser identification string. Your IP address is not stored in clear text, only as a salted hash that cannot be reversed.",
+        "COOKIES_GTM_TITLE": "Google Tag Manager",
+        "COOKIES_GTM_TEXT": "For audience measurement we use Google Tag Manager, provided by Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland. The Tag Manager loads only after you have consented. In doing so your IP address is transmitted to Google; processing in the USA is possible. Transfers are based on the EU-US Data Privacy Framework and, additionally, on Standard Contractual Clauses (Art. 44 et seq. GDPR).",
+        "COOKIES_GTM_HINWEIS": "The Tag Manager is not an analytics tool itself; it loads further services. Which ones these are, and which cookies they set, depends on our configuration at Google. We list them in this policy and update it when they change.",
+        "COOKIES_KATEGORIEN_TITLE": "What the categories do",
+        "COOKIES_KATEGORIEN_ITEM1": "Necessary: session and storing your choice. Cannot be deselected, because the site would not work otherwise.",
+        "COOKIES_KATEGORIEN_ITEM2": "Statistics: allows anonymous analysis of which pages are visited (consent signal “analytics_storage”).",
+        "COOKIES_KATEGORIEN_ITEM3": "Marketing: allows recognition for advertising on other sites (consent signals “ad_storage”, “ad_user_data”, “ad_personalization”).",
+        "COOKIES_RECHTSGRUNDLAGE": "The legal basis for non-essential cookies is your consent under Art. 6(1)(a) GDPR and Section 25(1) TDDDG. Essential cookies are based on Section 25(2) no. 2 TDDDG. A withdrawal takes effect for the future and does not affect the lawfulness of processing carried out beforehand.",
+
+        "SECTION8_TITLE": "9. Contact",
         "SECTION8_TEXT": "For questions about the privacy policy, please contact:",
         "SECTION8_DISCORD_LINK": "Discord Support Server",
-        
+
         "BACK_TO_HOME": "Back to Home"
     },
 

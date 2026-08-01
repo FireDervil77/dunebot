@@ -85,6 +85,57 @@
     </div>       
 
 
+    <%#
+      Abschnitt 8: Cookies und Reichweitenmessung.
+
+      ENTWURF – die technischen Angaben stimmen mit dem Code überein (Cookie-Name
+      und -Laufzeit aus helpers/AnalyticsConsent.js, Umfang des Nachweises aus der
+      Migration 20260801_140000_consent_log.js, Consent-Mode-Signale aus
+      partials/frontend/consent.ejs). Die rechtliche Einordnung und die Endfassung
+      gehören vor jemanden, der dafür haftet.
+
+      NACHZIEHEN, sobald sich der GTM-Container ändert: Welche Dienste er lädt und
+      welche Cookies die setzen, steht nirgends im Code – das weiß nur Google.
+    %>
+    <div class="privacy-section">
+      <div class="section-title text-center"><%= tr('PRIVACY.COOKIES_TITLE') %></div>
+      <p><%= tr('PRIVACY.COOKIES_INTRO') %></p>
+
+      <p>
+        <strong><%= tr('PRIVACY.COOKIES_CONSENT_TITLE') %></strong><br>
+        <%= tr('PRIVACY.COOKIES_CONSENT_TEXT') %>
+      </p>
+
+      <p>
+        <strong><%= tr('PRIVACY.COOKIES_NACHWEIS_TITLE') %></strong><br>
+        <%= tr('PRIVACY.COOKIES_NACHWEIS_TEXT') %>
+      </p>
+
+      <p>
+        <strong><%= tr('PRIVACY.COOKIES_GTM_TITLE') %></strong><br>
+        <%= tr('PRIVACY.COOKIES_GTM_TEXT') %><br>
+        <%= tr('PRIVACY.COOKIES_GTM_HINWEIS') %>
+      </p>
+
+      <p><strong><%= tr('PRIVACY.COOKIES_KATEGORIEN_TITLE') %></strong></p>
+      <ul>
+        <li><%= tr('PRIVACY.COOKIES_KATEGORIEN_ITEM1') %></li>
+        <li><%= tr('PRIVACY.COOKIES_KATEGORIEN_ITEM2') %></li>
+        <li><%= tr('PRIVACY.COOKIES_KATEGORIEN_ITEM3') %></li>
+      </ul>
+
+      <p><%= tr('PRIVACY.COOKIES_RECHTSGRUNDLAGE') %></p>
+
+      <%# Widerruf muss von hier aus genauso leicht sein wie aus der Fußzeile. %>
+      <% if (locals.consent && consent.aktiv) { %>
+        <p>
+          <a href="#" class="btn btn-outline-primary btn-sm" onclick="return cookieEinstellungenOeffnen();">
+            <i class="fas fa-cookie-bite mr-1"></i> Cookie-Einstellungen ändern
+          </a>
+        </p>
+      <% } %>
+    </div>
+
     <div class="privacy-section">
       <div class="section-title text-center"><%= tr('PRIVACY.SECTION8_TITLE') %></div>
       <p>

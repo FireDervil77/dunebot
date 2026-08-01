@@ -137,10 +137,25 @@
         "SECTION7_TITLE": "7. Änderungen an dieser Datenschutzrichtlinie",
         "SECTION7_TEXT": "Wir behalten uns vor, diese Datenschutzrichtlinie jederzeit anzupassen. Änderungen werden auf dieser Seite veröffentlicht.",
         
-        "SECTION8_TITLE": "8. Kontakt",
+        "COOKIES_TITLE": "8. Cookies und Reichweitenmessung",
+        "COOKIES_INTRO": "Ohne deine Einwilligung setzen wir nichts außer dem, was für den Betrieb der Seite nötig ist. Beim ersten Besuch fragen wir dich; deine Auswahl kannst du jederzeit über „Cookie-Einstellungen“ in der Fußzeile ändern oder vollständig widerrufen.",
+        "COOKIES_CONSENT_TITLE": "Cookie für deine Auswahl",
+        "COOKIES_CONSENT_TEXT": "Wir speichern deine Entscheidung in einem Cookie namens „firebot_consent“. Es enthält ausschließlich die von dir gewählten Kategorien und die Fassungsnummer des Einwilligungstextes – keine Kennung, die dich wiedererkennbar macht. Laufzeit: 180 Tage. Danach fragen wir erneut.",
+        "COOKIES_NACHWEIS_TITLE": "Nachweis der Einwilligung",
+        "COOKIES_NACHWEIS_TEXT": "Wir sind verpflichtet, eine erteilte Einwilligung nachweisen zu können (Art. 7 Abs. 1 DSGVO). Dafür protokollieren wir Zeitpunkt, gewählte Kategorien, Fassungsnummer, den Weg der Erteilung und deinen Browser-Kennstring. Deine IP-Adresse speichern wir dabei nicht im Klartext, sondern nur als nicht rückrechenbaren, gesalzenen Hashwert.",
+        "COOKIES_GTM_TITLE": "Google Tag Manager",
+        "COOKIES_GTM_TEXT": "Für die Reichweitenmessung setzen wir den Google Tag Manager ein, Anbieter ist Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland. Der Tag Manager lädt erst, nachdem du zugestimmt hast. Dabei wird deine IP-Adresse an Google übertragen; eine Verarbeitung in den USA ist möglich. Grundlage der Übermittlung ist das EU-US Data Privacy Framework sowie ergänzend Standardvertragsklauseln (Art. 44 ff. DSGVO).",
+        "COOKIES_GTM_HINWEIS": "Der Tag Manager ist selbst kein Analysewerkzeug, sondern lädt weitere Dienste. Welche das sind und welche Cookies sie setzen, richtet sich nach unserer Konfiguration bei Google; wir führen sie in dieser Erklärung auf und aktualisieren sie bei Änderungen.",
+        "COOKIES_KATEGORIEN_TITLE": "Was die Kategorien bewirken",
+        "COOKIES_KATEGORIEN_ITEM1": "Notwendig: Sitzung und die Speicherung deiner Auswahl. Nicht abwählbar, weil die Seite sonst nicht funktioniert.",
+        "COOKIES_KATEGORIEN_ITEM2": "Statistik: erlaubt die anonyme Auswertung, welche Seiten besucht werden (Consent-Signal „analytics_storage“).",
+        "COOKIES_KATEGORIEN_ITEM3": "Marketing: erlaubt Wiedererkennung für Werbung auf anderen Seiten (Consent-Signale „ad_storage“, „ad_user_data“, „ad_personalization“).",
+        "COOKIES_RECHTSGRUNDLAGE": "Rechtsgrundlage für nicht notwendige Cookies ist deine Einwilligung nach Art. 6 Abs. 1 lit. a DSGVO und § 25 Abs. 1 TDDDG. Notwendige Cookies stützen wir auf § 25 Abs. 2 Nr. 2 TDDDG. Ein Widerruf wirkt für die Zukunft und lässt die Rechtmäßigkeit der bis dahin erfolgten Verarbeitung unberührt.",
+
+        "SECTION8_TITLE": "9. Kontakt",
         "SECTION8_TEXT": "Für Fragen zur Datenschutzrichtlinie wende dich bitte an:",
         "SECTION8_DISCORD_LINK": "Discord Support Server",
-        
+
         "BACK_TO_HOME": "Zurück zur Startseite"
     },
 
