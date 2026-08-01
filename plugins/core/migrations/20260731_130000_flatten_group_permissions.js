@@ -40,11 +40,11 @@
  * ── Ablageort ─────────────────────────────────────────────────────────────
  *
  * Diese Datei gehoert nach `plugins/core/migrations/`. Der erste Anlauf lag in
- * `plugins/core/dashboard/migrations/` – dort liegen zwar die alten
- * 6.6.x/6.7.x/6.8.0-Dateien, aber `MigrationRunner.runPlugin()` liest
- * ausschliesslich `plugins/<name>/migrations/`. Der Ordner wird vom aktuellen
- * Runner nicht mehr angefasst; ein Neustart fuehrte die Migration schlicht nicht
- * aus, ohne dass irgendwo etwas gemeldet wurde.
+ * `plugins/core/dashboard/migrations/`, wo bis zum 2026-08-01 die alten
+ * 6.6.x/6.7.x/6.8.0-Dateien lagen – `MigrationRunner.runPlugin()` liest aber
+ * ausschliesslich `plugins/<name>/migrations/`. Ein Neustart fuehrte die
+ * Migration schlicht nicht aus, ohne dass irgendwo etwas gemeldet wurde. Der
+ * Legacy-Ordner ist inzwischen geloescht.
  */
 
 /** Slugs der mitgelieferten Standardgruppen – nur sie bilden die Leiter. */
