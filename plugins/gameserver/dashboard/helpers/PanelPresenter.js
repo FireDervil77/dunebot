@@ -21,6 +21,10 @@ const crypto = require('crypto');
 const COLOR_ONLINE  = 0x57F287;
 const COLOR_OFFLINE = 0x99AAB5;
 const COLOR_ERROR   = 0xED4245;
+/** Gelb für Übergänge – „gleich passiert etwas", nicht online und nicht aus. */
+const COLOR_UEBERGANG = 0xFEE75C;
+
+const { uebergangsText } = require('./ServerState');
 
 /** Mehr Namen passen nicht sinnvoll in ein Embed-Feld (1024 Zeichen). */
 const MAX_PLAYER_NAMES = 40;
@@ -201,9 +205,15 @@ function buildPanelPayload({ panel, server, snapshot, display, gameName }) {
         if (list) fields.push(list);
     }
 
-    const statusText = online
-        ? '🟢 Online'
-        : (server.status === 'error' ? '❌ Fehler' : '⚫ Offline');
+    // Übergangszustände schlagen den Schnappschuss. Der Schnappschuss sagt nur,
+    // ob eine Abfrage gerade antwortet – ein Server, der herunterfährt, antwortet
+    // schon nicht mehr und sähe damit aus wie „offline, bitte starten". Genau
+    // dieser Knopf lief dann in einen Fehler des Daemons.
+    const uebergang = uebergangsText(server.status);
+
+    const statusText = uebergang
+        ? uebergang
+        : (online ? '🟢 Online' : (server.status === 'error' ? '❌ Fehler' : '⚫ Offline'));
 
     return {
         panel_id:   panel.id,
@@ -214,7 +224,9 @@ function buildPanelPayload({ panel, server, snapshot, display, gameName }) {
         embed: {
             title:       `${statusText} · ${server.name}`,
             description: gameName || null,
-            color:       online ? COLOR_ONLINE : (server.status === 'error' ? COLOR_ERROR : COLOR_OFFLINE),
+            color:       uebergang ? COLOR_UEBERGANG
+                                   : (online ? COLOR_ONLINE
+                                             : (server.status === 'error' ? COLOR_ERROR : COLOR_OFFLINE)),
             fields,
             // Der Zeitstempel ist die Antwort auf "ist das noch aktuell?" – ohne
             // ihn müsste das Panel bei jedem Poll editiert werden, nur um zu
@@ -231,8 +243,11 @@ function buildPanelPayload({ panel, server, snapshot, display, gameName }) {
                 online,
                 show_controls: !!panel.show_controls,
                 show_refresh:  !!panel.show_refresh,
-                can_start:     !!panel.show_controls && !online,
-                can_stop:      !!panel.show_controls && online,
+                // Während eines Übergangs wird keiner der beiden Schalter
+                // angeboten – „Neu laden" bleibt, das ist lesend und hilft
+                // sogar: Damit sieht man, wann der Übergang vorbei ist.
+                can_start:     !!panel.show_controls && !uebergang && !online,
+                can_stop:      !!panel.show_controls && !uebergang && online,
             }
             : null,
     };

@@ -1,5 +1,10 @@
 const { Server, ServerStatus } = require("veza");
 const { ServiceManager } = require("dunebot-core");
+// Welche Aktion in welchem Zustand erlaubt ist, steht an genau einer Stelle.
+// Ein Discord-Knopf ist ein Abbild der Vergangenheit und kann jederzeit im
+// ungünstigsten Moment geklickt werden – die Prüfung gehört deshalb hierher.
+const { pruefeAktion: pruefeServerAktion } =
+    require("../../../plugins/gameserver/dashboard/helpers/ServerState");
 
 class IPCServer {
     constructor() {
@@ -809,7 +814,10 @@ class IPCServer {
 
                     const srv = await loadServerForStart(dbService, serverId, guildId);
                     if (!srv) return message.reply({ success: false, error: 'Gameserver nicht gefunden' });
-                    if (srv.status === 'online') return message.reply({ success: false, error: 'Server läuft bereits' });
+
+                    const startErlaubt = pruefeServerAktion('start', srv.status, srv.last_status_update);
+                    if (!startErlaubt.erlaubt) return message.reply({ success: false, error: startErlaubt.grund });
+
                     if (!srv.daemon_id) return message.reply({ success: false, error: 'Kein Daemon zugewiesen' });
                     if (!ipmServer?.isDaemonOnline(srv.daemon_id)) return message.reply({ success: false, error: 'Daemon ist offline' });
 
@@ -821,7 +829,10 @@ class IPCServer {
                         return message.reply({ success: false, error: payloadError });
                     }
 
-                    await dbService.query("UPDATE gameservers SET status = 'starting', last_started_at = NOW() WHERE id = ?", [serverId]);
+                    await dbService.query("UPDATE gameservers SET status = 'starting', last_started_at = NOW(), last_status_update = NOW() WHERE id = ?", [serverId]);
+                    // Panel sofort auf "Startet ..." ziehen, statt bis zum
+                    // naechsten Poll einen Stopp-Knopf anzubieten, der zu frueh kommt.
+                    require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
 
                     Logger.info(`[IPC/Gameserver] Start-Command an Daemon ${srv.daemon_id} (Image: ${dockerImage}${startPayload.auto_update ? ', mit Auto-Update' : ''})`);
 
@@ -838,18 +849,22 @@ class IPCServer {
                     if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
                     if (await actorMayNot('GAMESERVER.STOP')) return;
                     const [srv] = await dbService.query(
-                        `SELECT gs.id, gs.name, gs.status, r.daemon_id
+                        `SELECT gs.id, gs.name, gs.status, gs.last_status_update, r.daemon_id
                          FROM gameservers gs
                          LEFT JOIN rootserver r ON gs.rootserver_id = r.id
                          WHERE gs.id = ? AND gs.guild_id = ? LIMIT 1`,
                         [serverId, guildId]
                     );
                     if (!srv) return message.reply({ success: false, error: 'Gameserver nicht gefunden' });
-                    if (srv.status === 'offline') return message.reply({ success: false, error: 'Server ist bereits offline' });
+
+                    const stopErlaubt = pruefeServerAktion('stop', srv.status, srv.last_status_update);
+                    if (!stopErlaubt.erlaubt) return message.reply({ success: false, error: stopErlaubt.grund });
+
                     if (!srv.daemon_id) return message.reply({ success: false, error: 'Kein Daemon zugewiesen' });
                     if (!ipmServer?.isDaemonOnline(srv.daemon_id)) return message.reply({ success: false, error: 'Daemon ist offline' });
 
-                    await dbService.query("UPDATE gameservers SET status = 'stopping' WHERE id = ?", [serverId]);
+                    await dbService.query("UPDATE gameservers SET status = 'stopping', last_status_update = NOW() WHERE id = ?", [serverId]);
+                    require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
                     const stopR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.stop', {
                         server_id: String(serverId), guild_id: guildId,
                     }, 30000);
@@ -865,17 +880,22 @@ class IPCServer {
                     if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
                     if (await actorMayNot('GAMESERVER.RESTART')) return;
                     const [srv] = await dbService.query(
-                        `SELECT gs.id, gs.name, gs.status, r.daemon_id
+                        `SELECT gs.id, gs.name, gs.status, gs.last_status_update, r.daemon_id
                          FROM gameservers gs
                          LEFT JOIN rootserver r ON gs.rootserver_id = r.id
                          WHERE gs.id = ? AND gs.guild_id = ? LIMIT 1`,
                         [serverId, guildId]
                     );
                     if (!srv) return message.reply({ success: false, error: 'Gameserver nicht gefunden' });
+
+                    const restartErlaubt = pruefeServerAktion('restart', srv.status, srv.last_status_update);
+                    if (!restartErlaubt.erlaubt) return message.reply({ success: false, error: restartErlaubt.grund });
+
                     if (!srv.daemon_id) return message.reply({ success: false, error: 'Kein Daemon zugewiesen' });
                     if (!ipmServer?.isDaemonOnline(srv.daemon_id)) return message.reply({ success: false, error: 'Daemon ist offline' });
 
-                    await dbService.query("UPDATE gameservers SET status = 'starting' WHERE id = ?", [serverId]);
+                    await dbService.query("UPDATE gameservers SET status = 'starting', last_status_update = NOW() WHERE id = ?", [serverId]);
+                    require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
                     const restartR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.restart', {
                         server_id: String(serverId), guild_id: guildId,
                     }, 30000);

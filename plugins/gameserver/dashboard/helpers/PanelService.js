@@ -456,6 +456,36 @@ class PanelService {
      * @param {number} serverId
      * @returns {Promise<object|null>} Snapshot oder null
      */
+    /**
+     * Schiebt die Panels nach einem Zustandswechsel – ohne neue Abfrage.
+     *
+     * Nach „Stoppen" steht der Server auf `stopping`, und das Panel soll das
+     * sofort zeigen, statt bis zum nächsten Poll (bis zu 60 s) einen
+     * einsatzbereiten Start-Knopf anzubieten. Eine frische Abfrage wäre hier
+     * verkehrt: Ein Server, der gerade herunterfährt, antwortet nicht mehr, und
+     * das Ergebnis wäre nur die Feststellung „keine Antwort". Gebraucht wird der
+     * **Zustand**, nicht die Erreichbarkeit – deshalb der gespeicherte Snapshot.
+     *
+     * Fehler bleiben hier: Ein nicht aktualisiertes Panel darf einen erfolgreich
+     * abgesetzten Stopp-Befehl nicht scheitern lassen.
+     *
+     * @param {number|string} serverId
+     * @returns {Promise<void>}
+     */
+    static async pushZustandswechsel(serverId) {
+        try {
+            PanelService.refreshIndexIfStale();
+            if (!PanelService.hasPanel(String(serverId))) return;
+
+            const StatusService = require('./StatusService');
+            const snapshot = await StatusService.getSnapshot(serverId);
+            await PanelService.pushForServer(serverId, snapshot || {}, { force: true });
+        } catch (err) {
+            const Logger = ServiceManager.get('Logger');
+            Logger?.warn?.(`[PanelService] Zustandswechsel-Push fehlgeschlagen (Server ${serverId}): ${err.message}`);
+        }
+    }
+
     static async refreshNow(serverId) {
         const dbService = ServiceManager.get('dbService');
         const StatusService = require('./StatusService');
