@@ -2,7 +2,7 @@
     "name": "gameserver",
     "displayName": "Gameserver",
     "description": "The Gameserver Plugin - Choose your game. Download the game addon for the game and setup the gameserver",
-    "version": "1.7.0",
+    "version": "2.5.3",
     "author": "FireBot Team",
     "license": "none",
     "type":"commonjs",

@@ -25,6 +25,15 @@ const { buildPanelPayload, payloadHash } = require('./PanelPresenter');
 const PANEL_INDEX_TTL_MS = 30_000;
 
 /**
+ * Kleinster erlaubter Mindestabstand zwischen zwei Panel-Edits.
+ * Betreiber-Vorgabe: 30 s nach unten dicht machen und heraufsetzen, falls es bei
+ * Discords Rate-Limits eng wird. Der Poller fasst Panel-Server ohnehin nur alle
+ * 60 s an, die Schranke greift also erst, wenn jemand den Wert von Hand tiefer
+ * stellen will.
+ */
+const MIN_INTERVAL_UNTERGRENZE = 30;
+
+/**
  * Server-IDs mit aktivem Panel – als Set im Speicher, weil `_intervalFor()` im
  * Poller synchron entscheiden muss und pro Tick über alle Server läuft.
  * @type {Set<string>}
@@ -330,7 +339,7 @@ class PanelService {
                 enabled        = 1,
                 last_error     = NULL`,
             [guildId, serverId, channelId, showPlayers ? 1 : 0, showControls ? 1 : 0,
-             showRefresh ? 1 : 0, Math.max(15, Number(minIntervalS) || 60), createdBy]
+             showRefresh ? 1 : 0, Math.max(MIN_INTERVAL_UNTERGRENZE, Number(minIntervalS) || 60), createdBy]
         );
 
         PanelService.invalidateIndex();
@@ -387,7 +396,7 @@ class PanelService {
         if (showRefresh  !== undefined && showRefresh  !== null) { sets.push('show_refresh = ?');  values.push(showRefresh  ? 1 : 0); }
         if (minIntervalS !== undefined && minIntervalS !== null) {
             sets.push('min_interval_s = ?');
-            values.push(Math.max(15, Number(minIntervalS) || 60));
+            values.push(Math.max(MIN_INTERVAL_UNTERGRENZE, Number(minIntervalS) || 60));
         }
         if (!sets.length) return panel;
 
