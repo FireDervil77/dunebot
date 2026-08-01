@@ -79,7 +79,11 @@
                 <h3 class="card-title"><%= tr('BUG_REPORT.ALL_BUGS', 'Alle Bug Reports') %></h3>
             </div>
             <div class="card-body p-0">
-                <% if (bugs.length === 0) { %>
+                <% if (typeof ladeFehler !== 'undefined' && ladeFehler) { %>
+                    <div class="alert alert-danger m-3 mb-0">
+                        <i class="fas fa-triangle-exclamation me-2"></i><%= ladeFehler %>
+                    </div>
+                <% } else if (bugs.length === 0) { %>
                     <div class="text-center py-5">
                         <i class="fa-solid fa-bug fa-3x text-muted mb-3"></i>
                         <p class="text-muted"><%= tr('BUG_REPORT.NO_BUGS', 'Keine Bug Reports vorhanden') %></p>
@@ -91,10 +95,10 @@
                                 <th>#</th>
                                 <th><%= tr('BUG_REPORT.TITLE_COL', 'Titel') %></th>
                                 <th><%= tr('BUG_REPORT.CATEGORY_COL', 'Kategorie') %></th>
+                                <th>Sichtbarkeit</th>
                                 <th><%= tr('BUG_REPORT.STATUS_COL', 'Status') %></th>
                                 <th><%= tr('BUG_REPORT.PRIORITY_COL', 'Priorität') %></th>
                                 <th><%= tr('BUG_REPORT.REPORTER_COL', 'Gemeldet von') %></th>
-                                <th>Sichtbarkeit</th>
                                 <th><%= tr('BUG_REPORT.DATE_COL', 'Datum') %></th>
                             </tr>
                         </thead>
@@ -120,7 +124,11 @@
                                     <td><span class="badge bg-secondary"><%= bug.category || 'Allgemein' %></span></td>
                                     <td>
                                         <% if (bug.guild_only) { %>
-                                            <span class="badge bg-secondary"><i class="fas fa-lock me-1"></i>Diese Guild</span>
+                                            <% if (typeof istKontrollGuild !== 'undefined' && istKontrollGuild && String(bug.guild_id) !== String(guildId)) { %>
+                                                <span class="badge bg-warning text-dark"><i class="fas fa-lock me-1"></i>Nur <%= bug.guild_name || bug.guild_id %></span>
+                                            <% } else { %>
+                                                <span class="badge bg-secondary"><i class="fas fa-lock me-1"></i>Diese Guild</span>
+                                            <% } %>
                                         <% } else { %>
                                             <span class="badge bg-info"><i class="fas fa-globe me-1"></i>Alle Guilds</span>
                                         <% } %>

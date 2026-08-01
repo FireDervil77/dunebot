@@ -29,7 +29,12 @@
                     <%= f.title %>
                     <i class="fa-solid fa-chevron-down ml-1 text-muted" style="font-size: 0.7em;"></i>
                 </td>
-                <td><small class="text-muted"><%= f.guild_id %></small></td>
+                <td>
+                    <small class="text-muted" title="<%= f.guild_id %>"><%= f.guild_name || f.guild_id %></small>
+                    <% if (f.guild_only) { %>
+                        <br><span class="badge badge-warning" title="Nur in dieser Guild sichtbar — eine Antwort erreicht keine andere Guild"><i class="fa-solid fa-lock me-1"></i>Nur diese Guild</span>
+                    <% } %>
+                </td>
                 <td><small class="text-muted"><%= f.user_id %></small></td>
                 <td>
                     <% if (f.priority === 'critical') { %>

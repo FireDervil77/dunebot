@@ -71,7 +71,11 @@
                 </div>
             </div>
             <div class="card-body p-0">
-                <% if (features.length === 0) { %>
+                <% if (typeof ladeFehler !== 'undefined' && ladeFehler) { %>
+                    <div class="alert alert-danger m-3 mb-0">
+                        <i class="fas fa-triangle-exclamation me-2"></i><%= ladeFehler %>
+                    </div>
+                <% } else if (features.length === 0) { %>
                     <div class="text-center py-5">
                         <i class="fa-solid fa-lightbulb fa-3x text-muted mb-3"></i>
                         <p class="text-muted"><%= tr('FEATURE_REQUEST.NO_FEATURES', 'Keine Feature Requests vorhanden') %></p>
@@ -131,7 +135,11 @@
                                             
                                             <small class="text-muted ms-auto">
                                                 <% if (feature.guild_only) { %>
-                                                    <span class="badge bg-secondary me-1"><i class="fas fa-lock me-1"></i>Diese Guild</span>
+                                                    <% if (typeof istKontrollGuild !== 'undefined' && istKontrollGuild && String(feature.guild_id) !== String(guildId)) { %>
+                                                        <span class="badge bg-warning text-dark me-1"><i class="fas fa-lock me-1"></i>Nur <%= feature.guild_name || feature.guild_id %></span>
+                                                    <% } else { %>
+                                                        <span class="badge bg-secondary me-1"><i class="fas fa-lock me-1"></i>Diese Guild</span>
+                                                    <% } %>
                                                 <% } else { %>
                                                     <span class="badge bg-info me-1"><i class="fas fa-globe me-1"></i>Alle Guilds</span>
                                                 <% } %>

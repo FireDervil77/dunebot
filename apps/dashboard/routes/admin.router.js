@@ -49,10 +49,13 @@ async function getGlobalStats(dbService) {
 
     try {
         stats.topGuilds = await dbService.query(`
-            SELECT _id, guild_name, guild_id, created_at
+            SELECT _id, _id AS guild_id, guild_name, created_at
             FROM guilds ORDER BY created_at DESC LIMIT 10
         `);
-    } catch (_) { stats.topGuilds = []; }
+    } catch (err) {
+        Logger.error('[Admin] Fehler beim Laden der Top-Guilds:', err);
+        stats.topGuilds = [];
+    }
 
     try {
         const newsResults = await dbService.query(`
@@ -158,9 +161,12 @@ router.get('/feedback', async (req, res) => {
     const dbService = ServiceManager.get('dbService');
 
     try {
-        const feedbackList = await dbService.query(
-            'SELECT * FROM user_feedback ORDER BY created_at DESC'
-        );
+        const feedbackList = await dbService.query(`
+            SELECT uf.*, g.guild_name
+            FROM user_feedback uf
+            LEFT JOIN guilds g ON g._id = uf.guild_id
+            ORDER BY uf.created_at DESC
+        `);
         await themeManager.renderView(res, 'admin/feedback-management', {
             title: 'User Feedback Verwaltung',
             activeMenu: '/admin/feedback',
