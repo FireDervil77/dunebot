@@ -105,42 +105,6 @@ router.get('/feature-request', async (req, res) => {
     });
 });
 
-// GET /feedback/my-feedback
-router.get('/my-feedback', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
-    const themeManager = ServiceManager.get('themeManager');
-    const guildId = res.locals.guildId;
-    const userId = req.session.user.info.id;
-
-    let feedbacks = [];
-    let ladeFehler = null;
-
-    try {
-        // Eigene Beiträge sind guild-übergreifend: wer aus Guild A meldet, findet
-        // seinen Eintrag auch wieder, wenn er das Dashboard von Guild B aus öffnet.
-        feedbacks = await dbService.query(`
-            SELECT uf.*, g.guild_name,
-                   (SELECT 1 FROM user_feedback_votes WHERE feedback_id = uf.id AND user_id = ? LIMIT 1) as user_voted
-            FROM user_feedback uf
-            LEFT JOIN guilds g ON g._id = uf.guild_id
-            WHERE uf.user_id = ?
-            ORDER BY uf.created_at DESC
-        `, [userId, userId]);
-    } catch (err) {
-        Logger.error('[KernFeedback] Fehler beim Laden von My Feedback:', err);
-        ladeFehler = 'Deine Beiträge konnten nicht geladen werden.';
-    }
-
-    await themeManager.renderView(res, 'guild/my-feedback', {
-        title: 'Mein Feedback',
-        activeMenu: `/guild/${guildId}/feedback/my-feedback`,
-        guildId,
-        feedbacks: feedbacks || [],
-        ladeFehler
-    });
-});
-
 // GET /feedback/toast-history
 router.get('/toast-history', async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');

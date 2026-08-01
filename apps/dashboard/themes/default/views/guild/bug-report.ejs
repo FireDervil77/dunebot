@@ -109,17 +109,6 @@
                                     <td>
                                         <strong><%= bug.title %></strong>
                                         <br><small class="text-muted"><%= bug.description.substring(0, 100) %>...</small>
-                                        <% if (bug.admin_response) { %>
-                                            <br>
-                                            <button 
-                                                class="btn btn-sm btn-outline-info mt-1" 
-                                                type="button" 
-                                                data-toggle="collapse" 
-                                                data-target="#adminResponse<%= bug.id %>" 
-                                                aria-expanded="false">
-                                                <i class="fas fa-comment-dots me-1"></i>Admin-Antwort anzeigen
-                                            </button>
-                                        <% } %>
                                     </td>
                                     <td><span class="badge bg-secondary"><%= bug.category || 'Allgemein' %></span></td>
                                     <td>
@@ -164,8 +153,8 @@
                                     <td><%= new Date(bug.created_at).toLocaleDateString('de-DE') %></td>
                                 </tr>
                                 <% if (bug.admin_response) { %>
-                                    <tr class="collapse" id="adminResponse<%= bug.id %>">
-                                        <td colspan="7" class="bg-light">
+                                    <tr id="adminResponse<%= bug.id %>">
+                                        <td colspan="8" class="bg-light">
                                             <div class="alert alert-info mb-0">
                                                 <h6 class="alert-heading">
                                                     <i class="fas fa-reply me-2"></i><strong>Admin-Antwort</strong>
