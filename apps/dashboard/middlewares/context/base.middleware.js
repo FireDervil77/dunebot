@@ -4,6 +4,17 @@ const path = require("path");
 require("dotenv").config();
 
 /**
+ * Prüft, ob ein Pfadsegment eine Discord-Guild-ID sein kann (Snowflake, 17–20 Ziffern).
+ *
+ * Ohne diese Prüfung wird jedes beliebige Segment hinter /guild/ als Guild behandelt.
+ * Ein relativ aufgelöster Monaco-Sourcemap-Pfad hat so schon einmal die Guild
+ * "min-maps" erfunden, für die sich die Navigation dann selbst angelegt hat.
+ */
+function istGueltigeGuildId(wert) {
+    return typeof wert === 'string' && /^\d{17,20}$/.test(wert);
+}
+
+/**
  * Basis-Middleware zur Bereitstellung von Kontextdaten für alle Requests
  * Stellt globale Variablen für Templates, Benutzerinformationen und Navigation bereit
  * 
@@ -55,7 +66,7 @@ module.exports = async (req, res, next) => {
         // Fallback: Guild-ID aus Pfad extrahieren (/guild/GUILD_ID/...)
         if (!localeGuildId && req.path.startsWith('/guild/')) {
             const pathMatch = req.path.match(/^\/guild\/([^\/]+)/);
-            if (pathMatch && pathMatch[1]) {
+            if (pathMatch && istGueltigeGuildId(pathMatch[1])) {
                 localeGuildId = pathMatch[1];
                 Logger.debug(`[i18n] Guild-ID aus Pfad extrahiert: ${localeGuildId}`);
             }
@@ -289,6 +300,13 @@ module.exports = async (req, res, next) => {
             }
         }
 
+        // Alles, was keine Snowflake ist, ist keine Guild — sonst legt die
+        // selbstheilende Navigation weiter unten Einträge für Phantom-Guilds an.
+        if (guildId && !istGueltigeGuildId(guildId)) {
+            Logger.debug(`[Navigation] "${guildId}" ist keine Guild-ID, wird ignoriert (Pfad: ${req.path})`);
+            guildId = '';
+        }
+
         Logger.debug('[Navigation] Parameter-Extraktion:', {
             path: req.path,
             isGuildRoute,
@@ -469,7 +487,7 @@ module.exports = async (req, res, next) => {
                     if (!mainMenu || mainMenu.length === 0) {
                         Logger.warn(`[Navigation] Keine Navigation geladen für Guild ${navGuildId2}`);
                         // Versuche Core Plugin zu aktivieren (nur auf Guild-Routen)
-                        if (isGuildRoute) {
+                        if (isGuildRoute && istGueltigeGuildId(navGuildId2)) {
                             try {
                                 const corePlugin = pluginManager.getPlugin('core');
                                 if (corePlugin?.onGuildEnable) {
