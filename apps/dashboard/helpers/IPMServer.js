@@ -118,7 +118,27 @@ class IPMServer {
         this.Logger = ServiceManager.get('Logger');
         this.dbService = ServiceManager.get('dbService');
 
-        this.wss = new WebSocket.Server({ 
+        // Altzustand aus dem vorigen Prozessleben verwerfen, BEVOR der Server
+        // lauscht: Dieser Prozess hat noch keine Verbindung, also ist kein Daemon
+        // online. Wer läuft, meldet sich in Sekunden zurück.
+        //
+        // Ohne das blieb ein Daemon, der sich nach einem Dashboard-Neustart nicht
+        // mehr meldete, für immer als "online" verzeichnet — die Übersicht zeigte
+        // Online, während jede Aktion mit "Daemon nicht verbunden" scheiterte.
+        //
+        // Die Reihenfolge ist wichtig: Liefe das Zurücksetzen erst nach dem
+        // Öffnen des Ports, könnte es einen Daemon treffen, der sich in genau
+        // dieser Millisekunde angemeldet hat.
+        try {
+            const zurueckgesetzt = await RootServer.markAllOffline();
+            if (zurueckgesetzt > 0) {
+                this.Logger.info(`[IPMServer] ${zurueckgesetzt} Daemon(s) auf offline gesetzt — warte auf Anmeldung`);
+            }
+        } catch (error) {
+            this.Logger.error('[IPMServer] Zurücksetzen der Daemon-Zustände fehlgeschlagen:', error);
+        }
+
+        this.wss = new WebSocket.Server({
             port: this.port,
             perMessageDeflate: false // Performance
         });
