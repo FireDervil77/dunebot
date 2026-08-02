@@ -14,6 +14,7 @@
 const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const RootServer = require('../models/RootServer');
 const RootServer_getDaemon = async (guildId) => { const rows = await require('../models/RootServer').getByGuild(guildId); const rs = rows[0] || null; if (rs) { rs.status = rs.daemon_status; rs.version = rs.daemon_version; } return rs; };
 
@@ -27,7 +28,7 @@ const renderView = async (res, viewPath, data) => {
 // Route: Rootserver-Liste
 // GET /guild/:guildId/plugins/masterserver/rootservers
 // =====================================================
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     const guildId = res.locals.guildId;
@@ -89,7 +90,7 @@ router.get('/', async (req, res) => {
 // GET /guild/:guildId/plugins/masterserver/rootservers/events
 // ⚠️ MUSS VOR /:id stehen, sonst wird "events" als ID interpretiert!
 // =====================================================
-router.get('/events', (req, res) => {
+router.get('/events', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const sseManager = ServiceManager.get('sseManager');
     const guildId = res.locals.guildId;
@@ -128,7 +129,7 @@ router.get('/events', (req, res) => {
 // Route: RootServer erstellen (Wizard)
 // GET /guild/:guildId/plugins/masterserver/rootservers/create
 // =====================================================
-router.get('/create', async (req, res) => {
+router.get('/create', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
@@ -170,7 +171,7 @@ router.get('/create', async (req, res) => {
 // Route: RootServer erstellen (POST - Simplified)
 // POST /guild/:guildId/plugins/masterserver/rootservers
 // =====================================================
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
@@ -326,7 +327,7 @@ router.post('/', async (req, res) => {
 // Route: RootServer Details
 // GET /guild/:guildId/plugins/masterserver/rootservers/:id
 // =====================================================
-router.get('/:id', async (req, res) => {
+router.get('/:id', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     const guildId = res.locals.guildId;
@@ -391,7 +392,7 @@ router.get('/:id', async (req, res) => {
 // Route: RootServer bearbeiten (PUT)
 // PUT /guild/:guildId/plugins/masterserver/rootservers/:id
 // =====================================================
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
     const rootserverId = req.params.id;
@@ -439,53 +440,19 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// =====================================================
-// Route: RootServer löschen (DELETE)
-// DELETE /guild/:guildId/plugins/masterserver/rootservers/:id
-// =====================================================
-router.delete('/:id', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const guildId = res.locals.guildId;
-    const rootserverId = req.params.id;
-
-    try {
-        // RootServer laden und Berechtigung prüfen
-        const rootserver = await RootServer.getById(rootserverId);
-
-        if (!rootserver || rootserver.guild_id !== guildId) {
-            return res.status(404).json({
-                success: false,
-                message: 'RootServer nicht gefunden'
-            });
-        }
-
-        // TODO: Prüfe ob noch Gameserver aktiv sind
-
-        // RootServer löschen
-        await RootServer.delete(rootserverId);
-
-        Logger.info(`[Masterserver] RootServer deleted: ${rootserverId}`);
-
-        res.json({
-            success: true,
-            message: 'RootServer erfolgreich gelöscht'
-        });
-
-    } catch (error) {
-        Logger.error('[Masterserver] RootServer Delete Error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Fehler beim Löschen des RootServers',
-            error: error.message
-        });
-    }
-});
+// Hier stand bis zum 2026-08-02 ein erstes `DELETE /:id`, das nur
+// `RootServer.delete()` aufrief und an der Stelle des Gameserver-Checks ein
+// blosses `// TODO` trug. Weil Express bei gleichem Pfad den zuerst
+// registrierten Handler bedient, war es dieser — und der vollständige Handler
+// weiter unten (Gameserver-Check + `virtual.delete` ans Daemon) lief nie.
+// Ein RootServer liess sich damit mitsamt laufender Gameserver löschen, das
+// Verzeichnis blieb auf der Maschine zurück.
 
 // =====================================================
 // Route: RootServer Status (Live-Daten)
 // GET /guild/:guildId/plugins/masterserver/rootservers/:id/status
 // =====================================================
-router.get('/:id/status', async (req, res) => {
+router.get('/:id/status', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     const guildId = res.locals.guildId;
@@ -542,7 +509,7 @@ router.get('/:id/status', async (req, res) => {
 // Route: RootServer löschen
 // DELETE /guild/:guildId/plugins/masterserver/rootservers/:id
 // =====================================================
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('MASTERSERVER.ROOTSERVER.DELETE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const ipmServer = ServiceManager.get('ipmServer');
@@ -576,13 +543,14 @@ router.delete('/:id', async (req, res) => {
         }
 
         // 3. Virtual Server im Daemon löschen (wenn online)
-        const daemon = await RootServer_getDaemon(guildId);
-        
-        if (daemon && ipmServer.isDaemonOnline(daemon.daemon_id)) {
+        //    Adressiert wird der Daemon DIESES RootServers. Vorher stand hier
+        //    `RootServer_getDaemon(guildId)`, also immer der erste RootServer der
+        //    Guild — bei mehreren Maschinen ging der Löschbefehl an die falsche.
+        if (ipmServer.isDaemonOnline(rootserver.daemon_id)) {
             try {
                 Logger.info(`[Masterserver] Sende virtual.delete Command an Daemon für RootServer ${rootserverId}`);
-                
-                const deleteResponse = await ipmServer.sendCommand(daemon.daemon_id, 'virtual.delete', {
+
+                const deleteResponse = await ipmServer.sendCommand(rootserver.daemon_id, 'virtual.delete', {
                     daemon_id: rootserver.daemon_id,
                     rootserver_id: rootserverId
                 }, 30000);
@@ -627,7 +595,7 @@ router.delete('/:id', async (req, res) => {
 // Route: Vom Daemon bekannte Host-IPs (aus HardwareStats.Network)
 // GET /guild/:guildId/plugins/masterserver/rootservers/:id/host-ips
 // =====================================================
-router.get('/:id/host-ips', async (req, res) => {
+router.get('/:id/host-ips', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req, res) => {
     const ipmServer = ServiceManager.get('ipmServer');
     const guildId = res.locals.guildId;
     const rootserverId = req.params.id;
@@ -668,7 +636,7 @@ router.get('/:id/host-ips', async (req, res) => {
 // Route: IP-Adressen eines RootServers auflisten
 // GET /guild/:guildId/plugins/masterserver/rootservers/:id/ips
 // =====================================================
-router.get('/:id/ips', async (req, res) => {
+router.get('/:id/ips', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
     const rootserverId = req.params.id;
@@ -691,7 +659,7 @@ router.get('/:id/ips', async (req, res) => {
 // Route: IP-Adresse hinzufügen
 // POST /guild/:guildId/plugins/masterserver/rootservers/:id/ips
 // =====================================================
-router.post('/:id/ips', async (req, res) => {
+router.post('/:id/ips', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
     const rootserverId = req.params.id;
@@ -728,7 +696,7 @@ router.post('/:id/ips', async (req, res) => {
 // Route: IP-Adresse entfernen
 // DELETE /guild/:guildId/plugins/masterserver/rootservers/:id/ips/:ipId
 // =====================================================
-router.delete('/:id/ips/:ipId', async (req, res) => {
+router.delete('/:id/ips/:ipId', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
     const { id: rootserverId, ipId } = req.params;
@@ -756,7 +724,7 @@ router.delete('/:id/ips/:ipId', async (req, res) => {
 // Route: IP als primär setzen
 // PUT /guild/:guildId/plugins/masterserver/rootservers/:id/ips/:ipId/primary
 // =====================================================
-router.put('/:id/ips/:ipId/primary', async (req, res) => {
+router.put('/:id/ips/:ipId/primary', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
     const { id: rootserverId, ipId } = req.params;
@@ -779,7 +747,7 @@ router.put('/:id/ips/:ipId/primary', async (req, res) => {
 
 // GET /guild/:guildId/plugins/masterserver/rootservers/:id/allocations
 // Liste aller Port-Allocations für einen RootServer
-router.get('/:id/allocations', async (req, res) => {
+router.get('/:id/allocations', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
     const rootserverId = req.params.id;
@@ -815,7 +783,7 @@ router.get('/:id/allocations', async (req, res) => {
 
 // POST /guild/:guildId/plugins/masterserver/rootservers/:id/allocations
 // Port-Allocations hinzufügen (IP + Port-Range → wird zu Einzel-Rows expandiert)
-router.post('/:id/allocations', async (req, res) => {
+router.post('/:id/allocations', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
@@ -906,7 +874,7 @@ router.post('/:id/allocations', async (req, res) => {
 
 // DELETE /guild/:guildId/plugins/masterserver/rootservers/:id/allocations/:allocId
 // Einzelne Allocation löschen (nur wenn nicht zugewiesen)
-router.delete('/:id/allocations/:allocId', async (req, res) => {
+router.delete('/:id/allocations/:allocId', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
     const { id: rootserverId, allocId } = req.params;
@@ -939,7 +907,7 @@ router.delete('/:id/allocations/:allocId', async (req, res) => {
 
 // DELETE /guild/:guildId/plugins/masterserver/rootservers/:id/allocations-bulk
 // Alle freien Allocations für eine IP löschen
-router.delete('/:id/allocations-bulk', async (req, res) => {
+router.delete('/:id/allocations-bulk', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;

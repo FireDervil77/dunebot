@@ -12,6 +12,7 @@
 const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
 // Helper: themeManager.renderView() wrapper
 const renderView = async (res, viewPath, data) => {
@@ -23,7 +24,7 @@ const renderView = async (res, viewPath, data) => {
 // Route: Task-Details-Seite
 // GET /guild/:guildId/plugins/masterserver/tasks/:taskId
 // =====================================================
-router.get('/:taskId', async (req, res) => {
+router.get('/:taskId', requirePermission('MASTERSERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const { taskId } = req.params;
     const guildId = res.locals.guildId;

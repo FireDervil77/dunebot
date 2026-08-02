@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const RootServer = require('../models/RootServer');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,7 +79,7 @@ async function getGameserversWithQuotas(daemonId, dbService) {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /  – Quota-Übersicht (Pterodactyl Node-Style)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('MASTERSERVER.RESOURCES.VIEW'), async (req, res) => {
     const Logger       = ServiceManager.get('Logger');
     const themeManager = ServiceManager.get('themeManager');
     const dbService    = ServiceManager.get('dbService');
@@ -136,7 +137,7 @@ router.get('/', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /rootserver/:id/overallocation
 // ─────────────────────────────────────────────────────────────────────────────
-router.put('/rootserver/:rootserverId/overallocation', async (req, res) => {
+router.put('/rootserver/:rootserverId/overallocation', requirePermission('MASTERSERVER.RESOURCES.MANAGE'), async (req, res) => {
     const Logger    = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId   = res.locals.guildId;
@@ -168,7 +169,7 @@ router.put('/rootserver/:rootserverId/overallocation', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /rootserver/:id/reserved
 // ─────────────────────────────────────────────────────────────────────────────
-router.put('/rootserver/:rootserverId/reserved', async (req, res) => {
+router.put('/rootserver/:rootserverId/reserved', requirePermission('MASTERSERVER.RESOURCES.MANAGE'), async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const guildId   = res.locals.guildId;
     const { rootserverId } = req.params;
@@ -193,7 +194,7 @@ router.put('/rootserver/:rootserverId/reserved', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /rootserver/:id/check  – Verfügbarkeit prüfen
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/rootserver/:rootserverId/check', async (req, res) => {
+router.get('/rootserver/:rootserverId/check', requirePermission('MASTERSERVER.RESOURCES.VIEW'), async (req, res) => {
     const guildId = res.locals.guildId;
     const { rootserverId } = req.params;
     const { ramMB, cpuCores, diskGB } = req.query;

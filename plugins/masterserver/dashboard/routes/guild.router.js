@@ -15,6 +15,7 @@
 const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const DaemonToken = require('../models/DaemonToken');
 const RootServer = require('../models/RootServer');
 
@@ -43,7 +44,7 @@ const getDaemonForGuild = async (guildId) => {
 // URL: /guild/:guildId/plugins/masterserver
 // Redirected zu: /dashboard
 // =====================================================
-router.get('/', (req, res) => {
+router.get('/', requirePermission('MASTERSERVER.VIEW'), (req, res) => {
     const guildId = res.locals.guildId;
     res.redirect(`/guild/${guildId}/plugins/masterserver/dashboard`);
 });
@@ -52,7 +53,7 @@ router.get('/', (req, res) => {
 // Route 1: Masterserver Dashboard (Hauptseite)
 // URL: /guild/:guildId/plugins/masterserver/dashboard
 // =====================================================
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', requirePermission('MASTERSERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const ipmServer = ServiceManager.get('ipmServer');
@@ -95,7 +96,7 @@ router.get('/dashboard', async (req, res) => {
 // URL: /guild/:guildId/plugins/masterserver/daemon
 // =====================================================
 // Legacy: /daemon → redirect to /rootservers
-router.get('/daemon', (req, res) => {
+router.get('/daemon', requirePermission('MASTERSERVER.VIEW'), (req, res) => {
     const guildId = res.locals.guildId;
     res.redirect(301, `/guild/${guildId}/plugins/masterserver/rootservers`);
 });
@@ -104,7 +105,7 @@ router.get('/daemon', (req, res) => {
 // Route 2b: Daemon Update-Info abrufen (API)
 // URL: GET /guild/:guildId/plugins/masterserver/daemon/update-info
 // =====================================================
-router.get('/daemon/update-info', async (req, res) => {
+router.get('/daemon/update-info', requirePermission('MASTERSERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
 
@@ -162,7 +163,7 @@ router.get('/daemon/update-info', async (req, res) => {
 // Route 2c: Daemon-Update triggern (POST)
 // URL: POST /guild/:guildId/plugins/masterserver/daemon/trigger-update
 // =====================================================
-router.post('/daemon/trigger-update', async (req, res) => {
+router.post('/daemon/trigger-update', requirePermission('MASTERSERVER.DAEMON.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
 
@@ -242,7 +243,7 @@ router.post('/daemon/trigger-update', async (req, res) => {
 // =====================================================
 // Route 2d: Erster RootServer (= Daemon) für Guild anlegen
 // =====================================================
-router.post('/daemon/create', async (req, res) => {
+router.post('/daemon/create', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
@@ -286,7 +287,7 @@ router.post('/daemon/create', async (req, res) => {
 // Route 3: Token-Verwaltung
 // URL: /guild/:guildId/plugins/masterserver/tokens
 // =====================================================
-router.get('/tokens', async (req, res) => {
+router.get('/tokens', requirePermission('MASTERSERVER.TOKENS.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
 
@@ -325,7 +326,7 @@ router.get('/tokens', async (req, res) => {
 // =====================================================
 // Route 3a: Token generieren (POST)
 // =====================================================
-router.post('/tokens/generate', async (req, res) => {
+router.post('/tokens/generate', requirePermission('MASTERSERVER.TOKENS.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
 
@@ -373,7 +374,7 @@ router.post('/tokens/generate', async (req, res) => {
 // =====================================================
 // Route 3b: Token widerrufen (DELETE)
 // =====================================================
-router.delete('/tokens/:tokenId', async (req, res) => {
+router.delete('/tokens/:tokenId', requirePermission('MASTERSERVER.TOKENS.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
     const { tokenId } = req.params;
@@ -388,9 +389,13 @@ router.delete('/tokens/:tokenId', async (req, res) => {
             });
         }
 
-        // Token laden und Ownership prüfen
+        // Token laden und Ownership prüfen.
+        // Tokens hängen an der Guild, nicht am Daemon — `daemon_tokens` hat keine
+        // Spalte `daemon_id` (nur `used_by_daemon_id`). Der frühere Vergleich gegen
+        // `token.daemon_id` war deshalb immer `undefined !== ...` und hat jeden
+        // Widerruf mit 404 abgewiesen.
         const token = await DaemonToken.getById(tokenId);
-        if (!token || token.daemon_id !== daemon.daemon_id) {
+        if (!token || String(token.guild_id) !== String(guildId)) {
             return res.status(404).json({
                 success: false,
                 message: 'Token nicht gefunden'
@@ -420,7 +425,7 @@ router.delete('/tokens/:tokenId', async (req, res) => {
 // Route 4: Server-Registry (Physische Server)
 // URL: /guild/:guildId/plugins/masterserver/servers
 // =====================================================
-router.get('/servers', async (req, res) => {
+router.get('/servers', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     const guildId = res.locals.guildId;
@@ -471,7 +476,7 @@ router.get('/servers', async (req, res) => {
 // Route 4a: Server erstellen (GET - Create Form)
 // URL: /guild/:guildId/plugins/masterserver/servers/create
 // =====================================================
-router.get('/servers/create', async (req, res) => {
+router.get('/servers/create', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     const guildId = res.locals.guildId;
@@ -516,7 +521,7 @@ router.get('/servers/create', async (req, res) => {
 // =====================================================
 // Route 4b: Server bearbeiten (GET - Edit Form)
 // =====================================================
-router.get('/servers/:serverId/edit', async (req, res) => {
+router.get('/servers/:serverId/edit', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     const guildId = res.locals.guildId;
@@ -567,7 +572,7 @@ router.get('/servers/:serverId/edit', async (req, res) => {
 // Beschreibt den physischen Server (Daemon muss bereits registriert sein!)
 // Verknüpft RootServer mit existierendem Daemon (daemon_id)
 // =====================================================
-router.post('/servers/create', async (req, res) => {
+router.post('/servers/create', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
     const userId = res.locals.user?.id || res.locals.userId || null;
@@ -799,7 +804,7 @@ router.post('/servers/create', async (req, res) => {
 // =====================================================
 // Route 4b: Server aktualisieren (PUT)
 // =====================================================
-router.put('/servers/:serverId', async (req, res) => {
+router.put('/servers/:serverId', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
     const { serverId } = req.params;
@@ -872,7 +877,7 @@ router.put('/servers/:serverId', async (req, res) => {
 // =====================================================
 // Route 4c: Server löschen (DELETE)
 // =====================================================
-router.delete('/servers/:serverId', async (req, res) => {
+router.delete('/servers/:serverId', requirePermission('MASTERSERVER.ROOTSERVER.DELETE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
     const { serverId } = req.params;
@@ -944,7 +949,7 @@ router.delete('/servers/:serverId', async (req, res) => {
 // Route 5: Daemon-Logs
 // URL: /guild/:guildId/plugins/masterserver/logs
 // =====================================================
-router.get('/logs', async (req, res) => {
+router.get('/logs', requirePermission('MASTERSERVER.LOGS.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
@@ -1017,71 +1022,11 @@ router.get('/logs', async (req, res) => {
     }
 });
 
-// =====================================================
-// Route 6: Token generieren (POST)
-// URL: /guild/:guildId/plugins/masterserver/tokens/generate
-// =====================================================
-router.post('/tokens/generate', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
-    const guildId = res.locals.guildId;
-
-    try {
-        const { expiresInDays, description } = req.body;
-
-        // Validierung
-        if (!expiresInDays || isNaN(parseInt(expiresInDays))) {
-            return res.status(400).json({
-                success: false,
-                message: 'Ungültige Gültigkeitsdauer'
-            });
-        }
-
-        // Daemon für diese Guild laden
-        const daemon = await getDaemonForGuild(guildId);
-        if (!daemon) {
-            return res.status(404).json({
-                success: false,
-                message: 'Kein Daemon für diese Guild gefunden'
-            });
-        }
-
-        // Token generieren
-        const token = await DaemonToken.generate(
-            daemon.daemon_id,
-            guildId,
-            parseInt(expiresInDays),
-            description || null
-        );
-
-        Logger.info(`[Masterserver] Token generiert für Guild ${guildId}: ID ${token.id}`);
-
-        // Erfolg mit Token zurückgeben (für guild.js Handler)
-        res.json({
-            success: true,
-            message: 'Token erfolgreich generiert',
-            tokenId: token.id,
-            token: token.token, // ⚠️ Nur hier anzeigen, nie wieder!
-            expiresAt: token.expires_at,
-            description: token.description
-        });
-
-    } catch (error) {
-        Logger.error('[Masterserver] Token Generation Error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Fehler beim Generieren des Tokens: ' + error.message
-        });
-    }
-});
-
-// =====================================================
-// Route 7: Hauptseite Redirect
-// URL: /guild/:guildId/plugins/masterserver
-// =====================================================
-router.get('/', (req, res) => {
-    const guildId = res.locals.guildId;
-    res.redirect(`/guild/${guildId}/plugins/masterserver/dashboard`);
-});
+// Hier standen bis zum 2026-08-02 ein zweites `POST /tokens/generate` und ein
+// zweites `GET /`. Express bedient bei gleichem Pfad immer den zuerst
+// registrierten Handler — beide waren also unerreichbar. Das doppelte
+// `/tokens/generate` hätte ohnehin nie funktioniert: es rief `DaemonToken.generate()`
+// mit vier Argumenten in einer Reihenfolge auf, die das Modell nicht kennt
+// (daemonId, guildId, tage, beschreibung statt guildId, stunden, beschreibung, ersteller).
 
 module.exports = router;

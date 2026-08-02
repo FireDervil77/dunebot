@@ -13,12 +13,13 @@
 const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
+const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
 // =====================================================
 // GET /api/tasks/:taskId
 // Abrufen eines einzelnen Tasks mit vollständigen Details
 // =====================================================
-router.get('/:taskId', async (req, res) => {
+router.get('/:taskId', requirePermission('MASTERSERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     const { taskId } = req.params;
@@ -67,7 +68,7 @@ router.get('/:taskId', async (req, res) => {
 // GET /api/tasks/server/:serverId
 // Alle Tasks eines Servers abrufen
 // =====================================================
-router.get('/server/:serverId', async (req, res) => {
+router.get('/server/:serverId', requirePermission('MASTERSERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     const { serverId } = req.params;
@@ -119,7 +120,7 @@ router.get('/server/:serverId', async (req, res) => {
 // POST /api/tasks/:taskId/cancel
 // Task abbrechen
 // =====================================================
-router.post('/:taskId/cancel', async (req, res) => {
+router.post('/:taskId/cancel', requirePermission('MASTERSERVER.DAEMON.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     const { taskId } = req.params;
