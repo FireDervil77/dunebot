@@ -2,7 +2,7 @@
  * Core-Plugin API: Stripe Checkout Session erstellen
  * Route: POST /api/core/create-donation
  * 
- * @module plugins/core/dashboard/routes/api/create-donation
+ * @module apps/dashboard/routes/api/create-donation
  * @author FireBot Team
  */
 
@@ -96,8 +96,15 @@ router.post('/', async (req, res) => {
                 quantity: 1
             }],
             mode: 'payment',
-            success_url: `${process.env.DASHBOARD_BASE_URL}/guild/${guild_id}/donate?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.DASHBOARD_BASE_URL}/guild/${guild_id}/donate?payment=cancelled`,
+            // Rücksprung auf die eigenen Dankes- und Abbruchseiten.
+            //
+            // Bis zum 2026-08-02 ging es zurück auf `/donate?payment=success`, wo
+            // ein JavaScript einen Hinweis einblendete — die fertigen Views
+            // `donate-success.ejs` und `donate-cancel.ejs` samt ihrer Routen lagen
+            // ungenutzt daneben. Wer gerade Geld gegeben hat, verdient eine eigene
+            // Seite statt eines Einblenders auf dem Spendenformular.
+            success_url: `${process.env.DASHBOARD_BASE_URL}/guild/${guild_id}/donate/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.DASHBOARD_BASE_URL}/guild/${guild_id}/donate/cancel`,
             
             // WICHTIG: User-Daten als Metadata speichern
             metadata: {

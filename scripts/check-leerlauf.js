@@ -156,7 +156,7 @@ function routenOhneRecht(korpus) {
             // ueber der Definition. Gemeldet werden sie trotzdem — nur mit
             // Hinweis, damit niemand sie versehentlich zuschliesst.
             const davor = zeilen.slice(Math.max(0, i - 6), i).join('\n');
-            const absichtlich = /öffentlich|oeffentlich|public|ohne Anmeldung|Token/i.test(davor);
+            const absichtlich = /öffentlich|oeffentlich|public|ohne Anmeldung|Token|kein Schutz|nicht geschützt|absichtlich offen/i.test(davor);
 
             befunde.push({
                 datei: relativ(datei),

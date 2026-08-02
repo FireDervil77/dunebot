@@ -408,6 +408,12 @@ async function createDonation() {
 }
 
 // Payment-Status Benachrichtigungen anzeigen (nach Page-Load)
+//
+// Seit dem 2026-08-02 kehrt Stripe auf /donate/success bzw. /donate/cancel
+// zurueck, nicht mehr hierher. Dieser Zweig bleibt als Auffangnetz: Eine
+// Checkout-Session lebt bis zu 24 Stunden, und wer beim Umstellen gerade mitten
+// im Bezahlen war, kommt noch mit der alten Adresse an. Er soll dann eine
+// Bestaetigung sehen und keine wortlose Spendenseite.
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     const paymentStatus = urlParams.get('payment');
