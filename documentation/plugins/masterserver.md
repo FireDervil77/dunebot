@@ -15,16 +15,24 @@ Vollständige Dokumentation: [Masterserver](../gameserver/masterserver.md)
 
 ## Berechtigungen
 
+Die Schlüssel sind mit **Punkten** geschrieben, nicht mit Unterstrichen.
+
 | Berechtigung | Beschreibung |
 |-------------|-------------|
 | `MASTERSERVER.VIEW` | Masterserver-Bereich sehen |
-| `MASTERSERVER.DAEMON_MANAGE` | Daemons verwalten |
-| `MASTERSERVER.ROOTSERVER_VIEW` | Root-Server einsehen |
-| `MASTERSERVER.ROOTSERVER_CREATE` | Root-Server registrieren |
-| `MASTERSERVER.ROOTSERVER_EDIT` | Root-Server bearbeiten |
-| `MASTERSERVER.ROOTSERVER_DELETE` | Root-Server und alle Gameserver löschen |
-| `MASTERSERVER.RESOURCES_VIEW` | Ressourcenauslastung einsehen |
-| `MASTERSERVER.RESOURCES_MANAGE` | Ressourcen-Limits verwalten |
-| `MASTERSERVER.TOKENS_VIEW` | API-Tokens einsehen |
-| `MASTERSERVER.TOKENS_MANAGE` | API-Tokens verwalten |
-| `MASTERSERVER.LOGS_VIEW` | Logs einsehen |
+| `MASTERSERVER.DAEMON.MANAGE` | Daemon-Updates auslösen ⚠️ |
+| `MASTERSERVER.ROOTSERVER.VIEW` | Root-Server einsehen |
+| `MASTERSERVER.ROOTSERVER.CREATE` | Root-Server registrieren ⚠️ |
+| `MASTERSERVER.ROOTSERVER.EDIT` | Root-Server bearbeiten, IPs und Ports verwalten |
+| `MASTERSERVER.ROOTSERVER.DELETE` | Root-Server löschen ⚠️ |
+| `MASTERSERVER.RESOURCES.VIEW` | Ressourcenauslastung einsehen |
+| `MASTERSERVER.RESOURCES.MANAGE` | Überallokation und Reserven ändern |
+| `MASTERSERVER.LOGS.VIEW` | Daemon-Logs einsehen |
+
+⚠️ = als kritisch eingestuft.
+
+## Ressourcen
+
+Wie viel Arbeitsspeicher, CPU und Speicherplatz eine Maschine hergibt, erkennt
+der Daemon selbst — eintragen musst du nichts.
+Siehe [Ressourcen-Verwaltung](../gameserver/ressourcen.md).

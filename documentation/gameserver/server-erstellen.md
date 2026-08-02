@@ -29,7 +29,22 @@ Der Bot bestätigt die Erstellung und startet automatisch die Installation.
    - **Root-Server** — Wo soll der Server laufen?
    - **Addon** — Welches Spiel?
    - **Name** — Wie soll der Server heißen?
-4. Klicke auf **Erstellen**
+4. Lege die **Ressourcen** fest — diese drei Angaben sind Pflicht:
+
+   | Feld | Bedeutung | Vorgabe |
+   |------|-----------|---------|
+   | Arbeitsspeicher | Obergrenze in MiB, mindestens 512 | 2048 |
+   | CPU-Anteil | In Prozent, **100 % = ein Kern** | 100 |
+   | Speicherplatz | Obergrenze in GiB, mindestens 1 | 20 |
+
+5. Klicke auf **Erstellen**
+
+Die Werte reservieren Platz auf dem Root-Server und begrenzen den Server im
+Betrieb. Ist dort nicht genug frei, wird das Anlegen abgelehnt — mit Angabe,
+wie viel angefordert wurde und wie viel zur Verfügung steht. Ändern lassen sie
+sich jederzeit unter **Bearbeiten**.
+
+Mehr dazu: [Ressourcen-Verwaltung](ressourcen.md)
 
 ## Installationsvorgang
 

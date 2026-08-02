@@ -24,8 +24,9 @@ Discord/Dashboard  ←→  FireBot (Masterserver-Plugin)  ←→  FireBot Daemon
 
 1. [Daemon auf dem Root-Server installieren](daemon-setup.md)
 2. [Root-Server im Dashboard registrieren](masterserver.md)
-3. [Gameserver erstellen](server-erstellen.md)
-4. [Server verwalten](server-verwalten.md)
+3. [Ressourcen verstehen](ressourcen.md) — was der Daemon selbst erkennt
+4. [Gameserver erstellen](server-erstellen.md)
+5. [Server verwalten](server-verwalten.md)
 
 ## Unterstützte Spiele
 
