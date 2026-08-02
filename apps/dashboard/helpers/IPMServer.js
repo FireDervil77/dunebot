@@ -21,6 +21,11 @@ const path = require('path');
 const { ServiceManager } = require('dunebot-core');
 const { MessageValidator, MessageBuilder } = require('dunebot-sdk');
 const eventRouter = require('./IPMEventRouter');
+// Alle Schreibzugriffe auf `rootserver` laufen ueber dieses Modell. Bis zum
+// 2026-08-02 stand das SQL hier in der Datei verstreut und das Modell wurde nur
+// fuer Hardware-Stats benutzt — ein Umbau, der nach der ersten Methode
+// steckengeblieben war.
+const RootServer = require('../../../plugins/masterserver/dashboard/models/RootServer');
 
 // Pfad zur version.json (Dashboard-Download-Verzeichnis)
 const VERSION_JSON_PATH = path.join(__dirname, '..', 'downloads', 'daemon', 'version.json');
@@ -251,13 +256,29 @@ class IPMServer {
         ws.on('close', () => {
             if (daemonId) {
                 this.connections.delete(daemonId);
-                
+
                 // ✅ SECURITY: Connection-Count verringern
                 const currentConnections = this.connectionCounts.get(daemonId) || 0;
                 const newCount = Math.max(0, currentConnections - 1);
                 this.connectionCounts.set(daemonId, newCount);
-                
+
                 this.Logger.info(`[IPMServer] Daemon ${daemonId} disconnected (Connections: ${newCount}/${this.maxConnectionsPerDaemon})`);
+
+                // Zustand in der Datenbank nachziehen.
+                //
+                // Bis zum 2026-08-02 geschah das hier nicht, und der
+                // Heartbeat-Monitor konnte es auch nicht nachholen: Der läuft
+                // über `this.connections`, und der Eintrag ist eine Zeile weiter
+                // oben bereits gelöscht. Bei einem sauberen Verbindungsabbruch —
+                // also jedem `systemctl stop firebot-daemon` — blieb
+                // `daemon_status` deshalb dauerhaft auf 'online'. Die Live-Ansicht
+                // stimmte trotzdem, weil sie `isDaemonOnline()` fragt; falsch
+                // waren die Zählungen, die gegen die Spalte rechnen (Übersicht,
+                // Ressourcen-Seite, Gameserver-Detail).
+                if (newCount === 0) {
+                    RootServer.markOffline(daemonId)
+                        .catch(err => this.Logger.error('[IPMServer] Statuswechsel auf offline fehlgeschlagen:', err));
+                }
             }
         });
 
@@ -307,10 +328,7 @@ class IPMServer {
                     }
                     
                     // Daemon aus DB laden
-                    const [daemon] = await this.dbService.query(
-                        'SELECT * FROM rootserver WHERE daemon_id = ?',
-                        [daemon_id]
-                    );
+                    const daemon = await RootServer.getByDaemonId(daemon_id);
                     
                     if (!daemon) {
                         return { success: false, error: 'Daemon not found' };
@@ -324,16 +342,10 @@ class IPMServer {
                     }, this.jwtSecret, { expiresIn: this.jwtExpiry });
                     
                     // Daemon-Status aktualisieren
-                    await this.dbService.query(
-                        `UPDATE rootserver 
-                         SET daemon_status = 'online', 
-                             last_seen = NOW(),
-                             daemon_version = ?,
-                             session_token = ?,
-                             session_token_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
-                         WHERE daemon_id = ?`,
-                        [version || daemon.daemon_version, newSessionToken, daemon_id]
-                    );
+                    await RootServer.markOnline(daemon_id, {
+                        version:      version || daemon.daemon_version,
+                        sessionToken: newSessionToken,
+                    });
                     
                     await this._logDaemonEvent(daemon_id, 'reconnected', { version });
                     
@@ -389,11 +401,8 @@ class IPMServer {
             // FALL 2: Setup-Token / API-Key (Erste Registrierung)
             // ================================================
 
-            // RootServer anhand daemon_id + api_key direkt aus rootserver-Tabelle laden
-            const [rootserverByToken] = await this.dbService.query(
-                `SELECT * FROM rootserver WHERE daemon_id = ? AND api_key = ? LIMIT 1`,
-                [daemon_id, token]
-            );
+            // RootServer anhand daemon_id + api_key laden
+            const rootserverByToken = await RootServer.getByDaemonIdAndApiKey(daemon_id, token);
 
             if (!rootserverByToken) {
                 return { success: false, error: 'Invalid or expired token' };
@@ -408,17 +417,11 @@ class IPMServer {
 
             // Daemon-Status + Session-Token in rootserver aktualisieren
             // install_status → 'completed' bei erster erfolgreicher Verbindung
-            await this.dbService.query(
-                `UPDATE rootserver 
-                 SET daemon_status = 'online', 
-                     install_status = 'completed',
-                     last_seen = NOW(),
-                     daemon_version = ?,
-                     session_token = ?,
-                     session_token_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
-                 WHERE daemon_id = ?`,
-                [version || 'unknown', sessionToken, daemon_id]
-            );
+            await RootServer.markOnline(daemon_id, {
+                version:       version || 'unknown',
+                sessionToken:  sessionToken,
+                installStatus: 'completed',
+            });
 
             // Audit-Log
             await this._logDaemonEvent(daemon_id, 'first_registration', { version });
@@ -545,8 +548,6 @@ class IPMServer {
             conn.metadata.hardware = payload.hardware;
             
             // ✅ Hardware-Stats in rootserver Tabelle speichern
-            const RootServer = require('../../../plugins/masterserver/dashboard/models/RootServer');
-            
             try {
                 await RootServer.updateHardwareStats(daemonId, payload.hardware);
                 this.Logger.debug('[IPMServer] Hardware-Stats in DB gespeichert');
@@ -582,11 +583,11 @@ class IPMServer {
             this.Logger.debug(`[IPMServer] Update-Info: ${payload.updateInfo.currentVersion} → ${payload.updateInfo.latestVersion} (Available: ${payload.updateInfo.available})`);
         }
 
-        // DB-Update (last_seen + last_ping_ms)
-        await this.dbService.query(
-            'UPDATE rootserver SET last_seen = NOW(), last_ping_ms = COALESCE(?, last_ping_ms) WHERE daemon_id = ?',
-            [pingMs, daemonId]
-        );
+        // Herzschlag im Modell verbuchen. Das setzt zusaetzlich
+        // `daemon_status = 'online'` und `missed_heartbeats = 0` — ein Daemon,
+        // der sendet, korrigiert damit einen faelschlich auf offline stehenden
+        // Eintrag von selbst.
+        await RootServer.processHeartbeat(daemonId, pingMs);
 
         // ACK senden
         conn.ws.send(JSON.stringify({ 
@@ -838,10 +839,7 @@ class IPMServer {
 
         try {
             // Guild-ID für Log-Eintrag holen
-            const [daemon] = await this.dbService.query(
-                'SELECT guild_id FROM rootserver WHERE daemon_id = ?',
-                [daemonId]
-            );
+            const daemon = await RootServer.getByDaemonId(daemonId);
             
             if (!daemon) return;
             
@@ -865,10 +863,7 @@ class IPMServer {
     async _logDaemonEvent(daemonId, event, data) {
         try {
             // Guild-ID für Log-Eintrag holen
-            const [daemon] = await this.dbService.query(
-                'SELECT guild_id FROM rootserver WHERE daemon_id = ?',
-                [daemonId]
-            );
+            const daemon = await RootServer.getByDaemonId(daemonId);
             
             if (!daemon) return;
             
@@ -1009,11 +1004,17 @@ class IPMServer {
                     conn.ws.close(4000, 'Heartbeat timeout');
                     this.connections.delete(daemonId);
 
-                    // Status in DB auf offline setzen
-                    this.dbService.query(
-                        'UPDATE rootserver SET daemon_status = \'offline\' WHERE daemon_id = ?',
-                        [daemonId]
-                    ).catch(err => this.Logger.error('[IPMServer] DB Update Error:', err));
+                    // Verpassten Herzschlag zählen und Status auf offline setzen.
+                    // Der Zähler steht auf der RootServer-Detailseite und blieb
+                    // bis zum 2026-08-02 dauerhaft auf 0, weil ihn niemand erhöht
+                    // hat.
+                    //
+                    // Bewusst unabhängig voneinander: Der Statuswechsel ist das
+                    // Wichtige. Scheitert das Hochzählen, darf er nicht ausfallen.
+                    RootServer.incrementMissedHeartbeat(daemonId)
+                        .catch(err => this.Logger.error('[IPMServer] Heartbeat-Zähler nicht erhöht:', err));
+                    RootServer.markOffline(daemonId)
+                        .catch(err => this.Logger.error('[IPMServer] Statuswechsel auf offline fehlgeschlagen:', err));
                 }
             }
         }, 30000); // Alle 30s prüfen

@@ -259,10 +259,7 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
                     Logger.success(`[Masterserver] Virtual Server erstellt: ${vServerResponse.data?.server_path || 'unknown'}`);
                     
                     // Install-Status auf 'completed' setzen
-                    await dbService.query(
-                        'UPDATE rootserver SET install_status = ? WHERE id = ?',
-                        ['completed', result.id]
-                    );
+                    await RootServer.updateInstallStatus(result.daemonId, 'completed');
                 } else {
                     Logger.error(`[Masterserver] Virtual Server Setup fehlgeschlagen: ${vServerResponse.error}`);
                     // Nicht kritisch - User kann Setup später manuell triggern

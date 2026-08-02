@@ -142,11 +142,84 @@ class RootServer {
 
     // =========================================================
     // Daemon-Verbindungs-Management
+    //
+    // Alle Schreibzugriffe auf den Verbindungszustand laufen über diese
+    // Methoden. Bis zum 2026-08-02 schrieb der IPMServer sein SQL selbst und
+    // rief vom Modell nur `updateHardwareStats()` auf — ein Umbau, der nach der
+    // ersten Methode stehengeblieben war. Sichtbar wurde das an
+    // `missed_heartbeats`: Die RootServer-Detailseite zeigt den Zähler an, aber
+    // `incrementMissedHeartbeat()` hatte keinen Aufrufer, also stand dort immer
+    // eine 0.
     // =========================================================
 
-    // `updateStatus()` stand hier bis zum 2026-08-01 und wurde von keiner Zeile
-    // aufgerufen. Den Verbindungszustand pflegen `processHeartbeat()` und der
-    // IPMServer beim Disconnect - beide schreiben `daemon_status` direkt.
+    /**
+     * Setzt einen Daemon auf "online" — beim Register und beim Reconnect.
+     *
+     * Bewusst ein einziges UPDATE statt drei Einzelaufrufe: Version,
+     * Sitzungsschlüssel und Status gehören zu einem Vorgang und sollen nicht
+     * halb geschrieben stehen bleiben, wenn etwas dazwischen fehlschlägt.
+     *
+     * @param {string} daemonId
+     * @param {object} daten
+     * @param {string} [daten.version]           vom Daemon gemeldete Version
+     * @param {string} [daten.sessionToken]      neuer JWT
+     * @param {number} [daten.sessionTageGueltig] Gültigkeit in Tagen (Standard 30)
+     * @param {string} [daten.installStatus]     z.B. 'completed' bei Erstregistrierung
+     */
+    static async markOnline(daemonId, daten = {}) {
+        const dbService = ServiceManager.get('dbService');
+
+        const fields = ['daemon_status = ?', 'last_seen = NOW()', 'missed_heartbeats = 0'];
+        const values = ['online'];
+
+        if (daten.version) { fields.push('daemon_version = ?'); values.push(daten.version); }
+        if (daten.installStatus) { fields.push('install_status = ?'); values.push(daten.installStatus); }
+        if (daten.sessionToken) {
+            fields.push('session_token = ?');
+            values.push(daten.sessionToken);
+            fields.push(`session_token_expires_at = DATE_ADD(NOW(), INTERVAL ${parseInt(daten.sessionTageGueltig, 10) || 30} DAY)`);
+        }
+
+        values.push(daemonId);
+        await dbService.query(
+            `UPDATE rootserver SET ${fields.join(', ')} WHERE daemon_id = ?`, values
+        );
+    }
+
+    /**
+     * Setzt einen Daemon auf "offline" — beim Verbindungsabbruch.
+     *
+     * Ersetzt das frühere `updateStatus()`, das am 2026-08-01 entfernt wurde,
+     * weil es keinen Aufrufer hatte. Den Aufrufer gibt es jetzt: der
+     * Heartbeat-Monitor des IPMServers.
+     */
+    static async markOffline(daemonId) {
+        const dbService = ServiceManager.get('dbService');
+        await dbService.query(
+            'UPDATE rootserver SET daemon_status = ? WHERE daemon_id = ?',
+            ['offline', daemonId]
+        );
+    }
+
+    /**
+     * Lädt einen RootServer anhand von daemon_id UND API-Key.
+     *
+     * Für die Erstanmeldung: Der IPMServer braucht nicht nur die Auskunft
+     * "Schlüssel stimmt", sondern den Datensatz selbst (guild_id,
+     * base_directory, system_user). Das frühere `validateApiKey()` gab nur
+     * true/false zurück und war deshalb an dieser Stelle nicht verwendbar —
+     * genau deswegen stand dort ein eigenes SELECT.
+     *
+     * @returns {Promise<object|null>}
+     */
+    static async getByDaemonIdAndApiKey(daemonId, apiKey) {
+        const dbService = ServiceManager.get('dbService');
+        const [row] = await dbService.query(
+            'SELECT * FROM rootserver WHERE daemon_id = ? AND api_key = ? LIMIT 1',
+            [daemonId, apiKey]
+        );
+        return row || null;
+    }
 
     static async processHeartbeat(daemonId, latencyMs = null) {
         const dbService = ServiceManager.get('dbService');
@@ -167,16 +240,10 @@ class RootServer {
         );
     }
 
-    static async updateSessionToken(daemonId, sessionToken, expiresAt = null) {
-        const dbService = ServiceManager.get('dbService');
-        const fields = ['session_token = ?'];
-        const values = [sessionToken];
-        if (expiresAt) { fields.push('session_token_expires_at = ?'); values.push(expiresAt); }
-        values.push(daemonId);
-        await dbService.query(
-            `UPDATE rootserver SET ${fields.join(', ')} WHERE daemon_id = ?`, values
-        );
-    }
+    // `updateSessionToken()` stand hier bis zum 2026-08-02. Ein Sitzungsschlüssel
+    // entsteht ausschließlich beim Anmelden, und dort schreibt ihn `markOnline()`
+    // im selben UPDATE wie Status und Version — eine zweite Methode dafür hätte
+    // wieder keinen Aufrufer.
 
     static async updateHardwareStats(daemonId, stats) {
         const dbService = ServiceManager.get('dbService');
@@ -202,13 +269,22 @@ class RootServer {
         );
     }
 
-    static async updateInstallStatus(id, installStatus, installLog = null) {
+    /**
+     * Setzt den Installationsfortschritt eines RootServers.
+     *
+     * Adressiert über `daemon_id` statt wie früher über `id`: Alle anderen
+     * Methoden dieses Abschnitts sprechen den Daemon an, und die Aufrufer
+     * (IPMServer, Provisionierung) kennen die daemon_id, nicht die Tabellen-ID.
+     * Die alte Signatur war einer der Gründe, warum die Methode nie benutzt
+     * wurde.
+     */
+    static async updateInstallStatus(daemonId, installStatus, installLog = null) {
         const dbService = ServiceManager.get('dbService');
         const fields = ['install_status = ?'];
         const values = [installStatus];
         if (installLog !== null) { fields.push('install_log = ?'); values.push(installLog); }
-        values.push(id);
-        await dbService.query(`UPDATE rootserver SET ${fields.join(', ')} WHERE id = ?`, values);
+        values.push(daemonId);
+        await dbService.query(`UPDATE rootserver SET ${fields.join(', ')} WHERE daemon_id = ?`, values);
     }
 
     // =========================================================
@@ -223,14 +299,11 @@ class RootServer {
         return row !== undefined;
     }
 
-    static async validateApiKey(daemonId, apiKey) {
-        const dbService = ServiceManager.get('dbService');
-        const [row] = await dbService.query(
-            'SELECT id FROM rootserver WHERE daemon_id = ? AND api_key = ? LIMIT 1',
-            [daemonId, apiKey]
-        );
-        return row !== undefined;
-    }
+    // `validateApiKey()` stand hier bis zum 2026-08-02 und gab nur true/false
+    // zurück. Die einzige Stelle, die einen API-Key prüft — die Erstanmeldung im
+    // IPMServer — braucht den Datensatz selbst und hatte deshalb ein eigenes
+    // SELECT. Übrig bleibt `getByDaemonIdAndApiKey()` weiter oben, das beides
+    // leistet.
 
     static async getStatusSummary() {
         const dbService = ServiceManager.get('dbService');
