@@ -194,6 +194,16 @@ function buildStartPayload(server, guildId, Logger = null) {
         file_denylist:   fileDenylist,
         ...updateOptions,
         platform:        platform || 'linux',
+        // Gebuchte Ressourcen bei JEDEM Start mitgeben, nicht nur bei der
+        // Installation: Image, Ports und Limits leben im Daemon nur im Speicher.
+        // Nach einem Daemon-Neustart wüsste er die Grenzen sonst nicht mehr und
+        // startete den Container wieder unbegrenzt. NULL heisst "kein Limit" —
+        // Bestandsserver ohne gepflegte Werte laufen also weiter wie bisher.
+        resource_limits: {
+            ram_mb:      server.allocated_ram_mb      ?? null,
+            cpu_percent: server.allocated_cpu_percent ?? null,
+            disk_gb:     server.allocated_disk_gb     ?? null,
+        },
         game_data: {
             docker_image: dockerImage,
             runtime,

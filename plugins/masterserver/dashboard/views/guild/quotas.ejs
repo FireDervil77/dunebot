@@ -31,7 +31,7 @@
         <% if (!nodes || nodes.length === 0) { %>
         <div class="alert alert-warning">
             <i class="fas fa-exclamation-triangle mr-2"></i>
-            Kein RootServer konfiguriert. <a href="/guild/<%= guildId %>/plugins/masterserver/daemon">Daemon einrichten</a>.
+            Kein RootServer konfiguriert. <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers/create">RootServer einrichten</a>.
         </div>
         <% } %>
 
@@ -248,7 +248,7 @@
                         <% node.gameservers.forEach(function(gs) { %>
                             <tr>
                                 <td>
-                                    <a href="/guild/<%= guildId %>/plugins/masterserver/servers/<%= gs.server_id %>"
+                                    <a href="/guild/<%= guildId %>/plugins/gameserver/servers/<%= gs.server_id %>"
                                        class="text-dark">
                                         <%= gs.server_name || gs.server_id %>
                                     </a>
@@ -256,28 +256,34 @@
                                 <td><small class="text-muted"><%= gs.server_type || '–' %></small></td>
                                 <td class="text-right">
                                     <span class="<%= (gs.allocated_ram_mb || 0) > 0 ? '' : 'text-muted' %>">
-                                        <%= gs.allocated_ram_mb ? gs.allocated_ram_mb.toLocaleString() + ' MB' : '–' %>
+                                        <%= gs.allocated_ram_mb ? gs.allocated_ram_mb.toLocaleString() + ' MB' : 'kein Limit' %>
                                     </span>
                                 </td>
                                 <td class="text-right">
-                                    <span class="<%= (gs.allocated_cpu_cores || 0) > 0 ? '' : 'text-muted' %>">
-                                        <%= gs.allocated_cpu_cores || '–' %>
+                                    <span class="<%= (gs.allocated_cpu_percent || 0) > 0 ? '' : 'text-muted' %>">
+                                        <%= gs.allocated_cpu_percent ? gs.allocated_cpu_percent + ' %' : 'kein Limit' %>
                                     </span>
                                 </td>
                                 <td class="text-right">
                                     <span class="<%= (gs.allocated_disk_gb || 0) > 0 ? '' : 'text-muted' %>">
-                                        <%= gs.allocated_disk_gb ? gs.allocated_disk_gb + ' GB' : '–' %>
+                                        <%= gs.allocated_disk_gb ? gs.allocated_disk_gb + ' GB' : 'kein Limit' %>
                                     </span>
                                 </td>
                                 <td class="text-center">
-                                    <% if (gs.status === 'running') { %>
-                                        <span class="badge badge-success">running</span>
-                                    <% } else if (gs.status === 'stopped') { %>
-                                        <span class="badge badge-secondary">stopped</span>
-                                    <% } else if (gs.status === 'starting') { %>
-                                        <span class="badge badge-warning">starting</span>
+                                    <%# Statuswerte laut ENUM in gameservers: installing, installed,
+                                        starting, online, stopping, offline, error, updating.
+                                        Hier standen vorher 'running'/'stopped' — Werte, die die
+                                        Spalte nie annimmt; jede Zeile fiel in den Sonst-Zweig. %>
+                                    <% if (gs.status === 'online') { %>
+                                        <span class="badge badge-success">online</span>
+                                    <% } else if (gs.status === 'offline') { %>
+                                        <span class="badge badge-secondary">offline</span>
+                                    <% } else if (gs.status === 'starting' || gs.status === 'stopping') { %>
+                                        <span class="badge badge-warning"><%= gs.status %></span>
+                                    <% } else if (gs.status === 'error') { %>
+                                        <span class="badge badge-danger">Fehler</span>
                                     <% } else { %>
-                                        <span class="badge badge-light"><%= gs.status || 'unknown' %></span>
+                                        <span class="badge badge-light"><%= gs.status || 'unbekannt' %></span>
                                     <% } %>
                                 </td>
                             </tr>

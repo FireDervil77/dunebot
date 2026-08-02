@@ -583,8 +583,70 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         }
         
         const daemonId = rootserver.daemon_id;  // ← Die Daemon-ID für IPM!
-        
+
         Logger.debug(`[Gameserver] Rootserver: ${rootserver.name}, Daemon-ID: ${daemonId}`);
+
+        // ════════════════════════════════════════════════════════════════════
+        // Ressourcen: Pflichtangabe und Gegenprüfung gegen den RootServer
+        //
+        // Bis zum 2026-08-02 waren diese Felder optional und wurden nirgends
+        // geprüft: alle Bestandsserver hatten NULL, der Daemon startete die
+        // Container ohne Limit, und die Ressourcen-Seite zählte 0 % Auslastung,
+        // während die Maschine voll lief. Ohne Angabe lässt sich weder buchen
+        // noch begrenzen — deshalb sind die drei Werte jetzt verbindlich.
+        // ════════════════════════════════════════════════════════════════════
+        const ramMB      = parseInt(allocated_ram_mb, 10);
+        const cpuPercent = parseInt(allocated_cpu_percent, 10);
+        const diskGB     = parseInt(allocated_disk_gb, 10);
+
+        const fehlend = [];
+        if (!Number.isFinite(ramMB)      || ramMB      < 512) fehlend.push('Arbeitsspeicher (mind. 512 MiB)');
+        if (!Number.isFinite(cpuPercent) || cpuPercent < 10 || cpuPercent > 1600) fehlend.push('CPU-Anteil (10–1600 %)');
+        if (!Number.isFinite(diskGB)     || diskGB     < 1)   fehlend.push('Speicherplatz (mind. 1 GiB)');
+
+        if (fehlend.length) {
+            return res.status(400).json({
+                success: false,
+                message: `Ressourcen müssen angegeben werden: ${fehlend.join(', ')}`
+            });
+        }
+
+        // Passt das noch auf die Maschine? `checkResourceAvailability` rechnet
+        // gegen die Quota des RootServers inklusive Überallokation und Reserve
+        // und berücksichtigt eine etwaige Obergrenze für die Serveranzahl.
+        // CPU wird dort in Kernen geführt (100 % = 1 Kern).
+        const RootServerModel = require('../../../masterserver/dashboard/models/RootServer');
+        await RootServerModel.ensureQuota(rootserver.id);
+        const platz = await RootServerModel.checkResourceAvailability(rootserver_id, {
+            ramMB,
+            cpuCores: cpuPercent / 100,
+            diskGB
+        });
+
+        if (!platz.available) {
+            const gruende = [];
+            if (platz.missing?.ram) {
+                gruende.push(`Arbeitsspeicher: ${ramMB} MiB angefordert, ${Math.max(0, Math.round(platz.missing.ram.available))} MiB frei`);
+            }
+            if (platz.missing?.cpu) {
+                gruende.push(`CPU: ${cpuPercent} % angefordert, ${Math.max(0, Math.round(platz.missing.cpu.available * 100))} % frei`);
+            }
+            if (platz.missing?.disk) {
+                gruende.push(`Speicherplatz: ${diskGB} GiB angefordert, ${Math.max(0, Math.round(platz.missing.disk.available))} GiB frei`);
+            }
+            if (platz.missing?.gameserver_limit) {
+                gruende.push(`Serverzahl: ${platz.missing.gameserver_limit.current} von ${platz.missing.gameserver_limit.max} belegt`);
+            }
+
+            Logger.warn(`[Gameserver] Anlegen abgelehnt — RootServer ${rootserver.name} hat keinen Platz`, platz.missing);
+            return res.status(409).json({
+                success: false,
+                message: gruende.length
+                    ? `Auf "${rootserver.name}" ist nicht genug frei — ${gruende.join('; ')}.`
+                    : `Auf "${rootserver.name}" ist nicht genug frei (${platz.reason || 'Kapazität erschöpft'}).`,
+                missing: platz.missing || null
+            });
+        }
 
         // Addon abrufen
         const [addon] = await dbService.query(`
@@ -987,9 +1049,12 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
             // Vorher landete deshalb IMMER 1 in der DB, egal was gewählt wurde.
             toBool(auto_restart, true) ? 1 : 0,
             toBool(auto_update, false) ? 1 : 0,
-            allocated_ram_mb || null,      // ✅ NEU: Resource Limits
-            allocated_cpu_percent || null,
-            allocated_disk_gb || null,
+            // Geprüfte Werte, keine Rohdaten aus dem Formular: die drei Felder
+            // sind Pflicht und wurden oben gegen die Kapazität des RootServers
+            // gerechnet. Damit ist dieser INSERT zugleich die Buchung.
+            ramMB,
+            cpuPercent,
+            diskGB,
             // Vorher stand '1.0.0' fest im VALUES-Teil: jeder Server merkte sich
             // diese Version, egal welche das Addon wirklich hatte.
             addon.version || '1.0.0'
@@ -1069,9 +1134,9 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                     run_install: toBool(run_install, true),
                     start_after: toBool(start_after, false),
                     resource_limits: {
-                        ram_mb: allocated_ram_mb ? parseInt(allocated_ram_mb) : null,
-                        cpu_percent: allocated_cpu_percent ? parseInt(allocated_cpu_percent) : null,
-                        disk_gb: allocated_disk_gb ? parseInt(allocated_disk_gb) : null
+                        ram_mb:      ramMB,
+                        cpu_percent: cpuPercent,
+                        disk_gb:     diskGB
                     }
                 };
                 
@@ -1919,6 +1984,9 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
                 gs.env_variables,
                 gs.frozen_game_data,
                 gs.rootserver_id,
+                gs.allocated_ram_mb,
+                gs.allocated_cpu_percent,
+                gs.allocated_disk_gb,
                 am.name as game_name,
                 am.slug as game_slug
             FROM gameservers gs
@@ -2417,7 +2485,10 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
         // die der StatusPoller aus dem Snapshot pflegt. Wer sie hier von Hand
         // überschrieb, änderte am Spiel nichts - der Wert wanderte lautlos zurück,
         // sobald die nächste Abfrage durchlief.
-        const { name, auto_restart, auto_update, env_variables } = req.body;
+        const {
+            name, auto_restart, auto_update, env_variables,
+            allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb
+        } = req.body;
 
         Logger.info(`[Gameserver] Server-Update angefordert (ID: ${serverId})`);
 
@@ -2431,7 +2502,9 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
 
         // Server existiert prüfen
         const [server] = await dbService.query(
-            'SELECT id, name, status FROM gameservers WHERE id = ? AND guild_id = ?',
+            `SELECT id, name, status, rootserver_id,
+                    allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb
+             FROM gameservers WHERE id = ? AND guild_id = ?`,
             [serverId, guildId]
         );
 
@@ -2440,6 +2513,66 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
                 success: false,
                 message: 'Server nicht gefunden'
             });
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // Ressourcen ändern — inklusive Gegenprüfung gegen den RootServer
+        //
+        // Geprüft wird nur die *Differenz*: Was dieser Server bereits gebucht
+        // hat, ist in der Auslastung schon enthalten und darf ihm nicht ein
+        // zweites Mal angerechnet werden.
+        // ════════════════════════════════════════════════════════════════════
+        const ressourcenFelder = [allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb];
+        const ressourcenGesetzt = ressourcenFelder.some(v => v !== undefined && v !== null && v !== '');
+        let neueRessourcen = null;
+
+        if (ressourcenGesetzt) {
+            const ramMB      = parseInt(allocated_ram_mb, 10);
+            const cpuPercent = parseInt(allocated_cpu_percent, 10);
+            const diskGB     = parseInt(allocated_disk_gb, 10);
+
+            const fehlend = [];
+            if (!Number.isFinite(ramMB)      || ramMB      < 512) fehlend.push('Arbeitsspeicher (mind. 512 MiB)');
+            if (!Number.isFinite(cpuPercent) || cpuPercent < 10 || cpuPercent > 1600) fehlend.push('CPU-Anteil (10–1600 %)');
+            if (!Number.isFinite(diskGB)     || diskGB     < 1)   fehlend.push('Speicherplatz (mind. 1 GiB)');
+
+            if (fehlend.length) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Ungültige Ressourcenangabe: ${fehlend.join(', ')}`
+                });
+            }
+
+            const mehrRamMB  = ramMB      - (server.allocated_ram_mb      || 0);
+            const mehrCpuPct = cpuPercent - (server.allocated_cpu_percent || 0);
+            const mehrDiskGB = diskGB     - (server.allocated_disk_gb     || 0);
+
+            if (mehrRamMB > 0 || mehrCpuPct > 0 || mehrDiskGB > 0) {
+                const RootServerModel = require('../../../masterserver/dashboard/models/RootServer');
+                await RootServerModel.ensureQuota(server.rootserver_id);
+                const platz = await RootServerModel.checkResourceAvailability(server.rootserver_id, {
+                    ramMB:    Math.max(0, mehrRamMB),
+                    cpuCores: Math.max(0, mehrCpuPct) / 100,
+                    diskGB:   Math.max(0, mehrDiskGB)
+                });
+
+                if (!platz.available) {
+                    const gruende = [];
+                    if (platz.missing?.ram)  gruende.push(`${mehrRamMB} MiB mehr angefordert, ${Math.max(0, Math.round(platz.missing.ram.available))} MiB frei`);
+                    if (platz.missing?.cpu)  gruende.push(`${mehrCpuPct} % mehr angefordert, ${Math.max(0, Math.round(platz.missing.cpu.available * 100))} % frei`);
+                    if (platz.missing?.disk) gruende.push(`${mehrDiskGB} GiB mehr angefordert, ${Math.max(0, Math.round(platz.missing.disk.available))} GiB frei`);
+
+                    return res.status(409).json({
+                        success: false,
+                        message: gruende.length
+                            ? `Auf dem RootServer ist nicht genug frei — ${gruende.join('; ')}.`
+                            : `Auf dem RootServer ist nicht genug frei (${platz.reason || 'Kapazität erschöpft'}).`,
+                        missing: platz.missing || null
+                    });
+                }
+            }
+
+            neueRessourcen = { ramMB, cpuPercent, diskGB };
         }
 
         // ENV-Variables JSON validieren
@@ -2456,28 +2589,32 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
         }
 
         // Update ausführen
-        await dbService.query(`
-            UPDATE gameservers
-            SET
-                name = ?,
-                auto_restart = ?,
-                auto_update = ?,
-                env_variables = ?
-            WHERE id = ? AND guild_id = ?
-        `, [
+        const felder = ['name = ?', 'auto_restart = ?', 'auto_update = ?', 'env_variables = ?'];
+        const werte  = [
             name.trim(),
             toBool(auto_restart) ? 1 : 0,
             toBool(auto_update) ? 1 : 0,
-            JSON.stringify(envVarsJson),
-            serverId,
-            guildId
-        ]);
+            JSON.stringify(envVarsJson)
+        ];
+
+        if (neueRessourcen) {
+            felder.push('allocated_ram_mb = ?', 'allocated_cpu_percent = ?', 'allocated_disk_gb = ?');
+            werte.push(neueRessourcen.ramMB, neueRessourcen.cpuPercent, neueRessourcen.diskGB);
+        }
+
+        werte.push(serverId, guildId);
+        await dbService.query(
+            `UPDATE gameservers SET ${felder.join(', ')} WHERE id = ? AND guild_id = ?`,
+            werte
+        );
 
         Logger.success(`[Gameserver] Server aktualisiert (ID: ${serverId})`);
 
         res.json({
             success: true,
-            message: `Server "${name}" erfolgreich aktualisiert`
+            message: neueRessourcen
+                ? `Server "${name}" aktualisiert — die neuen Ressourcen-Limits greifen beim nächsten Start.`
+                : `Server "${name}" erfolgreich aktualisiert`
         });
     } catch (error) {
         Logger.error('[Gameserver] Fehler beim Aktualisieren des Servers:', error);

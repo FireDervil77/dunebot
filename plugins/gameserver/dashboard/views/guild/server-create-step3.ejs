@@ -147,64 +147,74 @@
               </h5>
             </div>
             <div class="card-body">
+              <%#
+                Bis zum 2026-08-02 standen alle drei Felder auf "Unbegrenzt" und
+                waren ausgeblendet — entsprechend hatte kein einziger Server ein
+                Limit, und die Ressourcen-Übersicht zeigte 0 % Auslastung, während
+                die Maschine lief. Die Werte sind jetzt Pflicht und vorbelegt:
+                nur mit ihnen lässt sich der Platz auf dem RootServer buchen und
+                vom Daemon durchsetzen.
+              %>
+              <div class="alert alert-light border mb-4 py-2">
+                <small class="text-muted">
+                  <i class="fa-solid fa-circle-info mr-1"></i>
+                  Diese Werte reservieren Platz auf dem RootServer und begrenzen den
+                  Server im Betrieb. Reicht der freie Platz nicht, wird das Anlegen
+                  mit einer Meldung abgelehnt.
+                </small>
+              </div>
+
               <!-- Memory Limit -->
               <div class="form-group mb-4">
-                <label class="d-flex justify-content-between align-items-center">
-                  <span><i class="fa-solid fa-memory mr-2 text-info"></i><%= tr('gameserver:SERVER.MEMORY') %></span>
-                  <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-secondary active" data-toggle-limit="ram" data-value="unlimited"><%= tr('gameserver:SERVER.UNLIMITED') %></button>
-                    <button type="button" class="btn btn-outline-secondary" data-toggle-limit="ram" data-value="limited"><%= tr('gameserver:SERVER.LIMITED') %></button>
-                  </div>
+                <label for="allocated_ram_mb">
+                  <i class="fa-solid fa-memory mr-2 text-info"></i><%= tr('gameserver:SERVER.MEMORY') %>
+                  <span class="text-danger">*</span>
                 </label>
-                <div id="ramLimitInput" style="display: none;">
-                  <div class="input-group">
-                    <input type="number" class="form-control" name="allocated_ram_mb" id="allocated_ram_mb" min="512" step="512" placeholder="2048">
-                    <div class="input-group-append">
-                      <span class="input-group-text">MiB</span>
-                    </div>
+                <div class="input-group">
+                  <input type="number" class="form-control" name="allocated_ram_mb" id="allocated_ram_mb"
+                         min="512" step="512" value="2048" required>
+                  <div class="input-group-append">
+                    <span class="input-group-text">MiB</span>
                   </div>
-                  <small class="form-text text-muted"><%= tr('gameserver:SERVER.RAM_HELP') %></small>
                 </div>
+                <small class="form-text text-muted"><%= tr('gameserver:SERVER.RAM_HELP') %></small>
               </div>
 
               <!-- CPU Limit -->
               <div class="form-group mb-4">
-                <label class="d-flex justify-content-between align-items-center">
-                  <span><i class="fa-solid fa-microchip mr-2 text-primary"></i><%= tr('gameserver:SERVER.CPU_LABEL') %></span>
-                  <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-secondary active" data-toggle-limit="cpu" data-value="unlimited"><%= tr('gameserver:SERVER.UNLIMITED') %></button>
-                    <button type="button" class="btn btn-outline-secondary" data-toggle-limit="cpu" data-value="limited"><%= tr('gameserver:SERVER.LIMITED') %></button>
-                  </div>
+                <label for="allocated_cpu_percent">
+                  <i class="fa-solid fa-microchip mr-2 text-primary"></i><%= tr('gameserver:SERVER.CPU_LABEL') %>
+                  <span class="text-danger">*</span>
                 </label>
-                <div id="cpuLimitInput" style="display: none;">
-                  <div class="input-group">
-                    <input type="number" class="form-control" name="allocated_cpu_percent" id="allocated_cpu_percent" min="10" max="100" step="5" placeholder="100">
-                    <div class="input-group-append">
-                      <span class="input-group-text">%</span>
-                    </div>
+                <div class="input-group">
+                  <%# 100 % = ein Kern (wie Docker NanoCPUs und cgroup cpu.max).
+                      Das Maximum lag bei 100 und schloss damit Server aus, die
+                      mehr als einen Kern brauchen. %>
+                  <input type="number" class="form-control" name="allocated_cpu_percent" id="allocated_cpu_percent"
+                         min="10" max="1600" step="10" value="100" required>
+                  <div class="input-group-append">
+                    <span class="input-group-text">%</span>
                   </div>
-                  <small class="form-text text-muted"><%= tr('gameserver:SERVER.CPU_HELP') %></small>
                 </div>
+                <small class="form-text text-muted">
+                  100 % entspricht einem CPU-Kern, 200 % zwei Kernen.
+                </small>
               </div>
 
               <!-- Disk Limit -->
               <div class="form-group mb-0">
-                <label class="d-flex justify-content-between align-items-center">
-                  <span><i class="fa-solid fa-hdd mr-2 text-warning"></i><%= tr('gameserver:SERVER.DISK_SPACE') %></span>
-                  <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-secondary active" data-toggle-limit="disk" data-value="unlimited"><%= tr('gameserver:SERVER.UNLIMITED') %></button>
-                    <button type="button" class="btn btn-outline-secondary" data-toggle-limit="disk" data-value="limited"><%= tr('gameserver:SERVER.LIMITED') %></button>
-                  </div>
+                <label for="allocated_disk_gb">
+                  <i class="fa-solid fa-hdd mr-2 text-warning"></i><%= tr('gameserver:SERVER.DISK_SPACE') %>
+                  <span class="text-danger">*</span>
                 </label>
-                <div id="diskLimitInput" style="display: none;">
-                  <div class="input-group">
-                    <input type="number" class="form-control" name="allocated_disk_gb" id="allocated_disk_gb" min="5" step="5" placeholder="50">
-                    <div class="input-group-append">
-                      <span class="input-group-text">GiB</span>
-                    </div>
+                <div class="input-group">
+                  <input type="number" class="form-control" name="allocated_disk_gb" id="allocated_disk_gb"
+                         min="1" step="5" value="20" required>
+                  <div class="input-group-append">
+                    <span class="input-group-text">GiB</span>
                   </div>
-                  <small class="form-text text-muted"><%= tr('gameserver:SERVER.DISK_HELP') %></small>
                 </div>
+                <small class="form-text text-muted"><%= tr('gameserver:SERVER.DISK_HELP') %></small>
               </div>
             </div>
           </div>
@@ -390,52 +400,25 @@ document.addEventListener('DOMContentLoaded', function() {
         noVariables: '<%= tr("gameserver:SERVER.NO_VARIABLES_SUMMARY") %>'
     };
     
-    // ========================================
-    // RESOURCE LIMIT TOGGLES
-    // ========================================
-    document.querySelectorAll('[data-toggle-limit]').forEach(button => {
-        button.addEventListener('click', function() {
-            const limitType = this.dataset.toggleLimit; // ram, cpu, disk
-            const value = this.dataset.value; // unlimited, limited
-            
-            // Toggle active state
-            this.parentElement.querySelectorAll('button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            this.classList.add('active');
-            
-            // Show/Hide input
-            const inputDiv = document.getElementById(`${limitType}LimitInput`);
-            const inputField = document.getElementById(`allocated_${limitType === 'cpu' ? 'cpu_percent' : limitType === 'ram' ? 'ram_mb' : 'disk_gb'}`);
-            
-            if (value === 'limited') {
-                inputDiv.style.display = 'block';
-                inputField.required = true;
-            } else {
-                inputDiv.style.display = 'none';
-                inputField.required = false;
-                inputField.value = '';
-            }
-            
-            updateSummary();
-        });
-    });
-    
+    // Die Umschalter "Unbegrenzt / Begrenzt" sind zum 2026-08-02 entfallen: die
+    // drei Ressourcenwerte sind Pflicht, weil ohne sie weder gebucht noch
+    // begrenzt werden kann. Damit entfällt auch die Show/Hide-Logik.
+
     // Live-Update Summary
     function updateSummary() {
         // RAM
         const ramInput = document.getElementById('allocated_ram_mb');
-        const ramValue = ramInput.value ? `${ramInput.value} MiB` : i18n.unlimited;
+        const ramValue = ramInput.value ? `${ramInput.value} MiB` : '—';
         document.getElementById('summaryRam').textContent = ramValue;
-        
+
         // CPU
         const cpuInput = document.getElementById('allocated_cpu_percent');
-        const cpuValue = cpuInput.value ? `${cpuInput.value}%` : i18n.unlimited;
+        const cpuValue = cpuInput.value ? `${cpuInput.value}%` : '—';
         document.getElementById('summaryCpu').textContent = cpuValue;
-        
+
         // Disk
         const diskInput = document.getElementById('allocated_disk_gb');
-        const diskValue = diskInput.value ? `${diskInput.value} GiB` : i18n.unlimited;
+        const diskValue = diskInput.value ? `${diskInput.value} GiB` : '—';
         document.getElementById('summaryDisk').textContent = diskValue;
     }
     

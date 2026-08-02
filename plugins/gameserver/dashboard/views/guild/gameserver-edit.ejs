@@ -79,11 +79,69 @@
                                            disabled>
                                 </div>
 
+                                <!-- Ressourcen: reservierter Platz auf dem RootServer -->
+                                <div class="form-group">
+                                    <label class="mb-2">
+                                        <i class="fa-solid fa-gauge-high mr-1 text-muted"></i>
+                                        Reservierte Ressourcen
+                                    </label>
+                                    <%#
+                                        Vor dem 2026-08-02 gab es diese Felder nur beim Anlegen und
+                                        auch dort nur als "unbegrenzt"; Bestandsserver stehen deshalb
+                                        auf NULL und laufen ohne Limit. Hier lassen sie sich nachziehen.
+                                        Geprüft wird beim Speichern nur die Erhöhung gegen den freien
+                                        Platz des RootServers.
+                                    %>
+                                    <div class="row">
+                                        <div class="col-sm-4">
+                                            <div class="input-group input-group-sm mb-2">
+                                                <input type="number" class="form-control"
+                                                       id="allocated_ram_mb" name="allocated_ram_mb"
+                                                       min="512" step="512"
+                                                       value="<%= server.allocated_ram_mb || '' %>"
+                                                       placeholder="kein Limit">
+                                                <div class="input-group-append">
+                                                    <span class="input-group-text">MiB</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <div class="input-group input-group-sm mb-2">
+                                                <input type="number" class="form-control"
+                                                       id="allocated_cpu_percent" name="allocated_cpu_percent"
+                                                       min="10" max="1600" step="10"
+                                                       value="<%= server.allocated_cpu_percent || '' %>"
+                                                       placeholder="kein Limit">
+                                                <div class="input-group-append">
+                                                    <span class="input-group-text">% CPU</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <div class="input-group input-group-sm mb-2">
+                                                <input type="number" class="form-control"
+                                                       id="allocated_disk_gb" name="allocated_disk_gb"
+                                                       min="1" step="5"
+                                                       value="<%= server.allocated_disk_gb || '' %>"
+                                                       placeholder="kein Limit">
+                                                <div class="input-group-append">
+                                                    <span class="input-group-text">GiB</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        100 % entspricht einem CPU-Kern. Die Werte buchen Platz auf dem
+                                        RootServer und begrenzen den Server im Betrieb — sie greifen beim
+                                        nächsten Start. Alle drei zusammen ausfüllen oder alle leer lassen.
+                                    </small>
+                                </div>
+
                                 <!-- Auto Restart -->
                                 <div class="form-group">
                                     <div class="custom-control custom-switch">
-                                        <input type="checkbox" 
-                                               class="custom-control-input" 
+                                        <input type="checkbox"
+                                               class="custom-control-input"
                                                id="auto_restart"
                                                name="auto_restart"
                                                value="1"

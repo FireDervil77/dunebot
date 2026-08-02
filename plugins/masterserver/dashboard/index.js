@@ -52,38 +52,11 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
             Logger.error('[Masterserver] Fehler beim Seeden der Quota-Profile:', error);
         }
 
-        // rootserver_ips Tabelle sicherstellen (Multi-IP-Support)
-        try {
-            await dbService.query(`
-                CREATE TABLE IF NOT EXISTS rootserver_ips (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    rootserver_id INT NOT NULL,
-                    ip_address VARCHAR(45) NOT NULL,
-                    label VARCHAR(100) NULL COMMENT 'Optionaler Name z.B. "Game-IP", "Admin-IP"',
-                    is_primary TINYINT(1) NOT NULL DEFAULT 0,
-                    created_at DATETIME DEFAULT NOW(),
-                    UNIQUE KEY unique_ip_per_rs (rootserver_id, ip_address),
-                    FOREIGN KEY (rootserver_id) REFERENCES rootserver(id) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            `);
-            Logger.info('[Masterserver] rootserver_ips Tabelle vorhanden');
-        } catch (error) {
-            Logger.error('[Masterserver] Fehler beim Erstellen der rootserver_ips Tabelle:', error);
-        }
-
-        // Overallocation-Felder in rootserver_quotas sicherstellen
-        try {
-            for (const col of [
-                "ADD COLUMN IF NOT EXISTS overallocate_ram_percent INT NOT NULL DEFAULT 0 COMMENT 'RAM-Überallokation in % (0 = keine)'",
-                "ADD COLUMN IF NOT EXISTS overallocate_disk_percent INT NOT NULL DEFAULT 0 COMMENT 'Disk-Überallokation in % (0 = keine)'"
-            ]) {
-                try { await dbService.query(`ALTER TABLE rootserver_quotas ${col}`); }
-                catch (e) { if (e.code !== 'ER_DUP_FIELDNAME') throw e; }
-            }
-            Logger.info('[Masterserver] rootserver_quotas Overallocation-Felder vorhanden');
-        } catch (error) {
-            Logger.error('[Masterserver] Fehler beim Migrieren der Overallocation-Felder:', error);
-        }
+        // `rootserver_ips` und die Overallocation-Spalten wurden hier bis zum
+        // 2026-08-02 bei jedem Start per CREATE TABLE / ALTER TABLE nachgezogen.
+        // Beides steht jetzt in `migrations/20260802_101500_ressourcen_eine_wahrheit.js`,
+        // wo Schemaänderungen hingehören — einmal ausgeführt und in
+        // `plugin_migrations` vermerkt, statt bei jedem Start erneut versucht.
 
         Logger.success('[Masterserver] Dashboard-Plugin aktiviert');
         return true;

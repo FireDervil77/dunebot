@@ -320,6 +320,46 @@ class RootServer {
         return this.getQuota(rootserverId);
     }
 
+    /**
+     * Stellt sicher, dass ein RootServer eine Quota hat, und gibt sie zurück.
+     *
+     * Ohne Quota liefert `getAvailableResources()` `hasQuota: false`, und jede
+     * Kapazitätsprüfung würde fehlschlagen — ein RootServer ohne Quota-Zeile
+     * könnte also gar keinen Gameserver mehr aufnehmen. Die Vorbelegung stammt
+     * aus den vom Daemon gemeldeten Hardware-Daten, mit vorsichtigen Reserven
+     * für das Wirtssystem.
+     *
+     * Lag bis zum 2026-08-02 als `autoInitQuota()` im Quotas-Router und stand
+     * damit nur der Ressourcen-Seite zur Verfügung.
+     *
+     * @param {object|number} rootserver - RootServer-Datensatz oder dessen ID
+     * @returns {Promise<object|null>} Die effektive Quota
+     */
+    static async ensureQuota(rootserver) {
+        const rs = typeof rootserver === 'object' && rootserver !== null
+            ? rootserver
+            : await this.getById(rootserver);
+        if (!rs) return null;
+
+        const vorhanden = await this.getQuota(rs.id);
+        if (vorhanden) return vorhanden;
+
+        try {
+            await this.initializeQuota(rs.id, {
+                customRamMB:      rs.ram_total_gb  ? Math.round(rs.ram_total_gb * 1024) : 4096,
+                customCpuCores:   rs.cpu_cores     || 4,
+                customDiskGB:     rs.disk_total_gb ? Math.round(rs.disk_total_gb)       : 100,
+                reservedRamMB:    1024,
+                reservedCpuCores: 0,
+                reservedDiskGB:   10
+            });
+        } catch (_) {
+            // Parallel angelegt (initializeQuota wirft bei vorhandener Zeile) —
+            // das Nachladen unten liefert dann die fremd erzeugte Quota.
+        }
+        return this.getQuota(rs.id);
+    }
+
     static async getQuota(rootserverId) {
         const dbService = ServiceManager.get('dbService');
         const [row] = await dbService.query(

@@ -253,10 +253,14 @@ class IPCServer {
                         try {
                             const quota = await RootServer.getQuota(rs.id);
                             if (quota) {
+                                // Gebucht wird in `gameservers` — `gameserver_quotas`
+                                // stand hier bis zum 2026-08-02 und war nie befüllt,
+                                // die Summe war also immer 0 und /daemon list meldete
+                                // den vollen Speicher als frei.
                                 const [alloc] = await dbService.query(
-                                    `SELECT COALESCE(SUM(gq.allocated_ram_mb),0) AS ram,
-                                            COALESCE(SUM(gq.allocated_disk_gb),0) AS disk
-                                     FROM gameserver_quotas gq WHERE gq.rootserver_id = ?`,
+                                    `SELECT COALESCE(SUM(allocated_ram_mb),0)  AS ram,
+                                            COALESCE(SUM(allocated_disk_gb),0) AS disk
+                                     FROM gameservers WHERE rootserver_id = ?`,
                                     [rs.id]
                                 );
                                 const overRam  = quota.overallocate_ram_percent  ?? 0;

@@ -10,66 +10,59 @@ const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const RootServer = require('../models/RootServer');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper: Quota für RootServer auto-initialisieren (aus Hardware-Daten)
-// ─────────────────────────────────────────────────────────────────────────────
-async function autoInitQuota(rootserver, dbService) {
-    const existing = await RootServer.getQuota(rootserver.id);
-    if (existing) return existing;
-
-    const ramMB    = rootserver.ram_total_gb  ? Math.round(rootserver.ram_total_gb  * 1024) : 4096;
-    const cpuCores = rootserver.cpu_cores     || 4;
-    const diskGB   = rootserver.disk_total_gb ? Math.round(rootserver.disk_total_gb)        : 100;
-
-    try {
-        await RootServer.initializeQuota(rootserver.id, {
-            customRamMB:    ramMB,
-            customCpuCores: cpuCores,
-            customDiskGB:   diskGB,
-            reservedRamMB:  1024,
-            reservedCpuCores: 0,
-            reservedDiskGB: 10
-        });
-        return await RootServer.getQuota(rootserver.id);
-    } catch (_) {
-        return await RootServer.getQuota(rootserver.id);
-    }
-}
+// Die frühere lokale `autoInitQuota()` liegt jetzt als `RootServer.ensureQuota()`
+// im Modell — die Kapazitätsprüfung beim Anlegen eines Gameservers braucht
+// dieselbe Vorbelegung, und zwei Kopien davon wären zwei Wahrheiten.
+const autoInitQuota = (rootserver) => RootServer.ensureQuota(rootserver);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: Allokierte Ressourcen aller Gameserver eines RootServers
+//
+// Gezählt wird `gameservers` — der einzige Ort, an dem Ressourcen wirklich
+// gebucht werden. Vorher stand hier `gameserver_quotas`, eine Tabelle, in die
+// nie ein INSERT ging; die Seite meldete deshalb dauerhaft 0 % Auslastung.
+// `allocated_cpu_percent` zählt Prozent eines Kerns (100 = 1 Kern), die
+// RootServer-Quota zählt Kerne — daher die Division.
 // ─────────────────────────────────────────────────────────────────────────────
 async function getAllocatedResources(rootserverId, dbService) {
+    const leer = { allocated_ram_mb: 0, allocated_cpu_cores: 0, allocated_disk_gb: 0, server_count: 0 };
     try {
         const [row] = await dbService.query(
             `SELECT
-                COALESCE(SUM(gq.allocated_ram_mb),    0) AS allocated_ram_mb,
-                COALESCE(SUM(gq.allocated_cpu_cores), 0) AS allocated_cpu_cores,
-                COALESCE(SUM(gq.allocated_disk_gb),   0) AS allocated_disk_gb,
-                COUNT(gq.id)                             AS server_count
-             FROM gameserver_quotas gq WHERE gq.rootserver_id = ?`,
+                COALESCE(SUM(allocated_ram_mb),      0)       AS allocated_ram_mb,
+                COALESCE(SUM(allocated_cpu_percent), 0) / 100 AS allocated_cpu_cores,
+                COALESCE(SUM(allocated_disk_gb),     0)       AS allocated_disk_gb,
+                COUNT(*)                                      AS server_count
+             FROM gameservers WHERE rootserver_id = ?`,
             [rootserverId]
         );
-        return row || { allocated_ram_mb: 0, allocated_cpu_cores: 0, allocated_disk_gb: 0, server_count: 0 };
+        return row || leer;
     } catch (_) {
-        return { allocated_ram_mb: 0, allocated_cpu_cores: 0, allocated_disk_gb: 0, server_count: 0 };
+        return leer;
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helper: Gameserver-Liste mit Quota-Daten
+// Helper: Gameserver-Liste eines RootServers samt gebuchter Ressourcen
+//
+// Ausgangspunkt ist `gameservers` (nach rootserver_id), nicht mehr
+// `server_registry` (nach daemon_id): ein Daemon kann mehrere RootServer
+// bedienen, die Zuordnung über die daemon_id warf deren Server zusammen.
+// `server_registry` liefert nur noch die Live-Messwerte dazu.
 // ─────────────────────────────────────────────────────────────────────────────
-async function getGameserversWithQuotas(daemonId, dbService) {
+async function getGameserversWithQuotas(rootserverId, dbService) {
     try {
         return await dbService.query(
-            `SELECT sr.id, sr.server_id, sr.server_name, sr.server_type, sr.status,
-                    gq.allocated_ram_mb, gq.allocated_cpu_cores, gq.allocated_disk_gb,
-                    gq.current_ram_usage_mb, gq.current_cpu_usage_percent
-             FROM server_registry sr
-             LEFT JOIN gameserver_quotas gq ON sr.id = gq.gameserver_id
-             WHERE sr.daemon_id = ?
-             ORDER BY sr.server_name ASC`,
-            [daemonId]
+            `SELECT gs.id, gs.id AS server_id, gs.name AS server_name,
+                    gs.template_name AS server_type, gs.status,
+                    gs.allocated_ram_mb, gs.allocated_cpu_percent, gs.allocated_disk_gb,
+                    sr.ram_used_mb  AS current_ram_usage_mb,
+                    sr.cpu_percent  AS current_cpu_usage_percent
+             FROM gameservers gs
+             LEFT JOIN server_registry sr ON sr.server_id = gs.id
+             WHERE gs.rootserver_id = ?
+             ORDER BY gs.name ASC`,
+            [rootserverId]
         );
     } catch (_) {
         return [];
@@ -88,13 +81,13 @@ router.get('/', requirePermission('MASTERSERVER.RESOURCES.VIEW'), async (req, re
     try {
         const allRootservers = await RootServer.getByGuild(guildId);
         if (!allRootservers.length) {
-            return res.redirect(`/guild/${guildId}/plugins/masterserver/daemon`);
+            return res.redirect(`/guild/${guildId}/plugins/masterserver/rootservers`);
         }
 
         const nodes = await Promise.all(allRootservers.map(async (rs) => {
             const quota      = await autoInitQuota(rs, dbService);
             const allocated  = await getAllocatedResources(rs.id, dbService);
-            const gameservers = await getGameserversWithQuotas(rs.daemon_id, dbService);
+            const gameservers = await getGameserversWithQuotas(rs.id, dbService);
 
             const overRam  = quota?.overallocate_ram_percent  ?? 0;
             const overDisk = quota?.overallocate_disk_percent ?? 0;
