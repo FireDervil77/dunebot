@@ -67,22 +67,6 @@
       "requires": "MASTERSERVER.RESOURCES.VIEW"
     },
     {
-      "key": "MASTERSERVER.TOKENS.VIEW",
-      "name": "Tokens anzeigen",
-      "description": "Berechtigung um API-Tokens zu sehen",
-      "category": "masterserver",
-      "is_dangerous": 0,
-      "requires": "MASTERSERVER.VIEW"
-    },
-    {
-      "key": "MASTERSERVER.TOKENS.MANAGE",
-      "name": "Tokens verwalten",
-      "description": "Berechtigung um API-Tokens zu erstellen, bearbeiten und löschen (kritisch)",
-      "category": "masterserver",
-      "is_dangerous": 1,
-      "requires": "MASTERSERVER.TOKENS.VIEW"
-    },
-    {
       "key": "MASTERSERVER.LOGS.VIEW",
       "name": "Daemon-Logs anzeigen",
       "description": "Berechtigung um Daemon-System-Logs zu sehen",

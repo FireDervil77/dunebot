@@ -422,7 +422,7 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
 
         try {
             await navigationManager.registerNavigation(this.name, guildId, navItems);
-            Logger.debug('[Masterserver] Navigation registriert (Hauptmenü + 6 Submenüs)');
+            Logger.debug(`[Masterserver] Navigation registriert (${navItems.length} Einträge)`);
         } catch (error) {
             Logger.error('[Masterserver] Fehler beim Registrieren der Navigation:', error);
         }

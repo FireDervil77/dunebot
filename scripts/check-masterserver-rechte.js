@@ -3,8 +3,8 @@
  * Wer verliert durch die neuen Waechter im Masterserver-Plugin welchen Zugriff?
  *
  * Gegenstueck zu `check-gameserver-rechte.js`, gleiche Frage eine Ebene hoeher:
- * bis zum 2026-08-02 stand jede der 41 Masterserver-Routen jedem aktiven
- * Dashboard-Nutzer offen — die elf Rechte aus `permissions.json` haben nur
+ * bis zum 2026-08-02 stand jede Masterserver-Route jedem aktiven
+ * Dashboard-Nutzer offen — die Rechte aus `permissions.json` haben nur
  * Menuepunkte ein- und ausgeblendet. Seit die Waechter haengen, entscheidet das
  * Rechtemodell wirklich, und dieses Skript sagt vorher, fuer wen sich dadurch
  * etwas aendert.
@@ -26,8 +26,6 @@ const NEU_BEWACHT = [
     ['MASTERSERVER.ROOTSERVER.DELETE', 'RootServer loeschen'],
     ['MASTERSERVER.RESOURCES.VIEW',    'Ressourcen-Seite, Verfuegbarkeitspruefung'],
     ['MASTERSERVER.RESOURCES.MANAGE',  'Overallocation und Reserven aendern'],
-    ['MASTERSERVER.TOKENS.VIEW',       'Token-Liste ansehen'],
-    ['MASTERSERVER.TOKENS.MANAGE',     'Tokens erzeugen und widerrufen'],
     ['MASTERSERVER.LOGS.VIEW',         'Daemon-Logs ansehen'],
 ];
 

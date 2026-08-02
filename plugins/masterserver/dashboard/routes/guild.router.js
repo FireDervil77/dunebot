@@ -4,7 +4,6 @@
  * Alle guild-spezifischen Routen für das Masterserver-Plugin
  * - Dashboard (Übersicht)
  * - Daemon-Setup (Wizard)
- * - Token-Verwaltung
  * - Server-Registry
  * - Daemon-Logs
  * 
@@ -16,7 +15,6 @@ const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
-const DaemonToken = require('../models/DaemonToken');
 const RootServer = require('../models/RootServer');
 
 // Helper: themeManager.renderView() wrapper
@@ -283,143 +281,12 @@ router.post('/daemon/create', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'
     }
 });
 
-// =====================================================
-// Route 3: Token-Verwaltung
-// URL: /guild/:guildId/plugins/masterserver/tokens
-// =====================================================
-router.get('/tokens', requirePermission('MASTERSERVER.TOKENS.VIEW'), async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const guildId = res.locals.guildId;
-
-    try {
-        res.locals.pluginName = 'masterserver';
-        req.params.pluginName = 'masterserver';
-
-        // Daemon prüfen
-        const daemon = await getDaemonForGuild(guildId);
-        if (!daemon) {
-            return res.redirect(`/guild/${guildId}/plugins/masterserver/rootservers`);
-        }
-
-                // Tokens für diese Guild abrufen
-        const activeTokens = await DaemonToken.getByGuild(guildId, true);
-        const expiredTokens = await DaemonToken.getByGuild(guildId, false);
-
-        await renderView(res, 'guild/masterserver-tokens', {
-            title: 'Token-Verwaltung',
-            activeMenu: `/guild/${guildId}/plugins/masterserver/tokens`,
-            daemon,
-            activeTokens,
-            expiredTokens: expiredTokens.filter(t => new Date(t.expires_at) < new Date()),
-            guildId
-        });
-
-    } catch (error) {
-        Logger.error('[Masterserver] Tokens Error:', error);
-        res.status(500).render('error', { 
-            message: 'Fehler beim Laden der Tokens',
-            error: error.message 
-        });
-    }
-});
-
-// =====================================================
-// Route 3a: Token generieren (POST)
-// =====================================================
-router.post('/tokens/generate', requirePermission('MASTERSERVER.TOKENS.MANAGE'), async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const guildId = res.locals.guildId;
-
-    try {
-        const { expiresInDays, description } = req.body;
-
-        // Daemon prüfen
-        const daemon = await getDaemonForGuild(guildId);
-        if (!daemon) {
-            return res.status(400).json({
-                success: false,
-                message: 'Kein Daemon konfiguriert'
-            });
-        }
-
-        // Ablaufzeit in Stunden umrechnen
-        const expiresInHours = parseInt(expiresInDays || 365) * 24;
-
-        // Token generieren für diese Guild (nicht für Daemon!)
-        const { token, tokenId } = await DaemonToken.generate(
-            guildId,  // ✅ Guild-ID, nicht daemon_id!
-            expiresInHours,
-            description || null,
-            res.locals.user?.id || null  // ✅ res.locals.user ist bereits das info-Objekt
-        );
-
-        Logger.info(`[Masterserver] Token #${tokenId} für Guild ${guildId} generiert`);
-
-        res.json({
-            success: true,
-            message: 'Token erfolgreich generiert',
-            token,
-            tokenId
-        });
-
-    } catch (error) {
-        Logger.error('[Masterserver] Token Generate Error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Fehler beim Generieren des Tokens'
-        });
-    }
-});
-
-// =====================================================
-// Route 3b: Token widerrufen (DELETE)
-// =====================================================
-router.delete('/tokens/:tokenId', requirePermission('MASTERSERVER.TOKENS.MANAGE'), async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const guildId = res.locals.guildId;
-    const { tokenId } = req.params;
-
-    try {
-        // Daemon prüfen
-        const daemon = await getDaemonForGuild(guildId);
-        if (!daemon) {
-            return res.status(400).json({
-                success: false,
-                message: 'Kein Daemon konfiguriert'
-            });
-        }
-
-        // Token laden und Ownership prüfen.
-        // Tokens hängen an der Guild, nicht am Daemon — `daemon_tokens` hat keine
-        // Spalte `daemon_id` (nur `used_by_daemon_id`). Der frühere Vergleich gegen
-        // `token.daemon_id` war deshalb immer `undefined !== ...` und hat jeden
-        // Widerruf mit 404 abgewiesen.
-        const token = await DaemonToken.getById(tokenId);
-        if (!token || String(token.guild_id) !== String(guildId)) {
-            return res.status(404).json({
-                success: false,
-                message: 'Token nicht gefunden'
-            });
-        }
-
-        // Token widerrufen
-        await DaemonToken.revoke(tokenId);
-
-        Logger.info(`[Masterserver] Token ${tokenId} widerrufen`);
-
-        res.json({
-            success: true,
-            message: 'Token erfolgreich widerrufen'
-        });
-
-    } catch (error) {
-        Logger.error('[Masterserver] Token Revoke Error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Fehler beim Widerrufen des Tokens'
-        });
-    }
-});
+// Die Token-Verwaltung stand bis zum 2026-08-02 hier: eine Seite, die
+// bcrypt-gehashte Tokens in `daemon_tokens` erzeugte, und eine Route, die sie
+// widerrief. Beides ohne Wirkung — der Daemon meldet sich mit
+// `rootserver.api_key` oder einem JWT an (IPMServer._handleRegister), die
+// Tabelle wurde von keiner Zeile im Repo gelesen. `DaemonToken.validate()` und
+// `markUsed()` hatten nie einen Aufrufer.
 
 // =====================================================
 // Route 4: Server-Registry (Physische Server)
@@ -1024,9 +891,6 @@ router.get('/logs', requirePermission('MASTERSERVER.LOGS.VIEW'), async (req, res
 
 // Hier standen bis zum 2026-08-02 ein zweites `POST /tokens/generate` und ein
 // zweites `GET /`. Express bedient bei gleichem Pfad immer den zuerst
-// registrierten Handler — beide waren also unerreichbar. Das doppelte
-// `/tokens/generate` hätte ohnehin nie funktioniert: es rief `DaemonToken.generate()`
-// mit vier Argumenten in einer Reihenfolge auf, die das Modell nicht kennt
-// (daemonId, guildId, tage, beschreibung statt guildId, stunden, beschreibung, ersteller).
+// registrierten Handler — beide waren unerreichbar.
 
 module.exports = router;
