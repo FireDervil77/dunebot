@@ -369,10 +369,7 @@ class IPMServer {
                             display_name: daemon.name,
                             version: version || daemon.daemon_version,
                             hardware: hardware || null,
-                            updateAvailable: (() => {
-                                const latest = this._getLatestDaemonVersion();
-                                return latest ? latest !== (version || daemon.daemon_version) : false;
-                            })(),
+                            updateAvailable: this._istDaemonUpdateVerfuegbar(version || daemon.daemon_version),
                             latestVersion: this._getLatestDaemonVersion()
                         }
                     };
@@ -457,10 +454,7 @@ class IPMServer {
                     display_name: rootserverByToken.name,
                     version,
                     hardware: hardware || null,
-                    updateAvailable: (() => {
-                        const latest = this._getLatestDaemonVersion();
-                        return latest ? latest !== version : false;
-                    })(),
+                    updateAvailable: this._istDaemonUpdateVerfuegbar(version),
                     latestVersion: this._getLatestDaemonVersion()
                 }
             };
@@ -1072,6 +1066,35 @@ class IPMServer {
             // version.json nicht vorhanden — kein Problem
             return null;
         }
+    }
+
+    /**
+     * Ist die vom Dashboard bereitgestellte Version neuer als die des Daemons?
+     *
+     * Verglichen wurde hier bis zum 2026-08-02 mit `!==`. Damit galt auch eine
+     * ÄLTERE Dashboard-Version als Update — nach einem Rückbau hätte das Panel
+     * einen Downgrade als Aktualisierung angeboten. Verglichen wird jetzt nach
+     * MAJOR.MINOR.PATCH; was sich nicht parsen lässt, gilt als "kein Update".
+     *
+     * @param {string} daemonVersion - vom Daemon gemeldete Version
+     * @returns {boolean}
+     * @private
+     */
+    _istDaemonUpdateVerfuegbar(daemonVersion) {
+        const bereitgestellt = this._getLatestDaemonVersion();
+        if (!bereitgestellt || !daemonVersion) return false;
+
+        const zerlegen = (v) => String(v).replace(/^v/, '').split('.').map(t => parseInt(t, 10));
+        const neu = zerlegen(bereitgestellt);
+        const alt = zerlegen(daemonVersion);
+        if (neu.length !== 3 || alt.length !== 3) return false;
+        if (neu.some(Number.isNaN) || alt.some(Number.isNaN)) return false;
+
+        for (let i = 0; i < 3; i++) {
+            if (neu[i] > alt[i]) return true;
+            if (neu[i] < alt[i]) return false;
+        }
+        return false;
     }
 
     /**
