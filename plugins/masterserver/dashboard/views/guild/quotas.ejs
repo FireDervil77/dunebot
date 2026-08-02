@@ -72,6 +72,46 @@
 
             <div class="card-body">
 
+                <%#
+                    Woher die Kapazität stammt. Der Normalfall ist "erkannt": Der
+                    Daemon meldet seine Hardware, das Dashboard rechnet damit, und
+                    niemand muss Zahlen eintragen. "Eingestellt" erscheint nur,
+                    wenn jemand bewusst abweichend festgelegt hat.
+                %>
+                <% const herkunft = [node.quota?.ram_herkunft, node.quota?.cpu_herkunft, node.quota?.disk_herkunft];
+                   const alleErkannt = herkunft.every(h => h === 'erkannt');
+                   const etwasGesetzt = herkunft.some(h => h === 'eingestellt');
+                   const nurProfil = herkunft.every(h => h === 'profil'); %>
+
+                <div class="mb-3">
+                    <% if (alleErkannt) { %>
+                        <small class="text-success">
+                            <i class="fas fa-wand-magic-sparkles mr-1"></i>
+                            Kapazität automatisch vom Daemon erkannt<% if (node.quota?.hardware_stand) { %>
+                            <span class="text-muted">(Stand: <%= new Date(node.quota.hardware_stand).toLocaleString('de-DE') %>)</span>
+                            <% } %>
+                        </small>
+                    <% } else if (nurProfil) { %>
+                        <small class="text-warning">
+                            <i class="fas fa-triangle-exclamation mr-1"></i>
+                            Noch keine Hardware erkannt — es gilt das Profil
+                            <strong><%= node.quota?.profile_display_name || node.quota?.profile_name || 'Standard' %></strong>.
+                            Sobald der Daemon verbunden war, stimmen die Werte von selbst.
+                        </small>
+                    <% } else if (etwasGesetzt) { %>
+                        <small class="text-info">
+                            <i class="fas fa-sliders mr-1"></i>
+                            Teilweise von Hand festgelegt:
+                            <%= [
+                                node.quota?.ram_herkunft  === 'eingestellt' ? 'RAM'  : null,
+                                node.quota?.cpu_herkunft  === 'eingestellt' ? 'CPU'  : null,
+                                node.quota?.disk_herkunft === 'eingestellt' ? 'Disk' : null
+                            ].filter(Boolean).join(', ') %>.
+                            Der Rest folgt der erkannten Hardware.
+                        </small>
+                    <% } %>
+                </div>
+
                 <!-- ── Ressourcen-Balken ── -->
                 <div class="row mb-3">
 

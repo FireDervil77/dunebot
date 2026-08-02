@@ -379,6 +379,9 @@ class RootServer {
             if (def) { profileId = def.id; Logger.info(`[RootServer] Default-Profil: ${def.name}`); }
         }
 
+        // `??` statt `||`: Eine ausdrücklich übergebene 0 ist eine gültige
+        // Reserve ("nichts für das Wirtssystem zurückhalten") und wurde vorher
+        // stillschweigend zum Standardwert hochgesetzt.
         await dbService.query(
             `INSERT INTO rootserver_quotas
              (rootserver_id, profile_id, custom_ram_mb, custom_cpu_cores, custom_disk_gb,
@@ -386,8 +389,8 @@ class RootServer {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 rootserverId, profileId,
-                config.customRamMB    || null, config.customCpuCores || null, config.customDiskGB || null,
-                config.reservedRamMB  || 2048, config.reservedCpuCores || 1,  config.reservedDiskGB || 50
+                config.customRamMB    ?? null, config.customCpuCores   ?? null, config.customDiskGB  ?? null,
+                config.reservedRamMB  ?? 2048, config.reservedCpuCores ?? 1,    config.reservedDiskGB ?? 50
             ]
         );
         return this.getQuota(rootserverId);
@@ -398,9 +401,14 @@ class RootServer {
      *
      * Ohne Quota liefert `getAvailableResources()` `hasQuota: false`, und jede
      * Kapazitätsprüfung würde fehlschlagen — ein RootServer ohne Quota-Zeile
-     * könnte also gar keinen Gameserver mehr aufnehmen. Die Vorbelegung stammt
-     * aus den vom Daemon gemeldeten Hardware-Daten, mit vorsichtigen Reserven
-     * für das Wirtssystem.
+     * könnte also gar keinen Gameserver mehr aufnehmen.
+     *
+     * Angelegt werden **nur die Reserven**. Die Kapazität selbst kommt aus der
+     * vom Daemon erkannten Hardware; `rootserver_quotas_effective` löst das auf
+     * (custom → erkannt → Profil). Bis zum 2026-08-02 schrieb diese Methode die
+     * Hardware-Werte in `custom_*` — dort standen sie dann für immer, und wer
+     * RAM nachrüstete, sah die Änderung nie. Ausserdem war danach nicht mehr
+     * unterscheidbar, ob eine Zahl erkannt oder eingestellt war.
      *
      * Lag bis zum 2026-08-02 als `autoInitQuota()` im Quotas-Router und stand
      * damit nur der Ressourcen-Seite zur Verfügung.
@@ -419,9 +427,8 @@ class RootServer {
 
         try {
             await this.initializeQuota(rs.id, {
-                customRamMB:      rs.ram_total_gb  ? Math.round(rs.ram_total_gb * 1024) : 4096,
-                customCpuCores:   rs.cpu_cores     || 4,
-                customDiskGB:     rs.disk_total_gb ? Math.round(rs.disk_total_gb)       : 100,
+                // Reserven für das Wirtssystem — das ist eine Annahme über den
+                // Betrieb, keine Hardware-Eigenschaft, und gehört deshalb hierher.
                 reservedRamMB:    1024,
                 reservedCpuCores: 0,
                 reservedDiskGB:   10
