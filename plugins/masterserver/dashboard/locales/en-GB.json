@@ -1,3 +1,22 @@
 {
-    "greeting": "Hallo!"
+    "NAV": {
+        "MASTERSERVER": "Masterserver",
+        "DASHBOARD": "Overview",
+        "ROOTSERVERS": "Root servers",
+        "RESOURCES": "Resources",
+        "LOGS": "Logs"
+    },
+    "DASHBOARD": {
+        "TITLE": "Masterserver Dashboard",
+        "STATS": {
+            "DAEMON_STATUS": "Daemon status",
+            "TOTAL_SERVERS": "Root servers"
+        }
+    },
+    "ROOTSERVER": {
+        "CREATE": "Create root server"
+    },
+    "LOGS": {
+        "TITLE": "Daemon logs"
+    }
 }

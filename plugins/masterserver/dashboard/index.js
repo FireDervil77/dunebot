@@ -58,6 +58,11 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
         // wo Schemaänderungen hingehören — einmal ausgeführt und in
         // `plugin_migrations` vermerkt, statt bei jedem Start erneut versucht.
 
+        // Alte Daemon-Logs abräumen und täglich dranbleiben.
+        await this._raeumeDaemonLogs();
+        this.logAufraeumer = setInterval(() => this._raeumeDaemonLogs(), 24 * 60 * 60 * 1000);
+        this.logAufraeumer.unref?.();
+
         Logger.success('[Masterserver] Dashboard-Plugin aktiviert');
         return true;
     }
@@ -68,8 +73,51 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
     async onDisable() {
         const Logger = ServiceManager.get('Logger');
         Logger.info('Deaktiviere [Masterserver] Dashboard-Plugin...');
-        // Cleanup bei Bedarf
+
+        if (this.logAufraeumer) {
+            clearInterval(this.logAufraeumer);
+            this.logAufraeumer = null;
+        }
         return true;
+    }
+
+    /**
+     * Löscht Daemon-Logs, die älter sind als die eingestellte Aufbewahrungsdauer.
+     *
+     * `LOG_RETENTION_DAYS` wurde bis zum 2026-08-02 nur auf der Logs-Seite
+     * angezeigt — aufgeräumt hat nie jemand, die Tabelle wuchs unbegrenzt. Die
+     * Dauer ist pro Guild einstellbar, also wird auch pro Guild gelöscht.
+     *
+     * @private
+     */
+    async _raeumeDaemonLogs() {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+
+        try {
+            const guilds = await dbService.query('SELECT DISTINCT guild_id FROM daemon_logs');
+            let geloescht = 0;
+
+            for (const { guild_id } of guilds) {
+                const tage = parseInt(
+                    await dbService.getConfig('masterserver', 'LOG_RETENTION_DAYS', 'shared', guild_id) || '30',
+                    10
+                );
+                if (!Number.isFinite(tage) || tage <= 0) continue;   // 0 = unbegrenzt aufheben
+
+                const ergebnis = await dbService.query(
+                    'DELETE FROM daemon_logs WHERE guild_id = ? AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+                    [guild_id, tage]
+                );
+                geloescht += ergebnis.affectedRows || 0;
+            }
+
+            if (geloescht > 0) {
+                Logger.info(`[Masterserver] ${geloescht} abgelaufene Daemon-Log-Einträge entfernt`);
+            }
+        } catch (error) {
+            Logger.error('[Masterserver] Aufräumen der Daemon-Logs fehlgeschlagen:', error);
+        }
     }
 
 
@@ -146,49 +194,39 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
             }
             
             // ════════════════════════════════════════════════════════════
-            // 4. Daemon-Cleanup für JEDEN Rootserver der Guild
+            // 4. Virtuelle Server auf den Daemons abräumen
+            //
+            // Hier stand bis zum 2026-08-02 ein Cleanup, der pro Daemon einen
+            // Linux-System-User löschen wollte (`rootserver.delete_user`). Er
+            // hat nie gelaufen: Migration 2.0.0 hat `rootserver.system_user` auf
+            // "[DEPRECATED] Legacy gs-User, nicht mehr benutzt" gesetzt, seither
+            // schreibt `RootServer.create()` die Spalte nicht mehr, und die
+            // Bedingung `if (rs.system_user && ...)` war damit immer falsch.
+            // Im Docker-Betrieb gibt es keinen Guild-User mehr, der zu löschen
+            // wäre — abzuräumen ist das Verzeichnis des virtuellen Servers.
             // ════════════════════════════════════════════════════════════
-            const processedDaemons = new Set(); // Track, um Daemon nur 1x zu löschen
-            const daemonsToDelete = new Map(); // daemon_id -> [rootserver_ids]
-            
+            const daemonsGesehen = new Set();
+
             for (const rs of rootservers) {
-                const daemonId = rs.daemon_id;
-                
-                // Daemon schon verarbeitet? (Falls mehrere Rootserver gleichen Daemon nutzen)
-                if (processedDaemons.has(daemonId)) {
-                    Logger.debug(`[Masterserver] Daemon ${daemonId} bereits verarbeitet - überspringe`);
-                    // Rootserver-ID zur Liste hinzufügen
-                    daemonsToDelete.get(daemonId).push(rs.id);
+                daemonsGesehen.add(rs.daemon_id);
+
+                if (!ipmServer?.isDaemonOnline(rs.daemon_id)) {
+                    Logger.warn(`[Masterserver] Daemon ${rs.daemon_id} offline — Verzeichnis von RootServer ${rs.id} bleibt liegen`);
                     continue;
                 }
-                
-                processedDaemons.add(daemonId);
-                daemonsToDelete.set(daemonId, [rs.id]);
-                
-                // ────────────────────────────────────────────────────────
-                // 4a. System-User vom Daemon löschen (IPM Command)
-                // ────────────────────────────────────────────────────────
-                if (rs.system_user && ipmServer?.isDaemonOnline(daemonId)) {
-                    try {
-                        Logger.info(`[Masterserver] Lösche System-User ${rs.system_user} von Daemon ${daemonId}`);
-                        
-                        await ipmServer.sendCommand(daemonId, 'rootserver.delete_user', {
-                            rootserver_id: rs.id,
-                            username: rs.system_user
-                        }, 30000);
-                        
-                        Logger.success(`[Masterserver] System-User ${rs.system_user} vom Daemon gelöscht`);
-                    } catch (error) {
-                        Logger.error(`[Masterserver] Fehler beim Löschen des System-Users:`, error);
-                        Logger.warn(`[Masterserver] → User muss manuell gelöscht werden: userdel -r ${rs.system_user}`);
-                        // Weitermachen - DB-Cleanup ist wichtiger
-                    }
-                } else if (!ipmServer?.isDaemonOnline(daemonId)) {
-                    Logger.warn(`[Masterserver] Daemon ${daemonId} offline - User-Cleanup wird übersprungen`);
-                    Logger.warn(`[Masterserver] → User ${rs.system_user} muss manuell gelöscht werden!`);
+
+                try {
+                    await ipmServer.sendCommand(rs.daemon_id, 'virtual.delete', {
+                        daemon_id: rs.daemon_id,
+                        rootserver_id: rs.id
+                    }, 30000);
+                    Logger.success(`[Masterserver] Virtueller Server ${rs.id} auf dem Daemon entfernt`);
+                } catch (error) {
+                    Logger.error(`[Masterserver] virtual.delete für RootServer ${rs.id} fehlgeschlagen:`, error);
+                    // Weitermachen — der DB-Cleanup ist wichtiger.
                 }
             }
-            
+
             // ════════════════════════════════════════════════════════════
             // 5. Rootserver löschen (CASCADE löscht server_registry, Quotas etc.)
             //    daemon_instances existiert nicht mehr (seit Migration 2.0.0)
@@ -210,11 +248,14 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
             // 7. Zusammenfassung & Warnungen
             // ════════════════════════════════════════════════════════════
             Logger.success(`[Masterserver] Cleanup erfolgreich abgeschlossen für Guild ${guildId}`);
-            Logger.info(`[Masterserver] Gelöscht: ${rootservers.length} Rootserver, ${processedDaemons.size} Daemon-Instances`);
-            
-            if (rootservers.some(rs => !ipmServer?.isDaemonOnline(rs.daemon_id))) {
-                Logger.warn(`[Masterserver] ⚠️  Einige Daemons waren offline!`);
-                Logger.warn(`[Masterserver] → System-User müssen manuell auf den Servern gelöscht werden!`);
+            Logger.info(`[Masterserver] Gelöscht: ${rootservers.length} RootServer auf ${daemonsGesehen.size} Daemon(s)`);
+
+            const offline = rootservers.filter(rs => !ipmServer?.isDaemonOnline(rs.daemon_id));
+            if (offline.length) {
+                Logger.warn(`[Masterserver] ⚠️  ${offline.length} Daemon(s) waren offline — deren Verzeichnisse bleiben liegen:`);
+                for (const rs of offline) {
+                    Logger.warn(`[Masterserver] → RootServer ${rs.id} (${rs.name}) auf Daemon ${rs.daemon_id}`);
+                }
             }
             
             return true;
@@ -255,10 +296,10 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
             const Logger = ServiceManager.get('Logger');
             
             try {
-                // === BASE-LEVEL ROUTES (System-weit, selten genutzt) ===
-                const baseRouter = require('./routes/settings.router');
-                this.baseRouter.use('/', baseRouter);
-                
+                // `routes/settings.router.js` hing hier bis zum 2026-08-02 als
+                // baseRouter. Die Datei enthielt keine einzige Route, nur einen
+                // auskommentierten Entwurf für ein Admin-Panel.
+
                 // === GUILD-LEVEL ROUTES (Per-Guild, häufig genutzt) ===
                 const guildRouter = require('./routes/guild.router');
                 this.guildRouter.use('/', guildRouter);
@@ -279,7 +320,7 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
                 const taskUIRouter = require('./routes/task-ui.router');
                 this.guildRouter.use('/tasks', taskUIRouter);
                 
-                Logger.debug('[Masterplugin] Routen registriert (Base + Guild + RootServer + Quotas + Task API + Task UI)');
+                Logger.debug('[Masterserver] Routen registriert (Guild + RootServer + Quotas + Task API + Task UI)');
             } catch (error) {
                 Logger.error('[Masterplugin] Fehler beim Einrichten der Routen:', error);
                 throw error;

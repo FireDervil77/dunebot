@@ -71,7 +71,7 @@ class RootServer {
         if (hasGs) {
             query = `SELECT r.*,
                 COUNT(DISTINCT g.id) AS gameserver_count,
-                SUM(CASE WHEN g.status = 'running' THEN 1 ELSE 0 END) AS gameserver_running_count
+                SUM(CASE WHEN g.status = 'online' THEN 1 ELSE 0 END) AS gameserver_running_count
              FROM rootserver r LEFT JOIN gameservers g ON r.id = g.rootserver_id
              WHERE r.id = ? GROUP BY r.id LIMIT 1`;
         } else {
@@ -98,7 +98,7 @@ class RootServer {
         if (hasGs) {
             query = `SELECT r.*,
                 COUNT(DISTINCT g.id) AS gameserver_count,
-                SUM(CASE WHEN g.status = 'running' THEN 1 ELSE 0 END) AS gameserver_running_count
+                SUM(CASE WHEN g.status = 'online' THEN 1 ELSE 0 END) AS gameserver_running_count
              FROM rootserver r LEFT JOIN gameservers g ON r.id = g.rootserver_id
              WHERE r.guild_id = ? GROUP BY r.id ORDER BY r.created_at DESC`;
         } else {
@@ -440,9 +440,13 @@ class RootServer {
         const dbService = ServiceManager.get('dbService');
         if (!await dbService.tableExists('gameservers')) return { total: 0, running: 0, stopped: 0 };
         const [row] = await dbService.query(
+            // Statuswerte laut ENUM in `gameservers`: installing, installed,
+            // starting, online, stopping, offline, error, updating. Hier stand
+            // bis zum 2026-08-02 'running'/'stopped' — Werte, die die Spalte nie
+            // annimmt; beide Zaehler meldeten deshalb immer 0.
             `SELECT COUNT(*) AS total,
-                SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) AS running,
-                SUM(CASE WHEN status = 'stopped' THEN 1 ELSE 0 END) AS stopped
+                SUM(CASE WHEN status = 'online'  THEN 1 ELSE 0 END) AS running,
+                SUM(CASE WHEN status = 'offline' THEN 1 ELSE 0 END) AS stopped
              FROM gameservers WHERE rootserver_id = ?`,
             [rootserverId]
         );

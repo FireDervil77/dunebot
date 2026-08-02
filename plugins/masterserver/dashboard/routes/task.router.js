@@ -1,11 +1,17 @@
 /**
  * Masterserver Plugin - Task API Routes
- * 
- * REST API für Task-Queue-Abfragen
+ *
+ * REST-Zugang zur Task-Queue des Daemons.
  * - Task-Status abrufen
- * - Task-History
- * - Task-Logs
- * 
+ * - Tasks eines Servers auflisten
+ * - Task abbrechen
+ *
+ * Bis zum 2026-08-02 riefen alle drei Routen `ipmServer.request(...)` auf — eine
+ * Methode, die der IPMServer nicht hat. Jeder Aufruf endete in einem TypeError
+ * und einem 500er; die Task-Ansicht war damit vollständig tot. Die Gegenseite
+ * war die ganze Zeit fertig: der Daemon beantwortet `task:get`, `task:list` und
+ * `task:cancel` aus seiner SQLite-Queue.
+ *
  * @module masterserver/routes/task
  * @author FireBot Team
  */
@@ -14,51 +20,58 @@ const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
+const RootServer = require('../models/RootServer');
+
+/**
+ * Ermittelt den Daemon, der die Tasks dieser Guild führt.
+ * @returns {Promise<object|null>}
+ */
+async function daemonDerGuild(guildId) {
+    const [rs] = await RootServer.getByGuild(guildId);
+    return rs || null;
+}
+
+/**
+ * Schickt ein Task-Kommando an den Daemon.
+ *
+ * `sendCommand` weist eine erfolglose Antwort per reject ab — der Aufrufer
+ * bekommt die Fehlermeldung des Daemons also als Exception, nicht als
+ * `{success:false}`.
+ */
+async function taskKommando(daemonId, kommando, payload) {
+    const ipmServer = ServiceManager.get('ipmServer');
+    if (!ipmServer) throw new Error('IPM-Server nicht verfügbar');
+    if (!ipmServer.isDaemonOnline(daemonId)) throw new Error('Daemon ist offline');
+    return ipmServer.sendCommand(daemonId, kommando, payload, 15000);
+}
 
 // =====================================================
 // GET /api/tasks/:taskId
-// Abrufen eines einzelnen Tasks mit vollständigen Details
+// Einzelnen Task mit vollständigen Details abrufen
 // =====================================================
 router.get('/:taskId', requirePermission('MASTERSERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
-    const ipmServer = ServiceManager.get('ipmServer');
     const { taskId } = req.params;
     const guildId = res.locals.guildId;
 
     try {
-        // ✅ Daemon der Guild holen
-        
-        const _rs = (await require("../models/RootServer").getByGuild(guildId))[0]; const daemon = _rs ? { ..._rs, status: _rs.daemon_status } : null;
-        
+        const daemon = await daemonDerGuild(guildId);
         if (!daemon) {
-            return res.status(404).json({
-                success: false,
-                error: 'No daemon configured for this guild'
-            });
+            return res.status(404).json({ success: false, error: 'Kein Daemon für diese Guild konfiguriert' });
         }
 
-        // ✅ Task-Daten vom Daemon via IPM abrufen
-        const taskData = await ipmServer.request(daemon.daemon_id, 'task:get', { 
-            task_id: taskId 
-        });
+        const antwort = await taskKommando(daemon.daemon_id, 'task:get', { task_id: taskId });
 
-        if (!taskData || !taskData.success) {
-            return res.status(404).json({
-                success: false,
-                error: 'Task not found'
-            });
-        }
-
-        res.json({
-            success: true,
-            task: taskData.task
-        });
+        res.json({ success: true, task: antwort.task || null });
 
     } catch (error) {
         Logger.error('[Masterserver API] Task GET Error:', error);
-        res.status(500).json({
+        // Der Daemon meldet einen unbekannten Task als Fehler — das ist ein 404,
+        // kein Serverfehler.
+        const unbekannt = /nicht gefunden|not found/i.test(error.message || '');
+        res.status(unbekannt ? 404 : 500).json({
             success: false,
-            error: 'Internal server error',
+            error: unbekannt ? 'Task nicht gefunden' : 'Task konnte nicht abgerufen werden',
             message: error.message
         });
     }
@@ -70,47 +83,33 @@ router.get('/:taskId', requirePermission('MASTERSERVER.VIEW'), async (req, res) 
 // =====================================================
 router.get('/server/:serverId', requirePermission('MASTERSERVER.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
-    const ipmServer = ServiceManager.get('ipmServer');
     const { serverId } = req.params;
     const guildId = res.locals.guildId;
     const { limit = 20, status } = req.query;
 
     try {
-        
-        const _rs = (await require("../models/RootServer").getByGuild(guildId))[0]; const daemon = _rs ? { ..._rs, status: _rs.daemon_status } : null;
-        
+        const daemon = await daemonDerGuild(guildId);
         if (!daemon) {
-            return res.status(404).json({
-                success: false,
-                error: 'No daemon configured for this guild'
-            });
+            return res.status(404).json({ success: false, error: 'Kein Daemon für diese Guild konfiguriert' });
         }
 
-        // ✅ Tasks vom Daemon abrufen
-        const tasksData = await ipmServer.request(daemon.daemon_id, 'task:list', { 
+        const antwort = await taskKommando(daemon.daemon_id, 'task:list', {
             server_id: serverId,
-            limit: parseInt(limit),
+            limit: parseInt(limit, 10) || 20,
             status: status || null
         });
 
-        if (!tasksData || !tasksData.success) {
-            return res.status(500).json({
-                success: false,
-                error: 'Failed to fetch tasks from daemon'
-            });
-        }
-
         res.json({
             success: true,
-            tasks: tasksData.tasks || [],
-            count: tasksData.count || 0
+            tasks: antwort.tasks || [],
+            count: antwort.count || 0
         });
 
     } catch (error) {
         Logger.error('[Masterserver API] Task List Error:', error);
         res.status(500).json({
             success: false,
-            error: 'Internal server error',
+            error: 'Tasks konnten nicht geladen werden',
             message: error.message
         });
     }
@@ -122,43 +121,25 @@ router.get('/server/:serverId', requirePermission('MASTERSERVER.VIEW'), async (r
 // =====================================================
 router.post('/:taskId/cancel', requirePermission('MASTERSERVER.DAEMON.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
-    const ipmServer = ServiceManager.get('ipmServer');
     const { taskId } = req.params;
     const guildId = res.locals.guildId;
 
     try {
-        
-        const _rs = (await require("../models/RootServer").getByGuild(guildId))[0]; const daemon = _rs ? { ..._rs, status: _rs.daemon_status } : null;
-        
+        const daemon = await daemonDerGuild(guildId);
         if (!daemon) {
-            return res.status(404).json({
-                success: false,
-                error: 'No daemon configured for this guild'
-            });
+            return res.status(404).json({ success: false, error: 'Kein Daemon für diese Guild konfiguriert' });
         }
 
-        // ✅ Task-Abbruch via IPM senden
-        const result = await ipmServer.request(daemon.daemon_id, 'task:cancel', { 
-            task_id: taskId 
-        });
+        await taskKommando(daemon.daemon_id, 'task:cancel', { task_id: taskId });
 
-        if (!result || !result.success) {
-            return res.status(400).json({
-                success: false,
-                error: result?.error || 'Failed to cancel task'
-            });
-        }
-
-        res.json({
-            success: true,
-            message: 'Task cancelled successfully'
-        });
+        Logger.info(`[Masterserver] Task ${taskId} abgebrochen (Guild ${guildId})`);
+        res.json({ success: true, message: 'Task abgebrochen' });
 
     } catch (error) {
         Logger.error('[Masterserver API] Task Cancel Error:', error);
-        res.status(500).json({
+        res.status(400).json({
             success: false,
-            error: 'Internal server error',
+            error: 'Task konnte nicht abgebrochen werden',
             message: error.message
         });
     }

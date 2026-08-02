@@ -23,7 +23,7 @@
         <div class="icon">
           <i class="fa-solid <%= isOnline ? 'fa-circle-check' : 'fa-circle-xmark' %>"></i>
         </div>
-        <a href="/guild/<%= guildId %>/plugins/masterserver/daemon" class="small-box-footer">
+        <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="small-box-footer">
           Daemon verwalten <i class="fas fa-arrow-circle-right"></i>
         </a>
       </div>
@@ -39,7 +39,7 @@
         <div class="icon">
           <i class="fa-solid fa-server"></i>
         </div>
-        <a href="/guild/<%= guildId %>/plugins/masterserver/servers" class="small-box-footer">
+        <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="small-box-footer">
           Zur Server-Liste <i class="fas fa-arrow-circle-right"></i>
         </a>
       </div>
@@ -55,7 +55,7 @@
         <div class="icon">
           <i class="fa-solid fa-circle-check"></i>
         </div>
-        <a href="/guild/<%= guildId %>/plugins/masterserver/servers" class="small-box-footer">
+        <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="small-box-footer">
           Details anzeigen <i class="fas fa-arrow-circle-right"></i>
         </a>
       </div>
@@ -71,7 +71,7 @@
         <div class="icon">
           <i class="fa-solid fa-gamepad"></i>
         </div>
-        <a href="/guild/<%= guildId %>/plugins/masterserver/servers" class="small-box-footer">
+        <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="small-box-footer">
           Server-Details <i class="fas fa-arrow-circle-right"></i>
         </a>
       </div>
@@ -94,7 +94,7 @@
         <div class="card-body">
           <div class="row">
             <div class="col-md-3 col-sm-6 mb-2">
-              <a href="/guild/<%= guildId %>/plugins/masterserver/daemon" class="btn btn-outline-primary btn-block">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-outline-primary btn-block">
                 <i class="fa-solid fa-cog me-2"></i> Daemon-Setup
               </a>
             </div>
@@ -104,7 +104,7 @@
               </a>
             </div>
             <div class="col-md-3 col-sm-6 mb-2">
-              <a href="/guild/<%= guildId %>/plugins/masterserver/servers" class="btn btn-outline-info btn-block">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-outline-info btn-block">
                 <i class="fa-solid fa-list me-2"></i> Server-Registry
               </a>
             </div>
@@ -179,7 +179,7 @@
               </tbody>
             </table>
             <div class="mt-3">
-              <a href="/guild/<%= guildId %>/plugins/masterserver/daemon" class="btn btn-primary btn-sm">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-primary btn-sm">
                 <i class="fa-solid fa-cog me-1"></i> Daemon konfigurieren
               </a>
               <a href="/guild/<%= guildId %>/plugins/masterserver/logs" class="btn btn-info btn-sm">
@@ -191,7 +191,7 @@
               <i class="fa-solid fa-triangle-exclamation me-2"></i>
               Kein Daemon konfiguriert. Starte den Setup-Wizard um loszulegen!
             </div>
-            <a href="/guild/<%= guildId %>/plugins/masterserver/daemon" class="btn btn-success">
+            <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-success">
               <i class="fa-solid fa-plus me-1"></i> Daemon erstellen
             </a>
           <% } %>

@@ -252,28 +252,8 @@ class GuildAjaxHandler {
                     break;
                 
                 // Masterserver Plugin Handlers
-                case 'daemon-create':
-                    await this.handleDaemonCreateResponse(form, result);
-                    break;
-                
-                case 'token-generate':
-                    await this.handleTokenGenerateResponse(form, result);
-                    break;
-                
-                case 'rootserver-create-wizard':
-                    await this.handleRootServerWizardResponse(form, result);
-                    break;
-                
                 case 'rootserver-create':
                     await this.handleRootServerCreateResponse(form, result);
-                    break;
-                
-                case 'create-server':
-                    await this.handleCreateServerResponse(form, result);
-                    break;
-                
-                case 'update-server':
-                    await this.handleUpdateServerResponse(form, result);
                     break;
                 
                 // Gameserver Plugin Handlers
@@ -438,70 +418,8 @@ class GuildAjaxHandler {
     // MASTERSERVER PLUGIN HANDLERS
     // =====================================================
     
-    static async handleDaemonCreateResponse(form, result) {
-        console.log('[GuildAjax] handleDaemonCreateResponse called:', result);
-        if (result.success) {
-            this.showToast('success', result.message || 'Daemon erfolgreich erstellt!');
-            // Nach 1,5s neu laden um Daemon-Info anzuzeigen
-            setTimeout(() => window.location.reload(), 1500);
-        } else {
-            this.showToast('error', result.message || 'Fehler beim Erstellen des Daemons');
-        }
-    }
     
-    static async handleCreateServerResponse(form, result) {
-        console.log('[GuildAjax] handleCreateServerResponse called:', result);
-        if (result.success) {
-            this.showToast('success', result.message || 'Server erfolgreich erstellt');
-            
-            // ✅ Redirect zur Server-Liste (kein Modal mehr!)
-            setTimeout(() => {
-                // Extrahiere Guild-ID aus Form-Action oder URL
-                const action = form.getAttribute('action');
-                const match = action.match(/\/guild\/([^/]+)\//);
-                
-                if (match && match[1]) {
-                    const guildId = match[1];
-                    console.log('[GuildAjax] Redirecting to server list for guild:', guildId);
-                    window.location.href = `/guild/${guildId}/plugins/masterserver/servers`;
-                } else {
-                    // Fallback: Aus aktueller URL extrahieren
-                    const urlMatch = window.location.pathname.match(/\/guild\/([^/]+)\//);
-                    if (urlMatch && urlMatch[1]) {
-                        const guildId = urlMatch[1];
-                        console.log('[GuildAjax] Redirecting to server list (from URL) for guild:', guildId);
-                        window.location.href = `/guild/${guildId}/plugins/masterserver/servers`;
-                    } else {
-                        // Letzter Fallback: Seite neu laden
-                        console.warn('[GuildAjax] Could not extract guildId, reloading page');
-                        window.location.reload();
-                    }
-                }
-            }, 1500);
-        } else {
-            this.showToast('error', result.message || 'Fehler beim Erstellen des Servers');
-        }
-    }
     
-    static async handleUpdateServerResponse(form, result) {
-        console.log('[GuildAjax] handleUpdateServerResponse called:', result);
-        if (result.success) {
-            this.showToast('success', result.message || 'Server erfolgreich aktualisiert');
-            
-            // Nach 1,5s zurück zur Server-Übersicht navigieren
-            setTimeout(() => {
-                // Guild-ID aus URL extrahieren
-                const pathParts = window.location.pathname.split('/');
-                const guildIdIndex = pathParts.indexOf('guild') + 1;
-                const guildId = pathParts[guildIdIndex];
-                
-                // Zurück zur Server-Liste
-                window.location.href = `/guild/${guildId}/plugins/masterserver/servers`;
-            }, 1500);
-        } else {
-            this.showToast('error', result.message || 'Fehler beim Aktualisieren des Servers');
-        }
-    }
     
     /**
      * Gameserver Creation Handler
@@ -568,54 +486,10 @@ class GuildAjaxHandler {
     }
 
     
-    static async handleTokenGenerateResponse(form, result) {
-        console.log('[GuildAjax] handleTokenGenerateResponse called:', result);
-        if (result.success) {
-            // Modal mit Token anzeigen (WICHTIG: Nur einmal sichtbar!)
-            const modal = document.getElementById('tokenModal');
-            if (modal) {
-                document.getElementById('modalTokenId').value = result.tokenId;
-                document.getElementById('modalToken').value = result.token;
-                $(modal).modal('show');
-                
-                this.showToast('success', 'Token erfolgreich generiert!');
-            } else {
-                // Fallback: Alert (falls Modal fehlt)
-                alert(`Token generiert!\n\nToken-ID: ${result.tokenId}\n\nToken (WICHTIG - nur einmal sichtbar!):\n${result.token}`);
-            }
-            
-            // Formular zurücksetzen
-            form.reset();
-        } else {
-            this.showToast('error', result.message || 'Fehler beim Generieren des Tokens');
-        }
-    }
-
     /**
      * RootServer Wizard Response Handler
      * Nach erfolgreicher Erstellung: Weiterleitung zur Details-Seite
      */
-    static async handleRootServerWizardResponse(form, result) {
-        console.log('[GuildAjax] handleRootServerWizardResponse called:', result);
-        if (result.success) {
-            this.showToast('success', result.message || 'RootServer erfolgreich erstellt!');
-            
-            // Redirect zur Details-Seite nach 1,5s
-            if (result.data && result.data.redirectUrl) {
-                setTimeout(() => {
-                    window.location.href = result.data.redirectUrl;
-                }, 1500);
-            } else {
-                // Fallback: Reload nach 2s
-                setTimeout(() => {
-                    window.location.reload();
-                }, 2000);
-            }
-        } else {
-            this.showToast('error', result.message || 'Fehler beim Erstellen des RootServers');
-        }
-    }
-
     /**
      * Handler für RootServer-Create (Simple - Pterodactyl-Style)
      * Nach erfolgreicher Erstellung: Weiterleitung zur Details-Seite mit Token-Anzeige
