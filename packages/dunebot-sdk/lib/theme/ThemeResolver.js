@@ -79,6 +79,10 @@ class ThemeResolver {
             const candidates = [
                 path.join(themeRoot.partials, partial + '.ejs'),
                 path.join(themeRoot.views, 'partials', partial + '.ejs'),
+                // Auch unterhalb von views/ suchen — dort liegen z. B. die
+                // Widget-Partials (`widgets/admin-stat`). Ohne diesen Eintrag
+                // waren sie fuer includePartial und hookArea unerreichbar.
+                path.join(themeRoot.views, partial + '.ejs'),
                 path.join(themeRoot.root, partial + '.ejs')
             ];
             const found = candidates.find(p => fs.existsSync(p));

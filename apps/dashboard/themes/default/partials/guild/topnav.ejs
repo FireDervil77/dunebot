@@ -113,14 +113,7 @@
   </li>
 
   <!-- Hook: content_header_actions -->
-  <% if (locals.hooks && hooks.getViewHooks) { %>
-    <% const headerActionHooks = hooks.getViewHooks('content_header_actions'); %>
-    <% if (headerActionHooks && headerActionHooks.length > 0) { %>
-      <% headerActionHooks.forEach(hook => { %>
-        <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-      <% }); %>
-    <% } %>
-  <% } %>
+<%- hookArea('content_header_actions') %>
 
   <!-- Abmelden -->
   <li class="nav-item">

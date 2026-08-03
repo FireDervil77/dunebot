@@ -28,39 +28,18 @@
     <% } %>
 
     <!-- Hook: auth_head -->
-    <% if (locals.hooks && hooks.getViewHooks) { %>
-        <% const headHooks = hooks.getViewHooks('auth_head'); %>
-        <% if (headHooks && headHooks.length > 0) { %>
-            <% headHooks.forEach(hook => { %>
-                <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-            <% }); %>
-        <% } %>
-    <% } %>
+<%- hookArea('auth_head') %>
 </head>
 <body class="login-page bg-body-secondary">
                               
 <!-- Hook: before_auth_content -->
-<% if (locals.hooks && hooks.getViewHooks) { %>
-    <% const beforeContentHooks = hooks.getViewHooks('auth_before_content'); %>
-    <% if (beforeContentHooks && beforeContentHooks.length > 0) { %>
-        <% beforeContentHooks.forEach(hook => { %>
-            <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-        <% }); %>
-    <% } %>
-<% } %>
+<%- hookArea('auth_before_content') %>
 
 <!-- Main Content -->
 <%- body %>
 
 <!-- Hook: after_auth_content -->
-<% if (locals.hooks && hooks.getViewHooks) { %>
-    <% const afterContentHooks = hooks.getViewHooks('auth_after_content'); %>
-    <% if (afterContentHooks && afterContentHooks.length > 0) { %>
-        <% afterContentHooks.forEach(hook => { %>
-            <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-        <% }); %>
-    <% } %>
-<% } %>
+<%- hookArea('auth_after_content') %>
 
 <!-- Footer -->
 <p class="mt-3 mb-3 text-body-secondary">
@@ -75,13 +54,6 @@
 <% } %>
 
 <!-- Hook: auth_footer_scripts -->
-<% if (locals.hooks && hooks.getViewHooks) { %>
-    <% const footerScriptHooks = hooks.getViewHooks('auth_footer_scripts'); %>
-    <% if (footerScriptHooks && footerScriptHooks.length > 0) { %>
-        <% footerScriptHooks.forEach(hook => { %>
-            <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-        <% }); %>
-    <% } %>
-<% } %>
+<%- hookArea('auth_footer_scripts') %>
 </body>
 </html>

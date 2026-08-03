@@ -29,14 +29,7 @@
     <%- includePartial('frontend/consent', locals) %>
     
     <!-- Hook: frontend_head -->
-    <% if (locals.hooks && hooks.getViewHooks) { %>
-      <% const headHooks = hooks.getViewHooks('frontend_head'); %>
-      <% if (headHooks && headHooks.length > 0) { %>
-        <% headHooks.forEach(hook => { %>
-          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-        <% }); %>
-      <% } %>
-    <% } %>
+<%- hookArea('frontend_head') %>
   </head>
 
   <body class="landing-page">
@@ -44,27 +37,13 @@
     <%- includePartial('frontend/header_nav', { locals }) %>
     
     <!-- Hook: before_frontend_content -->
-    <% if (locals.hooks && hooks.getViewHooks) { %>
-      <% const beforeContentHooks = hooks.getViewHooks('before_frontend_content'); %>
-      <% if (beforeContentHooks && beforeContentHooks.length > 0) { %>
-        <% beforeContentHooks.forEach(hook => { %>
-          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-        <% }); %>
-      <% } %>
-    <% } %>
+<%- hookArea('before_frontend_content') %>
     
     <!-- Main Content -->
     <%- body %>
     
     <!-- Hook: after_frontend_content -->
-    <% if (locals.hooks && hooks.getViewHooks) { %>
-      <% const afterContentHooks = hooks.getViewHooks('after_frontend_content'); %>
-      <% if (afterContentHooks && afterContentHooks.length > 0) { %>
-        <% afterContentHooks.forEach(hook => { %>
-          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-        <% }); %>
-      <% } %>
-    <% } %>
+<%- hookArea('after_frontend_content') %>
 
     <!-- Footer -->
     <%- includePartial('frontend/footer', locals) %>
@@ -73,13 +52,6 @@
     <%- includePartial('frontend/scripts', locals) %>
     
     <!-- Hook: frontend_footer_scripts -->
-    <% if (locals.hooks && hooks.getViewHooks) { %>
-      <% const footerScriptHooks = hooks.getViewHooks('frontend_footer_scripts'); %>
-      <% if (footerScriptHooks && footerScriptHooks.length > 0) { %>
-        <% footerScriptHooks.forEach(hook => { %>
-          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-        <% }); %>
-      <% } %>
-    <% } %>
+<%- hookArea('frontend_footer_scripts') %>
   </body>
 </html>

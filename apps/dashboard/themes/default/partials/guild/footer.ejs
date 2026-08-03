@@ -6,14 +6,7 @@
     %>
 
     <!-- Hook: after_content -->
-    <% if (locals.hooks && hooks.getViewHooks) { %>
-      <% const afterContentHooks = hooks.getViewHooks('after_content'); %>
-      <% if (afterContentHooks && afterContentHooks.length > 0) { %>
-        <% afterContentHooks.forEach(hook => { %>
-          <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-        <% }); %>
-      <% } %>
-    <% } %>
+<%- hookArea('after_content') %>
   </div>
   <!-- /.content-wrapper -->
   
@@ -45,14 +38,7 @@
 <!-- ./wrapper -->
 
 <!-- Hook: dashboard_footer_scripts -->
-<% if (locals.hooks && hooks.getViewHooks) { %>
-  <% const footerScriptsHooks = hooks.getViewHooks('dashboard_footer_scripts'); %>
-  <% if (footerScriptsHooks && footerScriptsHooks.length > 0) { %>
-    <% footerScriptsHooks.forEach(hook => { %>
-      <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-    <% }); %>
-  <% } %>
-<% } %>
+<%- hookArea('dashboard_footer_scripts') %>
 
 <!-- Plugin View Toggle Script (Global) -->
 <script src="/themes/default/assets/js/plugin-view-toggle.js"></script>

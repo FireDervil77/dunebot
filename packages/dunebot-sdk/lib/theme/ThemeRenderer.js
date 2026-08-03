@@ -220,6 +220,40 @@ class ThemeRenderer {
     }
 
     /**
+     * Datei zu einem View-Hook finden.
+     *
+     * Reihenfolge: Partial des Plugins, dann View des Plugins, dann die
+     * Theme-Kette. Absolute Pfade werden unveraendert genommen.
+     *
+     * @param {{component: string, plugin: ?string}} baustein
+     * @param {object} kontext - Render-Kontext (kann themeChain enthalten)
+     * @returns {string|null}
+     */
+    _resolveHookComponent(baustein, kontext = {}) {
+        const name = String(baustein.component || '').replace(/\.ejs$/i, '');
+        if (!name) return null;
+
+        if (path.isAbsolute(name)) {
+            return fs.existsSync(name + '.ejs') ? name + '.ejs' : null;
+        }
+
+        if (baustein.plugin) {
+            try {
+                const pluginPfade = this.manager.PathConfig.getPath('plugin', baustein.plugin);
+                const kandidaten = [
+                    path.join(pluginPfade.dashboard, 'views', 'partials', name + '.ejs'),
+                    path.join(pluginPfade.dashboard, 'views', name + '.ejs'),
+                    path.join(pluginPfade.dashboard, 'partials', name + '.ejs')
+                ];
+                const treffer = kandidaten.find(p => fs.existsSync(p));
+                if (treffer) return treffer;
+            } catch { /* Plugin gibt es nicht (mehr) */ }
+        }
+
+        return this.manager.resolver.resolvePartialPath(name, kontext.themeChain);
+    }
+
+    /**
      * Theme-spezifische View-Engine konfigurieren und EJS-Helpers registrieren
      */
     setupViewEngine() {
@@ -314,6 +348,65 @@ class ThemeRenderer {
             }
         };
         
+        // ============================================================================
+        // GLOBAL FUNCTION: hookArea (WordPress: do_action im Template)
+        // ============================================================================
+        /**
+         * Alle an einem Ankerpunkt angemeldeten Bausteine ausgeben.
+         *
+         * Ersetzt den siebenzeiligen Block, der bisher an jedem Anker stand:
+         * Verfuegbarkeit pruefen, Liste holen, auf Leere pruefen, iterieren,
+         * include. Neu ist eine Zeile:
+         *
+         *     <%- hookArea('guild_dashboard_after', { guild, guildId }) %>
+         *
+         * Ein Baustein darf sein:
+         *   - eine Funktion  → wird mit den Daten aufgerufen, gibt HTML zurueck
+         *   - ein Partial    → wird ueber Plugin bzw. Theme-Kette aufgeloest
+         *
+         * Ein Baustein, der wirft, wird uebersprungen und protokolliert — ein
+         * kaputtes Plugin darf keine Seite zerlegen.
+         *
+         * @param {string} name - Ankerpunkt
+         * @param {object} [data] - zusaetzliche Daten fuer den Baustein
+         * @returns {string} HTML
+         */
+        manager.app.locals.hookArea = function (name, data = {}) {
+            const hooks = manager.app?.pluginManager?.hooks;
+            if (!hooks || typeof hooks.getViewHooks !== 'function') return '';
+
+            const bausteine = hooks.getViewHooks(name) || [];
+            if (bausteine.length === 0) return '';
+
+            const ejs = require('ejs');
+            const kontext = { ...appLocals, ...this, ...data };
+            const teile = [];
+
+            for (const baustein of bausteine) {
+                try {
+                    if (typeof baustein.component === 'function') {
+                        teile.push(baustein.component(kontext) || '');
+                        continue;
+                    }
+
+                    const pfad = themeManager.renderer._resolveHookComponent(baustein, kontext);
+                    if (!pfad) {
+                        Logger.warn(`[hookArea] '${name}': ${baustein.component} nicht gefunden`);
+                        continue;
+                    }
+
+                    teile.push(ejs.render(fs.readFileSync(pfad, 'utf8'), kontext, {
+                        cache: false,
+                        filename: pfad
+                    }));
+                } catch (error) {
+                    Logger.error(`[hookArea] '${name}' — Baustein uebersprungen:`, error.message);
+                }
+            }
+
+            return teile.join('\n');
+        };
+
         // ============================================================================
         // GLOBAL FUNCTION: includePluginPartial
         // ============================================================================

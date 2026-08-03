@@ -122,12 +122,20 @@ class PluginHooks {
      * @param {number} [priority=10] - Priorität des Hooks
      * @author FireBot Team
      */
-    addViewHook(location, component, priority = 10) {
-
+    addViewHook(location, component, priority = 10, options = {}) {
         if (!this.viewHooks[location]) this.viewHooks[location] = [];
-        this.viewHooks[location].push({ component, priority });
+
+        // `plugin` wurde in den Views seit jeher ausgelesen, aber nie gespeichert —
+        // es war immer undefined. Ohne den Namen laesst sich ein Partial, das im
+        // Plugin liegt, gar nicht finden.
+        this.viewHooks[location].push({
+            component,
+            priority,
+            plugin: options.plugin || null
+        });
+
         this.viewHooks[location].sort((a, b) => a.priority - b.priority);
-        this.logger.debug(`View hook registered: ${location}`);
+        this.logger.debug(`View hook registered: ${location}${options.plugin ? ' (' + options.plugin + ')' : ''}`);
     }
     
     /**

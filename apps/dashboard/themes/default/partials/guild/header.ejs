@@ -38,14 +38,7 @@
 <% } %>
   
 <!-- Hook: dashboard_head -->
-<% if (locals.hooks && hooks.getViewHooks) { %>
-  <% const headHooks = hooks.getViewHooks('dashboard_head'); %>
-  <% if (headHooks && headHooks.length > 0) { %>
-    <% headHooks.forEach(hook => { %>
-      <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {} }) %>
-    <% }); %>
-  <% } %>
-<% } %>
+<%- hookArea('dashboard_head') %>
 <!-- Hook:end: dashboard_head -->
 
 <!-- View Styles (express-ejs-layouts) -->

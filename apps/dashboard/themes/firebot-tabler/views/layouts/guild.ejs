@@ -44,9 +44,10 @@
                             <div class="text-secondary mt-1"><%= locals.subtitle %></div>
                         <% } %>
                     </div>
-                    <% if (locals.pageActions) { %>
-                        <div class="col-auto ms-auto d-print-none"><%- locals.pageActions %></div>
-                    <% } %>
+                    <div class="col-auto ms-auto d-print-none">
+                        <%- locals.pageActions || '' %>
+                        <%- hookArea('content_header_actions') %>
+                    </div>
                 </div>
             </div>
         </div>
@@ -79,7 +80,11 @@
                     </div>
                 <% } %>
 
+                <%- hookArea('before_guild_content', { guild: locals.guild, guildId: locals.guildId }) %>
+
                 <%- body %>
+
+                <%- hookArea('after_guild_content', { guild: locals.guild, guildId: locals.guildId }) %>
 
             </div>
         </main>
@@ -172,6 +177,8 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+
+<%- hookArea('dashboard_footer_scripts') %>
 
 <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
 

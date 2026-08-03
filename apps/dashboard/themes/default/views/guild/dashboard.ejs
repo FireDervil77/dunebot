@@ -48,14 +48,7 @@ const _bekannt = _bereiche.map(b => b.id);
     <div class="container-fluid">
 
         <!-- Hook: before_guild_dashboard -->
-        <% if (locals.hooks && hooks.getViewHooks) { %>
-          <% const beforeHooks = hooks.getViewHooks('before_guild_dashboard'); %>
-          <% if (beforeHooks && beforeHooks.length > 0) { %>
-            <% beforeHooks.forEach(hook => { %>
-              <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {}, guild, guildId }) %>
-            <% }); %>
-          <% } %>
-        <% } %>
+<%- hookArea('before_guild_dashboard', { guild, guildId }) %>
 
         <%# ── Bereiche des Themes, in seiner Reihenfolge ─────────────────── %>
         <% _bereiche.forEach(bereich => { %>
@@ -88,14 +81,7 @@ const _bekannt = _bereiche.map(b => b.id);
         <% } %>
 
         <!-- Hook: after_guild_dashboard -->
-        <% if (locals.hooks && hooks.getViewHooks) { %>
-          <% const afterHooks = hooks.getViewHooks('after_guild_dashboard'); %>
-          <% if (afterHooks && afterHooks.length > 0) { %>
-            <% afterHooks.forEach(hook => { %>
-              <%- include(hook.component, { plugin: hook.plugin, context: hook.context || {}, guild, guildId }) %>
-            <% }); %>
-          <% } %>
-        <% } %>
+<%- hookArea('after_guild_dashboard', { guild, guildId }) %>
 
     </div>
 </div>
