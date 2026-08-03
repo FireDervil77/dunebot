@@ -51,6 +51,11 @@ class ThemeRenderer {
             // 5. Layout NACH dem Merge setzen
             res.locals.layout = this.getLayout(section);
 
+            // 5b. Basis-Assets des Themes für diesen Bereich einreihen.
+            //     Muss pro Request passieren, weil die Enqueue-Listen zwischen
+            //     den Requests zurückgesetzt werden.
+            this.manager.enqueueForSection(section);
+
             Logger.debug('Render Context:', {
                 view,
                 section,
@@ -85,18 +90,37 @@ class ThemeRenderer {
     }
 
     /**
-     * Layout für einen bestimmten Bereich abrufen
+     * Layout für einen bestimmten Bereich abrufen.
+     *
+     * Quelle ist `theme.json` → `layouts`, aufgelöst entlang der Theme-Kette,
+     * damit ein Child-Theme ein einzelnes Layout ersetzen kann, ohne alle
+     * anderen mitzubringen. PathConfig ist nur noch der Notnagel.
+     *
      * @param {string} section - Bereich (guild, frontend, auth)
-     * @returns {string} Layout-Pfad
+     * @returns {string} Absoluter Layout-Pfad ohne Endung (für express-ejs-layouts)
      */
     getLayout(section) {
-        const PathConfig = this.manager.PathConfig;
-        const layouts = PathConfig.getPath('dashboard').layouts(this.manager.activeTheme);
-        
-        if (!layouts[section]) {
-            throw new Error(`Kein Layout für Bereich '${section}' definiert`);
+        const manager = this.manager;
+        const declared = manager._layouts?.[section] ?? manager.themeConfig?.layouts?.[section];
+        const relative = typeof declared === 'string' ? declared : declared?.path;
+
+        if (relative) {
+            const withoutExt = relative.replace(/\.ejs$/i, '');
+
+            for (const themeName of manager._themeChain) {
+                const viewsDir = manager.PathConfig.getPath('theme', themeName).views;
+                const candidate = path.join(viewsDir, withoutExt);
+                if (fs.existsSync(candidate + '.ejs')) return candidate;
+            }
         }
-        return layouts[section];
+
+        // Notnagel: fest verdrahtete Pfade aus PathConfig
+        const fallback = manager.PathConfig.getPath('dashboard').layouts(manager.activeTheme);
+        if (fallback[section] && fs.existsSync(fallback[section] + '.ejs')) {
+            return fallback[section];
+        }
+
+        throw new Error(`Kein Layout für Bereich '${section}' definiert`);
     }
 
     /**

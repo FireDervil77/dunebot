@@ -18,7 +18,7 @@
         "primaryColor": "#e74c3c",
         "accentColor": "#f39c12",
         "logo": "images/firebot-logo.png",
-        "favicon": "images/favicon.ico"
+        "favicon": "images/favicon.png"
     },
     "layouts": {
         "frontend": "layouts/frontend.ejs",

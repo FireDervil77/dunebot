@@ -1,3 +1,9 @@
+<%#
+ * Frontend-Fußbereich: Bedienelemente und Skript-Ausgabe.
+ *
+ * Die Bibliotheken kommen aus dem AssetManager — angemeldet in `theme.js`
+ * (registerAssets), eingereiht pro Bereich (enqueueAssets).
+%>
 
 <!-- Scroll Top -->
 <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
@@ -5,29 +11,15 @@
 <!-- Preloader -->
 <div id="preloader"></div>
 
-<!-- jQuery ZUERST (Bootstrap braucht es!) -->
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<!-- Skripte: Theme + Plugins (AssetManager, Footer) -->
+<% if (locals.assetManager) { %>
+  <%- assetManager.renderScripts(true) %>
+<% } %>
 
-<!-- Vendor JS Files -->
-<script src="/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-<script src="/public/vendor/php-email-form/validate.js"></script>
-<script src="/public/vendor/aos/aos.js"></script>
-<script src="/public/vendor/waypoints/noframework.waypoints.js"></script>
-<script src="/public/vendor/purecounter/purecounter_vanilla.js"></script>
-<script src="/public/vendor/glightbox/js/glightbox.min.js"></script>
-<script src="/public/vendor/imagesloaded/imagesloaded.pkgd.min.js"></script>
-<script src="/public/vendor/isotope-layout/isotope.pkgd.min.js"></script>
-<script src="/public/vendor/swiper/swiper-bundle.min.js"></script>
-
-
+<%# Zusätzliche View-Skripte, die eine Route über `scripts` mitgibt %>
 <% locals.scripts?.forEach(function(script) { %>
 <script src="<%= script %>"></script>
 <% }); %>
 
-
-<!-- Main JS File -->
-<script src="<%= theme.asset('js/frontend.js') %>"></script>
-
 <!-- Language Switcher -->
 <%- includePartial('frontend/language_switcher', locals) %>
-

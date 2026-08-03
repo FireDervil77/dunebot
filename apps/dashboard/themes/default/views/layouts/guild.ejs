@@ -100,30 +100,10 @@
     </div>
     <!--end::App Wrapper-->
 
-<!-- SERVING SCRIPTS -->
-<!--begin::Third Party Plugin(OverlayScrollbars)-->
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
-
-<!-- Bootstrap MUSS VOR body-Content geladen werden! -->
-<script src="/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-
-<script
-      src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"
-      crossorigin="anonymous"
-    ></script>
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.5/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-
-<!-- Toastr - Global Toast Notifications -->
-<script src="https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.js" crossorigin="anonymous"></script>
-
-<!-- Global Toast System -->
-<script src="/themes/default/assets/js/global-toast.js"></script>
-
-<!-- Toast Notification Center -->
-<script src="/themes/default/assets/js/toast-notification-center.js"></script>
-<script src="/themes/default/assets/js/adminlte.min.js"></script>
-
+<%#
+  i18n steht bewusst VOR der Skript-Ausgabe: guild.js und global-toast.js
+  greifen auf window.i18n zu, also muss das Objekt vorher gesetzt sein.
+%>
 <!-- i18n Übersetzungen für Client-Side JavaScript -->
 <script>
 window.i18n = {
@@ -155,11 +135,10 @@ window.i18n = {
 };
 </script>
 
-<script src="/themes/default/assets/js/button-loading.js"></script>
-<script src="/themes/default/assets/js/data-table.js"></script>
-<script src="/themes/default/assets/js/guild.js"></script>
-<script src="/themes/default/assets/js/guild-switcher.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" crossorigin="anonymous"></script>
+<!-- Skripte: Theme + Plugins (AssetManager, Footer) -->
+<% if (locals.assetManager) { %>
+  <%- assetManager.renderScripts(true) %>
+<% } %>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -211,11 +190,6 @@ window.i18n = {
     }
 });
 </script>
-
-<!-- Plugin Scripts (AssetManager - Footer) -->
-<% if (locals.assetManager) { %>
-  <%- assetManager.renderScripts(true) %>
-<% } %>
 
 <!-- Plugin Partial Scripts (von includePluginPartial extrahiert) -->
 <% if (locals._pluginScripts && locals._pluginScripts.length > 0) { %>

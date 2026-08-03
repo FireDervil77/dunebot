@@ -6,21 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= locals.title ? `${title} - FireBot` : 'FireBot - Authentifizierung' %></title>
     <%- locals.csrfMetaTag || '' %>
-    <script src="/themes/default/assets/js/csrf-helper.js"></script>
 
     <!-- Favicon -->
-    <link rel="icon" href="<%= theme.asset('images/favicon.ico') %>" type="image/x-icon">
-    
-    <!-- Theme CSS -->
-    <link rel="stylesheet" href="<%= theme.asset('css/adminlte.min.css') %>">
-    <link rel="stylesheet" href="<%= theme.asset('css/auth.css') %>">
+    <link rel="icon" href="<%= theme.asset('images/favicon.png') %>" type="image/png">
 
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Bootstrap -->
-    <link rel="stylesheet" href="/public/vendor/bootstrap/css/bootstrap.min.css?v=<%= cacheBuster %>" type="text/css">
+    <!-- Styles: Theme + Plugins (AssetManager) -->
+    <% if (locals.assetManager) { %>
+      <%- assetManager.renderStyles() %>
+    <% } %>
+
+    <!-- Head-Skripte: Theme + Plugins (AssetManager) -->
+    <% if (locals.assetManager) { %>
+      <%- assetManager.renderScripts(false) %>
+    <% } %>
 
     <!-- Hook: auth_head -->
     <% if (locals.hooks && hooks.getViewHooks) { %>
@@ -64,15 +62,10 @@
 
 </main>
 
-<!-- jQuery (von CDN mit CSP-konformer Quelle) -->
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
-  
-<!-- Bootstrap JS (optional lokal) -->
-<script src="/public/vendor/bootstrap/js/bootstrap.bundle.min.js?v=<%= cacheBuster %>"></script>
-
-<!-- Theme JS -->
-<script src="<%= theme.asset('js/adminlte.min.js') %>"></script>
-<script src="<%= theme.asset('js/auth.js') %>"></script>
+<!-- Skripte: Theme + Plugins (AssetManager, Footer) -->
+<% if (locals.assetManager) { %>
+  <%- assetManager.renderScripts(true) %>
+<% } %>
 
 <!-- Hook: auth_footer_scripts -->
 <% if (locals.hooks && hooks.getViewHooks) { %>

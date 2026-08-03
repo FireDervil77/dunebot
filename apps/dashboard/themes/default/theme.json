@@ -18,7 +18,7 @@
         "primaryColor": "#3498db",
         "accentColor": "#f39c12",
         "logo": "images/dunebot-logo.png",
-        "favicon": "images/favicon.ico"
+        "favicon": "images/favicon.png"
     },
     "layouts": {
         "frontend": "layouts/frontend.ejs",

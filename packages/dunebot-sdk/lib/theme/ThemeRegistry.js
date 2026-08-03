@@ -16,42 +16,102 @@ class ThemeRegistry {
     }
 
     /**
-     * Theme-Konfiguration laden (für aktives Theme)
+     * Theme-Konfiguration laden (für aktives Theme).
+     *
+     * `theme.json` beschreibt das Theme (Metadaten, Layouts, Tokens),
+     * `theme.js` bringt sein Verhalten mit (Assets, Hooks, Widget-Bereiche).
+     * Beide werden geladen — die JSON ist keine Bedingung mehr dafür, dass
+     * das Modul übersprungen wird.
      */
     async loadThemeConfig() {
         const Logger = ServiceManager.get('Logger');
         const manager = this.manager;
-        
+
         try {
             const configPath = manager.PathConfig.getPath('theme', manager.activeTheme).config;
-            const jsModulePath = manager.PathConfig.getPath('theme', manager.activeTheme).module;
-            
+
             if (fs.existsSync(configPath)) {
                 manager.themeConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-            } else if (fs.existsSync(jsModulePath)) {
-                const ThemeModule = require(jsModulePath);
-                const themeInstance = new ThemeModule(manager.app);
-                manager.themeConfig = {
-                    name: themeInstance.name || manager.activeTheme,
-                    version: themeInstance.version || '1.0.0',
-                    description: themeInstance.description || 'Standard-Theme',
-                    author: themeInstance.author || 'System',
-                    layouts: themeInstance.layouts || {},
-                    info: themeInstance.info || {
-                        darkMode: false,
-                        supportRTL: false,
-                        responsive: true
-                    }
-                };
-                manager.themeInstance = themeInstance;
-                Logger.info(`Theme-Modul '${manager.themeConfig.name}' geladen`);
             }
-            
+
+            // theme.js ist unsere functions.php — immer laden, auch neben theme.json
+            const themeInstance = this.loadThemeModule(manager.activeTheme);
+
+            if (themeInstance) {
+                manager.themeInstance = themeInstance;
+
+                // Ohne theme.json die Metadaten aus dem Modul ableiten (Altbestand)
+                if (!fs.existsSync(configPath)) {
+                    manager.themeConfig = {
+                        name: themeInstance.name || manager.activeTheme,
+                        version: themeInstance.version || '1.0.0',
+                        description: themeInstance.description || 'Standard-Theme',
+                        author: themeInstance.author || 'System',
+                        layouts: this._normalizeLayouts(themeInstance.layouts),
+                        info: themeInstance.info || {
+                            darkMode: false,
+                            supportRTL: false,
+                            responsive: true
+                        }
+                    };
+                }
+            }
+
             return manager.themeConfig;
         } catch (error) {
             Logger.error('Fehler beim Laden der Theme-Konfiguration:', error);
             throw error;
         }
+    }
+
+    /**
+     * `theme.js` eines Themes laden und zu einer Instanz normalisieren.
+     *
+     * Erlaubt sind zwei Schreibweisen:
+     *  - `module.exports = class { … }`  → wird mit der App instanziiert
+     *  - `module.exports = { … }`        → wird unverändert verwendet
+     *
+     * @param {string} name - Theme-Verzeichnisname
+     * @returns {object|null} Theme-Instanz oder null, wenn es keine theme.js gibt
+     */
+    loadThemeModule(name) {
+        const Logger = ServiceManager.get('Logger');
+        const modulePath = this.manager.PathConfig.getPath('theme', name).module;
+
+        if (!fs.existsSync(modulePath)) return null;
+
+        try {
+            const exported = require(modulePath);
+            if (!exported) return null;
+
+            const instance = typeof exported === 'function'
+                ? new exported(this.manager.app)
+                : exported;
+
+            instance.themeName = instance.themeName || name;
+            Logger.debug(`[ThemeRegistry] theme.js für '${name}' geladen`);
+            return instance;
+        } catch (error) {
+            // Ein kaputtes Theme-Modul darf den Dashboard-Start nicht verhindern
+            Logger.error(`[ThemeRegistry] theme.js für '${name}' konnte nicht geladen werden:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Layout-Angaben auf reine Pfade bringen.
+     * Erlaubt sind `'layouts/guild.ejs'` und `{ path: 'layouts/guild.ejs' }`.
+     *
+     * @param {object} [layouts]
+     * @returns {object} Bereich → relativer Pfad
+     */
+    _normalizeLayouts(layouts = {}) {
+        return Object.fromEntries(
+            Object.entries(layouts || {}).map(([section, value]) => [
+                section,
+                typeof value === 'string' ? value : value?.path
+            ]).filter(([, value]) => Boolean(value))
+        );
     }
 
     /**
@@ -75,21 +135,20 @@ class ThemeRegistry {
             }
 
             if (fs.existsSync(jsModulePath)) {
-                const ThemeModule = require(jsModulePath);
-                const instance = new ThemeModule(manager.app);
+                const instance = this.loadThemeModule(name);
+                if (!instance) return null;
+
                 return {
                     name: instance.name || name,
                     displayName: instance.name || name,
                     version: instance.version || '1.0.0',
                     description: instance.description || '',
                     author: instance.author || 'System',
-                    parent: null,
+                    parent: instance.parent || null,
                     tags: [],
                     supports: instance.info || { darkMode: false, rtl: false, responsive: true },
                     config: instance.config || {},
-                    layouts: Object.fromEntries(
-                        Object.entries(instance.layouts || {}).map(([k, v]) => [k, v.path || v])
-                    )
+                    layouts: this._normalizeLayouts(instance.layouts)
                 };
             }
 
@@ -194,10 +253,38 @@ class ThemeRegistry {
 
         const themeJs = `/**
  * ${themeJson.displayName} — Child-Theme von ${sourceTheme}
+ *
+ * Wird nach dem Parent-Theme ausgeführt, kann dessen Anmeldungen also
+ * ergänzen oder ersetzen. Alle Methoden sind freiwillig.
  */
 module.exports = {
-    // registerHooks(hookManager) { },
-    // registerAssets(assetManager, themeName) { },
+    /**
+     * Eigene Assets anmelden. Ein relativer Name wird über die Theme-Kette
+     * aufgelöst — liegt die Datei hier, gewinnt sie gegen die des Parents.
+     *
+     * @param {object} am  - AssetManager
+     * @param {object} ctx - { themeManager, hooks, widgetManager, themeChain }
+     */
+    registerAssets(am, ctx) {
+        am.registerStyle('${newName}-custom', 'custom.css', { deps: ['guild-css'], version: '1.0.0' });
+    },
+
+    /**
+     * Pro Request: entscheiden, was in welchem Bereich geladen wird.
+     *
+     * @param {object} am      - AssetManager
+     * @param {string} section - 'guild', 'frontend' oder 'auth'
+     */
+    enqueueAssets(am, section) {
+        if (section === 'guild') am.enqueueStyle('${newName}-custom');
+    },
+
+    /**
+     * Filter und Aktionen anmelden.
+     *
+     * @param {object} hooks - Hook-System des PluginManagers
+     */
+    // registerHooks(hooks, ctx) { },
 };
 `;
 

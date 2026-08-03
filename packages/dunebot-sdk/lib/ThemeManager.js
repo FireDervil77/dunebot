@@ -37,6 +37,10 @@ class ThemeManager {
         this.currentLocals = {};
         /** @type {string[]} Geordnete Theme-Kette: [activeTheme, ...parents] */
         this._themeChain = ['default'];
+        /** @type {Array<{name: string, instance: object}>} Ausgeführte theme.js-Module (Eltern zuerst) */
+        this.themeModules = [];
+        /** @type {object} Zusammengeführte Layouts der Kette: Bereich → relativer Pfad */
+        this._layouts = {};
         /** @type {Map<string, string>} Guild → Theme In-Memory-Cache */
         this._themeGuildCache = new Map();
         
@@ -74,6 +78,7 @@ class ThemeManager {
 
     // --- ThemeRegistry ---
     async loadThemeConfig() { return this.registry.loadThemeConfig(); }
+    loadThemeModule(name) { return this.registry.loadThemeModule(name); }
     async loadTheme(name) { return this.registry.loadTheme(name); }
     async getInstalledThemes() { return this.registry.getInstalledThemes(); }
     async cloneTheme(sourceTheme, newName, options) { return this.registry.cloneTheme(sourceTheme, newName, options); }
@@ -112,18 +117,20 @@ class ThemeManager {
             // Parent-Chain aufbauen
             this._themeChain = await this.resolver.buildThemeChain(this.activeTheme);
             Logger.debug(`[ThemeManager] Theme-Chain: ${this._themeChain.join(' → ')}`);
-            
+
+            // Layout-Angaben der Kette zusammenführen (Kind schlägt Elternteil)
+            this._layouts = await this.buildLayoutMap();
+            Logger.debug('[ThemeManager] Layouts:', this._layouts);
+
             // View-Engine konfigurieren
             this.setupViewEngine();
-            
-            // Theme-Assets registrieren
+
+            // Statische Asset-Routen registrieren
             this.registerThemeAssets();
-            
-            // Hooks registrieren
-            if (this.themeInstance && typeof this.themeInstance.registerHooks === 'function') {
-                this.themeInstance.registerHooks();
-            }
-            
+
+            // theme.js der gesamten Kette ausführen (Eltern zuerst, Kind zuletzt)
+            await this.bootThemeModules();
+
             Logger.success(`Theme '${this.activeTheme}' initialisiert`);
             return true;
         } catch (error) {
@@ -243,8 +250,8 @@ class ThemeManager {
                 );
             }
 
-            if (this.theme?.routes) {
-                Object.entries(this.theme.routes).forEach(([routePath, handler]) => {
+            if (this.themeInstance?.routes) {
+                Object.entries(this.themeInstance.routes).forEach(([routePath, handler]) => {
                     routerManager.register(routePath, handler, { theme: this.activeTheme });
                 });
             }
@@ -369,28 +376,121 @@ class ThemeManager {
         }
     }
 
-    async _loadThemeModule() {
+    // ============================================================================
+    // THEME-MODULE (theme.js — unsere functions.php)
+    // ============================================================================
+
+    /**
+     * Layout-Angaben der gesamten Theme-Kette zu einer Karte zusammenführen.
+     *
+     * Ein Child-Theme muss damit nur die Layouts nennen, die es wirklich
+     * ersetzt — alles andere erbt es von seinem Parent. Ohne das müsste jedes
+     * Child-Theme die vollständige Liste wiederholen.
+     *
+     * @returns {Promise<object>} Bereich → relativer Layout-Pfad
+     */
+    async buildLayoutMap() {
+        const merged = {};
+
+        // Vom ältesten Elternteil zum Kind, damit das Kind zuletzt überschreibt
+        for (const themeName of [...this._themeChain].reverse()) {
+            const meta = await this.registry.loadTheme(themeName);
+            const layouts = this.registry._normalizeLayouts(meta?.layouts);
+            Object.assign(merged, layouts);
+        }
+
+        return merged;
+    }
+
+    /**
+     * Kontext, den jedes Theme-Modul bekommt.
+     * Damit muss ein Theme nicht über `this.app` in fremde Interna greifen.
+     *
+     * @returns {object}
+     */
+    _themeModuleContext() {
+        const { getInstance: getWidgetManager } = require('./WidgetManager');
+
+        return {
+            app: this.app,
+            themeManager: this,
+            assetManager: ServiceManager.get('assetManager'),
+            hooks: this.app?.pluginManager?.hooks || null,
+            widgetManager: getWidgetManager(),
+            themeChain: [...this._themeChain]
+        };
+    }
+
+    /**
+     * `theme.js` der gesamten Theme-Kette laden und ausführen.
+     *
+     * Reihenfolge: Eltern zuerst, Kind zuletzt — damit ein Child-Theme
+     * überschreiben kann, was sein Parent angemeldet hat.
+     *
+     * Lebenszyklus pro Modul: initialize() → registerAssets() → registerHooks()
+     *
+     * @returns {Promise<void>}
+     */
+    async bootThemeModules() {
         const Logger = ServiceManager.get('Logger');
-        const PathConfig = this.PathConfig;
-        
-        try {
-            const themePath = PathConfig.getPath('theme', this.activeTheme).module;
-            
-            if (fs.existsSync(themePath)) {
-                const ThemeClass = require(themePath);
-                this.theme = new ThemeClass(this.app);
-                
-                await this.theme.initialize();
-                
-                this.themeConfig = {
-                    ...this.themeConfig,
-                    ...this.theme.config
-                };
-                
-                Logger.debug(`Theme '${this.activeTheme}' geladen`);
+        const context = this._themeModuleContext();
+
+        // _themeChain läuft vom Kind zum ältesten Elternteil → umdrehen
+        const bootOrder = [...this._themeChain].reverse();
+
+        this.themeModules = [];
+
+        for (const themeName of bootOrder) {
+            const instance = themeName === this.activeTheme && this.themeInstance
+                ? this.themeInstance
+                : this.registry.loadThemeModule(themeName);
+
+            if (!instance) continue;
+
+            try {
+                if (typeof instance.initialize === 'function') {
+                    await instance.initialize(context);
+                }
+                if (typeof instance.registerAssets === 'function') {
+                    await instance.registerAssets(context.assetManager, context);
+                }
+                if (typeof instance.registerHooks === 'function') {
+                    await instance.registerHooks(context.hooks, context);
+                }
+
+                this.themeModules.push({ name: themeName, instance });
+                Logger.debug(`[ThemeManager] theme.js '${themeName}' ausgeführt`);
+            } catch (error) {
+                // Ein Theme-Modul darf den Start nicht verhindern
+                Logger.error(`[ThemeManager] theme.js '${themeName}' warf einen Fehler:`, error);
             }
-        } catch (error) {
-            Logger.error(`Fehler beim Laden der Theme-Klasse für '${this.activeTheme}':`, error);
+        }
+
+        if (this.themeModules.length > 0) {
+            Logger.info(`Theme-Module aktiv: ${this.themeModules.map(m => m.name).join(' → ')}`);
+        }
+    }
+
+    /**
+     * Basis-Assets eines Bereichs einreihen (wie wp_enqueue_scripts).
+     * Wird pro Request aus dem Renderer gerufen, weil die Enqueue-Listen
+     * zwischen den Requests zurückgesetzt werden.
+     *
+     * @param {string} section - 'guild', 'frontend' oder 'auth'
+     * @returns {void}
+     */
+    enqueueForSection(section) {
+        const Logger = ServiceManager.get('Logger');
+        const assetManager = ServiceManager.get('assetManager');
+        if (!assetManager) return;
+
+        for (const { name, instance } of this.themeModules || []) {
+            if (typeof instance.enqueueAssets !== 'function') continue;
+            try {
+                instance.enqueueAssets(assetManager, section, this._themeModuleContext());
+            } catch (error) {
+                Logger.error(`[ThemeManager] enqueueAssets von '${name}' warf einen Fehler:`, error);
+            }
         }
     }
 }

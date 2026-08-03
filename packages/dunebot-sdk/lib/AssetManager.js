@@ -233,7 +233,7 @@ class AssetManager {
             if (asset.defer) attrs.push('defer');
             if (asset.async) attrs.push('async');
             
-            const versionedSrc = `${src}?ver=${asset.version}`;
+            const versionedSrc = this._withVersion(src, asset.version);
             scripts.push(
                 `<script src="${versionedSrc}"${attrs.length ? ' ' + attrs.join(' ') : ''}></script>`
             );
@@ -275,8 +275,8 @@ class AssetManager {
 
         for (const handle of handlesToRender) {
             const asset = this.styles.get(handle);
-            const versionedSrc = `${asset.src}?ver=${asset.version}`;
-            
+            const versionedSrc = this._withVersion(asset.src, asset.version);
+
             styles.push(
                 `<link rel="stylesheet" href="${versionedSrc}" media="${asset.media}">`
             );
@@ -369,6 +369,20 @@ class AssetManager {
         // Fallback: default Theme
         const activeTheme = themeManager?.activeTheme || 'default';
         return `/themes/${activeTheme}/assets/${type}/${src}`;
+    }
+
+    /**
+     * Hängt die Version an eine URL an, ohne eine vorhandene Query zu zerstören.
+     * Nötig für Quellen wie Google Fonts, deren URL schon ein `?` enthält.
+     *
+     * @private
+     * @param {string} src
+     * @param {string} version
+     * @returns {string}
+     */
+    _withVersion(src, version) {
+        if (!version) return src;
+        return `${src}${src.includes('?') ? '&' : '?'}ver=${version}`;
     }
 
     /**
