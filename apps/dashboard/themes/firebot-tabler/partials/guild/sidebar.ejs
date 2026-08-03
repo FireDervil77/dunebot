@@ -1,0 +1,159 @@
+<%#
+ * Seitenleiste — Tabler-Fassung
+ *
+ * Baut auf denselben Daten auf wie die Fassung im Standard-Theme (`guildNav`,
+ * `activeMenu`, `user`), nur mit Tabler-Bauteilen: `.navbar-vertical` statt
+ * `.app-sidebar`, `.nav-link-icon`/`.nav-link-title` statt `<i>` + `<p>`,
+ * Untermenüs als Dropdown statt als `nav-treeview`.
+ *
+ * Der Systembereich wird aus einer Datenliste erzeugt statt aus 150 Zeilen
+ * wiederholtem Markup.
+%>
+
+<%
+  const _brandUrl = (typeof guildId !== 'undefined' && guildId) ? '/guild/' + guildId : '/guild';
+  const _navItems = (typeof guildNav !== 'undefined' && guildNav && guildNav.length) ? guildNav : [];
+  const _aktiv    = typeof activeMenu === 'string' ? activeMenu : '';
+
+  const _nachOrdnung = (a, b) => (a.sort_order || a.order || 0) - (b.sort_order || b.order || 0);
+
+  const _u = (typeof locals !== 'undefined' && locals.user) ? locals.user : (typeof user !== 'undefined' ? user : null);
+  const _istSystemNutzer = _u && (_u.isOwner === true || _u.hasSystemAccess === true);
+  const _adminPfad = _aktiv.startsWith('/admin') ? _aktiv : '';
+
+  // Systembereich als Daten — Reihenfolge und Inhalt an einem Ort
+  const _system = [
+    { url: '/admin',               titel: 'Übersicht',          icon: 'fa-solid fa-gauge-high' },
+    { url: '/admin/content',       titel: 'Content Management', icon: 'fa-solid fa-layer-group', kinder: [
+        { url: '/admin/content?tab=news',          titel: 'News' },
+        { url: '/admin/content?tab=changelogs',    titel: 'Changelogs' },
+        { url: '/admin/content?tab=notifications', titel: 'Benachrichtigungen' },
+        { url: '/admin/content?tab=settings',      titel: 'Einstellungen' },
+        { url: '/admin/docs',                      titel: 'Dokumentation' }
+    ] },
+    { url: '/admin/stats',         titel: 'Statistiken',        icon: 'fa-solid fa-chart-bar' },
+    { url: '/admin/feedback',      titel: 'Feedback',           icon: 'fa-solid fa-comments' },
+    { url: '/admin/donations',     titel: 'Spenden',            icon: 'fa-solid fa-hand-holding-heart' },
+    { url: '/admin/addons',        titel: 'Addon-Marketplace',  icon: 'fa-solid fa-puzzle-piece' },
+    { url: '/admin/plugin-badges', titel: 'Plugin Badges',      icon: 'fa-solid fa-tags' },
+    { url: '/admin/themes',        titel: 'Themes',             icon: 'fa-solid fa-palette', kinder: [
+        { url: '/admin/themes',           titel: 'Übersicht' },
+        { url: '/admin/themes/widgets',   titel: 'Widget-Bereiche' },
+        { url: '/admin/themes/frontpage', titel: 'Frontpage' },
+        { url: '/admin/themes/pages',     titel: 'Seiten' },
+        { url: '/admin/themes/menu',      titel: 'Navigation' },
+        { url: '/admin/themes/footer',    titel: 'Footer' }
+    ] }
+  ];
+
+  // Ein Eintrag ist aktiv, wenn er selbst getroffen ist oder eines seiner Kinder
+  const _istAktiv = (eintrag, kinder) =>
+    _aktiv === eintrag.url || (kinder || []).some(k => _aktiv === k.url);
+%>
+
+<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
+  <div class="container-fluid">
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#sidebar-menu" aria-controls="sidebar-menu"
+            aria-expanded="false" aria-label="Navigation umschalten">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="navbar-brand navbar-brand-autodark">
+      <a href="<%= _brandUrl %>" class="d-flex align-items-center gap-2 text-decoration-none">
+        <img src="<%= typeof resolveAssetUrl === 'function' ? resolveAssetUrl('images/firebot.png') : '/themes/default/assets/images/firebot.png' %>"
+             alt="FireBot" width="32" height="32" class="rounded">
+        <span class="fw-semibold">FireBot</span>
+      </a>
+    </div>
+
+    <div class="collapse navbar-collapse" id="sidebar-menu">
+
+      <%# ── Navigation der Guild ─────────────────────────────────────────── %>
+      <% if (_navItems.length === 0) { %>
+        <div class="text-secondary small px-3 py-2">
+          <i class="bi bi-info-circle me-1"></i> <%= tr('DASHBOARD_COMMON.NO_NAVIGATION') %>
+        </div>
+      <% } else { %>
+        <ul class="navbar-nav pt-lg-2">
+          <% _navItems.slice().sort(_nachOrdnung).forEach(eintrag => {
+               const kinder = (eintrag.subItems || []).slice().sort(_nachOrdnung);
+               const aktiv  = _istAktiv(eintrag, kinder);
+               const id     = 'nav-' + String(eintrag.url || '').replace(/[^a-z0-9]+/gi, '-');
+          %>
+            <% if (kinder.length > 0) { %>
+              <li class="nav-item dropdown <%= aktiv ? 'active' : '' %>">
+                <a class="nav-link dropdown-toggle" href="#<%= id %>" data-bs-toggle="dropdown"
+                   role="button" aria-expanded="<%= aktiv ? 'true' : 'false' %>">
+                  <span class="nav-link-icon"><i class="<%= eintrag.icon || 'fa-solid fa-circle' %>"></i></span>
+                  <span class="nav-link-title"><%= tr(eintrag.title, eintrag.title) %></span>
+                </a>
+                <div class="dropdown-menu <%= aktiv ? 'show' : '' %>">
+                  <% kinder.forEach(kind => { %>
+                    <a class="dropdown-item <%= _aktiv === kind.url ? 'active' : '' %>" href="<%= kind.url %>">
+                      <%= tr(kind.title, kind.title) %>
+                    </a>
+                  <% }); %>
+                </div>
+              </li>
+            <% } else { %>
+              <li class="nav-item <%= aktiv ? 'active' : '' %>">
+                <a class="nav-link" href="<%= eintrag.url %>">
+                  <span class="nav-link-icon"><i class="<%= eintrag.icon || 'fa-solid fa-circle' %>"></i></span>
+                  <span class="nav-link-title">
+                    <%= tr(eintrag.title, eintrag.title) %>
+                    <% if (eintrag.url && eintrag.url.includes('/plugins') && locals.pendingUpdatesCount > 0) { %>
+                      <span class="badge bg-warning text-dark ms-1"><%= locals.pendingUpdatesCount %></span>
+                    <% } %>
+                  </span>
+                </a>
+              </li>
+            <% } %>
+          <% }); %>
+        </ul>
+      <% } %>
+
+      <%# ── Systembereich — nur für Owner und System-Admins ──────────────── %>
+      <% if (_istSystemNutzer) { %>
+        <div class="mt-3 mb-1 px-3 text-uppercase fw-semibold" style="font-size:.7rem; letter-spacing:.08em; color: var(--fb-accent);">
+          <i class="fa-solid fa-shield-halved me-1"></i> System
+        </div>
+        <ul class="navbar-nav">
+          <% _system.forEach(eintrag => {
+               const kinder = eintrag.kinder || [];
+               const aktiv  = kinder.length
+                 ? _adminPfad.startsWith(eintrag.url)
+                 : _adminPfad === eintrag.url;
+               const id = 'sys-' + eintrag.url.replace(/[^a-z0-9]+/gi, '-');
+          %>
+            <% if (kinder.length > 0) { %>
+              <li class="nav-item dropdown <%= aktiv ? 'active' : '' %>">
+                <a class="nav-link dropdown-toggle" href="#<%= id %>" data-bs-toggle="dropdown"
+                   role="button" aria-expanded="<%= aktiv ? 'true' : 'false' %>">
+                  <span class="nav-link-icon"><i class="<%= eintrag.icon %>"></i></span>
+                  <span class="nav-link-title"><%= eintrag.titel %></span>
+                </a>
+                <div class="dropdown-menu <%= aktiv ? 'show' : '' %>">
+                  <% kinder.forEach(kind => { %>
+                    <a class="dropdown-item <%= _adminPfad === kind.url ? 'active' : '' %>" href="<%= kind.url %>">
+                      <%= kind.titel %>
+                    </a>
+                  <% }); %>
+                </div>
+              </li>
+            <% } else { %>
+              <li class="nav-item <%= aktiv ? 'active' : '' %>">
+                <a class="nav-link" href="<%= eintrag.url %>">
+                  <span class="nav-link-icon"><i class="<%= eintrag.icon %>"></i></span>
+                  <span class="nav-link-title"><%= eintrag.titel %></span>
+                </a>
+              </li>
+            <% } %>
+          <% }); %>
+        </ul>
+      <% } %>
+
+    </div>
+  </div>
+</aside>

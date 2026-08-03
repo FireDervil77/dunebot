@@ -11,6 +11,7 @@
         "dev": "nodemon index.js"
     },
     "dependencies": {
+        "@tabler/core": "1.4.0",
         "connect-mongo": "^5.1.0",
         "cryptr": "^6.3.0",
         "discord-oauth2": "^2.12.1",

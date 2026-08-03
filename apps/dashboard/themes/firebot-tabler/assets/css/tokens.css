@@ -1,0 +1,203 @@
+/*!
+ * FireBot Design-Tokens — Fassung für Tabler
+ *
+ * Die Rollen (`--fb-*`) sind dieselben wie im Standard-Theme. Nur die Brücke
+ * zielt woanders hin: Tabler benennt Bootstraps Variablen-Präfix von `--bs-`
+ * auf `--tblr-` um und bringt rund 830 eigene mit.
+ *
+ * Genau deshalb ist die Brücke eine eigene Datei pro Theme — die Rollen bleiben
+ * stabil, der Unterbau darf wechseln. Wer Farben ändern will, fasst nur
+ * Abschnitt 1 an oder setzt die Werte über `theme.json` bzw. den Theme-Editor.
+ *
+ * @author FireDervil
+ */
+
+/* ==========================================================================
+   1. ROLLEN — Standardwerte. theme.json und der Editor überschreiben sie.
+   ========================================================================== */
+
+:root {
+    --fb-primary: #3498db;
+    --fb-primary-rgb: 52, 152, 219;
+    --fb-primary-hover: #2980b9;
+
+    --fb-accent: #f39c12;
+    --fb-accent-rgb: 243, 156, 18;
+
+    --fb-link: #3498db;
+    --fb-link-hover: #2980b9;
+
+    --fb-body-bg: #f6f8fb;
+    --fb-surface-bg: #ffffff;
+    --fb-header-bg: #ffffff;
+    --fb-sidebar-bg: #1d273b;
+
+    --fb-text: #1e293b;
+    --fb-text-muted: #667382;
+    --fb-heading: #1e293b;
+
+    --fb-sidebar-text: #adb5bd;
+    --fb-sidebar-hover-bg: #2b3a55;
+    --fb-sidebar-hover-text: #ffffff;
+    --fb-sidebar-active-bg: #2b3a55;
+    --fb-sidebar-active-text: #ffffff;
+
+    --fb-success: #2fb344;
+    --fb-warning: #f76707;
+    --fb-danger: #d63939;
+    --fb-info: #4299e1;
+
+    --fb-border: #e6e7e9;
+    --fb-radius: 4px;
+}
+
+/* ==========================================================================
+   2. BRÜCKE — Rollen auf Tabler legen
+   ========================================================================== */
+
+:root,
+[data-bs-theme="light"] {
+    --tblr-primary: var(--fb-primary);
+    --tblr-primary-rgb: var(--fb-primary-rgb);
+
+    --tblr-body-bg: var(--fb-body-bg);
+    --tblr-body-color: var(--fb-text);
+    --tblr-muted: var(--fb-text-muted);
+    --tblr-secondary: var(--fb-text-muted);
+
+    --tblr-link-color: var(--fb-link);
+    --tblr-link-hover-color: var(--fb-link-hover);
+
+    --tblr-border-color: var(--fb-border);
+    --tblr-border-radius: var(--fb-radius);
+
+    --tblr-bg-surface: var(--fb-surface-bg);
+
+    --tblr-success: var(--fb-success);
+    --tblr-warning: var(--fb-warning);
+    --tblr-danger: var(--fb-danger);
+    --tblr-info: var(--fb-info);
+}
+
+/* --- Karten und Tabellen -------------------------------------------------- */
+.card {
+    --tblr-card-bg: var(--fb-surface-bg);
+    --tblr-card-border-color: var(--fb-border);
+    --tblr-card-cap-bg: var(--fb-surface-bg);
+    --tblr-card-color: var(--fb-text);
+}
+
+.table {
+    --tblr-table-bg: var(--fb-surface-bg);
+    --tblr-table-color: var(--fb-text);
+    --tblr-table-border-color: var(--fb-border);
+}
+
+/* --- Obere Leiste --------------------------------------------------------- */
+.navbar:not(.navbar-vertical) {
+    --tblr-navbar-bg: var(--fb-header-bg);
+    --tblr-navbar-border-color: var(--fb-border);
+}
+
+/* --- Seitenleiste --------------------------------------------------------- */
+.navbar-vertical {
+    --tblr-navbar-bg: var(--fb-sidebar-bg);
+    --tblr-navbar-color: var(--fb-sidebar-text);
+    --tblr-navbar-hover-color: var(--fb-sidebar-hover-text);
+    --tblr-navbar-active-color: var(--fb-sidebar-active-text);
+    --tblr-navbar-active-bg: var(--fb-sidebar-active-bg);
+    --tblr-navbar-brand-color: var(--fb-sidebar-hover-text);
+    --tblr-navbar-border-color: transparent;
+}
+
+.navbar-vertical .nav-link:hover {
+    background-color: var(--fb-sidebar-hover-bg);
+}
+
+/* --- Schaltflächen -------------------------------------------------------- */
+.btn-primary {
+    --tblr-btn-bg: var(--fb-primary);
+    --tblr-btn-border-color: var(--fb-primary);
+    --tblr-btn-hover-bg: var(--fb-primary-hover);
+    --tblr-btn-hover-border-color: var(--fb-primary-hover);
+    --tblr-btn-active-bg: var(--fb-primary-hover);
+    --tblr-btn-active-border-color: var(--fb-primary-hover);
+    --tblr-btn-disabled-bg: var(--fb-primary);
+    --tblr-btn-disabled-border-color: var(--fb-primary);
+}
+
+.btn-outline-primary {
+    --tblr-btn-color: var(--fb-primary);
+    --tblr-btn-border-color: var(--fb-primary);
+    --tblr-btn-hover-bg: var(--fb-primary);
+    --tblr-btn-hover-border-color: var(--fb-primary);
+    --tblr-btn-active-bg: var(--fb-primary);
+    --tblr-btn-active-border-color: var(--fb-primary);
+}
+
+.btn-warning { --tblr-btn-bg: var(--fb-accent); --tblr-btn-border-color: var(--fb-accent); }
+.btn-success { --tblr-btn-bg: var(--fb-success); --tblr-btn-border-color: var(--fb-success); }
+.btn-danger  { --tblr-btn-bg: var(--fb-danger);  --tblr-btn-border-color: var(--fb-danger); }
+.btn-info    { --tblr-btn-bg: var(--fb-info);    --tblr-btn-border-color: var(--fb-info); }
+
+/* ==========================================================================
+   3. ÜBERGANGSHILFE — AdminLTE-Bauteile, solange sie noch in Views stehen
+   --------------------------------------------------------------------------
+   `info-box`, `small-box` und `callout` kommen an rund 180 Stellen vor. Bis sie
+   auf Tabler-Bauteile gezogen sind, bekommen sie hier ein Minimum an Form,
+   damit die Seiten nicht auseinanderfallen. Dieser Abschnitt ist zum Löschen
+   gedacht, nicht zum Ausbauen.
+   ========================================================================== */
+
+.info-box,
+.small-box {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: var(--fb-surface-bg);
+    border: 1px solid var(--fb-border);
+    border-radius: var(--fb-radius);
+}
+
+.info-box .info-box-icon,
+.small-box .icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--fb-radius);
+    background: var(--fb-primary);
+    color: #fff;
+    flex: 0 0 auto;
+}
+
+.info-box-text,
+.small-box p {
+    color: var(--fb-text-muted);
+    font-size: .875rem;
+    margin: 0;
+}
+
+.info-box-number,
+.small-box h3 {
+    color: var(--fb-text);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.callout {
+    padding: .75rem 1rem;
+    margin-bottom: 1rem;
+    background: var(--fb-surface-bg);
+    border: 1px solid var(--fb-border);
+    border-left: 3px solid var(--fb-primary);
+    border-radius: var(--fb-radius);
+}
+
+.content-header {
+    padding: 0 0 1rem;
+}

@@ -1,0 +1,179 @@
+<%#
+ * Guild-Layout — Tabler-Gerüst
+ *
+ * Struktur nach Tablers kanonischem Aufbau (shared/layouts/DefaultLayout):
+ *
+ *   .page
+ *     aside.navbar.navbar-vertical      ← Seitenleiste
+ *     header.navbar.navbar-expand-md    ← obere Leiste
+ *     .page-wrapper
+ *       .page-header                    ← Titelzeile
+ *       main#content.page-body
+ *         .container-fluid              ← volle Breite statt .container-xl
+ *       footer.footer
+ *
+ * Der <head> kommt über die Theme-Kette aus dem Standard-Theme — er ist
+ * gerüstunabhängig (AssetManager, Tokens, Guild-CSS).
+ *
+ * @author FireDervil
+%>
+<!DOCTYPE html>
+<html lang="<%= locals.lang || 'de' %>">
+<head>
+    <%- includePartial('guild/header') %>
+</head>
+<body>
+
+<a href="#content" class="visually-hidden skip-link">Zum Inhalt springen</a>
+
+<div class="page">
+
+    <%- includePartial('guild/sidebar') %>
+    <%- includePartial('guild/topbar') %>
+
+    <div class="page-wrapper">
+
+        <%# ── Titelzeile ──────────────────────────────────────────────────── %>
+        <% if (locals.title) { %>
+        <div class="page-header d-print-none">
+            <div class="container-fluid">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title"><%= locals.title %></h2>
+                        <% if (locals.subtitle) { %>
+                            <div class="text-secondary mt-1"><%= locals.subtitle %></div>
+                        <% } %>
+                    </div>
+                    <% if (locals.pageActions) { %>
+                        <div class="col-auto ms-auto d-print-none"><%- locals.pageActions %></div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+        <% } %>
+
+        <%# ── Inhalt ──────────────────────────────────────────────────────── %>
+        <main id="content" class="page-body">
+            <div class="container-fluid">
+
+                <%# Systemmeldungen %>
+                <% if (locals.globalNotifications && globalNotifications.length > 0) { %>
+                    <div id="global-notifications-container">
+                        <% globalNotifications.forEach(notification => { %>
+                            <div class="alert alert-<%= notification.type || 'info' %> alert-dismissible"
+                                 role="alert" data-notification-id="<%= notification.id %>">
+                                <% if (notification.title) { %>
+                                    <h4 class="alert-title"><%- notification.title %></h4>
+                                <% } %>
+                                <div class="text-secondary"><%- notification.message %></div>
+                                <% if (notification.action_url && notification.action_text) { %>
+                                    <div class="mt-3">
+                                        <a href="<%- notification.action_url %>" class="btn btn-primary btn-sm" target="_blank" rel="noopener">
+                                            <%- notification.action_text %>
+                                        </a>
+                                    </div>
+                                <% } %>
+                                <button type="button" class="btn-close dismiss-notification-btn" aria-label="Schließen"></button>
+                            </div>
+                        <% }); %>
+                    </div>
+                <% } %>
+
+                <%- body %>
+
+            </div>
+        </main>
+
+        <%# ── Fußzeile ────────────────────────────────────────────────────── %>
+        <footer class="footer footer-transparent d-print-none">
+            <div class="container-fluid">
+                <div class="row text-center align-items-center flex-row-reverse">
+                    <div class="col-lg-auto ms-lg-auto">
+                        <ul class="list-inline list-inline-dots mb-0">
+                            <li class="list-inline-item"><a href="/documentation" class="link-secondary">Dokumentation</a></li>
+                            <li class="list-inline-item"><a href="/privacy" class="link-secondary">Datenschutz</a></li>
+                            <li class="list-inline-item"><a href="/tos" class="link-secondary">Nutzungsbedingungen</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-12 col-lg-auto mt-3 mt-lg-0">
+                        <ul class="list-inline list-inline-dots mb-0">
+                            <li class="list-inline-item">
+                                &copy; <%= new Date().getFullYear() %> FireBot
+                            </li>
+                            <li class="list-inline-item text-secondary">
+                                Dashboard <%= typeof dashboardVersion !== 'undefined' ? dashboardVersion : '1.0.0' %>
+                                &middot; Bot <%= typeof botVersion !== 'undefined' ? botVersion : '1.0.0' %>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </footer>
+
+    </div>
+</div>
+
+<%#
+  i18n steht bewusst VOR der Skript-Ausgabe: guild.js und global-toast.js
+  greifen auf window.i18n zu, also muss das Objekt vorher gesetzt sein.
+%>
+<script>
+window.i18n = {
+    TOAST_MESSAGES: {
+        PLUGIN_ENABLED: "<%= tr('TOAST_MESSAGES.PLUGIN_ENABLED') %>",
+        PLUGIN_DISABLED: "<%= tr('TOAST_MESSAGES.PLUGIN_DISABLED') %>",
+        PLUGIN_ERROR: "<%= tr('TOAST_MESSAGES.PLUGIN_ERROR') %>",
+        SETTINGS_SAVED: "<%= tr('TOAST_MESSAGES.SETTINGS_SAVED') %>",
+        SETTINGS_ERROR: "<%= tr('TOAST_MESSAGES.SETTINGS_ERROR') %>",
+        LOCALE_UPDATED: "<%= tr('TOAST_MESSAGES.LOCALE_UPDATED') %>",
+        LOCALE_ERROR: "<%= tr('TOAST_MESSAGES.LOCALE_ERROR') %>",
+        GENERIC_SUCCESS: "<%= tr('TOAST_MESSAGES.GENERIC_SUCCESS') %>",
+        GENERIC_ERROR: "<%= tr('TOAST_MESSAGES.GENERIC_ERROR') %>",
+        LOADING_ERROR: "<%= tr('TOAST_MESSAGES.LOADING_ERROR') %>"
+    },
+    COMMON: {
+        NETWORK_ERROR: "Netzwerkfehler oder Serverfehler"
+    }
+};
+</script>
+
+<!-- Skripte: Theme + Plugins (AssetManager, Footer) -->
+<% if (locals.assetManager) { %>
+  <%- assetManager.renderScripts(true) %>
+<% } %>
+
+<!-- Aus Plugin-Partials extrahierte Skripte -->
+<% if (locals._pluginScripts && locals._pluginScripts.length > 0) { %>
+  <% locals._pluginScripts.forEach(function(script) { %>
+    <%- script %>
+  <% }); %>
+<% } %>
+
+<!-- View-Skripte (express-ejs-layouts) -->
+<% if (typeof script !== 'undefined') { %>
+  <%- script %>
+<% } %>
+
+<script>
+// Systemmeldung schließen und serverseitig vermerken
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.dismiss-notification-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var box = this.closest('[data-notification-id]');
+            var id  = box ? box.getAttribute('data-notification-id') : null;
+            if (id) {
+                fetch('/api/notifications/dismiss/' + id, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
+                }).catch(function () {});
+            }
+        });
+    });
+});
+</script>
+
+<div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
+
+</body>
+</html>

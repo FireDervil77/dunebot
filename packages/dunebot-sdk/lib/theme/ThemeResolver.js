@@ -26,6 +26,31 @@ class ThemeResolver {
      * @returns {Promise<string[]>} Kette vom Kind zum ältesten Elternteil
      */
     async buildThemeChain(themeName) {
+        const chain = await this.buildDeclaredChain(themeName);
+
+        // Sicherstellen, dass 'default' immer am Ende steht
+        if (!chain.includes('default')) {
+            chain.push('default');
+        }
+
+        return chain;
+    }
+
+    /**
+     * Nur die **erklärte** Eltern-Kette — ohne das automatisch angehängte
+     * 'default'.
+     *
+     * Der Unterschied ist wichtig: Für Views und Assets soll 'default' immer
+     * als Auffangnetz dienen (ein Theme muss nicht alle 106 Views mitbringen).
+     * Für `theme.js` gilt das **nicht** — sonst würde ein eigenständiges Theme
+     * die Assets des Standard-Themes mit einreihen und AdminLTE ungewollt
+     * mitladen. Ein Theme baut nur dann auf einem anderen auf, wenn es das in
+     * seiner theme.json über `parent` ausdrücklich sagt.
+     *
+     * @param {string} themeName
+     * @returns {Promise<string[]>} Kette vom Kind zum ältesten erklärten Elternteil
+     */
+    async buildDeclaredChain(themeName) {
         const chain = [];
         let current = themeName;
         const visited = new Set();
@@ -36,11 +61,6 @@ class ThemeResolver {
 
             const meta = await this.manager.registry.loadTheme(current);
             current = meta?.parent || null;
-        }
-
-        // Sicherstellen, dass 'default' immer am Ende steht
-        if (!chain.includes('default')) {
-            chain.push('default');
         }
 
         return chain;

@@ -1,0 +1,103 @@
+<%#
+ * Obere Leiste — Tabler-Fassung
+ *
+ * Entspricht `guild/header_topbar` im Standard-Theme, aber mit Tabler-Bauteilen.
+ * Enthält Guild-Umschalter, Sprachwahl, Benachrichtigungen und das Nutzermenü.
+%>
+
+<%
+  const _guildId   = typeof guildId !== 'undefined' ? guildId : null;
+  const _guildName = (typeof guild !== 'undefined' && guild) ? (guild.name || 'Server') : 'Server';
+  const _u         = (typeof locals !== 'undefined' && locals.user) ? locals.user : null;
+  const _info      = _u && _u.info ? _u.info : _u;
+  const _meldungen = (typeof locals !== 'undefined' && locals.globalNotifications) ? locals.globalNotifications : [];
+%>
+
+<header class="navbar navbar-expand-md d-print-none">
+  <div class="container-fluid">
+
+    <button class="navbar-toggler collapsed" type="button" data-bs-toggle="collapse"
+            data-bs-target="#sidebar-menu" aria-label="Navigation umschalten">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <%# ── Aktueller Server ──────────────────────────────────────────────── %>
+    <div class="navbar-nav flex-row order-md-first">
+      <div class="nav-item d-flex align-items-center">
+        <span class="text-secondary small me-2 d-none d-md-inline">Server</span>
+        <a href="/guild" class="fw-semibold text-reset text-decoration-none" title="Server wechseln">
+          <%= _guildName %>
+          <i class="fa-solid fa-angle-down ms-1 small"></i>
+        </a>
+      </div>
+    </div>
+
+    <div class="navbar-nav flex-row order-md-last">
+
+      <%# ── Benachrichtigungen ──────────────────────────────────────────── %>
+      <div class="nav-item dropdown d-none d-md-flex me-2">
+        <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1"
+           aria-label="Benachrichtigungen anzeigen">
+          <i class="fa-regular fa-bell fs-3"></i>
+          <% if (_meldungen.length > 0) { %>
+            <span class="badge bg-red badge-notification badge-blink"><%= _meldungen.length %></span>
+          <% } %>
+        </a>
+        <div class="dropdown-menu dropdown-menu-end dropdown-menu-card">
+          <div class="card">
+            <div class="card-header"><h3 class="card-title mb-0">Benachrichtigungen</h3></div>
+            <div class="list-group list-group-flush list-group-hoverable">
+              <% if (_meldungen.length === 0) { %>
+                <div class="list-group-item text-secondary small">Nichts Neues.</div>
+              <% } else { %>
+                <% _meldungen.slice(0, 5).forEach(m => { %>
+                  <div class="list-group-item">
+                    <div class="row align-items-center">
+                      <div class="col-auto"><span class="status-dot status-dot-animated bg-<%= m.type || 'blue' %> d-block"></span></div>
+                      <div class="col text-truncate">
+                        <span class="text-reset d-block"><%- m.title || '' %></span>
+                        <div class="d-block text-secondary text-truncate mt-n1"><%- m.message || '' %></div>
+                      </div>
+                    </div>
+                  </div>
+                <% }); %>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <%# ── Nutzermenü ──────────────────────────────────────────────────── %>
+      <div class="nav-item dropdown">
+        <a href="#" class="nav-link d-flex lh-1 p-0 px-2" data-bs-toggle="dropdown" aria-label="Nutzermenü öffnen">
+          <span class="avatar avatar-sm rounded"
+                style="background-image: url(<%= typeof getUserAvatar === 'function' ? getUserAvatar(_u, 64) : '' %>)"></span>
+          <div class="d-none d-xl-block ps-2">
+            <div><%= _info && _info.username ? _info.username : 'Angemeldet' %></div>
+            <div class="mt-1 small text-secondary">
+              <% if (_u && (_u.isOwner || _u.hasSystemAccess)) { %>System<% } else { %>Mitglied<% } %>
+            </div>
+          </div>
+        </a>
+        <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+          <% if (_guildId) { %>
+            <a href="/guild/<%= _guildId %>/profile" class="dropdown-item">
+              <i class="fa-regular fa-user me-2"></i>Profil
+            </a>
+            <a href="/guild/<%= _guildId %>/settings" class="dropdown-item">
+              <i class="fa-solid fa-sliders me-2"></i>Einstellungen
+            </a>
+            <div class="dropdown-divider"></div>
+          <% } %>
+          <a href="/guild" class="dropdown-item">
+            <i class="fa-solid fa-repeat me-2"></i>Server wechseln
+          </a>
+          <a href="/auth/logout" class="dropdown-item text-danger">
+            <i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Abmelden
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</header>

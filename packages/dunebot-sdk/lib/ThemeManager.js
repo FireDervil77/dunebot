@@ -35,8 +35,10 @@ class ThemeManager {
         this.themeConfig = {};
         this.themeContext = {};
         this.currentLocals = {};
-        /** @type {string[]} Geordnete Theme-Kette: [activeTheme, ...parents] */
+        /** @type {string[]} Geordnete Theme-Kette für Views/Assets: [activeTheme, ...parents, 'default'] */
         this._themeChain = ['default'];
+        /** @type {string[]} Erklärte Eltern-Kette für theme.js — ohne das angehängte 'default' */
+        this._moduleChain = ['default'];
         /** @type {Array<{name: string, instance: object}>} Ausgeführte theme.js-Module (Eltern zuerst) */
         this.themeModules = [];
         /** @type {object} Zusammengeführte Layouts der Kette: Bereich → relativer Pfad */
@@ -119,7 +121,9 @@ class ThemeManager {
 
             // Parent-Chain aufbauen
             this._themeChain = await this.resolver.buildThemeChain(this.activeTheme);
+            this._moduleChain = await this.resolver.buildDeclaredChain(this.activeTheme);
             Logger.debug(`[ThemeManager] Theme-Chain: ${this._themeChain.join(' → ')}`);
+            Logger.debug(`[ThemeManager] Modul-Kette: ${this._moduleChain.join(' → ')}`);
 
             // Layout-Angaben und Tokens der Kette zusammenführen (Kind schlägt Elternteil)
             this._layouts = await this.buildLayoutMap();
@@ -475,8 +479,10 @@ class ThemeManager {
         const Logger = ServiceManager.get('Logger');
         const context = this._themeModuleContext();
 
-        // _themeChain läuft vom Kind zum ältesten Elternteil → umdrehen
-        const bootOrder = [...this._themeChain].reverse();
+        // Nur die erklärte Kette: ein Theme ohne `parent` bringt seine Assets
+        // allein mit und erbt nicht ungefragt die des Standard-Themes.
+        // Vom ältesten Elternteil zum Kind → umdrehen.
+        const bootOrder = [...this._moduleChain].reverse();
 
         this.themeModules = [];
 

@@ -620,6 +620,21 @@ module.exports = class App {
         // Beispiel: /public/vendor/bootstrap/css/bootstrap.min.css
         this.app.use('/public', express.static(path.join(__dirname, 'public')));
 
+        // Bibliotheken, die als npm-Abhängigkeit gepflegt werden, statt als Kopie
+        // im Repo zu liegen. Aktualisieren heißt dann `npm update`, nicht
+        // "Dateien austauschen und hoffen".
+        // Beispiel: /vendor/tabler/css/tabler.min.css
+        for (const [urlPfad, paketPfad] of Object.entries({
+            '/vendor/tabler': '@tabler/core/dist'
+        })) {
+            try {
+                const wurzel = path.dirname(require.resolve(`${paketPfad.split('/dist')[0]}/package.json`));
+                this.app.use(urlPfad, express.static(path.join(wurzel, 'dist')));
+            } catch {
+                // Paket nicht installiert — das Theme, das es braucht, meldet sich schon
+            }
+        }
+
         // robots.txt — Suchmaschinen von geschützten Bereichen fernhalten
         this.app.get('/robots.txt', (req, res) => {
             res.type('text/plain').send([
