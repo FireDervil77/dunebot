@@ -543,12 +543,13 @@ module.exports = class App {
                         "https://cdnjs.cloudflare.com" // Font Awesome
                     ],
                     scriptSrc: [
-                        "'self'", 
-                        "'unsafe-inline'", 
-                        "'unsafe-eval'", 
+                        "'self'",
+                        "'unsafe-inline'",
+                        "'unsafe-eval'",
                         "https://cdn.jsdelivr.net",
                         "https://cdnjs.cloudflare.com", // Font Awesome
-                        "https://js.stripe.com" // Stripe SDK
+                        "https://js.stripe.com", // Stripe SDK
+                        "https://www.googletagmanager.com" // GTM-Loader (siehe frontend/consent.ejs)
                     ],
                     scriptSrcAttr: ["'unsafe-inline'"], // Inline Event Handler (onclick, onload, etc.)
                     fontSrc: [
@@ -566,12 +567,15 @@ module.exports = class App {
                         "https://cdn.jsdelivr.net", // Source Maps für Chart.js, Toastr, etc.
                         "https://cdnjs.cloudflare.com", // Source Maps für Font Awesome, etc.
                         "https://api.stripe.com", // Stripe API
-                        "https://checkout.stripe.com" // Stripe Checkout
+                        "https://checkout.stripe.com", // Stripe Checkout
+                        "https://www.googletagmanager.com", // GTM-Container nachladen
+                        "https://www.google-analytics.com" // Messwerte senden
                     ],
                     frameSrc: [
                         "'self'",
                         "https://js.stripe.com", // Stripe Elements iframe
-                        "https://checkout.stripe.com" // Stripe Checkout iframe
+                        "https://checkout.stripe.com", // Stripe Checkout iframe
+                        "https://www.googletagmanager.com" // GTM-noscript-iframe
                     ],
                     formAction: [
                         "'self'",
