@@ -47,6 +47,10 @@ class ThemeManager {
         this._tokens = {};
         /** @type {Map<string, string>} Guild → Theme In-Memory-Cache */
         this._themeGuildCache = new Map();
+        /** @type {Map<string, object>} Theme-Name → Kontext (Kette, Layouts, Tokens, Module) */
+        this._contexts = new Map();
+        /** @type {string[]|null} Kette, gegen die gerade Assets angemeldet werden */
+        this._registeringChain = null;
         
         this.themesDir = this.PathConfig.getPath('dashboard').themes;
         this.viewPaths = {
@@ -70,7 +74,7 @@ class ThemeManager {
 
     // --- ThemeRenderer ---
     async renderView(res, view, data = {}) { return this.renderer.renderView(res, view, data); }
-    getLayout(section) { return this.renderer.getLayout(section); }
+    getLayout(section, ctx) { return this.renderer.getLayout(section, ctx); }
     async renderWidgetPartial(widgetName, data = {}) { return this.renderer.renderWidgetPartial(widgetName, data); }
     setupViewEngine() { return this.renderer.setupViewEngine(); }
 
@@ -130,18 +134,19 @@ class ThemeManager {
             this._tokens = await this.buildTokenMap();
             Logger.debug('[ThemeManager] Layouts:', this._layouts);
 
-            // Tokens aus theme.json stehen allen Views zur Verfügung. Sie ändern
-            // sich nach dem Start nicht mehr, also einmal rendern statt pro Request.
-            this.setGlobalVar('themeTokensCSS', this.renderThemeTokens());
-
             // View-Engine konfigurieren
             this.setupViewEngine();
 
             // Statische Asset-Routen registrieren
             this.registerThemeAssets();
 
-            // theme.js der gesamten Kette ausführen (Eltern zuerst, Kind zuletzt)
-            await this.bootThemeModules();
+            // Kontexte für ALLE installierten Themes bauen und deren theme.js
+            // ausführen. Erst dadurch kann eine Guild ihr Theme im Betrieb
+            // wählen — sonst wäre nur das beim Start gesetzte benutzbar.
+            await this.buildAllContexts();
+
+            // Tokens des aktiven Themes als Vorgabe für Views ohne Guild-Bezug
+            this.setGlobalVar('themeTokensCSS', this.getThemeContext()?.tokensCSS || '');
 
             Logger.success(`Theme '${this.activeTheme}' initialisiert`);
             return true;
@@ -398,10 +403,10 @@ class ThemeManager {
      *
      * @returns {Promise<object>} Token-Name → Wert
      */
-    async buildTokenMap() {
+    async buildTokenMap(chain = this._themeChain) {
         const merged = {};
 
-        for (const themeName of [...this._themeChain].reverse()) {
+        for (const themeName of [...chain].reverse()) {
             const meta = await this.registry.loadTheme(themeName);
             if (meta?.tokens && typeof meta.tokens === 'object') {
                 Object.assign(merged, meta.tokens);
@@ -420,8 +425,8 @@ class ThemeManager {
      *
      * @returns {string} CSS-Block oder leerer String
      */
-    renderThemeTokens() {
-        return this.customizer.buildTokenBlock(this._tokens);
+    renderThemeTokens(tokens = this._tokens) {
+        return this.customizer.buildTokenBlock(tokens);
     }
 
     /**
@@ -433,11 +438,11 @@ class ThemeManager {
      *
      * @returns {Promise<object>} Bereich → relativer Layout-Pfad
      */
-    async buildLayoutMap() {
+    async buildLayoutMap(chain = this._themeChain) {
         const merged = {};
 
         // Vom ältesten Elternteil zum Kind, damit das Kind zuletzt überschreibt
-        for (const themeName of [...this._themeChain].reverse()) {
+        for (const themeName of [...chain].reverse()) {
             const meta = await this.registry.loadTheme(themeName);
             const layouts = this.registry._normalizeLayouts(meta?.layouts);
             Object.assign(merged, layouts);
@@ -452,7 +457,7 @@ class ThemeManager {
      *
      * @returns {object}
      */
-    _themeModuleContext() {
+    _themeModuleContext(ctx = null) {
         const { getInstance: getWidgetManager } = require('./WidgetManager');
 
         return {
@@ -461,7 +466,8 @@ class ThemeManager {
             assetManager: ServiceManager.get('assetManager'),
             hooks: this.app?.pluginManager?.hooks || null,
             widgetManager: getWidgetManager(),
-            themeChain: [...this._themeChain]
+            themeName: ctx ? ctx.name : this.activeTheme,
+            themeChain: [...(ctx ? ctx.chain : this._themeChain)]
         };
     }
 
@@ -475,45 +481,191 @@ class ThemeManager {
      *
      * @returns {Promise<void>}
      */
-    async bootThemeModules() {
+    /**
+     * Namen aller installierten Themes (Verzeichnisnamen).
+     * @returns {string[]}
+     */
+    installierteThemes() {
+        try {
+            return fs.readdirSync(this.themesDir, { withFileTypes: true })
+                .filter(e => e.isDirectory() && !e.name.startsWith('.') && !e.name.startsWith('_'))
+                .map(e => e.name);
+        } catch {
+            return ['default'];
+        }
+    }
+
+    /**
+     * Alles zusammentragen, was ein Theme zum Rendern braucht.
+     *
+     * @param {string} name
+     * @returns {Promise<object>} Theme-Kontext
+     */
+    async buildContext(name) {
+        const chain = await this.resolver.buildThemeChain(name);
+        const moduleChain = await this.resolver.buildDeclaredChain(name);
+        const layouts = await this.buildLayoutMap(chain);
+        const tokens = await this.buildTokenMap(chain);
+
+        return {
+            name,
+            chain,
+            moduleChain,
+            layouts,
+            tokens,
+            tokensCSS: this.renderThemeTokens(tokens),
+            modules: []
+        };
+    }
+
+    /**
+     * Für jedes installierte Theme einen Kontext bauen und sein theme.js
+     * ausführen. Läuft einmal beim Start.
+     *
+     * @returns {Promise<void>}
+     */
+    async buildAllContexts() {
         const Logger = ServiceManager.get('Logger');
-        const context = this._themeModuleContext();
+        this._contexts = new Map();
 
-        // Nur die erklärte Kette: ein Theme ohne `parent` bringt seine Assets
-        // allein mit und erbt nicht ungefragt die des Standard-Themes.
-        // Vom ältesten Elternteil zum Kind → umdrehen.
-        const bootOrder = [...this._moduleChain].reverse();
-
-        this.themeModules = [];
-
-        for (const themeName of bootOrder) {
-            const instance = themeName === this.activeTheme && this.themeInstance
-                ? this.themeInstance
-                : this.registry.loadThemeModule(themeName);
-
-            if (!instance) continue;
-
+        for (const name of this.installierteThemes()) {
             try {
-                if (typeof instance.initialize === 'function') {
-                    await instance.initialize(context);
-                }
-                if (typeof instance.registerAssets === 'function') {
-                    await instance.registerAssets(context.assetManager, context);
-                }
-                if (typeof instance.registerHooks === 'function') {
-                    await instance.registerHooks(context.hooks, context);
-                }
-
-                this.themeModules.push({ name: themeName, instance });
-                Logger.debug(`[ThemeManager] theme.js '${themeName}' ausgeführt`);
+                const ctx = await this.buildContext(name);
+                await this.bootThemeModules(ctx);
+                this._contexts.set(name, ctx);
             } catch (error) {
-                // Ein Theme-Modul darf den Start nicht verhindern
-                Logger.error(`[ThemeManager] theme.js '${themeName}' warf einen Fehler:`, error);
+                Logger.error(`[ThemeManager] Kontext für Theme '${name}' fehlgeschlagen:`, error);
             }
         }
 
-        if (this.themeModules.length > 0) {
-            Logger.info(`Theme-Module aktiv: ${this.themeModules.map(m => m.name).join(' → ')}`);
+        // Rückwärtsverträglichkeit: die Felder des aktiven Themes bleiben gesetzt
+        const aktiv = this._contexts.get(this.activeTheme);
+        if (aktiv) {
+            this._themeChain = aktiv.chain;
+            this._moduleChain = aktiv.moduleChain;
+            this._layouts = aktiv.layouts;
+            this._tokens = aktiv.tokens;
+            this.themeModules = aktiv.modules;
+        }
+
+        Logger.info(`Theme-Kontexte bereit: ${[...this._contexts.keys()].join(', ')}`);
+    }
+
+    /**
+     * Kontext eines Themes holen — mit Rückfall auf das aktive und auf 'default'.
+     *
+     * @param {string} [name]
+     * @returns {object|null}
+     */
+    getThemeContext(name = this.activeTheme) {
+        if (!this._contexts) return null;
+        return this._contexts.get(name)
+            || this._contexts.get(this.activeTheme)
+            || this._contexts.get('default')
+            || null;
+    }
+
+    /**
+     * Kontext für die laufende Anfrage ermitteln — die Guild entscheidet.
+     *
+     * @param {import('express').Response} res
+     * @returns {Promise<object|null>}
+     */
+    async getContextForRequest(res) {
+        const guildId = res?.locals?.guildId || null;
+
+        if (guildId) {
+            try {
+                const name = await this.getThemeForGuild(guildId);
+                return this.getThemeContext(name);
+            } catch {
+                // DB nicht erreichbar → aktives Theme
+            }
+        }
+
+        return this.getThemeContext();
+    }
+
+    /**
+     * Fassade, die alle Handles eines Themes mit seinem Namen versieht.
+     *
+     * `registerStyle('tokens', …)` wird zu `default::tokens`. Damit können
+     * mehrere Themes gleichzeitig angemeldet sein, ohne sich die Namen
+     * wegzunehmen. Im Theme selbst bleibt der Code unverändert.
+     *
+     * @param {object} assetManager
+     * @param {string} themeName
+     * @returns {object} Fassade mit derselben Oberfläche
+     */
+    _assetFassade(assetManager, themeName) {
+        const mitPrefix = handle => `${themeName}::${handle}`;
+        const deps = (opts = {}) => ({
+            ...opts,
+            deps: (opts.deps || []).map(mitPrefix)
+        });
+
+        return {
+            registerScript:       (h, src, o = {}) => assetManager.registerScript(mitPrefix(h), src, deps(o)),
+            registerStyle:        (h, src, o = {}) => assetManager.registerStyle(mitPrefix(h), src, deps(o)),
+            registerVendorScript: (h, src, o = {}) => assetManager.registerVendorScript(mitPrefix(h), src, deps(o)),
+            registerVendorStyle:  (h, src, o = {}) => assetManager.registerVendorStyle(mitPrefix(h), src, deps(o)),
+            enqueueScript:        h => assetManager.enqueueScript(mitPrefix(h)),
+            enqueueStyle:         h => assetManager.enqueueStyle(mitPrefix(h)),
+            addInlineScript:      (h, code) => assetManager.addInlineScript(mitPrefix(h), code)
+        };
+    }
+
+    /**
+     * `theme.js` der erklärten Kette eines Kontexts ausführen.
+     *
+     * Reihenfolge: Eltern zuerst, Kind zuletzt — damit ein Child-Theme
+     * überschreiben kann, was sein Parent angemeldet hat.
+     * Lebenszyklus pro Modul: initialize() → registerAssets() → registerHooks()
+     *
+     * @param {object} ctx - Theme-Kontext
+     * @returns {Promise<void>}
+     */
+    async bootThemeModules(ctx) {
+        const Logger = ServiceManager.get('Logger');
+        const context = this._themeModuleContext(ctx);
+        const assetManager = ServiceManager.get('assetManager');
+        const fassade = assetManager ? this._assetFassade(assetManager, ctx.name) : null;
+
+        ctx.modules = [];
+
+        // Relative Asset-Pfade gegen die Kette DIESES Themes auflösen,
+        // nicht gegen die des gerade aktiven.
+        this._registeringChain = ctx.chain;
+
+        try {
+            for (const themeName of [...ctx.moduleChain].reverse()) {
+                const instance = this.registry.loadThemeModule(themeName);
+                if (!instance) continue;
+
+                try {
+                    if (typeof instance.initialize === 'function') {
+                        await instance.initialize(context);
+                    }
+                    if (typeof instance.registerAssets === 'function') {
+                        await instance.registerAssets(fassade, context);
+                    }
+                    if (typeof instance.registerHooks === 'function' && ctx.name === this.activeTheme) {
+                        // Hooks nur einmal anmelden — sie sind nicht pro Theme getrennt
+                        await instance.registerHooks(context.hooks, context);
+                    }
+
+                    ctx.modules.push({ name: themeName, instance });
+                } catch (error) {
+                    // Ein Theme-Modul darf den Start nicht verhindern
+                    Logger.error(`[ThemeManager] theme.js '${themeName}' warf einen Fehler:`, error);
+                }
+            }
+        } finally {
+            this._registeringChain = null;
+        }
+
+        if (ctx.modules.length > 0) {
+            Logger.debug(`[ThemeManager] '${ctx.name}': ${ctx.modules.map(m => m.name).join(' → ')}`);
         }
     }
 
@@ -525,15 +677,17 @@ class ThemeManager {
      * @param {string} section - 'guild', 'frontend' oder 'auth'
      * @returns {void}
      */
-    enqueueForSection(section) {
+    enqueueForSection(section, ctx = this.getThemeContext()) {
         const Logger = ServiceManager.get('Logger');
         const assetManager = ServiceManager.get('assetManager');
-        if (!assetManager) return;
+        if (!assetManager || !ctx) return;
 
-        for (const { name, instance } of this.themeModules || []) {
+        const fassade = this._assetFassade(assetManager, ctx.name);
+
+        for (const { name, instance } of ctx.modules || []) {
             if (typeof instance.enqueueAssets !== 'function') continue;
             try {
-                instance.enqueueAssets(assetManager, section, this._themeModuleContext());
+                instance.enqueueAssets(fassade, section, this._themeModuleContext(ctx));
             } catch (error) {
                 Logger.error(`[ThemeManager] enqueueAssets von '${name}' warf einen Fehler:`, error);
             }

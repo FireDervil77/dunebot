@@ -48,13 +48,42 @@ class ThemeRenderer {
             // 4. Alle View-Daten in res.locals mergen für express-ejs-layouts
             Object.assign(res.locals, viewData);
 
-            // 5. Layout NACH dem Merge setzen
-            res.locals.layout = this.getLayout(section);
+            // 5. Theme dieser Anfrage bestimmen — die Guild entscheidet.
+            const ctx = await this.manager.getContextForRequest(res);
 
-            // 5b. Basis-Assets des Themes für diesen Bereich einreihen.
-            //     Muss pro Request passieren, weil die Enqueue-Listen zwischen
-            //     den Requests zurückgesetzt werden.
-            this.manager.enqueueForSection(section);
+            if (ctx) {
+                res.locals.themeChain     = ctx.chain;
+                res.locals.themeTokensCSS = ctx.tokensCSS;
+                res.locals.activeTheme    = ctx.name;
+                viewData.themeChain       = ctx.chain;
+                viewData.themeTokensCSS   = ctx.tokensCSS;
+
+                // Damit Plugins weiterhin `enqueueScript('guild')` schreiben können
+                ServiceManager.get('assetManager')?.setThemeForRequest?.(ctx.name);
+
+                // Asset-Helfer an die Kette dieser Anfrage binden — sonst zeigten
+                // sie auf das beim Start gesetzte Theme.
+                const anKette = (pfad) => this.manager.resolver.resolveAssetUrl(pfad, ctx.chain);
+                res.locals.resolveAssetUrl = anKette;
+                res.locals.theme = {
+                    ...(this.manager.app.locals.theme || {}),
+                    asset: (pfad) => {
+                        if (!pfad || typeof pfad !== 'string') return anKette('images/favicon.png');
+                        if (/^https?:\/\//i.test(pfad)) return pfad;
+                        return anKette(pfad);
+                    }
+                };
+                viewData.theme = res.locals.theme;
+                viewData.resolveAssetUrl = anKette;
+            }
+
+            // 6. Layout NACH dem Merge setzen
+            res.locals.layout = this.getLayout(section, ctx);
+
+            // 7. Basis-Assets des Themes für diesen Bereich einreihen.
+            //    Muss pro Request passieren, weil die Warteschlange der
+            //    einzelnen Anfrage gehört.
+            this.manager.enqueueForSection(section, ctx);
 
             Logger.debug('Render Context:', {
                 view,
@@ -72,7 +101,7 @@ class ThemeRenderer {
             Logger.debug('[ThemeRenderer] Template-Hierarchie:', hierarchy);
 
             const resolvedPath = hierarchy
-                .map(candidate => this.manager.resolver.resolveViewPath(candidate, pluginName))
+                .map(candidate => this.manager.resolver.resolveViewPath(candidate, pluginName, ctx?.chain))
                 .find(p => p !== null);
 
             if (resolvedPath) {
@@ -99,15 +128,18 @@ class ThemeRenderer {
      * @param {string} section - Bereich (guild, frontend, auth)
      * @returns {string} Absoluter Layout-Pfad ohne Endung (für express-ejs-layouts)
      */
-    getLayout(section) {
+    getLayout(section, ctx = null) {
         const manager = this.manager;
-        const declared = manager._layouts?.[section] ?? manager.themeConfig?.layouts?.[section];
+        const layouts = ctx?.layouts || manager._layouts;
+        const chain   = ctx?.chain   || manager._themeChain;
+
+        const declared = layouts?.[section] ?? manager.themeConfig?.layouts?.[section];
         const relative = typeof declared === 'string' ? declared : declared?.path;
 
         if (relative) {
             const withoutExt = relative.replace(/\.ejs$/i, '');
 
-            for (const themeName of manager._themeChain) {
+            for (const themeName of chain) {
                 const viewsDir = manager.PathConfig.getPath('theme', themeName).views;
                 const candidate = path.join(viewsDir, withoutExt);
                 if (fs.existsSync(candidate + '.ejs')) return candidate;
@@ -115,7 +147,7 @@ class ThemeRenderer {
         }
 
         // Notnagel: fest verdrahtete Pfade aus PathConfig
-        const fallback = manager.PathConfig.getPath('dashboard').layouts(manager.activeTheme);
+        const fallback = manager.PathConfig.getPath('dashboard').layouts(ctx?.name || manager.activeTheme);
         if (fallback[section] && fs.existsSync(fallback[section] + '.ejs')) {
             return fallback[section];
         }
@@ -249,7 +281,9 @@ class ThemeRenderer {
 
                 Logger.debug(`[includePartial] ${filename} - Has guildId:`, typeof this.guildId !== 'undefined', this.guildId);
 
-                const filePath = themeManager.resolver.resolvePartialPath(filename);
+                // Kette der laufenden Anfrage — sonst gilt die des Startthemes
+                const kette = (this && this.themeChain) ? this.themeChain : undefined;
+                const filePath = themeManager.resolver.resolvePartialPath(filename, kette);
                 if (!filePath) {
                     Logger.warn(`Partial ${filename} nicht gefunden`);
                     return `<!-- Partial ${filename}.ejs nicht gefunden -->`;

@@ -49,7 +49,42 @@ class AssetManager {
      * @returns {*} Rückgabe des Rumpfes
      */
     inAnfrage(rumpf) {
-        return anfrageSpeicher.run({ scripts: new Set(), styles: new Set() }, rumpf);
+        return anfrageSpeicher.run({ scripts: new Set(), styles: new Set(), themePrefix: null }, rumpf);
+    }
+
+    /**
+     * Festlegen, welches Theme für die laufende Anfrage gilt.
+     *
+     * Theme-Handles sind mit dem Theme-Namen versehen (`default::tokens`),
+     * damit mehrere Themes gleichzeitig angemeldet sein können. Plugins kennen
+     * diese Schreibweise nicht — sie reihen `guild` ein und meinen das des
+     * gerade gültigen Themes. Der Präfix macht genau das möglich.
+     *
+     * @param {string} themeName
+     */
+    setThemeForRequest(themeName) {
+        const w = anfrageSpeicher.getStore();
+        if (w) w.themePrefix = themeName || null;
+    }
+
+    /**
+     * Handle auflösen: erst wörtlich, dann mit dem Präfix des Themes.
+     *
+     * @private
+     * @param {string} handle
+     * @param {Map} map
+     * @returns {string|null} tatsächlich vorhandenes Handle oder null
+     */
+    _handleAufloesen(handle, map) {
+        if (map.has(handle)) return handle;
+
+        const prefix = this._warteschlange.themePrefix;
+        if (prefix) {
+            const mitPrefix = `${prefix}::${handle}`;
+            if (map.has(mitPrefix)) return mitPrefix;
+        }
+
+        return null;
     }
 
     /**
@@ -173,10 +208,12 @@ class AssetManager {
      * @author FireBot Team
      */
     enqueueScript(handle) {
-        if (!this.scripts.has(handle)) {
+        const echt = this._handleAufloesen(handle, this.scripts);
+        if (!echt) {
             this.logger.warn(`Script '${handle}' ist nicht registriert! Registriere erst mit registerScript().`);
             return false;
         }
+        handle = echt;
 
         if (this.enqueuedScripts.has(handle)) {
             return true; // Bereits in der Queue
@@ -203,10 +240,12 @@ class AssetManager {
      * @author FireBot Team
      */
     enqueueStyle(handle) {
-        if (!this.styles.has(handle)) {
+        const echt = this._handleAufloesen(handle, this.styles);
+        if (!echt) {
             this.logger.warn(`Style '${handle}' ist nicht registriert!`);
             return false;
         }
+        handle = echt;
 
         if (this.enqueuedStyles.has(handle)) {
             return true;
@@ -405,7 +444,9 @@ class AssetManager {
         // Theme-Assets: aktives Theme aus ThemeManager ermitteln (Child → Parent Fallback)
         const themeManager = ServiceManager.get('themeManager');
         if (themeManager && typeof themeManager.resolveAssetUrl === 'function') {
-            return themeManager.resolveAssetUrl(`${type}/${src}`);
+            // Beim Start wird pro Theme angemeldet — dann gilt dessen Kette,
+            // nicht die des zufällig aktiven Themes.
+            return themeManager.resolveAssetUrl(`${type}/${src}`, themeManager._registeringChain || undefined);
         }
 
         // Fallback: default Theme
