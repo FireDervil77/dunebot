@@ -31,8 +31,8 @@ function _bereich(areaId) {
         .sort((a, b) => (a.position || 999) - (b.position || 999));
 }
 
-const _bereiche = (locals.widgetAreas && locals.widgetAreas.length)
-    ? locals.widgetAreas
+const _bereiche = (typeof widgetAreasFor === 'function' && widgetAreasFor('guild').length)
+    ? widgetAreasFor('guild')
     : [
         { id: 'dashboard-top',       defaultSize: 12 },
         { id: 'dashboard-primary',   defaultSize: 4  },

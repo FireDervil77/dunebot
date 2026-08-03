@@ -46,11 +46,11 @@ class WidgetManager {
      * @param {number|null} [options.maxWidgets] - Max. Anzahl Widgets (null = unbegrenzt)
      * @returns {void}
      */
-    registerArea(areaId, { label, description = '', maxWidgets = null, defaultSize = 12 } = {}) {
+    registerArea(areaId, { label, description = '', maxWidgets = null, defaultSize = 12, screen = 'guild' } = {}) {
         if (!areaId || typeof areaId !== 'string') {
             throw new Error('[WidgetManager] registerArea benötigt eine gültige areaId');
         }
-        this._areas.set(areaId, { label, description, maxWidgets, defaultSize });
+        this._areas.set(areaId, { label, description, maxWidgets, defaultSize, screen });
     }
 
     /**
@@ -65,8 +65,8 @@ class WidgetManager {
         if (!this._themeAreas.has(themeName)) {
             this._themeAreas.set(themeName, new Map());
         }
-        const { label, description = '', maxWidgets = null, defaultSize = 12 } = options;
-        this._themeAreas.get(themeName).set(areaId, { label, description, maxWidgets, defaultSize });
+        const { label, description = '', maxWidgets = null, defaultSize = 12, screen = 'guild' } = options;
+        this._themeAreas.get(themeName).set(areaId, { label, description, maxWidgets, defaultSize, screen });
     }
 
     /**
@@ -88,10 +88,24 @@ class WidgetManager {
      * @param {string} [themeName]
      * @returns {Array<{id: string, label: string, description: string, maxWidgets: number|null, defaultSize: number}>}
      */
-    getAreas(themeName = null) {
+    getAreas(themeName = null, screen = null) {
         const eigene = themeName ? this._themeAreas.get(themeName) : null;
-        const quelle = (eigene && eigene.size > 0) ? eigene : this._areas;
-        return Array.from(quelle.entries()).map(([id, meta]) => ({ id, ...meta }));
+
+        // Ein Theme, das eigene Bereiche mitbringt, ersetzt die Vorgaben — aber
+        // nur für die Bildschirme, die es auch bedient. Sagt es nichts über den
+        // Adminbereich, gelten dort weiter die Standardbereiche.
+        const zusammen = new Map(this._areas);
+        if (eigene && eigene.size > 0) {
+            const bedient = new Set([...eigene.values()].map(m => m.screen || 'guild'));
+            for (const [id, meta] of this._areas) {
+                if (bedient.has(meta.screen || 'guild')) zusammen.delete(id);
+            }
+            for (const [id, meta] of eigene) zusammen.set(id, meta);
+        }
+
+        return Array.from(zusammen.entries())
+            .map(([id, meta]) => ({ id, ...meta }))
+            .filter(a => !screen || (a.screen || 'guild') === screen);
     }
 
     // =========================================
@@ -286,6 +300,28 @@ function _registerDefaultAreas(wm) {
         label: 'Unten (Vollbreite)',
         description: 'Vollbreite-Karten am Ende des Dashboards',
         defaultSize: 12
+    });
+
+    // --- Adminbereich: eigene Bereiche, eigener Bildschirm -------------------
+    wm.registerArea('admin-top', {
+        label: 'Admin — Oben (Vollbreite)',
+        description: 'Hinweise über dem Inhalt',
+        defaultSize: 12, screen: 'admin'
+    });
+    wm.registerArea('admin-stats', {
+        label: 'Admin — Kennzahlen (4-spaltig)',
+        description: 'Zahlen auf einen Blick',
+        defaultSize: 3, screen: 'admin'
+    });
+    wm.registerArea('admin-primary', {
+        label: 'Admin — Hauptbereich (3-spaltig)',
+        description: 'Einstiege und Verknüpfungen',
+        defaultSize: 4, screen: 'admin'
+    });
+    wm.registerArea('admin-bottom', {
+        label: 'Admin — Unten (Vollbreite)',
+        description: 'Abschließende Karten',
+        defaultSize: 12, screen: 'admin'
     });
 }
 

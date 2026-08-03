@@ -34,6 +34,7 @@ class PluginManager extends BasePluginManager {
         // Filter-Hooks
         this.hooks.addFilter('guild_navigation_items', async (items) => items);
         this.hooks.addFilter('guild_dashboard_widgets', async (widgets) => widgets);
+        this.hooks.addFilter('admin_dashboard_widgets', async (widgets) => widgets);
         this.hooks.addFilter('guild_sections', async (sections) => sections);
         
         // Action-Hooks

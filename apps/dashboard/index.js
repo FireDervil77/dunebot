@@ -137,6 +137,12 @@ process.on('uncaughtException', (error) => {
         Logger.success("Dashboard-App erfolgreich initialisiert");
 
         // Kern-Widgets direkt beim Start registrieren (außerhalb des Plugin-Systems)
+        const { registerAdminWidgets } = require('./helpers/AdminWidgets');
+        registerAdminWidgets(
+            app.app.pluginManager,
+            app.app.themeManager
+        );
+
         const { registerKernWidgets } = require('./helpers/KernWidgets');
         registerKernWidgets(
             ServiceManager.get('pluginManager'),

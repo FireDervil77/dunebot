@@ -56,9 +56,13 @@ class ThemeRenderer {
                 res.locals.themeTokensCSS = ctx.tokensCSS;
                 res.locals.activeTheme    = ctx.name;
                 res.locals.widgetAreas    = ctx.widgetAreas || [];
+                // Bereiche eines Bildschirms ('guild' oder 'admin')
+                res.locals.widgetAreasFor = (screen) =>
+                    (ctx.widgetAreas || []).filter(a => (a.screen || 'guild') === screen);
                 viewData.themeChain       = ctx.chain;
                 viewData.themeTokensCSS   = ctx.tokensCSS;
                 viewData.widgetAreas      = res.locals.widgetAreas;
+                viewData.widgetAreasFor   = res.locals.widgetAreasFor;
 
                 // Damit Plugins weiterhin `enqueueScript('guild')` schreiben können
                 ServiceManager.get('assetManager')?.setThemeForRequest?.(ctx.name);

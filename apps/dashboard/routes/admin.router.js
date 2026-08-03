@@ -112,13 +112,31 @@ async function getGlobalStats(dbService) {
 router.get('/', async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
     const dbService = ServiceManager.get('dbService');
+    const pluginManager = ServiceManager.get('pluginManager');
 
     try {
         const stats = await getGlobalStats(dbService);
+
+        // Widgets einsammeln — Plugins können sich über denselben Filter
+        // danebenstellen, wie sie es beim Guild-Dashboard längst tun.
+        let widgets = [];
+        if (pluginManager?.hooks) {
+            widgets = await pluginManager.hooks.applyFilter(
+                'admin_dashboard_widgets', [], { req, res, stats, user: req.session?.user || null }
+            );
+        }
+
+        const { getInstance: getWidgetManager } = require('dunebot-sdk/lib/WidgetManager');
+        const widgetManager = getWidgetManager();
+
+        res.locals.renderWidgetArea = (areaId) =>
+            widgetManager.getWidgetsForArea(areaId, widgets, []);
+
         await themeManager.renderView(res, 'admin/dashboard', {
             title: 'Admin Dashboard',
             activeMenu: '/admin',
-            stats
+            stats,
+            widgets
         });
     } catch (error) {
         ServiceManager.get('Logger').error('[Admin] Fehler beim Dashboard:', error);

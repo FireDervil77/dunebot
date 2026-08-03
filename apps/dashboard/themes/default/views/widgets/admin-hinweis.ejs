@@ -1,0 +1,10 @@
+<%#
+ * Hinweisleiste im Adminbereich.
+ *
+ * @context {string} text
+ * @context {string} [icon]
+%>
+<div class="d-flex align-items-center">
+    <i class="<%= locals.icon || 'fa-solid fa-circle-info' %> me-2"></i>
+    <div><%- locals.text || '' %></div>
+</div>

@@ -1,0 +1,14 @@
+<%#
+ * Einstieg im Adminbereich — Beschreibung plus Schaltfläche.
+ *
+ * @context {string} text
+ * @context {string} url
+ * @context {string} knopf
+ * @context {string} [knopfKlasse]
+ * @context {string} [knopfIcon]
+%>
+<p class="mb-3"><%= locals.text || '' %></p>
+<a href="<%= locals.url || '#' %>" class="btn <%= locals.knopfKlasse || 'btn-primary' %>">
+    <% if (locals.knopfIcon) { %><i class="<%= knopfIcon %> me-2"></i><% } %>
+    <%= locals.knopf || 'Öffnen' %>
+</a>

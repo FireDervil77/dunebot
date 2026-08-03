@@ -1,0 +1,17 @@
+<%#
+ * Kennzahl im Adminbereich — eine Zahl mit Beschriftung.
+ * Wird mehrfach mit unterschiedlichen Daten gerendert.
+ *
+ * @context {string|number} wert
+ * @context {string} beschriftung
+ * @context {string} [icon]
+%>
+<div class="d-flex align-items-center justify-content-between">
+    <div>
+        <div class="display-6 fw-semibold" style="line-height:1.1;"><%= locals.wert ?? 0 %></div>
+        <div class="text-muted small"><%= locals.beschriftung || '' %></div>
+    </div>
+    <% if (locals.icon) { %>
+        <i class="<%= icon %> fa-2x text-muted opacity-50"></i>
+    <% } %>
+</div>
