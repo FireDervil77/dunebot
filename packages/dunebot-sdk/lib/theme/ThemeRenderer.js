@@ -83,6 +83,26 @@ class ThemeRenderer {
                 viewData.resolveAssetUrl = anKette;
             }
 
+            // Rechte-Helfer an die Daten dieser Anfrage binden.
+            //
+            // In app.locals lesen sie `this.userPermissions`. Bei einem
+            // schlichten `hasPermission('X')` in einer View gibt es dieses
+            // `this` aber nicht — der Helfer lieferte dort immer `false`.
+            // Aufgefallen ist es nie, weil ihn bis jetzt keine View benutzt hat.
+            const rechte = () => res.locals.userPermissions || {};
+            res.locals.hasPermission = (key) =>
+                this.manager.app.locals.hasPermission.call({ userPermissions: rechte() }, key);
+            res.locals.hasAnyPermission = (keys) =>
+                Array.isArray(keys) && keys.some(k => res.locals.hasPermission(k));
+            res.locals.hasAllPermissions = (keys) =>
+                Array.isArray(keys) && keys.every(k => res.locals.hasPermission(k));
+            res.locals.isGuildOwner = () => rechte().isOwner === true;
+
+            viewData.hasPermission     = res.locals.hasPermission;
+            viewData.hasAnyPermission  = res.locals.hasAnyPermission;
+            viewData.hasAllPermissions = res.locals.hasAllPermissions;
+            viewData.isGuildOwner      = res.locals.isGuildOwner;
+
             // 6. Layout NACH dem Merge setzen
             res.locals.layout = this.getLayout(section, ctx);
 
