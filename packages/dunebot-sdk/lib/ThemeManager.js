@@ -649,6 +649,10 @@ class ThemeManager {
                     if (typeof instance.registerAssets === 'function') {
                         await instance.registerAssets(fassade, context);
                     }
+                    if (typeof instance.registerWidgetAreas === 'function') {
+                        // Entspricht register_sidebar() in der functions.php
+                        await instance.registerWidgetAreas(context.widgetManager.fuerTheme(ctx.name), context);
+                    }
                     if (typeof instance.registerHooks === 'function' && ctx.name === this.activeTheme) {
                         // Hooks nur einmal anmelden — sie sind nicht pro Theme getrennt
                         await instance.registerHooks(context.hooks, context);
@@ -663,6 +667,10 @@ class ThemeManager {
         } finally {
             this._registeringChain = null;
         }
+
+        // Welche Widget-Bereiche für dieses Theme gelten — eigene, sonst die
+        // Standardbereiche des Kerns.
+        ctx.widgetAreas = context.widgetManager.getAreas(ctx.name);
 
         if (ctx.modules.length > 0) {
             Logger.debug(`[ThemeManager] '${ctx.name}': ${ctx.modules.map(m => m.name).join(' → ')}`);

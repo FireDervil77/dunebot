@@ -109,29 +109,20 @@ exports.getDashboard = async (req, res) => {
         // supportUrl, supportName, dashboardVersion, botVersion
 
         // Widget-Config aus DB (guild-spezifische Overrides laden)
+        const { getInstance: getWidgetManager } = require('dunebot-sdk/lib/WidgetManager');
+        const widgetManager = getWidgetManager();
+
         let guildWidgetOverrides = [];
         try {
-            const { getInstance: getWidgetManager } = require('dunebot-sdk/lib/WidgetManager');
-            const wm = getWidgetManager();
-            guildWidgetOverrides = await wm.getGuildWidgetConfig(guildId);
+            guildWidgetOverrides = await widgetManager.getGuildWidgetConfig(guildId);
         } catch (_) { /* Tabelle noch nicht vorhanden → kein Problem */ }
 
-        // renderWidgetArea-Helper für EJS: Widgets eines Bereichs als Array zurückgeben
-        const _widgetOverrideMap = new Map(guildWidgetOverrides.map(o => [o.widget_id, o]));
-        res.locals.renderWidgetArea = (areaId) => {
-            return widgets
-                .map(w => {
-                    const ov = _widgetOverrideMap.get(w.id);
-                    return {
-                        ...w,
-                        area:     ov?.area     ?? w.area     ?? 'dashboard-main',
-                        position: ov?.position ?? w.position ?? 999,
-                        visible:  ov?.visible  !== undefined ? Boolean(ov.visible) : (w.visible !== false),
-                    };
-                })
-                .filter(w => w.area === areaId && w.visible)
-                .sort((a, b) => a.position - b.position);
-        };
+        // Die Override-Kaskade (Guild > Widget > Registrierung > Vorgabe) steht
+        // im WidgetManager und **nur** dort. Sie lag früher zusätzlich hier und
+        // ein drittes Mal als Notlösung in der View — drei Kopien, die
+        // auseinanderlaufen konnten.
+        res.locals.renderWidgetArea = (areaId) =>
+            widgetManager.getWidgetsForArea(areaId, widgets, guildWidgetOverrides);
 
         // Template rendern (Theme-Hierarchy: guild/dashboard → ggf. Child-Theme-Override)
         const viewData = {

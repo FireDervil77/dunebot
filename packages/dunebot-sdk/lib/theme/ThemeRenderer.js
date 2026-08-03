@@ -55,8 +55,10 @@ class ThemeRenderer {
                 res.locals.themeChain     = ctx.chain;
                 res.locals.themeTokensCSS = ctx.tokensCSS;
                 res.locals.activeTheme    = ctx.name;
+                res.locals.widgetAreas    = ctx.widgetAreas || [];
                 viewData.themeChain       = ctx.chain;
                 viewData.themeTokensCSS   = ctx.tokensCSS;
+                viewData.widgetAreas      = res.locals.widgetAreas;
 
                 // Damit Plugins weiterhin `enqueueScript('guild')` schreiben können
                 ServiceManager.get('assetManager')?.setThemeForRequest?.(ctx.name);

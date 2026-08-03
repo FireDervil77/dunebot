@@ -20,6 +20,14 @@ class WidgetManager {
         /** @type {Map<string, {label: string, description: string, maxWidgets: number|null}>} */
         this._areas = new Map();
 
+        /**
+         * Bereiche, die ein Theme selbst mitbringt.
+         * Meldet ein Theme eigene an, gelten **nur** seine — es bestimmt sein
+         * Layout, nicht der Kern.
+         * @type {Map<string, Map<string, object>>} Theme-Name → Bereiche
+         */
+        this._themeAreas = new Map();
+
         /** @type {Map<string, {id: string, area: string, position: number, size: number, visible: boolean}>} */
         this._registeredWidgets = new Map();
     }
@@ -38,20 +46,52 @@ class WidgetManager {
      * @param {number|null} [options.maxWidgets] - Max. Anzahl Widgets (null = unbegrenzt)
      * @returns {void}
      */
-    registerArea(areaId, { label, description = '', maxWidgets = null } = {}) {
+    registerArea(areaId, { label, description = '', maxWidgets = null, defaultSize = 12 } = {}) {
         if (!areaId || typeof areaId !== 'string') {
             throw new Error('[WidgetManager] registerArea benötigt eine gültige areaId');
         }
-        this._areas.set(areaId, { label, description, maxWidgets });
+        this._areas.set(areaId, { label, description, maxWidgets, defaultSize });
     }
 
     /**
-     * Alle registrierten Bereiche zurückgeben.
+     * Einen Bereich für ein bestimmtes Theme anmelden (wie register_sidebar
+     * in der functions.php eines Themes).
      *
-     * @returns {Array<{id: string, label: string, description: string, maxWidgets: number|null}>}
+     * @param {string} themeName
+     * @param {string} areaId
+     * @param {object} options - wie bei registerArea
      */
-    getAreas() {
-        return Array.from(this._areas.entries()).map(([id, meta]) => ({ id, ...meta }));
+    registerAreaFor(themeName, areaId, options = {}) {
+        if (!this._themeAreas.has(themeName)) {
+            this._themeAreas.set(themeName, new Map());
+        }
+        const { label, description = '', maxWidgets = null, defaultSize = 12 } = options;
+        this._themeAreas.get(themeName).set(areaId, { label, description, maxWidgets, defaultSize });
+    }
+
+    /**
+     * Fassade für ein Theme — `registerArea` landet automatisch bei ihm.
+     *
+     * @param {string} themeName
+     * @returns {{registerArea: Function}}
+     */
+    fuerTheme(themeName) {
+        return {
+            registerArea: (areaId, options) => this.registerAreaFor(themeName, areaId, options)
+        };
+    }
+
+    /**
+     * Bereiche eines Themes — oder die Standardbereiche, wenn es keine eigenen
+     * mitbringt.
+     *
+     * @param {string} [themeName]
+     * @returns {Array<{id: string, label: string, description: string, maxWidgets: number|null, defaultSize: number}>}
+     */
+    getAreas(themeName = null) {
+        const eigene = themeName ? this._themeAreas.get(themeName) : null;
+        const quelle = (eigene && eigene.size > 0) ? eigene : this._areas;
+        return Array.from(quelle.entries()).map(([id, meta]) => ({ id, ...meta }));
     }
 
     // =========================================
@@ -230,18 +270,22 @@ function _registerDefaultAreas(wm) {
     wm.registerArea('dashboard-top', {
         label: 'Oben (Vollbreite)',
         description: 'Benachrichtigungen und Warnungen über dem Hauptinhalt',
+        defaultSize: 12
     });
     wm.registerArea('dashboard-primary', {
         label: 'Hauptbereich (3-spaltig)',
         description: 'Hauptkennzahlen in drei Spalten nebeneinander',
+        defaultSize: 4
     });
     wm.registerArea('dashboard-secondary', {
         label: 'Analysebereich (2-spaltig)',
         description: 'Analysekarten und erweiterte Informationen',
+        defaultSize: 6
     });
     wm.registerArea('dashboard-bottom', {
         label: 'Unten (Vollbreite)',
         description: 'Vollbreite-Karten am Ende des Dashboards',
+        defaultSize: 12
     });
 }
 

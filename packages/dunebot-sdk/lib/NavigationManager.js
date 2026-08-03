@@ -369,41 +369,6 @@ class NavigationManager {
     }
 
     /**
-     * Fügt ein Widget zum Dashboard hinzu
-     * @param {string} pluginName - Name des Plugins
-     * @param {string} guildId - ID der Guild
-     * @param {Object} widget - Eigenschaften des Widgets
-     * @returns {Promise<Object>} - Das erstellte Widget-Item
-     */
-    async addDashboardWidget(pluginName, guildId, widget) {
-        return (await this.registerNavigation(pluginName, guildId, [
-            {
-                ...widget,
-                type: this.menuTypes.WIDGET
-            }
-        ]))[0];
-    }
-
-    /**
-     * Fügt eine Metabox zu einer bestehenden Seite hinzu
-     * @param {string} pluginName - Name des Plugins
-     * @param {string} guildId - ID der Guild
-     * @param {string} screenId - ID der Seite, zu der die Metabox hinzugefügt werden soll
-     * @param {Object} metabox - Eigenschaften der Metabox
-     * @returns {Promise<Object>} - Das erstellte Metabox-Item
-     */
-    async addMetabox(pluginName, guildId, screenId, metabox) {
-        return (await this.registerNavigation(pluginName, guildId, [
-            {
-                ...metabox,
-                type: this.menuTypes.METABOX,
-                parent: screenId,
-                position: metabox.position || 'normal'
-            }
-        ]))[0];
-    }
-
-    /**
      * Lädt alle Navigationselemente für eine Guild (mit Permission-Filterung)
      * @param {string} guildId - ID der Guild
      * @param {string} [userId=null] - User ID für Permission-Check (null = keine Filterung)

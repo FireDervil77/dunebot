@@ -1,50 +1,50 @@
-<%# 
+<%#
   * Server-Dashboard-View
-  * Zeigt die Hauptübersicht für einen Discord-Server an
-  * 
-  * Widget-Bereiche (WordPress-Stil):
-  *  - dashboard-top       — Vollbreite, Benachrichtigungen
-  *  - dashboard-primary   — 3-spaltig, Hauptkennzahlen
-  *  - dashboard-secondary — 2-spaltig, Analyse
-  *  - dashboard-bottom    — Vollbreite, Support
+  *
+  * Die Widget-Bereiche kommen aus dem aktiven Theme, nicht aus dieser Datei.
+  * Ein Theme meldet sie in seiner `theme.js` über `registerWidgetAreas()` an —
+  * wie `register_sidebar()` in WordPress. Bringt es keine eigenen mit, gelten
+  * die vier Standardbereiche des Kerns.
   *
   * @author FireDervil
-  * @context {Object} guild - Discord Guild-Objekt
-  * @context {Array} widgets - Dashboard-Widgets (mit area/position-Metadaten)
-  * @context {Function} renderWidgetArea - Helper: Widgets eines Bereichs rendern
-  * @context {Array} enabledPlugins - Aktivierte Plugins für diese Guild
-  * @context {Object} stats - Server-Statistiken
+  * @context {Object}   guild            - Discord Guild-Objekt
+  * @context {Array}    widgets          - Dashboard-Widgets (mit area/position)
+  * @context {Array}    widgetAreas      - Bereiche des aktiven Themes
+  * @context {Function} renderWidgetArea - Widgets eines Bereichs, sortiert
+  * @context {Array}    enabledPlugins   - Aktivierte Plugins dieser Guild
+  * @context {Object}   stats            - Server-Statistiken
   %>
 
 <%
 /**
- * Rendert alle Widgets eines Bereichs als Bootstrap-Grid-HTML.
- * Fallback: Falls renderWidgetArea aus dem Controller nicht übergeben wurde,
- * wird hier ein lokaler Inline-Renderer verwendet.
+ * Widgets eines Bereichs holen.
+ * Die Kaskade (Guild-Override > Widget > Registrierung) liegt im
+ * WidgetManager; hier wird sie nur abgefragt.
  *
- * @param {string} areaId - Widget-Bereich ID
- * @returns {string} HTML
+ * @param {string} areaId
+ * @returns {Array<object>}
  */
-function _renderArea(areaId) {
-    if (typeof renderWidgetArea === 'function') {
-        return renderWidgetArea(areaId);
-    }
-    // Inline-Fallback: Widgets nach area filtern (kein WidgetManager nötig)
-    const areaWidgets = (locals.widgets || [])
+function _bereich(areaId) {
+    if (typeof renderWidgetArea === 'function') return renderWidgetArea(areaId);
+    return (locals.widgets || [])
         .filter(w => (w.area || 'dashboard-main') === areaId && w.visible !== false)
         .sort((a, b) => (a.position || 999) - (b.position || 999));
-    return areaWidgets;
 }
 
-const _topWidgets        = _renderArea('dashboard-top');
-const _primaryWidgets    = _renderArea('dashboard-primary');
-const _secondaryWidgets  = _renderArea('dashboard-secondary');
-const _bottomWidgets     = _renderArea('dashboard-bottom');
+const _bereiche = (locals.widgetAreas && locals.widgetAreas.length)
+    ? locals.widgetAreas
+    : [
+        { id: 'dashboard-top',       defaultSize: 12 },
+        { id: 'dashboard-primary',   defaultSize: 4  },
+        { id: 'dashboard-secondary', defaultSize: 6  },
+        { id: 'dashboard-bottom',    defaultSize: 12 }
+      ];
+
+const _bekannt = _bereiche.map(b => b.id);
 %>
 
 <!--begin::App Content-->
 <div class="app-content">
-    <!--begin::Container-->
     <div class="container-fluid">
 
         <!-- Hook: before_guild_dashboard -->
@@ -57,67 +57,29 @@ const _bottomWidgets     = _renderArea('dashboard-bottom');
           <% } %>
         <% } %>
 
-        <!-- =====================================================
-             WIDGET-BEREICH: dashboard-top (Vollbreite)
-             ===================================================== -->
-        <% if (Array.isArray(_topWidgets) && _topWidgets.length > 0) { %>
-          <div class="row g-3 mb-3">
-            <% _topWidgets.forEach(widget => { %>
-              <div class="col-md-<%= widget.size || 12 %>">
-                <%- _widgetCard(widget) %>
-              </div>
-            <% }); %>
-          </div>
-        <% } %>
+        <%# ── Bereiche des Themes, in seiner Reihenfolge ─────────────────── %>
+        <% _bereiche.forEach(bereich => { %>
+          <% const _widgets = _bereich(bereich.id); %>
+          <% if (Array.isArray(_widgets) && _widgets.length > 0) { %>
+            <div class="row g-3 mb-3" data-widget-area="<%= bereich.id %>">
+              <% _widgets.forEach(widget => { %>
+                <div class="col-md-<%= widget.size || bereich.defaultSize || 12 %>">
+                  <%- _widgetCard(widget) %>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
+        <% }); %>
 
-        <!-- =====================================================
-             WIDGET-BEREICH: dashboard-primary (3-spaltig)
-             ===================================================== -->
-        <% if (Array.isArray(_primaryWidgets) && _primaryWidgets.length > 0) { %>
-          <div class="row g-3 mb-3">
-            <% _primaryWidgets.forEach(widget => { %>
-              <div class="col-md-<%= widget.size || 4 %>">
-                <%- _widgetCard(widget) %>
-              </div>
-            <% }); %>
-          </div>
-        <% } %>
-
-        <!-- =====================================================
-             WIDGET-BEREICH: dashboard-secondary (2-spaltig)
-             ===================================================== -->
-        <% if (Array.isArray(_secondaryWidgets) && _secondaryWidgets.length > 0) { %>
-          <div class="row g-3 mb-3">
-            <% _secondaryWidgets.forEach(widget => { %>
-              <div class="col-md-<%= widget.size || 6 %>">
-                <%- _widgetCard(widget) %>
-              </div>
-            <% }); %>
-          </div>
-        <% } %>
-
-        <!-- =====================================================
-             WIDGET-BEREICH: dashboard-bottom (Vollbreite)
-             ===================================================== -->
-        <% if (Array.isArray(_bottomWidgets) && _bottomWidgets.length > 0) { %>
-          <div class="row g-3 mb-3">
-            <% _bottomWidgets.forEach(widget => { %>
-              <div class="col-md-<%= widget.size || 12 %>">
-                <%- _widgetCard(widget) %>
-              </div>
-            <% }); %>
-          </div>
-        <% } %>
-
-        <!-- Fallback: Widgets ohne area oder unbekannte area -->
-        <% const _legacyWidgets = (locals.widgets || []).filter(w =>
-              !['dashboard-top','dashboard-primary','dashboard-secondary','dashboard-bottom'].includes(w.area || 'dashboard-main')
+        <%# ── Auffangnetz: Widgets, deren Bereich es nicht (mehr) gibt ────── %>
+        <% const _heimatlos = (locals.widgets || []).filter(w =>
+              !_bekannt.includes(w.area || 'dashboard-main')
               && w.area !== 'dashboard-main'
               && w.visible !== false
            ); %>
-        <% if (_legacyWidgets.length > 0) { %>
-          <div class="row g-3 mb-3">
-            <% _legacyWidgets.forEach(widget => { %>
+        <% if (_heimatlos.length > 0) { %>
+          <div class="row g-3 mb-3" data-widget-area="unbekannt">
+            <% _heimatlos.forEach(widget => { %>
               <div class="col-md-<%= widget.size || 12 %>">
                 <%- _widgetCard(widget) %>
               </div>
@@ -136,13 +98,11 @@ const _bottomWidgets     = _renderArea('dashboard-bottom');
         <% } %>
 
     </div>
-    <!--end::Container-->
 </div>
 <!--end::App Content-->
 
 <%#
- * Lokale Hilfsfunktion: Widget-Card HTML generieren
- * Ausgelagert um DRY durch alle 4 Bereiche zu halten
+ * Hilfsfunktion: Karte eines Widgets erzeugen
 %>
 <%
 function _widgetCard(widget) {

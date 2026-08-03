@@ -89,6 +89,44 @@ class TablerTheme {
     }
 
     /**
+     * Widget-Bereiche dieses Themes — Gegenstück zu register_sidebar().
+     *
+     * Die vier Bezeichner bleiben wie im Kern, damit vorhandene Widgets dort
+     * landen, wo sie hingehören. Nur die Spaltenbreiten sind auf Tablers
+     * ruhigeres Raster abgestimmt, und ein zusätzlicher Bereich zeigt, dass ein
+     * Theme das Raster selbst bestimmt.
+     *
+     * @param {{registerArea: Function}} bereiche
+     */
+    registerWidgetAreas(bereiche) {
+        bereiche.registerArea('dashboard-top', {
+            label: 'Oben (Vollbreite)',
+            description: 'Hinweise über dem Inhalt',
+            defaultSize: 12
+        });
+        bereiche.registerArea('dashboard-primary', {
+            label: 'Kennzahlen (4-spaltig)',
+            description: 'Kompakte Kacheln nebeneinander',
+            defaultSize: 3
+        });
+        bereiche.registerArea('dashboard-secondary', {
+            label: 'Analyse (2-spaltig)',
+            description: 'Auswertungen und Verläufe',
+            defaultSize: 6
+        });
+        bereiche.registerArea('dashboard-side', {
+            label: 'Nebenspalte',
+            description: 'Schmale Karten neben dem Hauptinhalt',
+            defaultSize: 4
+        });
+        bereiche.registerArea('dashboard-bottom', {
+            label: 'Unten (Vollbreite)',
+            description: 'Abschließende Karten',
+            defaultSize: 12
+        });
+    }
+
+    /**
      * @param {import('dunebot-sdk/lib/AssetManager')} am
      * @param {string} section
      */
