@@ -177,7 +177,11 @@ class ThemeRegistry {
 
                 const meta = await this.loadTheme(entry.name);
                 if (meta) {
-                    themes.push({ ...meta, active: entry.name === this.manager.activeTheme });
+                    themes.push({
+                        ...meta,
+                        active: entry.name === this.manager.activeTheme,
+                        screenshotUrl: this.screenshotUrl(entry.name, meta.screenshot)
+                    });
                 }
             }
         } catch (error) {
@@ -185,6 +189,31 @@ class ThemeRegistry {
         }
 
         return themes;
+    }
+
+    /**
+     * Vorschaubild eines Themes auflösen.
+     *
+     * Erlaubt sind eine vollständige URL (dann unverändert) oder ein Dateiname
+     * im `assets`-Ordner des Themes. Existiert die Datei nicht, kommt `null`
+     * zurück — die Galerie zeigt dann einen Platzhalter statt eines kaputten
+     * Bildes. Vorher wurde alles stumpf zusammengesetzt, sodass aus einer
+     * https-Adresse `/themes/x/assets/https://…` wurde.
+     *
+     * @param {string} themeName - Verzeichnisname
+     * @param {string} [angabe]  - Wert aus theme.json
+     * @returns {string|null}
+     */
+    screenshotUrl(themeName, angabe) {
+        if (angabe && /^https?:\/\//i.test(angabe)) return angabe;
+
+        const datei = angabe || 'screenshot.png';
+        const pfad = path.join(
+            this.manager.PathConfig.getPath('theme', themeName).assets,
+            datei
+        );
+
+        return fs.existsSync(pfad) ? `/themes/${themeName}/assets/${datei}` : null;
     }
 
     /**

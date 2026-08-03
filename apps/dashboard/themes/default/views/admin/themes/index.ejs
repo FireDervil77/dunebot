@@ -28,12 +28,13 @@
                     <!-- Screenshot / Placeholder -->
                     <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center"
                          style="height: 160px; overflow: hidden; position: relative;">
-                        <% const screenshotUrl = `/themes/${theme.name}/assets/${theme.screenshot || 'screenshot.png'}`; %>
-                        <img src="<%= screenshotUrl %>"
+                        <%# Aufgeloest in der ThemeRegistry: absolute URL, vorhandene Datei oder null %>
+                        <% const screenshotUrl = theme.screenshotUrl; %>
+                        <% if (screenshotUrl) { %><img src="<%= screenshotUrl %>"
                              alt="<%= theme.displayName %> Screenshot"
                              style="width:100%; height:100%; object-fit:cover;"
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                        <div style="display:none; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; background:#343a40; color:#6c757d;">
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><% } %>
+                        <div style="display:<%= screenshotUrl ? 'none' : 'flex' %>; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; background:#343a40; color:#6c757d;">
                             <i class="fas fa-image fa-3x mb-2"></i>
                             <small>Kein Screenshot</small>
                         </div>
