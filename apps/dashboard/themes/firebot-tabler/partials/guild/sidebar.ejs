@@ -90,6 +90,15 @@
                   <span class="nav-link-title"><%= tr(eintrag.title, eintrag.title) %></span>
                 </a>
                 <div class="dropdown-menu <%= aktiv ? 'show' : '' %>">
+                  <%# Der Elternpunkt hat eine eigene Seite — ohne diesen Eintrag
+                      waere sie nicht erreichbar, weil der Aufklapp-Punkt selbst
+                      nicht verlinkt. Genau wie in WordPress. %>
+                  <% if (eintrag.url) { %>
+                    <a class="dropdown-item <%= _aktiv === eintrag.url ? 'active' : '' %>" href="<%= eintrag.url %>">
+                      <%= tr(eintrag.title, eintrag.title) %>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                  <% } %>
                   <% kinder.forEach(kind => { %>
                     <a class="dropdown-item <%= _aktiv === kind.url ? 'active' : '' %>" href="<%= kind.url %>">
                       <%= tr(kind.title, kind.title) %>
@@ -135,6 +144,12 @@
                   <span class="nav-link-title"><%= eintrag.titel %></span>
                 </a>
                 <div class="dropdown-menu <%= aktiv ? 'show' : '' %>">
+                  <% if (!kinder.some(k => k.url === eintrag.url)) { %>
+                    <a class="dropdown-item <%= _adminPfad === eintrag.url ? 'active' : '' %>" href="<%= eintrag.url %>">
+                      <%= eintrag.titel %>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                  <% } %>
                   <% kinder.forEach(kind => { %>
                     <a class="dropdown-item <%= _adminPfad === kind.url ? 'active' : '' %>" href="<%= kind.url %>">
                       <%= kind.titel %>
