@@ -43,6 +43,8 @@
             knopfAnordnen.setAttribute('aria-pressed', an ? 'true' : 'false');
         }
 
+        versteckteZeigen(an);
+
         if (an) {
             sortiererStarten();
             huellenAusstatten();
@@ -65,6 +67,40 @@
         });
     }
 
+    /**
+     * Sichtbarkeit einer Karte setzen — die einzige Stelle, die das tut.
+     * Ausserhalb des Anordnen-Modus verschwindet eine ausgeblendete Karte
+     * ganz; im Modus bleibt sie blass stehen, damit man sie zurueckholen kann.
+     *
+     * @param {string} id
+     * @param {boolean} sichtbar
+     */
+    function sichtbarkeitSetzen(id, sichtbar) {
+        var huelle = document.querySelector('[data-widget-id="' + CSS.escape(id) + '"]');
+        if (!huelle) return;
+
+        huelle.dataset.widgetHidden = sichtbar ? '0' : '1';
+        huelle.hidden = !sichtbar && !aktiv;
+        huelle.style.opacity = sichtbar ? '' : '.4';
+
+        var auge = huelle.querySelector('.widget-arrange-hide i');
+        if (auge) auge.className = sichtbar ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+
+        var haken = document.querySelector('.widget-visibility-toggle[data-widget-target="' + CSS.escape(id) + '"]');
+        if (haken) haken.checked = sichtbar;
+
+        geaendert = true;
+        standAnzeigen();
+    }
+
+    /** Im Anordnen-Modus werden auch ausgeblendete Karten gezeigt. */
+    function versteckteZeigen(zeigen) {
+        document.querySelectorAll('[data-widget-hidden="1"]').forEach(function (huelle) {
+            huelle.hidden = !zeigen;
+            huelle.style.opacity = '.4';
+        });
+    }
+
     // ── Griff und Ausblenden-Knopf an jede Karte ────────────────────────────
     function huellenAusstatten() {
         document.querySelectorAll('[data-widget-area] > [data-widget-id]').forEach(function (huelle) {
@@ -83,13 +119,12 @@
             huelle.style.position = 'relative';
             huelle.prepend(werkzeuge);
 
+            if (huelle.dataset.widgetHidden === '1') {
+                werkzeuge.querySelector('.widget-arrange-hide i').className = 'fa-solid fa-eye-slash';
+            }
+
             werkzeuge.querySelector('.widget-arrange-hide').addEventListener('click', function () {
-                var versteckt = huelle.dataset.widgetHidden === '1';
-                huelle.dataset.widgetHidden = versteckt ? '0' : '1';
-                huelle.style.opacity = versteckt ? '' : '.4';
-                this.querySelector('i').className = versteckt ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
-                geaendert = true;
-                standAnzeigen();
+                sichtbarkeitSetzen(huelle.dataset.widgetId, huelle.dataset.widgetHidden === '1');
             });
         });
     }
@@ -167,4 +202,13 @@
         knopfSpeichern.addEventListener('click', speichern);
         knopfSpeichern.disabled = true;
     }
+
+    // Haken in der Ansicht-anpassen-Klappe
+    document.querySelectorAll('.widget-visibility-toggle').forEach(function (haken) {
+        haken.addEventListener('change', function () {
+            sichtbarkeitSetzen(this.dataset.widgetTarget, this.checked);
+            // Ohne den Modus gibt es keinen Speichern-Knopf — also einblenden
+            if (!aktiv) modusSetzen(true);
+        });
+    });
 })();

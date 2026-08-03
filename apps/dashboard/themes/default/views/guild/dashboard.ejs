@@ -54,7 +54,28 @@ const _bekannt = _bereiche.map(b => b.id);
         <% if (typeof hasPermission !== 'function' || hasPermission('CORE.THEMES.EDIT')) { %>
           <% assetManager && assetManager.enqueueScript('widget-arrange'); %>
           <div data-widget-arrange data-guild-id="<%= guildId %>">
-            <div class="d-flex justify-content-end mb-2">
+            <div class="d-flex justify-content-end gap-2 mb-2">
+              <div class="dropdown">
+                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                        data-bs-toggle="dropdown" aria-expanded="false"
+                        title="Welche Karten sollen erscheinen?">
+                  <i class="fa-solid fa-sliders me-1"></i>Ansicht anpassen
+                </button>
+                <div class="dropdown-menu dropdown-menu-end p-3" id="widget-visibility-menu" style="min-width: 16rem;">
+                  <div class="text-muted small mb-2">Karten auf dem Dashboard</div>
+                  <% (locals.alleWidgets || []).slice().sort((a,b) => (a.position||0)-(b.position||0)).forEach(w => { %>
+                    <div class="form-check">
+                      <input class="form-check-input widget-visibility-toggle" type="checkbox"
+                             id="sichtbar-<%= w.id %>" data-widget-target="<%= w.id %>"
+                             <%= w.visible === false ? '' : 'checked' %>>
+                      <label class="form-check-label" for="sichtbar-<%= w.id %>">
+                        <%= w.title || w.id %>
+                      </label>
+                    </div>
+                  <% }); %>
+                  <div class="text-muted small mt-2">Änderungen über „Anordnung speichern" sichern.</div>
+                </div>
+              </div>
               <button type="button" id="widget-arrange-toggle" class="btn btn-sm btn-outline-secondary"
                       aria-pressed="false" title="Karten verschieben und ausblenden">
                 <i class="fa-solid fa-table-cells-large me-1"></i>Anordnen
@@ -79,7 +100,10 @@ const _bekannt = _bereiche.map(b => b.id);
           <% if (Array.isArray(_widgets) && _widgets.length > 0) { %>
             <div class="row g-3 mb-3" data-widget-area="<%= bereich.id %>">
               <% _widgets.forEach(widget => { %>
-                <div class="col-md-<%= widget.size || bereich.defaultSize || 12 %>" data-widget-id="<%= widget.id %>">
+                <div class="col-md-<%= widget.size || bereich.defaultSize || 12 %>"
+                     data-widget-id="<%= widget.id %>"
+                     data-widget-hidden="<%= widget.visible === false ? '1' : '0' %>"
+                     <%= widget.visible === false ? 'hidden' : '' %>>
                   <%- _widgetCard(widget) %>
                 </div>
               <% }); %>

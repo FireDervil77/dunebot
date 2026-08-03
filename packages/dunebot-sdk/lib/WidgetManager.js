@@ -160,29 +160,38 @@ class WidgetManager {
      * @returns {Array<object>} Sortierte, sichtbare Widgets für diesen Bereich
      */
     getWidgetsForArea(areaId, allWidgets, guildOverrides = []) {
-        // Index der Guild-Overrides: widget_id → override
-        const overrideMap = new Map(guildOverrides.map(o => [o.widget_id, o]));
-
-        return allWidgets
-            .map(widget => {
-                const registered = this._registeredWidgets.get(widget.id);
-                const override = overrideMap.get(widget.id);
-
-                // Bereich bestimmen: Override > Widget-Feld > Registrierung > Fallback
-                const area = override?.area ?? widget.area ?? registered?.area ?? 'dashboard-main';
-
-                // Position: Override > Widget-Feld > Registrierung > 999
-                const position = override?.position ?? widget.position ?? registered?.position ?? 999;
-
-                // Sichtbarkeit: Override > Widget-Feld > Registrierung > true
-                const visible = override?.visible !== undefined
-                    ? Boolean(override.visible)
-                    : (widget.visible !== undefined ? widget.visible : (registered?.visible !== false));
-
-                return { ...widget, area, position, visible };
-            })
+        return this.resolveWidgets(allWidgets, guildOverrides)
             .filter(w => w.area === areaId && w.visible)
             .sort((a, b) => a.position - b.position);
+    }
+
+    /**
+     * Alle Widgets mit ihren **wirksamen** Werten — ohne zu filtern.
+     *
+     * Wird für die Ansicht-anpassen-Klappe gebraucht: Dort müssen auch die
+     * ausgeblendeten auftauchen, sonst kommt man nicht mehr an sie heran.
+     *
+     * Kaskade: Guild-Override > Feld am Widget > Registrierung > Vorgabe.
+     *
+     * @param {Array<object>} allWidgets
+     * @param {Array<object>} [guildOverrides]
+     * @returns {Array<object>}
+     */
+    resolveWidgets(allWidgets, guildOverrides = []) {
+        const overrideMap = new Map((guildOverrides || []).map(o => [o.widget_id, o]));
+
+        return (allWidgets || []).map(widget => {
+            const registered = this._registeredWidgets.get(widget.id);
+            const override = overrideMap.get(widget.id);
+
+            const area = override?.area ?? widget.area ?? registered?.area ?? 'dashboard-main';
+            const position = override?.position ?? widget.position ?? registered?.position ?? 999;
+            const visible = override?.visible !== undefined
+                ? Boolean(override.visible)
+                : (widget.visible !== undefined ? widget.visible : (registered?.visible !== false));
+
+            return { ...widget, area, position, visible };
+        });
     }
 
     // =========================================

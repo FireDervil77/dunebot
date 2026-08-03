@@ -121,8 +121,13 @@ exports.getDashboard = async (req, res) => {
         // im WidgetManager und **nur** dort. Sie lag früher zusätzlich hier und
         // ein drittes Mal als Notlösung in der View — drei Kopien, die
         // auseinanderlaufen konnten.
+        // Auch die ausgeblendeten mitgeben — die Ansicht-anpassen-Klappe muss
+        // sie zeigen koennen, sonst holt man sie nie wieder zurueck.
+        const alleWidgets = widgetManager.resolveWidgets(widgets, guildWidgetOverrides);
+        res.locals.alleWidgets = alleWidgets;
+
         res.locals.renderWidgetArea = (areaId) =>
-            widgetManager.getWidgetsForArea(areaId, widgets, guildWidgetOverrides);
+            alleWidgets.filter(w => w.area === areaId).sort((a, b) => a.position - b.position);
 
         // Template rendern (Theme-Hierarchy: guild/dashboard → ggf. Child-Theme-Override)
         const viewData = {
