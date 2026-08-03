@@ -202,3 +202,32 @@ body.bg-body-tertiary,
 /* --- Abzeichen ------------------------------------------------------------ */
 .badge.bg-primary { --bs-badge-bg: var(--fb-primary); }
 .badge.bg-warning { --bs-badge-bg: var(--fb-accent); }
+
+/* ==========================================================================
+   4. ANORDNEN-MODUS — nur aktiv, solange im Dashboard sortiert wird
+   ========================================================================== */
+
+.widget-arrange-tools {
+    position: absolute;
+    top: .5rem;
+    right: 1.25rem;
+    z-index: 5;
+    display: flex;
+    gap: .25rem;
+}
+
+.widget-arrange-active [data-widget-id] {
+    outline: 1px dashed var(--fb-border);
+    outline-offset: 4px;
+    border-radius: var(--fb-radius);
+}
+
+.widget-arrange-active [data-widget-area] {
+    background: color-mix(in srgb, var(--fb-primary) 4%, transparent);
+    border-radius: var(--fb-radius);
+}
+
+.widget-arrange-griff { cursor: grab; }
+.widget-arrange-griff:active { cursor: grabbing; }
+
+.widget-arrange-ghost { opacity: .35; }

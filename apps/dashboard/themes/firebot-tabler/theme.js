@@ -82,6 +82,9 @@ class TablerTheme {
         // Diese vier liegen im Standard-Theme und werden über die Kette
         // gefunden. Sie sind noch AdminLTE-geprägt und werden Stück für Stück
         // abgelöst — bis dahin halten sie die Seiten zusammen.
+                // Anordnen im Dashboard — wird von der Dashboard-View selbst eingereiht
+        am.registerScript('widget-arrange', 'widget-arrange.js', { deps: ['sortable'], version: this.version });
+
         am.registerScript('csrf-helper', 'csrf-helper.js', { inFooter: false, version: this.version });
         am.registerScript('global-toast', 'global-toast.js', { deps: ['toastr-js'], version: this.version });
         am.registerScript('button-loading', 'button-loading.js', { version: this.version });

@@ -106,6 +106,9 @@ class DefaultTheme {
 
         // ── Theme-Skripte ───────────────────────────────────────────────────
         // csrf-helper muss in den Head: nachfolgende Inline-Skripte brauchen ihn
+                // Anordnen im Dashboard — wird von der Dashboard-View selbst eingereiht
+        am.registerScript('widget-arrange', 'widget-arrange.js', { deps: ['sortable'], version: this.version });
+
         am.registerScript('csrf-helper', 'csrf-helper.js', { inFooter: false, version: this.version });
 
         am.registerScript('global-toast', 'global-toast.js', { deps: ['toastr-js'], version: this.version });

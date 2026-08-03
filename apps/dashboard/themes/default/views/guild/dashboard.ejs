@@ -50,13 +50,36 @@ const _bekannt = _bereiche.map(b => b.id);
         <!-- Hook: before_guild_dashboard -->
 <%- hookArea('before_guild_dashboard', { guild, guildId }) %>
 
+        <%# ── Anordnen: Knopf und Leiste ──────────────────────────────────── %>
+        <% if (typeof hasPermission !== 'function' || hasPermission('CORE.THEMES.EDIT')) { %>
+          <% assetManager && assetManager.enqueueScript('widget-arrange'); %>
+          <div data-widget-arrange data-guild-id="<%= guildId %>">
+            <div class="d-flex justify-content-end mb-2">
+              <button type="button" id="widget-arrange-toggle" class="btn btn-sm btn-outline-secondary"
+                      aria-pressed="false" title="Karten verschieben und ausblenden">
+                <i class="fa-solid fa-table-cells-large me-1"></i>Anordnen
+              </button>
+            </div>
+            <div id="widget-arrange-bar" class="alert alert-info d-none d-flex align-items-center justify-content-between py-2">
+              <span>
+                <i class="fa-solid fa-hand-pointer me-1"></i>
+                Karten am Griff ziehen — auch zwischen den Bereichen. Das Auge blendet eine Karte aus.
+              </span>
+              <span>
+                <button type="button" id="widget-arrange-cancel" class="btn btn-sm btn-link text-secondary">Abbrechen</button>
+                <button type="button" id="widget-arrange-save" class="btn btn-sm btn-primary">Anordnung speichern</button>
+              </span>
+            </div>
+          </div>
+        <% } %>
+
         <%# ── Bereiche des Themes, in seiner Reihenfolge ─────────────────── %>
         <% _bereiche.forEach(bereich => { %>
           <% const _widgets = _bereich(bereich.id); %>
           <% if (Array.isArray(_widgets) && _widgets.length > 0) { %>
             <div class="row g-3 mb-3" data-widget-area="<%= bereich.id %>">
               <% _widgets.forEach(widget => { %>
-                <div class="col-md-<%= widget.size || bereich.defaultSize || 12 %>">
+                <div class="col-md-<%= widget.size || bereich.defaultSize || 12 %>" data-widget-id="<%= widget.id %>">
                   <%- _widgetCard(widget) %>
                 </div>
               <% }); %>
