@@ -176,19 +176,23 @@ router.get('/editor', requirePermission('CORE.THEMES.EDIT'), async (req, res) =>
         // Customization aus DB laden
         const customization = await themeManager.getGuildCustomization(guildId);
 
-        // Definierte CSS-Variablen mit Defaults aus theme.json config
-        const defaultVariables = {
-            'primary-color': activeTheme?.config?.primaryColor || '#3498db',
-            'accent-color': activeTheme?.config?.accentColor || '#f39c12',
-            'sidebar-bg': '#343a40',
-            'sidebar-color': '#c2c7d0',
-            'sidebar-hover-bg': '#495057',
-            'header-bg': '#3f6791',
-            'body-bg': '#f4f6f9',
-            'card-bg': '#ffffff',
-            'text-color': '#212529',
-            'link-color': '#3498db'
+        // Standardwerte der Token-Schicht. Sie spiegeln `assets/css/tokens.css`;
+        // ein Theme darf sie über den `tokens`-Abschnitt seiner theme.json
+        // überschreiben, die Guild-Anpassung schlägt beides.
+        const tokenDefaults = {
+            'fb-primary': '#3498db',
+            'fb-accent': '#f39c12',
+            'fb-link': '#3498db',
+            'fb-sidebar-bg': '#343a40',
+            'fb-sidebar-text': '#c2c7d0',
+            'fb-sidebar-hover-bg': '#495057',
+            'fb-header-bg': '#ffffff',
+            'fb-body-bg': '#f4f6f9',
+            'fb-surface-bg': '#ffffff',
+            'fb-text': '#212529'
         };
+
+        const defaultVariables = { ...tokenDefaults, ...(activeTheme?.tokens || {}) };
 
         // Gespeicherte Variablen mit Defaults mergen
         const variables = { ...defaultVariables, ...(customization.custom_variables || {}) };

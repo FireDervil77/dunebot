@@ -15,7 +15,14 @@
       <%- assetManager.renderStyles() %>
     <% } %>
 
-    <!-- Head-Skripte: Theme + Plugins (AssetManager) -->
+    <%# Design-Tokens aus theme.json — stehen zwischen tokens.css und der Guild-Anpassung %>
+<% if (locals.themeTokensCSS) { %>
+<style id="theme-tokens">
+<%- locals.themeTokensCSS %>
+</style>
+<% } %>
+
+<!-- Head-Skripte: Theme + Plugins (AssetManager) -->
     <% if (locals.assetManager) { %>
       <%- assetManager.renderScripts(false) %>
     <% } %>

@@ -15,10 +15,16 @@
     },
     "config": {
         "darkMode": true,
-        "primaryColor": "#e74c3c",
-        "accentColor": "#f39c12",
         "logo": "images/firebot-logo.png",
         "favicon": "images/favicon.png"
+    },
+    "tokens": {
+        "fb-primary": "#e74c3c",
+        "fb-primary-hover": "#c0392b",
+        "fb-accent": "#f39c12",
+        "fb-accent-hover": "#d68910",
+        "fb-link": "#e74c3c",
+        "fb-link-hover": "#c0392b"
     },
     "layouts": {
         "frontend": "layouts/frontend.ejs",

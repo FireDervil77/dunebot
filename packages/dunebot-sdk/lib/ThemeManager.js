@@ -41,6 +41,8 @@ class ThemeManager {
         this.themeModules = [];
         /** @type {object} Zusammengeführte Layouts der Kette: Bereich → relativer Pfad */
         this._layouts = {};
+        /** @type {object} Zusammengeführte Design-Tokens der Kette: Name → Wert */
+        this._tokens = {};
         /** @type {Map<string, string>} Guild → Theme In-Memory-Cache */
         this._themeGuildCache = new Map();
         
@@ -89,6 +91,7 @@ class ThemeManager {
     async getGuildCustomization(guildId) { return this.customizer.getGuildCustomization(guildId); }
     async setGuildCustomization(guildId, data) { return this.customizer.setGuildCustomization(guildId, data); }
     async renderGuildCustomCSS(guildId) { return this.customizer.renderGuildCustomCSS(guildId); }
+    buildTokenBlock(variables) { return this.customizer.buildTokenBlock(variables); }
     async getThemeForRequest(req, res) { return this.customizer.getThemeForRequest(req, res); }
 
     // ============================================================================
@@ -118,9 +121,14 @@ class ThemeManager {
             this._themeChain = await this.resolver.buildThemeChain(this.activeTheme);
             Logger.debug(`[ThemeManager] Theme-Chain: ${this._themeChain.join(' → ')}`);
 
-            // Layout-Angaben der Kette zusammenführen (Kind schlägt Elternteil)
+            // Layout-Angaben und Tokens der Kette zusammenführen (Kind schlägt Elternteil)
             this._layouts = await this.buildLayoutMap();
+            this._tokens = await this.buildTokenMap();
             Logger.debug('[ThemeManager] Layouts:', this._layouts);
+
+            // Tokens aus theme.json stehen allen Views zur Verfügung. Sie ändern
+            // sich nach dem Start nicht mehr, also einmal rendern statt pro Request.
+            this.setGlobalVar('themeTokensCSS', this.renderThemeTokens());
 
             // View-Engine konfigurieren
             this.setupViewEngine();
@@ -379,6 +387,38 @@ class ThemeManager {
     // ============================================================================
     // THEME-MODULE (theme.js — unsere functions.php)
     // ============================================================================
+
+    /**
+     * Design-Tokens der Theme-Kette zu einer Karte zusammenführen.
+     * Gleiche Regel wie bei den Layouts: das Kind schlägt seinen Elternteil.
+     *
+     * @returns {Promise<object>} Token-Name → Wert
+     */
+    async buildTokenMap() {
+        const merged = {};
+
+        for (const themeName of [...this._themeChain].reverse()) {
+            const meta = await this.registry.loadTheme(themeName);
+            if (meta?.tokens && typeof meta.tokens === 'object') {
+                Object.assign(merged, meta.tokens);
+            }
+        }
+
+        return merged;
+    }
+
+    /**
+     * Die in `theme.json` deklarierten Tokens als `:root`-Block ausgeben.
+     *
+     * Damit kann ein Theme seine Farben festlegen, ohne CSS zu schreiben.
+     * Die Werte stehen zwischen `tokens.css` (Standard des Themes) und der
+     * Guild-Anpassung — ein Server kann sie also weiterhin überschreiben.
+     *
+     * @returns {string} CSS-Block oder leerer String
+     */
+    renderThemeTokens() {
+        return this.customizer.buildTokenBlock(this._tokens);
+    }
 
     /**
      * Layout-Angaben der gesamten Theme-Kette zu einer Karte zusammenführen.

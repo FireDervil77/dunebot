@@ -1,0 +1,204 @@
+/*!
+ * FireBot Design-Tokens
+ *
+ * Eine Ebene für alle Farben des Dashboards. Wer etwas umfärben will, ändert
+ * hier einen Wert — nicht dutzende Selektoren.
+ *
+ * Aufbau:
+ *   1. ROLLEN      — die --fb-*-Tokens. Das ist die öffentliche Oberfläche;
+ *                    nur sie werden vom Theme-Editor und von theme.json gesetzt.
+ *   2. BRÜCKE      — bildet die Rollen auf die Variablen ab, mit denen
+ *                    Bootstrap 5 und AdminLTE 4 tatsächlich arbeiten.
+ *
+ * Warum es eine Brücke braucht und nicht `--bs-primary` allein reicht:
+ * Bootstrap 5 schreibt in `.btn-primary` den Wert `--bs-btn-bg` **wörtlich**
+ * hinein, nicht als `var(--bs-primary)`. Ein Token wirkt also erst, wenn es
+ * auf die jeweilige Komponentenvariable gelegt wird. Das ist der dokumentierte
+ * Weg von Bootstrap 5 — und der Grund, warum hier **kein `!important`** steht.
+ *
+ * RGB-Tripel: Die Utilities von Bootstrap (`.text-primary`, `.bg-primary`)
+ * rechnen mit `rgba(var(--bs-primary-rgb), …)`. Deshalb führt jede Rolle, die
+ * in Utilities auftaucht, zusätzlich ein `-rgb`-Token. Der Theme-Editor füllt
+ * beide.
+ *
+ * @author FireDervil
+ */
+
+/* ==========================================================================
+   1. ROLLEN
+   ========================================================================== */
+
+:root {
+    /* --- Akzente ---------------------------------------------------------- */
+    --fb-primary: #3498db;
+    --fb-primary-rgb: 52, 152, 219;
+    --fb-primary-hover: #2980b9;
+
+    --fb-accent: #f39c12;
+    --fb-accent-rgb: 243, 156, 18;
+    --fb-accent-hover: #d68910;
+
+    --fb-link: #3498db;
+    --fb-link-hover: #2980b9;
+
+    /* --- Flächen ---------------------------------------------------------- */
+    --fb-body-bg: #f4f6f9;      /* Seitenhintergrund */
+    --fb-surface-bg: #ffffff;   /* Karten, Tabellen, Panels */
+    --fb-header-bg: #ffffff;    /* obere Leiste */
+    --fb-sidebar-bg: #343a40;   /* Seitenleiste */
+
+    /* --- Text ------------------------------------------------------------- */
+    --fb-text: #212529;
+    --fb-text-muted: #6c757d;
+    --fb-heading: #212529;
+
+    /* --- Seitenleiste (eigene Rollen, weil sie ein dunkler Bereich ist) ---- */
+    --fb-sidebar-text: #c2c7d0;
+    --fb-sidebar-hover-bg: #495057;
+    --fb-sidebar-hover-text: #ffffff;
+    --fb-sidebar-active-bg: #495057;
+    --fb-sidebar-active-text: #ffffff;
+
+    /* --- Rückmeldungen ---------------------------------------------------- */
+    --fb-success: #28a745;
+    --fb-warning: #f39c12;
+    --fb-danger: #dc3545;
+    --fb-info: #17a2b8;
+
+    /* --- Kanten ----------------------------------------------------------- */
+    --fb-border: #dee2e6;
+    --fb-radius: 0.375rem;
+}
+
+/* ==========================================================================
+   2. BRÜCKE — Rollen auf Bootstrap 5 / AdminLTE 4 legen
+   ========================================================================== */
+
+/* --- Grundwerte, die vieles automatisch mitnehmen ------------------------- */
+:root,
+[data-bs-theme="light"] {
+    --bs-primary: var(--fb-primary);
+    --bs-primary-rgb: var(--fb-primary-rgb);
+
+    --bs-body-color: var(--fb-text);
+    --bs-emphasis-color: var(--fb-heading);
+    --bs-secondary-color: var(--fb-text-muted);
+
+    --bs-link-color: var(--fb-link);
+    --bs-link-hover-color: var(--fb-link-hover);
+
+    --bs-border-color: var(--fb-border);
+    --bs-border-radius: var(--fb-radius);
+
+    --bs-success: var(--fb-success);
+    --bs-warning: var(--fb-warning);
+    --bs-danger: var(--fb-danger);
+    --bs-info: var(--fb-info);
+}
+
+/* --- Seitenhintergrund ---------------------------------------------------- */
+/* Der <body> trägt `bg-body-tertiary`, das ist die Fläche hinter allem. */
+body.bg-body-tertiary,
+.app-main {
+    --bs-tertiary-bg: var(--fb-body-bg);
+}
+
+/* --- Karten und Panels ---------------------------------------------------- */
+.card {
+    --bs-card-bg: var(--fb-surface-bg);
+    --bs-card-border-color: var(--fb-border);
+    --bs-card-cap-bg: var(--fb-surface-bg);
+}
+
+.table {
+    --bs-table-bg: var(--fb-surface-bg);
+    --bs-table-color: var(--fb-text);
+    --bs-table-border-color: var(--fb-border);
+}
+
+/* --- Obere Leiste --------------------------------------------------------- */
+/* `.app-header` trägt `bg-body`, färbt sich also über --bs-body-bg. */
+.app-header {
+    --bs-body-bg: var(--fb-header-bg);
+    --bs-border-color: var(--fb-border);
+}
+
+/* --- Seitenleiste --------------------------------------------------------- */
+/* `.app-sidebar` trägt `bg-body-secondary` und läuft im dunklen Farbschema. */
+.app-sidebar {
+    --bs-secondary-bg: var(--fb-sidebar-bg);
+    --lte-sidebar-color: var(--fb-sidebar-text);
+    --lte-sidebar-hover-color: var(--fb-sidebar-hover-text);
+    --lte-sidebar-hover-bg: var(--fb-sidebar-hover-bg);
+    --lte-sidebar-active-color: var(--fb-sidebar-active-text);
+    --lte-sidebar-menu-active-bg: var(--fb-sidebar-active-bg);
+    --lte-sidebar-menu-active-color: var(--fb-sidebar-active-text);
+    --lte-sidebar-submenu-color: var(--fb-sidebar-text);
+    --lte-sidebar-submenu-hover-color: var(--fb-sidebar-hover-text);
+    --lte-sidebar-submenu-hover-bg: var(--fb-sidebar-hover-bg);
+    --lte-sidebar-submenu-active-color: var(--fb-sidebar-active-text);
+    --lte-sidebar-submenu-active-bg: var(--fb-sidebar-active-bg);
+    --lte-sidebar-header-color: var(--fb-sidebar-text);
+}
+
+/* --- Schaltflächen -------------------------------------------------------- */
+/* Bootstrap 5 schreibt diese Werte je Variante wörtlich — daher hier einmal
+   sauber überschrieben statt per !important übermalt. */
+.btn-primary {
+    --bs-btn-bg: var(--fb-primary);
+    --bs-btn-border-color: var(--fb-primary);
+    --bs-btn-hover-bg: var(--fb-primary-hover);
+    --bs-btn-hover-border-color: var(--fb-primary-hover);
+    --bs-btn-active-bg: var(--fb-primary-hover);
+    --bs-btn-active-border-color: var(--fb-primary-hover);
+    --bs-btn-disabled-bg: var(--fb-primary);
+    --bs-btn-disabled-border-color: var(--fb-primary);
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--fb-primary);
+    --bs-btn-border-color: var(--fb-primary);
+    --bs-btn-hover-bg: var(--fb-primary);
+    --bs-btn-hover-border-color: var(--fb-primary);
+    --bs-btn-active-bg: var(--fb-primary);
+    --bs-btn-active-border-color: var(--fb-primary);
+    --bs-btn-disabled-color: var(--fb-primary);
+    --bs-btn-disabled-border-color: var(--fb-primary);
+}
+
+.btn-warning {
+    --bs-btn-bg: var(--fb-accent);
+    --bs-btn-border-color: var(--fb-accent);
+    --bs-btn-hover-bg: var(--fb-accent-hover);
+    --bs-btn-hover-border-color: var(--fb-accent-hover);
+    --bs-btn-active-bg: var(--fb-accent-hover);
+    --bs-btn-active-border-color: var(--fb-accent-hover);
+}
+
+.btn-success { --bs-btn-bg: var(--fb-success); --bs-btn-border-color: var(--fb-success); }
+.btn-danger  { --bs-btn-bg: var(--fb-danger);  --bs-btn-border-color: var(--fb-danger); }
+.btn-info    { --bs-btn-bg: var(--fb-info);    --bs-btn-border-color: var(--fb-info); }
+
+/* --- Seitennummerierung --------------------------------------------------- */
+.pagination {
+    --bs-pagination-color: var(--fb-link);
+    --bs-pagination-hover-color: var(--fb-link-hover);
+    --bs-pagination-active-bg: var(--fb-primary);
+    --bs-pagination-active-border-color: var(--fb-primary);
+}
+
+/* --- Eingabefelder -------------------------------------------------------- */
+.form-control,
+.form-select {
+    --bs-body-bg: var(--fb-surface-bg);
+    --bs-border-color: var(--fb-border);
+}
+
+.form-check-input:checked {
+    background-color: var(--fb-primary);
+    border-color: var(--fb-primary);
+}
+
+/* --- Abzeichen ------------------------------------------------------------ */
+.badge.bg-primary { --bs-badge-bg: var(--fb-primary); }
+.badge.bg-warning { --bs-badge-bg: var(--fb-accent); }

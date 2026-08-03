@@ -48,7 +48,7 @@ class DefaultTheme {
             primaryColor: '#3498db',
             accentColor: '#f39c12',
             logo: 'images/dunebot-logo.png',
-            favicon: 'images/favicon.ico'
+            favicon: 'images/favicon.png'
         };
     }
 
@@ -76,11 +76,15 @@ class DefaultTheme {
         am.registerVendorStyle('swiper-css', '/public/vendor/swiper/swiper-bundle.min.css', { version: '11.0.5' });
 
         // ── Theme-Styles (über die Kette auflösbar) ──────────────────────────
-        am.registerStyle('guild-css', 'guild.css', { deps: ['adminlte-css'], version: this.version });
+        // tokens.css trägt die --fb-Rollen und legt sie auf Bootstrap/AdminLTE.
+        // Muss nach adminlte-css kommen, sonst gewinnen dessen Standardwerte.
+        am.registerStyle('tokens', 'tokens.css', { deps: ['adminlte-css'], version: this.version });
+
+        am.registerStyle('guild-css', 'guild.css', { deps: ['tokens'], version: this.version });
         am.registerStyle('guild-switcher-css', 'guild-switcher.css', { deps: ['guild-css'], version: this.version });
         am.registerStyle('data-table-css', 'data-table.css', { deps: ['guild-css'], version: this.version });
-        am.registerStyle('auth-css', 'auth.css', { deps: ['adminlte-css'], version: this.version });
-        am.registerStyle('frontend-css', 'frontend.css', { deps: ['bootstrap-css'], version: this.version });
+        am.registerStyle('auth-css', 'auth.css', { deps: ['tokens'], version: this.version });
+        am.registerStyle('frontend-css', 'frontend.css', { deps: ['tokens'], version: this.version });
 
         // ── Vendor-Skripte ──────────────────────────────────────────────────
         am.registerVendorScript('jquery', CDN.jquery, { version: '3.7.1' });
@@ -130,7 +134,7 @@ class DefaultTheme {
             guild: {
                 styles: [
                     'fonts-guild', 'bootstrap-css', 'bootstrap-icons', 'fontawesome',
-                    'toastr-css', 'adminlte-css',
+                    'toastr-css', 'adminlte-css', 'tokens',
                     'guild-css', 'guild-switcher-css', 'data-table-css'
                 ],
                 scripts: [
@@ -142,14 +146,14 @@ class DefaultTheme {
                 ]
             },
             auth: {
-                styles: ['bootstrap-css', 'fontawesome', 'adminlte-css', 'auth-css'],
+                styles: ['bootstrap-css', 'fontawesome', 'adminlte-css', 'tokens', 'auth-css'],
                 scripts: ['csrf-helper', 'jquery', 'bootstrap-js', 'adminlte-js', 'auth-js']
             },
             frontend: {
                 styles: [
                     'fonts-frontend', 'bootstrap-icons', 'fontawesome',
                     'bootstrap-css', 'aos-css', 'glightbox-css', 'swiper-css',
-                    'frontend-css'
+                    'tokens', 'frontend-css'
                 ],
                 scripts: [
                     'csrf-helper',

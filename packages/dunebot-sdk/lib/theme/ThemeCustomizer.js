@@ -125,7 +125,14 @@ class ThemeCustomizer {
     }
 
     /**
-     * Generiert CSS-<style>-Block aus Guild-Customization.
+     * Erzeugt den <style>-Block einer Guild: Design-Tokens und eigenes CSS.
+     *
+     * Gesetzt werden **nur Variablen**. Was die Variablen bewirken, steht
+     * gebündelt in `assets/css/tokens.css` — früher stand hier ein Generator,
+     * der für jede Variable handgeschriebene `!important`-Selektorlisten
+     * ausgab und dabei auf drei AdminLTE-Generationen gleichzeitig zielte.
+     * Jedes neue Bedienelement musste dort nachgetragen werden.
+     *
      * @param {string} guildId
      * @returns {Promise<string>} CSS-String
      */
@@ -134,105 +141,76 @@ class ThemeCustomizer {
 
         let css = '';
 
-        if (custom_variables && typeof custom_variables === 'object') {
-            const entries = Object.entries(custom_variables).filter(([, v]) => v != null && v !== '');
-            if (entries.length > 0) {
-                css += ':root {\n';
-                for (const [key, value] of entries) {
-                    const safeKey = key.replace(/[^a-zA-Z0-9-_]/g, '');
-                    const safeValue = String(value).replace(/[;<>{}]/g, '').trim();
-                    if (safeKey && safeValue) {
-                        css += `  --${safeKey}: ${safeValue};\n`;
-                    }
-                }
-                css += '}\n';
+        const tokens = this.buildTokenBlock(custom_variables);
+        if (tokens) css += tokens;
 
-                const v = {};
-                for (const [key, value] of entries) {
-                    const safeKey = key.replace(/[^a-zA-Z0-9-_]/g, '');
-                    const safeValue = String(value).replace(/[;<>{}]/g, '').trim();
-                    if (safeKey && safeValue) v[safeKey] = safeValue;
-                }
-
-                // Sidebar
-                if (v['sidebar-bg']) {
-                    css += `.app-sidebar, .main-sidebar, .sidebar { background-color: ${v['sidebar-bg']} !important; }\n`;
-                }
-                if (v['sidebar-color']) {
-                    css += `.app-sidebar .nav-link, .app-sidebar .nav-link p, .app-sidebar .nav-header, .app-sidebar .sidebar-brand-text { color: ${v['sidebar-color']} !important; }\n`;
-                    css += `.app-sidebar .nav-icon, .app-sidebar .nav-link .nav-icon { color: ${v['sidebar-color']} !important; }\n`;
-                    css += `.nav-sidebar .nav-link, .nav-sidebar .nav-link p { color: ${v['sidebar-color']} !important; }\n`;
-                    css += `[data-bs-theme="dark"] .nav-sidebar .nav-link, [data-bs-theme="dark"] .nav-link p { color: ${v['sidebar-color']} !important; }\n`;
-                    css += `.sidebar .nav-link, .sidebar .nav-link p, .sidebar .nav-header, .sidebar-brand-text { color: ${v['sidebar-color']} !important; }\n`;
-                }
-                if (v['sidebar-hover-bg']) {
-                    css += `.app-sidebar .nav-link:hover, .app-sidebar .nav-link.active { background-color: ${v['sidebar-hover-bg']} !important; }\n`;
-                    css += `.nav-sidebar > .nav-item > .nav-link.active, .nav-sidebar .nav-treeview > .nav-item > .nav-link.active { background-color: ${v['sidebar-hover-bg']} !important; }\n`;
-                    css += `.sidebar .nav-link:hover, .sidebar .nav-link.active, .sidebar .nav-treeview > .nav-item > .nav-link.active { background-color: ${v['sidebar-hover-bg']} !important; }\n`;
-                }
-
-                // Header
-                if (v['header-bg']) {
-                    css += `.app-header, .main-header, .main-header.navbar { background-color: ${v['header-bg']} !important; }\n`;
-                }
-
-                // Body / Content
-                if (v['body-bg']) {
-                    css += `.content-wrapper, .app-main { background-color: ${v['body-bg']} !important; }\n`;
-                }
-
-                // Cards
-                if (v['card-bg']) {
-                    css += `.card { background-color: ${v['card-bg']} !important; }\n`;
-                }
-
-                // Text
-                if (v['text-color']) {
-                    css += `body, .content-wrapper, .card-body, p, span, td, th, li, label { color: ${v['text-color']} !important; }\n`;
-                    css += `h1, h2, h3, h4, h5, h6, .card-title, .info-box-text, .info-box-number { color: ${v['text-color']} !important; }\n`;
-                    css += `.main-header .navbar-nav .nav-link, .main-header .navbar-nav .nav-link i { color: ${v['text-color']} !important; }\n`;
-                    css += `.content-header h1, .breadcrumb-item a, .breadcrumb-item.active { color: ${v['text-color']} !important; }\n`;
-                }
-
-                // Primary Color
-                if (v['primary-color']) {
-                    css += `.btn-primary { background-color: ${v['primary-color']} !important; border-color: ${v['primary-color']} !important; }\n`;
-                    css += `.btn-outline-primary { color: ${v['primary-color']} !important; border-color: ${v['primary-color']} !important; }\n`;
-                    css += `.btn-outline-primary:hover { background-color: ${v['primary-color']} !important; color: #fff !important; }\n`;
-                    css += `.badge-primary { background-color: ${v['primary-color']} !important; }\n`;
-                    css += `.bg-primary { background-color: ${v['primary-color']} !important; }\n`;
-                    css += `.text-primary { color: ${v['primary-color']} !important; }\n`;
-                    css += `.page-item.active .page-link { background-color: ${v['primary-color']} !important; border-color: ${v['primary-color']} !important; }\n`;
-                    css += `.custom-control-input:checked ~ .custom-control-label::before { background-color: ${v['primary-color']} !important; border-color: ${v['primary-color']} !important; }\n`;
-                }
-
-                // Accent Color
-                if (v['accent-color']) {
-                    css += `.btn-warning { background-color: ${v['accent-color']} !important; border-color: ${v['accent-color']} !important; }\n`;
-                    css += `.badge-warning { background-color: ${v['accent-color']} !important; }\n`;
-                    css += `.text-warning { color: ${v['accent-color']} !important; }\n`;
-                }
-
-                // Link Color
-                if (v['link-color']) {
-                    css += `a:not(.btn):not(.nav-link):not(.dropdown-item) { color: ${v['link-color']} !important; }\n`;
-                    css += `a:not(.btn):not(.nav-link):not(.dropdown-item):hover { color: ${v['link-color']} !important; filter: brightness(0.85); }\n`;
-                }
-            }
-        }
-
-        // Custom CSS anhängen (sanitized)
-        if (custom_css) {
-            const safeCss = custom_css
-                .replace(/<script[\s\S]*?<\/script>/gi, '')
-                .replace(/<\/style>/gi, '')
-                .replace(/expression\s*\(/gi, '')
-                .replace(/javascript\s*:/gi, '')
-                .replace(/url\s*\(\s*['"]?\s*javascript:/gi, '');
-            css += safeCss;
-        }
+        if (custom_css) css += this.sanitizeCss(custom_css);
 
         return css;
+    }
+
+    /**
+     * Aus gespeicherten Tokens einen `:root`-Block bauen.
+     *
+     * Farben bekommen zusätzlich ein `-rgb`-Tripel, weil die Utilities von
+     * Bootstrap (`.text-primary`, `.bg-primary`) mit
+     * `rgba(var(--…-rgb), …)` rechnen und mit einem Hex-Wert nichts anfangen
+     * können.
+     *
+     * @param {object|null} variables - { 'fb-primary': '#3498db', … }
+     * @returns {string} CSS-Block oder leerer String
+     */
+    buildTokenBlock(variables) {
+        if (!variables || typeof variables !== 'object') return '';
+
+        const zeilen = [];
+
+        for (const [key, value] of Object.entries(variables)) {
+            if (value == null || value === '') continue;
+
+            const name = String(key).replace(/[^a-zA-Z0-9-_]/g, '');
+            const wert = String(value).replace(/[;<>{}]/g, '').trim();
+            if (!name || !wert) continue;
+
+            zeilen.push(`  --${name}: ${wert};`);
+
+            const rgb = this.hexToRgbTriplet(wert);
+            if (rgb) zeilen.push(`  --${name}-rgb: ${rgb};`);
+        }
+
+        return zeilen.length ? `:root {\n${zeilen.join('\n')}\n}\n` : '';
+    }
+
+    /**
+     * '#3498db' → '52, 152, 219'. Kurzform '#abc' wird mitgenommen.
+     *
+     * @param {string} wert
+     * @returns {string|null} Tripel oder null, wenn es keine Hex-Farbe ist
+     */
+    hexToRgbTriplet(wert) {
+        const treffer = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(wert.trim());
+        if (!treffer) return null;
+
+        let hex = treffer[1];
+        if (hex.length === 3) hex = hex.split('').map(z => z + z).join('');
+
+        const zahl = parseInt(hex, 16);
+        return `${(zahl >> 16) & 255}, ${(zahl >> 8) & 255}, ${zahl & 255}`;
+    }
+
+    /**
+     * Eigenes CSS entschärfen, bevor es in die Seite geschrieben wird.
+     *
+     * @param {string} css
+     * @returns {string}
+     */
+    sanitizeCss(css) {
+        return String(css)
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<\/style>/gi, '')
+            .replace(/expression\s*\(/gi, '')
+            .replace(/javascript\s*:/gi, '')
+            .replace(/url\s*\(\s*['"]?\s*javascript:/gi, '');
     }
 
     /**
