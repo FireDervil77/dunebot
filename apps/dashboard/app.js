@@ -19,6 +19,7 @@ const { RouterManager } = require('dunebot-sdk');
 // Middlewares
 const expressLayouts = require("express-ejs-layouts");
 const sessionMiddleware = require("./middlewares/session.middleware");
+const assetQueueMiddleware = require("./middlewares/context/asset-queue.middleware");
 const baseMiddleware = require("./middlewares/context/base.middleware");
 const userConfigMiddleware = require("./middlewares/context/user-config.middleware");
 const { CheckAuth } = require("./middlewares/auth.middleware");
@@ -717,6 +718,10 @@ module.exports = class App {
         
         // Rest of the middlewares
         this.app.use(hookMiddleware);
+        // Eigene Asset-Warteschlange pro Anfrage — muss vor allem stehen,
+        // was Assets einreiht
+        this.app.use(assetQueueMiddleware);
+
         // ✅ WICHTIG: baseMiddleware VOR guildMiddleware! 
         // baseMiddleware lädt ungefilterte Navigation, guildMiddleware filtert und überschreibt
         this.app.use(baseMiddleware);

@@ -1,5 +1,17 @@
 const { ServiceManager } = require('dunebot-core');
 const path = require('path');
+const { AsyncLocalStorage } = require('node:async_hooks');
+
+/**
+ * Die Warteschlange der laufenden Anfrage.
+ *
+ * Registrierte Assets sind global und ändern sich nach dem Start nicht mehr —
+ * **was eingereiht ist, gehört dagegen zur einzelnen Anfrage**. Lag das auf der
+ * Instanz, löschte bei gleichzeitigen Anfragen die eine die Liste der anderen
+ * mitten im Rendern. Mit Theme-Wahl pro Guild würde daraus die falsche Optik
+ * für den falschen Server.
+ */
+const anfrageSpeicher = new AsyncLocalStorage();
 
 /**
  * AssetManager - WordPress-ähnliches Asset-Enqueuing-System
@@ -15,14 +27,44 @@ class AssetManager {
         /** @type {Map<string, Asset>} Registrierte Styles */
         this.styles = new Map();
         
-        /** @type {Set<string>} Bereits eingereiht für Rendering */
-        this.enqueuedScripts = new Set();
-        
-        /** @type {Set<string>} Bereits eingereiht für Rendering */
-        this.enqueuedStyles = new Set();
-        
+        /**
+         * Auffangnetz für Aufrufe außerhalb einer Anfrage (Start, Tests).
+         * Im Normalbetrieb gilt die Warteschlange aus `anfrageSpeicher`.
+         * @type {{scripts: Set<string>, styles: Set<string>}}
+         */
+        this._globaleWarteschlange = { scripts: new Set(), styles: new Set() };
+
         this.logger = ServiceManager.get('Logger');
     }
+
+    // =========================================
+    // WARTESCHLANGE DER LAUFENDEN ANFRAGE
+    // =========================================
+
+    /**
+     * Einen Rumpf im Kontext einer eigenen Warteschlange ausführen.
+     * Alles, was darin eingereiht wird, gehört nur zu dieser Anfrage.
+     *
+     * @param {Function} rumpf - wird sofort aufgerufen
+     * @returns {*} Rückgabe des Rumpfes
+     */
+    inAnfrage(rumpf) {
+        return anfrageSpeicher.run({ scripts: new Set(), styles: new Set() }, rumpf);
+    }
+
+    /**
+     * Die aktuell gültige Warteschlange.
+     * @returns {{scripts: Set<string>, styles: Set<string>}}
+     */
+    get _warteschlange() {
+        return anfrageSpeicher.getStore() || this._globaleWarteschlange;
+    }
+
+    /** @returns {Set<string>} Eingereihte Skripte der laufenden Anfrage */
+    get enqueuedScripts() { return this._warteschlange.scripts; }
+
+    /** @returns {Set<string>} Eingereihte Styles der laufenden Anfrage */
+    get enqueuedStyles() { return this._warteschlange.styles; }
 
     /**
      * Registriert ein Script (wie wp_register_script)
@@ -445,17 +487,21 @@ class AssetManager {
     reset() {
         this.scripts.clear();
         this.styles.clear();
-        this.enqueuedScripts.clear();
-        this.enqueuedStyles.clear();
+        this._globaleWarteschlange.scripts.clear();
+        this._globaleWarteschlange.styles.clear();
     }
 
     /**
-     * Nur die Enqueue-Sets zurücksetzen, Registrierungen bleiben erhalten.
-     * Wird pro Request aufgerufen, damit keine Assets aus vorherigen Requests durchsickern.
+     * Nur die Warteschlange zurücksetzen, Registrierungen bleiben erhalten.
+     *
+     * Innerhalb einer Anfrage ist das seit der Umstellung ein Selbstläufer —
+     * jede Anfrage bekommt über `inAnfrage()` ohnehin eine eigene Liste. Die
+     * Methode bleibt für Aufrufe außerhalb einer Anfrage und für Tests.
      */
     resetEnqueued() {
-        this.enqueuedScripts.clear();
-        this.enqueuedStyles.clear();
+        const w = this._warteschlange;
+        w.scripts.clear();
+        w.styles.clear();
     }
 
     /**

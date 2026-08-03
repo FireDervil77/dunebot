@@ -34,8 +34,8 @@ module.exports = async (req, res, next) => {
     const assetManager = ServiceManager.get('assetManager');
     const siteConfig = ServiceManager.get('siteConfig');
 
-    // Enqueue-Sets pro Request zurücksetzen (Registrierungen bleiben erhalten)
-    assetManager?.resetEnqueued();
+    // Die Warteschlange gehört seit asset-queue.middleware der einzelnen
+    // Anfrage — es gibt nichts mehr zurückzusetzen.
 
     try {
         // Core Config laden
