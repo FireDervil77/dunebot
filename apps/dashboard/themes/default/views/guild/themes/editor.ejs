@@ -1,19 +1,26 @@
-<%# Theme-Editor — /guild/:guildId/themes/editor %>
-<%# Combined: CSS-Variablen + Custom CSS + Live-Preview %>
+<%#
+ * Theme-Editor — /guild/:guildId/themes/editor
+ *
+ * Farbvariablen, eigenes CSS und Live-Vorschau nebeneinander.
+ *
+ * @context {object} variables        - gespeicherte Werte der Guild
+ * @context {object} defaultVariables - Werte des Themes, als Rueckfallebene
+ * @context {string} customCSS        - gespeichertes eigenes CSS
+%>
 
 <style>
+/*
+ * Zweispaltiges Arbeitsfenster ueber die volle Hoehe — das gibt es in keinem
+ * der beiden Geruestbaukaesten. Die Festfarben sind raus: Rahmen und
+ * Fokusfarbe folgen den Theme-Tokens, die dieser Editor selbst setzt.
+ */
 .editor-layout {
     display: flex;
     gap: 15px;
     height: calc(100vh - 180px);
     min-height: 500px;
 }
-.editor-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
+.editor-panel,
 .preview-panel {
     flex: 1;
     display: flex;
@@ -22,8 +29,8 @@
 }
 .preview-frame {
     flex: 1;
-    border: 2px solid #dee2e6;
-    border-radius: .25rem;
+    border: 2px solid var(--fb-border, #dee2e6);
+    border-radius: var(--fb-radius, .25rem);
     background: #fff;
 }
 .color-var-row {
@@ -40,7 +47,7 @@
 .color-var-row input[type="color"] {
     width: 38px;
     height: 30px;
-    border: 1px solid #ced4da;
+    border: 1px solid var(--fb-border, #ced4da);
     border-radius: .2rem;
     padding: 2px;
     cursor: pointer;
@@ -62,8 +69,8 @@
     font-size: .85rem;
     line-height: 1.5;
     padding: 12px;
-    border: 1px solid #ced4da;
-    border-radius: .25rem;
+    border: 1px solid var(--fb-border, #ced4da);
+    border-radius: var(--fb-radius, .25rem);
     background: #1e1e2e;
     color: #cdd6f4;
     resize: none;
@@ -71,187 +78,160 @@
 }
 .css-editor-wrap textarea:focus {
     outline: none;
-    border-color: #3498db;
-    box-shadow: 0 0 0 .2rem rgba(52,152,219,.25);
+    border-color: var(--fb-primary, #3498db);
+    box-shadow: 0 0 0 .2rem rgba(var(--fb-primary-rgb, 52,152,219), .25);
 }
-.var-reset-btn {
-    opacity: 0;
-    transition: opacity .15s;
-}
-.color-var-row:hover .var-reset-btn {
-    opacity: 1;
-}
-.editor-tabs .nav-link {
-    font-size: .85rem;
-    padding: .4rem .8rem;
-}
-.save-indicator {
-    display: none;
-    font-size: .8rem;
-}
-.save-indicator.show {
-    display: inline;
-}
+.var-reset-btn { opacity: 0; transition: opacity .15s; }
+.color-var-row:hover .var-reset-btn { opacity: 1; }
+.editor-tabs .nav-link { font-size: .85rem; padding: .4rem .8rem; }
+.save-indicator { display: none; font-size: .8rem; }
+.save-indicator.show { display: inline; }
+.var-gruppe-titel { font-size: .7rem; letter-spacing: 1px; }
 </style>
 
-<div class="row mb-3">
-    <div class="col-12 d-flex align-items-center justify-content-between">
-        <div class="d-flex align-items-center">
-            <a href="/guild/<%= guildId %>/themes" class="btn btn-sm btn-outline-secondary mr-3">
-                <i class="fa-solid fa-arrow-left mr-1"></i>Zurück
-            </a>
-            <div>
-                <h4 class="mb-0">
-                    <i class="fa-solid fa-paint-roller mr-2"></i>Theme-Editor
-                </h4>
-                <small class="text-muted">
-                    Aktiv: <strong><%= activeTheme ? (activeTheme.displayName || activeTheme.name) : activeThemeName %></strong>
-                    <% if (activeTheme && activeTheme.parent) { %>
-                        <span class="badge badge-secondary ml-1"><i class="fa-solid fa-sitemap mr-1"></i>Child von <%= activeTheme.parent %></span>
-                    <% } %>
-                </small>
-            </div>
+<%# ── Kopfzeile ───────────────────────────────────────────────────────────── %>
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div class="d-flex align-items-center gap-3">
+        <a href="/guild/<%= guildId %>/themes" class="btn btn-sm btn-outline-secondary">
+            <i class="fa-solid fa-arrow-left me-1"></i>Zurück
+        </a>
+        <div>
+            <div class="h3 mb-0"><i class="fa-solid fa-paint-roller me-2"></i>Theme-Editor</div>
+            <small class="text-secondary">
+                Aktiv: <strong><%= activeTheme ? (activeTheme.displayName || activeTheme.name) : activeThemeName %></strong>
+                <% if (activeTheme && activeTheme.parent) { %>
+                    <span class="badge bg-secondary-lt ms-1"><i class="fa-solid fa-sitemap me-1"></i>Child von <%= activeTheme.parent %></span>
+                <% } %>
+            </small>
         </div>
-        <div class="d-flex align-items-center">
-            <span class="save-indicator text-success mr-3" id="save-indicator">
-                <i class="fa-solid fa-check mr-1"></i>Gespeichert
-            </span>
-            <span class="save-indicator text-warning mr-3" id="unsaved-indicator">
-                <i class="fa-solid fa-circle-exclamation mr-1"></i>Ungespeichert
-            </span>
-            <button class="btn btn-outline-danger btn-sm mr-2" id="btn-reset" title="Alle Anpassungen zurücksetzen">
-                <i class="fa-solid fa-rotate-left mr-1"></i>Zurücksetzen
-            </button>
-            <button class="btn btn-primary btn-sm" id="btn-save">
-                <i class="fa-solid fa-save mr-1"></i>Speichern
-                <span class="badge badge-light ml-1" style="font-size:.65rem;">Ctrl+S</span>
-            </button>
-        </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="save-indicator text-success" id="save-indicator">
+            <i class="fa-solid fa-check me-1"></i>Gespeichert
+        </span>
+        <span class="save-indicator text-warning" id="unsaved-indicator">
+            <i class="fa-solid fa-circle-exclamation me-1"></i>Ungespeichert
+        </span>
+        <button class="btn btn-outline-danger btn-sm" id="btn-reset" title="Alle Anpassungen zurücksetzen">
+            <i class="fa-solid fa-rotate-left me-1"></i>Zurücksetzen
+        </button>
+        <button class="btn btn-primary btn-sm" id="btn-save">
+            <i class="fa-solid fa-save me-1"></i>Speichern
+            <span class="badge bg-white text-dark ms-1" style="font-size:.65rem;">Strg+S</span>
+        </button>
     </div>
 </div>
 
+<%
+/**
+ * Eine Zeile im Farbteil. Stand dreimal wortgleich in der Datei — einmal je
+ * Gruppe — und musste bei jeder Aenderung dreimal nachgezogen werden.
+ */
+function _farbzeile(v) {
+    const wert = variables[v.key] || '';
+    const vorgabe = defaultVariables[v.key] || '';
+    return `<div class="color-var-row" data-var="${v.key}">
+      <i class="fa-solid ${v.icon} text-secondary" style="width:16px;"></i>
+      <label>${v.label}</label>
+      <input type="color" class="var-color-picker" value="${wert || '#000000'}">
+      <input type="text" class="form-control form-control-sm var-hex-input" value="${wert}" placeholder="#000000" maxlength="20">
+      <button class="btn btn-sm btn-outline-secondary var-reset-btn" title="Auf Standard zurücksetzen" data-default="${vorgabe}">
+        <i class="fa-solid fa-rotate-left"></i>
+      </button>
+    </div>`;
+}
+
+const gruppen = [
+    { titel: 'Hauptfarben', felder: [
+        { key: 'fb-primary', label: 'Primärfarbe', icon: 'fa-droplet' },
+        { key: 'fb-accent',  label: 'Akzentfarbe', icon: 'fa-star' },
+        { key: 'fb-link',    label: 'Link-Farbe',  icon: 'fa-link' },
+    ]},
+    { titel: 'Seitenleiste', felder: [
+        { key: 'fb-sidebar-bg',       label: 'Hintergrund',       icon: 'fa-square' },
+        { key: 'fb-sidebar-text',     label: 'Text',              icon: 'fa-font' },
+        { key: 'fb-sidebar-hover-bg', label: 'Hover-Hintergrund', icon: 'fa-hand-pointer' },
+    ]},
+    { titel: 'Layout', felder: [
+        { key: 'fb-header-bg',  label: 'Header-Hintergrund', icon: 'fa-window-maximize' },
+        { key: 'fb-body-bg',    label: 'Seiten-Hintergrund', icon: 'fa-expand' },
+        { key: 'fb-surface-bg', label: 'Karten-Hintergrund', icon: 'fa-square-full' },
+        { key: 'fb-text',       label: 'Textfarbe',          icon: 'fa-font' },
+    ]},
+];
+%>
+
 <div class="editor-layout">
-    <!-- Linke Seite: Editor -->
+
+    <%# ── Arbeitsflaeche ──────────────────────────────────────────────────── %>
     <div class="editor-panel">
-        <div class="card shadow-sm h-100 mb-0 d-flex flex-column">
+        <div class="card h-100 mb-0 d-flex flex-column">
             <div class="card-header p-0">
                 <ul class="nav nav-tabs editor-tabs" role="tablist">
                     <li class="nav-item">
-                        <a class="nav-link active" data-toggle="tab" href="#tab-variables" role="tab">
-                            <i class="fa-solid fa-palette mr-1"></i>Farben & Variablen
+                        <a class="nav-link active" data-bs-toggle="tab" href="#tab-variables" role="tab">
+                            <i class="fa-solid fa-palette me-1"></i>Farben &amp; Variablen
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" data-toggle="tab" href="#tab-css" role="tab">
-                            <i class="fa-solid fa-code mr-1"></i>Custom CSS
+                        <a class="nav-link" data-bs-toggle="tab" href="#tab-css" role="tab">
+                            <i class="fa-solid fa-code me-1"></i>Eigenes CSS
                         </a>
                     </li>
                 </ul>
             </div>
             <div class="card-body p-0 d-flex flex-column" style="overflow:hidden; flex:1; min-height:0;">
                 <div class="tab-content flex-fill d-flex flex-column" style="min-height:0;">
-                    <!-- Tab: Variablen -->
+
                     <div class="tab-pane fade show active p-3" id="tab-variables" role="tabpanel" style="overflow-y:auto; flex:1; min-height:0;">
-                        <p class="text-muted small mb-3">
-                            <i class="fa-solid fa-info-circle mr-1"></i>
-                            Passe die Farben deines Themes an. Änderungen werden sofort in der Vorschau angezeigt.
+                        <p class="text-secondary small mb-3">
+                            <i class="fa-solid fa-circle-info me-1"></i>
+                            Passe die Farben deines Themes an. Änderungen erscheinen sofort in der Vorschau.
                         </p>
 
-                        <h6 class="text-uppercase text-muted mb-2" style="font-size:.7rem; letter-spacing:1px;">Hauptfarben</h6>
-                        <% const mainColors = [
-                            { key: 'fb-primary', label: 'Primärfarbe', icon: 'fa-droplet' },
-                            { key: 'fb-accent', label: 'Akzentfarbe', icon: 'fa-star' },
-                            { key: 'fb-link', label: 'Link-Farbe', icon: 'fa-link' }
-                        ]; %>
-                        <% mainColors.forEach(v => { %>
-                        <div class="color-var-row" data-var="<%= v.key %>">
-                            <i class="fa-solid <%= v.icon %> text-muted" style="width:16px;"></i>
-                            <label><%= v.label %></label>
-                            <input type="color" class="var-color-picker" value="<%= variables[v.key] || '#000000' %>">
-                            <input type="text" class="form-control form-control-sm var-hex-input" value="<%= variables[v.key] || '' %>" placeholder="#000000" maxlength="20">
-                            <button class="btn btn-xs btn-outline-secondary var-reset-btn" title="Auf Standard zurücksetzen" data-default="<%= defaultVariables[v.key] || '' %>">
-                                <i class="fa-solid fa-rotate-left"></i>
-                            </button>
-                        </div>
-                        <% }); %>
-
-                        <h6 class="text-uppercase text-muted mb-2 mt-3" style="font-size:.7rem; letter-spacing:1px;">Sidebar</h6>
-                        <% const sidebarColors = [
-                            { key: 'fb-sidebar-bg', label: 'Hintergrund', icon: 'fa-square' },
-                            { key: 'fb-sidebar-text', label: 'Text', icon: 'fa-font' },
-                            { key: 'fb-sidebar-hover-bg', label: 'Hover-Hintergrund', icon: 'fa-hand-pointer' }
-                        ]; %>
-                        <% sidebarColors.forEach(v => { %>
-                        <div class="color-var-row" data-var="<%= v.key %>">
-                            <i class="fa-solid <%= v.icon %> text-muted" style="width:16px;"></i>
-                            <label><%= v.label %></label>
-                            <input type="color" class="var-color-picker" value="<%= variables[v.key] || '#000000' %>">
-                            <input type="text" class="form-control form-control-sm var-hex-input" value="<%= variables[v.key] || '' %>" placeholder="#000000" maxlength="20">
-                            <button class="btn btn-xs btn-outline-secondary var-reset-btn" title="Auf Standard zurücksetzen" data-default="<%= defaultVariables[v.key] || '' %>">
-                                <i class="fa-solid fa-rotate-left"></i>
-                            </button>
-                        </div>
-                        <% }); %>
-
-                        <h6 class="text-uppercase text-muted mb-2 mt-3" style="font-size:.7rem; letter-spacing:1px;">Layout</h6>
-                        <% const layoutColors = [
-                            { key: 'fb-header-bg', label: 'Header-Hintergrund', icon: 'fa-window-maximize' },
-                            { key: 'fb-body-bg', label: 'Seiten-Hintergrund', icon: 'fa-expand' },
-                            { key: 'fb-surface-bg', label: 'Card-Hintergrund', icon: 'fa-square-full' },
-                            { key: 'fb-text', label: 'Textfarbe', icon: 'fa-font' }
-                        ]; %>
-                        <% layoutColors.forEach(v => { %>
-                        <div class="color-var-row" data-var="<%= v.key %>">
-                            <i class="fa-solid <%= v.icon %> text-muted" style="width:16px;"></i>
-                            <label><%= v.label %></label>
-                            <input type="color" class="var-color-picker" value="<%= variables[v.key] || '#000000' %>">
-                            <input type="text" class="form-control form-control-sm var-hex-input" value="<%= variables[v.key] || '' %>" placeholder="#000000" maxlength="20">
-                            <button class="btn btn-xs btn-outline-secondary var-reset-btn" title="Auf Standard zurücksetzen" data-default="<%= defaultVariables[v.key] || '' %>">
-                                <i class="fa-solid fa-rotate-left"></i>
-                            </button>
-                        </div>
+                        <% gruppen.forEach((g, i) => { %>
+                            <h6 class="text-uppercase text-secondary var-gruppe-titel mb-2 <%= i > 0 ? 'mt-3' : '' %>"><%= g.titel %></h6>
+                            <% g.felder.forEach(v => { %><%- _farbzeile(v) %><% }); %>
                         <% }); %>
                     </div>
 
-                    <!-- Tab: Custom CSS -->
                     <div class="tab-pane fade d-flex flex-column" id="tab-css" role="tabpanel" style="flex:1; min-height:0;">
                         <div class="p-3 pb-2">
-                            <p class="text-muted small mb-2">
-                                <i class="fa-solid fa-info-circle mr-1"></i>
-                                Eigenes CSS schreiben. Nutze <code>var(--fb-primary)</code> etc. für die obigen Variablen.
+                            <p class="text-secondary small mb-2">
+                                <i class="fa-solid fa-circle-info me-1"></i>
+                                Eigenes CSS schreiben. Nutze <code>var(--fb-primary)</code> und die übrigen Variablen von nebenan.
                                 Die Änderungen überschreiben das aktive Theme, ohne es zu verändern.
                             </p>
-                            <div class="d-flex gap-2" style="gap:6px;">
-                                <button class="btn btn-xs btn-outline-secondary" id="btn-restore-css" title="Zuletzt gespeicherten CSS-Stand wiederherstellen">
-                                    <i class="fa-solid fa-clock-rotate-left mr-1"></i>Letzte Sicherung
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-secondary" id="btn-restore-css" title="Zuletzt gespeicherten Stand wiederherstellen">
+                                    <i class="fa-solid fa-clock-rotate-left me-1"></i>Letzte Sicherung
                                 </button>
-                                <button class="btn btn-xs btn-outline-danger" id="btn-clear-css" title="Custom CSS komplett leeren (Variablen bleiben erhalten)">
-                                    <i class="fa-solid fa-eraser mr-1"></i>CSS zurücksetzen
+                                <button class="btn btn-sm btn-outline-danger" id="btn-clear-css" title="Eigenes CSS leeren (Variablen bleiben erhalten)">
+                                    <i class="fa-solid fa-eraser me-1"></i>CSS leeren
                                 </button>
                             </div>
                         </div>
                         <div class="css-editor-wrap flex-fill">
-                            <textarea id="css-editor" spellcheck="false" placeholder="/* Dein Custom CSS */&#10;&#10;.app-sidebar {&#10;  background: var(--fb-sidebar-bg);&#10;}"><%= customCSS %></textarea>
+                            <textarea id="css-editor" spellcheck="false" placeholder="/* Dein eigenes CSS */&#10;&#10;.navbar-vertical {&#10;  background: var(--fb-sidebar-bg);&#10;}"><%= customCSS %></textarea>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Rechte Seite: Live-Vorschau -->
+    <%# ── Vorschau ────────────────────────────────────────────────────────── %>
     <div class="preview-panel">
-        <div class="card shadow-sm h-100 mb-0">
-            <div class="card-header d-flex align-items-center justify-content-between py-2">
-                <h3 class="card-title mb-0" style="font-size:.9rem;">
-                    <i class="fa-solid fa-eye mr-1"></i>Live-Vorschau
-                </h3>
-                <div>
-                    <button class="btn btn-xs btn-outline-secondary" id="btn-refresh-preview" title="Vorschau neu laden">
+        <div class="card h-100 mb-0">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h3 class="card-title mb-0"><i class="fa-solid fa-eye me-1"></i>Live-Vorschau</h3>
+                <div class="card-actions d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-secondary" id="btn-refresh-preview" title="Vorschau neu laden">
                         <i class="fa-solid fa-rotate"></i>
                     </button>
-                    <button class="btn btn-xs btn-outline-secondary ml-1" id="btn-open-preview" title="In neuem Tab öffnen">
-                        <i class="fa-solid fa-external-link-alt"></i>
+                    <button class="btn btn-sm btn-outline-secondary" id="btn-open-preview" title="In neuem Tab öffnen">
+                        <i class="fa-solid fa-up-right-from-square"></i>
                     </button>
                 </div>
             </div>
@@ -270,11 +250,19 @@
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const defaultVars = <%- JSON.stringify(defaultVariables) %>;
 
-    // Gespeicherter Stand beim Laden (für "Letzte Sicherung")
-    const savedCSS = <%= JSON.stringify(customCSS || '') %>;
+    /*
+     * Der gespeicherte Stand beim Laden — Grundlage fuer "Letzte Sicherung".
+     *
+     * Hier stand `<%%= JSON.stringify(...) %>` mit escapendem Ausgabefeld. In
+     * einem Skriptblock werden HTML-Entities nicht zurueckverwandelt: Aus den
+     * Anfuehrungszeichen wurde `&#34;`, und der ganze Block war ein
+     * Syntaxfehler. Damit lief KEINE Zeile dieses Editors — keine Farbwahl,
+     * kein Speichern, kein Strg+S, keine Vorschau. Zwei Zeilen weiter oben und
+     * unten stand es bereits richtig mit `<%%-`.
+     */
+    const savedCSS = <%- JSON.stringify(customCSS || '') %>;
     const savedVariables = <%- JSON.stringify(variables) %>;
 
-    // State
     let isDirty = false;
     const saveIndicator = document.getElementById('save-indicator');
     const unsavedIndicator = document.getElementById('unsaved-indicator');
@@ -307,9 +295,6 @@
         return vars;
     }
 
-    // ============================
-    // CSS-Variablen als Style-String
-    // ============================
     // '#3498db' → '52, 152, 219' (Bootstrap-Utilities rechnen mit dem Tripel)
     function hexZuTripel(wert) {
         const treffer = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec((wert || '').trim());
@@ -321,8 +306,7 @@
     }
 
     // Nur Variablen setzen — was sie bewirken, steht in tokens.css, das die
-    // Vorschau ohnehin lädt. Früher stand hier derselbe !important-Generator
-    // wie im ThemeCustomizer ein zweites Mal.
+    // Vorschau ohnehin lädt.
     function buildPreviewCSS() {
         const v = collectVariables();
         const zeilen = [];
@@ -336,14 +320,14 @@
 
         let css = zeilen.length ? `:root {\n${zeilen.join('\n')}\n}\n` : '';
 
-        const customCSS = document.getElementById('css-editor').value;
-        if (customCSS) css += customCSS;
+        const eigenesCSS = document.getElementById('css-editor').value;
+        if (eigenesCSS) css += eigenesCSS;
 
         return css;
     }
 
     // ============================
-    // Preview updaten
+    // Vorschau nachziehen
     // ============================
     function updatePreview() {
         const frame = document.getElementById('preview-frame');
@@ -358,12 +342,12 @@
             }
             styleEl.textContent = buildPreviewCSS();
         } catch (e) {
-            // Cross-origin, ignorieren
+            // Fremde Herkunft — ignorieren
         }
     }
 
     // ============================
-    // Color Picker <-> Hex Input sync
+    // Farbwaehler und Hex-Feld gleichziehen
     // ============================
     document.querySelectorAll('.color-var-row').forEach(row => {
         const colorPicker = row.querySelector('.var-color-picker');
@@ -384,7 +368,6 @@
             updatePreview();
         });
 
-        // Reset-Button
         const resetBtn = row.querySelector('.var-reset-btn');
         if (resetBtn) {
             resetBtn.addEventListener('click', function() {
@@ -400,7 +383,7 @@
     });
 
     // ============================
-    // CSS Editor
+    // CSS-Feld
     // ============================
     const cssEditor = document.getElementById('css-editor');
     cssEditor.addEventListener('input', function() {
@@ -408,7 +391,7 @@
         updatePreview();
     });
 
-    // Tab-Support im Editor
+    // Tabulator im Feld statt Sprung zum nächsten Element
     cssEditor.addEventListener('keydown', function(e) {
         if (e.key === 'Tab') {
             e.preventDefault();
@@ -423,10 +406,12 @@
     // ============================
     // Speichern
     // ============================
+    const SPEICHERN_HTML = '<i class="fa-solid fa-save me-1"></i>Speichern <span class="badge bg-white text-dark ms-1" style="font-size:.65rem;">Strg+S</span>';
+
     async function save() {
         const btn = document.getElementById('btn-save');
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Speichern...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Speichern…';
 
         try {
             const response = await fetch(`/guild/${guildId}/themes/editor`, {
@@ -453,13 +438,12 @@
             if (typeof toastr !== 'undefined') toastr.error('Netzwerkfehler');
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-save mr-1"></i>Speichern <span class="badge badge-light ml-1" style="font-size:.65rem;">Ctrl+S</span>';
+            btn.innerHTML = SPEICHERN_HTML;
         }
     }
 
     document.getElementById('btn-save').addEventListener('click', save);
 
-    // Ctrl+S
     document.addEventListener('keydown', function(e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
@@ -468,7 +452,7 @@
     });
 
     // ============================
-    // Zurücksetzen
+    // Alles zurücksetzen
     // ============================
     document.getElementById('btn-reset').addEventListener('click', async function() {
         if (!confirm('Alle Theme-Anpassungen für diese Guild zurücksetzen? Das kann nicht rückgängig gemacht werden.')) return;
@@ -487,7 +471,6 @@
             const data = await response.json();
 
             if (data.success) {
-                // Variablen auf Defaults zurücksetzen
                 document.querySelectorAll('.color-var-row').forEach(row => {
                     const key = row.dataset.var;
                     const def = defaultVars[key] || '';
@@ -511,15 +494,15 @@
     });
 
     // ============================
-    // CSS zurücksetzen (nur CSS, Variablen bleiben)
+    // Nur das CSS leeren
     // ============================
     document.getElementById('btn-clear-css').addEventListener('click', function() {
         if (!cssEditor.value.trim()) return;
-        if (!confirm('Custom CSS komplett leeren? Die Farb-Variablen bleiben erhalten.')) return;
+        if (!confirm('Eigenes CSS komplett leeren? Die Farb-Variablen bleiben erhalten.')) return;
         cssEditor.value = '';
         markDirty();
         updatePreview();
-        if (typeof toastr !== 'undefined') toastr.info('CSS geleert — zum Speichern auf "Speichern" klicken');
+        if (typeof toastr !== 'undefined') toastr.info('CSS geleert — zum Übernehmen auf „Speichern" klicken');
     });
 
     // ============================
@@ -532,10 +515,8 @@
         }
         if (!confirm('CSS und Variablen auf den zuletzt gespeicherten Stand zurücksetzen?')) return;
 
-        // CSS wiederherstellen
         cssEditor.value = savedCSS;
 
-        // Variablen wiederherstellen
         document.querySelectorAll('.color-var-row').forEach(row => {
             const key = row.dataset.var;
             const val = savedVariables[key] || '';
@@ -547,11 +528,11 @@
 
         markDirty();
         updatePreview();
-        if (typeof toastr !== 'undefined') toastr.success('Letzte Sicherung wiederhergestellt — zum Speichern auf "Speichern" klicken');
+        if (typeof toastr !== 'undefined') toastr.success('Letzte Sicherung wiederhergestellt — zum Übernehmen auf „Speichern" klicken');
     });
 
     // ============================
-    // Preview Controls
+    // Vorschau steuern
     // ============================
     document.getElementById('btn-refresh-preview').addEventListener('click', function() {
         const frame = document.getElementById('preview-frame');
@@ -562,14 +543,12 @@
         window.open(`/guild/${guildId}`, '_blank');
     });
 
-    // Preview nach Laden initialisieren
     const previewFrame = document.getElementById('preview-frame');
     previewFrame.addEventListener('load', function() {
-        // Kurz warten bis DOM fertig
         setTimeout(updatePreview, 300);
     });
 
-    // Ungespeicherte Änderungen warnen
+    // Vor dem Verlassen warnen
     window.addEventListener('beforeunload', function(e) {
         if (isDirty) {
             e.preventDefault();

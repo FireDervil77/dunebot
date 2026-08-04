@@ -1,144 +1,149 @@
 <%# Guild Themes-Übersicht — /guild/:guildId/themes %>
 
-<div class="row mb-4">
-    <div class="col-12 d-flex align-items-center justify-content-between">
-        <div>
-            <h4 class="mb-1"><i class="fa-solid fa-palette mr-2"></i>Themes</h4>
-            <p class="text-muted mb-0">Wähle und verwalte das Aussehen deines Guild-Dashboards.</p>
-        </div>
-        <div>
-            <a href="/guild/<%= guildId %>/themes/editor" class="btn btn-sm btn-outline-warning mr-2">
-                <i class="fa-solid fa-paint-roller mr-1"></i>Theme-Editor
-            </a>
-            <span class="badge badge-info"><%= themes.length %> Theme<%= themes.length !== 1 ? 's' : '' %> verfügbar</span>
-        </div>
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+    <div>
+        <div class="h3 mb-1"><i class="fa-solid fa-palette me-2"></i>Themes</div>
+        <div class="text-secondary">Wähle und verwalte das Aussehen deines Guild-Dashboards.</div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a href="/guild/<%= guildId %>/themes/editor" class="btn btn-sm btn-outline-warning">
+            <i class="fa-solid fa-paint-roller me-1"></i>Theme-Editor
+        </a>
+        <span class="badge bg-info-lt"><%= themes.length %> Theme<%= themes.length !== 1 ? 's' : '' %> verfügbar</span>
     </div>
 </div>
 
-<div class="row">
+<div class="row row-cards">
     <% themes.forEach(theme => { %>
-    <% const isActive = theme.name === activeThemeName; %>
-    <div class="col-xl-4 col-md-6 mb-4">
-        <div class="card shadow-sm h-100 <%= isActive ? 'border-success' : '' %>" style="cursor:pointer;"
-             onclick="window.location.href='/guild/<%= guildId %>/themes/<%= theme.name %>'">
+        <% const isActive = theme.name === activeThemeName; %>
+        <div class="col-xl-4 col-md-6">
+            <%#
+              Die ganze Karte war anklickbar (`onclick` auf dem Kartenrahmen) und
+              trug `cursor:pointer` — dann mussten Knopf und Link im Fuss den Klick
+              per `stopPropagation` wieder abfangen. Jetzt fuehrt nur noch der
+              Titel zur Detailseite, wie ueberall sonst.
+            %>
+            <div class="card h-100 <%= isActive ? 'border-success' : '' %>">
 
-            <!-- Screenshot -->
-            <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center"
-                 style="height: 160px; overflow: hidden; position: relative;">
-                <%# Aufgeloest in der ThemeRegistry: absolute URL, vorhandene Datei oder null %>
-                <% const screenshotUrl = theme.screenshotUrl; %>
-                <% if (screenshotUrl) { %><img src="<%= screenshotUrl %>"
-                     alt="<%= theme.displayName %> Screenshot"
-                     style="width:100%; height:100%; object-fit:cover;"
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><% } %>
-                <div style="display:<%= screenshotUrl ? 'none' : 'flex' %>; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; background:#343a40; color:#6c757d;">
-                    <i class="fa-solid fa-image fa-3x mb-2"></i>
-                    <small>Kein Screenshot</small>
+                <%# Vorschaubild — aufgeloest in der ThemeRegistry: URL oder null %>
+                <div class="card-img-top d-flex align-items-center justify-content-center bg-surface-secondary"
+                     style="height: 160px; overflow: hidden; position: relative;">
+                    <% if (theme.screenshotUrl) { %>
+                        <img src="<%= theme.screenshotUrl %>"
+                             alt="Vorschau von <%= theme.displayName %>"
+                             style="width:100%; height:100%; object-fit:cover;"
+                             onerror="this.style.display='none'; this.nextElementSibling.classList.remove('d-none');">
+                    <% } %>
+                    <div class="flex-column align-items-center justify-content-center w-100 h-100 text-secondary <%= theme.screenshotUrl ? 'd-none' : 'd-flex' %>">
+                        <i class="fa-solid fa-image fa-3x mb-2"></i>
+                        <small>Kein Screenshot</small>
+                    </div>
+
+                    <div class="position-absolute top-0 end-0 m-2 d-flex gap-1">
+                        <% if (isActive) { %>
+                            <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Aktiv</span>
+                        <% } %>
+                        <% if (theme.parent) { %>
+                            <span class="badge bg-secondary"><i class="fa-solid fa-sitemap me-1"></i>Child</span>
+                        <% } %>
+                    </div>
                 </div>
 
-                <!-- Status-Badges -->
-                <div style="position:absolute; top:8px; right:8px;">
-                    <% if (isActive) { %>
-                        <span class="badge badge-success"><i class="fa-solid fa-check mr-1"></i>Aktiv</span>
-                    <% } %>
+                <div class="card-body">
+                    <h3 class="card-title mb-1">
+                        <a href="/guild/<%= guildId %>/themes/<%= theme.name %>" class="text-reset">
+                            <%= theme.displayName || theme.name %>
+                        </a>
+                        <small class="text-secondary ms-1">v<%= theme.version || '1.0.0' %></small>
+                    </h3>
+
                     <% if (theme.parent) { %>
-                        <span class="badge badge-secondary ml-1"><i class="fa-solid fa-sitemap mr-1"></i>Child</span>
+                        <div class="text-secondary small mb-1">
+                            <i class="fa-solid fa-sitemap me-1"></i>Erbt von <strong><%= theme.parent %></strong>
+                        </div>
                     <% } %>
-                </div>
-            </div>
 
-            <!-- Card Body -->
-            <div class="card-body">
-                <h5 class="card-title mb-1">
-                    <%= theme.displayName || theme.name %>
-                    <small class="text-muted ml-1">v<%= theme.version || '1.0.0' %></small>
-                </h5>
-                <% if (theme.parent) { %>
-                    <p class="text-muted small mb-1">
-                        <i class="fa-solid fa-sitemap mr-1"></i>Erbt von <strong><%= theme.parent %></strong>
+                    <p class="text-secondary small mb-2">
+                        <%= theme.description || 'Keine Beschreibung verfügbar' %>
                     </p>
-                <% } %>
-                <p class="card-text text-muted small mb-2">
-                    <%= theme.description || 'Keine Beschreibung verfügbar' %>
-                </p>
 
-                <div class="small text-muted">
-                    <i class="fa-solid fa-user mr-1"></i><%= theme.author || 'Unbekannt' %>
-                    <% if (theme.tags && theme.tags.length > 0) { %>
-                        &nbsp;·&nbsp;
-                        <% theme.tags.slice(0, 3).forEach(tag => { %>
-                            <span class="badge badge-light border mr-1"><%= tag %></span>
+                    <div class="small text-secondary d-flex align-items-center flex-wrap gap-1">
+                        <span><i class="fa-solid fa-user me-1"></i><%= theme.author || 'Unbekannt' %></span>
+                        <% (theme.tags || []).slice(0, 3).forEach(tag => { %>
+                            <span class="badge bg-secondary-lt"><%= tag %></span>
                         <% }); %>
-                    <% } %>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Card Footer -->
-            <div class="card-footer bg-transparent d-flex gap-2">
-                <% if (isActive) { %>
-                    <button class="btn btn-success btn-sm flex-fill" disabled>
-                        <i class="fa-solid fa-check mr-1"></i>Aktiv
-                    </button>
-                <% } else { %>
-                    <button class="btn btn-primary btn-sm flex-fill theme-activate-btn"
-                            data-theme="<%= theme.name %>"
-                            data-displayname="<%= theme.displayName || theme.name %>"
-                            onclick="event.stopPropagation(); activateTheme(this);">
-                        <i class="fa-solid fa-paint-brush mr-1"></i>Aktivieren
-                    </button>
-                <% } %>
-                <a href="/guild/<%= guildId %>/themes/<%= theme.name %>"
-                   class="btn btn-outline-secondary btn-sm"
-                   onclick="event.stopPropagation();"
-                   title="Details">
-                    <i class="fa-solid fa-arrow-right"></i>
-                </a>
+                <div class="card-footer d-flex gap-2">
+                    <% if (isActive) { %>
+                        <button class="btn btn-success btn-sm flex-fill" disabled>
+                            <i class="fa-solid fa-check me-1"></i>Aktiv
+                        </button>
+                    <% } else { %>
+                        <button class="btn btn-primary btn-sm flex-fill theme-activate-btn"
+                                data-theme="<%= theme.name %>">
+                            <i class="fa-solid fa-paint-brush me-1"></i>Aktivieren
+                        </button>
+                    <% } %>
+                    <a href="/guild/<%= guildId %>/themes/<%= theme.name %>"
+                       class="btn btn-outline-secondary btn-sm" title="Details">
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
             </div>
         </div>
-    </div>
     <% }); %>
 
     <% if (themes.length === 0) { %>
-    <div class="col-12">
-        <div class="alert alert-warning">
-            <i class="fa-solid fa-exclamation-triangle mr-2"></i>
-            Keine Themes gefunden. Bitte überprüfe das Themes-Verzeichnis.
+        <div class="col-12">
+            <div class="alert alert-warning">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                Keine Themes gefunden. Bitte überprüfe das Themes-Verzeichnis.
+            </div>
         </div>
-    </div>
     <% } %>
 </div>
 
 <script>
-async function activateTheme(btn) {
-    const themeName = btn.dataset.theme;
+(function() {
     const guildId = '<%= guildId %>';
 
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Wird aktiviert...';
+    document.querySelectorAll('.theme-activate-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const themeName = btn.dataset.theme;
 
-    try {
-        const res = await fetch(`/guild/${guildId}/themes/activate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
-            },
-            body: JSON.stringify({ themeName })
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Wird aktiviert…';
+
+            const zurueck = () => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-paint-brush me-1"></i>Aktivieren';
+            };
+
+            try {
+                const res = await fetch(`/guild/${guildId}/themes/activate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    },
+                    body: JSON.stringify({ themeName })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert('Fehler: ' + (data.message || 'Unbekannter Fehler'));
+                    zurueck();
+                }
+            } catch (err) {
+                alert('Netzwerkfehler beim Aktivieren des Themes.');
+                zurueck();
+            }
         });
-
-        const data = await res.json();
-
-        if (data.success) {
-            window.location.reload();
-        } else {
-            alert('Fehler: ' + (data.message || 'Unbekannter Fehler'));
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-paint-brush mr-1"></i>Aktivieren';
-        }
-    } catch (err) {
-        alert('Netzwerkfehler beim Aktivieren des Themes.');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-paint-brush mr-1"></i>Aktivieren';
-    }
-}
+    });
+})();
 </script>
