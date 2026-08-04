@@ -8,8 +8,17 @@ const guildController = require("../controllers/guild.controller");
 // Middlewares
 const pluginMiddleware = require("../middlewares/context/plugin.middleware");
 const { CheckAuth, CheckGuildAccess } = require("../middlewares/auth.middleware");
+const { loadUserPermissions } = require("../middlewares/permissions.middleware");
 
 // Kern-Routen
+// Rechte des Nutzers fuer ALLE Guild-Seiten bereitstellen.
+//
+// Bisher lief das nur im permissions.router und im gameserver-Plugin. Ueberall
+// sonst war res.locals.userPermissions leer — eine Rechtepruefung in einer View
+// sagte dort also immer "nein", ohne dass etwas im Log stand. Die Middleware
+// faengt eigene Fehler ab und setzt notfalls leere Rechte.
+router.use("/:guildId", loadUserPermissions);
+
 const permissionsRouter = require("./permissions.router");
 const settingsRouter = require("./guild/settings.router");
 const feedbackRouter = require("./guild/feedback.router");
