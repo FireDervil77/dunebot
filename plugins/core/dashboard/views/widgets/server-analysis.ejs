@@ -1,62 +1,79 @@
-<!-- Erweiterte Server-Analyse -->
-      
-<div class="d-flex justify-content-between mb-2">
-  <div class="text-center">
-    <h4><%= stats?.cacheStats?.members?.total || '0' %></h4>
-    <small class="text-muted"><%= tr('core:WIDGETS.SERVER_ANALYSIS.MEMBERS') %></small>
-  </div>
-  <div class="text-center">
-    <h4><%= stats?.cacheStats?.channels || '0' %></h4>
-    <small class="text-muted"><%= tr('core:WIDGETS.SERVER_ANALYSIS.CHANNELS') %></small>
-  </div>
-  <div class="text-center">
-    <h4><%= stats?.cacheStats?.roles || '0' %></h4>
-    <small class="text-muted"><%= tr('core:WIDGETS.SERVER_ANALYSIS.ROLES') %></small>
-  </div>
-</div>
-
-<!-- Cache-Effektivität - Korrigiert -->
-<h6 class="mt-4"><%= tr('core:WIDGETS.SERVER_ANALYSIS.CACHE_EFFICIENCY') %></h6>
-<div class="progress" style="height: 20px;">
-  <% 
-  // Sicherer Cache-Ratio-Berechnungsausdruck
-  const cacheRatio = stats && stats.cacheStats && stats.cacheStats.members && stats.cacheStats.members.ratio ? 
-    Math.round(stats.cacheStats.members.ratio * 100) : 0;
-  %>
-  <div class="progress-bar bg-success" role="progressbar" 
-      style="width: <%= cacheRatio %>%;" 
-      aria-valuenow="<%= cacheRatio %>" 
-      aria-valuemin="0" aria-valuemax="100">
-    <%= cacheRatio %>%
-  </div>
-</div>
-<small class="text-muted"><%= tr('core:WIDGETS.SERVER_ANALYSIS.CACHED_MEMBERS') %> 
-  <%= stats?.cacheStats?.members?.cached || '0' %>/<%= stats?.cacheStats?.members?.total || '0' %>
-</small>
-
-<!-- Server-Alter -->
-<h6 class="mt-3"><%= tr('core:WIDGETS.SERVER_ANALYSIS.SERVER_AGE') %></h6>
-<% if (stats?.guild?.createdAt) { 
-    const createdDate = new Date(stats.guild.createdAt);
-    const now = new Date();
-    const diffTime = Math.abs(now - createdDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+<%#
+ * Widget: Server-Analyse
+ *
+ * Auf Tabler-Bauteile gezogen: Kennzahlen als `.datagrid`, die Cache-Quote als
+ * schlanker Balken statt als grüner Klotz mit Prozentzahl darin.
+ *
+ * Farben kommen aus den Design-Tokens. `text-muted` ist durch
+ * `text-secondary` ersetzt — in Bootstrap 5 ist das die vorgesehene Klasse,
+ * und sie hängt an `--fb-text-muted`.
 %>
-  <p><i class="bi bi-calendar3 me-1"></i> <%= createdDate.toLocaleDateString() %> 
-    <span class="badge bg-secondary ms-2"><%= diffDays %> <%= tr('core:WIDGETS.SERVER_ANALYSIS.DAYS') %></span>
-  </p>
+
+<%
+  const _mitglieder = stats?.cacheStats?.members?.total || 0;
+  const _kanaele    = stats?.cacheStats?.channels || 0;
+  const _rollen     = stats?.cacheStats?.roles || 0;
+
+  const _quote = stats?.cacheStats?.members?.ratio
+      ? Math.round(stats.cacheStats.members.ratio * 100)
+      : 0;
+  const _imCache = stats?.cacheStats?.members?.cached || 0;
+
+  const _erstellt = stats?.guild?.createdAt ? new Date(stats.guild.createdAt) : null;
+  const _tage = _erstellt
+      ? Math.ceil(Math.abs(new Date() - _erstellt) / (1000 * 60 * 60 * 24))
+      : null;
+%>
+
+<div class="datagrid mb-3">
+  <div class="datagrid-item">
+    <div class="datagrid-title"><%= tr('core:WIDGETS.SERVER_ANALYSIS.MEMBERS') %></div>
+    <div class="datagrid-content h3 mb-0"><%= _mitglieder %></div>
+  </div>
+  <div class="datagrid-item">
+    <div class="datagrid-title"><%= tr('core:WIDGETS.SERVER_ANALYSIS.CHANNELS') %></div>
+    <div class="datagrid-content h3 mb-0"><%= _kanaele %></div>
+  </div>
+  <div class="datagrid-item">
+    <div class="datagrid-title"><%= tr('core:WIDGETS.SERVER_ANALYSIS.ROLES') %></div>
+    <div class="datagrid-content h3 mb-0"><%= _rollen %></div>
+  </div>
+</div>
+
+<div class="mb-1 d-flex justify-content-between align-items-baseline">
+  <span class="text-secondary small"><%= tr('core:WIDGETS.SERVER_ANALYSIS.CACHE_EFFICIENCY') %></span>
+  <span class="fw-semibold"><%= _quote %>%</span>
+</div>
+<div class="progress progress-sm">
+  <div class="progress-bar bg-success" style="width: <%= _quote %>%"
+       role="progressbar" aria-valuenow="<%= _quote %>" aria-valuemin="0" aria-valuemax="100">
+    <span class="visually-hidden"><%= _quote %>%</span>
+  </div>
+</div>
+<div class="text-secondary small mt-1">
+  <%= tr('core:WIDGETS.SERVER_ANALYSIS.CACHED_MEMBERS') %> <%= _imCache %>/<%= _mitglieder %>
+</div>
+
+<div class="hr-text hr-text-left my-3"><%= tr('core:WIDGETS.SERVER_ANALYSIS.SERVER_AGE') %></div>
+<% if (_erstellt) { %>
+  <div class="d-flex align-items-center gap-2">
+    <i class="fa-regular fa-calendar text-secondary"></i>
+    <span><%= _erstellt.toLocaleDateString() %></span>
+    <span class="badge bg-blue-lt"><%= _tage %> <%= tr('core:WIDGETS.SERVER_ANALYSIS.DAYS') %></span>
+  </div>
 <% } else { %>
-  <p><%= tr('core:WIDGETS.SERVER_ANALYSIS.NO_DATA') %></p>
+  <div class="text-secondary"><%= tr('core:WIDGETS.SERVER_ANALYSIS.NO_DATA') %></div>
 <% } %>
 
-<!-- Premium-Status -->
 <% if (stats?.guild?.premiumTier) { %>
-  <h6 class="mt-3"><%= tr('core:WIDGETS.SERVER_ANALYSIS.PREMIUM_STATUS') %></h6>
-  <div class="d-flex align-items-center">
-    <% for(let i = 0; i < stats.guild.premiumTier; i++) { %>
-      <i class="bi bi-stars text-warning me-1"></i>
-    <% } %>
-    <span class="ms-2"><%= tr('core:WIDGETS.SERVER_ANALYSIS.LEVEL') %> <%= stats.guild.premiumTier %></span>
-    <span class="badge bg-primary ms-2"><%= stats.guild.premiumSubscriptionCount || 0 %> <%= tr('core:WIDGETS.SERVER_ANALYSIS.BOOSTS') %></span>
+  <div class="hr-text hr-text-left my-3"><%= tr('core:WIDGETS.SERVER_ANALYSIS.PREMIUM_STATUS') %></div>
+  <div class="d-flex align-items-center gap-2">
+    <span class="text-warning">
+      <% for (let i = 0; i < stats.guild.premiumTier; i++) { %><i class="fa-solid fa-star"></i><% } %>
+    </span>
+    <span><%= tr('core:WIDGETS.SERVER_ANALYSIS.LEVEL') %> <%= stats.guild.premiumTier %></span>
+    <span class="badge bg-primary-lt">
+      <%= stats.guild.premiumSubscriptionCount || 0 %> <%= tr('core:WIDGETS.SERVER_ANALYSIS.BOOSTS') %>
+    </span>
   </div>
 <% } %>
