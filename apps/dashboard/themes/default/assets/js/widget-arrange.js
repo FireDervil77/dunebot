@@ -62,7 +62,7 @@
                 animation: 150,
                 handle: '.widget-arrange-griff',
                 ghostClass: 'widget-arrange-ghost',
-                onSort: function () { geaendert = true; standAnzeigen(); }
+                onSort: function () { geaendert = true; huellenAusstatten(); standAnzeigen(); }
             }));
         });
     }
@@ -137,42 +137,44 @@
         });
     }
 
-    // ── Griff und Ausblenden-Knopf an jede Karte ────────────────────────────
+    // ── Griff und Werkzeuge an jede Karte ───────────────────────────────────
+    /**
+     * Jeder Karte ihre Werkzeugleiste geben.
+     *
+     * Wird nicht nur beim Einschalten gerufen, sondern auch nach jedem
+     * Verschieben — sonst steht eine Karte, die den Bereich gewechselt hat,
+     * ohne Werkzeuge da.
+     *
+     * Jede Huelle wird einzeln abgesichert: Vorher hing alles an einer
+     * Schleife, und ein Fehler bei einer Karte liess alle folgenden leer
+     * ausgehen.
+     */
     function huellenAusstatten() {
         document.querySelectorAll('[data-widget-area] > [data-widget-id]').forEach(function (huelle) {
-            if (huelle.querySelector('.widget-arrange-tools')) return;
+            try {
+                if (huelle.querySelector(':scope > .widget-arrange-tools')) return;
 
-            var werkzeuge = document.createElement('div');
-            werkzeuge.className = 'widget-arrange-tools';
-            werkzeuge.innerHTML =
-                '<button type="button" class="btn btn-sm btn-secondary widget-arrange-griff" title="Verschieben">' +
-                '  <i class="fa-solid fa-up-down-left-right"></i>' +
-                '</button>' +
-                '<button type="button" class="btn btn-sm btn-secondary widget-arrange-schmaler" title="Schmaler">' +
-                '  <i class="fa-solid fa-left-right"></i><i class="fa-solid fa-minus ms-1 small"></i>' +
-                '</button>' +
-                '<button type="button" class="btn btn-sm btn-secondary widget-arrange-breiter" title="Breiter">' +
-                '  <i class="fa-solid fa-left-right"></i><i class="fa-solid fa-plus ms-1 small"></i>' +
-                '</button>' +
-                '<button type="button" class="btn btn-sm btn-secondary widget-arrange-hide" title="Ausblenden">' +
-                '  <i class="fa-solid fa-eye"></i>' +
-                '</button>';
+                var werkzeuge = document.createElement('div');
+                werkzeuge.className = 'widget-arrange-tools';
+                werkzeuge.innerHTML =
+                    '<button type="button" class="btn btn-sm btn-secondary widget-arrange-griff" title="Verschieben">' +
+                    '  <i class="fa-solid fa-up-down-left-right"></i>' +
+                    '</button>' +
+                    '<button type="button" class="btn btn-sm btn-secondary widget-arrange-schmaler" title="Schmaler">' +
+                    '  <i class="fa-solid fa-left-right"></i><i class="fa-solid fa-minus ms-1 small"></i>' +
+                    '</button>' +
+                    '<button type="button" class="btn btn-sm btn-secondary widget-arrange-breiter" title="Breiter">' +
+                    '  <i class="fa-solid fa-left-right"></i><i class="fa-solid fa-plus ms-1 small"></i>' +
+                    '</button>' +
+                    '<button type="button" class="btn btn-sm btn-secondary widget-arrange-hide" title="Ausblenden">' +
+                    '  <i class="fa-solid ' + (huelle.dataset.widgetHidden === '1' ? 'fa-eye-slash' : 'fa-eye') + '"></i>' +
+                    '</button>';
 
-            huelle.style.position = 'relative';
-            huelle.prepend(werkzeuge);
-
-            if (huelle.dataset.widgetHidden === '1') {
-                werkzeuge.querySelector('.widget-arrange-hide i').className = 'fa-solid fa-eye-slash';
+                huelle.style.position = 'relative';
+                huelle.prepend(werkzeuge);
+            } catch (fehler) {
+                console.warn('[Anordnen] Werkzeuge fuer eine Karte uebersprungen:', fehler);
             }
-
-            werkzeuge.querySelector('.widget-arrange-hide').addEventListener('click', function () {
-                sichtbarkeitSetzen(huelle.dataset.widgetId, huelle.dataset.widgetHidden === '1');
-            });
-
-            werkzeuge.querySelector('.widget-arrange-schmaler')
-                .addEventListener('click', function () { breiteAendern(huelle, -1); });
-            werkzeuge.querySelector('.widget-arrange-breiter')
-                .addEventListener('click', function () { breiteAendern(huelle, +1); });
         });
     }
 
@@ -237,6 +239,25 @@
     }
 
     // ── Verdrahten ──────────────────────────────────────────────────────────
+    // Ein Zuhoerer am Dokument statt einer pro Knopf: Karten, die Sortable
+    // verschiebt, bringen ihre Bedienung damit automatisch mit.
+    document.addEventListener('click', function (e) {
+        var knopf = e.target.closest('.widget-arrange-tools button');
+        if (!knopf) return;
+
+        var huelle = knopf.closest('[data-widget-id]');
+        if (!huelle) return;
+        e.preventDefault();
+
+        if (knopf.classList.contains('widget-arrange-hide')) {
+            sichtbarkeitSetzen(huelle.dataset.widgetId, huelle.dataset.widgetHidden === '1');
+        } else if (knopf.classList.contains('widget-arrange-schmaler')) {
+            breiteAendern(huelle, -1);
+        } else if (knopf.classList.contains('widget-arrange-breiter')) {
+            breiteAendern(huelle, +1);
+        }
+    });
+
     if (knopfAnordnen) {
         knopfAnordnen.addEventListener('click', function () { modusSetzen(!aktiv); });
     }
