@@ -79,6 +79,37 @@
     --tblr-info: var(--fb-info);
 }
 
+/* --- Seitenrand ----------------------------------------------------------- */
+/*
+ * Tabler rechnet mit einem `.container-xl`: Der hat eine Höchstbreite und wird
+ * zentriert, links und rechts bleibt von selbst Luft. Unser Layout nimmt
+ * bewusst `.container-fluid` — volle Breite — und dort ist Tablers
+ * `--tblr-page-padding` von 1rem der einzige Abstand zum Fensterrand. Das ist
+ * auf einem breiten Bildschirm zu knapp: Der Inhalt klebt an der Seitenleiste.
+ *
+ * Aufgefallen ist es im Vergleich Dashboard ↔ Bug Report: Die alten Views
+ * bringen ihren eigenen `.container-fluid` mit, verschachteln also zwei davon
+ * und kommen so auf den doppelten Rand. Der sah richtig aus — nicht weil die
+ * Verschachtelung richtig wäre, sondern weil 1rem zu wenig ist. Beim Entfernen
+ * des alten Seitenrahmens (Stufe 5) verlöre sonst jede Seite der Reihe nach
+ * ihren Rand.
+ *
+ * Die Mobil-Stufe hält Tablers eigenen Wert nach: Ohne sie würde die Regel hier
+ * auch die Medienabfrage in `tabler.min.css` überschreiben, die den Rand auf
+ * schmalen Geräten absichtlich kleiner hält.
+ */
+:root,
+[data-bs-theme="light"] {
+    --tblr-page-padding: var(--tblr-spacer-4);
+}
+
+@media (max-width: 991.98px) {
+    :root,
+    [data-bs-theme="light"] {
+        --tblr-page-padding: var(--tblr-spacer-2);
+    }
+}
+
 /* --- Karten und Tabellen -------------------------------------------------- */
 .card {
     --tblr-card-bg: var(--fb-surface-bg);
