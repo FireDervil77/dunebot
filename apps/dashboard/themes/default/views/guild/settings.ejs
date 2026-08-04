@@ -1,243 +1,147 @@
-<!-- 
-  Settings Hauptseite - Übersicht & Schnellzugriffe
-  Zeigt alle verfügbaren Einstellungsbere        <ul class="list-unstyled small mb-3">
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.WEBHOOKS') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.API_KEYS') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.OAUTH') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.THIRD_PARTY') %></li>
-        </ul>
-        
-        <a href="/guild/<%= guildId %>/plugins/core/settings/integrations" class="btn btn-warning btn-sm w-100 disabled">
-          <i class="fa-solid fa-lock me-2"></i><%= tr('core:SETTINGS_OVERVIEW.COMING_SOON') %></a>visuellen Karten
--->
+<%#
+ * Einstellungen — Übersicht mit Schnellzugriffen
+ *
+ * Am Kopf der Datei stand ein zerschossener HTML-Kommentar: In die
+ * Beschreibung war ein halber Kartenblock hineingerutscht, mitsamt vier
+ * `tr()`-Aufrufen. EJS kennt keine HTML-Kommentare — die Aufrufe liefen bei
+ * jedem Aufruf der Seite und schrieben ihr Ergebnis in den Kommentar.
+ *
+ * @context {string} guildId
+ * @context {Array}  enabledPlugins - nur fuer die Anzahl im Systemblock
+%>
 
-<div class="row mb-4">
-  <div class="col-12">
-    <div class="alert alert-info">
-      <i class="fa-solid fa-circle-info me-2"></i>
-      <strong><%= tr('DASHBOARD_COMMON.WELCOME_SETTINGS') %></strong> 
-      <%= tr('DASHBOARD_COMMON.WELCOME_SETTINGS_DESC') %>
-    </div>
-  </div>
+<div class="alert alert-info mb-4">
+    <i class="fa-solid fa-circle-info me-2"></i>
+    <strong><%= tr('DASHBOARD_COMMON.WELCOME_SETTINGS') %></strong>
+    <%= tr('DASHBOARD_COMMON.WELCOME_SETTINGS_DESC') %>
 </div>
 
-<!-- Schnellzugriff-Karten -->
-<div class="row g-4 mb-4">
-  <!-- Allgemeine Einstellungen -->
-  <div class="col-md-6 col-lg-4">
-    <div class="card h-100 hover-shadow">
-      <div class="card-body">
-        <div class="d-flex align-items-center mb-3">
-          <div class="icon-circle bg-primary bg-opacity-10 text-primary me-3">
-            <i class="fa-solid fa-sliders fs-4"></i>
-          </div>
-          <div>
-            <h5 class="card-title mb-0"><%= tr('core:SETTINGS_OVERVIEW.GENERAL_TITLE') %></h5>
-            <small class="text-muted"><%= tr('core:SETTINGS_OVERVIEW.GENERAL_SUBTITLE') %></small>
-          </div>
-        </div>
-        
-        <p class="card-text text-muted mb-3">
-          <%= tr('core:SETTINGS_OVERVIEW.GENERAL_DESCRIPTION') %>
-        </p>
-        
-        <ul class="list-unstyled small mb-3">
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.GENERAL_FEATURES.PREFIX') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.GENERAL_FEATURES.LOCALE') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.GENERAL_FEATURES.THEME') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.GENERAL_FEATURES.SLASH') %></li>
-        </ul>
-        
-        <a href="/guild/<%= guildId %>/settings/general" class="btn btn-primary btn-sm w-100">
-          <i class="fa-solid fa-arrow-right me-2"></i><%= tr('core:SETTINGS_OVERVIEW.BTN_CONFIGURE') %>
-        </a>
-      </div>
-    </div>
-  </div>
+<%# ── Schnellzugriffe ─────────────────────────────────────────────────────── %>
+<%
+/*
+ * Die vier Karten waren viermal derselbe Block mit vertauschten Texten — rund
+ * 130 Zeilen. Als Liste steht die Abweichung da, wo sie hingehoert.
+ *
+ * `schluessel` ist der gemeinsame Praefix in den Uebersetzungen; ist er nicht
+ * gesetzt, stehen Titel und Merkmale wortwoertlich hier (Discord-Channels hat
+ * nie welche bekommen).
+ */
+const bereiche = [
+    {
+        farbe: 'primary', symbol: 'fa-sliders', schluessel: 'GENERAL',
+        merkmale: ['PREFIX', 'LOCALE', 'THEME', 'SLASH'],
+        ziel: `/guild/${guildId}/settings/general`, knopf: 'BTN_CONFIGURE'
+    },
+    {
+        farbe: 'success', symbol: 'fa-users', schluessel: 'USER',
+        merkmale: ['ROLES', 'ADMIN', 'COMMANDS', 'BLACKLIST'],
+        // Diese Karte hatte als einzige keinen Knopf: vier Versprechen, kein Weg
+        // dorthin. Das Ziel gibt es laengst, es steht auch in der Navigation.
+        ziel: `/guild/${guildId}/permissions/users`, knopf: 'BTN_OPEN'
+    },
+    {
+        farbe: 'info', symbol: 'fa-hashtag',
+        titel: 'Discord Channels', untertitel: 'Channel-Übersicht',
+        beschreibung: 'Übersicht aller Discord-Channels deines Servers — Text, Voice, Announcement, Forum und mehr.',
+        merkmaleText: ['Alle Channel-Typen', 'Kategorie-Struktur', 'Channel-Details & Metadaten'],
+        ziel: `/guild/${guildId}/settings/channels`, knopfText: 'Channels anzeigen'
+    },
+    {
+        farbe: 'warning', symbol: 'fa-plug', schluessel: 'INTEGRATIONS',
+        merkmale: ['WEBHOOKS', 'API_KEYS', 'DISCORD_LOGS', 'EXTERNAL_SERVICES'],
+        ziel: `/guild/${guildId}/plugins/core/settings/integrations`, knopf: 'BTN_OPEN'
+    },
+];
 
-  <!-- Benutzer-Verwaltung -->
-  <div class="col-md-6 col-lg-4">
-    <div class="card h-100 hover-shadow">
-      <div class="card-body">
-        <div class="d-flex align-items-center mb-3">
-          <div class="icon-circle bg-success bg-opacity-10 text-success me-3">
-            <i class="fa-solid fa-users fs-4"></i>
-          </div>
-          <div>
-            <h5 class="card-title mb-0"><%= tr('core:SETTINGS_OVERVIEW.USER_TITLE') %></h5>
-            <small class="text-muted"><%= tr('core:SETTINGS_OVERVIEW.USER_SUBTITLE') %></small>
-          </div>
-        </div>
-        
-        <p class="card-text text-muted mb-3">
-          <%= tr('core:SETTINGS_OVERVIEW.USER_DESCRIPTION') %>
-        </p>
-        
-        <ul class="list-unstyled small mb-3">
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.USER_FEATURES.ROLES') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.USER_FEATURES.ADMIN') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.USER_FEATURES.COMMANDS') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.USER_FEATURES.BLACKLIST') %></li>
-        </ul>
-      </div>
-    </div>
-  </div>
+/** Uebersetzung mit gemeinsamem Praefix, oder der wortwoertliche Text. */
+const t = (b, feld) => tr(`core:SETTINGS_OVERVIEW.${b.schluessel}_${feld}`);
+%>
+<div class="row row-cards mb-4">
+    <% bereiche.forEach(b => { %>
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="avatar avatar-md bg-<%= b.farbe %>-lt me-3">
+                            <i class="fa-solid <%= b.symbol %> fs-3"></i>
+                        </span>
+                        <div>
+                            <div class="fw-medium"><%= b.titel || t(b, 'TITLE') %></div>
+                            <small class="text-secondary"><%= b.untertitel || t(b, 'SUBTITLE') %></small>
+                        </div>
+                    </div>
 
-  <!-- Integrationen -->
-  <div class="col-md-6 col-lg-4">
-    <div class="card h-100 hover-shadow">
-      <div class="card-body">
-        <div class="d-flex align-items-center mb-3">
-          <div class="icon-circle bg-info bg-opacity-10 text-info me-3">
-            <i class="fa-solid fa-hashtag fs-4"></i>
-          </div>
-          <div>
-            <h5 class="card-title mb-0">Discord Channels</h5>
-            <small class="text-muted">Channel-Übersicht</small>
-          </div>
+                    <p class="text-secondary"><%= b.beschreibung || t(b, 'DESCRIPTION') %></p>
+
+                    <ul class="list-unstyled small mb-3">
+                        <% (b.merkmaleText || b.merkmale.map(m => tr(`core:SETTINGS_OVERVIEW.${b.schluessel}_FEATURES.${m}`))).forEach(m => { %>
+                            <li><i class="fa-solid fa-check text-success me-2"></i><%= m %></li>
+                        <% }); %>
+                    </ul>
+
+                    <a href="<%= b.ziel %>" class="btn btn-<%= b.farbe %> btn-sm w-100 mt-auto">
+                        <i class="fa-solid fa-arrow-right me-2"></i><%= b.knopfText || tr(`core:SETTINGS_OVERVIEW.${b.knopf}`) %>
+                    </a>
+                </div>
+            </div>
         </div>
-        
-        <p class="card-text text-muted mb-3">
-          Übersicht aller Discord-Channels deines Servers — Text, Voice, Announcement, Forum und mehr.
-        </p>
-        
-        <ul class="list-unstyled small mb-3">
-          <li><i class="fa-solid fa-check text-success me-2"></i>Alle Channel-Typen</li>
-          <li><i class="fa-solid fa-check text-success me-2"></i>Kategorie-Struktur</li>
-          <li><i class="fa-solid fa-check text-success me-2"></i>Channel-Details & Metadaten</li>
-        </ul>
-        
-        <a href="/guild/<%= guildId %>/settings/channels" class="btn btn-info btn-sm w-100">
-          <i class="fa-solid fa-arrow-right me-2"></i>Channels anzeigen
-        </a>
-      </div>
-    </div>
-  </div>
+    <% }); %>
 </div>
 
-<!-- Zweite Reihe -->
-<div class="row g-4 mb-4">
-  <!-- Integrationen -->
-  <div class="col-md-6 col-lg-4">
-    <div class="card h-100 hover-shadow">
-      <div class="card-body">
-        <div class="d-flex align-items-center mb-3">
-          <div class="icon-circle bg-warning bg-opacity-10 text-warning me-3">
-            <i class="fa-solid fa-plug fs-4"></i>
-          </div>
-          <div>
-            <h5 class="card-title mb-0"><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_TITLE') %></h5>
-            <small class="text-muted"><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_SUBTITLE') %></small>
-          </div>
-        </div>
-        
-        <p class="card-text text-muted mb-3">
-          <%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_DESCRIPTION') %>
-        </p>
-        
-        <ul class="list-unstyled small mb-3">
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.WEBHOOKS') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.API_KEYS') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.DISCORD_LOGS') %></li>
-          <li><i class="fa-solid fa-check text-success me-2"></i><%= tr('core:SETTINGS_OVERVIEW.INTEGRATIONS_FEATURES.EXTERNAL_SERVICES') %></li>
-        </ul>
-        
-        <a href="/guild/<%= guildId %>/plugins/core/settings/integrations" class="btn btn-warning btn-sm w-100">
-          <i class="fa-solid fa-arrow-right me-2"></i><%= tr('core:SETTINGS_OVERVIEW.BTN_OPEN') %>
-        </a>
-      </div>
+<%# ── Einstellungen der Plugins ───────────────────────────────────────────── %>
+<div class="card mb-4">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fa-solid fa-puzzle-piece me-2"></i><%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_TITLE') %>
+        </h3>
     </div>
-  </div>
+    <div class="card-body">
+        <p class="text-secondary"><%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_DESC') %></p>
+
+        <div class="alert alert-info mb-0">
+            <i class="fa-solid fa-lightbulb me-2"></i>
+            <strong><%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_TIP') %>:</strong>
+            <%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_TIP_TEXT') %>
+        </div>
+    </div>
 </div>
 
-<!-- Plugin-spezifische Einstellungen (dynamisch) -->
-<div class="row mb-4">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-header bg-light">
-        <h5 class="mb-0">
-          <i class="fa-solid fa-puzzle-piece me-2"></i><%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_TITLE') %>
-        </h5>
-      </div>
-      <div class="card-body">
-        <p class="text-muted mb-3">
-          <%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_DESC') %>
-        </p>
-        
-        <div class="alert alert-secondary mb-0">
-          <i class="fa-solid fa-lightbulb me-2"></i>
-          <strong><%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_TIP') %>:</strong> <%= tr('core:SETTINGS_OVERVIEW.PLUGIN_SETTINGS_TIP_TEXT') %>
-        </div>
-      </div>
+<%# ── Systemzustand ───────────────────────────────────────────────────────── %>
+<%#
+  ACHTUNG: Drei der vier Werte sind fester Text — "Bot online", "Datenbank
+  verbunden" und "Leistung stabil" stehen hier, seit es die Seite gibt, und
+  werden nirgends gemessen. Nur die Anzahl der Plugins ist echt. Beim Umbau
+  bewusst unveraendert uebernommen; ob die Kachel gemessene Werte bekommt oder
+  verschwindet, ist eine eigene Entscheidung.
+%>
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fa-solid fa-server me-2"></i><%= tr('core:SETTINGS_OVERVIEW.SYSTEM_STATUS_TITLE') %>
+        </h3>
     </div>
-  </div>
-</div>
-
-<!-- System-Status -->
-<div class="row">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-header bg-light">
-        <h5 class="mb-0">
-          <i class="fa-solid fa-server me-2"></i><%= tr('core:SETTINGS_OVERVIEW.SYSTEM_STATUS_TITLE') %>
-        </h5>
-      </div>
-      <div class="card-body">
+    <div class="card-body">
         <div class="row text-center">
-          <div class="col-md-3">
-            <div class="border-end">
-              <i class="fa-solid fa-circle-check text-success fs-2 mb-2"></i>
-              <h6 class="text-muted small mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_BOT') %></h6>
-              <p class="fw-bold mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_BOT_ONLINE') %></p>
+            <div class="col-md-3 border-end">
+                <i class="fa-solid fa-circle-check text-success fs-2 mb-2"></i>
+                <div class="text-secondary small"><%= tr('core:SETTINGS_OVERVIEW.STATUS_BOT') %></div>
+                <div class="fw-bold"><%= tr('core:SETTINGS_OVERVIEW.STATUS_BOT_ONLINE') %></div>
             </div>
-          </div>
-          <div class="col-md-3">
-            <div class="border-end">
-              <i class="fa-solid fa-database text-primary fs-2 mb-2"></i>
-              <h6 class="text-muted small mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_DATABASE') %></h6>
-              <p class="fw-bold mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_DATABASE_CONNECTED') %></p>
+            <div class="col-md-3 border-end">
+                <i class="fa-solid fa-database text-primary fs-2 mb-2"></i>
+                <div class="text-secondary small"><%= tr('core:SETTINGS_OVERVIEW.STATUS_DATABASE') %></div>
+                <div class="fw-bold"><%= tr('core:SETTINGS_OVERVIEW.STATUS_DATABASE_CONNECTED') %></div>
             </div>
-          </div>
-          <div class="col-md-3">
-            <div class="border-end">
-              <i class="fa-solid fa-puzzle-piece text-info fs-2 mb-2"></i>
-              <h6 class="text-muted small mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_PLUGINS') %></h6>
-              <p class="fw-bold mb-0"><%= enabledPlugins?.length || 0 %> <%= tr('core:SETTINGS_OVERVIEW.STATUS_PLUGINS_ACTIVE') %></p>
+            <div class="col-md-3 border-end">
+                <i class="fa-solid fa-puzzle-piece text-info fs-2 mb-2"></i>
+                <div class="text-secondary small"><%= tr('core:SETTINGS_OVERVIEW.STATUS_PLUGINS') %></div>
+                <div class="fw-bold"><%= enabledPlugins?.length || 0 %> <%= tr('core:SETTINGS_OVERVIEW.STATUS_PLUGINS_ACTIVE') %></div>
             </div>
-          </div>
-          <div class="col-md-3">
-            <i class="fa-solid fa-bolt text-warning fs-2 mb-2"></i>
-            <h6 class="text-muted small mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_PERFORMANCE') %></h6>
-            <p class="fw-bold mb-0"><%= tr('core:SETTINGS_OVERVIEW.STATUS_PERFORMANCE_STABLE') %></p>
-          </div>
+            <div class="col-md-3">
+                <i class="fa-solid fa-bolt text-warning fs-2 mb-2"></i>
+                <div class="text-secondary small"><%= tr('core:SETTINGS_OVERVIEW.STATUS_PERFORMANCE') %></div>
+                <div class="fw-bold"><%= tr('core:SETTINGS_OVERVIEW.STATUS_PERFORMANCE_STABLE') %></div>
+            </div>
         </div>
-      </div>
     </div>
-  </div>
 </div>
-
-<style>
-.hover-shadow {
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.hover-shadow:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
-}
-
-.icon-circle {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.border-end:last-child {
-  border-right: none !important;
-}
-</style>

@@ -137,7 +137,8 @@ hallOfFameRouter.get('/', async (req, res) => {
         }
 
         await themeManager.renderView(res, 'guild/hall-of-fame', {
-            title: 'Hall of Fame - Top Supporters',
+            title: 'Hall of Fame',
+            subtitle: 'Unsere Top-Supporter, die FireBot möglich machen! ❤️',
             activeMenu: `/guild/${guildId}/hall-of-fame`,
             guildId,
             topDonators: topDonators || [],
