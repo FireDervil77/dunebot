@@ -42,6 +42,9 @@ class IPMServer {
         this.pendingCommands = new Map(); // commandId -> {resolve, reject, timeout}
         this.Logger = null;
         this.dbService = null;
+        // Wird in stop() gesetzt: Ab da schreiben die close-Handler nicht mehr in
+        // die Datenbank — der Pool wird gleich geschlossen. Siehe stop().
+        this.wirdBeendet = false;
         
         // JWT Secret aus ENV (oder generieren falls nicht vorhanden)
         this.jwtSecret = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
@@ -163,6 +166,21 @@ class IPMServer {
     async stop() {
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
+        }
+
+        // Der Zustandswechsel gehört HIER hin, in einen Rutsch und abgewartet —
+        // nicht in die close-Handler der einzelnen Verbindungen.
+        //
+        // `ws.close()` beendet die Verbindung nicht sofort, das 'close'-Ereignis
+        // kommt erst einen Tick später. Bis dahin ist der Aufräumpfad in
+        // index.js schon bei `dbService.close()` angekommen, und der
+        // nachlaufende Handler schrieb in einen bereits geschlossenen Pool:
+        // "Pool is closed." beim Beenden des Dashboards.
+        this.wirdBeendet = true;
+        try {
+            await RootServer.markAllOffline();
+        } catch (error) {
+            this.Logger.error('[IPMServer] Zurücksetzen der Daemon-Zustände beim Beenden fehlgeschlagen:', error);
         }
 
         // Alle Verbindungen sauber schließen
@@ -295,7 +313,10 @@ class IPMServer {
                 // stimmte trotzdem, weil sie `isDaemonOnline()` fragt; falsch
                 // waren die Zählungen, die gegen die Spalte rechnen (Übersicht,
                 // Ressourcen-Seite, Gameserver-Detail).
-                if (newCount === 0) {
+                // Beim Herunterfahren hat stop() den Zustand bereits gesetzt und
+                // abgewartet; ein Schreibversuch von hier träfe den geschlossenen
+                // Datenbank-Pool.
+                if (newCount === 0 && !this.wirdBeendet) {
                     RootServer.markOffline(daemonId)
                         .catch(err => this.Logger.error('[IPMServer] Statuswechsel auf offline fehlgeschlagen:', err));
                 }
