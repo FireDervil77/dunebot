@@ -67,7 +67,9 @@ plugins/leveling/
 plugins/social-alerts/
 plugins/clan-manager/
 
-
+# tabler_source
+tabler_source/
+tabler_source/*
 
 
 # Daemon Binaries (separat laden)
@@ -85,4 +87,6 @@ apps/dashboard/downloads/launcher/
 #docs and docs folder
 docs/
 docs/*
+docs_OLD/
+docs_OLD/*
 !apps/dashboard/themes/default/views/admin/docs/

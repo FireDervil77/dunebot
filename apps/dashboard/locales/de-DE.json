@@ -223,6 +223,7 @@
         "TITLE": "Deine Server",
         "ACTIVE": "Aktiv",
         "SWITCH_TO": "Wechseln zu",
+        "ALL": "Server Selector",
         "NO_GUILDS": "Keine Server verfügbar"
     },
 

@@ -48,6 +48,7 @@
         if (an) {
             sortiererStarten();
             huellenAusstatten();
+            verwaisteMelden();
         } else {
             sortierer.forEach(function (s) { s.destroy(); });
             sortierer = [];
@@ -184,6 +185,30 @@
 
     function standAnzeigen() {
         if (knopfSpeichern) knopfSpeichern.disabled = !geaendert;
+    }
+
+    /**
+     * Karten melden, die in keinem Bereich haengen.
+     *
+     * Ein einziges ueberzaehliges </div> in einer Widget-Vorlage schliesst die
+     * Zeile im Browser zu frueh — die folgenden Huellen stehen danach *neben*
+     * dem Bereich statt darin. Sie bekommen dann keine Werkzeuge, lassen sich
+     * nicht ziehen und fehlen beim Speichern. Vorher passierte das lautlos;
+     * jetzt sagt es die Konsole.
+     */
+    function verwaisteMelden() {
+        var verwaist = Array.prototype.slice
+            .call(document.querySelectorAll('[data-widget-id][data-widget-hidden]'))
+            .filter(function (huelle) { return !huelle.closest('[data-widget-area]'); })
+            .map(function (huelle) { return huelle.dataset.widgetId; });
+
+        if (verwaist.length) {
+            console.warn(
+                '[Anordnen] Diese Karten haengen in keinem Bereich und lassen sich ' +
+                'weder ziehen noch speichern — meist ein ueberzaehliges </div> in der ' +
+                'Vorlage der Karte davor:', verwaist
+            );
+        }
     }
 
     // ── Aktuellen Stand einsammeln ──────────────────────────────────────────
