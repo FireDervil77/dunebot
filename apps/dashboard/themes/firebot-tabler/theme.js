@@ -87,6 +87,7 @@ class TablerTheme {
 
         am.registerScript('csrf-helper', 'csrf-helper.js', { inFooter: false, version: this.version });
         am.registerScript('global-toast', 'global-toast.js', { deps: ['toastr-js'], version: this.version });
+        am.registerScript('toast-notification-center', 'toast-notification-center.js', { deps: ['global-toast'], version: this.version });
         am.registerScript('button-loading', 'button-loading.js', { version: this.version });
         am.registerScript('guild', 'guild.js', { deps: ['jquery'], version: this.version });
     }
@@ -159,6 +160,7 @@ class TablerTheme {
         am.enqueueScript('toastr-js');
         am.enqueueScript('sortable');
         am.enqueueScript('global-toast');
+        am.enqueueScript('toast-notification-center');
         am.enqueueScript('button-loading');
         am.enqueueScript('guild');
     }

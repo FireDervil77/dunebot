@@ -178,6 +178,9 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+<%# Sprachwahl — das Skript liegt im Standard-Theme und wird ueber die Kette gefunden %>
+<%- includePartial('guild/language_switcher', locals) %>
+
 <%- hookArea('dashboard_footer_scripts') %>
 
 <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
