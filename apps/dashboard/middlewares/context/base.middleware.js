@@ -549,6 +549,32 @@ module.exports = async (req, res, next) => {
             }
         }
 
+        // Bei welchen Servern des Nutzers ist der Bot ueberhaupt dabei?
+        //
+        // Die Sitzung traegt nur die rohe Discord-Liste. Ohne diese Angabe zeigt
+        // der Server-Umschalter auch Server an, zu denen es bei uns gar keine
+        // Daten gibt - ein Wechsel dorthin laeuft ins Leere. Die Serverwahl
+        // fragt dafuer den Bot per IPC; fuer jede Seite waere das zu teuer,
+        // also fragen wir unsere eigene Tabelle.
+        if (dbService && Array.isArray(res.locals.userGuilds) && res.locals.userGuilds.length > 0) {
+            try {
+                const ids = res.locals.userGuilds.map(g => g.id).filter(Boolean);
+                const platzhalter = ids.map(() => '?').join(',');
+                const zeilen = await dbService.query(
+                    `SELECT _id FROM guilds WHERE _id IN (${platzhalter})`, ids
+                );
+                const bekannt = new Set((zeilen || []).map(z => String(z._id)));
+
+                res.locals.userGuilds = res.locals.userGuilds.map(g => ({
+                    ...g,
+                    botInGuild: bekannt.has(String(g.id))
+                }));
+            } catch (err) {
+                // Ohne Angabe lieber alle zeigen als gar keine
+                Logger.warn('[Base] Bot-Server konnten nicht ermittelt werden:', err.message);
+            }
+        }
+
         // Aktives Theme per Guild ermitteln und in Request/Response bereitstellen
         if (themeManager) {
             const activeThemeName = await themeManager.getThemeForRequest(req, res);

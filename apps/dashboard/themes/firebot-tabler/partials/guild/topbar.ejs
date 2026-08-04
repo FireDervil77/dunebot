@@ -27,6 +27,12 @@
   const _alleServer = (typeof userGuilds !== 'undefined' && Array.isArray(userGuilds)) ? userGuilds : [];
   const _meineServer = _alleServer.filter(g => {
       if (!g || !g.permissions) return false;
+
+      // Server ohne Bot fliegen raus: Dort gibt es bei uns keine Daten, ein
+      // Wechsel dorthin liefe ins Leere. `botInGuild` setzt die Basis-Middleware.
+      // Fehlt die Angabe (DB nicht erreichbar), lieber zeigen als verstecken.
+      if (g.botInGuild === false) return false;
+
       try {
           const rechte = BigInt(g.permissions);
           return (rechte & MANAGE_GUILD) === MANAGE_GUILD || (rechte & ADMINISTRATOR) === ADMINISTRATOR;

@@ -38,7 +38,12 @@
               const allUserGuilds = (typeof userGuilds !== 'undefined' && Array.isArray(userGuilds)) 
                 ? userGuilds 
                 : [];
-              const managedGuilds = allUserGuilds.filter(hasGuildPermission);
+              // Server ohne Bot fliegen raus: Dort gibt es bei uns keine Daten,
+              // ein Wechsel dorthin liefe ins Leere. `botInGuild` setzt die
+              // Basis-Middleware; fehlt die Angabe, lieber zeigen als verstecken.
+              const managedGuilds = allUserGuilds
+                .filter(g => g.botInGuild !== false)
+                .filter(hasGuildPermission);
               
               const currentGuildId = locals.guild?.id || locals.guildId;
               const currentGuild = managedGuilds.find(g => g.id === currentGuildId);
