@@ -356,7 +356,7 @@ class IPMServer {
      * @private
      */
     async _handleRegister(ws, payload, clientIp) {
-        const { token, daemon_id, version, hardware } = payload; // ✅ Hardware-Info extrahieren
+        const { token, daemon_id, version, hardware, sftp_fingerprint } = payload;
 
         if (!token || !daemon_id) {
             return { success: false, error: 'Missing token or daemon_id' };
@@ -401,6 +401,7 @@ class IPMServer {
                     await RootServer.markOnline(daemon_id, {
                         version:      version || daemon.daemon_version,
                         sessionToken: newSessionToken,
+                        sftpFingerprint: sftp_fingerprint || null,
                     });
                     
                     await this._logDaemonEvent(daemon_id, 'reconnected', { version });
@@ -474,9 +475,10 @@ class IPMServer {
             // Daemon-Status + Session-Token in rootserver aktualisieren
             // install_status → 'completed' bei erster erfolgreicher Verbindung
             await RootServer.markOnline(daemon_id, {
-                version:       version || 'unknown',
-                sessionToken:  sessionToken,
-                installStatus: 'completed',
+                version:         version || 'unknown',
+                sessionToken:    sessionToken,
+                installStatus:   'completed',
+                sftpFingerprint: sftp_fingerprint || null,
             });
 
             // Audit-Log

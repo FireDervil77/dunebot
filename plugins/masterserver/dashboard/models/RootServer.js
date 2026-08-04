@@ -173,6 +173,10 @@ class RootServer {
         const values = ['online'];
 
         if (daten.version) { fields.push('daemon_version = ?'); values.push(daten.version); }
+        // Fingerabdruck des SFTP-Host-Keys. Der Daemon meldet ihn bei jeder
+        // Anmeldung; er aendert sich nur, wenn der Schluessel neu erzeugt wurde
+        // — dann soll auch die Anzeige sofort den neuen Wert nennen.
+        if (daten.sftpFingerprint) { fields.push('sftp_fingerprint = ?'); values.push(daten.sftpFingerprint); }
         if (daten.installStatus) { fields.push('install_status = ?'); values.push(daten.installStatus); }
         if (daten.sessionToken) {
             fields.push('session_token = ?');

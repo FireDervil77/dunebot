@@ -1755,6 +1755,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 r.hostname as rootserver_hostname,
                 r.host as rootserver_ip,
                 r.daemon_id,
+                r.sftp_fingerprint,
                 r.system_user
             FROM gameservers gs
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
@@ -1898,6 +1899,9 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // SFTP-Verbindungsinfo anfügen (IP bevorzugen – Hostname ist oft nicht konfiguriert)
         server.sftp_host = server.rootserver_ip || server.rootserver_hostname || 'N/A';
         server.sftp_port = 2022;
+        // Der Fingerabdruck kommt vom Daemon bei jeder Anmeldung. Fehlt er, ist
+        // der Daemon zu alt oder SFTP dort abgeschaltet — dann sagt die Anzeige
+        // das auch, statt ein leeres Feld zu zeigen.
 
         Logger.info(`[Gameserver] SFTP-Config gesetzt, lade RootServers...`);
         Logger.success(`[Gameserver] Server ${server.name} (${server.id}) geladen für Detail-View`);
