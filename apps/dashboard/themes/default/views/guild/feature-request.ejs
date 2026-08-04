@@ -227,7 +227,7 @@ document.getElementById('featureRequestForm').addEventListener('submit', async (
         const result = await response.json();
 
         if (result.success) {
-            // Kein `$(…).modal('hide')`: Das ist die jQuery-Schnittstelle von
+            // Kein Schliessen per jQuery: Das ist die Schnittstelle von
             // Bootstrap 4, die es unter Tabler nicht gibt — und vor einem
             // Neuladen waere das Schliessen ohnehin umsonst.
             window.location.reload();

@@ -70,6 +70,10 @@ const MUSTER = [
     { schwere: 'TOT', regex: /\bcustom-(control|checkbox|switch|select)\b/, ersatz: 'form-check / form-select' },
     { schwere: 'TOT', regex: /\bsr-only\b/,              ersatz: 'visually-hidden' },
     { schwere: 'TOT', regex: /\bbadge-(primary|secondary|success|danger|warning|info|light|dark)\b/, ersatz: 'bg-*' },
+    // Die jQuery-Erweiterung von Bootstrap 4. jQuery selbst ist unter Tabler
+    // geladen, diese Methoden gibt es dort aber nicht — `$('#x').modal('show')`
+    // wirft, und alles danach im selben Block laeuft nicht mehr.
+    { schwere: 'TOT', regex: /\$\([^)]*\)\s*\.\s*(modal|tab|tooltip|popover|collapse|carousel|dropdown|toast)\s*\(/, ersatz: 'bootstrap.Modal/Tooltip … (Bootstrap-5-Schnittstelle)' },
 
     // ── 2. AdminLTE-Bauteile ────────────────────────────────────────────────
     { schwere: 'ADMINLTE', regex: /\bcontent-(header|wrapper)\b/, ersatz: 'Seitenrahmen kommt aus dem Layout' },

@@ -32,14 +32,14 @@
                         <i class="fas fa-bell me-2"></i>
                         Meine Toast-Benachrichtigungen
                     </h3>
-                    <div class="card-tools">
-                        <span class="badge badge-info" id="totalCount">0 Events</span>
+                    <div class="card-actions">
+                        <span class="badge bg-info-lt" id="totalCount">0 Events</span>
                     </div>
                 </div>
                 <div class="card-body">
                     <!-- Info-Text -->
                     <div class="alert alert-info mb-3">
-                        <i class="bi bi-info-circle me-2"></i>
+                        <i class="fas fa-circle-info me-2"></i>
                         Hier siehst du deine letzten <strong>Toast-Benachrichtigungen</strong>. 
                         Diese werden automatisch gespeichert und helfen beim Debugging.
                     </div>
@@ -47,7 +47,7 @@
                     <!-- Filter -->
                     <div class="row mb-3">
                         <div class="col-md-3">
-                            <select class="form-control" id="filterType">
+                            <select class="form-select" id="filterType">
                                 <option value="">Alle Typen</option>
                                 <option value="success">Erfolg</option>
                                 <option value="info">Info</option>
@@ -59,12 +59,12 @@
                             <input type="text" class="form-control" id="filterUrl" placeholder="URL filtern...">
                         </div>
                         <div class="col-md-3">
-                            <button class="btn btn-primary btn-block" id="reloadToastsBtn">
+                            <button class="btn btn-primary w-100" id="reloadToastsBtn">
                                 <i class="fas fa-sync me-1"></i> Neu laden
                             </button>
                         </div>
                         <div class="col-md-3">
-                            <button class="btn btn-danger btn-block" id="deleteAllToastsBtn">
+                            <button class="btn btn-danger w-100" id="deleteAllToastsBtn">
                                 <i class="fas fa-trash me-1"></i> Alle löschen
                             </button>
                         </div>
@@ -85,7 +85,7 @@
                             </thead>
                             <tbody id="toastTableBody">
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted">
+                                    <td colspan="6" class="text-center text-secondary">
                                         <i class="fas fa-spinner fa-spin me-2"></i>
                                         Lade Benachrichtigungen...
                                     </td>
@@ -147,10 +147,10 @@ function renderToastTable(toasts) {
     if (!toasts || toasts.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="text-center text-muted py-4">
+                <td colspan="6" class="text-center text-secondary py-4">
                     <i class="bi bi-check-circle text-success me-2" style="font-size: 2rem;"></i>
                     <div class="mt-2">Keine Benachrichtigungen gefunden</div>
-                    <small class="text-muted">Toast-Benachrichtigungen werden hier angezeigt</small>
+                    <small class="text-secondary">Toast-Benachrichtigungen werden hier angezeigt</small>
                 </td>
             </tr>
         `;
@@ -200,7 +200,7 @@ function renderToastTable(toasts) {
         const urlPath = toast.url ? toast.url.replace(/^https?:\/\/[^/]+/, '') : '-';
         
         // Metadata NUR bei errors anzeigen
-        let metadataHtml = '<small class="text-muted">-</small>';
+        let metadataHtml = '<small class="text-secondary">-</small>';
         if (toast.type === 'error' && toast.metadata && Object.keys(toast.metadata).length > 0) {
             const metaKeys = Object.keys(toast.metadata);
             metadataHtml = `

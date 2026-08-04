@@ -1,89 +1,69 @@
-<!-- Donation Abbruch-Seite -->
+<%#
+ * Abbruchseite nach einer nicht abgeschlossenen Spende
+ *
+ * Kein eigener Seitenrahmen und keine eigene Titelzeile: beides stellt das
+ * Layout des Themes.
+%>
 
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-12 text-center">
-                <h1 class="m-0">
-                    <i class="fas fa-times-circle text-warning fa-3x mb-3"></i>
-                    <br>
-                    Spende abgebrochen
-                </h1>
+<div class="row justify-content-center">
+    <div class="col-md-6">
+
+        <div class="card mb-3">
+            <div class="card-status-top bg-warning"></div>
+            <div class="card-body text-center">
+
+                <div class="mb-3">
+                    <i class="fas fa-circle-xmark text-warning fa-3x"></i>
+                </div>
+                <h2>Spende abgebrochen</h2>
+
+                <div class="alert alert-warning">
+                    <h4 class="alert-title">Du hast die Zahlung abgebrochen</h4>
+                    <div class="text-secondary">Es wurde keine Abbuchung vorgenommen.</div>
+                </div>
+
+                <p class="mb-4">
+                    Möchtest du es erneut versuchen?<br>
+                    <small class="text-secondary">
+                        Oder hast du Fragen? Melde dich im Support-Kanal.
+                    </small>
+                </p>
+
+                <div class="btn-list justify-content-center">
+                    <a href="/guild/<%= guildId %>/plugins/core/donate" class="btn btn-success">
+                        <i class="fas fa-rotate-right me-2"></i>Erneut versuchen
+                    </a>
+                    <a href="/guild/<%= guildId %>" class="btn btn-outline-secondary">
+                        <i class="fas fa-home me-2"></i>Zum Dashboard
+                    </a>
+                </div>
+
             </div>
         </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-life-ring me-2"></i>Brauchst du Hilfe?</h3>
+            </div>
+            <div class="card-body">
+                <%
+                const hinweise = [
+                    ['Zahlungsmethoden', 'Kreditkarte, SEPA, Giropay, Sofort'],
+                    ['Mindestbetrag',    '€1'],
+                    ['Sicher',           'Zahlung über Stripe (PCI-DSS Level 1)'],
+                    ['Support',          'Bei Problemen melde dich im Discord'],
+                ];
+                %>
+                <ul class="list-unstyled mb-0">
+                    <% hinweise.forEach(([titel, text], i) => { %>
+                        <li class="<%= i < hinweise.length - 1 ? 'mb-2' : '' %>">
+                            <i class="fas fa-check text-success me-2"></i>
+                            <strong><%= titel %>:</strong> <%= text %>
+                        </li>
+                    <% }); %>
+                </ul>
+            </div>
+        </div>
+
     </div>
 </div>
-
-<section class="content">
-    <div class="container-fluid">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                
-                <div class="card card-warning">
-                    <div class="card-header">
-                        <h3 class="card-title">
-                            <i class="fas fa-info-circle me-2"></i>Keine Zahlung erfolgt
-                        </h3>
-                    </div>
-                    <div class="card-body text-center">
-                        
-                        <div class="alert alert-warning">
-                            <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
-                            <h5>Du hast die Zahlung abgebrochen</h5>
-                            <p class="mb-0">
-                                Es wurde keine Abbuchung vorgenommen.
-                            </p>
-                        </div>
-                        
-                        <p class="mb-4">
-                            Möchtest du es erneut versuchen?<br>
-                            <small class="text-muted">
-                                Oder hast du Fragen? Kontaktiere uns über den Support-Channel!
-                            </small>
-                        </p>
-                        
-                        <div class="btn-group" role="group">
-                            <a href="/guild/<%= guildId %>/plugins/core/donate" class="btn btn-success">
-                                <i class="fas fa-redo me-2"></i>Erneut versuchen
-                            </a>
-                            <a href="/guild/<%= guildId %>" class="btn btn-secondary">
-                                <i class="fas fa-home me-2"></i>Zum Dashboard
-                            </a>
-                        </div>
-                        
-                    </div>
-                </div>
-                
-                <!-- Hilfe -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">
-                            <i class="fas fa-life-ring me-2"></i>Brauchst du Hilfe?
-                        </h3>
-                    </div>
-                    <div class="card-body">
-                        <ul class="list-unstyled mb-0">
-                            <li class="mb-2">
-                                <i class="fas fa-check text-success me-2"></i>
-                                <strong>Zahlungsmethoden:</strong> Kreditkarte, SEPA, Giropay, Sofort
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-check text-success me-2"></i>
-                                <strong>Mindestbetrag:</strong> €1
-                            </li>
-                            <li class="mb-2">
-                                <i class="fas fa-check text-success me-2"></i>
-                                <strong>Sicher:</strong> Zahlung via Stripe (PCI-DSS Level 1)
-                            </li>
-                            <li class="mb-0">
-                                <i class="fas fa-check text-success me-2"></i>
-                                <strong>Support:</strong> Bei Problemen kontaktiere uns im Discord
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-                
-            </div>
-        </div>
-    </div>
-</section>

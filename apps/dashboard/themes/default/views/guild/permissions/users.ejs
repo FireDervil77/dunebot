@@ -11,13 +11,13 @@
           <i class="fa-solid fa-users text-primary me-2"></i>
           Benutzer-Verwaltung
         </h2>
-        <p class="text-muted mb-0">
+        <p class="text-secondary mb-0">
           Verwalte Zugriffsberechtigungen für Dashboard-Benutzer
         </p>
       </div>
       
       <% if (userPermissions.permissions['PERMISSIONS.USERS.INVITE']) { %>
-      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addGuildMemberModal">
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addGuildMemberModal">
         <i class="fa-solid fa-user-plus me-2"></i>
         Mitglied hinzufügen
       </button>
@@ -46,14 +46,12 @@
           <i class="fa-solid fa-list me-2"></i>
           Aktive Benutzer (<%= users.length %>)
         </h3>
-        <div class="card-tools">
+        <div class="card-actions">
+          <%# In Bootstrap 5 sind die Zusaetze direkte Kinder der input-group — mit
+              der alten Verpackung von Bootstrap 4 sass die Lupe daneben. %>
           <div class="input-group input-group-sm" style="width: 250px;">
-            <input type="text" id="userSearchInput" class="form-control" placeholder="Benutzer suchen...">
-            <div class="input-group-append">
-              <span class="input-group-text">
-                <i class="fa-solid fa-search"></i>
-              </span>
-            </div>
+            <input type="text" id="userSearchInput" class="form-control" placeholder="Benutzer suchen…">
+            <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
           </div>
         </div>
       </div>
@@ -61,12 +59,12 @@
       <div class="card-body p-0">
         <% if (users.length === 0) { %>
         <div class="text-center py-5">
-          <i class="fa-solid fa-users text-muted" style="font-size: 4rem;"></i>
+          <i class="fa-solid fa-users text-secondary" style="font-size: 4rem;"></i>
           <h4 class="mt-3">Keine Benutzer vorhanden</h4>
-          <p class="text-muted">Lade den ersten Benutzer ein, um zu beginnen.</p>
+          <p class="text-secondary">Lade den ersten Benutzer ein, um zu beginnen.</p>
           
           <% if (userPermissions.permissions['PERMISSIONS.USERS.INVITE']) { %>
-          <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#inviteUserModal">
+          <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#inviteUserModal">
             <i class="fa-solid fa-user-plus me-2"></i>
             Ersten Benutzer einladen
           </button>
@@ -110,7 +108,7 @@
                        width="40" 
                        height="40"
                        alt="<%= user.username %>"
-                       data-toggle="tooltip"
+                       data-bs-toggle="tooltip"
                        title="<%= user.username %>"
                        onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
                 </td>
@@ -120,7 +118,7 @@
                   <div class="d-flex align-items-center">
                     <div>
                       <strong class="d-block"><%= user.username || 'Unknown User' %></strong>
-                      <small class="text-muted">ID: <%= user.user_id %></small>
+                      <small class="text-secondary">ID: <%= user.user_id %></small>
                       <% if (user.is_owner) { %>
                       <span class="badge bg-danger ms-2">
                         <i class="fa-solid fa-crown"></i> Owner
@@ -143,7 +141,7 @@
                     </span>
                   <% }); 
                   } else { %>
-                    <span class="text-muted"><i>Keine Gruppen</i></span>
+                    <span class="text-secondary"><i>Keine Gruppen</i></span>
                   <% } %>
                   
                   <% if (user.direct_permissions && Object.keys(user.direct_permissions).length > 0) { %>
@@ -181,7 +179,7 @@
                     <button type="button" 
                             class="btn btn-primary btn-edit-user" 
                             data-user-id="<%= user.user_id %>"
-                            data-toggle="tooltip"
+                            data-bs-toggle="tooltip"
                             title="Bearbeiten">
                       <i class="fa-solid fa-edit"></i>
                     </button>
@@ -192,7 +190,7 @@
                             class="btn btn-danger btn-remove-user" 
                             data-user-id="<%= user.user_id %>"
                             data-username="<%= user.username %>"
-                            data-toggle="tooltip"
+                            data-bs-toggle="tooltip"
                             title="Entfernen">
                       <i class="fa-solid fa-trash"></i>
                     </button>
@@ -200,7 +198,7 @@
                     <button type="button" 
                             class="btn btn-secondary" 
                             disabled
-                            data-toggle="tooltip"
+                            data-bs-toggle="tooltip"
                             title="Owner kann nicht entfernt werden">
                       <i class="fa-solid fa-lock"></i>
                     </button>
@@ -228,7 +226,7 @@
           <i class="fa-brands fa-discord me-2"></i>
           Guild-Mitglied hinzufügen
         </h5>
-        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       
       <div class="modal-body">
@@ -250,7 +248,7 @@
           <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Lade Mitglieder...</span>
           </div>
-          <p class="mt-3 text-muted">Lade Discord-Mitglieder...</p>
+          <p class="mt-3 text-secondary">Lade Discord-Mitglieder...</p>
         </div>
         
         <!-- Error State -->
@@ -268,13 +266,13 @@
         
         <!-- Empty State -->
         <div id="guildMembersEmpty" class="text-center py-5 d-none">
-          <i class="fa-solid fa-users-slash fa-3x text-muted mb-3"></i>
-          <p class="text-muted">Keine Mitglieder gefunden</p>
+          <i class="fa-solid fa-users-slash fa-3x text-secondary mb-3"></i>
+          <p class="text-secondary">Keine Mitglieder gefunden</p>
         </div>
       </div>
       
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
           Schließen
         </button>
       </div>
@@ -291,7 +289,7 @@
           <i class="fa-solid fa-user-edit me-2"></i>
           Benutzer bearbeiten
         </h5>
-        <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       
       <form id="editUserForm" class="guild-ajax-form"
@@ -308,7 +306,7 @@
               </div>
               <div>
                 <strong id="edit_user_display_name"></strong><br>
-                <small class="text-muted" id="edit_user_id_display"></small>
+                <small class="text-secondary" id="edit_user_id_display"></small>
               </div>
             </div>
           </div>
@@ -335,12 +333,12 @@
                   <span class="badge me-2" style="background-color: <%= group.color %>;">
                     <%= group.name %>
                   </span>
-                  <small class="text-muted"><%= group.description || '' %></small>
+                  <small class="text-secondary"><%= group.description || '' %></small>
                 </label>
               </div>
             <% }); 
             } else { %>
-              <p class="text-muted">Keine Gruppen verfügbar</p>
+              <p class="text-secondary">Keine Gruppen verfügbar</p>
             <% } %>
           </div>
           
@@ -389,7 +387,7 @@
                 <% if (typeof permissions !== 'undefined' && permissions) { 
                   Object.keys(permissions).forEach(category => { %>
                   <div class="permission-category mb-3">
-                    <h6 class="text-uppercase text-muted mb-2">
+                    <h6 class="text-uppercase text-secondary mb-2">
                       <i class="fa-solid fa-folder-open me-2"></i>
                       <%= category %>
                     </h6>
@@ -421,7 +419,7 @@
         </div>
         
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
             Abbrechen
           </button>
           <button type="submit" class="btn btn-primary">
@@ -443,7 +441,7 @@
           <i class="fa-solid fa-exclamation-triangle me-2"></i>
           Benutzer entfernen
         </h5>
-        <button type="button" class="btn-close btn-close-white" data-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       
       <form id="removeUserForm" class="guild-ajax-form"
@@ -453,11 +451,11 @@
         
         <div class="modal-body">
           <p>Möchtest du den Benutzer <strong id="remove_username"></strong> wirklich entfernen?</p>
-          <p class="text-muted mb-0">Der Benutzer verliert sofort alle Zugriffsrechte auf das Dashboard.</p>
+          <p class="text-secondary mb-0">Der Benutzer verliert sofort alle Zugriffsrechte auf das Dashboard.</p>
         </div>
         
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
             Abbrechen
           </button>
           <button type="submit" class="btn btn-danger">
@@ -474,7 +472,19 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const guildId = '<%= guildId %>';
-  
+
+  /**
+   * Ein Fenster ansprechen.
+   *
+   * Vorher lief das ueber die jQuery-Erweiterung von
+   * Bootstrap 4. jQuery ist unter Tabler geladen, diese Methode aber nicht:
+   * Der Aufruf warf, und alles danach im selben Block lief nicht mehr.
+   */
+  const fenster = (id) => {
+    const el = document.getElementById(id);
+    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+  };
+
   // Search functionality
   const searchInput = document.getElementById('userSearchInput');
   if (searchInput) {
@@ -498,7 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let modalInstance = null; // Speichere Instanz global
   
   // Bootstrap Modal initialisieren
-  const addMemberButton = document.querySelector('[data-target="#addGuildMemberModal"]');
+  const addMemberButton = document.querySelector('[data-bs-target="#addGuildMemberModal"]');
   const addMemberModalElement = document.getElementById('addGuildMemberModal');
   
   if (addMemberButton && addMemberModalElement) {
@@ -600,9 +610,9 @@ document.addEventListener('DOMContentLoaded', () => {
                  style="width: 40px; height: 40px;">
             <div>
               <strong>${member.user.username}</strong>
-              ${member.nick ? `<span class="text-muted">(${member.nick})</span>` : ''}
+              ${member.nick ? `<span class="text-secondary">(${member.nick})</span>` : ''}
               <br>
-              <small class="text-muted">ID: ${member.user.id}</small>
+              <small class="text-secondary">ID: ${member.user.id}</small>
               ${isBot ? '<span class="badge bg-info ms-2">BOT</span>' : ''}
             </div>
           </div>
@@ -716,8 +726,7 @@ document.addEventListener('DOMContentLoaded', () => {
           // Toast anzeigen
           showToast('success', result.message);
           
-          // Modal schließen (Bootstrap 4 Syntax mit jQuery!)
-          $('#inviteUserModal').modal('hide');
+          fenster('inviteUserModal')?.hide();
           
           // Seite neu laden
           setTimeout(() => window.location.reload(), 1500);
@@ -837,9 +846,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const form = document.getElementById('removeUserForm');
       form.action = `/guild/${guildId}/permissions/users/${userId}`;
       
-      // WICHTIG: Wiederverwendung bestehender Instanz oder neue erstellen
-      // Modal öffnen (Bootstrap 4 Syntax mit jQuery!)
-      $('#removeUserModal').modal('show');
+      fenster('removeUserModal')?.show();
     });
   });
   
@@ -848,8 +855,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Toast Helper - Nutzt globales Toast-System aus global-toast.js
   // (window.showToast ist bereits verfügbar)
   
-  // Initialize Bootstrap tooltips (Bootstrap 4 Syntax mit jQuery!)
-  $('[data-toggle="tooltip"]').tooltip();
+  // Kurzhinweise
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    if (window.bootstrap) new bootstrap.Tooltip(el);
+  });
 });
 </script>
 

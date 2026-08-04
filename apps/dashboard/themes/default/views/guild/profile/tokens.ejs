@@ -5,7 +5,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">
-                            <i class="fas fa-key mr-2"></i>
+                            <i class="fas fa-key me-2"></i>
                             API-Tokens
                         </h3>
                     </div>
@@ -25,7 +25,7 @@
                                         <% tokens.forEach(token => { %>
                                             <tr>
                                                 <td><%= token.name %></td>
-                                                <td><span class="badge badge-info"><%= token.type %></span></td>
+                                                <td><span class="badge bg-info-lt"><%= token.type %></span></td>
                                                 <td><%= token.expires_at %></td>
                                                 <td>
                                                     <code class="text-truncate d-inline-block" style="max-width: 200px;">
@@ -39,8 +39,8 @@
                             </div>
                         <% } else { %>
                             <div class="text-center py-5">
-                                <i class="fas fa-key fa-3x text-muted mb-3"></i>
-                                <p class="text-muted">Keine API-Tokens vorhanden.</p>
+                                <i class="fas fa-key fa-3x text-secondary mb-3"></i>
+                                <p class="text-secondary">Keine API-Tokens vorhanden.</p>
                             </div>
                         <% } %>
                     </div>

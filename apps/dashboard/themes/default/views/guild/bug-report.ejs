@@ -231,7 +231,7 @@ document.getElementById('bugReportForm').addEventListener('submit', async (e) =>
         const result = await response.json();
 
         if (result.success) {
-            // Kein `$('#createBugModal').modal('hide')` mehr: Das ist die
+            // Kein Schliessen per jQuery mehr: Das ist die
             // jQuery-Schnittstelle von Bootstrap 4, die es unter Tabler nicht
             // gibt — und vor einem Neuladen ist das Schliessen ohnehin umsonst.
             window.location.reload();

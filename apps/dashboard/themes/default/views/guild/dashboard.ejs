@@ -60,7 +60,7 @@ const _bekannt = _bereiche.map(b => b.id);
                   <i class="fa-solid fa-sliders me-1"></i>Ansicht anpassen
                 </button>
                 <div class="dropdown-menu dropdown-menu-end p-3" id="widget-visibility-menu" style="min-width: 16rem;">
-                  <div class="text-muted small mb-2">Karten auf dem Dashboard</div>
+                  <div class="text-secondary small mb-2">Karten auf dem Dashboard</div>
                   <% (locals.alleWidgets || []).slice().sort((a,b) => (a.position||0)-(b.position||0)).forEach(w => { %>
                     <div class="form-check">
                       <input class="form-check-input widget-visibility-toggle" type="checkbox"
@@ -71,7 +71,7 @@ const _bekannt = _bereiche.map(b => b.id);
                       </label>
                     </div>
                   <% }); %>
-                  <div class="text-muted small mt-2">Änderungen über „Anordnung speichern" sichern.</div>
+                  <div class="text-secondary small mt-2">Änderungen über „Anordnung speichern" sichern.</div>
                 </div>
               </div>
               <button type="button" id="widget-arrange-toggle" class="btn btn-sm btn-outline-secondary"
@@ -140,7 +140,7 @@ function _widgetCard(widget) {
     const actionsHtml = (widget.actions || []).map(action => {
         const attrs = Object.entries(action.attributes || {})
             .map(([k, v]) => `${k}="${v}"`).join(' ');
-        return `<button type="button" class="btn btn-tool" data-action="${action.id}" ${attrs}>
+        return `<button type="button" class="btn btn-action" data-action="${action.id}" ${attrs}>
                   <i class="${action.icon || 'fas fa-wrench'}"></i>
                 </button>`;
     }).join('');
@@ -151,7 +151,7 @@ function _widgetCard(widget) {
           ${widget.icon ? `<i class="${widget.icon} me-2"></i>` : ''}
           ${widget.title || 'Widget'}
         </h3>
-        ${actionsHtml ? `<div class="card-tools">${actionsHtml}</div>` : ''}
+        ${actionsHtml ? `<div class="card-actions">${actionsHtml}</div>` : ''}
       </div>
       <div class="card-body">
         ${widget.content || ''}

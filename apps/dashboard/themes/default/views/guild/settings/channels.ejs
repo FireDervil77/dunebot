@@ -162,7 +162,7 @@
                 </div>
 
                 <!-- Statistiken -->
-                <div class="px-3 py-2 d-flex flex-wrap gap-3 text-muted small">
+                <div class="px-3 py-2 d-flex flex-wrap gap-3 text-secondary small">
                     <span><i class="fa-solid fa-hashtag me-1 text-primary"></i> <%= channels.filter(c => c.type === 'text').length %> Text</span>
                     <span><i class="fa-solid fa-volume-high me-1 text-success"></i> <%= channels.filter(c => c.type === 'voice').length %> Voice</span>
                     <span><i class="fa-solid fa-bullhorn me-1 text-warning"></i> <%= channels.filter(c => c.type === 'announcement').length %> Announcement</span>
@@ -184,7 +184,7 @@
 
                     <% if (uncategorized.length > 0) { %>
                     <div class="channel-category" data-category="uncategorized">
-                        <div class="category-header" data-toggle="collapse" data-target="#cat-uncategorized">
+                        <div class="category-header" data-bs-toggle="collapse" data-bs-target="#cat-uncategorized">
                             <span><i class="fa-solid fa-folder-open me-2"></i> Ohne Kategorie (<%= uncategorized.length %>)</span>
                             <i class="fa-solid fa-chevron-down collapse-icon"></i>
                         </div>
@@ -210,13 +210,13 @@
                         const catChannels = channelsByCategory[cat.id] || [];
                     %>
                     <div class="channel-category" data-category="<%= cat.id %>">
-                        <div class="category-header" data-toggle="collapse" data-target="#cat-<%= cat.id %>">
+                        <div class="category-header" data-bs-toggle="collapse" data-bs-target="#cat-<%= cat.id %>">
                             <span><i class="fa-solid fa-folder me-2"></i> <%= cat.name %> (<%= catChannels.length %>)</span>
                             <i class="fa-solid fa-chevron-down collapse-icon"></i>
                         </div>
                         <div class="collapse show" id="cat-<%= cat.id %>">
                             <% if (catChannels.length === 0) { %>
-                            <div class="channel-item text-muted small">
+                            <div class="channel-item text-secondary small">
                                 <i class="fa-solid fa-circle-info me-2"></i> Keine Channels in dieser Kategorie
                             </div>
                             <% } else { %>
@@ -239,7 +239,7 @@
                     <% }); %>
 
                     <% if (channels.length === 0 && categories.length === 0) { %>
-                    <div class="text-center text-muted p-4">
+                    <div class="text-center text-secondary p-4">
                         <i class="fa-solid fa-circle-info fa-2x mb-2"></i>
                         <p>Keine Channels gefunden. Ist der Bot online?</p>
                     </div>
@@ -253,7 +253,7 @@
     <div class="col-lg-7 col-xl-8">
         <!-- Leerzustand -->
         <div id="channelEmptyState" class="card mb-4">
-            <div class="card-body text-center text-muted py-5">
+            <div class="card-body text-center text-secondary py-5">
                 <i class="fa-solid fa-hand-pointer fa-3x mb-3"></i>
                 <h5>Channel auswählen</h5>
                 <p>Wähle einen Channel aus der Liste, um seine Details zu sehen.</p>
@@ -328,19 +328,19 @@
                     <div class="row text-center" id="channelStats">
                         <div class="col-md-3 mb-3">
                             <div class="stat-number text-primary" id="statText">0</div>
-                            <small class="text-muted">Text</small>
+                            <small class="text-secondary">Text</small>
                         </div>
                         <div class="col-md-3 mb-3">
                             <div class="stat-number text-success" id="statVoice">0</div>
-                            <small class="text-muted">Voice</small>
+                            <small class="text-secondary">Voice</small>
                         </div>
                         <div class="col-md-3 mb-3">
                             <div class="stat-number text-warning" id="statAnnouncement">0</div>
-                            <small class="text-muted">Announcement</small>
+                            <small class="text-secondary">Announcement</small>
                         </div>
                         <div class="col-md-3 mb-3">
                             <div class="stat-number text-danger" id="statForum">0</div>
-                            <small class="text-muted">Forum</small>
+                            <small class="text-secondary">Forum</small>
                         </div>
                     </div>
                 </div>

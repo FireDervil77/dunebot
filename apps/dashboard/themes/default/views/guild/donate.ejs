@@ -1,38 +1,18 @@
-<!-- 
-    FireBot - Donation-Seite
-    User-facing Seite für Spenden via Stripe
-    Path: /guild/:guildId/plugins/core/donate
--->
+<%#
+ * Spendenseite — /guild/:guildId/plugins/core/donate
+ *
+ * Kein eigener Seitenrahmen, keine eigene Titelzeile und keine Brotkrumen:
+ * Titel kommt aus dem Layout, wo man ist zeigt die Navigation.
+%>
 
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-6">
-                <h1 class="m-0">
-                    <i class="fas fa-heart text-danger me-2"></i>
-                    Unterstütze FireBot
-                </h1>
-            </div>
-            <div class="col-sm-6">
-                <ol class="breadcrumb float-sm-right">
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>">Dashboard</a></li>
-                    <li class="breadcrumb-item active">Spenden</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-</div>
-
-<section class="content">
-    <div class="container-fluid">
-        
-        <!-- Success/Cancel Benachrichtigungen (dynamisch via JavaScript) -->
+<!-- Success/Cancel Benachrichtigungen (dynamisch via JavaScript) -->
         <div id="payment-notification"></div>
         
         <div class="row">
             <!-- Donation-Form -->
             <div class="col-md-8">
-                <div class="card card-primary">
+                <div class="card">
+                    <div class="card-status-top bg-primary"></div>
                     <div class="card-header">
                         <h3 class="card-title">
                             <i class="fas fa-gift me-2"></i>Jetzt spenden
@@ -51,13 +31,13 @@
                         <form id="donation-form">
                             
                             <!-- Betrag wählen -->
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="donation-amount">
                                     <i class="fas fa-euro-sign me-1"></i>Betrag auswählen
                                 </label>
                                 
                                 <!-- Vordefinierte Beträge -->
-                                <div class="btn-group btn-group-toggle d-flex mb-3" data-toggle="buttons">
+                                <div class="btn-group btn-group-toggle d-flex mb-3" data-bs-toggle="buttons">
                                     <label class="btn btn-outline-primary" onclick="setAmount(3)">
                                         <input type="radio" name="amount-preset" value="3">
                                         €3
@@ -94,13 +74,13 @@
                                            placeholder="Betrag eingeben">
                                     <span class="input-group-text">EUR</span>
                                 </div>
-                                <small class="form-text text-muted">
+                                <small class="form-text text-secondary">
                                     Mindestbetrag: €1
                                 </small>
                             </div>
                             
                             <!-- Optionale Nachricht -->
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="donation-message">
                                     <i class="fas fa-comment me-1"></i>Nachricht (optional)
                                 </label>
@@ -109,7 +89,7 @@
                                           rows="3"
                                           placeholder="Danke für FireBot! Ihr macht einen tollen Job! 😊"
                                           maxlength="500"></textarea>
-                                <small class="form-text text-muted">
+                                <small class="form-text text-secondary">
                                     Deine Nachricht wird im SuperAdmin-Dashboard sichtbar (max. 500 Zeichen)
                                 </small>
                             </div>
@@ -137,7 +117,7 @@
                                          class="me-3">
                                     <div>
                                         <strong>Sichere Zahlung via Stripe</strong><br>
-                                        <small class="text-muted">
+                                        <small class="text-secondary">
                                             Deine Zahlung wird über Stripe abgewickelt. 
                                             FireBot hat keinen Zugriff auf deine Kreditkartendaten.
                                         </small>
@@ -148,14 +128,14 @@
                             <!-- Submit-Button -->
                             <button type="button" 
                                     id="donate-button"
-                                    class="btn btn-lg btn-success btn-block" 
+                                    class="btn btn-lg btn-success w-100" 
                                     onclick="createDonation()">
                                 <i class="fas fa-heart me-2"></i>
                                 <span id="button-text">Jetzt spenden</span>
                                 <span id="button-spinner" class="spinner-border spinner-border-sm ms-2 d-none"></span>
                             </button>
                             
-                            <p class="text-center text-muted mt-3 mb-0">
+                            <p class="text-center text-secondary mt-3 mb-0">
                                 <small>
                                     <i class="fas fa-lock me-1"></i>
                                     Sichere Zahlung via Stripe | 
@@ -175,7 +155,8 @@
                 
                 <!-- Deine Supporter-Info (falls vorhanden) -->
                 <% if (userBadge) { %>
-                <div class="card card-success">
+                <div class="card">
+                    <div class="card-status-top bg-success"></div>
                     <div class="card-header">
                         <h3 class="card-title">
                             <i class="fas fa-star me-2"></i>Dein Supporter-Status
@@ -207,7 +188,7 @@
                             <strong>Anzahl Spenden:</strong> <%= userBadge.donation_count %>
                         </p>
                         
-                        <p class="text-muted small mb-0">
+                        <p class="text-secondary small mb-0">
                             Supporter seit: <%= new Date(userBadge.first_donation_at).toLocaleDateString('de-DE') %>
                         </p>
                         
@@ -236,28 +217,28 @@
                                         <i class="fas fa-award text-info"></i>
                                     </td>
                                     <td><strong>Bronze</strong></td>
-                                    <td class="text-right">ab €5</td>
+                                    <td class="text-end">ab €5</td>
                                 </tr>
                                 <tr>
                                     <td class="text-center">
                                         <i class="fas fa-medal text-secondary"></i>
                                     </td>
                                     <td><strong>Silver</strong></td>
-                                    <td class="text-right">ab €20</td>
+                                    <td class="text-end">ab €20</td>
                                 </tr>
                                 <tr>
                                     <td class="text-center">
                                         <i class="fas fa-trophy text-warning"></i>
                                     </td>
                                     <td><strong>Gold</strong></td>
-                                    <td class="text-right">ab €50</td>
+                                    <td class="text-end">ab €50</td>
                                 </tr>
                                 <tr>
                                     <td class="text-center">
                                         <i class="fas fa-crown text-secondary"></i>
                                     </td>
                                     <td><strong>Platinum</strong></td>
-                                    <td class="text-right">ab €100</td>
+                                    <td class="text-end">ab €100</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -272,25 +253,26 @@
                         </h3>
                     </div>
                     <div class="card-body">
-                        <div class="info-box mb-3">
-                            <span class="info-box-icon bg-success">
-                                <i class="fas fa-euro-sign"></i>
-                            </span>
-                            <div class="info-box-content">
-                                <span class="info-box-text">Gesamt gespendet</span>
-                                <span class="info-box-number">€<%= communityStats.total_amount || 0 %></span>
+                        <%
+                        // Die alten Kacheln gibt es in Tabler nicht — sie
+                        // standen als nackte Zeilen da. Jetzt derselbe Zuschnitt wie
+                        // ueberall sonst.
+                        const kennzahlen = [
+                            { farbe: 'success', symbol: 'fa-euro-sign', wert: '€' + (communityStats.total_amount || 0), text: 'Gesamt gespendet' },
+                            { farbe: 'info',    symbol: 'fa-users',     wert: communityStats.supporter_count || 0,      text: 'Supporter' },
+                        ];
+                        %>
+                        <% kennzahlen.forEach((k, i) => { %>
+                            <div class="row align-items-center <%= i < kennzahlen.length - 1 ? 'mb-3' : '' %>">
+                                <div class="col-auto">
+                                    <span class="bg-<%= k.farbe %> text-white avatar"><i class="fas <%= k.symbol %>"></i></span>
+                                </div>
+                                <div class="col">
+                                    <div class="h3 fw-medium mb-0"><%= k.wert %></div>
+                                    <div class="text-secondary"><%= k.text %></div>
+                                </div>
                             </div>
-                        </div>
-                        
-                        <div class="info-box mb-0">
-                            <span class="info-box-icon bg-info">
-                                <i class="fas fa-users"></i>
-                            </span>
-                            <div class="info-box-content">
-                                <span class="info-box-text">Supporter</span>
-                                <span class="info-box-number"><%= communityStats.supporter_count || 0 %></span>
-                            </div>
-                        </div>
+                        <% }); %>
                     </div>
                 </div>
                 
@@ -304,21 +286,21 @@
                     <div class="card-body">
                         <div class="mb-3">
                             <strong>Wofür wird das Geld verwendet?</strong>
-                            <p class="small text-muted mb-0">
+                            <p class="small text-secondary mb-0">
                                 Server-Kosten, Entwicklung neuer Features und Wartung des Bots.
                             </p>
                         </div>
                         
                         <div class="mb-3">
                             <strong>Ist meine Zahlung sicher?</strong>
-                            <p class="small text-muted mb-0">
+                            <p class="small text-secondary mb-0">
                                 Ja! Wir nutzen Stripe, einen der sichersten Payment-Provider weltweit.
                             </p>
                         </div>
                         
                         <div class="mb-0">
                             <strong>Kann ich stornieren?</strong>
-                            <p class="small text-muted mb-0">
+                            <p class="small text-secondary mb-0">
                                 Bei Problemen kontaktiere uns über den Support-Channel.
                             </p>
                         </div>
@@ -327,9 +309,6 @@
                 
             </div>
         </div>
-        
-    </div>
-</section>
 
 <script>
 /**
@@ -427,9 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p class="mb-0">
                     Deine Zahlung war erfolgreich. Du erhältst in Kürze dein Supporter-Badge und die Discord-Role wird automatisch vergeben!
                 </p>
-                <button type="button" class="close" data-dismiss="alert">
-                    <span>&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schließen"></button>
             </div>
         `;
         
@@ -446,9 +423,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p class="mb-0">
                     Du hast die Zahlung abgebrochen. Keine Sorge - du kannst jederzeit erneut spenden!
                 </p>
-                <button type="button" class="close" data-dismiss="alert">
-                    <span>&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schließen"></button>
             </div>
         `;
         

@@ -4,9 +4,9 @@
   <div class="col-12 d-flex align-items-center justify-content-between">
     <div>
       <h4 class="mb-1"><i class="fa-solid fa-palette me-2"></i>Theme-Auswahl</h4>
-      <p class="text-muted mb-0">Wähle das Aussehen deines Guild-Dashboards. Die Änderung gilt nur für diesen Server.</p>
+      <p class="text-secondary mb-0">Wähle das Aussehen deines Guild-Dashboards. Die Änderung gilt nur für diesen Server.</p>
     </div>
-    <span class="badge badge-info"><%= themes.length %> Theme<%= themes.length !== 1 ? 's' : '' %> verfügbar</span>
+    <span class="badge bg-info-lt"><%= themes.length %> Theme<%= themes.length !== 1 ? 's' : '' %> verfügbar</span>
   </div>
 </div>
 
@@ -32,10 +32,10 @@
         <!-- Status-Badge -->
         <div style="position:absolute; top:8px; right:8px;">
           <% if (isActive) { %>
-            <span class="badge badge-success"><i class="fas fa-check me-1"></i>Aktiv</span>
+            <span class="badge bg-success-lt"><i class="fas fa-check me-1"></i>Aktiv</span>
           <% } %>
           <% if (theme.parent) { %>
-            <span class="badge badge-secondary ml-1">Child</span>
+            <span class="badge bg-secondary-lt ms-1">Child</span>
           <% } %>
         </div>
       </div>
@@ -44,23 +44,23 @@
       <div class="card-body">
         <h5 class="card-title mb-1">
           <%= theme.displayName || theme.name %>
-          <small class="text-muted ml-1">v<%= theme.version || '1.0.0' %></small>
+          <small class="text-secondary ms-1">v<%= theme.version || '1.0.0' %></small>
         </h5>
         <% if (theme.parent) { %>
-          <p class="text-muted small mb-1">
-            <i class="fas fa-sitemap mr-1"></i>Child von <strong><%= theme.parent %></strong>
+          <p class="text-secondary small mb-1">
+            <i class="fas fa-sitemap me-1"></i>Child von <strong><%= theme.parent %></strong>
           </p>
         <% } %>
-        <p class="card-text text-muted small">
+        <p class="card-text text-secondary small">
           <%= theme.description || 'Keine Beschreibung verfügbar' %>
         </p>
 
-        <div class="small text-muted mb-3">
-          <i class="fas fa-user mr-1"></i><%= theme.author || 'Unbekannt' %>
+        <div class="small text-secondary mb-3">
+          <i class="fas fa-user me-1"></i><%= theme.author || 'Unbekannt' %>
           <% if (theme.tags && theme.tags.length > 0) { %>
             &nbsp;·&nbsp;
             <% theme.tags.slice(0, 3).forEach(tag => { %>
-              <span class="badge badge-light border mr-1"><%= tag %></span>
+              <span class="badge bg-light-lt border me-1"><%= tag %></span>
             <% }); %>
           <% } %>
         </div>

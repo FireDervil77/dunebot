@@ -109,7 +109,7 @@
                 </div>
 
                 <!-- Statistiken -->
-                <div class="px-3 py-2 d-flex gap-3 text-muted small">
+                <div class="px-3 py-2 d-flex gap-3 text-secondary small">
                     <span><i class="fa-solid fa-list me-1"></i> <%= roles.length %> <%= tr('core:ROLES.TOTAL') %></span>
                     <span><i class="fa-solid fa-pen me-1 text-success"></i> <%= roles.filter(r => r.editable).length %> <%= tr('core:ROLES.EDITABLE') %></span>
                     <span><i class="fa-solid fa-robot me-1 text-info"></i> <%= roles.filter(r => r.managed).length %> <%= tr('core:ROLES.MANAGED') %></span>
@@ -140,7 +140,7 @@
                     <% }); %>
 
                     <% if (roles.length === 0) { %>
-                    <div class="text-center text-muted p-4">
+                    <div class="text-center text-secondary p-4">
                         <i class="fa-solid fa-circle-info fa-2x mb-2"></i>
                         <p><%= tr('core:ROLES.NO_ROLES') %></p>
                     </div>
@@ -154,7 +154,7 @@
     <div class="col-lg-7 col-xl-8">
         <!-- Leerzustand -->
         <div id="roleEmptyState" class="card mb-4">
-            <div class="card-body text-center text-muted py-5">
+            <div class="card-body text-center text-secondary py-5">
                 <i class="fa-solid fa-hand-pointer fa-3x mb-3"></i>
                 <h5><%= tr('core:ROLES.SELECT_ROLE') %></h5>
                 <p><%= tr('core:ROLES.SELECT_ROLE_DESC') %></p>
@@ -178,12 +178,12 @@
                     <!-- Tab Navigation -->
                     <ul class="nav nav-tabs mb-3" role="tablist">
                         <li class="nav-item">
-                            <a class="nav-link active" data-toggle="tab" href="#tabRoleGeneral" role="tab">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#tabRoleGeneral" role="tab">
                                 <i class="fa-solid fa-sliders me-1"></i> <%= tr('core:ROLES.TAB_GENERAL') %>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" data-toggle="tab" href="#tabRolePermissions" role="tab">
+                            <a class="nav-link" data-bs-toggle="tab" href="#tabRolePermissions" role="tab">
                                 <i class="fa-solid fa-key me-1"></i> <%= tr('core:ROLES.TAB_PERMISSIONS') %>
                             </a>
                         </li>
@@ -263,7 +263,7 @@
                         <!-- Tab: Permissions -->
                         <div class="tab-pane fade" id="tabRolePermissions" role="tabpanel">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <small class="text-muted"><%= tr('core:ROLES.PERM_HINT') %></small>
+                                <small class="text-secondary"><%= tr('core:ROLES.PERM_HINT') %></small>
                                 <div>
                                     <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPermSelectAll">
                                         <i class="fa-solid fa-check-double me-1"></i> Alle
@@ -290,7 +290,7 @@
                 <h5 class="modal-title">
                     <i class="fa-solid fa-plus-circle me-2"></i> <%= tr('core:ROLES.CREATE_TITLE') %>
                 </h5>
-                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <form id="createRoleForm">
                 <div class="modal-body">
@@ -318,7 +318,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= tr('BTN_CANCEL') %></button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><%= tr('BTN_CANCEL') %></button>
                     <button type="submit" class="btn btn-success">
                         <i class="fa-solid fa-plus me-1"></i> <%= tr('BTN_CREATE') %>
                     </button>
@@ -334,14 +334,14 @@
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title"><i class="fa-solid fa-trash me-2"></i> <%= tr('core:ROLES.DELETE_TITLE') %></h5>
-                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
                 <p><%= tr('core:ROLES.DELETE_CONFIRM') %></p>
                 <p class="fw-bold text-danger" id="deleteRoleName"></p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= tr('BTN_CANCEL') %></button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><%= tr('BTN_CANCEL') %></button>
                 <button type="button" class="btn btn-danger" id="btnConfirmDelete">
                     <i class="fa-solid fa-trash me-1"></i> <%= tr('core:ROLES.BTN_DELETE') %>
                 </button>
@@ -354,6 +354,18 @@
 (function() {
     const guildId = '<%= guildId %>';
     const baseUrl = `/guild/${guildId}/settings/roles`;
+
+    /**
+     * Ein Fenster ansprechen.
+     *
+     * Vorher lief das ueber die jQuery-Erweiterung von Bootstrap 4. jQuery ist
+     * unter Tabler geladen, diese Methode aber nicht: Der Aufruf warf, und
+     * alles danach im selben Block lief nicht mehr.
+     */
+    const fenster = (id) => {
+        const el = document.getElementById(id);
+        return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+    };
 
     // Rollen-Daten (vom Server)
     const rolesData = <%- JSON.stringify(roles) %>;
@@ -582,7 +594,7 @@
         if (!selectedRoleId) return;
         const role = rolesData.find(r => r.id === selectedRoleId);
         document.getElementById('deleteRoleName').textContent = role ? role.name : selectedRoleId;
-        $('#deleteRoleModal').modal('show');
+        fenster('deleteRoleModal')?.show();
     });
 
     document.getElementById('btnConfirmDelete').addEventListener('click', async function() {
@@ -596,7 +608,7 @@
             const data = await res.json();
             if (data.success) {
                 showToast('<%= tr("core:ROLES.TOAST_DELETED") %>', 'success');
-                $('#deleteRoleModal').modal('hide');
+                fenster('deleteRoleModal')?.hide();
                 setTimeout(() => location.reload(), 800);
             } else {
                 showToast(data.message || '<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
@@ -608,7 +620,7 @@
 
     // ====== Neue Rolle erstellen ======
     document.getElementById('btnCreateRole')?.addEventListener('click', function() {
-        $('#createRoleModal').modal('show');
+        fenster('createRoleModal')?.show();
     });
 
     document.getElementById('createRoleForm').addEventListener('submit', async function(e) {
@@ -633,7 +645,7 @@
             const data = await res.json();
             if (data.success) {
                 showToast('<%= tr("core:ROLES.TOAST_CREATED") %>', 'success');
-                $('#createRoleModal').modal('hide');
+                fenster('createRoleModal')?.hide();
                 setTimeout(() => location.reload(), 800);
             } else {
                 showToast(data.message || '<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
