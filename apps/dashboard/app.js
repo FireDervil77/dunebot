@@ -533,6 +533,14 @@ module.exports = class App {
         // 1. Helmet - HTTP Security Headers
         const helmet = require('helmet');
         this.app.use(helmet({
+            // Bilder duerfen von der Schwester-Domain geladen werden.
+            //
+            // helmet setzt sonst `Cross-Origin-Resource-Policy: same-origin`, und
+            // `www.firenetworks.de` und `firenetworks.de` sind fuer den Browser
+            // zwei verschiedene Herkuenfte: Ein Bild aus /uploads/media wurde auf
+            // der jeweils anderen Adresse mit ERR_BLOCKED_BY_RESPONSE.NotSameOrigin
+            // verworfen. `same-site` erlaubt beide, fremde Seiten weiterhin nicht.
+            crossOriginResourcePolicy: { policy: 'same-site' },
             contentSecurityPolicy: {
                 directives: {
                     defaultSrc: ["'self'"],
@@ -570,7 +578,14 @@ module.exports = class App {
                         "https://api.stripe.com", // Stripe API
                         "https://checkout.stripe.com", // Stripe Checkout
                         "https://www.googletagmanager.com", // GTM-Container nachladen
-                        "https://www.google-analytics.com" // Messwerte senden
+                        // Analytics schickt die Messwerte NICHT an www.google-analytics.com,
+                        // sondern an den naechstgelegenen Regionalserver —
+                        // `region1.google-analytics.com` und Geschwister. Mit nur dem
+                        // www-Namen wurde jeder Seitenaufruf von der CSP geblockt; in der
+                        // Browser-Konsole stand bei jedem Laden ein roter Fehler.
+                        "https://www.google-analytics.com",
+                        "https://*.google-analytics.com",
+                        "https://*.analytics.google.com"
                     ],
                     frameSrc: [
                         "'self'",
