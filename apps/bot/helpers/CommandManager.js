@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const { Collection, ApplicationCommandType } = require("discord.js");
 const { Logger } = require("dunebot-sdk/utils");
 const { ServiceManager } = require("dunebot-core");
@@ -365,11 +366,15 @@ class CommandManager {
                 try {
                     const guild = this.client.guilds.cache.get(guildId);
                     const commands = await this.#registerGuildCommands(guildId, force);
-                    
-                    if (guild) {
-                        Logger.info(`Registered ${commands?.size ?? 0} interactions in guild ${guild.name} (${guild.id})`);
+                    const wo = guild ? `${guild.name} (${guild.id})` : guildId;
+
+                    // `null` heisst: Der Satz stand schon bei Discord, es wurde
+                    // nichts gesendet. Frueher stand hier in dem Fall
+                    // "Registered 0 interactions" — was nach Verlust aussieht.
+                    if (commands === null) {
+                        Logger.debug(`Slash-Commands in guild ${wo} unveraendert`);
                     } else {
-                        Logger.info(`Registered ${commands?.size ?? 0} interactions in guild ${guildId}`);
+                        Logger.info(`Registered ${commands.size} interactions in guild ${wo}`);
                     }
                 } catch (error) {
                     Logger.error(`Failed to register commands for guild ${guildId}:`, error);
@@ -526,15 +531,89 @@ class CommandManager {
                 }))
                 .forEach((c) => toRegister.push(c));
         }
+        // ────────────────────────────────────────────────────────────────
+        // Nur senden, wenn sich wirklich etwas geaendert hat.
+        //
+        // `guild.commands.set()` ueberschreibt bei Discord den kompletten Satz.
+        // Bis zum 2026-08-04 lief das bei JEDEM Start fuer JEDE Guild, ohne zu
+        // fragen, ob sich etwas geaendert hat. Discord bremst das ab: Eine
+        // einzelne Guild brauchte 59 Sekunden, ueber alle hinweg waren die
+        // Befehle rund vier Minuten lang weg. Bei 23 Neustarts an einem Tag
+        // war das viermal taeglich ein Ausfall ohne jeden Anlass.
+        // ────────────────────────────────────────────────────────────────
+        const pruefsumme = CommandManager.#satzPruefsumme(toRegister);
+
+        if (!force && await this.#satzUnveraendert(guildId, pruefsumme)) {
+            Logger.info(`Slash-Commands fuer Guild ${guildId} unveraendert (${toRegister.length}) — nichts gesendet`);
+            return null;
+        }
+
         try {
-            // Nach der Registrierung der Commands
             const commands = await guild.commands.set(toRegister);
             Logger.debug(`Successfully registered ${commands.size} commands for guild ${guildId}`);
+            await this.#merkeSatz(guildId, pruefsumme, toRegister.length);
             return commands;
         } catch (error) {
             Logger.error(`Error registering commands for guild ${guildId}:`, error);
             throw error;
-        }      
+        }
+    }
+
+    /**
+     * Pruefsumme eines Befehlssatzes.
+     *
+     * Die Reihenfolge, in der die Befehle zusammenkommen, haengt an der
+     * Ladereihenfolge der Plugins — deshalb wird nach Namen sortiert, bevor
+     * gehasht wird. Sonst gaebe es bei gleichem Inhalt unterschiedliche
+     * Summen, und die Ersparnis waere dahin.
+     */
+    static #satzPruefsumme(befehle) {
+        const sortiert = [...befehle].sort((a, b) =>
+            String(a.name).localeCompare(String(b.name)) || (a.type || 0) - (b.type || 0));
+        return crypto.createHash('sha256')
+            .update(JSON.stringify(sortiert))
+            .digest('hex');
+    }
+
+    /**
+     * Steht dieser Satz bei Discord schon?
+     *
+     * Im Zweifel `false`: Lieber einmal zu viel senden als eine Guild ohne
+     * Befehle zuruecklassen, weil die Tabelle nicht erreichbar war.
+     */
+    async #satzUnveraendert(guildId, pruefsumme) {
+        const dbService = ServiceManager.get("dbService");
+        try {
+            const [zeile] = await dbService.query(
+                'SELECT commands_hash FROM guild_command_state WHERE guild_id = ? LIMIT 1',
+                [guildId]
+            );
+            return zeile?.commands_hash === pruefsumme;
+        } catch (error) {
+            ServiceManager.get("Logger").warn(
+                `[CommandManager] Stand fuer Guild ${guildId} nicht lesbar, registriere sicherheitshalber:`,
+                error.message
+            );
+            return false;
+        }
+    }
+
+    /** Haelt fest, was jetzt bei Discord steht. */
+    async #merkeSatz(guildId, pruefsumme, anzahl) {
+        const dbService = ServiceManager.get("dbService");
+        try {
+            await dbService.query(`
+                INSERT INTO guild_command_state (guild_id, commands_hash, command_count)
+                VALUES (?, ?, ?)
+                ON DUPLICATE KEY UPDATE commands_hash = VALUES(commands_hash),
+                                        command_count = VALUES(command_count)
+            `, [guildId, pruefsumme, anzahl]);
+        } catch (error) {
+            // Nicht schlimm: Beim naechsten Start wird eben neu registriert.
+            ServiceManager.get("Logger").warn(
+                `[CommandManager] Stand fuer Guild ${guildId} nicht speicherbar:`, error.message
+            );
+        }
     }
 
     /**
