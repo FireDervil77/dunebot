@@ -1,347 +1,312 @@
-<div class="content">
-    <div class="container-fluid">
-      <!-- Flash -->
-      <% 
-        const successMsgs = Array.isArray(locals.success) ? locals.success : [];
-        const errorMsgs = Array.isArray(locals.error) ? locals.error : [];
-      %>
-      <% if (successMsgs.length) { %>
-        <div class="alert alert-success"><%= successMsgs.join('<br>') %></div>
-      <% } %>
-      <% if (errorMsgs.length) { %>
-        <div class="alert alert-danger"><%= errorMsgs.join('<br>') %></div>
-      <% } %>
+<%#
+ * Plugins der Guild — aktiviert, verfuegbar, und was die Abzeichen bedeuten
+ *
+ * Kein eigener Seitenrahmen: den stellt das Layout des Themes. Die Datei hatte
+ * hier ein `</div>` zu viel — beim alten Rahmen fiel es nicht auf, weil das
+ * Layout die Verschachtelung wieder aufgefangen hat.
+ *
+ * @context {Array}  enabledPlugins   - aktivierte Plugins, ggf. mit updateInfo
+ * @context {Array}  availablePlugins - installierbare Plugins
+ * @context {Array}  pendingUpdates   - anstehende Updates (nur fuer den Hinweis)
+%>
 
-      <!-- Plugin-Updates Info (falls vorhanden) -->
-      <% if (pendingUpdates && pendingUpdates.length > 0) { %>
-      <div class="alert alert-warning alert-dismissible fade show mb-3">
-          <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-              <span aria-hidden="true">&times;</span>
-          </button>
-          <h5><i class="icon fas fa-exclamation-triangle"></i> <%= pendingUpdates.length %> Plugin-Update(s) verfügbar</h5>
-          <p class="mb-0">
-              Es stehen Updates für installierte Plugins bereit. Bitte überprüfen Sie die Details unten und aktualisieren Sie rechtzeitig vor Ablauf der Frist.
-          </p>
-      </div>
-      <% } %>
+<%
+/**
+ * Abzeichen eines Plugins (NEU / BETA / UPDATE / DEPRECATED).
+ *
+ * Stand bisher dreimal wortgleich in dieser Datei — einmal je Ansicht. Die
+ * Fassungen liefen bereits auseinander: In der Tabelle hiess `updated` einmal
+ * "UPDATED", in den Karten "UPDATE".
+ *
+ * @param {object} p - Plugin mit `badge`
+ * @returns {string} HTML oder Leerstring
+ */
+function _abzeichen(p) {
+    if (!p.badge || !p.badge.active) return '';
 
-      <!-- View Toggle -->
-      <div class="mb-3 text-right">
-          <div class="btn-group btn-group-sm" role="group" aria-label="View Mode">
-              <button type="button" class="btn btn-outline-secondary active" id="cardViewBtn">
-                  <i class="fas fa-th-large"></i> <%= tr('ADMIN_PAGE.CARD_VIEW') || 'Karten' %>
-              </button>
-              <button type="button" class="btn btn-outline-secondary" id="tableViewBtn">
-                  <i class="fas fa-table"></i> <%= tr('ADMIN_PAGE.TABLE_VIEW') || 'Tabelle' %>
-              </button>
-          </div>
-      </div>
+    const farben = { new: 'success', beta: 'warning', updated: 'info', deprecated: 'danger' };
+    const texte  = { new: 'NEU', beta: 'BETA', updated: 'UPDATE', deprecated: 'DEPRECATED' };
 
-      <!-- Aktivierte Plugins -->
-      <div class="card card-primary">
-          <div class="card-header">
-              <h3 class="card-title"><i class="fas fa-plug mr-2"></i><%= tr('ADMIN_PAGE.ENABLED_TITLE') %></h3>
-          </div>
-          <div class="card-body">
-              <% if (enabledPlugins && enabledPlugins.length) { %>
-                  
-                  <!-- Karten-Ansicht (Standard) -->
-                  <div class="row plugin-view-cards">
-                      <% enabledPlugins.forEach((p, index) => { %>
-                          <div class="col-lg-4 col-md-6 col-sm-12 mb-3">
-                              <div class="card plugin-card <%= p.updateInfo ? 'border-warning' : '' %> h-100">
-                                  <div class="card-header d-flex align-items-center">
-                                      <img src="<%= p.icon %>" class="img-circle elevation-1 mr-2" style="width:40px;height:40px;" alt="<%= p.displayName %>">
-                                      <div class="flex-grow-1">
-                                          <h5 class="mb-0">
-                                              <%= p.displayName %>
-                                              <% if (p.badge && p.badge.active) { %>
-                                                  <% 
-                                                    const badgeColorMap = {
-                                                      'new': 'bg-success',
-                                                      'beta': 'bg-warning',
-                                                      'updated': 'bg-info',
-                                                      'deprecated': 'bg-danger'
-                                                    };
-                                                    const badgeColor = badgeColorMap[p.badge.status] || 'bg-secondary';
-                                                    const badgeTextMap = {
-                                                      'new': 'NEU',
-                                                      'beta': 'BETA',
-                                                      'updated': 'UPDATE',
-                                                      'deprecated': 'DEPRECATED'
-                                                    };
-                                                    const badgeText = badgeTextMap[p.badge.status] || p.badge.status.toUpperCase();
-                                                  %>
-                                                  <span class="plugin-badge <%= badgeColor %> text-white">
-                                                      <%= badgeText %>
-                                                  </span>
-                                              <% } %>
-                                              <% if (p.badge && p.badge.featured) { %>
-                                                  <i class="plugin-featured-star fas fa-star text-warning" title="Featured Plugin"></i>
-                                              <% } %>
-                                              <% if (p.updateInfo) { %>
-                                                  <span class="badge badge-warning badge-sm ml-1">
-                                                      <i class="fas fa-arrow-up"></i> Update
-                                                  </span>
-                                              <% } %>
-                                          </h5>
-                                          <small class="text-muted">
-                                              v<%= p.version %>
-                                              <% if (p.updateInfo) { %>
-                                                  → v<%= p.updateInfo.available_version %>
-                                              <% } %>
-                                          </small>
-                                      </div>
-                                  </div>
-                                  <div class="card-body">
-                                      <p><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></p>
-                                      <p><small class="text-muted"><%= tr('ADMIN_PAGE.AUTHOR') %>: <%= p.author %></small></p>
-                                      
-                                      <% if (p.updateInfo) { %>
-                                          <div class="alert alert-warning p-2 mb-2">
-                                              <strong><i class="fas fa-clock"></i> Update verfügbar!</strong><br>
-                                              <small>
-                                                  Deadline: <%= new Date(p.updateInfo.update_deadline_at).toLocaleDateString('de-DE') %>
-                                                  (<%= p.updateInfo.daysLeft %> Tag<%= p.updateInfo.daysLeft !== 1 ? 'e' : '' %> verbleibend)
-                                              </small>
-                                              <% if (p.updateInfo.changelog && p.updateInfo.changelog.length > 0) { %>
-                                                  <div class="mt-2">
-                                                      <small><strong>Änderungen:</strong></small>
-                                                      <ul class="mb-0 pl-3" style="font-size:0.85rem;">
-                                                          <% p.updateInfo.changelog.slice(0, 3).forEach(change => { %>
-                                                              <li><%= change %></li>
-                                                          <% }); %>
-                                                          <% if (p.updateInfo.changelog.length > 3) { %>
-                                                              <li><em>... und <%= p.updateInfo.changelog.length - 3 %> weitere</em></li>
-                                                          <% } %>
-                                                      </ul>
-                                                  </div>
-                                              <% } %>
-                                          </div>
-                                      <% } %>
-                                  </div>
-                                  <div class="card-footer d-flex flex-wrap gap-2">
-                                      <% if (p.updateInfo) { %>
-                                          <button type="button" 
-                                                  class="btn btn-warning btn-update-plugin mr-2"
-                                                  data-plugin="<%= p.name %>"
-                                                  data-version="<%= p.updateInfo.available_version %>"
-                                                  data-guild="<%= guildId %>">
-                                              <i class="fas fa-sync-alt mr-1"></i> Jetzt aktualisieren
-                                          </button>
-                                      <% } %>
-                            
-                                      
-                                      <% if (p.name !== 'core') { %>
-                                          <form action="/guild/<%= guildId %>/plugins"
-                                                method="POST" 
-                                                class="guild-ajax-form mr-2"
-                                                data-form-type="plugin">
-                                              <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
-                                              <input type="hidden" name="action" value="disable">
-                                              <input type="hidden" name="plugins[]" value="<%= p.name %>">
-                                              <button type="submit" class="btn btn-danger">
-                                                  <i class="fas fa-power-off mr-1"></i> <%= tr('ADMIN_PAGE.DISABLE_ACTION') %>
-                                              </button>
-                                          </form>
-                                      <% } else { %>
-                                          <span class="badge badge-secondary"><%= tr('ADMIN_PAGE.CORE_BADGE') %></span>
-                                      <% } %>
-                                      
-                                      <% if (p.hasSettings && p.settingsUrl) { %>
-                                          <a href="<%= p.settingsUrl %>" class="btn btn-info">
-                                              <i class="fas fa-cog mr-1"></i> <%= tr('ADMIN_PAGE.SETTINGS_ACTION') %>
-                                          </a>
-                                      <% } %>
-                                  </div>
-                              </div>
-                          </div>
-                      <% }); %>
-                  </div>
+    const farbe = farben[p.badge.status] || 'secondary';
+    const text  = texte[p.badge.status] || String(p.badge.status).toUpperCase();
 
-                  <!-- Tabellen-Ansicht (versteckt) -->
-                  <div class="plugin-view-table" style="display:none;">
-                      <div class="table-responsive">
-                          <table class="table table-bordered table-hover">
-                              <thead>
-                                  <tr>
-                                      <th style="width:60px;"><%= tr('ADMIN_PAGE.TABLE_ICON') || 'Icon' %></th>
-                                      <th><%= tr('ADMIN_PAGE.TABLE_NAME') || 'Name' %></th>
-                                      <th><%= tr('ADMIN_PAGE.TABLE_VERSION') || 'Version' %></th>
-                                      <th><%= tr('ADMIN_PAGE.TABLE_AUTHOR') || 'Autor' %></th>
-                                      <th><%= tr('ADMIN_PAGE.TABLE_DESCRIPTION') || 'Beschreibung' %></th>
-                                      <th style="width:250px;"><%= tr('ADMIN_PAGE.TABLE_ACTIONS') || 'Aktionen' %></th>
-                                  </tr>
-                              </thead>
-                              <tbody>
-                                  <% enabledPlugins.forEach(p => { %>
-                                      <tr class="<%= p.updateInfo ? 'table-warning' : '' %>">
-                                          <td class="text-center">
-                                              <img src="<%= p.icon %>" class="img-circle elevation-1" style="width:40px;height:40px;" alt="<%= p.displayName %>">
-                                          </td>
-                                          <td>
-                                              <strong><%= p.displayName %></strong>
-                                              <% if (p.badge && p.badge.active) { %>
-                                                  <% 
-                                                    const badgeColorMap = {
-                                                      'new': 'bg-success',
-                                                      'beta': 'bg-warning',
-                                                      'updated': 'bg-info',
-                                                      'deprecated': 'bg-danger'
-                                                    };
-                                                    const badgeColor = badgeColorMap[p.badge.status] || 'bg-secondary';
-                                                    const badgeTextMap = {
-                                                      'new': 'NEU',
-                                                      'beta': 'BETA',
-                                                      'updated': 'UPDATED',
-                                                      'deprecated': 'DEPRECATED'
-                                                    };
-                                                    const badgeText = badgeTextMap[p.badge.status] || p.badge.status.toUpperCase();
-                                                  %>
-                                                  <span class="badge <%= badgeColor %> text-white ml-2">
-                                                      <%= badgeText %>
-                                                  </span>
-                                              <% } %>
-                                              <% if (p.badge && p.badge.featured) { %>
-                                                  <i class="fas fa-star text-warning ml-1" title="Featured Plugin"></i>
-                                              <% } %>
-                                              <% if (p.updateInfo) { %>
-                                                  <br><span class="badge badge-warning"><i class="fas fa-arrow-up"></i> Update verfügbar</span>
-                                                  <br><small class="text-muted">Deadline: <%= new Date(p.updateInfo.update_deadline_at).toLocaleDateString('de-DE') %> (<%= p.updateInfo.daysLeft %> Tage)</small>
-                                              <% } %>
-                                          </td>
-                                          <td>
-                                              <span class="badge badge-info">v<%= p.version %></span>
-                                              <% if (p.updateInfo) { %>
-                                                  <br><i class="fas fa-arrow-down text-warning"></i>
-                                                  <br><span class="badge badge-warning">v<%= p.updateInfo.available_version %></span>
-                                              <% } %>
-                                          </td>
-                                          <td><small class="text-muted"><%= p.author %></small></td>
-                                          <td><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
-                                          <td>
-                                              <% if (p.updateInfo) { %>
-                                                  <button type="button" 
-                                                          class="btn btn-warning btn-sm btn-update-plugin mb-1"
-                                                          data-plugin="<%= p.name %>"
-                                                          data-version="<%= p.updateInfo.available_version %>"
-                                                          data-guild="<%= guildId %>">
-                                                      <i class="fas fa-sync-alt"></i> Update
-                                                  </button>
-                                                  <br>
-                                              <% } %>                                              
-                                              <% if (p.name !== 'core') { %>
-                                                  <form action="/guild/<%= guildId %>/plugins"
-                                                        method="POST" 
-                                                        class="guild-ajax-form d-inline"
-                                                        data-form-type="plugin">
-                                                      <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
-                                                      <input type="hidden" name="action" value="disable">
-                                                      <input type="hidden" name="plugins[]" value="<%= p.name %>">
-                                                      <button type="submit" class="btn btn-danger btn-sm">
-                                                          <i class="fas fa-power-off"></i>
-                                                      </button>
-                                                  </form>
-                                              <% } else { %>
-                                                  <span class="badge badge-secondary"><%= tr('ADMIN_PAGE.CORE_BADGE') %></span>
-                                              <% } %>
-                                              
-                                              <% if (p.hasSettings && p.settingsUrl) { %>
-                                                  <a href="<%= p.settingsUrl %>" class="btn btn-info btn-sm ml-1">
-                                                      <i class="fas fa-cog"></i>
-                                                  </a>
-                                              <% } %>
-                                          </td>
-                                      </tr>
-                                  <% }); %>
-                              </tbody>
-                          </table>
-                      </div>
-                  </div>
+    return `<span class="badge bg-${farbe}-lt ms-1">${text}</span>`;
+}
 
-              <% } else { %>
-                  <div class="alert alert-info mb-0">
-                      <i class="icon fas fa-info-circle"></i> <%= tr('ADMIN_PAGE.NO_ENABLED') %>
-                  </div>
-              <% } %>
-          </div>
-      </div>
+/** Der Stern fuer hervorgehobene Plugins. */
+function _stern(p) {
+    return (p.badge && p.badge.featured)
+        ? '<i class="fas fa-star text-warning ms-1" title="Hervorgehoben"></i>'
+        : '';
+}
+%>
 
-      <!-- Abstand zwischen aktivierten und verfügbaren Plugins -->
-      <div style="margin-bottom: 2rem;"></div>
+<%# ── Rueckmeldungen ──────────────────────────────────────────────────────── %>
+<%
+  // Frueher `join('<br>')` in einem escapenden Ausgabefeld: Bei mehr als einer
+  // Meldung stand das <br> als Text auf der Seite.
+  const erfolge = Array.isArray(locals.success) ? locals.success : [];
+  const fehler  = Array.isArray(locals.error)   ? locals.error   : [];
+%>
+<% erfolge.forEach(m => { %>
+    <div class="alert alert-success"><%= m %></div>
+<% }); %>
+<% fehler.forEach(m => { %>
+    <div class="alert alert-danger"><%= m %></div>
+<% }); %>
 
-      <!-- Verfügbare Plugins -->
-      <div class="card card-secondary">
-        <div class="card-header">
-          <h3 class="card-title"><i class="fas fa-box-open mr-2"></i><%= tr('ADMIN_PAGE.AVAILABLE_TITLE') %></h3>
-        </div>
-        <div class="card-body">
-          <% if (availablePlugins && availablePlugins.length) { %>
-            
-            <!-- Karten-Ansicht -->
-            <div class="row plugin-view-cards">
-              <% availablePlugins.forEach((p, index) => { %>
-                <div class="col-lg-4 col-md-6 col-sm-12 mb-3">
-                  <div class="card plugin-card bg-light h-100">
-                    <div class="card-header d-flex align-items-center bg-light">
-                      <img src="<%= p.icon %>" class="img-circle mr-2" style="width:40px;height:40px;opacity:.8" alt="<%= p.displayName %>">
-                      <div class="flex-grow-1">
-                        <h5 class="mb-0">
-                            <%= p.displayName %>
-                            <% if (p.badge && p.badge.active) { %>
-                                <% 
-                                  const badgeColorMap = {
-                                    'new': 'bg-success',
-                                    'beta': 'bg-warning',
-                                    'updated': 'bg-info',
-                                    'deprecated': 'bg-danger'
-                                  };
-                                  const badgeColor = badgeColorMap[p.badge.status] || 'bg-secondary';
-                                  const badgeTextMap = {
-                                    'new': 'NEU',
-                                    'beta': 'BETA',
-                                    'updated': 'UPDATE',
-                                    'deprecated': 'DEPRECATED'
-                                  };
-                                  const badgeText = badgeTextMap[p.badge.status] || p.badge.status.toUpperCase();
-                                %>
-                                <span class="plugin-badge <%= badgeColor %> text-white">
-                                    <%= badgeText %>
-                                </span>
-                            <% } %>
-                            <% if (p.badge && p.badge.featured) { %>
-                                <i class="plugin-featured-star fas fa-star text-warning" title="Featured Plugin"></i>
-                            <% } %>
-                        </h5>
-                        <small class="text-muted">v<%= p.version %></small>
-                      </div>
-                    </div>
-                    <div class="card-body">
-                      <p class="text-muted"><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></p>
-                      <p><small class="text-muted"><%= tr('ADMIN_PAGE.AUTHOR') %>: <%= p.author %></small></p>
-                    </div>
-                    <div class="card-footer bg-light">
-                      <form action="/guild/<%= guildId %>/plugins"
-                          method="POST"
-                          class="guild-ajax-form"
-                          data-form-type="plugin">
-                        <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
-                        <input type="hidden" name="action" value="enable">
-                        <input type="hidden" name="plugins[]" value="<%= p.name %>">
-                        <button type="submit" class="btn btn-success">
-                            <i class="fas fa-power-off mr-1"></i> <%= tr('ADMIN_PAGE.ENABLE_ACTION') %>
-                        </button>
-                    </form>
-                    </div>
-                  </div>
+<% if (pendingUpdates && pendingUpdates.length > 0) { %>
+    <div class="alert alert-warning alert-dismissible mb-3" role="alert">
+        <div class="d-flex">
+            <div class="me-3"><i class="fas fa-triangle-exclamation fa-lg"></i></div>
+            <div>
+                <h4 class="alert-title"><%= pendingUpdates.length %> Plugin-Update(s) verfügbar</h4>
+                <div class="text-secondary">
+                    Es stehen Updates für installierte Plugins bereit. Bitte prüfe die Angaben unten und
+                    aktualisiere rechtzeitig vor Ablauf der Frist.
                 </div>
-              <% }); %>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schließen"></button>
+    </div>
+<% } %>
+
+<%# ── Umschalter Karten / Tabelle ─────────────────────────────────────────── %>
+<div class="mb-3 text-end">
+    <div class="btn-group btn-group-sm" role="group" aria-label="Ansicht">
+        <button type="button" class="btn btn-outline-secondary active" id="cardViewBtn">
+            <i class="fas fa-th-large me-1"></i><%= tr('ADMIN_PAGE.CARD_VIEW') || 'Karten' %>
+        </button>
+        <button type="button" class="btn btn-outline-secondary" id="tableViewBtn">
+            <i class="fas fa-table me-1"></i><%= tr('ADMIN_PAGE.TABLE_VIEW') || 'Tabelle' %>
+        </button>
+    </div>
+</div>
+
+<%# ── Aktivierte Plugins ──────────────────────────────────────────────────── %>
+<div class="card mb-4">
+    <div class="card-status-top bg-primary"></div>
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-plug me-2"></i><%= tr('ADMIN_PAGE.ENABLED_TITLE') %></h3>
+    </div>
+    <div class="card-body">
+        <% if (enabledPlugins && enabledPlugins.length) { %>
+
+            <%# Karten %>
+            <div class="row row-cards plugin-view-cards">
+                <% enabledPlugins.forEach(p => { %>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="card h-100 <%= p.updateInfo ? 'border-warning' : '' %>">
+                            <div class="card-header d-flex align-items-center">
+                                <span class="avatar me-2" style="background-image: url('<%= p.icon %>')"></span>
+                                <div class="flex-grow-1">
+                                    <div class="fw-medium">
+                                        <%= p.displayName %><%- _abzeichen(p) %><%- _stern(p) %>
+                                        <% if (p.updateInfo) { %>
+                                            <span class="badge bg-warning-lt ms-1"><i class="fas fa-arrow-up me-1"></i>Update</span>
+                                        <% } %>
+                                    </div>
+                                    <small class="text-secondary">
+                                        v<%= p.version %><% if (p.updateInfo) { %> → v<%= p.updateInfo.available_version %><% } %>
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></p>
+                                <p class="text-secondary small mb-0"><%= tr('ADMIN_PAGE.AUTHOR') %>: <%= p.author %></p>
+
+                                <% if (p.updateInfo) { %>
+                                    <div class="alert alert-warning p-2 mt-3 mb-0">
+                                        <strong><i class="fas fa-clock me-1"></i>Update verfügbar</strong>
+                                        <div class="small">
+                                            Frist: <%= new Date(p.updateInfo.update_deadline_at).toLocaleDateString('de-DE') %>
+                                            (noch <%= p.updateInfo.daysLeft %> Tag<%= p.updateInfo.daysLeft !== 1 ? 'e' : '' %>)
+                                        </div>
+                                        <% if (p.updateInfo.changelog && p.updateInfo.changelog.length > 0) { %>
+                                            <div class="mt-2 small">
+                                                <strong>Änderungen:</strong>
+                                                <ul class="mb-0 ps-3">
+                                                    <% p.updateInfo.changelog.slice(0, 3).forEach(change => { %>
+                                                        <li><%= change %></li>
+                                                    <% }); %>
+                                                    <% if (p.updateInfo.changelog.length > 3) { %>
+                                                        <li><em>… und <%= p.updateInfo.changelog.length - 3 %> weitere</em></li>
+                                                    <% } %>
+                                                </ul>
+                                            </div>
+                                        <% } %>
+                                    </div>
+                                <% } %>
+                            </div>
+                            <div class="card-footer d-flex flex-wrap gap-2">
+                                <% if (p.updateInfo) { %>
+                                    <button type="button"
+                                            class="btn btn-warning btn-update-plugin"
+                                            data-plugin="<%= p.name %>"
+                                            data-version="<%= p.updateInfo.available_version %>"
+                                            data-guild="<%= guildId %>">
+                                        <i class="fas fa-sync-alt me-1"></i>Jetzt aktualisieren
+                                    </button>
+                                <% } %>
+
+                                <% if (p.name !== 'core') { %>
+                                    <form action="/guild/<%= guildId %>/plugins"
+                                          method="POST"
+                                          class="guild-ajax-form"
+                                          data-form-type="plugin">
+                                        <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+                                        <input type="hidden" name="action" value="disable">
+                                        <input type="hidden" name="plugins[]" value="<%= p.name %>">
+                                        <button type="submit" class="btn btn-danger">
+                                            <i class="fas fa-power-off me-1"></i><%= tr('ADMIN_PAGE.DISABLE_ACTION') %>
+                                        </button>
+                                    </form>
+                                <% } else { %>
+                                    <span class="badge bg-secondary-lt align-self-center"><%= tr('ADMIN_PAGE.CORE_BADGE') %></span>
+                                <% } %>
+
+                                <% if (p.hasSettings && p.settingsUrl) { %>
+                                    <a href="<%= p.settingsUrl %>" class="btn btn-info">
+                                        <i class="fas fa-cog me-1"></i><%= tr('ADMIN_PAGE.SETTINGS_ACTION') %>
+                                    </a>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                <% }); %>
             </div>
 
-            <!-- Tabellen-Ansicht -->
-            <div class="plugin-view-table" style="display:none;">
+            <%# Tabelle %>
+            <div class="plugin-view-table d-none">
                 <div class="table-responsive">
-                    <table class="table table-bordered table-hover">
+                    <table class="table table-vcenter">
+                        <thead>
+                            <tr>
+                                <th style="width:60px;"><%= tr('ADMIN_PAGE.TABLE_ICON') || 'Icon' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_NAME') || 'Name' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_VERSION') || 'Version' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_AUTHOR') || 'Autor' %></th>
+                                <th><%= tr('ADMIN_PAGE.TABLE_DESCRIPTION') || 'Beschreibung' %></th>
+                                <th style="width:250px;"><%= tr('ADMIN_PAGE.TABLE_ACTIONS') || 'Aktionen' %></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% enabledPlugins.forEach(p => { %>
+                                <tr class="<%= p.updateInfo ? 'table-warning' : '' %>">
+                                    <td><span class="avatar" style="background-image: url('<%= p.icon %>')"></span></td>
+                                    <td>
+                                        <strong><%= p.displayName %></strong><%- _abzeichen(p) %><%- _stern(p) %>
+                                        <% if (p.updateInfo) { %>
+                                            <div class="small text-secondary mt-1">
+                                                Frist: <%= new Date(p.updateInfo.update_deadline_at).toLocaleDateString('de-DE') %>
+                                                (noch <%= p.updateInfo.daysLeft %> Tage)
+                                            </div>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info-lt">v<%= p.version %></span>
+                                        <% if (p.updateInfo) { %>
+                                            <i class="fas fa-arrow-right text-warning mx-1"></i>
+                                            <span class="badge bg-warning-lt">v<%= p.updateInfo.available_version %></span>
+                                        <% } %>
+                                    </td>
+                                    <td class="text-secondary"><%= p.author %></td>
+                                    <td><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <% if (p.updateInfo) { %>
+                                                <button type="button"
+                                                        class="btn btn-warning btn-sm btn-update-plugin"
+                                                        data-plugin="<%= p.name %>"
+                                                        data-version="<%= p.updateInfo.available_version %>"
+                                                        data-guild="<%= guildId %>">
+                                                    <i class="fas fa-sync-alt me-1"></i>Update
+                                                </button>
+                                            <% } %>
+                                            <% if (p.name !== 'core') { %>
+                                                <form action="/guild/<%= guildId %>/plugins"
+                                                      method="POST"
+                                                      class="guild-ajax-form d-inline"
+                                                      data-form-type="plugin">
+                                                    <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+                                                    <input type="hidden" name="action" value="disable">
+                                                    <input type="hidden" name="plugins[]" value="<%= p.name %>">
+                                                    <button type="submit" class="btn btn-danger btn-sm" title="<%= tr('ADMIN_PAGE.DISABLE_ACTION') %>">
+                                                        <i class="fas fa-power-off"></i>
+                                                    </button>
+                                                </form>
+                                            <% } else { %>
+                                                <span class="badge bg-secondary-lt align-self-center"><%= tr('ADMIN_PAGE.CORE_BADGE') %></span>
+                                            <% } %>
+                                            <% if (p.hasSettings && p.settingsUrl) { %>
+                                                <a href="<%= p.settingsUrl %>" class="btn btn-info btn-sm" title="<%= tr('ADMIN_PAGE.SETTINGS_ACTION') %>">
+                                                    <i class="fas fa-cog"></i>
+                                                </a>
+                                            <% } %>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        <% } else { %>
+            <div class="alert alert-info mb-0">
+                <i class="fas fa-circle-info me-2"></i><%= tr('ADMIN_PAGE.NO_ENABLED') %>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<%# ── Verfuegbare Plugins ─────────────────────────────────────────────────── %>
+<div class="card mb-4">
+    <div class="card-status-top bg-secondary"></div>
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-box-open me-2"></i><%= tr('ADMIN_PAGE.AVAILABLE_TITLE') %></h3>
+    </div>
+    <div class="card-body">
+        <% if (availablePlugins && availablePlugins.length) { %>
+
+            <%# Karten %>
+            <div class="row row-cards plugin-view-cards">
+                <% availablePlugins.forEach(p => { %>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="card h-100 bg-surface-secondary">
+                            <div class="card-header d-flex align-items-center">
+                                <span class="avatar me-2 opacity-75" style="background-image: url('<%= p.icon %>')"></span>
+                                <div class="flex-grow-1">
+                                    <div class="fw-medium"><%= p.displayName %><%- _abzeichen(p) %><%- _stern(p) %></div>
+                                    <small class="text-secondary">v<%= p.version %></small>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-secondary"><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></p>
+                                <p class="text-secondary small mb-0"><%= tr('ADMIN_PAGE.AUTHOR') %>: <%= p.author %></p>
+                            </div>
+                            <div class="card-footer">
+                                <form action="/guild/<%= guildId %>/plugins"
+                                      method="POST"
+                                      class="guild-ajax-form"
+                                      data-form-type="plugin">
+                                    <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+                                    <input type="hidden" name="action" value="enable">
+                                    <input type="hidden" name="plugins[]" value="<%= p.name %>">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-power-off me-1"></i><%= tr('ADMIN_PAGE.ENABLE_ACTION') %>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+
+            <%# Tabelle %>
+            <div class="plugin-view-table d-none">
+                <div class="table-responsive">
+                    <table class="table table-vcenter">
                         <thead>
                             <tr>
                                 <th style="width:60px;"><%= tr('ADMIN_PAGE.TABLE_ICON') || 'Icon' %></th>
@@ -354,50 +319,22 @@
                         </thead>
                         <tbody>
                             <% availablePlugins.forEach(p => { %>
-                                <tr class="bg-light">
-                                    <td class="text-center">
-                                        <img src="<%= p.icon %>" class="img-circle" style="width:40px;height:40px;opacity:.8" alt="<%= p.displayName %>">
-                                    </td>
-                                    <td>
-                                        <strong><%= p.displayName %></strong>
-                                        <% if (p.badge && p.badge.active) { %>
-                                            <% 
-                                              const badgeColorMap = {
-                                                'new': 'bg-success',
-                                                'beta': 'bg-warning',
-                                                'updated': 'bg-info',
-                                                'deprecated': 'bg-danger'
-                                              };
-                                              const badgeColor = badgeColorMap[p.badge.status] || 'bg-secondary';
-                                              const badgeTextMap = {
-                                                'new': 'NEU',
-                                                'beta': 'BETA',
-                                                'updated': 'UPDATE',
-                                                'deprecated': 'DEPRECATED'
-                                              };
-                                              const badgeText = badgeTextMap[p.badge.status] || p.badge.status.toUpperCase();
-                                            %>
-                                            <span class="badge <%= badgeColor %> text-white ml-2">
-                                                <%= badgeText %>
-                                            </span>
-                                        <% } %>
-                                        <% if (p.badge && p.badge.featured) { %>
-                                            <i class="fas fa-star text-warning ml-1" title="Featured Plugin"></i>
-                                        <% } %>
-                                    </td>
-                                    <td><span class="badge badge-secondary">v<%= p.version %></span></td>
-                                    <td><small class="text-muted"><%= p.author %></small></td>
-                                    <td class="text-muted"><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
+                                <tr>
+                                    <td><span class="avatar opacity-75" style="background-image: url('<%= p.icon %>')"></span></td>
+                                    <td><strong><%= p.displayName %></strong><%- _abzeichen(p) %><%- _stern(p) %></td>
+                                    <td><span class="badge bg-secondary-lt">v<%= p.version %></span></td>
+                                    <td class="text-secondary"><%= p.author %></td>
+                                    <td class="text-secondary"><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
                                     <td>
                                         <form action="/guild/<%= guildId %>/plugins"
-                                            method="POST"
-                                            class="guild-ajax-form d-inline"
-                                            data-form-type="plugin">
+                                              method="POST"
+                                              class="guild-ajax-form d-inline"
+                                              data-form-type="plugin">
                                             <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
                                             <input type="hidden" name="action" value="enable">
                                             <input type="hidden" name="plugins[]" value="<%= p.name %>">
                                             <button type="submit" class="btn btn-success btn-sm">
-                                                <i class="fas fa-power-off mr-1"></i> <%= tr('ADMIN_PAGE.ENABLE_ACTION') %>
+                                                <i class="fas fa-power-off me-1"></i><%= tr('ADMIN_PAGE.ENABLE_ACTION') %>
                                             </button>
                                         </form>
                                     </td>
@@ -408,155 +345,119 @@
                 </div>
             </div>
 
-          <% } else { %>
+        <% } else { %>
             <div class="alert alert-info mb-0">
-              <i class="icon fas fa-info-circle"></i> <%= tr('ADMIN_PAGE.NO_AVAILABLE') %>
+                <i class="fas fa-circle-info me-2"></i><%= tr('ADMIN_PAGE.NO_AVAILABLE') %>
             </div>
-          <% } %>
-        </div>
-      </div>
-      
-      <!-- Badge-Erklärung Info-Box -->
-      <div class="card card-info mt-4">
-          <div class="card-header">
-              <h3 class="card-title"><i class="fas fa-question-circle mr-2"></i><%= tr('PLUGIN_BADGES.INFO_TITLE') %></h3>
-          </div>
-          <div class="card-body">
-              <div class="row">
-                  <!-- Badge-Erklärungen -->
-                  <div class="col-md-6 mb-3">
-                      <div class="d-flex align-items-center mb-2">
-                          <span class="badge bg-success mr-2" style="font-size: 0.75rem;">NEU</span>
-                          <strong><%= tr('PLUGIN_BADGES.NEW_TITLE') %></strong>
-                      </div>
-                      <p class="text-muted mb-0 ml-4"><%= tr('PLUGIN_BADGES.NEW_DESC') %></p>
-                  </div>
-                  
-                  <div class="col-md-6 mb-3">
-                      <div class="d-flex align-items-center mb-2">
-                          <span class="badge bg-warning text-dark mr-2" style="font-size: 0.75rem;">BETA</span>
-                          <strong><%= tr('PLUGIN_BADGES.BETA_TITLE') %></strong>
-                      </div>
-                      <p class="text-muted mb-0 ml-4"><%= tr('PLUGIN_BADGES.BETA_DESC') %></p>
-                  </div>
-                  
-                  <div class="col-md-6 mb-3">
-                      <div class="d-flex align-items-center mb-2">
-                          <span class="badge bg-info mr-2" style="font-size: 0.75rem;">UPDATE</span>
-                          <strong><%= tr('PLUGIN_BADGES.UPDATED_TITLE') %></strong>
-                      </div>
-                      <p class="text-muted mb-0 ml-4"><%= tr('PLUGIN_BADGES.UPDATED_DESC') %></p>
-                  </div>
-                  
-                  <div class="col-md-6 mb-3">
-                      <div class="d-flex align-items-center mb-2">
-                          <span class="badge bg-danger mr-2" style="font-size: 0.75rem;">DEPRECATED</span>
-                          <strong><%= tr('PLUGIN_BADGES.DEPRECATED_TITLE') %></strong>
-                      </div>
-                      <p class="text-muted mb-0 ml-4"><%= tr('PLUGIN_BADGES.DEPRECATED_DESC') %></p>
-                  </div>
-                  
-                  <div class="col-md-12 mb-3">
-                      <div class="d-flex align-items-center mb-2">
-                          <i class="fas fa-star text-warning mr-2" style="font-size: 1.1rem;"></i>
-                          <strong><%= tr('PLUGIN_BADGES.FEATURED_TITLE') %></strong>
-                      </div>
-                      <p class="text-muted mb-0 ml-4"><%= tr('PLUGIN_BADGES.FEATURED_DESC') %></p>
-                  </div>
-              </div>
-              
-          </div>
-      </div>
+        <% } %>
     </div>
-  </div>
+</div>
+
+<%# ── Was die Abzeichen bedeuten ──────────────────────────────────────────── %>
+<div class="card">
+    <div class="card-status-top bg-info"></div>
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-question-circle me-2"></i><%= tr('PLUGIN_BADGES.INFO_TITLE') %></h3>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <%
+            const erklaerungen = [
+                { marke: '<span class="badge bg-success-lt">NEU</span>',          titel: 'NEW',        breite: 6 },
+                { marke: '<span class="badge bg-warning-lt">BETA</span>',         titel: 'BETA',       breite: 6 },
+                { marke: '<span class="badge bg-info-lt">UPDATE</span>',          titel: 'UPDATED',    breite: 6 },
+                { marke: '<span class="badge bg-danger-lt">DEPRECATED</span>',    titel: 'DEPRECATED', breite: 6 },
+                { marke: '<i class="fas fa-star text-warning"></i>',              titel: 'FEATURED',   breite: 12 },
+            ];
+            %>
+            <% erklaerungen.forEach(e => { %>
+                <div class="col-md-<%= e.breite %> mb-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <%- e.marke %>
+                        <strong><%= tr('PLUGIN_BADGES.' + e.titel + '_TITLE') %></strong>
+                    </div>
+                    <p class="text-secondary mb-0"><%= tr('PLUGIN_BADGES.' + e.titel + '_DESC') %></p>
+                </div>
+            <% }); %>
+        </div>
+    </div>
 </div>
 
 <script>
 $(document).ready(function() {
-    // View Toggle zwischen Karten und Tabelle
+    // Umschalter Karten / Tabelle
     $('#cardViewBtn').click(function() {
-        $('.plugin-view-cards').show();
-        $('.plugin-view-table').hide();
+        $('.plugin-view-cards').removeClass('d-none');
+        $('.plugin-view-table').addClass('d-none');
         $(this).addClass('active');
         $('#tableViewBtn').removeClass('active');
     });
-    
+
     $('#tableViewBtn').click(function() {
-        $('.plugin-view-cards').hide();
-        $('.plugin-view-table').show();
+        $('.plugin-view-cards').addClass('d-none');
+        $('.plugin-view-table').removeClass('d-none');
         $(this).addClass('active');
         $('#cardViewBtn').removeClass('active');
     });
 
-    // Plugin Update Handler
+    /**
+     * Meldung oben auf der Seite einblenden.
+     *
+     * Anker ist der Inhaltsbereich des Layouts — seit dem Wegfall des eigenen
+     * Seitenrahmens gibt es hier keinen `.container-fluid` mehr. `main` trifft
+     * beide Gerueste: Tabler (`main.page-body`) und AdminLTE (`main.app-main`).
+     */
+    function meldung(art, symbol, text) {
+        $('main .container-fluid').first().prepend(
+            '<div class="alert alert-' + art + ' alert-dismissible">' +
+            '<i class="fas ' + symbol + ' me-2"></i>' + text +
+            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schließen"></button>' +
+            '</div>'
+        );
+    }
+
+    // Plugin aktualisieren
     $('.btn-update-plugin').on('click', function(e) {
         e.preventDefault();
-        
+
         const $btn = $(this);
         const pluginName = $btn.data('plugin');
         const version = $btn.data('version');
         const guildId = $btn.data('guild');
         const csrfToken = $('input[name="_csrf"]').first().val();
-        
-        // Bestätigungsdialog
+
         if (!confirm(`Plugin "${pluginName}" auf Version ${version} aktualisieren?\n\nDies kann einige Sekunden dauern und führt möglicherweise Datenbankmigrationen durch.`)) {
             return;
         }
-        
-        // Button-Status setzen
+
         const originalHtml = $btn.html();
         $btn.prop('disabled', true);
-        $btn.html('<i class="fas fa-spinner fa-spin"></i> Wird aktualisiert...');
-        
-        // AJAX-Request
+        $btn.html('<i class="fas fa-spinner fa-spin me-1"></i>Wird aktualisiert…');
+
         $.ajax({
             url: `/guild/${guildId}/plugins/${pluginName}/update`,
             method: 'POST',
-            headers: {
-                'X-CSRF-Token': csrfToken
-            },
+            headers: { 'X-CSRF-Token': csrfToken },
             success: function(response) {
                 if (response.success) {
-                    // Erfolgs-Nachricht anzeigen
-                    const alertHtml = `
-                        <div class="alert alert-success alert-dismissible fade show">
-                            <button type="button" class="close" data-dismiss="alert">&times;</button>
-                            <i class="icon fas fa-check"></i> ${response.message}
-                        </div>
-                    `;
-                    $('.container-fluid').prepend(alertHtml);
-                    
-                    // Seite nach 1.5 Sekunden neu laden
-                    setTimeout(function() {
-                        window.location.reload();
-                    }, 1500);
+                    meldung('success', 'fa-check', response.message);
+                    setTimeout(function() { window.location.reload(); }, 1500);
                 } else {
                     throw new Error(response.message || 'Unbekannter Fehler');
                 }
             },
             error: function(xhr) {
-                // Fehler-Behandlung
                 let errorMsg = 'Ein Fehler ist aufgetreten.';
-                
                 if (xhr.responseJSON && xhr.responseJSON.message) {
                     errorMsg = xhr.responseJSON.message;
                 } else if (xhr.statusText) {
                     errorMsg = xhr.statusText;
                 }
-                
-                const alertHtml = `
-                    <div class="alert alert-danger alert-dismissible fade show">
-                        <button type="button" class="close" data-dismiss="alert">&times;</button>
-                        <i class="icon fas fa-exclamation-triangle"></i> Update fehlgeschlagen: ${errorMsg}
-                    </div>
-                `;
-                $('.container-fluid').prepend(alertHtml);
-                
-                // Button wiederherstellen
+
+                meldung('danger', 'fa-triangle-exclamation', 'Update fehlgeschlagen: ' + errorMsg);
+
                 $btn.prop('disabled', false);
                 $btn.html(originalHtml);
-                
-                // Nach oben scrollen
                 $('html, body').animate({ scrollTop: 0 }, 'fast');
             }
         });
