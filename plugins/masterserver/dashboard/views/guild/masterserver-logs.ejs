@@ -64,38 +64,62 @@
   <!-- Stats Row -->
   <div class="row mb-3">
     <div class="col-md-3 col-sm-6 col-12">
-      <div class="info-box">
-        <span class="info-box-icon bg-info"><i class="fa-solid fa-file-lines"></i></span>
-        <div class="info-box-content">
-          <span class="info-box-text">Gesamt Logs</span>
-          <span class="info-box-number"><%= stats.total %></span>
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="bg-info text-white avatar"><i class="fa-solid fa-file-lines"></i></span>
+            </div>
+            <div class="col">
+              <div class="h2 fw-medium mb-0"><%= stats.total %></div>
+              <div class="text-secondary">Gesamt Logs</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
     <div class="col-md-3 col-sm-6 col-12">
-      <div class="info-box">
-        <span class="info-box-icon bg-danger"><i class="fa-solid fa-circle-exclamation"></i></span>
-        <div class="info-box-content">
-          <span class="info-box-text">Errors</span>
-          <span class="info-box-number"><%= stats.errors %></span>
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="bg-danger text-white avatar"><i class="fa-solid fa-circle-exclamation"></i></span>
+            </div>
+            <div class="col">
+              <div class="h2 fw-medium mb-0"><%= stats.errors %></div>
+              <div class="text-secondary">Errors</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
     <div class="col-md-3 col-sm-6 col-12">
-      <div class="info-box">
-        <span class="info-box-icon bg-warning"><i class="fa-solid fa-triangle-exclamation"></i></span>
-        <div class="info-box-content">
-          <span class="info-box-text">Warnings</span>
-          <span class="info-box-number"><%= stats.warnings %></span>
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="bg-warning text-white avatar"><i class="fa-solid fa-triangle-exclamation"></i></span>
+            </div>
+            <div class="col">
+              <div class="h2 fw-medium mb-0"><%= stats.warnings %></div>
+              <div class="text-secondary">Warnings</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
     <div class="col-md-3 col-sm-6 col-12">
-      <div class="info-box">
-        <span class="info-box-icon bg-success"><i class="fa-solid fa-circle-info"></i></span>
-        <div class="info-box-content">
-          <span class="info-box-text">Info</span>
-          <span class="info-box-number"><%= stats.info %></span>
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="bg-success text-white avatar"><i class="fa-solid fa-circle-info"></i></span>
+            </div>
+            <div class="col">
+              <div class="h2 fw-medium mb-0"><%= stats.info %></div>
+              <div class="text-secondary">Info</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -49,13 +49,14 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
         <div class="container-fluid">
             
             <!-- Console Card -->
-            <div class="card card-dark card-outline">
+            <div class="card card-outline">
+                <div class="card-status-top bg-dark"></div>
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-terminal"></i> Terminal Output
                     </h3>
                     
-                    <div class="card-tools">
+                    <div class="card-actions">
                         <!-- Auto-Scroll Toggle -->
                         <div class="form-check form-switch d-inline-block me-2">
                             <input type="checkbox" class="form-check-input" id="autoscroll-toggle" checked>
@@ -65,12 +66,12 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
                         </div>
                         
                         <!-- Clear Button -->
-                        <button type="button" class="btn btn-tool" id="clear-console" title="Console leeren">
+                        <button type="button" class="btn btn-action" id="clear-console" title="Console leeren">
                             <i class="fas fa-eraser"></i>
                         </button>
                         
                         <!-- Fullscreen Button -->
-                        <button type="button" class="btn btn-tool" data-card-widget="maximize">
+                        <button type="button" class="btn btn-action" data-card-widget="maximize">
                             <i class="fas fa-expand"></i>
                         </button>
                     </div>
@@ -85,11 +86,9 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
                 <!-- Command Input Footer (nur wenn RCON supported) -->
                 <div class="card-footer">
                     <form id="command-form" class="input-group">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">
-                                <i class="fas fa-chevron-right"></i>
-                            </span>
-                        </div>
+                        <span class="input-group-text">
+                        <i class="fas fa-chevron-right"></i>
+                        </span>
                         <input 
                             type="text" 
                             id="command-input" 
@@ -98,11 +97,9 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
                             autocomplete="off"
                             disabled
                         >
-                        <div class="input-group-append">
-                            <button type="submit" class="btn btn-primary" disabled>
-                                <i class="fas fa-paper-plane"></i> Send
-                            </button>
-                        </div>
+                        <button type="submit" class="btn btn-primary" disabled>
+                        <i class="fas fa-paper-plane"></i> Send
+                        </button>
                     </form>
                     <small class="text-secondary mt-1 d-block">
                         <i class="fas fa-info-circle"></i> 
@@ -122,13 +119,14 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
             </div>
             
             <!-- Info Card -->
-            <div class="card card-info collapsed-card">
+            <div class="card collapsed-card">
+                <div class="card-status-top bg-info"></div>
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-info-circle"></i> Console Info
                     </h3>
-                    <div class="card-tools">
-                        <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                    <div class="card-actions">
+                        <button type="button" class="btn btn-action" data-card-widget="collapse">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>

@@ -26,7 +26,8 @@
 
             <% if (mode === 'create') { %>
             <!-- Template Selection (nur Create) -->
-            <div class="card card-info card-outline mb-4">
+            <div class="card card-outline mb-4">
+                <div class="card-status-top bg-info"></div>
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fa-solid fa-layer-group"></i>
@@ -164,14 +165,12 @@
                                                 <input type="text" class="form-control" id="addon-icon-url" name="icon_url"
                                                        value="<%- iconVal %>"
                                                        placeholder="https://... oder aus Medien wählen">
-                                                <div class="input-group-append">
-                                                    <button type="button" class="btn btn-outline-info" onclick="openMediaPicker('addon-icon-url')" title="Aus Medien wählen">
-                                                        <i class="fa-solid fa-photo-film"></i>
-                                                    </button>
-                                                    <button type="button" class="btn btn-outline-danger" onclick="clearMediaField('addon-icon-url')" title="Entfernen">
-                                                        <i class="fa-solid fa-xmark"></i>
-                                                    </button>
-                                                </div>
+                                                <button type="button" class="btn btn-outline-info" onclick="openMediaPicker('addon-icon-url')" title="Aus Medien wählen">
+                                                <i class="fa-solid fa-photo-film"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-outline-danger" onclick="clearMediaField('addon-icon-url')" title="Entfernen">
+                                                <i class="fa-solid fa-xmark"></i>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -192,14 +191,12 @@
                                         <input type="text" class="form-control" id="addon-banner-url" name="banner_url"
                                                value="<%- bannerVal %>"
                                                placeholder="https://... oder aus Medien wählen">
-                                        <div class="input-group-append">
-                                            <button type="button" class="btn btn-outline-info" onclick="openMediaPicker('addon-banner-url')" title="Aus Medien wählen">
-                                                <i class="fa-solid fa-photo-film"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-outline-danger" onclick="clearMediaField('addon-banner-url')" title="Entfernen">
-                                                <i class="fa-solid fa-xmark"></i>
-                                            </button>
-                                        </div>
+                                        <button type="button" class="btn btn-outline-info" onclick="openMediaPicker('addon-banner-url')" title="Aus Medien wählen">
+                                        <i class="fa-solid fa-photo-film"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger" onclick="clearMediaField('addon-banner-url')" title="Entfernen">
+                                        <i class="fa-solid fa-xmark"></i>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -239,7 +236,7 @@
                                     <i class="fa-brands fa-docker"></i>
                                     Docker Images <span class="text-danger">*</span>
                                 </h3>
-                                <div class="card-tools">
+                                <div class="card-actions">
                                     <button type="button" class="btn btn-success btn-sm" id="add-docker-image-btn">
                                         <i class="fa-solid fa-plus"></i> Image hinzufügen
                                     </button>
@@ -301,7 +298,7 @@
                                     <i class="fa-solid fa-sliders"></i>
                                     <%= tr('gameserver:ADDON_EDITOR.VARIABLES_SECTION') %>
                                 </h3>
-                                <div class="card-tools">
+                                <div class="card-actions">
                                     <button type="button" class="btn btn-success btn-sm" id="add-variable-btn">
                                         <i class="fa-solid fa-plus"></i> <%= tr('gameserver:ADDON_EDITOR.ADD_VARIABLE') %>
                                     </button>
@@ -324,7 +321,7 @@
                                     Config-Files
                                     <span class="badge bg-light-lt ms-2" id="config-files-count">0</span>
                                 </h3>
-                                <div class="card-tools">
+                                <div class="card-actions">
                                     <button type="button" class="btn btn-sm btn-light" id="add-config-file-btn">
                                         <i class="fa-solid fa-plus"></i> Datei hinzufügen
                                     </button>
@@ -349,7 +346,7 @@
                                     <i class="fa-solid fa-layer-group"></i> Templates
                                     <span class="badge bg-light-lt ms-2" id="templates-count">0</span>
                                 </h3>
-                                <div class="card-tools">
+                                <div class="card-actions">
                                     <button type="button" class="btn btn-sm btn-light" id="btnAddTemplate">
                                         <i class="fa-solid fa-plus"></i> Template hinzufügen
                                     </button>
@@ -581,11 +578,9 @@ function createDockerImageRow(imageKey, imageLabel) {
         <input type="text" class="form-control docker-image-label"
                placeholder="Debian"
                value="${escHtml(imageLabel)}">
-        <div class="input-group-append">
-            <button type="button" class="btn btn-danger remove-docker-image-btn" title="Entfernen">
-                <i class="fa-solid fa-trash"></i>
-            </button>
-        </div>
+        <button type="button" class="btn btn-danger remove-docker-image-btn" title="Entfernen">
+        <i class="fa-solid fa-trash"></i>
+        </button>
     `;
     row.querySelector('.remove-docker-image-btn').addEventListener('click', () => {
         row.remove();
@@ -867,11 +862,9 @@ function createConfigKeyRow(key, val) {
                value="${escHtml(key)}" placeholder="key.path">
         <input type="text" class="form-control font-monospace cf-val"
                value="${escHtml(val)}" placeholder="{{VARIABLE}}">
-        <div class="input-group-append">
-            <button type="button" class="btn btn-outline-danger cf-remove-key">
-                <i class="fa-solid fa-times"></i>
-            </button>
-        </div>
+        <button type="button" class="btn btn-outline-danger cf-remove-key">
+        <i class="fa-solid fa-times"></i>
+        </button>
     `;
     row.querySelector('.cf-remove-key').addEventListener('click', () => {
         row.remove();
@@ -938,7 +931,7 @@ function renderTemplates() {
             `<div class="tpl-ov-file card card-outline card-secondary mb-2">
                 <div class="card-header py-1">
                     <input type="text" class="form-control form-control-sm font-monospace tpl-ov-filename" value="${escHtml(fname)}" placeholder="config/server.cfg">
-                    <div class="card-tools"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
+                    <div class="card-actions"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
                 </div>
                 <div class="card-body py-1 tpl-ov-keys">${Object.entries(keys).map(([k, v]) =>
                     `<div class="input-group input-group-sm mb-1 tpl-ov-row">
@@ -1000,7 +993,7 @@ function bindTemplateEvents() {
         oc.insertAdjacentHTML('beforeend', `<div class="tpl-ov-file card card-outline card-secondary mb-2">
             <div class="card-header py-1">
                 <input type="text" class="form-control form-control-sm font-monospace tpl-ov-filename" value="" placeholder="config/server.cfg">
-                <div class="card-tools"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
+                <div class="card-actions"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
             </div>
             <div class="card-body py-1 tpl-ov-keys"></div>
             <div class="card-footer py-1"><button type="button" class="btn btn-sm btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
@@ -1361,9 +1354,7 @@ async function mediaPickerUpload(input) {
                 <!-- Toolbar -->
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div class="input-group" style="max-width:300px;">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
-                        </div>
+                        <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
                         <input type="text" class="form-control" id="media-picker-search" placeholder="Suche...">
                     </div>
                     <div>

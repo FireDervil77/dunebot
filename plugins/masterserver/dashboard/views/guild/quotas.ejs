@@ -61,7 +61,7 @@
                         </span>
                     <% } %>
                 </h3>
-                <div class="card-tools">
+                <div class="card-actions">
                     <small class="text-secondary">
                         <i class="fas fa-microchip me-1"></i><%= node.cpu_cores || '?' %> Kerne &nbsp;·&nbsp;
                         <i class="fas fa-memory me-1"></i><%= node.ram_total_gb ? parseFloat(node.ram_total_gb).toFixed(1) : '?' %> GB RAM &nbsp;·&nbsp;
@@ -201,26 +201,18 @@
                         </h6>
                         <form class="form-overallocation" data-rs-id="<%= node.id %>">
                             <div class="input-group input-group-sm mb-2">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text" style="min-width:80px;">RAM %</span>
-                                </div>
+                                <span class="input-group-text" style="min-width:80px;">RAM %</span>
                                 <input type="number" class="form-control" name="overallocateRam"
                                        min="0" max="300" value="<%= l.overRam %>"
                                        placeholder="0">
-                                <div class="input-group-append">
-                                    <span class="input-group-text">%</span>
-                                </div>
+                                <span class="input-group-text">%</span>
                             </div>
                             <div class="input-group input-group-sm mb-2">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text" style="min-width:80px;">Disk %</span>
-                                </div>
+                                <span class="input-group-text" style="min-width:80px;">Disk %</span>
                                 <input type="number" class="form-control" name="overallocateDisk"
                                        min="0" max="300" value="<%= l.overDisk %>"
                                        placeholder="0">
-                                <div class="input-group-append">
-                                    <span class="input-group-text">%</span>
-                                </div>
+                                <span class="input-group-text">%</span>
                             </div>
                             <button type="submit" class="btn btn-sm btn-primary">
                                 <i class="fas fa-save me-1"></i>Speichern
@@ -236,26 +228,18 @@
                         </h6>
                         <form class="form-reserved" data-rs-id="<%= node.id %>">
                             <div class="input-group input-group-sm mb-2">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text" style="min-width:80px;">RAM</span>
-                                </div>
+                                <span class="input-group-text" style="min-width:80px;">RAM</span>
                                 <input type="number" class="form-control" name="reservedRamMB"
                                        min="0" value="<%= l.reservedRamMB %>"
                                        placeholder="1024">
-                                <div class="input-group-append">
-                                    <span class="input-group-text">MB</span>
-                                </div>
+                                <span class="input-group-text">MB</span>
                             </div>
                             <div class="input-group input-group-sm mb-2">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text" style="min-width:80px;">Disk</span>
-                                </div>
+                                <span class="input-group-text" style="min-width:80px;">Disk</span>
                                 <input type="number" class="form-control" name="reservedDiskGB"
                                        min="0" value="<%= l.reservedDiskGB %>"
                                        placeholder="10">
-                                <div class="input-group-append">
-                                    <span class="input-group-text">GB</span>
-                                </div>
+                                <span class="input-group-text">GB</span>
                             </div>
                             <button type="submit" class="btn btn-sm btn-primary">
                                 <i class="fas fa-save me-1"></i>Speichern

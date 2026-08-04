@@ -100,9 +100,7 @@
                                                        min="512" step="512"
                                                        value="<%= server.allocated_ram_mb || '' %>"
                                                        placeholder="kein Limit">
-                                                <div class="input-group-append">
-                                                    <span class="input-group-text">MiB</span>
-                                                </div>
+                                                <span class="input-group-text">MiB</span>
                                             </div>
                                         </div>
                                         <div class="col-sm-4">
@@ -112,9 +110,7 @@
                                                        min="10" max="1600" step="10"
                                                        value="<%= server.allocated_cpu_percent || '' %>"
                                                        placeholder="kein Limit">
-                                                <div class="input-group-append">
-                                                    <span class="input-group-text">% CPU</span>
-                                                </div>
+                                                <span class="input-group-text">% CPU</span>
                                             </div>
                                         </div>
                                         <div class="col-sm-4">
@@ -124,9 +120,7 @@
                                                        min="1" step="5"
                                                        value="<%= server.allocated_disk_gb || '' %>"
                                                        placeholder="kein Limit">
-                                                <div class="input-group-append">
-                                                    <span class="input-group-text">GiB</span>
-                                                </div>
+                                                <span class="input-group-text">GiB</span>
                                             </div>
                                         </div>
                                     </div>

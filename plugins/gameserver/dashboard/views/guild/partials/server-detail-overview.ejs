@@ -840,7 +840,7 @@ async function savePorts() {
                     <i class="fas fa-folder-open me-2"></i>
                     SFTP-Zugang
                 </h3>
-                <div class="card-tools">
+                <div class="card-actions">
                     <% if (userPermissions && userPermissions.permissions && userPermissions.permissions['GAMESERVER.EDIT']) { %>
                     <button type="button"
                             class="btn btn-sm btn-warning"
@@ -858,47 +858,39 @@ async function savePorts() {
                         <label class="text-secondary small mb-1 d-block">HOST</label>
                         <div class="input-group input-group-sm">
                             <input type="text" class="form-control" id="sftp-host" value="<%= server.sftp_host %>" readonly>
-                            <div class="input-group-append">
-                                <button class="btn btn-outline-secondary" onclick="copyToClipboard('<%= server.sftp_host %>')" title="Kopieren">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
+                            <button class="btn btn-outline-secondary" onclick="copyToClipboard('<%= server.sftp_host %>')" title="Kopieren">
+                            <i class="fas fa-copy"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="col-md-1 col-sm-6 mb-2">
                         <label class="text-secondary small mb-1 d-block">PORT</label>
                         <div class="input-group input-group-sm">
                             <input type="text" class="form-control" value="<%= server.sftp_port %>" readonly>
-                            <div class="input-group-append">
-                                <button class="btn btn-outline-secondary" onclick="copyToClipboard('<%= server.sftp_port %>')" title="Kopieren">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
+                            <button class="btn btn-outline-secondary" onclick="copyToClipboard('<%= server.sftp_port %>')" title="Kopieren">
+                            <i class="fas fa-copy"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="col-md-4 col-sm-6 mb-2">
                         <label class="text-secondary small mb-1 d-block">BENUTZERNAME</label>
                         <div class="input-group input-group-sm">
                             <input type="text" class="form-control font-italic" id="sftp-user" value="<%= server.sftp_username || '' %>" readonly>
-                            <div class="input-group-append">
-                                <button class="btn btn-outline-secondary" onclick="copyToClipboard('<%= server.sftp_username %>')" title="Kopieren">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
+                            <button class="btn btn-outline-secondary" onclick="copyToClipboard('<%= server.sftp_username %>')" title="Kopieren">
+                            <i class="fas fa-copy"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="col-md-4 col-sm-6 mb-2">
                         <label class="text-secondary small mb-1 d-block">PASSWORT</label>
                         <div class="input-group input-group-sm">
                             <input type="password" class="form-control font-italic" id="sftp-pass" value="<%= server.sftp_password || '' %>" readonly>
-                            <div class="input-group-append">
-                                <button class="btn btn-outline-secondary" id="sftp-pass-toggle" onclick="toggleSftpPassword()" title="Anzeigen/Verbergen">
-                                    <i class="fas fa-eye" id="sftp-pass-icon"></i>
-                                </button>
-                                <button class="btn btn-outline-secondary" onclick="copyToClipboard(document.getElementById('sftp-pass').value)" title="Kopieren">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
+                            <button class="btn btn-outline-secondary" id="sftp-pass-toggle" onclick="toggleSftpPassword()" title="Anzeigen/Verbergen">
+                            <i class="fas fa-eye" id="sftp-pass-icon"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="copyToClipboard(document.getElementById('sftp-pass').value)" title="Kopieren">
+                            <i class="fas fa-copy"></i>
+                            </button>
                         </div>
                     </div>
                 </div>

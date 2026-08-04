@@ -75,18 +75,14 @@
                   <select class="form-control" id="game_port" name="game_port">
                     <option value="auto"><%= tr('gameserver:SERVER.PORT_AUTO') %></option>
                   </select>
-                  <div class="input-group-append">
-                    <button type="button" class="btn btn-outline-secondary" id="toggleManualPort" title="<%= tr('gameserver:SERVER.PORT_MANUAL_TITLE') %>">
-                      <i class="fa-solid fa-keyboard"></i>
-                    </button>
-                  </div>
+                  <button type="button" class="btn btn-outline-secondary" id="toggleManualPort" title="<%= tr('gameserver:SERVER.PORT_MANUAL_TITLE') %>">
+                  <i class="fa-solid fa-keyboard"></i>
+                  </button>
                 </div>
                 <div id="manualPortInput" style="display:none;" class="mt-2">
                   <div class="input-group">
                     <input type="number" class="form-control" id="game_port_manual" min="1024" max="65535" placeholder="<%= tr('gameserver:SERVER.PORT_MANUAL_PLACEHOLDER') %>">
-                    <div class="input-group-append">
-                        <button type="button" class="btn btn-outline-primary" id="useManualPort"><%= tr('gameserver:SERVER.PORT_MANUAL_APPLY') %></button>
-                    </div>
+                    <button type="button" class="btn btn-outline-primary" id="useManualPort"><%= tr('gameserver:SERVER.PORT_MANUAL_APPLY') %></button>
                   </div>
                   <small class="form-text text-secondary"><%= tr('gameserver:SERVER.PORT_POOL_HELP') %></small>
                 </div>
@@ -173,9 +169,7 @@
                 <div class="input-group">
                   <input type="number" class="form-control" name="allocated_ram_mb" id="allocated_ram_mb"
                          min="512" step="512" value="2048" required>
-                  <div class="input-group-append">
-                    <span class="input-group-text">MiB</span>
-                  </div>
+                  <span class="input-group-text">MiB</span>
                 </div>
                 <small class="form-text text-secondary"><%= tr('gameserver:SERVER.RAM_HELP') %></small>
               </div>
@@ -192,9 +186,7 @@
                       mehr als einen Kern brauchen. %>
                   <input type="number" class="form-control" name="allocated_cpu_percent" id="allocated_cpu_percent"
                          min="10" max="1600" step="10" value="100" required>
-                  <div class="input-group-append">
-                    <span class="input-group-text">%</span>
-                  </div>
+                  <span class="input-group-text">%</span>
                 </div>
                 <small class="form-text text-secondary">
                   100 % entspricht einem CPU-Kern, 200 % zwei Kernen.
@@ -210,9 +202,7 @@
                 <div class="input-group">
                   <input type="number" class="form-control" name="allocated_disk_gb" id="allocated_disk_gb"
                          min="1" step="5" value="20" required>
-                  <div class="input-group-append">
-                    <span class="input-group-text">GiB</span>
-                  </div>
+                  <span class="input-group-text">GiB</span>
                 </div>
                 <small class="form-text text-secondary"><%= tr('gameserver:SERVER.DISK_HELP') %></small>
               </div>

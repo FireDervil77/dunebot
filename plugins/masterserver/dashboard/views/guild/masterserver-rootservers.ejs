@@ -24,39 +24,63 @@
         <!-- Stats-Leiste -->
         <div class="row mb-3">
             <div class="col-md-3 col-sm-6">
-                <div class="info-box">
-                    <span class="info-box-icon bg-info"><i class="fa-solid fa-server"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">RootServer gesamt</span>
-                        <span class="info-box-number"><%= serverStats.total %></span>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-info text-white avatar"><i class="fa-solid fa-server"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= serverStats.total %></div>
+                        <div class="text-secondary">RootServer gesamt</div>
+                      </div>
                     </div>
+                  </div>
                 </div>
             </div>
             <div class="col-md-3 col-sm-6">
-                <div class="info-box">
-                    <span class="info-box-icon bg-success"><i class="fa-solid fa-circle-check"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">Online</span>
-                        <span class="info-box-number"><%= servers.filter(s => s.isOnline).length %></span>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-success text-white avatar"><i class="fa-solid fa-circle-check"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= servers.filter(s => s.isOnline).length %></div>
+                        <div class="text-secondary">Online</div>
+                      </div>
                     </div>
+                  </div>
                 </div>
             </div>
             <div class="col-md-3 col-sm-6">
-                <div class="info-box">
-                    <span class="info-box-icon bg-warning"><i class="fa-solid fa-circle-xmark"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">Offline</span>
-                        <span class="info-box-number"><%= servers.filter(s => !s.isOnline).length %></span>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-warning text-white avatar"><i class="fa-solid fa-circle-xmark"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= servers.filter(s => !s.isOnline).length %></div>
+                        <div class="text-secondary">Offline</div>
+                      </div>
                     </div>
+                  </div>
                 </div>
             </div>
             <div class="col-md-3 col-sm-6">
-                <div class="info-box">
-                    <span class="info-box-icon bg-primary"><i class="fa-solid fa-gamepad"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">Gameserver</span>
-                        <span class="info-box-number"><%= serverStats.totalGameservers %></span>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-primary text-white avatar"><i class="fa-solid fa-gamepad"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= serverStats.totalGameservers %></div>
+                        <div class="text-secondary">Gameserver</div>
+                      </div>
                     </div>
+                  </div>
                 </div>
             </div>
         </div>
@@ -100,7 +124,7 @@
                                     <i class="fa-solid fa-server me-1"></i>
                                     <%= rs.name %>
                                 </h3>
-                                <div class="card-tools">
+                                <div class="card-actions">
                                     <span class="badge badge-<%= rs.isOnline ? 'success' : 'secondary' %>"
                                           id="rs-badge-<%= rs.id %>">
                                         <i class="fa-solid fa-circle me-1" style="font-size:.6em;"></i>

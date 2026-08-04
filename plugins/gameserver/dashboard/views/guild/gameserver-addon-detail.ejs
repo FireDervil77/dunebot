@@ -28,7 +28,8 @@
             <!-- Hero Section -->
             <div class="row mb-4">
                 <div class="col-12">
-                    <div class="card card-primary card-outline">
+                    <div class="card card-outline">
+                        <div class="card-status-top bg-primary"></div>
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-8">
@@ -82,8 +83,8 @@
 
                                 <div class="col-md-4">
                                     <!-- Stats -->
-                                    <div class="info-box bg-light">
-                                        <div class="info-box-content">
+                                    <div class="card">
+                                        <div class="card-body">
                                             <div class="mb-3">
                                                 <h5><%= tr('gameserver:ADDON.RATING') %></h5>
                                                 <% if (addon.rating_count > 0) { %>

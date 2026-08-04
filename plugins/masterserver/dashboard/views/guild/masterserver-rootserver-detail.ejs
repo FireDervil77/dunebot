@@ -50,7 +50,7 @@
                         <h3 class="card-title text-sm mb-0">
                             <i class="fa-solid fa-microchip me-1"></i>CPU
                         </h3>
-                        <div class="card-tools">
+                        <div class="card-actions">
                             <% if (rootserver.cpu_model) { %>
                                 <small class="text-secondary" title="<%= rootserver.cpu_model %>" style="font-size:.7rem;">
                                     <%= rootserver.cpu_model.length > 22 ? rootserver.cpu_model.substring(0,22)+'…' : rootserver.cpu_model %>
@@ -173,7 +173,8 @@
         </div>
 
         <!-- Tabs -->
-        <div class="card card-primary card-outline">
+        <div class="card card-outline">
+            <div class="card-status-top bg-primary"></div>
             <div class="card-header p-0 pt-1">
                 <ul class="nav nav-tabs" id="rootserverTabs">
                     <li class="nav-item">
@@ -267,14 +268,14 @@
                             </div>
                             <div class="col-md-6">
                                 <% if (!isOnline) { %>
-                                    <div class="callout callout-warning">
+                                    <div class="alert alert-warning">
                                         <h6><i class="fa-solid fa-triangle-exclamation me-1"></i>Daemon offline</h6>
                                         <p class="mb-2">Der Daemon ist nicht verbunden. Prüfe ob der Service auf dem Server läuft:</p>
                                         <pre class="bg-dark text-white p-2 rounded" style="font-size:0.8rem;"><code>sudo systemctl status firebot-daemon
 sudo journalctl -u firebot-daemon -n 50</code></pre>
                                     </div>
                                 <% } else { %>
-                                    <div class="callout callout-success">
+                                    <div class="alert alert-success">
                                         <h6><i class="fa-solid fa-circle-check me-1"></i>Daemon verbunden</h6>
                                         <p class="mb-0">Der Daemon ist online und bereit. Gameserver können erstellt werden.</p>
                                     </div>
@@ -478,7 +479,7 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                 </table>
                             </div>
                             <div class="col-md-6">
-                                <div class="callout callout-info">
+                                <div class="alert alert-info">
                                     <h6><i class="fa-solid fa-circle-info me-1"></i>Service-Befehle</h6>
                                     <pre class="bg-dark text-white p-2 rounded mb-0" style="font-size:0.8rem;"><code>sudo systemctl status firebot-daemon
 sudo systemctl restart firebot-daemon
@@ -597,7 +598,7 @@ sudo journalctl -u firebot-daemon -f</code></pre>
 
                     <!-- Tab: Gefahrenzone -->
                     <div class="tab-pane fade" id="tab-danger">
-                        <div class="callout callout-danger">
+                        <div class="alert alert-danger">
                             <h5><i class="fa-solid fa-triangle-exclamation me-2"></i>RootServer löschen</h5>
                             <p class="mb-3">Diese Aktion löscht den RootServer permanent und kann <strong>nicht rückgängig gemacht werden</strong>.</p>
                             <p class="text-secondary" style="font-size:.85rem;">Alle zugehörigen Gameserver müssen vorher entfernt werden.</p>

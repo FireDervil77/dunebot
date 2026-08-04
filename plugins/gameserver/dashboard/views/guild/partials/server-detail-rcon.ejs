@@ -60,11 +60,9 @@
 
     <!-- Eingabe -->
     <div class="input-group">
-        <div class="input-group-prepend">
-            <span class="input-group-text bg-dark border-secondary text-success fw-bold">
-                <i class="fas fa-chevron-right"></i>
-            </span>
-        </div>
+        <span class="input-group-text bg-dark border-secondary text-success fw-bold">
+        <i class="fas fa-chevron-right"></i>
+        </span>
         <input type="text"
                id="rcon-input"
                class="form-control bg-dark text-light border-secondary"
@@ -74,11 +72,9 @@
                autocorrect="off"
                spellcheck="false"
                <%= server.rcon_available ? '' : 'disabled' %>>
-        <div class="input-group-append">
-            <button class="btn btn-success" id="rcon-send-btn" type="button" <%= server.rcon_available ? '' : 'disabled' %>>
-                <i class="fas fa-paper-plane me-1"></i> Senden
-            </button>
-        </div>
+        <button class="btn btn-success" id="rcon-send-btn" type="button" <%= server.rcon_available ? '' : 'disabled' %>>
+        <i class="fas fa-paper-plane me-1"></i> Senden
+        </button>
     </div>
     <small class="text-secondary mt-1 d-block">
         <i class="fas fa-info-circle me-1"></i>
