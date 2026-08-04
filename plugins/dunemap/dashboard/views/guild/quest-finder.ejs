@@ -8,25 +8,8 @@
  */
 %>
 
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-6">
-                <h1 class="m-0"><i class="fa-solid fa-scroll"></i> Quest-Finder</h1>
-            </div>
-            <div class="col-sm-6">
-                <ol class="breadcrumb float-sm-right">
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/dashboard">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/dunemap">DuneMap</a></li>
-                    <li class="breadcrumb-item active">Quest-Finder</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-</div>
 
-<section class="content">
-    <div class="container-fluid">
+<%# Kein eigener Seitenrahmen und keine Brotkrumen: Titel kommt aus dem Layout. %>
         
         <!-- Statistiken -->
         <div class="row mb-3">
@@ -78,7 +61,8 @@
         </div>
 
         <!-- Suchfilter -->
-        <div class="card card-primary">
+        <div class="card">
+            <div class="card-status-top bg-primary"></div>
             <div class="card-header">
                 <h3 class="card-title"><i class="fa-solid fa-filter"></i> Quest-Suche</h3>
             </div>
@@ -145,11 +129,8 @@
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title"><i class="fa-solid fa-list"></i> Quests (<span id="questCount">0</span>)</h3>
-                <div class="card-tools">
-                    <button type="button" class="btn btn-tool" data-card-widget="collapse">
-                        <i class="fas fa-minus"></i>
-                    </button>
-                </div>
+                <%# Der Einklapp-Knopf hing an AdminLTEs data-card-widget — den gibt es
+                    in Tabler nicht, der Knopf tat nichts. Ersatzlos entfernt. %>
             </div>
             <div class="card-body p-0">
                 <div id="loadingSpinner" class="text-center p-4" style="display: none;">
@@ -164,9 +145,6 @@
                 </div>
             </div>
         </div>
-
-    </div>
-</section>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

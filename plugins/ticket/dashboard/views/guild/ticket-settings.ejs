@@ -388,7 +388,7 @@
           <hr>
           <h6><i class="fa-solid fa-envelope-open me-1"></i> <%= tr('ticket:OPEN_MSG') %></h6>
 
-          <div class="callout callout-info py-2 px-3 mb-3">
+          <div class="alert alert-info py-2 px-3 mb-3">
             <small class="text-secondary d-block mb-1"><strong>Verfügbare Platzhalter:</strong></small>
             <div class="d-flex flex-wrap" style="gap: 4px;">
               <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{server}</code>
@@ -588,6 +588,16 @@
     const guildId = '<%= guildId %>';
     const baseUrl = `/guild/${guildId}/plugins/ticket`;
 
+    /**
+     * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
+     * jQuery ist unter Tabler geladen, dessen .modal() aber nicht: Der Aufruf
+     * warf, und alles danach im selben Block lief nicht mehr.
+     */
+    const fenster = (id) => {
+        const el = document.getElementById(id);
+        return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+    };
+
     // Categories data for editing
     const categoriesData = <%- JSON.stringify(categories) %>;
 
@@ -687,7 +697,7 @@
 
         $('#categoryModalTitle').text('<%= tr("ticket:UPDATE_TITLE") %>');
         $('#categorySubmitBtn').text('<%= tr("ticket:UPDATE_BTN") %>');
-        $('#categoryModal').modal('show');
+        fenster('categoryModal')?.show();
     };
 
     window.submitCategory = function() {
@@ -732,7 +742,7 @@
             contentType: 'application/json',
             data: JSON.stringify(data),
             success: function() {
-                $('#categoryModal').modal('hide');
+                fenster('categoryModal')?.hide();
                 showToast(editId ? '<%= tr("ticket:TOAST_CATEGORY_UPDATED") %>' : '<%= tr("ticket:TOAST_CATEGORY_CREATED") %>');
                 setTimeout(function() { location.reload(); }, 1000);
             },
@@ -772,7 +782,7 @@
         $('#transcriptChat').addClass('d-none').empty();
         $('#transcriptFooter').addClass('d-none');
         $('#transcriptMsgCount').text('');
-        $('#transcriptModal').modal('show');
+        fenster('transcriptModal')?.show();
 
         $.ajax({
             url: baseUrl + '/tickets/' + dbId + '/transcript',
