@@ -365,7 +365,7 @@ class CommandManager {
 
                 try {
                     const guild = this.client.guilds.cache.get(guildId);
-                    const commands = await this.#registerGuildCommands(guildId, force);
+                    const commands = await this.#registerGuildCommands(guildId);
                     const wo = guild ? `${guild.name} (${guild.id})` : guildId;
 
                     // `null` heisst: Der Satz stand schon bei Discord, es wurde
@@ -412,9 +412,12 @@ class CommandManager {
     /**
      * Register commands for a specific guild based on enabled plugins
      * @param {string} guildId - The guild ID
-     * @param {boolean} force - Whether to force registration
+     *
+     * Ohne `force`-Parameter: Die 10-Sekunden-Bremse sitzt in der Warteschlange
+     * (#processRegistrationQueue), die Aenderungspruefung weiter unten. Hier
+     * gab es fuer den Wert nichts mehr zu tun.
      */
-    async #registerGuildCommands(guildId, force = false) {
+    async #registerGuildCommands(guildId) {
         const Logger = ServiceManager.get("Logger");
         const dbService = ServiceManager.get("dbService");
         const client = ServiceManager.get("client");
@@ -482,26 +485,7 @@ class CommandManager {
                     description: this.client.translate(cmd.description),
                     descriptionLocalizations: this.client.i18n.getAllTr(cmd.description),
                     type: ApplicationCommandType.ChatInput,
-                    options: cmd.slashCommand.options?.map((opt) => {
-                        if (opt.description) {
-                            opt.description = this.client.translate(opt.description);
-                            opt.descriptionLocalizations = this.client.i18n.getAllTr(
-                                opt.description,
-                            );
-                        }
-                        if (opt.options) {
-                            opt.options = opt.options.map((o) => {
-                                if (o.description) {
-                                    o.description = this.client.translate(o.description);
-                                    o.descriptionLocalizations = this.client.i18n.getAllTr(
-                                        o.description,
-                                    );
-                                }
-                                return o;
-                            });
-                        }
-                        return opt;
-                    }),
+                    options: this.#uebersetzeOptionen(cmd.slashCommand.options),
                 }))
                 .forEach((s) => toRegister.push(s));
         }
@@ -543,7 +527,20 @@ class CommandManager {
         // ────────────────────────────────────────────────────────────────
         const pruefsumme = CommandManager.#satzPruefsumme(toRegister);
 
-        if (!force && await this.#satzUnveraendert(guildId, pruefsumme)) {
+        // `force` bleibt hier bewusst aussen vor.
+        //
+        // Es bedeutet "umgeh die 10-Sekunden-Bremse", nicht "sende auch, wenn
+        // sich nichts geaendert hat" — und wird beim Laden JEDES Plugins fuer
+        // JEDE Guild gesetzt (updatePluginStatus → #queueGuildRegistration mit
+        // true). Wuerde es auch diese Pruefung uebergehen, waere die Ersparnis
+        // beim Start sofort wieder weg: genau der Fall, der am 2026-08-04 in
+        // den Protokollen stand, waehrend fuenf Guilds sauber uebersprangen.
+        //
+        // Aendert ein Plugin die Befehle wirklich, faellt das ueber die
+        // Pruefsumme ohnehin auf. Soll doch einmal erzwungen neu gesendet
+        // werden (etwa weil bei Discord von Hand etwas geloescht wurde), reicht
+        // ein DELETE der Zeile aus `guild_command_state`.
+        if (await this.#satzUnveraendert(guildId, pruefsumme)) {
             Logger.info(`Slash-Commands fuer Guild ${guildId} unveraendert (${toRegister.length}) — nichts gesendet`);
             return null;
         }
@@ -557,6 +554,43 @@ class CommandManager {
             Logger.error(`Error registering commands for guild ${guildId}:`, error);
             throw error;
         }
+    }
+
+    /**
+     * Uebersetzt die Optionen eines Befehls — ohne die Vorlage anzufassen.
+     *
+     * Vorher stand hier `opt.description = translate(opt.description)`. Das
+     * beschrieb das Befehlsobjekt selbst, und zwar dauerhaft: Beim naechsten
+     * Aufruf lag dort nicht mehr der Uebersetzungsschluessel, sondern deutscher
+     * Text. `translate()` fand dafuer nichts mehr, und `getAllTr()` bekam ihn
+     * ebenfalls als Schluessel gereicht — die Lokalisierungen anderer Sprachen
+     * waren ab der zweiten Guild dahin.
+     *
+     * Aufgefallen ist es an der neuen Pruefsumme: Fuer Guilds mit
+     * Optionen-Befehlen kam bei jedem Durchlauf ein anderer Satz heraus, also
+     * wurde jedes Mal neu registriert. Die kleinen Guilds (nur Kern-Befehle
+     * ohne Optionen) uebersprangen dagegen sauber.
+     *
+     * Der zweite Fehler steckte in der Reihenfolge: `getAllTr` wurde erst NACH
+     * der Zuweisung aufgerufen, bekam also schon den uebersetzten Text statt
+     * des Schluessels — selbst beim allerersten Durchlauf.
+     */
+    #uebersetzeOptionen(optionen) {
+        if (!Array.isArray(optionen)) return optionen;
+
+        return optionen.map((opt) => {
+            const kopie = { ...opt };
+
+            if (opt.description) {
+                kopie.description = this.client.translate(opt.description);
+                kopie.descriptionLocalizations = this.client.i18n.getAllTr(opt.description);
+            }
+            if (Array.isArray(opt.options)) {
+                kopie.options = this.#uebersetzeOptionen(opt.options);
+            }
+
+            return kopie;
+        });
     }
 
     /**
