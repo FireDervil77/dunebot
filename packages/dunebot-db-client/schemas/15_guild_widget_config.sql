@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS `guild_widget_config` (
     `widget_id`  VARCHAR(100) NOT NULL COMMENT 'Widget-Bezeichner (z.B. server-info)',
     `area`       VARCHAR(100) DEFAULT NULL COMMENT 'Override Widget-Bereich (NULL = Standard)',
     `position`   INT DEFAULT NULL COMMENT 'Override Reihenfolge im Bereich (NULL = Standard)',
+    `size`       TINYINT UNSIGNED DEFAULT NULL COMMENT 'Override Spaltenbreite 1-12 (NULL = Vorgabe des Bereichs)',
     `visible`    TINYINT(1) DEFAULT NULL COMMENT 'Override Sichtbarkeit (NULL = Standard)',
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 

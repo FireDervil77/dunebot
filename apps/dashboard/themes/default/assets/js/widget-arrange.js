@@ -93,6 +93,42 @@
         standAnzeigen();
     }
 
+    /**
+     * Erlaubte Breiten im 12er-Raster. Nur Teiler von 12, damit Zeilen
+     * aufgehen und keine halben Luecken entstehen.
+     */
+    var BREITEN = [3, 4, 6, 12];
+
+    /** Aktuelle Breite einer Huelle aus ihrer col-md-Klasse lesen. */
+    function breiteLesen(huelle) {
+        var treffer = /\bcol-md-(\d+)\b/.exec(huelle.className);
+        return treffer ? parseInt(treffer[1], 10) : 12;
+    }
+
+    /**
+     * Breite einer Karte um eine Stufe aendern.
+     *
+     * @param {HTMLElement} huelle
+     * @param {number} richtung - -1 schmaler, +1 breiter
+     */
+    function breiteAendern(huelle, richtung) {
+        var jetzt = breiteLesen(huelle);
+        var i = BREITEN.indexOf(jetzt);
+        if (i === -1) {
+            // Unbekannte Breite auf die naechstgroessere aus der Liste ziehen
+            i = BREITEN.findIndex(function (b) { return b >= jetzt; });
+            if (i === -1) i = BREITEN.length - 1;
+        }
+
+        var neu = BREITEN[Math.min(BREITEN.length - 1, Math.max(0, i + richtung))];
+        if (neu === jetzt) return;
+
+        huelle.className = huelle.className.replace(/\bcol-md-\d+\b/, 'col-md-' + neu);
+        huelle.dataset.widgetSize = String(neu);
+        geaendert = true;
+        standAnzeigen();
+    }
+
     /** Im Anordnen-Modus werden auch ausgeblendete Karten gezeigt. */
     function versteckteZeigen(zeigen) {
         document.querySelectorAll('[data-widget-hidden="1"]').forEach(function (huelle) {
@@ -112,6 +148,12 @@
                 '<button type="button" class="btn btn-sm btn-secondary widget-arrange-griff" title="Verschieben">' +
                 '  <i class="fa-solid fa-up-down-left-right"></i>' +
                 '</button>' +
+                '<button type="button" class="btn btn-sm btn-secondary widget-arrange-schmaler" title="Schmaler">' +
+                '  <i class="fa-solid fa-left-right"></i><i class="fa-solid fa-minus ms-1 small"></i>' +
+                '</button>' +
+                '<button type="button" class="btn btn-sm btn-secondary widget-arrange-breiter" title="Breiter">' +
+                '  <i class="fa-solid fa-left-right"></i><i class="fa-solid fa-plus ms-1 small"></i>' +
+                '</button>' +
                 '<button type="button" class="btn btn-sm btn-secondary widget-arrange-hide" title="Ausblenden">' +
                 '  <i class="fa-solid fa-eye"></i>' +
                 '</button>';
@@ -126,6 +168,11 @@
             werkzeuge.querySelector('.widget-arrange-hide').addEventListener('click', function () {
                 sichtbarkeitSetzen(huelle.dataset.widgetId, huelle.dataset.widgetHidden === '1');
             });
+
+            werkzeuge.querySelector('.widget-arrange-schmaler')
+                .addEventListener('click', function () { breiteAendern(huelle, -1); });
+            werkzeuge.querySelector('.widget-arrange-breiter')
+                .addEventListener('click', function () { breiteAendern(huelle, +1); });
         });
     }
 
@@ -148,6 +195,7 @@
                     widget_id: id,
                     area: areaId,
                     position: (i + 1) * 10,
+                    size: breiteLesen(huelle),
                     visible: huelle.dataset.widgetHidden !== '1'
                 });
             });

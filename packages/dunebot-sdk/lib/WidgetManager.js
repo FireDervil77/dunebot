@@ -190,7 +190,10 @@ class WidgetManager {
                 ? Boolean(override.visible)
                 : (widget.visible !== undefined ? widget.visible : (registered?.visible !== false));
 
-            return { ...widget, area, position, visible };
+            // Breite: null bleibt null — dann gilt die Vorgabe des Bereichs
+            const size = override?.size ?? widget.size ?? registered?.size ?? null;
+
+            return { ...widget, area, position, visible, size };
         });
     }
 
@@ -210,7 +213,7 @@ class WidgetManager {
             if (!dbService) return [];
 
             const rows = await dbService.query(
-                'SELECT widget_id, area, position, visible FROM guild_widget_config WHERE guild_id = ?',
+                'SELECT widget_id, area, position, size, visible FROM guild_widget_config WHERE guild_id = ?',
                 [guildId]
             );
             return rows || [];
@@ -233,15 +236,17 @@ class WidgetManager {
         const dbService = ServiceManager.get('dbService');
         if (!dbService) throw new Error('[WidgetManager] dbService nicht verfügbar');
 
-        const { area, position, visible } = config;
+        const { area, position, size, visible } = config;
         await dbService.query(
-            `INSERT INTO guild_widget_config (guild_id, widget_id, area, position, visible)
-             VALUES (?, ?, ?, ?, ?)
+            `INSERT INTO guild_widget_config (guild_id, widget_id, area, position, size, visible)
+             VALUES (?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                area = COALESCE(VALUES(area), area),
                position = COALESCE(VALUES(position), position),
+               size = COALESCE(VALUES(size), size),
                visible = COALESCE(VALUES(visible), visible)`,
-            [guildId, widgetId, area ?? null, position ?? null, visible !== undefined ? (visible ? 1 : 0) : null]
+            [guildId, widgetId, area ?? null, position ?? null, size ?? null,
+             visible !== undefined ? (visible ? 1 : 0) : null]
         );
     }
 

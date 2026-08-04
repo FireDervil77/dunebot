@@ -81,6 +81,8 @@ router.post('/widgets', requirePermission('CORE.THEMES.EDIT'), async (req, res) 
             await wm.setGuildWidgetConfig(guildId, cfg.widget_id, {
                 area: cfg.area || null,
                 position: cfg.position !== undefined ? Number(cfg.position) : null,
+                // Breite nur uebernehmen, wenn sie im Raster liegt
+                size: (cfg.size >= 1 && cfg.size <= 12) ? Number(cfg.size) : null,
                 visible: cfg.visible !== undefined ? (cfg.visible ? 1 : 0) : null,
             });
         }
