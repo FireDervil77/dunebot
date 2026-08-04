@@ -16,7 +16,7 @@
         <div class="d-flex align-items-center justify-content-between">
           <div>
             <h1 class="h3 mb-0"><i class="fa-solid fa-palette me-2 text-primary"></i>Widget-Bereiche</h1>
-            <p class="text-muted small mb-0">Verwalte welche Widgets in welchem Bereich des Dashboards angezeigt werden.</p>
+            <p class="text-secondary small mb-0">Verwalte welche Widgets in welchem Bereich des Dashboards angezeigt werden.</p>
           </div>
           <a href="/admin/themes" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left me-1"></i> Zurück zu Themes
@@ -32,18 +32,18 @@
         <div class="card-header d-flex align-items-center justify-content-between">
           <div>
             <h5 class="card-title mb-0">
-              <i class="fa-solid fa-layer-group me-2 text-muted"></i>
+              <i class="fa-solid fa-layer-group me-2 text-secondary"></i>
               <%= area.label %>
             </h5>
             <% if (area.description) { %>
-              <small class="text-muted"><%= area.description %></small>
+              <small class="text-secondary"><%= area.description %></small>
             <% } %>
           </div>
           <span class="badge bg-secondary"><%= areaWidgets.length %> Widgets</span>
         </div>
         <div class="card-body p-0">
           <% if (areaWidgets.length === 0) { %>
-            <div class="text-muted small p-3">
+            <div class="text-secondary small p-3">
               <i class="bi bi-info-circle me-1"></i>
               Keine Widgets in diesem Bereich registriert.
             </div>
@@ -95,7 +95,7 @@
           <h5 class="card-title mb-0 text-warning">
             <i class="bi bi-exclamation-triangle me-2"></i>Nicht zugewiesene Widgets
           </h5>
-          <small class="text-muted">Diese Widgets haben einen unbekannten Bereich und erscheinen im Dashboard-Fallback.</small>
+          <small class="text-secondary">Diese Widgets haben einen unbekannten Bereich und erscheinen im Dashboard-Fallback.</small>
         </div>
         <div class="card-body p-0">
           <div class="table-responsive">

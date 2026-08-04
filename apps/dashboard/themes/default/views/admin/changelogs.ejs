@@ -1,27 +1,9 @@
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-6">
-                <h1 class="m-0"><%= tr('CHANGELOGS.TITLE') %></h1>
-            </div>
-            <div class="col-sm-6">
-                <div class="float-sm-right">
-                    <a href="/admin/changelogs/new" class="btn btn-primary">
-                        <i class="fas fa-plus mr-2"></i><%= tr('CHANGELOGS.ADD_NEW') %>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <div class="content">
     <div class="container-fluid">
         <% if (locals.toast) { %>
             <div class="alert alert-<%= toast.type %> alert-dismissible fade show">
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" aria-label="Schließen"></button>
                 <%= toast.message %>
             </div>
         <% } %>
@@ -61,7 +43,7 @@
                                         const icon = typeIcons[changelog.type] || 'code-branch';
                                         %>
                                         <i class="fas fa-<%= icon %>"></i>
-                                        <span class="ml-1"><%= changelog.type %></span>
+                                        <span class="ms-1"><%= changelog.type %></span>
                                     </td>
                                     <td><%= new Date(changelog.release_date).toLocaleDateString(currentLocale) %></td>
                                     <td>
@@ -84,11 +66,11 @@
                         </tbody>
                     </table>
                 <% } else { %>
-                    <div class="p-4 text-center text-muted">
+                    <div class="p-4 text-center text-secondary">
                         <i class="fas fa-code-branch fa-3x mb-3"></i>
                         <p><%= tr('CHANGELOGS.NO_CHANGELOGS') %></p>
                         <a href="/admin/changelogs/new" class="btn btn-primary">
-                            <i class="fas fa-plus mr-2"></i><%= tr('CHANGELOGS.ADD_FIRST') %>
+                            <i class="fas fa-plus me-2"></i><%= tr('CHANGELOGS.ADD_FIRST') %>
                         </a>
                     </div>
                 <% } %>

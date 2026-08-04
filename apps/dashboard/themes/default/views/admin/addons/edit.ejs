@@ -1,30 +1,4 @@
 <%# Admin: Addon Edit/Review %>
-<div class="content-wrapper">
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">
-                        <i class="fa-solid fa-edit"></i>
-                        <%= addon.name %>
-                    </h1>
-                    <p class="text-muted">
-                        ID: <%= addon.id %> | Slug: <%= addon.slug %>
-                    </p>
-                </div>
-                <div class="col-sm-6">
-                    <div class="float-sm-right">
-                        <a href="/admin/addons" class="btn btn-secondary">
-                            <i class="fa-solid fa-arrow-left"></i> Zurück
-                        </a>
-                        <button class="btn btn-success" id="btnApprove">
-                            <i class="fa-solid fa-check"></i> Approve & Publish
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div class="content">
         <div class="container-fluid">
@@ -32,21 +6,21 @@
             <%# Status-Badges %>
             <div class="row mb-3">
                 <div class="col-md-12">
-                    <span class="badge badge-lg <%= addon.trust_level === 'official' ? 'badge-success' : addon.trust_level === 'verified' ? 'badge-info' : 'badge-secondary' %>">
+                    <span class="badge badge-lg <%= addon.trust_level === 'official' ? 'bg-success-lt' : addon.trust_level === 'verified' ? 'bg-info-lt' : 'bg-secondary-lt' %>">
                         Trust: <%= addon.trust_level %>
                     </span>
-                    <span class="badge badge-lg <%= addon.visibility === 'public' || addon.visibility === 'official' ? 'badge-success' : addon.visibility === 'unlisted' ? 'badge-warning' : 'badge-secondary' %>">
+                    <span class="badge badge-lg <%= addon.visibility === 'public' || addon.visibility === 'official' ? 'bg-success-lt' : addon.visibility === 'unlisted' ? 'bg-warning-lt' : 'bg-secondary-lt' %>">
                         Visibility: <%= addon.visibility %>
                     </span>
-                    <span class="badge badge-lg <%= addon.runtime_type === 'docker_steam' ? 'badge-primary' : addon.runtime_type === 'docker_standalone' ? 'badge-info' : 'badge-secondary' %>">
+                    <span class="badge badge-lg <%= addon.runtime_type === 'docker_steam' ? 'bg-primary-lt' : addon.runtime_type === 'docker_standalone' ? 'bg-info-lt' : 'bg-secondary-lt' %>">
                         <i class="fa-brands fa-docker"></i> <%= addon.runtime_type %>
                     </span>
                     <% if (addon.source_type === 'pelican') { %>
-                        <span class="badge badge-lg badge-warning">
+                        <span class="badge badge-lg bg-warning-lt">
                             <i class="fa-solid fa-egg"></i> Pelican Import
                         </span>
                     <% } else if (addon.source_type === 'native') { %>
-                        <span class="badge badge-lg badge-success">
+                        <span class="badge badge-lg bg-success-lt">
                             <i class="fa-solid fa-crown"></i> Native
                         </span>
                     <% } %>
@@ -68,31 +42,31 @@
                         </div>
                         <div class="card-body">
                             <form id="metadataForm">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label>Name</label>
                                     <input type="text" class="form-control" name="name" value="<%= addon.name %>" required>
                                 </div>
                                 
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label>Slug</label>
                                     <input type="text" class="form-control" name="slug" value="<%= addon.slug %>" required>
                                 </div>
                                 
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label>Beschreibung</label>
                                     <textarea class="form-control" name="description" rows="4"><%= addon.description || '' %></textarea>
                                 </div>
                                 
-                                <div class="form-group">
-                                    <label>Runtime Type <small class="text-muted">(wird automatisch aus game_data ermittelt)</small></label>
+                                <div class="mb-3">
+                                    <label>Runtime Type <small class="text-secondary">(wird automatisch aus game_data ermittelt)</small></label>
                                     <select class="form-control" name="runtime_type" disabled>
                                         <option value="docker_steam"      <%= addon.runtime_type === 'docker_steam'      ? 'selected' : '' %>>Docker + SteamCMD</option>
                                         <option value="docker_standalone" <%= addon.runtime_type === 'docker_standalone' ? 'selected' : '' %>>Docker Standalone</option>
                                     </select>
-                                    <small class="form-text text-muted">Wird beim Speichern von game_data neu berechnet.</small>
+                                    <small class="form-text text-secondary">Wird beim Speichern von game_data neu berechnet.</small>
                                 </div>
                                 
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label>Tags (comma-separated)</label>
                                     <input type="text" class="form-control" name="tags" 
                                            value="<%= addon.tags ? (() => { try { return JSON.parse(addon.tags).join(', '); } catch(e) { return addon.tags; } })() : '' %>">
@@ -115,7 +89,7 @@
                         </div>
                         <div class="card-body">
                             <form id="approvalForm">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label>Trust Level</label>
                                     <select class="form-control" name="trust_level">
                                         <option value="unverified" <%= addon.trust_level === 'unverified' ? 'selected' : '' %>>
@@ -133,7 +107,7 @@
                                     </select>
                                 </div>
                                 
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label>Visibility</label>
                                     <select class="form-control" name="visibility">
                                         <option value="unlisted" <%= addon.visibility === 'unlisted' ? 'selected' : '' %>>
@@ -157,7 +131,7 @@
                                     <strong>Last Tested:</strong> <%= addon.last_tested_at ? new Date(addon.last_tested_at).toLocaleString('de-DE') : 'Nie' %>
                                 </div>
                                 
-                                <button type="submit" class="btn btn-success btn-block">
+                                <button type="submit" class="btn btn-success w-100">
                                     <i class="fa-solid fa-check"></i> Approve & Update
                                 </button>
                             </form>
@@ -183,13 +157,13 @@
                                         <li class="list-group-item py-1 px-2 small">
                                             <code><%= img %></code>
                                             <% if (label && label !== img) { %>
-                                                <span class="text-muted ml-2">(<%= label %>)</span>
+                                                <span class="text-secondary ms-2">(<%= label %>)</span>
                                             <% } %>
                                         </li>
                                     <% }); %>
                                 </ul>
                             <% } else { %>
-                                <p class="text-muted">Keine Docker-Images definiert</p>
+                                <p class="text-secondary">Keine Docker-Images definiert</p>
                             <% } %>
                         </div>
                     </div>
@@ -200,9 +174,9 @@
                             <h3 class="card-title"><i class="fa-solid fa-play"></i> Startup</h3>
                         </div>
                         <div class="card-body">
-                            <label class="small font-weight-bold">Command:</label>
+                            <label class="small fw-bold">Command:</label>
                             <code class="d-block bg-dark text-white p-2 small rounded mb-2"><%= addon.game_data?.startup?.command || '–' %></code>
-                            <label class="small font-weight-bold">Done-String:</label>
+                            <label class="small fw-bold">Done-String:</label>
                             <code class="d-block bg-dark text-white p-2 small rounded"><%= addon.game_data?.startup?.done || '–' %></code>
                         </div>
                     </div>
@@ -214,9 +188,9 @@
                         </div>
                         <div class="card-body">
                             <% const vars = addon.game_data?.variables || []; %>
-                            <p class="text-muted">
+                            <p class="text-secondary">
                                 <strong><%= vars.length %></strong> Variable(n) definiert
-                                <small class="ml-2">(aus game_data — im Guild-Kontext bearbeitbar)</small>
+                                <small class="ms-2">(aus game_data — im Guild-Kontext bearbeitbar)</small>
                             </p>
                             <% if (vars.length > 0) { %>
                                 <div class="table-responsive">
@@ -226,8 +200,8 @@
                                             <% vars.forEach(v => { %>
                                                 <tr>
                                                     <td><code><%= v.env_variable %></code></td>
-                                                    <td class="text-muted small"><%= v.default_value || '–' %></td>
-                                                    <td><span class="badge badge-secondary"><%= v.field_type || 'text' %></span></td>
+                                                    <td class="text-secondary small"><%= v.default_value || '–' %></td>
+                                                    <td><span class="badge bg-secondary-lt"><%= v.field_type || 'text' %></span></td>
                                                 </tr>
                                             <% }); %>
                                         </tbody>
@@ -245,17 +219,17 @@
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <label class="small font-weight-bold">Container:</label>
+                                    <label class="small fw-bold">Container:</label>
                                     <code class="d-block bg-dark text-white p-2 small rounded mb-2"><%= addon.game_data?.scripts?.installation?.container || '–' %></code>
-                                    <label class="small font-weight-bold">Entrypoint:</label>
+                                    <label class="small fw-bold">Entrypoint:</label>
                                     <code class="d-block bg-dark text-white p-2 small rounded"><%= addon.game_data?.scripts?.installation?.entrypoint || 'bash' %></code>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="small font-weight-bold">Script (read-only Vorschau):</label>
+                                    <label class="small fw-bold">Script (read-only Vorschau):</label>
                                     <textarea class="form-control bg-dark text-light" rows="8"
                                               style="font-family:monospace;font-size:0.8rem;resize:vertical;" readonly
                                     ><%= addon.game_data?.scripts?.installation?.script || '' %></textarea>
-                                    <small class="text-muted">Skript über <em>game_data JSON-Editor</em> bearbeiten.</small>
+                                    <small class="text-secondary">Skript über <em>game_data JSON-Editor</em> bearbeiten.</small>
                                 </div>
                             </div>
                         </div>
@@ -274,7 +248,7 @@
                                 <button type="button" id="btnSaveGameData" class="btn btn-warning btn-sm">
                                     <i class="fa-solid fa-save"></i> game_data speichern
                                 </button>
-                                <small class="text-muted ml-2">runtime_type wird automatisch neu berechnet.</small>
+                                <small class="text-secondary ms-2">runtime_type wird automatisch neu berechnet.</small>
                             </div>
                         </div>
                     </div>
@@ -285,7 +259,6 @@
 
         </div>
     </div>
-</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {

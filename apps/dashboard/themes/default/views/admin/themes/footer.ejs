@@ -26,7 +26,7 @@
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
           <div>
             <h1 class="h3 mb-0"><i class="bi bi-layout-three-columns me-2 text-primary"></i>Footer</h1>
-            <p class="text-muted small mb-0">Verwalte die Spalten und Links im Website-Footer.</p>
+            <p class="text-secondary small mb-0">Verwalte die Spalten und Links im Website-Footer.</p>
           </div>
           <div class="d-flex gap-2">
             <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#columnModal" onclick="resetColumnModal()">
@@ -66,7 +66,7 @@
                 <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
                 <strong><%= col.title %></strong>
                 <span class="badge bg-secondary"><%= col.column_type %></span>
-                <small class="text-muted"><%= col.col_width %></small>
+                <small class="text-secondary"><%= col.col_width %></small>
               </div>
               <div class="d-flex gap-1">
                 <button class="btn btn-sm btn-outline-primary btn-edit-col"
@@ -82,7 +82,7 @@
 
               <% if (col.column_type === 'about' || col.column_type === 'custom') { %>
                 <!-- About / Custom: Freitext -->
-                <p class="small mb-0 text-muted"><%= (col.content || '').substring(0, 150) %><%= (col.content || '').length > 150 ? '...' : '' %></p>
+                <p class="small mb-0 text-secondary"><%= (col.content || '').substring(0, 150) %><%= (col.content || '').length > 150 ? '...' : '' %></p>
               <% } else { %>
                 <!-- Links / Social -->
                 <div class="link-list" data-column="<%= col.id %>">
@@ -93,7 +93,7 @@
                         <div class="flex-grow-1">
                           <% if (link.icon) { %><i class="<%= link.icon %> me-1"></i><% } %>
                           <span><%= link.label %></span>
-                          <small class="text-muted ms-1"><%= link.url %></small>
+                          <small class="text-secondary ms-1"><%= link.url %></small>
                         </div>
                         <button class="btn btn-sm btn-outline-primary btn-edit-link"
                           data-link='<%- JSON.stringify({id:link.id, column_id:link.column_id, label:link.label, url:link.url, icon:link.icon||"", target:link.target||"_self", visible:link.visible}) %>'>
@@ -105,7 +105,7 @@
                       </div>
                     <% }); %>
                   <% } else { %>
-                    <p class="text-muted small mb-0">Keine Links</p>
+                    <p class="text-secondary small mb-0">Keine Links</p>
                   <% } %>
                 </div>
                 <button class="btn btn-sm btn-outline-success mt-2 btn-add-link" data-column="<%= col.id %>">

@@ -8,7 +8,7 @@
         <div class="row mb-4">
             <div class="col-md-12">
                 <h2>System Statistiken</h2>
-                <p class="text-muted">Detaillierte Übersicht über den Bot-Status</p>
+                <p class="text-secondary">Detaillierte Übersicht über den Bot-Status</p>
             </div>
         </div>
 
@@ -20,10 +20,10 @@
                     <div class="card-body">
                         <div class="row align-items-center">
                             <div class="col">
-                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                <div class="text-xs fw-bold text-primary text-uppercase mb-1">
                                     Guilds
                                 </div>
-                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                <div class="h5 mb-0 fw-bold text-gray-800">
                                     <%= stats.guilds %>
                                 </div>
                             </div>
@@ -41,10 +41,10 @@
                     <div class="card-body">
                         <div class="row align-items-center">
                             <div class="col">
-                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                <div class="text-xs fw-bold text-success text-uppercase mb-1">
                                     Benutzer
                                 </div>
-                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                <div class="h5 mb-0 fw-bold text-gray-800">
                                     <%= stats.users %>
                                 </div>
                             </div>
@@ -62,10 +62,10 @@
                     <div class="card-body">
                         <div class="row align-items-center">
                             <div class="col">
-                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                <div class="text-xs fw-bold text-info text-uppercase mb-1">
                                     News
                                 </div>
-                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                <div class="h5 mb-0 fw-bold text-gray-800">
                                     <%= stats.news %>
                                 </div>
                             </div>
@@ -83,10 +83,10 @@
                     <div class="card-body">
                         <div class="row align-items-center">
                             <div class="col">
-                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                <div class="text-xs fw-bold text-warning text-uppercase mb-1">
                                     Notifications
                                 </div>
-                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                <div class="h5 mb-0 fw-bold text-gray-800">
                                     <%= stats.notifications %>
                                 </div>
                             </div>
@@ -105,7 +105,7 @@
             <div class="col-lg-6 mb-4">
                 <div class="card shadow">
                     <div class="card-header py-3">
-                        <h6 class="m-0 font-weight-bold text-primary">Neueste Guilds</h6>
+                        <h6 class="m-0 fw-bold text-primary">Neueste Guilds</h6>
                     </div>
                     <div class="card-body">
                         <% if (topGuilds && topGuilds.length > 0) { %>
@@ -128,7 +128,7 @@
                                 </table>
                             </div>
                         <% } else { %>
-                            <p class="text-muted text-center">Keine Guilds vorhanden</p>
+                            <p class="text-secondary text-center">Keine Guilds vorhanden</p>
                         <% } %>
                     </div>
                 </div>
@@ -138,7 +138,7 @@
             <div class="col-lg-6 mb-4">
                 <div class="card shadow">
                     <div class="card-header py-3">
-                        <h6 class="m-0 font-weight-bold text-success">Letzte News</h6>
+                        <h6 class="m-0 fw-bold text-success">Letzte News</h6>
                     </div>
                     <div class="card-body">
                         <% if (recentNews && recentNews.length > 0) { %>
@@ -167,7 +167,7 @@
                                 </table>
                             </div>
                         <% } else { %>
-                            <p class="text-muted text-center">Keine News vorhanden</p>
+                            <p class="text-secondary text-center">Keine News vorhanden</p>
                         <% } %>
                     </div>
                 </div>
@@ -179,7 +179,7 @@
             <div class="col-12 mb-4">
                 <div class="card shadow">
                     <div class="card-header py-3">
-                        <h6 class="m-0 font-weight-bold text-info">Plugin Aktivierungen</h6>
+                        <h6 class="m-0 fw-bold text-info">Plugin Aktivierungen</h6>
                     </div>
                     <div class="card-body">
                         <% if (pluginStats && pluginStats.length > 0) { %>
@@ -215,7 +215,7 @@
                                 </table>
                             </div>
                         <% } else { %>
-                            <p class="text-muted text-center">Keine Plugin-Statistiken vorhanden</p>
+                            <p class="text-secondary text-center">Keine Plugin-Statistiken vorhanden</p>
                         <% } %>
                     </div>
                 </div>

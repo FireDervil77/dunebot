@@ -1,27 +1,9 @@
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-6">
-                <h1 class="m-0"><%= tr('NOTIFICATIONS.TITLE') %></h1>
-            </div>
-            <div class="col-sm-6">
-                <div class="float-sm-right">
-                    <a href="/admin/notifications/new" class="btn btn-primary">
-                        <i class="fas fa-plus mr-2"></i><%= tr('NOTIFICATIONS.ADD_NEW') %>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <div class="content">
     <div class="container-fluid">
         <% if (locals.toast) { %>
             <div class="alert alert-<%= toast.type %> alert-dismissible fade show">
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" aria-label="Schließen"></button>
                 <%= toast.message %>
             </div>
         <% } %>
@@ -62,7 +44,7 @@
                                         const icon = typeIcons[notification.type] || 'bell';
                                         %>
                                         <i class="fas fa-<%= icon %>"></i>
-                                        <span class="ml-1"><%= notification.type %></span>
+                                        <span class="ms-1"><%= notification.type %></span>
                                     </td>
                                     <td>
                                         <%
@@ -81,7 +63,7 @@
                                         <% if (notification.expiry) { %>
                                             <%= new Date(notification.expiry).toLocaleDateString(currentLocale) %>
                                         <% } else { %>
-                                            <span class="text-muted">—</span>
+                                            <span class="text-secondary">—</span>
                                         <% } %>
                                     </td>
                                     <td><%= new Date(notification.created_at).toLocaleDateString(currentLocale) %></td>
@@ -105,11 +87,11 @@
                         </tbody>
                     </table>
                 <% } else { %>
-                    <div class="p-4 text-center text-muted">
+                    <div class="p-4 text-center text-secondary">
                         <i class="fas fa-bell fa-3x mb-3"></i>
                         <p><%= tr('NOTIFICATIONS.NO_NOTIFICATIONS') %></p>
                         <a href="/admin/notifications/new" class="btn btn-primary">
-                            <i class="fas fa-plus mr-2"></i><%= tr('NOTIFICATIONS.ADD_FIRST') %>
+                            <i class="fas fa-plus me-2"></i><%= tr('NOTIFICATIONS.ADD_FIRST') %>
                         </a>
                     </div>
                 <% } %>

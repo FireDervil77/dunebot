@@ -1,30 +1,4 @@
 <%# Admin: Addon Marketplace Management - Hauptseite %>
-<div class="content-wrapper">
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">
-                        <i class="fa-solid fa-puzzle-piece"></i>
-                        Addon Marketplace Management
-                    </h1>
-                </div>
-                <div class="col-sm-6">
-                    <div class="float-sm-right">
-                        <button type="button" class="btn btn-warning" data-toggle="modal" data-target="#modalJsonPaste">
-                            <i class="fa-solid fa-code"></i> Per JSON einfügen
-                        </button>
-                        <a href="/admin/addons/import" class="btn btn-primary">
-                            <i class="fa-solid fa-download"></i> Egg importieren
-                        </a>
-                        <a href="/admin/addons/create" class="btn btn-success">
-                            <i class="fa-solid fa-plus"></i> Manuell erstellen
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div class="content">
         <div class="container-fluid">
@@ -32,62 +6,82 @@
             <%# Stats-Cards %>
             <div class="row">
                 <div class="col-lg-3 col-6">
-                    <div class="small-box bg-info">
-                        <div class="inner">
-                            <h3><%= stats.total %></h3>
-                            <p>Total Addons</p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-info text-white avatar"><i class="fa-solid fa-puzzle-piece"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= stats.total %></div>
+                            <div class="text-secondary">Total Addons</div>
+                          </div>
                         </div>
-                        <div class="icon">
-                            <i class="fa-solid fa-puzzle-piece"></i>
-                        </div>
+                      </div>
                     </div>
                 </div>
                 
                 <div class="col-lg-3 col-6">
-                    <div class="small-box bg-success">
-                        <div class="inner">
-                            <h3><%= stats.official %></h3>
-                            <p>Official</p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-success text-white avatar"><i class="fa-solid fa-crown"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= stats.official %></div>
+                            <div class="text-secondary">Official</div>
+                          </div>
                         </div>
-                        <div class="icon">
-                            <i class="fa-solid fa-crown"></i>
-                        </div>
+                      </div>
                     </div>
                 </div>
                 
                 <div class="col-lg-3 col-6">
-                    <div class="small-box bg-warning">
-                        <div class="inner">
-                            <h3><%= stats.pending_review %></h3>
-                            <p>Pending Review</p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-warning text-white avatar"><i class="fa-solid fa-clock"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= stats.pending_review %></div>
+                            <div class="text-secondary">Pending Review</div>
+                          </div>
                         </div>
-                        <div class="icon">
-                            <i class="fa-solid fa-clock"></i>
-                        </div>
+                      </div>
                     </div>
                 </div>
                 
                 <div class="col-lg-3 col-6">
-                    <div class="small-box bg-primary">
-                        <div class="inner">
-                            <h3><%= stats.docker_steam %></h3>
-                            <p>Docker + SteamCMD</p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-primary text-white avatar"><i class="fa-brands fa-docker"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= stats.docker_steam %></div>
+                            <div class="text-secondary">Docker + SteamCMD</div>
+                          </div>
                         </div>
-                        <div class="icon">
-                            <i class="fa-brands fa-docker"></i>
-                        </div>
+                      </div>
                     </div>
                 </div>
                 
                 <div class="col-lg-3 col-6">
-                    <div class="small-box bg-secondary">
-                        <div class="inner">
-                            <h3><%= stats.docker_standalone %></h3>
-                            <p>Docker Standalone</p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-secondary text-white avatar"><i class="fa-solid fa-cube"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= stats.docker_standalone %></div>
+                            <div class="text-secondary">Docker Standalone</div>
+                          </div>
                         </div>
-                        <div class="icon">
-                            <i class="fa-solid fa-cube"></i>
-                        </div>
+                      </div>
                     </div>
                 </div>
             </div>
@@ -99,14 +93,12 @@
                         <i class="fa-solid fa-list"></i>
                         Alle Addons
                     </h3>
-                    <div class="card-tools">
+                    <div class="card-actions">
                         <div class="input-group input-group-sm" style="width: 300px;">
-                            <input type="text" id="addonSearch" class="form-control float-right" placeholder="Suchen...">
-                            <div class="input-group-append">
-                                <button type="button" class="btn btn-default">
-                                    <i class="fa-solid fa-search"></i>
-                                </button>
-                            </div>
+                            <input type="text" id="addonSearch" class="form-control float-end" placeholder="Suchen...">
+                            <button type="button" class="btn btn-default">
+                            <i class="fa-solid fa-search"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -132,19 +124,19 @@
                                         <td><%= addon.id %></td>
                                         <td>
                                             <strong><%= addon.name %></strong><br>
-                                            <small class="text-muted"><%= addon.slug %></small>
+                                            <small class="text-secondary"><%= addon.slug %></small>
                                         </td>
                                         <td>
                                             <% if (addon.runtime_type === 'docker_steam') { %>
-                                                <span class="badge badge-primary">
+                                                <span class="badge bg-primary-lt">
                                                     <i class="fa-brands fa-docker"></i> Docker + Steam
                                                 </span>
                                             <% } else if (addon.runtime_type === 'docker_standalone') { %>
-                                                <span class="badge badge-info">
+                                                <span class="badge bg-info-lt">
                                                     <i class="fa-solid fa-cube"></i> Docker Standalone
                                                 </span>
                                             <% } else { %>
-                                                <span class="badge badge-secondary">
+                                                <span class="badge bg-secondary-lt">
                                                     <i class="fa-solid fa-question"></i> <%= addon.runtime_type || 'Unbekannt' %>
                                                 </span>
                                             <% } %>
@@ -160,65 +152,65 @@
                                         </td>
                                         <td>
                                             <% if (addon.status === 'approved') { %>
-                                                <span class="badge badge-success">
+                                                <span class="badge bg-success-lt">
                                                     <i class="fa-solid fa-check"></i> Approved
                                                 </span>
                                             <% } else if (addon.status === 'pending_review') { %>
-                                                <span class="badge badge-warning">
+                                                <span class="badge bg-warning-lt">
                                                     <i class="fa-solid fa-clock"></i> Pending
                                                 </span>
                                             <% } else if (addon.status === 'rejected') { %>
-                                                <span class="badge badge-danger">
+                                                <span class="badge bg-danger-lt">
                                                     <i class="fa-solid fa-times"></i> Rejected
                                                 </span>
                                             <% } else if (addon.status === 'draft') { %>
-                                                <span class="badge badge-secondary">
+                                                <span class="badge bg-secondary-lt">
                                                     <i class="fa-solid fa-file"></i> Draft
                                                 </span>
                                             <% } else { %>
-                                                <span class="badge badge-secondary">
+                                                <span class="badge bg-secondary-lt">
                                                     <i class="fa-solid fa-question"></i> <%= addon.status || 'Unknown' %>
                                                 </span>
                                             <% } %>
                                         </td>
                                         <td>
                                             <% if (addon.trust_level === 'official') { %>
-                                                <span class="badge badge-success">
+                                                <span class="badge bg-success-lt">
                                                     <i class="fa-solid fa-crown"></i> Official
                                                 </span>
                                             <% } else if (addon.trust_level === 'trusted') { %>
-                                                <span class="badge badge-primary">
+                                                <span class="badge bg-primary-lt">
                                                     <i class="fa-solid fa-shield-check"></i> Trusted
                                                 </span>
                                             <% } else if (addon.trust_level === 'verified') { %>
-                                                <span class="badge badge-info">
+                                                <span class="badge bg-info-lt">
                                                     <i class="fa-solid fa-check-circle"></i> Verified
                                                 </span>
                                             <% } else { %>
-                                                <span class="badge badge-secondary">
+                                                <span class="badge bg-secondary-lt">
                                                     <i class="fa-solid fa-question-circle"></i> Unverified
                                                 </span>
                                             <% } %>
                                         </td>
                                         <td>
                                             <% if (addon.visibility === 'official') { %>
-                                                <span class="badge badge-danger">
+                                                <span class="badge bg-danger-lt">
                                                     <i class="fa-solid fa-crown"></i> Official
                                                 </span>
                                             <% } else if (addon.visibility === 'public') { %>
-                                                <span class="badge badge-success">
+                                                <span class="badge bg-success-lt">
                                                     <i class="fa-solid fa-eye"></i> Public
                                                 </span>
                                             <% } else if (addon.visibility === 'unlisted') { %>
-                                                <span class="badge badge-info">
+                                                <span class="badge bg-info-lt">
                                                     <i class="fa-solid fa-link"></i> Unlisted
                                                 </span>
                                             <% } else if (addon.visibility === 'private') { %>
-                                                <span class="badge badge-secondary">
+                                                <span class="badge bg-secondary-lt">
                                                     <i class="fa-solid fa-eye-slash"></i> Private
                                                 </span>
                                             <% } else { %>
-                                                <span class="badge badge-warning">
+                                                <span class="badge bg-warning-lt">
                                                     <i class="fa-solid fa-question"></i> <%= addon.visibility || 'Unknown' %>
                                                 </span>
                                             <% } %>
@@ -227,7 +219,7 @@
                                             <% if (addon.last_tested_at) { %>
                                                 <small><%= new Date(addon.last_tested_at).toLocaleDateString('de-DE') %></small>
                                             <% } else { %>
-                                                <small class="text-muted">Nie</small>
+                                                <small class="text-secondary">Nie</small>
                                             <% } %>
                                         </td>
                                         <td>
@@ -252,7 +244,7 @@
                                 <% }); %>
                             <% } else { %>
                                 <tr>
-                                    <td colspan="9" class="text-center text-muted">
+                                    <td colspan="9" class="text-center text-secondary">
                                         <i class="fa-solid fa-inbox"></i><br>
                                         Keine Addons vorhanden<br>
                                         <a href="/admin/addons/import" class="btn btn-primary btn-sm mt-2">
@@ -268,7 +260,6 @@
 
         </div>
     </div>
-</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -380,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const btn = this;
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Speichere…';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Speichere…';
 
         try {
             const response = await fetch('/admin/addons/', {
@@ -402,13 +393,13 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 toastr.error(result.message || 'Fehler beim Speichern');
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-save mr-1"></i> Speichern';
+                btn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Speichern';
             }
         } catch (error) {
             console.error('JSON-Paste Fehler:', error);
             toastr.error('Netzwerkfehler');
             btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-save mr-1"></i> Speichern';
+            btn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Speichern';
         }
     });
 
@@ -421,17 +412,15 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalJsonPasteLabel">
-                    <i class="fa-solid fa-code mr-2"></i>Addon per JSON einfügen
+                    <i class="fa-solid fa-code me-2"></i>Addon per JSON einfügen
                 </h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="jsonPasteContent">
                         <strong>FIREBOT_v2 JSON</strong>
-                        <span class="text-muted ml-2">— vollständige Addon-Definition einfügen</span>
+                        <span class="text-secondary ms-2">— vollständige Addon-Definition einfügen</span>
                     </label>
                     <textarea
                         id="jsonPasteContent"
@@ -442,19 +431,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="row">
                     <div class="col-md-5">
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label for="jsonPasteName">Name <span class="text-danger">*</span></label>
                             <input type="text" id="jsonPasteName" class="form-control" placeholder="wird aus JSON befüllt">
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label for="jsonPasteSlug">Slug <span class="text-danger">*</span></label>
                             <input type="text" id="jsonPasteSlug" class="form-control" placeholder="z.B. valheim">
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label for="jsonPasteCategory">Kategorie</label>
                             <select id="jsonPasteCategory" class="form-control">
                                 <option value="other">Sonstiges</option>
@@ -474,15 +463,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="alert alert-info mb-0">
-                    <i class="fa-solid fa-circle-info mr-1"></i>
+                    <i class="fa-solid fa-circle-info me-1"></i>
                     Das Addon wird mit Status <strong>Pending Review</strong> gespeichert.
                     Name und Slug werden automatisch aus dem <code>meta</code>-Block befüllt, können aber manuell überschrieben werden.
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
                 <button type="button" id="btnJsonPasteSubmit" class="btn btn-warning">
-                    <i class="fa-solid fa-save mr-1"></i> Speichern
+                    <i class="fa-solid fa-save me-1"></i> Speichern
                 </button>
             </div>
         </div>

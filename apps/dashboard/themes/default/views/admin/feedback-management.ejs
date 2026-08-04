@@ -3,76 +3,100 @@
         <div class="row mb-4">
             <div class="col-md-12">
                 <h2><i class="fa-solid fa-comments me-2"></i>User Feedback Verwaltung</h2>
-                <p class="text-muted">Verwalte Bug Reports und Feature Requests von allen Guilds</p>
+                <p class="text-secondary">Verwalte Bug Reports und Feature Requests von allen Guilds</p>
             </div>
         </div>
         
         <!-- Statistik-Karten -->
         <div class="row mb-3">
             <div class="col-md-2">
-                <div class="small-box bg-primary">
-                    <div class="inner">
-                        <h3><%= feedbackList.length %></h3>
-                        <p>Gesamt</p>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-primary text-white avatar"><i class="fa-solid fa-comments"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= feedbackList.length %></div>
+                        <div class="text-secondary">Gesamt</div>
+                      </div>
                     </div>
-                    <div class="icon">
-                        <i class="fa-solid fa-comments"></i>
-                    </div>
+                  </div>
                 </div>
             </div>
             <div class="col-md-2">
-                <div class="small-box bg-danger">
-                    <div class="inner">
-                        <h3><%= feedbackList.filter(f => f.type === 'bug').length %></h3>
-                        <p>Bugs</p>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-danger text-white avatar"><i class="fa-solid fa-bug"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= feedbackList.filter(f => f.type === 'bug').length %></div>
+                        <div class="text-secondary">Bugs</div>
+                      </div>
                     </div>
-                    <div class="icon">
-                        <i class="fa-solid fa-bug"></i>
-                    </div>
+                  </div>
                 </div>
             </div>
             <div class="col-md-2">
-                <div class="small-box bg-info">
-                    <div class="inner">
-                        <h3><%= feedbackList.filter(f => f.type === 'feature').length %></h3>
-                        <p>Features</p>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-info text-white avatar"><i class="fa-solid fa-lightbulb"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= feedbackList.filter(f => f.type === 'feature').length %></div>
+                        <div class="text-secondary">Features</div>
+                      </div>
                     </div>
-                    <div class="icon">
-                        <i class="fa-solid fa-lightbulb"></i>
-                    </div>
+                  </div>
                 </div>
             </div>
             <div class="col-md-2">
-                <div class="small-box bg-warning">
-                    <div class="inner">
-                        <h3><%= feedbackList.filter(f => f.status === 'open').length %></h3>
-                        <p>Offen</p>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-warning text-white avatar"><i class="fa-solid fa-folder-open"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= feedbackList.filter(f => f.status === 'open').length %></div>
+                        <div class="text-secondary">Offen</div>
+                      </div>
                     </div>
-                    <div class="icon">
-                        <i class="fa-solid fa-folder-open"></i>
-                    </div>
+                  </div>
                 </div>
             </div>
             <div class="col-md-2">
-                <div class="small-box bg-secondary">
-                    <div class="inner">
-                        <h3><%= feedbackList.filter(f => f.status === 'in_progress').length %></h3>
-                        <p>In Arbeit</p>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-secondary text-white avatar"><i class="fa-solid fa-spinner"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= feedbackList.filter(f => f.status === 'in_progress').length %></div>
+                        <div class="text-secondary">In Arbeit</div>
+                      </div>
                     </div>
-                    <div class="icon">
-                        <i class="fa-solid fa-spinner"></i>
-                    </div>
+                  </div>
                 </div>
             </div>
             <div class="col-md-2">
-                <div class="small-box bg-success">
-                    <div class="inner">
-                        <h3><%= feedbackList.filter(f => f.status === 'resolved' || f.status === 'implemented').length %></h3>
-                        <p>Erledigt</p>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-success text-white avatar"><i class="fa-solid fa-check"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= feedbackList.filter(f => f.status === 'resolved' || f.status === 'implemented').length %></div>
+                        <div class="text-secondary">Erledigt</div>
+                      </div>
                     </div>
-                    <div class="icon">
-                        <i class="fa-solid fa-check"></i>
-                    </div>
+                  </div>
                 </div>
             </div>
         </div>
@@ -80,22 +104,22 @@
         <!-- Filter Tabs -->
         <ul class="nav nav-tabs mb-3" id="feedbackTabs" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="all-tab" data-toggle="tab" href="#all">
+                <a class="nav-link active" id="all-tab" data-bs-toggle="tab" href="#all">
                     Alle (<%= feedbackList.length %>)
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="bugs-tab" data-toggle="tab" href="#bugs">
+                <a class="nav-link" id="bugs-tab" data-bs-toggle="tab" href="#bugs">
                     <i class="fa-solid fa-bug me-1"></i>Bugs (<%= feedbackList.filter(f => f.type === 'bug').length %>)
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="features-tab" data-toggle="tab" href="#features">
+                <a class="nav-link" id="features-tab" data-bs-toggle="tab" href="#features">
                     <i class="fa-solid fa-lightbulb me-1"></i>Features (<%= feedbackList.filter(f => f.type === 'feature').length %>)
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="open-tab" data-toggle="tab" href="#open">
+                <a class="nav-link" id="open-tab" data-bs-toggle="tab" href="#open">
                     Offen (<%= feedbackList.filter(f => f.status === 'open').length %>)
                 </a>
             </li>
@@ -133,9 +157,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Feedback bearbeiten</h5>
-                <button type="button" class="close" data-dismiss="modal">
-                    <span>&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <form id="editFeedbackForm">
                 <input type="hidden" name="feedbackId" id="edit-feedbackId">
@@ -144,11 +166,11 @@
                     <div class="card mb-3" style="background: #f8f9fa;">
                         <div class="card-body py-2 px-3">
                             <div class="d-flex align-items-center mb-1">
-                                <span id="edit-type-badge" class="badge mr-2"></span>
+                                <span id="edit-type-badge" class="badge me-2"></span>
                                 <strong id="edit-title-display"></strong>
-                                <span id="edit-category-badge" class="badge badge-secondary ml-2" style="display:none;"></span>
+                                <span id="edit-category-badge" class="badge bg-secondary-lt ms-2" style="display:none;"></span>
                             </div>
-                            <p id="edit-description-display" class="mb-0 mt-1 text-muted" style="white-space: pre-wrap; font-size: 0.9em;"></p>
+                            <p id="edit-description-display" class="mb-0 mt-1 text-secondary" style="white-space: pre-wrap; font-size: 0.9em;"></p>
                         </div>
                     </div>
                     <hr>
@@ -189,7 +211,7 @@
                     <button type="button" class="btn btn-danger" id="deleteFeedbackBtn">
                         <i class="fa-solid fa-trash me-1"></i>Löschen
                     </button>
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
                     <button type="submit" class="btn btn-primary">Speichern</button>
                 </div>
             </form>
@@ -198,6 +220,16 @@
 </div>
 
 <script>
+/**
+ * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
+ * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
+ * Aufruf warf, und alles danach im selben Block lief nicht mehr.
+ */
+function fenster(id) {
+    const el = document.getElementById(id);
+    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+}
+
 // Feedback bearbeiten
 function editFeedback(id, status, priority, adminNotes, adminResponse, title, description, type, category) {
     $('#edit-feedbackId').val(id);
@@ -213,9 +245,9 @@ function editFeedback(id, status, priority, adminNotes, adminResponse, title, de
     // Typ-Badge
     const $badge = $('#edit-type-badge');
     if (type === 'bug') {
-        $badge.attr('class', 'badge badge-danger mr-2').html('<i class="fa-solid fa-bug mr-1"></i>Bug');
+        $badge.attr('class', 'badge bg-danger-lt me-2').html('<i class="fa-solid fa-bug me-1"></i>Bug');
     } else {
-        $badge.attr('class', 'badge badge-info mr-2').html('<i class="fa-solid fa-lightbulb mr-1"></i>Feature');
+        $badge.attr('class', 'badge bg-info-lt me-2').html('<i class="fa-solid fa-lightbulb me-1"></i>Feature');
     }
 
     // Kategorie
@@ -225,7 +257,7 @@ function editFeedback(id, status, priority, adminNotes, adminResponse, title, de
         $('#edit-category-badge').hide();
     }
 
-    $('#editFeedbackModal').modal('show');
+    fenster('editFeedbackModal')?.show();
 }
 
 // Form Submit
@@ -249,7 +281,7 @@ $('#editFeedbackForm').on('submit', async function(e) {
         const result = await response.json();
         
         if (result.success) {
-            $('#editFeedbackModal').modal('hide');
+            fenster('editFeedbackModal')?.hide();
             window.location.reload();
         } else {
             alert(result.message);
@@ -274,7 +306,7 @@ $('#deleteFeedbackBtn').on('click', async function() {
         const result = await response.json();
         
         if (result.success) {
-            $('#editFeedbackModal').modal('hide');
+            fenster('editFeedbackModal')?.hide();
             window.location.reload();
         } else {
             alert(result.message);

@@ -1,30 +1,10 @@
 <%# Admin: Egg Import (Pelican / FIREBOT_v2) %>
-<div class="content-wrapper">
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">
-                        <i class="fa-solid fa-egg"></i>
-                        Egg importieren
-                    </h1>
-                </div>
-                <div class="col-sm-6">
-                    <div class="float-sm-right">
-                        <a href="/admin/addons" class="btn btn-secondary">
-                            <i class="fa-solid fa-arrow-left"></i> Zurück zur Übersicht
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div class="content">
         <div class="container-fluid">
 
             <div class="alert alert-info alert-dismissible">
-                <button type="button" class="close" data-dismiss="alert">&times;</button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schließen"></button>
                 <h5><i class="icon fa-solid fa-info-circle"></i> Pelican Egg Import</h5>
                 Importiert Eggs aus dem offiziellen <strong>Pelican</strong>-Repository
                 (<a href="https://github.com/pelican-eggs" target="_blank" rel="noreferrer">github.com/pelican-eggs</a>)
@@ -37,7 +17,7 @@
                 <div class="col-12">
                     <div class="bs-stepper-header d-flex align-items-center">
                         <div class="step" id="step1-indicator">
-                            <button class="step-trigger active-step font-weight-bold">
+                            <button class="step-trigger active-step fw-bold">
                                 <span class="bs-stepper-circle bg-primary text-white">1</span>
                                 <span class="bs-stepper-label">Repository</span>
                             </button>
@@ -83,7 +63,7 @@
                     </button>
                 </div>
                 <div class="card-body">
-                    <div class="form-group">
+                    <div class="mb-3">
                         <input type="text" id="eggSearch" class="form-control" placeholder="Egg suchen...">
                     </div>
                     <div id="eggLoading" class="text-center p-4">
@@ -121,22 +101,22 @@
                                 </table>
                             </div>
                             <div class="col-md-6">
-                                <label class="font-weight-bold">Startup-Kommando:</label>
+                                <label class="fw-bold">Startup-Kommando:</label>
                                 <code id="prev-startup" class="d-block bg-dark text-white p-2 small rounded mb-3"></code>
-                                <label class="font-weight-bold">Install-Container:</label>
+                                <label class="fw-bold">Install-Container:</label>
                                 <code id="prev-install-container" class="d-block bg-dark text-white p-2 small rounded"></code>
                             </div>
                         </div>
 
-                        <div class="form-group mt-3">
+                        <div class="mb-3 mt-3">
                             <label><i class="fa-solid fa-tag"></i> Name (editierbar)</label>
                             <input type="text" id="saveAddonName" class="form-control" placeholder="Addon-Name">
                         </div>
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label><i class="fa-solid fa-align-left"></i> Beschreibung (optional)</label>
                             <textarea id="saveAddonDesc" class="form-control" rows="2"></textarea>
                         </div>
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label><i class="fa-solid fa-folder"></i> Kategorie</label>
                             <select id="saveAddonCategory" class="form-control">
                                 <option value="other">Sonstiges</option>
@@ -161,8 +141,8 @@
                             <button id="btnSaveAddon" class="btn btn-success">
                                 <i class="fa-solid fa-save"></i> Als Addon speichern
                             </button>
-                            <details class="ml-3">
-                                <summary class="text-muted small" style="cursor:pointer;">game_data (raw JSON) anzeigen</summary>
+                            <details class="ms-3">
+                                <summary class="text-secondary small" style="cursor:pointer;">game_data (raw JSON) anzeigen</summary>
                                 <pre id="rawJson" class="bg-dark text-white p-2 rounded mt-2 small" style="max-height:300px;overflow:auto;"></pre>
                             </details>
                         </div>
@@ -172,7 +152,6 @@
 
         </div>
     </div>
-</div>
 
 <style>
 .bs-stepper-circle {
@@ -224,11 +203,11 @@ document.addEventListener('DOMContentLoaded', () => {
             ? eggs.map(e => `
                 <button type="button" class="list-group-item list-group-item-action egg-item"
                         data-url="${e.downloadUrl}" data-name="${e.displayName}">
-                    <i class="fa-solid fa-egg mr-2 text-warning"></i>
+                    <i class="fa-solid fa-egg me-2 text-warning"></i>
                     <strong>${e.displayName}</strong>
-                    <small class="text-muted ml-2">${e.name}</small>
+                    <small class="text-secondary ms-2">${e.name}</small>
                 </button>`).join('')
-            : '<p class="text-muted p-2">Keine Eggs gefunden.</p>';
+            : '<p class="text-secondary p-2">Keine Eggs gefunden.</p>';
 
         list.querySelectorAll('.egg-item').forEach(el => {
             el.addEventListener('click', function() {
@@ -267,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="card-body text-center">
                             <i class="${icons[r.id] || 'fa-solid fa-folder'} fa-3x text-${colors[r.id] || 'primary'} mb-2"></i>
                             <h5>${r.name}</h5>
-                            <small class="text-muted">${r.id}</small>
+                            <small class="text-secondary">${r.id}</small>
                         </div>
                     </div>
                 </div>
@@ -347,8 +326,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('prev-name').textContent    = gd.meta?.name        || displayName;
             document.getElementById('prev-desc').textContent    = gd.meta?.description || '–';
             document.getElementById('prev-runtime').innerHTML   = hasSteam
-                ? '<span class="badge badge-primary"><i class="fa-brands fa-docker"></i> docker_steam</span>'
-                : '<span class="badge badge-info"><i class="fa-solid fa-cube"></i> docker_standalone</span>';
+                ? '<span class="badge bg-primary-lt"><i class="fa-brands fa-docker"></i> docker_steam</span>'
+                : '<span class="badge bg-info-lt"><i class="fa-solid fa-cube"></i> docker_standalone</span>';
             document.getElementById('prev-image').textContent    = firstImage;
             document.getElementById('prev-vars').textContent     = (gd.variables || []).length;
             document.getElementById('prev-startup').textContent  = gd.startup?.command || '–';

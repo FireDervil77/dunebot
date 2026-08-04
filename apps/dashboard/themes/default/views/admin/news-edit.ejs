@@ -106,7 +106,7 @@
                                                   id="content_de" 
                                                   name="content_de" 
                                                   rows="15"><%= news && news.content_de ? news.content_de : '' %></textarea>
-                                        <small class="form-text text-muted">
+                                        <small class="form-text text-secondary">
                                             HTML-Tags werden unterstützt (z.B. &lt;p&gt;, &lt;h3&gt;, &lt;ul&gt;, &lt;strong&gt;)
                                         </small>
                                     </div>
@@ -143,7 +143,7 @@
                                                   id="content_en" 
                                                   name="content_en" 
                                                   rows="15"><%= news && news.content_en ? news.content_en : '' %></textarea>
-                                        <small class="form-text text-muted">
+                                        <small class="form-text text-secondary">
                                             HTML tags are supported (e.g. &lt;p&gt;, &lt;h3&gt;, &lt;ul&gt;, &lt;strong&gt;)
                                         </small>
                                     </div>
@@ -166,7 +166,7 @@
                                                name="slug" 
                                                value="<%= news && news.slug ? news.slug : '' %>" 
                                                required>
-                                        <small class="form-text text-muted">
+                                        <small class="form-text text-secondary">
                                             URL-freundlicher Name (z.B. "grosse-news-update")
                                         </small>
                                     </div>
@@ -191,7 +191,7 @@
                                                name="image_url" 
                                                value="<%= news && news.image_url ? news.image_url : '/images/dunebot-news.gif' %>"
                                                placeholder="/images/dunebot-news.gif oder https://example.com/image.jpg">
-                                        <small class="form-text text-muted">
+                                        <small class="form-text text-secondary">
                                             Optional: URL oder relativer Pfad zu einem Bild
                                         </small>
                                     </div>
@@ -224,32 +224,32 @@
 
                             <!-- Submit Buttons -->
                             <hr class="mt-4">
-                            <h5 class="mb-3"><i class="fas fa-rocket mr-2"></i> Veröffentlichungs-Aktionen <small class="text-muted">(optional)</small></h5>
-                            <p class="text-muted small mb-3">
+                            <h5 class="mb-3"><i class="fas fa-rocket me-2"></i> Veröffentlichungs-Aktionen <small class="text-secondary">(optional)</small></h5>
+                            <p class="text-secondary small mb-3">
                                 Wähle aus, wie diese News verteilt werden soll.
                                 <% if (news && news._id) { %>
                                 <br><i class="fas fa-info-circle text-info"></i> Aktionen können auch nachträglich ausgelöst werden.
                                 <% } %>
                             </p>
 
-                            <div class="custom-control custom-checkbox mb-3">
-                                <input type="checkbox" class="custom-control-input" id="sendDiscordPost" name="send_discord_post" value="1">
-                                <label class="custom-control-label" for="sendDiscordPost">
-                                    <i class="fab fa-discord text-primary mr-1"></i>
+                            <div class="form-check mb-3">
+                                <input type="checkbox" class="form-check-input" id="sendDiscordPost" name="send_discord_post" value="1">
+                                <label class="form-check-label" for="sendDiscordPost">
+                                    <i class="fab fa-discord text-primary me-1"></i>
                                     <strong>In Discord posten</strong>
                                 </label>
-                                <small class="form-text text-muted ml-4">
+                                <small class="form-text text-secondary ms-4">
                                     Postet die News als Embed in den konfigurierten Announcement-Channel auf Discord.
                                 </small>
                             </div>
 
-                            <div class="custom-control custom-checkbox mb-3">
-                                <input type="checkbox" class="custom-control-input" id="sendDashboardBadge" name="send_dashboard_badge" value="1">
-                                <label class="custom-control-label" for="sendDashboardBadge">
-                                    <i class="fas fa-bell text-success mr-1"></i>
+                            <div class="form-check mb-3">
+                                <input type="checkbox" class="form-check-input" id="sendDashboardBadge" name="send_dashboard_badge" value="1">
+                                <label class="form-check-label" for="sendDashboardBadge">
+                                    <i class="fas fa-bell text-success me-1"></i>
                                     <strong>Dashboard-Benachrichtigung senden</strong>
                                 </label>
-                                <small class="form-text text-muted ml-4">
+                                <small class="form-text text-secondary ms-4">
                                     Erstellt eine Benachrichtigung (Badge) die allen Nutzern im Dashboard angezeigt wird.
                                 </small>
                             </div>

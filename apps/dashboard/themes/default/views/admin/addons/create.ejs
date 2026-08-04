@@ -1,57 +1,33 @@
 <%# Admin: Addon manuell erstellen / aus externer URL importieren %>
-<div class="content-wrapper">
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">
-                        <i class="fa-solid fa-plus-circle"></i>
-                        Addon erstellen
-                    </h1>
-                </div>
-                <div class="col-sm-6">
-                    <div class="float-sm-right">
-                        <a href="/admin/addons/import" class="btn btn-secondary mr-2">
-                            <i class="fa-solid fa-egg"></i> Aus Pelican-Repo importieren
-                        </a>
-                        <a href="/admin/addons" class="btn btn-default">
-                            <i class="fa-solid fa-arrow-left"></i> Zurück
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div class="content">
         <div class="container-fluid">
 
             <%# ── URL Import Panel ─────────────────────────────────────────── %>
-            <div class="card card-outline card-info collapsed-card mb-3">
+            <div class="card collapsed-card mb-3">
+                <div class="card-status-top bg-info"></div>
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fa-solid fa-link"></i>
-                        Aus externer URL automatisch befüllen <span class="badge badge-info ml-2">optional</span>
+                        Aus externer URL automatisch befüllen <span class="badge bg-info-lt ms-2">optional</span>
                     </h3>
-                    <div class="card-tools">
-                        <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                    <div class="card-actions">
+                        <button type="button" class="btn btn-action" data-card-widget="collapse">
                             <i class="fa-solid fa-plus"></i>
                         </button>
                     </div>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted mb-2">
+                    <p class="text-secondary mb-2">
                         Paste die Raw-URL zu einer Pelican-Egg JSON-Datei. Das Formular wird damit vorausgefüllt und kann danach beliebig angepasst werden.<br>
                         <small>Erlaubte Hosts: <code>raw.githubusercontent.com</code>, <code>gist.githubusercontent.com</code></small>
                     </p>
                     <div class="input-group">
                         <input type="url" id="externalUrl" class="form-control"
                                placeholder="https://raw.githubusercontent.com/pelican-eggs/games-steamcmd/main/valheim/egg-valheim.json">
-                        <div class="input-group-append">
-                            <button class="btn btn-info" type="button" id="btnLoadUrl">
-                                <i class="fa-solid fa-download"></i> Laden & befüllen
-                            </button>
-                        </div>
+                        <button class="btn btn-info" type="button" id="btnLoadUrl">
+                        <i class="fa-solid fa-download"></i> Laden & befüllen
+                        </button>
                     </div>
                     <div id="urlLoadStatus" class="mt-2" style="display:none;"></div>
                 </div>
@@ -68,26 +44,26 @@
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><i class="fa-solid fa-tag"></i> Name <span class="text-danger">*</span></label>
                                     <input type="text" id="addonName" class="form-control" placeholder="z.B. Valheim" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><i class="fa-solid fa-fingerprint"></i> Slug</label>
                                     <input type="text" id="addonSlug" class="form-control" placeholder="z.B. valheim">
-                                    <small class="form-text text-muted">Wird automatisch aus dem Namen generiert. Muss eindeutig sein.</small>
+                                    <small class="form-text text-secondary">Wird automatisch aus dem Namen generiert. Muss eindeutig sein.</small>
                                 </div>
                             </div>
                         </div>
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label><i class="fa-solid fa-align-left"></i> Beschreibung</label>
                             <textarea id="addonDescription" class="form-control" rows="2" placeholder="Kurze Beschreibung des Spiels / der Anwendung"></textarea>
                         </div>
                         <div class="row">
                             <div class="col-md-4">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><i class="fa-solid fa-folder"></i> Kategorie</label>
                                     <select id="addonCategory" class="form-control">
                                         <option value="other">Sonstiges</option>
@@ -103,7 +79,7 @@
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><i class="fa-solid fa-database"></i> Source-Typ</label>
                                     <select id="addonSourceType" class="form-control">
                                         <option value="community">Community</option>
@@ -113,7 +89,7 @@
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><i class="fa-solid fa-user-pen"></i> Autor</label>
                                     <input type="text" id="addonAuthor" class="form-control" placeholder="Pelican Community" value="Community">
                                 </div>
@@ -130,15 +106,15 @@
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-8">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><i class="fa-solid fa-box"></i> Primäres Docker-Image <span class="text-danger">*</span></label>
                                     <input type="text" id="dockerImage" class="form-control font-mono"
                                            placeholder="ghcr.io/parkervcp/games:valheim">
-                                    <small class="form-text text-muted">Das Standard-Runtime-Image</small>
+                                    <small class="form-text text-secondary">Das Standard-Runtime-Image</small>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><i class="fa-solid fa-tag"></i> Image-Label</label>
                                     <input type="text" id="dockerImageLabel" class="form-control" placeholder="Valheim Latest">
                                 </div>
@@ -148,23 +124,23 @@
                         <button type="button" class="btn btn-sm btn-outline-secondary mb-3" id="btnAddImage">
                             <i class="fa-solid fa-plus"></i> Weiteres Docker-Image
                         </button>
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label><i class="fa-solid fa-terminal"></i> Startup-Befehl <span class="text-danger">*</span></label>
                             <input type="text" id="startupCommand" class="form-control font-mono"
                                    placeholder="./${EXECUTABLE} -port {{SERVER_PORT}} -name {{SERVER_NAME}}">
-                            <small class="form-text text-muted">Platzhalter im Format <code>{{ENV_VARIABLE}}</code></small>
+                            <small class="form-text text-secondary">Platzhalter im Format <code>{{ENV_VARIABLE}}</code></small>
                         </div>
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><i class="fa-solid fa-circle-check"></i> Startup-Done Pattern</label>
                                     <input type="text" id="startupDone" class="form-control font-mono"
                                            placeholder='z.B. "Game server connected"'>
-                                    <small class="form-text text-muted">Regex/String im Log wenn Server bereit ist</small>
+                                    <small class="form-text text-secondary">Regex/String im Log wenn Server bereit ist</small>
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><i class="fa-solid fa-stop-circle"></i> Stop-Befehl</label>
                                     <input type="text" id="stopCommand" class="form-control font-mono"
                                            placeholder="stop" value="stop">
@@ -182,27 +158,27 @@
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-8">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><i class="fa-solid fa-cube"></i> Install-Container</label>
                                     <input type="text" id="installContainer" class="form-control font-mono"
                                            value="ghcr.io/parkervcp/yolks:debian"
                                            placeholder="ghcr.io/parkervcp/yolks:debian">
-                                    <small class="form-text text-muted">Docker-Image das zum Installieren verwendet wird</small>
+                                    <small class="form-text text-secondary">Docker-Image das zum Installieren verwendet wird</small>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><i class="fa-solid fa-play"></i> Entrypoint</label>
                                     <input type="text" id="installEntrypoint" class="form-control font-mono"
                                            value="bash" placeholder="bash">
                                 </div>
                             </div>
                         </div>
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label><i class="fa-solid fa-code"></i> Install-Script</label>
                             <textarea id="installScript" class="form-control font-mono" rows="12"
                                       placeholder="#!/bin/bash&#10;# Installations-Script&#10;# Wird in /mnt/server ausgeführt"></textarea>
-                            <small class="form-text text-muted">
+                            <small class="form-text text-secondary">
                                 Bash-Script das im Install-Container ausgeführt wird. Arbeitsverzeichnis: <code>/mnt/server</code>
                             </small>
                         </div>
@@ -214,7 +190,7 @@
                     <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                         <h3 class="card-title mb-0">
                             <i class="fa-solid fa-sliders-h"></i>
-                            Variablen <span id="varCount" class="badge badge-light ml-2">0</span>
+                            Variablen <span id="varCount" class="badge bg-light-lt ms-2">0</span>
                         </h3>
                         <button type="button" class="btn btn-sm btn-light" id="btnAddVariable">
                             <i class="fa-solid fa-plus"></i> Variable hinzufügen
@@ -236,7 +212,7 @@
                                 </thead>
                                 <tbody id="variablesList">
                                     <tr id="noVarsRow">
-                                        <td colspan="7" class="text-center text-muted p-3">
+                                        <td colspan="7" class="text-center text-secondary p-3">
                                             <i class="fa-solid fa-info-circle"></i>
                                             Noch keine Variablen — URL laden oder manuell hinzufügen
                                         </td>
@@ -244,7 +220,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="card-footer text-muted small">
+                        <div class="card-footer text-secondary small">
                             Wichtige Felder: <code>SERVER_PORT</code>, <code>SERVER_IP</code> werden vom Daemon automatisch befüllt (<code>daemon_auto_assign: true</code>).
                         </div>
                     </div>
@@ -255,19 +231,19 @@
                     <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
                         <h3 class="card-title mb-0">
                             <i class="fa-solid fa-file-code"></i>
-                            Config-Dateien <span id="cfgCount" class="badge badge-dark ml-2">0</span>
+                            Config-Dateien <span id="cfgCount" class="badge bg-dark-lt ms-2">0</span>
                         </h3>
                         <button type="button" class="btn btn-sm btn-dark" id="btnAddConfigFile">
                             <i class="fa-solid fa-plus"></i> Datei hinzufügen
                         </button>
                     </div>
                     <div class="card-body" id="configFilesContainer">
-                        <p class="text-muted small mb-2" id="cfgEmptyHint">
+                        <p class="text-secondary small mb-2" id="cfgEmptyHint">
                             <i class="fa-solid fa-info-circle"></i>
                             Keine Config-Dateien definiert. Bei Egg-Import werden diese automatisch befüllt.
                         </p>
                     </div>
-                    <div class="card-footer text-muted small">
+                    <div class="card-footer text-secondary small">
                         Config-Dateien werden <strong>vor jedem Server-Start</strong> automatisch gepatcht.
                         Werte können Variablen enthalten: <code>{{SERVER_PORT}}</code>, <code>{{SERVER_NAME}}</code> etc.
                     </div>
@@ -278,20 +254,20 @@
                     <div class="card-header bg-info">
                         <h3 class="card-title">
                             <i class="fa-solid fa-layer-group"></i> Templates
-                            <span class="badge badge-light ml-2" id="templates-count">0</span>
+                            <span class="badge bg-light-lt ms-2" id="templates-count">0</span>
                         </h3>
-                        <div class="card-tools">
+                        <div class="card-actions">
                             <button type="button" class="btn btn-sm btn-light" id="btnAddTemplate">
                                 <i class="fa-solid fa-plus"></i> Template hinzufügen
                             </button>
                         </div>
                     </div>
                     <div class="card-body">
-                        <p class="text-muted small mb-2">
+                        <p class="text-secondary small mb-2">
                             Templates definieren Server-Vorlagen (z.B. "Competitive 5v5") mit vordefinierten Variablen und Config-Overrides.
                         </p>
                         <div id="templates-container"></div>
-                        <div id="no-templates-msg" class="text-muted small" style="display: none;">
+                        <div id="no-templates-msg" class="text-secondary small" style="display: none;">
                             <i class="fa-solid fa-info-circle"></i> Keine Templates definiert.
                         </div>
                     </div>
@@ -303,11 +279,11 @@
                         <h3 class="card-title">
                             <i class="fa-solid fa-code"></i> game_data JSON Vorschau
                         </h3>
-                        <div class="card-tools">
-                            <button type="button" class="btn btn-tool" id="btnRefreshPreview" title="Aktualisieren">
+                        <div class="card-actions">
+                            <button type="button" class="btn btn-action" id="btnRefreshPreview" title="Aktualisieren">
                                 <i class="fa-solid fa-sync"></i>
                             </button>
-                            <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                            <button type="button" class="btn btn-action" data-card-widget="collapse">
                                 <i class="fa-solid fa-plus"></i>
                             </button>
                         </div>
@@ -327,14 +303,13 @@
                         <button type="submit" class="btn btn-success btn-lg" id="btnSave">
                             <i class="fa-solid fa-save"></i> Addon speichern
                         </button>
-                        <a href="/admin/addons" class="btn btn-secondary btn-lg ml-2">Abbrechen</a>
+                        <a href="/admin/addons" class="btn btn-secondary btn-lg ms-2">Abbrechen</a>
                     </div>
                 </div>
 
             </form>
         </div>
     </div>
-</div>
 
 <style>
 .font-mono { font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important; }
@@ -377,8 +352,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="col-md-4">
                 <input type="text" class="form-control form-control-sm extra-image-label" placeholder="Label">
             </div>
-            <div class="col-md-1 pl-0">
-                <button type="button" class="btn btn-sm btn-danger btn-block" onclick="this.closest('.extra-image-row').remove()">
+            <div class="col-md-1 ps-0">
+                <button type="button" class="btn btn-sm btn-danger w-100" onclick="this.closest('.extra-image-row').remove()">
                     <i class="fa-solid fa-times"></i>
                 </button>
             </div>
@@ -420,9 +395,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     </select>
                 </td>
                 <td class="text-center">
-                    <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input var-viewable" id="varView_${idx}"${v.user_viewable !== false ? ' checked' : ''}>
-                        <label class="custom-control-label" for="varView_${idx}"></label>
+                    <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input var-viewable" id="varView_${idx}"${v.user_viewable !== false ? ' checked' : ''}>
+                        <label class="form-check-label" for="varView_${idx}"></label>
                     </div>
                 </td>
                 <td>
@@ -506,14 +481,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const find = entry.find || {};
 
             const block = document.createElement('div');
-            block.className = 'cfg-file-block card card-outline card-secondary mb-2';
+            block.className = 'cfg-file-block card card-secondary mb-2';
             block.innerHTML = `
                 <div class="card-header py-2 d-flex justify-content-between align-items-center">
                     <span>
                         <i class="fa-solid fa-file-alt"></i>
                         <input type="text" class="form-control form-control-sm d-inline-block font-mono cfg-filename" 
                                value="${escHtml(fileName)}" style="width:320px" data-original="${escHtml(fileName)}">
-                        <select class="form-control form-control-sm d-inline-block cfg-parser ml-2" style="width:130px">
+                        <select class="form-control form-control-sm d-inline-block cfg-parser ms-2" style="width:130px">
                             <option value="file"${parser==='file'?' selected':''}>file (text)</option>
                             <option value="properties"${parser==='properties'?' selected':''}>properties</option>
                             <option value="yaml"${parser==='yaml'?' selected':''}>yaml</option>
@@ -532,7 +507,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="card-body py-2 px-3 cfg-keys-body">
-                    ${Object.keys(find).length === 0 ? '<span class="text-muted small">Keine Keys</span>' : ''}
+                    ${Object.keys(find).length === 0 ? '<span class="text-secondary small">Keine Keys</span>' : ''}
                 </div>
             `;
 
@@ -550,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             block.querySelector('.cfg-add-key').addEventListener('click', () => {
-                keysBody.querySelector('.text-muted')?.remove();
+                keysBody.querySelector('.text-secondary')?.remove();
                 keysBody.appendChild(createKeyRow('', ''));
                 keysBody.lastElementChild.querySelector('.cfg-key').focus();
             });
@@ -573,8 +548,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="col-md-7">
                 <input type="text" class="form-control form-control-sm font-mono cfg-val" value="${escHtml(val)}" placeholder="Value (z.B. {{SERVER_PORT}})">
             </div>
-            <div class="col-md-1 pl-0">
-                <button type="button" class="btn btn-sm btn-danger btn-block cfg-remove-key">
+            <div class="col-md-1 ps-0">
+                <button type="button" class="btn btn-sm btn-danger w-100 cfg-remove-key">
                     <i class="fa-solid fa-times"></i>
                 </button>
             </div>
@@ -624,31 +599,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const templates = _preservedGameData.templates || [];
         templates.forEach((tpl, idx) => {
             const card = document.createElement('div');
-            card.className = 'tpl-card card card-outline card-info mb-3';
+            card.className = 'tpl-card card border-info mb-3';
             card.dataset.idx = idx;
 
             const varsHtml = Object.entries(tpl.variables || {}).map(([k, v]) =>
                 `<div class="input-group input-group-sm mb-1 tpl-var-row">
                     <input type="text" class="form-control font-monospace tpl-var-key" value="${escHtml(k)}" placeholder="ENV_KEY">
                     <input type="text" class="form-control font-monospace tpl-var-val" value="${escHtml(v)}" placeholder="Wert">
-                    <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-var"><i class="fa-solid fa-times"></i></button></div>
+                    <button type="button" class="btn btn-outline-danger tpl-remove-var"><i class="fa-solid fa-times"></i></button>
                 </div>`
             ).join('');
 
             const ovHtml = Object.entries(tpl.config_overrides || {}).map(([fname, keys]) =>
-                `<div class="tpl-ov-file card card-outline card-secondary mb-2">
+                `<div class="tpl-ov-file card card-secondary mb-2">
                     <div class="card-header py-1">
                         <input type="text" class="form-control form-control-sm font-monospace tpl-ov-filename" value="${escHtml(fname)}" placeholder="config/server.cfg">
-                        <div class="card-tools"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
+                        <div class="card-actions"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
                     </div>
                     <div class="card-body py-1 tpl-ov-keys">${Object.entries(keys).map(([k, v]) =>
                         `<div class="input-group input-group-sm mb-1 tpl-ov-row">
                             <input type="text" class="form-control font-monospace tpl-ov-key" value="${escHtml(k)}" placeholder="key">
                             <input type="text" class="form-control font-monospace tpl-ov-val" value="${escHtml(v)}" placeholder="value">
-                            <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-ov"><i class="fa-solid fa-times"></i></button></div>
+                            <button type="button" class="btn btn-outline-danger tpl-remove-ov"><i class="fa-solid fa-times"></i></button>
                         </div>`
                     ).join('')}</div>
-                    <div class="card-footer py-1"><button type="button" class="btn btn-xs btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
+                    <div class="card-footer py-1"><button type="button" class="btn btn-sm btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
                 </div>`
             ).join('');
 
@@ -658,17 +633,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="col-md-3"><input type="text" class="form-control form-control-sm tpl-name" value="${escHtml(tpl.name || '')}" placeholder="template-name"></div>
                         <div class="col-md-3"><input type="text" class="form-control form-control-sm tpl-label" value="${escHtml(tpl.label || '')}" placeholder="Anzeigename"></div>
                         <div class="col-md-3"><input type="text" class="form-control form-control-sm tpl-icon" value="${escHtml(tpl.icon || '')}" placeholder="fa-trophy"></div>
-                        <div class="col-md-3 text-right"><button type="button" class="btn btn-sm btn-danger tpl-remove"><i class="fa-solid fa-trash"></i></button></div>
+                        <div class="col-md-3 text-end"><button type="button" class="btn btn-sm btn-danger tpl-remove"><i class="fa-solid fa-trash"></i></button></div>
                     </div>
                 </div>
                 <div class="card-body py-2">
                     <input type="text" class="form-control form-control-sm mb-2 tpl-desc" value="${escHtml(tpl.description || '')}" placeholder="Beschreibung">
-                    <p class="mb-1 text-muted small"><strong>Variable-Overrides:</strong></p>
+                    <p class="mb-1 text-secondary small"><strong>Variable-Overrides:</strong></p>
                     <div class="tpl-vars-container">${varsHtml}</div>
-                    <button type="button" class="btn btn-xs btn-outline-success mb-2 tpl-add-var"><i class="fa-solid fa-plus"></i> Variable</button>
-                    <p class="mb-1 text-muted small"><strong>Config-Overrides:</strong></p>
+                    <button type="button" class="btn btn-sm btn-outline-success mb-2 tpl-add-var"><i class="fa-solid fa-plus"></i> Variable</button>
+                    <p class="mb-1 text-secondary small"><strong>Config-Overrides:</strong></p>
                     <div class="tpl-overrides-container">${ovHtml}</div>
-                    <button type="button" class="btn btn-xs btn-outline-info tpl-add-ov-file"><i class="fa-solid fa-plus"></i> Config-Datei</button>
+                    <button type="button" class="btn btn-sm btn-outline-info tpl-add-ov-file"><i class="fa-solid fa-plus"></i> Config-Datei</button>
                 </div>
             `;
             container.appendChild(card);
@@ -688,7 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
             vc.insertAdjacentHTML('beforeend', `<div class="input-group input-group-sm mb-1 tpl-var-row">
                 <input type="text" class="form-control font-monospace tpl-var-key" value="" placeholder="ENV_KEY">
                 <input type="text" class="form-control font-monospace tpl-var-val" value="" placeholder="Wert">
-                <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-var"><i class="fa-solid fa-times"></i></button></div>
+                <button type="button" class="btn btn-outline-danger tpl-remove-var"><i class="fa-solid fa-times"></i></button>
             </div>`);
             bindTemplateEvents();
         }));
@@ -702,13 +677,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? this.closest('.card-body').querySelector('.tpl-overrides-container')
                 : this.previousElementSibling;
             if (!oc) return;
-            oc.insertAdjacentHTML('beforeend', `<div class="tpl-ov-file card card-outline card-secondary mb-2">
+            oc.insertAdjacentHTML('beforeend', `<div class="tpl-ov-file card card-secondary mb-2">
                 <div class="card-header py-1">
                     <input type="text" class="form-control form-control-sm font-monospace tpl-ov-filename" value="" placeholder="config/server.cfg">
-                    <div class="card-tools"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
+                    <div class="card-actions"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
                 </div>
                 <div class="card-body py-1 tpl-ov-keys"></div>
-                <div class="card-footer py-1"><button type="button" class="btn btn-xs btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
+                <div class="card-footer py-1"><button type="button" class="btn btn-sm btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
             </div>`);
             bindTemplateEvents();
         }));
@@ -722,7 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
             kc.insertAdjacentHTML('beforeend', `<div class="input-group input-group-sm mb-1 tpl-ov-row">
                 <input type="text" class="form-control font-monospace tpl-ov-key" value="" placeholder="key">
                 <input type="text" class="form-control font-monospace tpl-ov-val" value="" placeholder="value">
-                <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-ov"><i class="fa-solid fa-times"></i></button></div>
+                <button type="button" class="btn btn-outline-danger tpl-remove-ov"><i class="fa-solid fa-times"></i></button>
             </div>`);
             bindTemplateEvents();
         }));
@@ -852,8 +827,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="col-md-4">
                     <input type="text" class="form-control form-control-sm extra-image-label" value="${escHtml(images[key] || '')}">
                 </div>
-                <div class="col-md-1 pl-0">
-                    <button type="button" class="btn btn-sm btn-danger btn-block" onclick="this.closest('.extra-image-row').remove()">
+                <div class="col-md-1 ps-0">
+                    <button type="button" class="btn btn-sm btn-danger w-100" onclick="this.closest('.extra-image-row').remove()">
                         <i class="fa-solid fa-times"></i>
                     </button>
                 </div>

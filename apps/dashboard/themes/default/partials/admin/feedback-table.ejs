@@ -16,35 +16,35 @@
         </thead>
         <tbody>
             <% feedback.forEach(f => { %>
-            <tr class="feedback-row" data-toggle="collapse" data-target="#desc-<%= f.id %>" style="cursor: pointer;">
+            <tr class="feedback-row" data-bs-toggle="collapse" data-bs-target="#desc-<%= f.id %>" style="cursor: pointer;">
                 <td><%= f.id %></td>
                 <td>
                     <% if (f.type === 'bug') { %>
-                        <span class="badge badge-danger"><i class="fa-solid fa-bug me-1"></i>Bug</span>
+                        <span class="badge bg-danger-lt"><i class="fa-solid fa-bug me-1"></i>Bug</span>
                     <% } else { %>
-                        <span class="badge badge-info"><i class="fa-solid fa-lightbulb me-1"></i>Feature</span>
+                        <span class="badge bg-info-lt"><i class="fa-solid fa-lightbulb me-1"></i>Feature</span>
                     <% } %>
                 </td>
                 <td>
                     <%= f.title %>
-                    <i class="fa-solid fa-chevron-down ml-1 text-muted" style="font-size: 0.7em;"></i>
+                    <i class="fa-solid fa-chevron-down ms-1 text-secondary" style="font-size: 0.7em;"></i>
                 </td>
                 <td>
-                    <small class="text-muted" title="<%= f.guild_id %>"><%= f.guild_name || f.guild_id %></small>
+                    <small class="text-secondary" title="<%= f.guild_id %>"><%= f.guild_name || f.guild_id %></small>
                     <% if (f.guild_only) { %>
-                        <br><span class="badge badge-warning" title="Nur in dieser Guild sichtbar — eine Antwort erreicht keine andere Guild"><i class="fa-solid fa-lock me-1"></i>Nur diese Guild</span>
+                        <br><span class="badge bg-warning-lt" title="Nur in dieser Guild sichtbar — eine Antwort erreicht keine andere Guild"><i class="fa-solid fa-lock me-1"></i>Nur diese Guild</span>
                     <% } %>
                 </td>
-                <td><small class="text-muted"><%= f.user_id %></small></td>
+                <td><small class="text-secondary"><%= f.user_id %></small></td>
                 <td>
                     <% if (f.priority === 'critical') { %>
-                        <span class="badge badge-danger">Kritisch</span>
+                        <span class="badge bg-danger-lt">Kritisch</span>
                     <% } else if (f.priority === 'high') { %>
-                        <span class="badge badge-warning">Hoch</span>
+                        <span class="badge bg-warning-lt">Hoch</span>
                     <% } else if (f.priority === 'medium') { %>
-                        <span class="badge badge-info">Mittel</span>
+                        <span class="badge bg-info-lt">Mittel</span>
                     <% } else { %>
-                        <span class="badge badge-secondary">Niedrig</span>
+                        <span class="badge bg-secondary-lt">Niedrig</span>
                     <% } %>
                 </td>
                 <td onclick="event.stopPropagation()">
@@ -63,7 +63,7 @@
                 </td>
                 <td><small><%= new Date(f.created_at).toLocaleDateString('de-DE') %></small></td>
                 <td>
-                    <button class="btn btn-xs btn-outline-primary" 
+                    <button class="btn btn-sm btn-outline-primary" 
                             onclick="event.stopPropagation(); editFeedback('<%= f.id %>', '<%= f.status %>', '<%= f.priority %>', `<%= (f.admin_notes || '').replace(/`/g, "'") %>`, `<%= (f.admin_response || '').replace(/`/g, "'") %>`, `<%= (f.title || '').replace(/`/g, "'") %>`, `<%= (f.description || '').replace(/`/g, "'").replace(/\n/g, '\\n') %>`, '<%= f.type %>', '<%= f.category || '' %>')">
                         <i class="fa-solid fa-edit"></i>
                     </button>
@@ -72,7 +72,7 @@
             <tr class="collapse" id="desc-<%= f.id %>">
                 <td colspan="9" style="background: #f8f9fa; border-top: none;">
                     <div class="p-2">
-                        <% if (f.category) { %><span class="badge badge-secondary mr-2"><%= f.category %></span><% } %>
+                        <% if (f.category) { %><span class="badge bg-secondary-lt me-2"><%= f.category %></span><% } %>
                         <strong>Beschreibung:</strong>
                         <p class="mb-0 mt-1" style="white-space: pre-wrap;"><%= f.description %></p>
                     </div>
@@ -83,7 +83,7 @@
     </table>
 </div>
 <% } else { %>
-<div class="text-center text-muted py-4">
+<div class="text-center text-secondary py-4">
     <i class="fa-solid fa-inbox fa-2x mb-2"></i>
     <p>Kein Feedback vorhanden</p>
 </div>

@@ -1,22 +1,4 @@
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-6">
-                <h1 class="m-0"><i class="fas fa-tags me-2"></i>Plugin Badge Management</h1>
-            </div>
-            <div class="col-sm-6">
-                <ol class="breadcrumb float-sm-right">
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="/admin">SuperAdmin</a></li>
-                    <li class="breadcrumb-item active">Plugin Badges</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-</div>
 
-<section class="content">
-    <div class="container-fluid">
         
         <!-- Info Alert -->
         <div class="alert alert-info">
@@ -26,7 +8,8 @@
         </div>
 
         <!-- Badge hinzufügen -->
-        <div class="card card-primary">
+        <div class="card">
+            <div class="card-status-top bg-primary"></div>
             <div class="card-header">
                 <h3 class="card-title"><i class="fas fa-plus-circle me-2"></i>Neues Badge setzen</h3>
             </div>
@@ -34,7 +17,7 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="pluginName">Plugin auswählen</label>
                                 <select class="form-select" id="pluginName" name="pluginName" required>
                                     <option value="">-- Plugin wählen --</option>
@@ -45,7 +28,7 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="badgeStatus">Badge-Status</label>
                                 <select class="form-select" id="badgeStatus" name="badgeStatus" required>
                                     <option value="new">🟢 NEU (Neu veröffentlicht)</option>
@@ -58,15 +41,15 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="badgeUntil">Ablaufdatum (Optional)</label>
                                 <input type="date" class="form-control" id="badgeUntil" name="badgeUntil" 
                                        value="<%= new Date(Date.now() + 14*24*60*60*1000).toISOString().split('T')[0] %>">
-                                <small class="form-text text-muted">Leer lassen für permanentes Badge. Standard: +14 Tage</small>
+                                <small class="form-text text-secondary">Leer lassen für permanentes Badge. Standard: +14 Tage</small>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="isFeatured">Featured (Hervorheben)</label>
                                 <div class="form-check">
                                     <input type="checkbox" class="form-check-input" id="isFeatured" name="isFeatured" value="1">
@@ -87,7 +70,10 @@
         </div>
 
         <!-- Aktive Badges Liste -->
-        <div class="card card-success">
+        <%# Die id ist der Haltepunkt fuers Skript: Frueher suchte es die Karte
+            ueber ihre Farbklasse — die gibt es in Tabler nicht mehr. %>
+        <div class="card" id="aktive-badges">
+            <div class="card-status-top bg-success"></div>
             <div class="card-header">
                 <h3 class="card-title"><i class="fas fa-list me-2"></i>Aktive Plugin-Badges</h3>
             </div>
@@ -128,14 +114,14 @@
                                             <% if (badge.badge_until) { %>
                                                 <%= new Date(badge.badge_until).toLocaleDateString('de-DE') %>
                                             <% } else { %>
-                                                <span class="text-muted">Permanent</span>
+                                                <span class="text-secondary">Permanent</span>
                                             <% } %>
                                         </td>
                                         <td>
                                             <% if (badge.is_featured) { %>
                                                 <span class="text-warning"><i class="fas fa-star"></i> Featured</span>
                                             <% } else { %>
-                                                <span class="text-muted">-</span>
+                                                <span class="text-secondary">-</span>
                                             <% } %>
                                         </td>
                                         <td>
@@ -146,7 +132,7 @@
                                             <% } %>
                                         </td>
                                         <td>
-                                            <small class="text-muted">
+                                            <small class="text-secondary">
                                                 <%= new Date(badge.created_at).toLocaleDateString('de-DE') %>
                                             </small>
                                         </td>
@@ -170,8 +156,6 @@
             </div>
         </div>
 
-    </div>
-</section>
 
 <script>
 // DELETE Badge Handler
@@ -209,7 +193,7 @@ document.querySelectorAll('.delete-badge').forEach(btn => {
                     const tbody = document.querySelector('.table tbody');
                     if (tbody && tbody.children.length === 0) {
                         // Zeige "Keine Badges" Nachricht
-                        document.querySelector('.card-success .card-body').innerHTML = `
+                        document.querySelector('#aktive-badges .card-body').innerHTML = `
                             <div class="alert alert-info">
                                 <i class="fas fa-info-circle me-2"></i>
                                 Noch keine Plugin-Badges vorhanden. Erstelle das erste Badge oben!

@@ -19,7 +19,7 @@
                 <div>
                     <h2 class="mb-0">
                         <i class="fa-solid fa-file-pen me-2"></i>
-                        <span class="text-muted"><%= filePath %></span>
+                        <span class="text-secondary"><%= filePath %></span>
                     </h2>
                 </div>
                 <div class="d-flex gap-2">
@@ -54,7 +54,7 @@
                                     <% if (item.children) { renderSidebar(item.children, depth + 1); } %>
                                 <% } else { %>
                                     <div style="padding-left: <%= depth * 16 %>px;" class="py-1">
-                                        <i class="fa-solid fa-file-lines me-1 small <%= item.path === filePath ? 'text-success' : 'text-muted' %>"></i>
+                                        <i class="fa-solid fa-file-lines me-1 small <%= item.path === filePath ? 'text-success' : 'text-secondary' %>"></i>
                                         <% if (item.path === filePath) { %>
                                             <strong class="small text-success"><%= item.name %></strong>
                                         <% } else { %>
@@ -69,7 +69,7 @@
                         <% if (tree && tree.length > 0) { %>
                             <% renderSidebar(tree, 0); %>
                         <% } else { %>
-                            <p class="text-muted small mb-0">Keine Dateien</p>
+                            <p class="text-secondary small mb-0">Keine Dateien</p>
                         <% } %>
                     </div>
                 </div>

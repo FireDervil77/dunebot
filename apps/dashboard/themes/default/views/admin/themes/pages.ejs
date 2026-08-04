@@ -21,7 +21,7 @@
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
           <div>
             <h1 class="h3 mb-0"><i class="fa-solid fa-file-lines me-2 text-primary"></i>Seiten</h1>
-            <p class="text-muted small mb-0">Verwalte statische Seiten wie Datenschutz, FAQ, Über uns usw.</p>
+            <p class="text-secondary small mb-0">Verwalte statische Seiten wie Datenschutz, FAQ, Über uns usw.</p>
           </div>
           <div class="d-flex gap-2">
             <a href="/admin/themes/pages/new" class="btn btn-success btn-sm">
@@ -47,9 +47,9 @@
     <% if (!pages || pages.length === 0) { %>
       <div class="card">
         <div class="card-body text-center py-5">
-          <i class="fa-solid fa-file-circle-plus fa-3x text-muted mb-3"></i>
-          <h5 class="text-muted">Keine Seiten vorhanden</h5>
-          <p class="text-muted">Erstelle deine erste Seite über den Button oben.</p>
+          <i class="fa-solid fa-file-circle-plus fa-3x text-secondary mb-3"></i>
+          <h5 class="text-secondary">Keine Seiten vorhanden</h5>
+          <p class="text-secondary">Erstelle deine erste Seite über den Button oben.</p>
         </div>
       </div>
     <% } else { %>
@@ -71,7 +71,7 @@
               <tbody>
                 <% pages.forEach((page, index) => { %>
                   <tr>
-                    <td class="text-muted"><%= index + 1 %></td>
+                    <td class="text-secondary"><%= index + 1 %></td>
                     <td>
                       <strong><%= page.title %></strong>
                       <% if (page.visible_in_menu) { %>
@@ -95,7 +95,7 @@
                     </td>
                     <td><code><%= page.template %></code></td>
                     <td>
-                      <small class="text-muted">
+                      <small class="text-secondary">
                         <%= new Date(page.updated_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
                       </small>
                     </td>

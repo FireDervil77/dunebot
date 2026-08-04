@@ -12,72 +12,58 @@
  * @context {string} controlGuildId
 %>
 
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-6">
-                <h1 class="m-0"><i class="fas fa-layer-group mr-2"></i>Content Management</h1>
-            </div>
-            <div class="col-sm-6">
-                <ol class="breadcrumb float-sm-right">
-                    <li class="breadcrumb-item"><a href="/admin">Admin</a></li>
-                    <li class="breadcrumb-item active">Content</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-</div>
 
 <div class="content">
     <div class="container-fluid">
 
         <%# ====== TAB NAVIGATION ====== %>
-        <div class="card card-outline card-primary">
+        <div class="card">
+            <div class="card-status-top bg-primary"></div>
             <div class="card-header p-0 pt-1 border-bottom-0">
                 <ul class="nav nav-tabs" id="contentTabs" role="tablist">
                     <li class="nav-item">
                         <a class="nav-link <%= activeTab === 'news' ? 'active' : '' %>"
                            href="/admin/content?tab=news" data-tab="news">
-                            <i class="fas fa-newspaper mr-1"></i> News
-                            <span class="badge badge-info ml-1"><%= newsList ? newsList.length : 0 %></span>
+                            <i class="fas fa-newspaper me-1"></i> News
+                            <span class="badge bg-info-lt ms-1"><%= newsList ? newsList.length : 0 %></span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link <%= activeTab === 'blog' ? 'active' : '' %>"
                            href="/admin/content?tab=blog" data-tab="blog">
-                            <i class="fas fa-blog mr-1"></i> Blog
-                            <span class="badge badge-info ml-1"><%= blogPosts ? blogPosts.length : 0 %></span>
+                            <i class="fas fa-blog me-1"></i> Blog
+                            <span class="badge bg-info-lt ms-1"><%= blogPosts ? blogPosts.length : 0 %></span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link <%= activeTab === 'changelogs' ? 'active' : '' %>"
                            href="/admin/content?tab=changelogs" data-tab="changelogs">
-                            <i class="fas fa-code-branch mr-1"></i> Changelogs
-                            <span class="badge badge-info ml-1"><%= changelogsList ? changelogsList.length : 0 %></span>
+                            <i class="fas fa-code-branch me-1"></i> Changelogs
+                            <span class="badge bg-info-lt ms-1"><%= changelogsList ? changelogsList.length : 0 %></span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link <%= activeTab === 'notifications' ? 'active' : '' %>"
                            href="/admin/content?tab=notifications" data-tab="notifications">
-                            <i class="fas fa-bell mr-1"></i> Benachrichtigungen
-                            <span class="badge badge-info ml-1"><%= notifications ? notifications.length : 0 %></span>
+                            <i class="fas fa-bell me-1"></i> Benachrichtigungen
+                            <span class="badge bg-info-lt ms-1"><%= notifications ? notifications.length : 0 %></span>
                         </a>
                     </li>
-                    <li class="nav-item ml-auto">
+                    <li class="nav-item ms-auto">
                         <a class="nav-link <%= activeTab === 'analytics' ? 'active' : '' %>"
                            href="/admin/content?tab=analytics" data-tab="analytics">
-                            <i class="fas fa-chart-line mr-1"></i> Analyse &amp; Cookies
+                            <i class="fas fa-chart-line me-1"></i> Analyse &amp; Cookies
                             <% if (locals.analytics && analytics.aktiv && analytics.gtmId) { %>
-                                <span class="badge badge-success ml-1">aktiv</span>
+                                <span class="badge bg-success-lt ms-1">aktiv</span>
                             <% } else { %>
-                                <span class="badge badge-secondary ml-1">aus</span>
+                                <span class="badge bg-secondary-lt ms-1">aus</span>
                             <% } %>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link <%= activeTab === 'settings' ? 'active' : '' %>"
                            href="/admin/content?tab=settings" data-tab="settings">
-                            <i class="fas fa-cog mr-1"></i> Einstellungen
+                            <i class="fas fa-cog me-1"></i> Einstellungen
                         </a>
                     </li>
                 </ul>
@@ -91,7 +77,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">News Verwalten</h4>
                             <a href="/admin/content/news/new" class="btn btn-primary btn-sm">
-                                <i class="fas fa-plus mr-1"></i> Neue News
+                                <i class="fas fa-plus me-1"></i> Neue News
                             </a>
                         </div>
 
@@ -114,7 +100,7 @@
                                     <td>
                                         <strong><%= n.title || 'Ohne Titel' %></strong>
                                         <% if (n.slug) { %>
-                                            <br><small class="text-muted">/news-details/<%= n.slug %></small>
+                                            <br><small class="text-secondary">/news-details/<%= n.slug %></small>
                                         <% } %>
                                     </td>
                                     <td>
@@ -142,11 +128,11 @@
                             </tbody>
                         </table>
                         <% } else { %>
-                        <div class="text-center text-muted py-5">
+                        <div class="text-center text-secondary py-5">
                             <i class="fas fa-newspaper fa-3x mb-3"></i>
                             <p>Noch keine News vorhanden.</p>
                             <a href="/admin/content/news/new" class="btn btn-primary">
-                                <i class="fas fa-plus mr-1"></i> Erste News erstellen
+                                <i class="fas fa-plus me-1"></i> Erste News erstellen
                             </a>
                         </div>
                         <% } %>
@@ -157,7 +143,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">Blog Verwalten</h4>
                             <a href="/admin/content/blog/new" class="btn btn-primary btn-sm">
-                                <i class="fas fa-plus mr-1"></i> Neuer Blog-Post
+                                <i class="fas fa-plus me-1"></i> Neuer Blog-Post
                             </a>
                         </div>
 
@@ -181,10 +167,10 @@
                                     <td>
                                         <strong><%= p.title || 'Ohne Titel' %></strong>
                                         <% if (p.slug) { %>
-                                            <br><small class="text-muted">/blog/<%= p.slug %></small>
+                                            <br><small class="text-secondary">/blog/<%= p.slug %></small>
                                         <% } %>
                                     </td>
-                                    <td><span class="badge badge-secondary"><%= p.category || 'gaming' %></span></td>
+                                    <td><span class="badge bg-secondary-lt"><%= p.category || 'gaming' %></span></td>
                                     <td>
                                         <span class="badge bg-<%= p.status === 'published' ? 'success' : 'warning' %>-lt">
                                             <%= p.status || 'draft' %>
@@ -207,11 +193,11 @@
                             </tbody>
                         </table>
                         <% } else { %>
-                        <div class="text-center text-muted py-5">
+                        <div class="text-center text-secondary py-5">
                             <i class="fas fa-blog fa-3x mb-3"></i>
                             <p>Noch keine Blog-Posts vorhanden.</p>
                             <a href="/admin/content/blog/new" class="btn btn-primary">
-                                <i class="fas fa-plus mr-1"></i> Ersten Blog-Post erstellen
+                                <i class="fas fa-plus me-1"></i> Ersten Blog-Post erstellen
                             </a>
                         </div>
                         <% } %>
@@ -222,7 +208,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">Changelogs Verwalten</h4>
                             <a href="/admin/content/changelogs/new" class="btn btn-primary btn-sm">
-                                <i class="fas fa-plus mr-1"></i> Neuer Changelog
+                                <i class="fas fa-plus me-1"></i> Neuer Changelog
                             </a>
                         </div>
 
@@ -270,11 +256,11 @@
                             </tbody>
                         </table>
                         <% } else { %>
-                        <div class="text-center text-muted py-5">
+                        <div class="text-center text-secondary py-5">
                             <i class="fas fa-code-branch fa-3x mb-3"></i>
                             <p>Noch keine Changelogs vorhanden.</p>
                             <a href="/admin/content/changelogs/new" class="btn btn-primary">
-                                <i class="fas fa-plus mr-1"></i> Ersten Changelog erstellen
+                                <i class="fas fa-plus me-1"></i> Ersten Changelog erstellen
                             </a>
                         </div>
                         <% } %>
@@ -285,7 +271,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">Benachrichtigungen</h4>
                             <a href="/admin/content/notifications/new" class="btn btn-primary btn-sm">
-                                <i class="fas fa-plus mr-1"></i> Neue Benachrichtigung
+                                <i class="fas fa-plus me-1"></i> Neue Benachrichtigung
                             </a>
                         </div>
 
@@ -340,11 +326,11 @@
                             </tbody>
                         </table>
                         <% } else { %>
-                        <div class="text-center text-muted py-5">
+                        <div class="text-center text-secondary py-5">
                             <i class="fas fa-bell fa-3x mb-3"></i>
                             <p>Keine Benachrichtigungen vorhanden.</p>
                             <a href="/admin/content/notifications/new" class="btn btn-primary">
-                                <i class="fas fa-plus mr-1"></i> Erste Benachrichtigung
+                                <i class="fas fa-plus me-1"></i> Erste Benachrichtigung
                             </a>
                         </div>
                         <% } %>
@@ -354,10 +340,10 @@
                     <div class="tab-pane fade <%= activeTab === 'analytics' ? 'show active' : '' %>" id="tab-analytics">
                         <% const _an = locals.analytics || { gtmId: '', aktiv: false, version: 1, kategorien: [] }; %>
 
-                        <h4 class="mb-3"><i class="fas fa-chart-line mr-2"></i>Google Tag Manager</h4>
+                        <h4 class="mb-3"><i class="fas fa-chart-line me-2"></i>Google Tag Manager</h4>
 
-                        <div class="callout callout-warning">
-                            <h5><i class="fas fa-triangle-exclamation mr-1"></i> Was GTM lädt, siehst du hier nicht</h5>
+                        <div class="alert alert-warning">
+                            <h5><i class="fas fa-triangle-exclamation me-1"></i> Was GTM lädt, siehst du hier nicht</h5>
                             <p class="mb-0">
                                 Die Tags verwaltest du im GTM-Container bei Google. Ergänzt dort jemand ein
                                 Marketing-Tag, ändern sich die gesetzten Cookies &mdash; ohne dass in diesem
@@ -367,26 +353,26 @@
                         </div>
 
                         <form id="analyticsForm">
-                            <div class="form-group">
-                                <div class="custom-control custom-switch">
-                                    <input type="checkbox" class="custom-control-input" id="analytics_aktiv"
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" id="analytics_aktiv"
                                            name="aktiv" <%= _an.aktiv ? 'checked' : '' %>>
-                                    <label class="custom-control-label" for="analytics_aktiv">
+                                    <label class="form-check-label" for="analytics_aktiv">
                                         Tag Manager und Cookie-Abfrage aktiv
                                     </label>
                                 </div>
-                                <small class="form-text text-muted">
+                                <small class="form-text text-secondary">
                                     Aus heißt: kein GTM, kein Banner, keine Cookies außer der Sitzung.
                                     Die Container-ID bleibt dabei gespeichert.
                                 </small>
                             </div>
 
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="analytics_gtm_id">GTM-Container-ID</label>
                                 <input type="text" class="form-control" id="analytics_gtm_id" name="gtmId"
                                        value="<%= _an.gtmId %>" placeholder="GTM-XXXXXXX"
                                        pattern="GTM-[A-Za-z0-9]{4,10}">
-                                <small class="form-text text-muted">
+                                <small class="form-text text-secondary">
                                     Format <code>GTM-XXXXXXX</code>. Leer lassen schaltet die Einbindung ab &mdash;
                                     eine falsche ID erzeugt keinen Fehler, es passiert dann einfach nichts.
                                 </small>
@@ -394,7 +380,7 @@
 
                             <hr>
                             <h5 class="mb-3">Kategorien der Abfrage</h5>
-                            <p class="text-muted">
+                            <p class="text-secondary">
                                 „Notwendig" lässt sich nicht abwählen &mdash; darin stecken die Sitzung und die
                                 Speicherung dieser Auswahl selbst. Alles andere ist standardmäßig <strong>aus</strong>.
                             </p>
@@ -417,9 +403,9 @@
                                         </td>
                                         <td class="text-center align-middle">
                                             <% if (k.pflicht) { %>
-                                                <span class="badge badge-secondary">Pflicht</span>
+                                                <span class="badge bg-secondary-lt">Pflicht</span>
                                             <% } else { %>
-                                                <span class="text-muted">abwählbar</span>
+                                                <span class="text-secondary">abwählbar</span>
                                             <% } %>
                                         </td>
                                     </tr>
@@ -428,18 +414,16 @@
                             </table>
 
                             <hr>
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="analytics_version">Fassung des Einwilligungstextes</label>
                                 <div class="input-group" style="max-width:22rem">
                                     <input type="number" class="form-control" id="analytics_version"
                                            name="version" value="<%= _an.version %>" min="1" step="1">
-                                    <div class="input-group-append">
-                                        <button type="button" class="btn btn-outline-secondary" id="versionHoch">
-                                            +1 &amp; erneut fragen
-                                        </button>
-                                    </div>
+                                    <button type="button" class="btn btn-outline-secondary" id="versionHoch">
+                                    +1 &amp; erneut fragen
+                                    </button>
                                 </div>
-                                <small class="form-text text-muted">
+                                <small class="form-text text-secondary">
                                     Erhöhen, wenn sich der Text wesentlich ändert: Alle bisherigen Einwilligungen
                                     verlieren damit ihre Gültigkeit und die Abfrage erscheint erneut.
                                     <strong>Ohne diesen Schritt gilt eine veraltete Einwilligung weiter.</strong>
@@ -447,26 +431,26 @@
                             </div>
 
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save mr-1"></i> Speichern
+                                <i class="fas fa-save me-1"></i> Speichern
                             </button>
-                            <span id="analyticsStatus" class="ml-2 small"></span>
+                            <span id="analyticsStatus" class="ms-2 small"></span>
                         </form>
 
                         <hr>
-                        <h5><i class="fas fa-clipboard-check mr-2"></i>Nachweis</h5>
-                        <p class="text-muted mb-2">
+                        <h5><i class="fas fa-clipboard-check me-2"></i>Nachweis</h5>
+                        <p class="text-secondary mb-2">
                             Erteilte Einwilligungen werden protokolliert &mdash; die DSGVO verlangt, dass du sie
                             belegen kannst. Gespeichert werden Zeitpunkt, Auswahl und Fassung;
                             <strong>keine IP im Klartext</strong>, nur ein gesalzener Hash.
                         </p>
                         <p>
-                            <span class="badge badge-info"><%= locals.consentAnzahl || 0 %></span>
+                            <span class="badge bg-info-lt"><%= locals.consentAnzahl || 0 %></span>
                             Einträge insgesamt<% if (locals.consentLetzter) { %>,
                             zuletzt am <%= new Date(consentLetzter).toLocaleString('de-DE') %><% } %>.
                         </p>
 
-                        <div class="callout callout-danger">
-                            <h5><i class="fas fa-scale-balanced mr-1"></i> Was ich nicht abnehmen kann</h5>
+                        <div class="alert alert-danger">
+                            <h5><i class="fas fa-scale-balanced me-1"></i> Was ich nicht abnehmen kann</h5>
                             <p class="mb-0">
                                 Der Mechanismus hier ist gebaut. <strong>Die Formulierungen im Banner und auf
                                 der Datenschutzseite gehören von jemandem geprüft, der dafür haftet</strong> &mdash;
@@ -477,10 +461,10 @@
 
                     <%# ====== EINSTELLUNGEN TAB ====== %>
                     <div class="tab-pane fade <%= activeTab === 'settings' ? 'show active' : '' %>" id="tab-settings">
-                        <h4 class="mb-3"><i class="fas fa-cog mr-2"></i>Channel-Konfiguration</h4>
+                        <h4 class="mb-3"><i class="fas fa-cog me-2"></i>Channel-Konfiguration</h4>
 
-                        <div class="callout callout-info">
-                            <h5><i class="fas fa-info-circle mr-1"></i> Hinweis</h5>
+                        <div class="alert alert-info">
+                            <h5><i class="fas fa-info-circle me-1"></i> Hinweis</h5>
                             <p class="mb-0">
                                 Hier legst du fest, in welchem Discord-Channel Inhalte je nach Kategorie gepostet werden.
                                 Die Channels beziehen sich auf den <strong>Control-Server</strong>
@@ -492,12 +476,12 @@
 
                             <div class="card">
                                 <div class="card-header">
-                                    <h3 class="card-title"><i class="fas fa-hashtag mr-2"></i>Channel pro Kategorie</h3>
+                                    <h3 class="card-title"><i class="fas fa-hashtag me-2"></i>Channel pro Kategorie</h3>
                                 </div>
                                 <div class="card-body">
                                     <div id="channels-loading" class="text-center py-4">
                                         <i class="fas fa-spinner fa-spin fa-2x"></i>
-                                        <p class="mt-2 text-muted">Lade Discord-Channels...</p>
+                                        <p class="mt-2 text-secondary">Lade Discord-Channels...</p>
                                     </div>
 
                                     <div id="channels-content" style="display: none;">
@@ -512,7 +496,7 @@
                                         };
                                         %>
                                         <% for (const cat of categories) { %>
-                                            <div class="form-group row">
+                                            <div class="mb-3 row">
                                                 <label class="col-sm-3 col-form-label">
                                                     <%= settingsCatLabels[cat] || cat %>
                                                 </label>
@@ -528,11 +512,11 @@
                                                 <div class="col-sm-2">
                                                     <span class="channel-status-<%= cat %>">
                                                     <% if (channelConfig[cat]?.channel_id) { %>
-                                                        <span class="badge badge-success mt-2 d-inline-block">
+                                                        <span class="badge bg-success-lt mt-2 d-inline-block">
                                                             <i class="fas fa-check"></i> Konfiguriert
                                                         </span>
                                                     <% } else { %>
-                                                        <span class="badge badge-warning mt-2 d-inline-block">
+                                                        <span class="badge bg-warning-lt mt-2 d-inline-block">
                                                             <i class="fas fa-exclamation-triangle"></i> Nicht gesetzt
                                                         </span>
                                                     <% } %>
@@ -543,7 +527,7 @@
                                     </div>
 
                                     <div id="channels-error" class="alert alert-danger" style="display: none;">
-                                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                                        <i class="fas fa-exclamation-triangle me-1"></i>
                                         <span id="channels-error-msg">Fehler beim Laden der Channels.</span>
                                     </div>
 
@@ -551,7 +535,7 @@
                                 </div>
                                 <div class="card-footer">
                                     <button type="submit" class="btn btn-primary" id="btn-save-channels" disabled>
-                                        <i class="fas fa-save mr-2"></i>Speichern
+                                        <i class="fas fa-save me-2"></i>Speichern
                                     </button>
                                 </div>
                             </div>
@@ -570,20 +554,20 @@
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-link mr-2"></i>Inhalt verknüpfen</h5>
-                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                <h5 class="modal-title"><i class="fas fa-link me-2"></i>Inhalt verknüpfen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
                 <p>Verknüpfe <strong id="link-source-name"></strong> mit:</p>
                 <div class="list-group" id="link-targets">
                     <a href="#" class="list-group-item list-group-item-action" data-action="copy-url">
-                        <i class="fas fa-clipboard mr-2"></i> URL in Zwischenablage kopieren
+                        <i class="fas fa-clipboard me-2"></i> URL in Zwischenablage kopieren
                     </a>
                     <a href="#" class="list-group-item list-group-item-action" data-action="create-news">
-                        <i class="fas fa-newspaper mr-2"></i> Neue News mit Verweis erstellen
+                        <i class="fas fa-newspaper me-2"></i> Neue News mit Verweis erstellen
                     </a>
                     <a href="#" class="list-group-item list-group-item-action" data-action="create-notification">
-                        <i class="fas fa-bell mr-2"></i> Neue Benachrichtigung mit Verweis erstellen
+                        <i class="fas fa-bell me-2"></i> Neue Benachrichtigung mit Verweis erstellen
                     </a>
                 </div>
             </div>
@@ -592,6 +576,16 @@
 </div>
 
 <script>
+/**
+ * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
+ * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
+ * Aufruf warf, und alles danach im selben Block lief nicht mehr.
+ */
+function fenster(id) {
+    const el = document.getElementById(id);
+    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
 
     // ====== ANALYSE & COOKIES: Speichern ======
@@ -609,7 +603,7 @@ document.addEventListener('DOMContentLoaded', function() {
         analyticsForm.addEventListener('submit', async function (e) {
             e.preventDefault();
             status.textContent = 'Speichere …';
-            status.className = 'ml-2 small text-muted';
+            status.className = 'ms-2 small text-secondary';
 
             const kategorien = [];
             analyticsForm.querySelectorAll('input[name^="kat_key_"]').forEach(function (feld) {
@@ -640,14 +634,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const result = await resp.json();
                 if (result.success) {
                     status.textContent = '✓ ' + (result.message || 'Gespeichert');
-                    status.className = 'ml-2 small text-success';
+                    status.className = 'ms-2 small text-success';
                 } else {
                     status.textContent = '✗ ' + (result.message || 'Fehlgeschlagen');
-                    status.className = 'ml-2 small text-danger';
+                    status.className = 'ms-2 small text-danger';
                 }
             } catch (err) {
                 status.textContent = '✗ ' + err.message;
-                status.className = 'ml-2 small text-danger';
+                status.className = 'ms-2 small text-danger';
             }
         });
     }
@@ -724,7 +718,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const resultDiv = document.getElementById('channels-save-result');
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Speichere...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Speichere...';
             resultDiv.style.display = 'none';
 
             // Formulardaten sammeln
@@ -761,19 +755,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (result.success) {
                     resultDiv.className = 'alert alert-success';
-                    resultDiv.innerHTML = '<i class="fas fa-check mr-2"></i>' + (result.message || 'Gespeichert!');
+                    resultDiv.innerHTML = '<i class="fas fa-check me-2"></i>' + (result.message || 'Gespeichert!');
                     resultDiv.style.display = 'block';
                     if (typeof toastr !== 'undefined') toastr.success(result.message || 'Gespeichert!');
                 } else {
                     resultDiv.className = 'alert alert-danger';
-                    resultDiv.innerHTML = '<i class="fas fa-times mr-2"></i>' + (result.message || 'Fehler beim Speichern');
+                    resultDiv.innerHTML = '<i class="fas fa-times me-2"></i>' + (result.message || 'Fehler beim Speichern');
                     resultDiv.style.display = 'block';
                     if (typeof toastr !== 'undefined') toastr.error(result.message || 'Fehler');
                 }
             } catch (err) {
                 console.error('[Content] Channel-Save fehlgeschlagen:', err);
                 resultDiv.className = 'alert alert-danger';
-                resultDiv.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Fehler: ' + err.message;
+                resultDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Fehler: ' + err.message;
                 resultDiv.style.display = 'block';
                 if (typeof toastr !== 'undefined') toastr.error('Speichern fehlgeschlagen: ' + err.message);
             } finally {
@@ -811,7 +805,7 @@ function linkContent(type, id, title) {
     _linkId = id;
     _linkTitle = title;
     document.getElementById('link-source-name').textContent = title;
-    $('#linkModal').modal('show');
+    fenster('linkModal')?.show();
 }
 
 document.querySelectorAll('#link-targets [data-action]').forEach(el => {
@@ -827,13 +821,13 @@ document.querySelectorAll('#link-targets [data-action]').forEach(el => {
             const fullUrl = window.location.origin + url;
             navigator.clipboard.writeText(fullUrl).then(() => {
                 toastr.success('URL kopiert: ' + fullUrl);
-                $('#linkModal').modal('hide');
+                fenster('linkModal')?.hide();
             });
         } else if (action === 'create-news') {
-            $('#linkModal').modal('hide');
+            fenster('linkModal')?.hide();
             window.location.href = '/admin/content/news/new?link_url=' + encodeURIComponent(url) + '&link_title=' + encodeURIComponent(_linkTitle);
         } else if (action === 'create-notification') {
-            $('#linkModal').modal('hide');
+            fenster('linkModal')?.hide();
             window.location.href = '/admin/content/notifications/new?link_url=' + encodeURIComponent(url) + '&link_title=' + encodeURIComponent(_linkTitle);
         }
     });

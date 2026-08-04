@@ -32,7 +32,7 @@
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
           <div>
             <h1 class="h3 mb-0"><i class="fa-solid fa-desktop me-2 text-primary"></i>Frontpage-Sektionen</h1>
-            <p class="text-muted small mb-0">Verwalte Reihenfolge, Sichtbarkeit und Inhalte der Landing-Page Sektionen.</p>
+            <p class="text-secondary small mb-0">Verwalte Reihenfolge, Sichtbarkeit und Inhalte der Landing-Page Sektionen.</p>
           </div>
           <div class="d-flex gap-2">
             <button class="btn btn-success btn-sm" id="btnAddSection">
@@ -89,7 +89,7 @@
               <!-- Title & Meta -->
               <div class="col">
                 <h5 class="mb-0 section-title-display"><%= section.title %></h5>
-                <small class="text-muted">
+                <small class="text-secondary">
                   Typ: <code><%= section.section_type %></code>
                   &middot; Hintergrund: <code><%= section.css_class || 'standard' %></code>
                   &middot; Divider: <code><%= section.divider_before || 'auto' %></code>
@@ -190,7 +190,7 @@
                       <label class="form-label fw-bold">HTML-Inhalt</label>
                       <textarea class="form-control form-control-sm font-monospace" name="custom_html" rows="10"
                                 placeholder="<div class=&quot;container py-5&quot;>&#10;  <h2>Überschrift</h2>&#10;  <p>Inhalt...</p>&#10;</div>"><%= section.custom_html || '' %></textarea>
-                      <small class="text-muted">HTML wird direkt in die Seite eingefügt. Bootstrap-Klassen verfügbar.</small>
+                      <small class="text-secondary">HTML wird direkt in die Seite eingefügt. Bootstrap-Klassen verfügbar.</small>
                     </div>
                   <% } %>
 
@@ -267,7 +267,7 @@
         <div class="mb-3">
           <label class="form-label fw-bold">HTML-Inhalt</label>
           <textarea class="form-control font-monospace" id="newSectionHtml" rows="6" placeholder='<div class="container py-5">&#10;  <h2>Überschrift</h2>&#10;  <p>Inhalt...</p>&#10;</div>'></textarea>
-          <small class="text-muted">Bootstrap-Klassen und HTML verfügbar.</small>
+          <small class="text-secondary">Bootstrap-Klassen und HTML verfügbar.</small>
         </div>
       </div>
       <div class="modal-footer">

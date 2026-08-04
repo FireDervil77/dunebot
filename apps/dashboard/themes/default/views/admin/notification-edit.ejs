@@ -85,9 +85,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     <div class="container-fluid">
         <% if (locals.toast) { %>
             <div class="alert alert-<%= toast.type %> alert-dismissible fade show">
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" aria-label="Schließen"></button>
                 <%= toast.message %>
             </div>
         <% } %>
@@ -112,13 +110,13 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <!-- Sprach-Tabs -->
                     <ul class="nav nav-tabs mb-3" id="langTabs" role="tablist">
                         <li class="nav-item">
-                            <a class="nav-link active" id="de-tab" data-toggle="tab" href="#de-content" role="tab">
-                                <i class="fas fa-flag mr-1"></i> Deutsch
+                            <a class="nav-link active" id="de-tab" data-bs-toggle="tab" href="#de-content" role="tab">
+                                <i class="fas fa-flag me-1"></i> Deutsch
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" id="en-tab" data-toggle="tab" href="#en-content" role="tab">
-                                <i class="fas fa-flag mr-1"></i> English
+                            <a class="nav-link" id="en-tab" data-bs-toggle="tab" href="#en-content" role="tab">
+                                <i class="fas fa-flag me-1"></i> English
                             </a>
                         </li>
                     </ul>
@@ -126,7 +124,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <div class="tab-content" id="langTabContent">
                         <!-- Deutsch Tab -->
                         <div class="tab-pane fade show active" id="de-content" role="tabpanel">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="title_de"><%= tr('NOTIFICATIONS.FORM.TITLE') %> (DE) <span class="text-danger">*</span></label>
                                 <input type="text" 
                                        class="form-control" 
@@ -136,7 +134,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                                        required>
                             </div>
 
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="message_de"><%= tr('NOTIFICATIONS.FORM.MESSAGE') %> (DE) <span class="text-danger">*</span></label>
                                 <textarea class="form-control" 
                                           id="message_de" 
@@ -145,21 +143,21 @@ document.addEventListener('DOMContentLoaded', async function() {
                                           required><%= notification?.message_de || '' %></textarea>
                             </div>
 
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="action_text_de"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT') %> (DE)</label>
                                 <input type="text" 
                                        class="form-control" 
                                        id="action_text_de" 
                                        name="action_text_de" 
                                        value="<%= notification?.action_text_de || '' %>">
-                                <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT_HELP') %></small>
+                                <small class="form-text text-secondary"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT_HELP') %></small>
                             </div>
                         </div>
 
                         <!-- English Tab -->
                         <div class="tab-pane fade" id="en-content" role="tabpanel">
-                            <div class="form-group">
-                                <label for="title_en"><%= tr('NOTIFICATIONS.FORM.TITLE') %> (EN) <small class="text-muted">(optional)</small></label>
+                            <div class="mb-3">
+                                <label for="title_en"><%= tr('NOTIFICATIONS.FORM.TITLE') %> (EN) <small class="text-secondary">(optional)</small></label>
                                 <input type="text" 
                                        class="form-control" 
                                        id="title_en" 
@@ -167,22 +165,22 @@ document.addEventListener('DOMContentLoaded', async function() {
                                        value="<%= notification?.title_en || '' %>">
                             </div>
 
-                            <div class="form-group">
-                                <label for="message_en"><%= tr('NOTIFICATIONS.FORM.MESSAGE') %> (EN) <small class="text-muted">(optional)</small></label>
+                            <div class="mb-3">
+                                <label for="message_en"><%= tr('NOTIFICATIONS.FORM.MESSAGE') %> (EN) <small class="text-secondary">(optional)</small></label>
                                 <textarea class="form-control" 
                                           id="message_en" 
                                           name="message_en" 
                                           rows="4"><%= notification?.message_en || '' %></textarea>
                             </div>
 
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="action_text_en"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT') %> (EN)</label>
                                 <input type="text" 
                                        class="form-control" 
                                        id="action_text_en" 
                                        name="action_text_en" 
                                        value="<%= notification?.action_text_en || '' %>">
-                                <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT_HELP') %></small>
+                                <small class="form-text text-secondary"><%= tr('NOTIFICATIONS.FORM.ACTION_TEXT_HELP') %></small>
                             </div>
                         </div>
                     </div>
@@ -192,7 +190,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <!-- Gemeinsame Felder -->
                     <div class="row">
                         <div class="col-md-4">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="type"><%= tr('NOTIFICATIONS.FORM.TYPE') %> <span class="text-danger">*</span></label>
                                 <select class="form-control" id="type" name="type" required>
                                     <option value="info" <%= notification?.type === 'info' ? 'selected' : '' %>>
@@ -212,7 +210,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         </div>
 
                         <div class="col-md-4">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="category">Kategorie</label>
                                 <select class="form-control" id="category" name="category">
                                     <option value="announcement" <%= notification?.category === 'announcement' ? 'selected' : '' %>>📢 Announcement</option>
@@ -221,67 +219,67 @@ document.addEventListener('DOMContentLoaded', async function() {
                                     <option value="maintenance" <%= notification?.category === 'maintenance' ? 'selected' : '' %>>🔧 Maintenance</option>
                                     <option value="other" <%= notification?.category === 'other' ? 'selected' : '' %>>📌 Sonstige</option>
                                 </select>
-                                <small class="form-text text-muted">
+                                <small class="form-text text-secondary">
                                     Bestimmt den Discord-Channel (per Kategorie konfigurierbar)
                                 </small>
                             </div>
                         </div>
 
                         <div class="col-md-4">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="action_url"><%= tr('NOTIFICATIONS.FORM.ACTION_URL') %></label>
                                 <input type="url" 
                                        class="form-control" 
                                        id="action_url" 
                                        name="action_url" 
                                        value="<%= notification?.action_url || '' %>">
-                                <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.ACTION_URL_HELP') %></small>
+                                <small class="form-text text-secondary"><%= tr('NOTIFICATIONS.FORM.ACTION_URL_HELP') %></small>
                             </div>
                         </div>
                     </div>
 
-                    <div class="form-group">
+                    <div class="mb-3">
                         <label for="expiry"><%= tr('NOTIFICATIONS.FORM.EXPIRES_AT') %></label>
                         <input type="datetime-local" 
                                class="form-control" 
                                id="expiry" 
                                name="expiry" 
                                value="<%= notification?.expiry ? new Date(notification.expiry).toISOString().slice(0, 16) : '' %>">
-                        <small class="form-text text-muted"><%= tr('NOTIFICATIONS.FORM.EXPIRES_AT_HELP') %></small>
+                        <small class="form-text text-secondary"><%= tr('NOTIFICATIONS.FORM.EXPIRES_AT_HELP') %></small>
                     </div>
 
                     <hr>
 
                     <!-- Delivery Options -->
-                    <h5 class="mb-3"><i class="fas fa-paper-plane mr-2"></i> Zustellungs-Optionen</h5>
+                    <h5 class="mb-3"><i class="fas fa-paper-plane me-2"></i> Zustellungs-Optionen</h5>
                     
-                    <div class="form-group">
+                    <div class="mb-3">
                         <label>Wie soll die Benachrichtigung zugestellt werden?</label>
-                        <div class="ml-2">
-                            <div class="custom-control custom-checkbox mb-2">
-                                <input type="checkbox" class="custom-control-input delivery-method-cb" 
+                        <div class="ms-2">
+                            <div class="form-check mb-2">
+                                <input type="checkbox" class="form-check-input delivery-method-cb" 
                                        id="dm_dashboard" value="dashboard"
                                        <%= deliveryMethods.includes('dashboard') ? 'checked' : '' %>>
-                                <label class="custom-control-label" for="dm_dashboard">
+                                <label class="form-check-label" for="dm_dashboard">
                                     📊 Im Dashboard anzeigen
                                 </label>
                             </div>
-                            <div class="custom-control custom-checkbox mb-2">
-                                <input type="checkbox" class="custom-control-input delivery-method-cb" 
+                            <div class="form-check mb-2">
+                                <input type="checkbox" class="form-check-input delivery-method-cb" 
                                        id="dm_discord_category" value="discord_category"
                                        <%= deliveryMethods.includes('discord_category') || deliveryMethods.includes('discord_channel') || deliveryMethods.includes('system_channel') ? 'checked' : '' %>>
-                                <label class="custom-control-label" for="dm_discord_category">
+                                <label class="form-check-label" for="dm_discord_category">
                                     📢 Im konfigurierten Discord-Channel posten (nach Kategorie)
                                 </label>
-                                <small class="form-text text-muted ml-4" id="category-channel-info">
+                                <small class="form-text text-secondary ms-4" id="category-channel-info">
                                     <i class="fas fa-info-circle"></i> <span id="category-channel-hint">Der Channel wird aus der Kategorie-Konfiguration geladen...</span>
                                 </small>
                             </div>
-                            <div class="custom-control custom-checkbox mb-2">
-                                <input type="checkbox" class="custom-control-input delivery-method-cb" 
+                            <div class="form-check mb-2">
+                                <input type="checkbox" class="form-check-input delivery-method-cb" 
                                        id="dm_discord_dm" value="discord_dm"
                                        <%= deliveryMethods.includes('discord_dm') ? 'checked' : '' %>>
-                                <label class="custom-control-label" for="dm_discord_dm">
+                                <label class="form-check-label" for="dm_discord_dm">
                                     ✉️ DM an Server-Admins senden
                                 </label>
                             </div>
@@ -290,9 +288,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                     <!-- Konfigurierte Channels (nur Anzeige) -->
                     <div id="category-channel-config" class="alert alert-info" style="display: none;">
-                        <i class="fas fa-hashtag mr-1"></i>
+                        <i class="fas fa-hashtag me-1"></i>
                         <strong>Ziel-Channel:</strong> <span id="resolved-channel-name">Wird geladen...</span>
-                        <a href="/admin/content?tab=settings" class="btn btn-sm btn-outline-primary float-right">
+                        <a href="/admin/content?tab=settings" class="btn btn-sm btn-outline-primary float-end">
                             <i class="fas fa-cog"></i> Channel-Konfiguration
                         </a>
                     </div>
@@ -300,10 +298,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                 <div class="card-footer">
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save mr-2"></i><%= tr('NOTIFICATIONS.FORM.SAVE') %>
+                        <i class="fas fa-save me-2"></i><%= tr('NOTIFICATIONS.FORM.SAVE') %>
                     </button>
                     <a href="<%= _backUrl %>" class="btn btn-secondary">
-                        <i class="fas fa-times mr-2"></i><%= tr('NOTIFICATIONS.FORM.CANCEL') %>
+                        <i class="fas fa-times me-2"></i><%= tr('NOTIFICATIONS.FORM.CANCEL') %>
                     </a>
                 </div>
             </div>

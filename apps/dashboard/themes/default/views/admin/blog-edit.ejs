@@ -87,7 +87,7 @@
                                         <label for="content_de" class="form-label">Inhalt (DE) *</label>
                                         <textarea class="form-control" id="content_de" name="content_de" 
                                                   rows="15"><%= post && post.content_de ? post.content_de : '' %></textarea>
-                                        <small class="form-text text-muted">
+                                        <small class="form-text text-secondary">
                                             HTML-Tags werden unterstützt (z.B. &lt;p&gt;, &lt;h3&gt;, &lt;ul&gt;, &lt;strong&gt;)
                                         </small>
                                     </div>
@@ -113,7 +113,7 @@
                                         <label for="content_en" class="form-label">Content (EN)</label>
                                         <textarea class="form-control" id="content_en" name="content_en" 
                                                   rows="15"><%= post && post.content_en ? post.content_en : '' %></textarea>
-                                        <small class="form-text text-muted">
+                                        <small class="form-text text-secondary">
                                             HTML tags are supported (e.g. &lt;p&gt;, &lt;h3&gt;, &lt;ul&gt;, &lt;strong&gt;)
                                         </small>
                                     </div>
@@ -128,7 +128,7 @@
                                         <input type="text" class="form-control" id="slug" name="slug" 
                                                value="<%= post && post.slug ? post.slug : '' %>"
                                                placeholder="wird automatisch generiert">
-                                        <small class="form-text text-muted">
+                                        <small class="form-text text-secondary">
                                             URL-freundlicher Name (z.B. "counter-strike-2-tipps"). Leer lassen für Auto-Generierung.
                                         </small>
                                     </div>
