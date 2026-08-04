@@ -48,7 +48,8 @@ if (startupTemplate) {
 
 <%# ═══════ Startup Command Anzeige ═══════ %>
 <% if (startupTemplate) { %>
-<div class="card card-outline card-dark mb-3">
+<div class="card mb-3">
+    <div class="card-status-top bg-dark"></div>
     <div class="card-header py-2">
         <h3 class="card-title">
             <i class="fas fa-terminal me-2"></i>
@@ -63,7 +64,7 @@ if (startupTemplate) {
 
 <% if (variablesArray.length === 0) { %>
     <div class="alert alert-info">
-        <i class="fas fa-info-circle mr-2"></i>
+        <i class="fas fa-info-circle me-2"></i>
         Dieses Addon hat keine konfigurierbaren Variablen.
     </div>
 <% } else { %>
@@ -88,11 +89,11 @@ if (startupTemplate) {
                                         : (variable.default_value ?? ''));
         %>
         <div class="col-md-6 col-lg-4">
-            <div class="form-group">
+            <div class="mb-3">
                 <label for="env_<%= varName %>">
                     <strong><%= varDisplayName %></strong>
                     <% if (isRequired) { %><span class="text-danger">*</span><% } %>
-                    <code class="ml-1 text-muted small">{{<%= varName %>}}</code>
+                    <code class="ms-1 text-secondary small">{{<%= varName %>}}</code>
                 </label>
 
                 <% if (varType === 'select' && varOptions.length > 0) { %>
@@ -154,7 +155,7 @@ if (startupTemplate) {
                 <% } %>
 
                 <% if (varDescription) { %>
-                    <small class="form-text text-muted"><%= varDescription %></small>
+                    <small class="form-text text-secondary"><%= varDescription %></small>
                 <% } %>
             </div>
         </div>
@@ -164,17 +165,17 @@ if (startupTemplate) {
     <div class="row mt-2">
         <div class="col-12">
             <button type="button" class="btn btn-primary" id="variables-save-btn" onclick="saveVariables()">
-                <i class="fas fa-save mr-1"></i>
+                <i class="fas fa-save me-1"></i>
                 Variablen speichern
             </button>
             <% if (gameData.config && gameData.config.files && Object.keys(gameData.config.files).length > 0) { %>
-            <button type="button" class="btn btn-outline-info ml-2" id="apply-config-btn" onclick="applyConfig()" title="Config-Dateien auf dem Server patchen (ohne Neustart)">
-                <i class="fas fa-cogs mr-1"></i>
+            <button type="button" class="btn btn-outline-info ms-2" id="apply-config-btn" onclick="applyConfig()" title="Config-Dateien auf dem Server patchen (ohne Neustart)">
+                <i class="fas fa-cogs me-1"></i>
                 Config anwenden
             </button>
             <% } %>
-            <small class="text-muted ml-3">
-                <i class="fas fa-info-circle mr-1"></i>
+            <small class="text-secondary ms-3">
+                <i class="fas fa-info-circle me-1"></i>
                 Änderungen werden beim nächsten Server-Start wirksam.
             </small>
         </div>
@@ -221,7 +222,7 @@ async function saveVariables() {
     });
 
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Speichern...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Speichern...';
 
     try {
         const resp = await fetch(
@@ -245,7 +246,7 @@ async function saveVariables() {
         toastr.error('Netzwerkfehler beim Speichern der Variablen.');
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-save mr-1"></i> Variablen speichern';
+        btn.innerHTML = '<i class="fas fa-save me-1"></i> Variablen speichern';
     }
 }
 
@@ -255,7 +256,7 @@ async function applyConfig() {
     if (!btn) return;
 
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Patche Configs...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Patche Configs...';
 
     try {
         const resp = await fetch(
@@ -278,7 +279,7 @@ async function applyConfig() {
         toastr.error('Netzwerkfehler beim Config-Apply.');
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-cogs mr-1"></i> Config anwenden';
+        btn.innerHTML = '<i class="fas fa-cogs me-1"></i> Config anwenden';
     }
 }
 </script>

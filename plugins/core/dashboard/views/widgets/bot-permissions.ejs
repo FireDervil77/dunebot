@@ -42,7 +42,7 @@
     </li>
   </ul>
   
-  <small class="text-muted"><%= tr('core:WIDGETS.BOT_PERMISSIONS.JOINED_AT') %> <%= new Date(stats.botStats.joinedAt).toLocaleDateString() %></small>
+  <small class="text-secondary"><%= tr('core:WIDGETS.BOT_PERMISSIONS.JOINED_AT') %> <%= new Date(stats.botStats.joinedAt).toLocaleDateString() %></small>
 <% } else { %>
   <div class="alert alert-warning">
     <%= tr('core:WIDGETS.BOT_PERMISSIONS.NO_DATA') %>

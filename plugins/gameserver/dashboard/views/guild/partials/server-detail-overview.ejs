@@ -48,7 +48,7 @@
                             <th>Addon-Version:</th>
                             <td>
                                 <span class="badge bg-secondary"><%= server.addon_version || '–' %></span>
-                                <small class="text-muted ms-1">Version des Marketplace-Addons</small>
+                                <small class="text-secondary ms-1">Version des Marketplace-Addons</small>
                             </td>
                         </tr>
                         <tr>
@@ -80,7 +80,7 @@
                             <td>
                                 <%= server.rootserver_name || 'N/A' %>
                                 <% if (server.rootserver_hostname) { %>
-                                    <small class="text-muted">(<%= server.rootserver_hostname %>)</small>
+                                    <small class="text-secondary">(<%= server.rootserver_hostname %>)</small>
                                 <% } %>
                             </td>
                         </tr>
@@ -150,15 +150,15 @@
                                     </button>
                                 <% } else if (server.port_query_expected) { %>
                                     <span class="text-warning">Nicht allokiert</span>
-                                    <small class="text-muted d-block">
+                                    <small class="text-secondary d-block">
                                         <i class="fas fa-triangle-exclamation me-1"></i>
                                         Das Spiel erwartet <code><%= server.port_query_expected %></code>/UDP,
                                         der Port ist aber nicht angelegt – die Statusabfrage bleibt deshalb leer.
                                         Über „Ports bearbeiten“ hinzufügen und den Server neu starten.
                                     </small>
                                 <% } else { %>
-                                    <span class="text-muted">Nicht konfiguriert</span>
-                                    <small class="text-muted d-block">
+                                    <span class="text-secondary">Nicht konfiguriert</span>
+                                    <small class="text-secondary d-block">
                                         <i class="fas fa-info-circle me-1"></i>
                                         Query-Port ermöglicht Server-Status-Abfragen (z.B. für Discord-Bots)
                                     </small>
@@ -176,8 +176,8 @@
                                         <i class="fas fa-copy"></i>
                                     </button>
                                 <% } else { %>
-                                    <span class="text-muted">Nicht konfiguriert</span>
-                                    <small class="text-muted d-block">
+                                    <span class="text-secondary">Nicht konfiguriert</span>
+                                    <small class="text-secondary d-block">
                                         <i class="fas fa-info-circle me-1"></i>
                                         RCON ermöglicht Remote-Administration des Servers
                                     </small>
@@ -208,7 +208,7 @@
                                             <i class="fas fa-copy"></i>
                                         </button>
                                     <% } else { %>
-                                        <span class="text-muted">Nicht konfiguriert</span>
+                                        <span class="text-secondary">Nicht konfiguriert</span>
                                     <% } %>
                                 </td>
                             </tr>
@@ -223,7 +223,7 @@
                 </table>
                 <% if (userPermissions.permissions['GAMESERVER.EDIT']) { %>
                 <div class="mt-2">
-                    <button class="btn btn-sm btn-outline-primary" data-toggle="modal" data-target="#portsEditModal">
+                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#portsEditModal">
                         <i class="fas fa-edit me-1"></i>Ports bearbeiten
                     </button>
                 </div>
@@ -237,7 +237,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-plug me-2"></i>Ports bearbeiten</h5>
-                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-warning alert-sm">
@@ -255,8 +255,8 @@
                     const label = portTypeLabels[pKey] || pKey;
                     const extVal = pEntry.external || pEntry.internal || '';
                 %>
-                    <div class="form-group">
-                        <label><strong><%= label %></strong> <code class="text-muted small"><%= pKey %></code></label>
+                    <div class="mb-3">
+                        <label><strong><%= label %></strong> <code class="text-secondary small"><%= pKey %></code></label>
                         <input type="number" class="form-control port-input" data-port-key="<%= pKey %>"
                                value="<%= extVal %>" min="1024" max="65535" placeholder="z.B. 27015">
                     </div>
@@ -264,7 +264,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
                 <button type="button" class="btn btn-primary" id="ports-save-btn" onclick="savePorts()">
                     <i class="fas fa-save me-1"></i>Speichern
                 </button>
@@ -334,7 +334,7 @@ async function savePorts() {
                             <%= playersKnown ? server.current_players : '–' %> / <%= server.max_players || '?' %>
                         </strong>
                         <% if (!playersKnown && server.status === 'online') { %>
-                            <i class="fas fa-circle-question text-muted ms-1"
+                            <i class="fas fa-circle-question text-secondary ms-1"
                                title="Spielerzahl unbekannt – die Live-Abfrage erreicht den Server nicht"></i>
                         <% } %>
                     </div>
@@ -431,7 +431,7 @@ async function savePorts() {
                         <span class="badge bg-secondary ms-2" id="query-ping-badge" style="display:none"></span>
                     </h3>
                     <div class="d-flex align-items-center gap-2">
-                        <small class="text-muted">
+                        <small class="text-secondary">
                             Stand: <span id="qry-last-update">–</span>
                         </small>
                         <button class="btn btn-sm btn-outline-primary" id="btn-refresh-query" onclick="refreshLiveQuery()">
@@ -440,7 +440,7 @@ async function savePorts() {
                     </div>
                 </div>
                 <div class="card-body">
-                    <div id="live-query-loading" class="text-center text-muted py-3">
+                    <div id="live-query-loading" class="text-center text-secondary py-3">
                         <i class="fas fa-spinner fa-spin me-2"></i>Lade Live-Status…
                     </div>
                     <div id="live-query-content" style="display:none">
@@ -455,12 +455,12 @@ async function savePorts() {
                         <div class="row g-3 mb-3">
                             <div class="col-6 col-md-3 text-center">
                                 <div class="fw-bold text-primary fs-4" id="qry-players">–</div>
-                                <div class="small text-muted">Spieler</div>
+                                <div class="small text-secondary">Spieler</div>
                             </div>
                             <% statusFields.forEach(field => { %>
                                 <div class="col-6 col-md-3 text-center" id="qry-field-<%= field.key %>" style="display:none">
                                     <div class="fw-bold <%= field.format === 'code' ? 'fs-6' : 'fs-4' %>" data-field-value></div>
-                                    <div class="small text-muted"><%= field.label %></div>
+                                    <div class="small text-secondary"><%= field.label %></div>
                                 </div>
                             <% }); %>
                         </div>
@@ -552,7 +552,7 @@ async function savePorts() {
                                 if (value != null) {
                                     html = value
                                         ? '<i class="fas fa-shield-alt text-success"></i> An'
-                                        : '<i class="fas fa-shield-alt text-muted"></i> Aus';
+                                        : '<i class="fas fa-shield-alt text-secondary"></i> Aus';
                                 }
                                 break;
                             case 'code':
@@ -743,7 +743,7 @@ async function savePorts() {
                                                     </button>
                                                 <% } %>
                                             </div>
-                                            <small class="text-muted">
+                                            <small class="text-secondary">
                                                 <i class="fas fa-lightbulb me-1"></i>
                                                 <strong>Verfügbare Variablen:</strong><br>
                                                 <code>{{PORT}}</code> - Game-Port,
@@ -779,7 +779,7 @@ async function savePorts() {
                                                     </button>
                                                 </div>
                                                 
-                                                <small class="text-muted d-block mt-2">
+                                                <small class="text-secondary d-block mt-2">
                                                     <i class="fas fa-exclamation-triangle me-1"></i>
                                                     <strong>Wichtig:</strong> Änderungen werden erst nach Neustart des Servers aktiv!
                                                 </small>
@@ -833,10 +833,11 @@ async function savePorts() {
      ======================================== -->
 <div class="row mt-3">
     <div class="col-12">
-        <div class="card card-outline card-info">
+        <div class="card">
+            <div class="card-status-top bg-info"></div>
             <div class="card-header">
                 <h3 class="card-title">
-                    <i class="fas fa-folder-open mr-2"></i>
+                    <i class="fas fa-folder-open me-2"></i>
                     SFTP-Zugang
                 </h3>
                 <div class="card-tools">
@@ -845,7 +846,7 @@ async function savePorts() {
                             class="btn btn-sm btn-warning"
                             id="sftp-reset-btn"
                             onclick="sftpResetPassword()">
-                        <i class="fas fa-sync-alt mr-1"></i>
+                        <i class="fas fa-sync-alt me-1"></i>
                         Passwort zurücksetzen
                     </button>
                     <% } %>
@@ -854,7 +855,7 @@ async function savePorts() {
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-3 col-sm-6 mb-2">
-                        <label class="text-muted small mb-1 d-block">HOST</label>
+                        <label class="text-secondary small mb-1 d-block">HOST</label>
                         <div class="input-group input-group-sm">
                             <input type="text" class="form-control" id="sftp-host" value="<%= server.sftp_host %>" readonly>
                             <div class="input-group-append">
@@ -865,7 +866,7 @@ async function savePorts() {
                         </div>
                     </div>
                     <div class="col-md-1 col-sm-6 mb-2">
-                        <label class="text-muted small mb-1 d-block">PORT</label>
+                        <label class="text-secondary small mb-1 d-block">PORT</label>
                         <div class="input-group input-group-sm">
                             <input type="text" class="form-control" value="<%= server.sftp_port %>" readonly>
                             <div class="input-group-append">
@@ -876,7 +877,7 @@ async function savePorts() {
                         </div>
                     </div>
                     <div class="col-md-4 col-sm-6 mb-2">
-                        <label class="text-muted small mb-1 d-block">BENUTZERNAME</label>
+                        <label class="text-secondary small mb-1 d-block">BENUTZERNAME</label>
                         <div class="input-group input-group-sm">
                             <input type="text" class="form-control font-italic" id="sftp-user" value="<%= server.sftp_username || '' %>" readonly>
                             <div class="input-group-append">
@@ -887,7 +888,7 @@ async function savePorts() {
                         </div>
                     </div>
                     <div class="col-md-4 col-sm-6 mb-2">
-                        <label class="text-muted small mb-1 d-block">PASSWORT</label>
+                        <label class="text-secondary small mb-1 d-block">PASSWORT</label>
                         <div class="input-group input-group-sm">
                             <input type="password" class="form-control font-italic" id="sftp-pass" value="<%= server.sftp_password || '' %>" readonly>
                             <div class="input-group-append">
@@ -901,8 +902,8 @@ async function savePorts() {
                         </div>
                     </div>
                 </div>
-                <small class="text-muted">
-                    <i class="fas fa-info-circle mr-1"></i>
+                <small class="text-secondary">
+                    <i class="fas fa-info-circle me-1"></i>
                     Verbindung: <code>sftp://<%= server.sftp_username %>@<%= server.sftp_host %>:<%= server.sftp_port %></code>
                     &nbsp;|&nbsp;
                     Client-Empfehlung: FileZilla, WinSCP
@@ -929,7 +930,7 @@ async function sftpResetPassword() {
     const btn = document.getElementById('sftp-reset-btn');
     if (!confirm('Passwort zurücksetzen? Das alte Passwort wird sofort ungültig.')) return;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Wird gesetzt...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Wird gesetzt...';
     try {
         const resp = await fetch(
             `/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/sftp/reset-password`,
@@ -949,7 +950,7 @@ async function sftpResetPassword() {
         toastr.error('Netzwerkfehler beim SFTP-Passwort-Reset.');
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-sync-alt mr-1"></i> Passwort zurücksetzen';
+        btn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Passwort zurücksetzen';
     }
 }
 </script>

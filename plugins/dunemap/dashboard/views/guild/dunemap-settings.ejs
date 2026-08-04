@@ -40,7 +40,7 @@
                 🇦🇺 <%= tr('dunemap:SETTINGS.CORIOLIS_REGION.OCE') %> (11:00 - 21:00)
               </option>
             </select>
-            <small class="text-muted"><%= tr('dunemap:SETTINGS.CORIOLIS_REGION.HELP') %></small>
+            <small class="text-secondary"><%= tr('dunemap:SETTINGS.CORIOLIS_REGION.HELP') %></small>
           </div>
 
           <!-- Map Channel ID -->
@@ -81,7 +81,7 @@
                   </option>
                 <% }) %>
               </select>
-              <small class="text-muted">
+              <small class="text-secondary">
                 <%= tr('dunemap:SETTINGS.CHANNEL.HELP') %>
                 <% if (settings.MAP_CHANNEL_ID) { %>
                   <br><strong><%= tr('dunemap:SETTINGS.CHANNEL.CURRENT') %></strong> 
@@ -102,7 +102,7 @@
                 placeholder="<%= tr('dunemap:SETTINGS.CHANNEL.PLACEHOLDER') %>"
                 pattern="[0-9]{17,20}"
               >
-              <small class="text-muted text-warning">
+              <small class="text-secondary text-warning">
                 <i class="fa-solid fa-exclamation-triangle me-1"></i>
                 <%= tr('dunemap:SETTINGS.CHANNEL.ERROR') %>
               </small>
@@ -160,7 +160,7 @@
         <table class="table table-sm table-borderless mb-0">
           <tbody>
             <tr>
-              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.REGION') %></td>
+              <td class="text-secondary small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.REGION') %></td>
               <td class="small">
                 <% const regionFlags = { NA: '🇺🇸', SA: '🇧🇷', EU: '🇪🇺', AS: '🇨🇳', OCE: '🇦🇺' }; %>
                 <% const regionNames = { NA: 'North America', SA: 'South America', EU: 'Europe', AS: 'Asia', OCE: 'Oceania' }; %>
@@ -169,7 +169,7 @@
               </td>
             </tr>
             <tr>
-              <td class="text-muted small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.CHANNEL') %></td>
+              <td class="text-secondary small"><%= tr('dunemap:SETTINGS.CURRENT_CONFIG.CHANNEL') %></td>
               <td class="small font-monospace" style="font-size: 0.7rem;">
                 <%= settings.MAP_CHANNEL_ID || tr('dunemap:SETTINGS.CURRENT_CONFIG.NOT_SET') %>
               </td>
@@ -177,7 +177,7 @@
           </tbody>
         </table>
         <hr class="my-2">
-        <small class="text-muted d-block">
+        <small class="text-secondary d-block">
           <i class="fa-solid fa-info-circle me-1"></i>
           Storm-Zeiten werden automatisch basierend auf deiner Region berechnet (wöchentlicher Reset, 10h Dauer).
         </small>

@@ -24,7 +24,7 @@
           <div class="progress-circle bg-success text-white">
             <i class="fa-solid fa-check"></i>
           </div>
-          <div class="text-muted"><%= tr('gameserver:SERVER.STEP1_LABEL') %></div>
+          <div class="text-secondary"><%= tr('gameserver:SERVER.STEP1_LABEL') %></div>
         </div>
       </div>
       <div class="col-md-4">
@@ -32,7 +32,7 @@
           <div class="progress-circle bg-success text-white">
             <i class="fa-solid fa-check"></i>
           </div>
-          <div class="text-muted"><%= tr('gameserver:SERVER.STEP2_LABEL_EGG') %></div>
+          <div class="text-secondary"><%= tr('gameserver:SERVER.STEP2_LABEL_EGG') %></div>
         </div>
       </div>
       <div class="col-md-4">
@@ -62,14 +62,14 @@
           <div class="card mb-4">
             <div class="card-header">
               <h5 class="mb-0">
-                <i class="fa-solid fa-network-wired mr-2"></i>
+                <i class="fa-solid fa-network-wired me-2"></i>
                 <%= tr('gameserver:SERVER.PORT_CONFIG') %>
               </h5>
             </div>
             <div class="card-body">
-              <div class="form-group mb-3">
+              <div class="mb-3 mb-3">
                 <label for="game_port">
-                  <i class="fa-solid fa-plug mr-1 text-primary"></i><%= tr('gameserver:SERVER.GAME_PORT') %>
+                  <i class="fa-solid fa-plug me-1 text-primary"></i><%= tr('gameserver:SERVER.GAME_PORT') %>
                 </label>
                 <div class="input-group">
                   <select class="form-control" id="game_port" name="game_port">
@@ -88,9 +88,9 @@
                         <button type="button" class="btn btn-outline-primary" id="useManualPort"><%= tr('gameserver:SERVER.PORT_MANUAL_APPLY') %></button>
                     </div>
                   </div>
-                  <small class="form-text text-muted"><%= tr('gameserver:SERVER.PORT_POOL_HELP') %></small>
+                  <small class="form-text text-secondary"><%= tr('gameserver:SERVER.PORT_POOL_HELP') %></small>
                 </div>
-                <small class="form-text text-muted" id="portPoolInfo"><i class="fa-solid fa-spinner fa-spin mr-1"></i><%= tr('gameserver:SERVER.PORT_LOADING') %></small>
+                <small class="form-text text-secondary" id="portPoolInfo"><i class="fa-solid fa-spinner fa-spin me-1"></i><%= tr('gameserver:SERVER.PORT_LOADING') %></small>
               </div>
 
               <% 
@@ -100,9 +100,9 @@
               %>
               <% if (extraPorts.length > 0) { %>
                 <hr class="my-3">
-                <h6 class="text-muted mb-3">
-                  <i class="fa-solid fa-list-ol mr-1"></i>
-                  Zusätzliche Ports <small class="text-muted">(werden automatisch zugewiesen)</small>
+                <h6 class="text-secondary mb-3">
+                  <i class="fa-solid fa-list-ol me-1"></i>
+                  Zusätzliche Ports <small class="text-secondary">(werden automatisch zugewiesen)</small>
                 </h6>
                 <div class="table-responsive">
                   <table class="table table-sm table-bordered mb-0" id="extraPortsTable">
@@ -117,21 +117,21 @@
                       <% extraPorts.forEach((ep, idx) => { %>
                         <tr data-port-type="<%= ep.type %>" data-port-offset="<%= idx + 1 %>">
                           <td>
-                            <i class="fa-solid fa-plug mr-1 text-secondary"></i>
+                            <i class="fa-solid fa-plug me-1 text-secondary"></i>
                             <strong><%= ep.label %></strong>
-                            <code class="ml-1 text-muted"><%= ep.env_variable || (ep.type.toUpperCase() + '_PORT') %></code>
+                            <code class="ms-1 text-secondary"><%= ep.env_variable || (ep.type.toUpperCase() + '_PORT') %></code>
                           </td>
-                          <td class="extra-port-value text-muted">
+                          <td class="extra-port-value text-secondary">
                             <em>Game-Port + <%= idx + 1 %></em>
                           </td>
-                          <td><span class="badge badge-secondary"><%= ep.protocol.toUpperCase() %></span></td>
+                          <td><span class="badge bg-secondary-lt"><%= ep.protocol.toUpperCase() %></span></td>
                         </tr>
                       <% }); %>
                     </tbody>
                   </table>
                 </div>
-                <small class="form-text text-muted mt-2">
-                  <i class="fa-solid fa-info-circle mr-1"></i>
+                <small class="form-text text-secondary mt-2">
+                  <i class="fa-solid fa-info-circle me-1"></i>
                   Zusätzliche Ports werden sequenziell ab dem Game-Port vergeben (Game+1, Game+2, ...) und automatisch im Pool reserviert.
                 </small>
               <% } %>
@@ -142,7 +142,7 @@
           <div class="card mb-4">
             <div class="card-header">
               <h5 class="mb-0">
-                <i class="fa-solid fa-gauge-high mr-2"></i>
+                <i class="fa-solid fa-gauge-high me-2"></i>
                 <%= tr('gameserver:SERVER.RESOURCE_LIMITS') %>
               </h5>
             </div>
@@ -156,8 +156,8 @@
                 vom Daemon durchsetzen.
               %>
               <div class="alert alert-light border mb-4 py-2">
-                <small class="text-muted">
-                  <i class="fa-solid fa-circle-info mr-1"></i>
+                <small class="text-secondary">
+                  <i class="fa-solid fa-circle-info me-1"></i>
                   Diese Werte reservieren Platz auf dem RootServer und begrenzen den
                   Server im Betrieb. Reicht der freie Platz nicht, wird das Anlegen
                   mit einer Meldung abgelehnt.
@@ -165,9 +165,9 @@
               </div>
 
               <!-- Memory Limit -->
-              <div class="form-group mb-4">
+              <div class="mb-3 mb-4">
                 <label for="allocated_ram_mb">
-                  <i class="fa-solid fa-memory mr-2 text-info"></i><%= tr('gameserver:SERVER.MEMORY') %>
+                  <i class="fa-solid fa-memory me-2 text-info"></i><%= tr('gameserver:SERVER.MEMORY') %>
                   <span class="text-danger">*</span>
                 </label>
                 <div class="input-group">
@@ -177,13 +177,13 @@
                     <span class="input-group-text">MiB</span>
                   </div>
                 </div>
-                <small class="form-text text-muted"><%= tr('gameserver:SERVER.RAM_HELP') %></small>
+                <small class="form-text text-secondary"><%= tr('gameserver:SERVER.RAM_HELP') %></small>
               </div>
 
               <!-- CPU Limit -->
-              <div class="form-group mb-4">
+              <div class="mb-3 mb-4">
                 <label for="allocated_cpu_percent">
-                  <i class="fa-solid fa-microchip mr-2 text-primary"></i><%= tr('gameserver:SERVER.CPU_LABEL') %>
+                  <i class="fa-solid fa-microchip me-2 text-primary"></i><%= tr('gameserver:SERVER.CPU_LABEL') %>
                   <span class="text-danger">*</span>
                 </label>
                 <div class="input-group">
@@ -196,15 +196,15 @@
                     <span class="input-group-text">%</span>
                   </div>
                 </div>
-                <small class="form-text text-muted">
+                <small class="form-text text-secondary">
                   100 % entspricht einem CPU-Kern, 200 % zwei Kernen.
                 </small>
               </div>
 
               <!-- Disk Limit -->
-              <div class="form-group mb-0">
+              <div class="mb-3 mb-0">
                 <label for="allocated_disk_gb">
-                  <i class="fa-solid fa-hdd mr-2 text-warning"></i><%= tr('gameserver:SERVER.DISK_SPACE') %>
+                  <i class="fa-solid fa-hdd me-2 text-warning"></i><%= tr('gameserver:SERVER.DISK_SPACE') %>
                   <span class="text-danger">*</span>
                 </label>
                 <div class="input-group">
@@ -214,7 +214,7 @@
                     <span class="input-group-text">GiB</span>
                   </div>
                 </div>
-                <small class="form-text text-muted"><%= tr('gameserver:SERVER.DISK_HELP') %></small>
+                <small class="form-text text-secondary"><%= tr('gameserver:SERVER.DISK_HELP') %></small>
               </div>
             </div>
           </div>
@@ -223,14 +223,14 @@
           <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h5 class="mb-0">
-                <i class="fa-solid fa-folder-tree mr-2"></i>
+                <i class="fa-solid fa-folder-tree me-2"></i>
                 <%= tr('gameserver:SERVER.SFTP_ACCESS') %>
               </h5>
-              <span class="badge badge-warning"><%= tr('gameserver:SERVER.COMING_SOON') %></span>
+              <span class="badge bg-warning-lt"><%= tr('gameserver:SERVER.COMING_SOON') %></span>
             </div>
             <div class="card-body">
               <div class="alert alert-info mb-0">
-                <i class="fa-solid fa-info-circle mr-2"></i>
+                <i class="fa-solid fa-info-circle me-2"></i>
                 <strong><%= tr('gameserver:SERVER.SFTP_INFO') %></strong><br>
                 <small><%= tr('gameserver:SERVER.SFTP_INFO_DETAIL') %></small>
               </div>
@@ -247,7 +247,7 @@
           <div class="card mb-4">
             <div class="card-header">
               <h5 class="mb-0">
-                <i class="fa-solid fa-sliders mr-2"></i>
+                <i class="fa-solid fa-sliders me-2"></i>
                 <%= tr('gameserver:SERVER.ADVANCED_SETTINGS') %>
               </h5>
             </div>
@@ -255,27 +255,27 @@
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label for="auto_restart">
-                    <i class="fa-solid fa-rotate mr-2 text-success"></i>
+                    <i class="fa-solid fa-rotate me-2 text-success"></i>
                     <%= tr('gameserver:SERVER.AUTO_RESTART') %>
                   </label>
                   <select class="form-control" id="auto_restart" name="auto_restart">
                     <option value="1" selected><%= tr('gameserver:SERVER.ENABLED') %></option>
                     <option value="0"><%= tr('gameserver:SERVER.DISABLED') %></option>
                   </select>
-                  <small class="form-text text-muted">
+                  <small class="form-text text-secondary">
                     <%= tr('gameserver:SERVER.AUTO_RESTART_HELP') %>
                   </small>
                 </div>
                 <div class="col-md-6 mb-3">
                   <label for="auto_update">
-                    <i class="fa-solid fa-download mr-2 text-info"></i>
+                    <i class="fa-solid fa-download me-2 text-info"></i>
                     <%= tr('gameserver:SERVER.AUTO_UPDATE') %>
                   </label>
                   <select class="form-control" id="auto_update" name="auto_update">
                     <option value="0" selected><%= tr('gameserver:SERVER.DISABLED') %></option>
                     <option value="1"><%= tr('gameserver:SERVER.ENABLED') %></option>
                   </select>
-                  <small class="form-text text-muted">
+                  <small class="form-text text-secondary">
                     <%= tr('gameserver:SERVER.AUTO_UPDATE_HELP') %>
                   </small>
                 </div>
@@ -288,11 +288,11 @@
             <div class="card-body">
               <div class="d-flex justify-content-between">
                 <button type="button" id="btnBack" class="btn btn-secondary">
-                  <i class="fa-solid fa-arrow-left mr-2"></i>
+                  <i class="fa-solid fa-arrow-left me-2"></i>
                   <%= tr('gameserver:SERVER.BACK') %>
                 </button>
                 <button type="submit" id="btnCreate" class="btn btn-success btn-lg">
-                  <i class="fa-solid fa-rocket mr-2"></i>
+                  <i class="fa-solid fa-rocket me-2"></i>
                   <%= tr('gameserver:SERVER.CREATE_SERVER') %>
                 </button>
               </div>
@@ -306,13 +306,13 @@
         <div class="card sticky-top" style="top: 20px;">
           <div class="card-header bg-success text-white">
             <h6 class="mb-0">
-              <i class="fa-solid fa-clipboard-check mr-2"></i>
+              <i class="fa-solid fa-clipboard-check me-2"></i>
               <%= tr('gameserver:SERVER.SUMMARY') %>
             </h6>
           </div>
           <div class="card-body">
             <!-- From Step 1 -->
-            <h6 class="text-muted mb-2"><%= tr('gameserver:SERVER.SUMMARY_STEP1') %></h6>
+            <h6 class="text-secondary mb-2"><%= tr('gameserver:SERVER.SUMMARY_STEP1') %></h6>
             <ul class="list-unstyled mb-3">
               <li><strong><%= tr('gameserver:SERVER.SUMMARY_SERVER_NAME') %></strong> <span id="summaryServerName">-</span></li>
               <li><strong><%= tr('gameserver:SERVER.SUMMARY_ADDON') %></strong> <%= addon.name %></li>
@@ -323,14 +323,14 @@
             <hr>
             
             <!-- From Step 2 -->
-            <h6 class="text-muted mb-2"><%= tr('gameserver:SERVER.SUMMARY_STEP2') %></h6>
+            <h6 class="text-secondary mb-2"><%= tr('gameserver:SERVER.SUMMARY_STEP2') %></h6>
             <ul class="list-unstyled mb-3" id="summaryVariables">
-              <li class="text-muted"><em><%= tr('gameserver:SERVER.SUMMARY_NO_VARIABLES') %></em></li>
+              <li class="text-secondary"><em><%= tr('gameserver:SERVER.SUMMARY_NO_VARIABLES') %></em></li>
             </ul>
             <hr>
             
             <!-- From Step 3 -->
-            <h6 class="text-muted mb-2"><%= tr('gameserver:SERVER.SUMMARY_STEP3') %></h6>
+            <h6 class="text-secondary mb-2"><%= tr('gameserver:SERVER.SUMMARY_STEP3') %></h6>
             <ul class="list-unstyled mb-0">
               <li><strong><%= tr('gameserver:SERVER.SUMMARY_PORT') %></strong> <span id="summaryPort">Auto</span></li>
               <li><strong><%= tr('gameserver:SERVER.SUMMARY_RAM') %></strong> <span id="summaryRam"><%= tr('gameserver:SERVER.UNLIMITED') %></span></li>
@@ -468,7 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     if (!hasVariables) {
-        variablesList.innerHTML = `<li class="text-muted"><em>${i18n.noVariables}</em></li>`;
+        variablesList.innerHTML = `<li class="text-secondary"><em>${i18n.noVariables}</em></li>`;
     }
     
     // ========================================
@@ -492,7 +492,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Button disablen + Spinner
         submitBtn.disabled = true;
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> ${i18n.creatingServer}`;
+        submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i> ${i18n.creatingServer}`;
         
         try {
             // ✅ JSON-Payload aus Form-Daten + URL-Params
@@ -565,7 +565,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadFreePorts() {
         const rsId = urlParams.get('rootserver');
         if (!rsId) {
-            portInfo.innerHTML = `<span class="text-warning"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${i18n.noRootserverSelected}</span>`;
+            portInfo.innerHTML = `<span class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i>${i18n.noRootserverSelected}</span>`;
             return;
         }
         try {
@@ -577,7 +577,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             const freePorts = data.filter(a => a.server_id === null).sort((a, b) => a.port - b.port);
             if (freePorts.length === 0) {
-                portInfo.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-xmark mr-1"></i>${i18n.noFreePorts}</span>`;
+                portInfo.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-xmark me-1"></i>${i18n.noFreePorts}</span>`;
                 return;
             }
             // Dropdown befüllen (max 200 einzeln anzeigen, danach gruppiert)
@@ -595,7 +595,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 opt.textContent = `... ${freePorts.length - showMax} ${i18n.moreFreePorts}`;
                 portSelect.appendChild(opt);
             }
-            portInfo.innerHTML = `<span class="text-success"><i class="fa-solid fa-circle-check mr-1"></i>${freePorts.length} ${i18n.freePortsAvailable} (${summary.assigned} ${i18n.portsAssigned})</span>`;
+            portInfo.innerHTML = `<span class="text-success"><i class="fa-solid fa-circle-check me-1"></i>${freePorts.length} ${i18n.freePortsAvailable} (${summary.assigned} ${i18n.portsAssigned})</span>`;
         } catch (_) {
             portInfo.innerHTML = `<span class="text-danger">${i18n.networkError}</span>`;
         }
@@ -644,7 +644,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const offset = parseInt(row.dataset.portOffset);
             const cell = row.querySelector('.extra-port-value');
             if (gamePort) {
-                cell.innerHTML = `<strong>${gamePort + offset}</strong> <small class="text-muted">(${gamePort} + ${offset})</small>`;
+                cell.innerHTML = `<strong>${gamePort + offset}</strong> <small class="text-secondary">(${gamePort} + ${offset})</small>`;
             } else {
                 cell.innerHTML = `<em>Game-Port + ${offset}</em>`;
             }

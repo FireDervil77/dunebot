@@ -72,7 +72,7 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
         </h5>
         
         <!-- Game-Name -->
-        <p class="text-muted mb-3">
+        <p class="text-secondary mb-3">
             <small><%= server.game_name || server.game_slug %></small>
         </p>
         
@@ -89,8 +89,8 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
                 <!-- CPU -->
                 <div class="mb-2">
                     <div class="d-flex justify-content-between mb-1">
-                        <small class="text-muted">CPU</small>
-                        <small class="server-cpu text-muted">--</small>
+                        <small class="text-secondary">CPU</small>
+                        <small class="server-cpu text-secondary">--</small>
                     </div>
                     <div class="progress" style="height: 6px;">
                         <div class="progress-bar bg-info server-cpu-bar" 
@@ -105,8 +105,8 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
                 <!-- RAM -->
                 <div class="mb-2">
                     <div class="d-flex justify-content-between mb-1">
-                        <small class="text-muted">RAM</small>
-                        <small class="server-ram text-muted">--</small>
+                        <small class="text-secondary">RAM</small>
+                        <small class="server-ram text-secondary">--</small>
                     </div>
                     <div class="progress" style="height: 6px;">
                         <div class="progress-bar bg-warning server-ram-bar" 
@@ -120,7 +120,7 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
                 
                 <!-- Players -->
                 <div class="d-flex justify-content-between">
-                    <small class="text-muted">
+                    <small class="text-secondary">
                         <i class="bi bi-people-fill me-1"></i>Spieler
                     </small>
                     <small class="server-players">
@@ -135,7 +135,7 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
         
         <!-- Connection-Info -->
         <div class="mb-3 mt-auto">
-            <small class="text-muted d-block mb-1">Verbindung</small>
+            <small class="text-secondary d-block mb-1">Verbindung</small>
             <div class="d-flex align-items-center">
                 <code class="server-connection flex-grow-1" style="font-size: 0.85rem;">
                     <%= connectionString %>

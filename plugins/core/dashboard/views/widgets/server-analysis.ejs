@@ -4,9 +4,9 @@
  * Auf Tabler-Bauteile gezogen: Kennzahlen als `.datagrid`, die Cache-Quote als
  * schlanker Balken statt als grüner Klotz mit Prozentzahl darin.
  *
- * Farben kommen aus den Design-Tokens. `text-muted` ist durch
+ * Farben kommen aus den Design-Tokens. `text-secondary` ist durch
  * `text-secondary` ersetzt — in Bootstrap 5 ist das die vorgesehene Klasse,
- * und sie hängt an `--fb-text-muted`.
+ * und sie hängt an `--fb-text-secondary`.
 %>
 
 <%
@@ -54,7 +54,7 @@
   <%= tr('core:WIDGETS.SERVER_ANALYSIS.CACHED_MEMBERS') %> <%= _imCache %>/<%= _mitglieder %>
 </div>
 
-<div class="hr-text hr-text-left my-3"><%= tr('core:WIDGETS.SERVER_ANALYSIS.SERVER_AGE') %></div>
+<div class="hr-text hr-text-start my-3"><%= tr('core:WIDGETS.SERVER_ANALYSIS.SERVER_AGE') %></div>
 <% if (_erstellt) { %>
   <div class="d-flex align-items-center gap-2">
     <i class="fa-regular fa-calendar text-secondary"></i>
@@ -66,7 +66,7 @@
 <% } %>
 
 <% if (stats?.guild?.premiumTier) { %>
-  <div class="hr-text hr-text-left my-3"><%= tr('core:WIDGETS.SERVER_ANALYSIS.PREMIUM_STATUS') %></div>
+  <div class="hr-text hr-text-start my-3"><%= tr('core:WIDGETS.SERVER_ANALYSIS.PREMIUM_STATUS') %></div>
   <div class="d-flex align-items-center gap-2">
     <span class="text-warning">
       <% for (let i = 0; i < stats.guild.premiumTier; i++) { %><i class="fa-solid fa-star"></i><% } %>

@@ -74,7 +74,7 @@
                 <form id="questSearchForm">
                     <div class="row">
                         <div class="col-md-3">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label>Quest-Typ</label>
                                 <select class="form-control" name="type" id="filterType">
                                     <option value="">Alle Typen</option>
@@ -85,7 +85,7 @@
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label>Faction</label>
                                 <select class="form-control" name="faction" id="filterFaction">
                                     <option value="">Alle Factions</option>
@@ -96,7 +96,7 @@
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label>Schwierigkeit</label>
                                 <select class="form-control" name="difficulty" id="filterDifficulty">
                                     <option value="">Alle</option>
@@ -109,7 +109,7 @@
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label>Freitextsuche</label>
                                 <input type="text" class="form-control" name="search" id="filterSearch" placeholder="Quest-Name...">
                             </div>
@@ -145,7 +145,7 @@
                     <p class="mt-2">Lade Quests...</p>
                 </div>
                 <div id="questResults">
-                    <div class="text-center p-4 text-muted">
+                    <div class="text-center p-4 text-secondary">
                         <i class="fa-solid fa-search fa-3x mb-3"></i>
                         <p>Nutze die Filter oben, um Quests zu suchen.</p>
                     </div>
@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (data.quests.length === 0) {
                     resultsContainer.innerHTML = `
-                        <div class="text-center p-4 text-muted">
+                        <div class="text-center p-4 text-secondary">
                             <i class="fa-solid fa-search fa-3x mb-3"></i>
                             <p>Keine Quests gefunden. Versuche andere Filter.</p>
                         </div>
@@ -286,18 +286,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 <tr>
                     <td>
                         <strong>${questName}</strong>
-                        ${quest.chain_name_en ? `<br><small class="text-muted"><i class="fa-solid fa-link"></i> ${quest.chain_name_de || quest.chain_name_en} (${quest.quest_chain_position || '?'}/${quest.total_quests || '?'})</small>` : ''}
+                        ${quest.chain_name_en ? `<br><small class="text-secondary"><i class="fa-solid fa-link"></i> ${quest.chain_name_de || quest.chain_name_en} (${quest.quest_chain_position || '?'}/${quest.total_quests || '?'})</small>` : ''}
                     </td>
                     <td><span class="badge badge-${typeColor}">${quest.quest_type}</span></td>
                     <td><span class="badge badge-${factionColor}">${quest.faction}</span></td>
                     <td>
                         ${npcName}
-                        <br><small class="text-muted"><i class="fa-solid fa-map-marker-alt"></i> ${location}</small>
+                        <br><small class="text-secondary"><i class="fa-solid fa-map-marker-alt"></i> ${location}</small>
                     </td>
                     <td>
-                        ${quest.reward_xp ? `<span class="badge badge-success">${quest.reward_xp} XP</span> ` : ''}
-                        ${quest.reward_solari ? `<span class="badge badge-warning">${quest.reward_solari} <i class="fa-solid fa-coins"></i></span>` : ''}
-                        ${quest.reward_items && quest.reward_items.length > 0 ? `<br><small class="text-muted">${quest.reward_items.length} Items</small>` : ''}
+                        ${quest.reward_xp ? `<span class="badge bg-success-lt">${quest.reward_xp} XP</span> ` : ''}
+                        ${quest.reward_solari ? `<span class="badge bg-warning-lt">${quest.reward_solari} <i class="fa-solid fa-coins"></i></span>` : ''}
+                        ${quest.reward_items && quest.reward_items.length > 0 ? `<br><small class="text-secondary">${quest.reward_items.length} Items</small>` : ''}
                     </td>
                     <td>
                         <button class="btn btn-sm btn-info" onclick="viewQuestDetails('${quest.quest_slug}')">

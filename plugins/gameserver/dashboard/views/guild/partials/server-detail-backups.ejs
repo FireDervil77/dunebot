@@ -27,18 +27,16 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-save me-2"></i>Backup erstellen</h5>
-                <button type="button" class="close" data-dismiss="modal">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
-                <div class="form-group mb-0">
+                <div class="mb-3 mb-0">
                     <label for="backupNote">Notiz (optional)</label>
                     <textarea id="backupNote" class="form-control" rows="3" placeholder="z.B. Vor Update auf v2.5 erstellt..." maxlength="500"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
                 <button type="button" class="btn btn-primary" id="confirmBackupBtn" onclick="confirmCreateBackup()">
                     <i class="fas fa-save me-1"></i> Backup erstellen
                 </button>
@@ -50,12 +48,12 @@
 
 <!-- Backup-Tabelle -->
 <div id="backups-container">
-    <div id="backups-loading" class="text-center text-muted py-5">
+    <div id="backups-loading" class="text-center text-secondary py-5">
         <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
         <p>Backups werden geladen...</p>
     </div>
-    <div id="backups-empty" class="text-center text-muted py-5" style="display:none;">
-        <i class="fas fa-archive fa-3x mb-3 text-muted"></i>
+    <div id="backups-empty" class="text-center text-secondary py-5" style="display:none;">
+        <i class="fas fa-archive fa-3x mb-3 text-secondary"></i>
         <p>Keine Backups vorhanden.</p>
         <% if (userPermissions.permissions['GAMESERVER.BACKUPS.CREATE']) { %>
             <button class="btn btn-primary" onclick="createBackup()">
@@ -103,13 +101,13 @@
 
     function statusBadge(status) {
         const map = {
-            pending:    '<span class="badge badge-secondary"><i class="fas fa-clock me-1"></i>Ausstehend</span>',
-            running:    '<span class="badge badge-info"><i class="fas fa-spinner fa-spin me-1"></i>Läuft</span>',
-            completed:  '<span class="badge badge-success"><i class="fas fa-check me-1"></i>Fertig</span>',
-            failed:     '<span class="badge badge-danger"><i class="fas fa-times me-1"></i>Fehlgeschlagen</span>',
-            restoring:  '<span class="badge badge-warning"><i class="fas fa-undo me-1"></i>Wiederherstellung</span>',
+            pending:    '<span class="badge bg-secondary-lt"><i class="fas fa-clock me-1"></i>Ausstehend</span>',
+            running:    '<span class="badge bg-info-lt"><i class="fas fa-spinner fa-spin me-1"></i>Läuft</span>',
+            completed:  '<span class="badge bg-success-lt"><i class="fas fa-check me-1"></i>Fertig</span>',
+            failed:     '<span class="badge bg-danger-lt"><i class="fas fa-times me-1"></i>Fehlgeschlagen</span>',
+            restoring:  '<span class="badge bg-warning-lt"><i class="fas fa-undo me-1"></i>Wiederherstellung</span>',
         };
-        return map[status] || `<span class="badge badge-secondary">${status}</span>`;
+        return map[status] || `<span class="badge bg-secondary-lt">${status}</span>`;
     }
 
     function fmtDate(d) {
@@ -147,7 +145,7 @@
                     <td><strong>${escHtml(b.name)}</strong></td>
                     <td>${formatBytes(b.size_bytes)}</td>
                     <td>${statusBadge(b.status)}</td>
-                    <td class="text-muted small">${escHtml(b.note) || '—'}</td>
+                    <td class="text-secondary small">${escHtml(b.note) || '—'}</td>
                     <td><small>${fmtDate(b.created_at)}</small></td>
                     <td>
                         <div class="btn-group btn-group-sm">

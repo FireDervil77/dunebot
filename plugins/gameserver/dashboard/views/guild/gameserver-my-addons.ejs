@@ -58,57 +58,57 @@
                                     <div class="mb-2">
                                         <!-- Status Badge -->
                                         <% if (addon.status === 'draft') { %>
-                                            <span class="badge badge-secondary">
+                                            <span class="badge bg-secondary-lt">
                                                 <i class="fa-solid fa-pen"></i> <%= tr('gameserver:MY_ADDONS.STATUS_DRAFT') %>
                                             </span>
                                         <% } else if (addon.status === 'pending_review') { %>
-                                            <span class="badge badge-warning">
+                                            <span class="badge bg-warning-lt">
                                                 <i class="fa-solid fa-clock"></i> <%= tr('gameserver:MY_ADDONS.STATUS_PENDING') %>
                                             </span>
                                         <% } else if (addon.status === 'approved') { %>
-                                            <span class="badge badge-success">
+                                            <span class="badge bg-success-lt">
                                                 <i class="fa-solid fa-check"></i> <%= tr('gameserver:MY_ADDONS.STATUS_APPROVED') %>
                                             </span>
                                         <% } %>
                                         
                                         <!-- Runtime Type Badge -->
                                         <% if (addon.runtime_type === 'docker_steam') { %>
-                                            <span class="badge badge-dark ml-1">
+                                            <span class="badge bg-dark-lt ms-1">
                                                 <i class="fa-brands fa-steam"></i> Steam
                                             </span>
                                         <% } else if (addon.runtime_type === 'docker_standalone') { %>
-                                            <span class="badge badge-dark ml-1">
+                                            <span class="badge bg-dark-lt ms-1">
                                                 <i class="fa-brands fa-docker"></i> Docker
                                             </span>
                                         <% } else if (addon.runtime_type === 'native_steamcmd') { %>
-                                            <span class="badge badge-secondary ml-1">
+                                            <span class="badge bg-secondary-lt ms-1">
                                                 <i class="fa-brands fa-steam"></i> Native
                                             </span>
                                         <% } %>
 
                                         <!-- Visibility Badge -->
                                         <% if (addon.visibility === 'private') { %>
-                                            <span class="badge badge-info ml-1">
+                                            <span class="badge bg-info-lt ms-1">
                                                 <i class="fa-solid fa-lock"></i> <%= tr('gameserver:MY_ADDONS.VISIBILITY_PRIVATE') %>
                                             </span>
                                         <% } else if (addon.visibility === 'public') { %>
-                                            <span class="badge badge-primary ml-1">
+                                            <span class="badge bg-primary-lt ms-1">
                                                 <i class="fa-solid fa-globe"></i> <%= tr('gameserver:MY_ADDONS.VISIBILITY_PUBLIC') %>
                                             </span>
                                         <% } else if (addon.visibility === 'unlisted') { %>
-                                            <span class="badge badge-secondary ml-1">
+                                            <span class="badge bg-secondary-lt ms-1">
                                                 <i class="fa-solid fa-eye-slash"></i> <%= tr('gameserver:MY_ADDONS.VISIBILITY_UNLISTED') %>
                                             </span>
                                         <% } %>
                                     </div>
                                     
-                                    <p class="card-text text-muted small">
+                                    <p class="card-text text-secondary small">
                                         <%= addon.description ? addon.description.substring(0, 100) + '...' : 'Keine Beschreibung' %>
                                     </p>
                                     
                                     <!-- Meta Info -->
                                     <p class="card-text">
-                                        <small class="text-muted">
+                                        <small class="text-secondary">
                                             <i class="fa-solid fa-tag"></i> <%= addon.category || 'Keine Kategorie' %><br>
                                             <i class="fa-solid fa-download"></i> <%= addon.install_count || 0 %> Installationen<br>
                                             <i class="fa-solid fa-clock"></i> <%= tr('gameserver:MY_ADDONS.LAST_EDITED') %>: <%= new Date(addon.updated_at).toLocaleDateString('de-DE') %>
@@ -117,7 +117,7 @@
                                 </div>
                                 
                                 <div class="card-footer">
-                                    <div class="btn-group btn-block" role="group">
+                                    <div class="btn-group w-100" role="group">
                                         <a href="/guild/<%= guildId %>/plugins/gameserver/addons/edit/<%= addon.id %>" 
                                            class="btn btn-sm btn-primary">
                                             <i class="fa-solid fa-edit"></i> <%= tr('gameserver:MY_ADDONS.EDIT') %>
@@ -143,9 +143,9 @@
                     <div class="col-12">
                         <div class="card">
                             <div class="card-body text-center py-5">
-                                <i class="fa-solid fa-puzzle-piece fa-5x text-muted mb-3"></i>
+                                <i class="fa-solid fa-puzzle-piece fa-5x text-secondary mb-3"></i>
                                 <h3><%= tr('gameserver:MY_ADDONS.NO_EGGS') %></h3>
-                                <p class="text-muted">
+                                <p class="text-secondary">
                                     <%= tr('gameserver:MY_ADDONS.NO_EGGS_DESC') %>
                                 </p>
                                 <a href="/guild/<%= guildId %>/plugins/gameserver/addons/create" class="btn btn-primary btn-lg">

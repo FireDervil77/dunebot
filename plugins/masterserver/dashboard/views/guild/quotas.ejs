@@ -11,7 +11,7 @@
         <div class="row mb-2">
             <div class="col-sm-6">
                 <h1 class="m-0">
-                    <i class="fas fa-tachometer-alt mr-2"></i>Ressourcen-Management
+                    <i class="fas fa-tachometer-alt me-2"></i>Ressourcen-Management
                 </h1>
             </div>
             <div class="col-sm-6">
@@ -30,7 +30,7 @@
 
         <% if (!nodes || nodes.length === 0) { %>
         <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle mr-2"></i>
+            <i class="fas fa-exclamation-triangle me-2"></i>
             Kein RootServer konfiguriert. <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers/create">RootServer einrichten</a>.
         </div>
         <% } %>
@@ -49,23 +49,23 @@
             <!-- Card Header -->
             <div class="card-header">
                 <h3 class="card-title">
-                    <i class="fas fa-server mr-2"></i>
+                    <i class="fas fa-server me-2"></i>
                     <strong><%= node.name %></strong>
                     <% if (isOnline) { %>
-                        <span class="badge badge-success ml-2">
+                        <span class="badge bg-success-lt ms-2">
                             <i class="fas fa-circle" style="font-size:.6em;"></i> Online
                         </span>
                     <% } else { %>
-                        <span class="badge badge-secondary ml-2">
+                        <span class="badge bg-secondary-lt ms-2">
                             <i class="fas fa-circle" style="font-size:.6em;"></i> Offline
                         </span>
                     <% } %>
                 </h3>
                 <div class="card-tools">
-                    <small class="text-muted">
-                        <i class="fas fa-microchip mr-1"></i><%= node.cpu_cores || '?' %> Kerne &nbsp;·&nbsp;
-                        <i class="fas fa-memory mr-1"></i><%= node.ram_total_gb ? parseFloat(node.ram_total_gb).toFixed(1) : '?' %> GB RAM &nbsp;·&nbsp;
-                        <i class="fas fa-hdd mr-1"></i><%= node.disk_total_gb ? parseFloat(node.disk_total_gb).toFixed(1) : '?' %> GB Disk
+                    <small class="text-secondary">
+                        <i class="fas fa-microchip me-1"></i><%= node.cpu_cores || '?' %> Kerne &nbsp;·&nbsp;
+                        <i class="fas fa-memory me-1"></i><%= node.ram_total_gb ? parseFloat(node.ram_total_gb).toFixed(1) : '?' %> GB RAM &nbsp;·&nbsp;
+                        <i class="fas fa-hdd me-1"></i><%= node.disk_total_gb ? parseFloat(node.disk_total_gb).toFixed(1) : '?' %> GB Disk
                     </small>
                 </div>
             </div>
@@ -86,21 +86,21 @@
                 <div class="mb-3">
                     <% if (alleErkannt) { %>
                         <small class="text-success">
-                            <i class="fas fa-wand-magic-sparkles mr-1"></i>
+                            <i class="fas fa-wand-magic-sparkles me-1"></i>
                             Kapazität automatisch vom Daemon erkannt<% if (node.quota?.hardware_stand) { %>
-                            <span class="text-muted">(Stand: <%= new Date(node.quota.hardware_stand).toLocaleString('de-DE') %>)</span>
+                            <span class="text-secondary">(Stand: <%= new Date(node.quota.hardware_stand).toLocaleString('de-DE') %>)</span>
                             <% } %>
                         </small>
                     <% } else if (nurProfil) { %>
                         <small class="text-warning">
-                            <i class="fas fa-triangle-exclamation mr-1"></i>
+                            <i class="fas fa-triangle-exclamation me-1"></i>
                             Noch keine Hardware erkannt — es gilt das Profil
                             <strong><%= node.quota?.profile_display_name || node.quota?.profile_name || 'Standard' %></strong>.
                             Sobald der Daemon verbunden war, stimmen die Werte von selbst.
                         </small>
                     <% } else if (etwasGesetzt) { %>
                         <small class="text-info">
-                            <i class="fas fa-sliders mr-1"></i>
+                            <i class="fas fa-sliders me-1"></i>
                             Teilweise von Hand festgelegt:
                             <%= [
                                 node.quota?.ram_herkunft  === 'eingestellt' ? 'RAM'  : null,
@@ -118,10 +118,10 @@
                     <!-- RAM -->
                     <div class="col-md-4 mb-3 mb-md-0">
                         <div class="d-flex justify-content-between mb-1">
-                            <span class="text-sm font-weight-bold">
-                                <i class="fas fa-memory mr-1 text-muted"></i>Arbeitsspeicher
+                            <span class="text-sm fw-bold">
+                                <i class="fas fa-memory me-1 text-secondary"></i>Arbeitsspeicher
                             </span>
-                            <span class="text-sm text-muted">
+                            <span class="text-sm text-secondary">
                                 <%= Math.round(node.allocated.allocated_ram_mb || 0).toLocaleString() %> MB
                                 / <%= l.usableRamMB.toLocaleString() %> MB
                             </span>
@@ -134,18 +134,18 @@
                             </div>
                         </div>
                         <div class="d-flex justify-content-between mt-1">
-                            <small class="text-muted">Reserviert: <%= l.reservedRamMB %> MB</small>
-                            <small class="text-muted">Gesamt: <%= l.totalRamMB.toLocaleString() %> MB</small>
+                            <small class="text-secondary">Reserviert: <%= l.reservedRamMB %> MB</small>
+                            <small class="text-secondary">Gesamt: <%= l.totalRamMB.toLocaleString() %> MB</small>
                         </div>
                     </div>
 
                     <!-- Disk -->
                     <div class="col-md-4 mb-3 mb-md-0">
                         <div class="d-flex justify-content-between mb-1">
-                            <span class="text-sm font-weight-bold">
-                                <i class="fas fa-hdd mr-1 text-muted"></i>Festplatte
+                            <span class="text-sm fw-bold">
+                                <i class="fas fa-hdd me-1 text-secondary"></i>Festplatte
                             </span>
-                            <span class="text-sm text-muted">
+                            <span class="text-sm text-secondary">
                                 <%= Math.round(node.allocated.allocated_disk_gb || 0) %> GB
                                 / <%= l.usableDiskGB %> GB
                             </span>
@@ -158,18 +158,18 @@
                             </div>
                         </div>
                         <div class="d-flex justify-content-between mt-1">
-                            <small class="text-muted">Reserviert: <%= l.reservedDiskGB %> GB</small>
-                            <small class="text-muted">Gesamt: <%= l.totalDiskGB %> GB</small>
+                            <small class="text-secondary">Reserviert: <%= l.reservedDiskGB %> GB</small>
+                            <small class="text-secondary">Gesamt: <%= l.totalDiskGB %> GB</small>
                         </div>
                     </div>
 
                     <!-- CPU -->
                     <div class="col-md-4">
                         <div class="d-flex justify-content-between mb-1">
-                            <span class="text-sm font-weight-bold">
-                                <i class="fas fa-microchip mr-1 text-muted"></i>CPU-Kerne
+                            <span class="text-sm fw-bold">
+                                <i class="fas fa-microchip me-1 text-secondary"></i>CPU-Kerne
                             </span>
-                            <span class="text-sm text-muted">
+                            <span class="text-sm text-secondary">
                                 <%= node.allocated.allocated_cpu_cores || 0 %> / <%= l.totalCpuCores %>
                             </span>
                         </div>
@@ -181,8 +181,8 @@
                             </div>
                         </div>
                         <div class="d-flex justify-content-between mt-1">
-                            <small class="text-muted">Server: <%= node.allocated.server_count || 0 %></small>
-                            <small class="text-muted">Kerne: <%= l.totalCpuCores %></small>
+                            <small class="text-secondary">Server: <%= node.allocated.server_count || 0 %></small>
+                            <small class="text-secondary">Kerne: <%= l.totalCpuCores %></small>
                         </div>
                     </div>
 
@@ -195,9 +195,9 @@
 
                     <!-- Überallokation -->
                     <div class="col-md-6 mb-3 mb-md-0">
-                        <h6 class="text-sm font-weight-bold mb-2">
-                            <i class="fas fa-expand-arrows-alt mr-1 text-muted"></i>Überallokation
-                            <small class="text-muted font-weight-normal ml-1">(0 – 300 %)</small>
+                        <h6 class="text-sm fw-bold mb-2">
+                            <i class="fas fa-expand-arrows-alt me-1 text-secondary"></i>Überallokation
+                            <small class="text-secondary fw-normal ms-1">(0 – 300 %)</small>
                         </h6>
                         <form class="form-overallocation" data-rs-id="<%= node.id %>">
                             <div class="input-group input-group-sm mb-2">
@@ -223,16 +223,16 @@
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-sm btn-primary">
-                                <i class="fas fa-save mr-1"></i>Speichern
+                                <i class="fas fa-save me-1"></i>Speichern
                             </button>
                         </form>
                     </div>
 
                     <!-- OS-Reservierung -->
                     <div class="col-md-6">
-                        <h6 class="text-sm font-weight-bold mb-2">
-                            <i class="fas fa-lock mr-1 text-muted"></i>OS-Reservierung
-                            <small class="text-muted font-weight-normal ml-1">(Betriebssystem)</small>
+                        <h6 class="text-sm fw-bold mb-2">
+                            <i class="fas fa-lock me-1 text-secondary"></i>OS-Reservierung
+                            <small class="text-secondary fw-normal ms-1">(Betriebssystem)</small>
                         </h6>
                         <form class="form-reserved" data-rs-id="<%= node.id %>">
                             <div class="input-group input-group-sm mb-2">
@@ -258,7 +258,7 @@
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-sm btn-primary">
-                                <i class="fas fa-save mr-1"></i>Speichern
+                                <i class="fas fa-save me-1"></i>Speichern
                             </button>
                         </form>
                     </div>
@@ -268,19 +268,19 @@
                 <!-- ── Gameserver-Tabelle ── -->
                 <% if (node.gameservers && node.gameservers.length > 0) { %>
                 <hr class="mt-3 mb-3">
-                <h6 class="text-sm font-weight-bold mb-2">
-                    <i class="fas fa-th-list mr-1 text-muted"></i>
+                <h6 class="text-sm fw-bold mb-2">
+                    <i class="fas fa-th-list me-1 text-secondary"></i>
                     Gameserver (<%= node.gameservers.length %>)
                 </h6>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0">
                         <thead>
-                            <tr class="text-muted" style="font-size:.8rem;">
+                            <tr class="text-secondary" style="font-size:.8rem;">
                                 <th>Name</th>
                                 <th>Typ</th>
-                                <th class="text-right">RAM</th>
-                                <th class="text-right">CPU</th>
-                                <th class="text-right">Disk</th>
+                                <th class="text-end">RAM</th>
+                                <th class="text-end">CPU</th>
+                                <th class="text-end">Disk</th>
                                 <th class="text-center">Status</th>
                             </tr>
                         </thead>
@@ -293,19 +293,19 @@
                                         <%= gs.server_name || gs.server_id %>
                                     </a>
                                 </td>
-                                <td><small class="text-muted"><%= gs.server_type || '–' %></small></td>
-                                <td class="text-right">
-                                    <span class="<%= (gs.allocated_ram_mb || 0) > 0 ? '' : 'text-muted' %>">
+                                <td><small class="text-secondary"><%= gs.server_type || '–' %></small></td>
+                                <td class="text-end">
+                                    <span class="<%= (gs.allocated_ram_mb || 0) > 0 ? '' : 'text-secondary' %>">
                                         <%= gs.allocated_ram_mb ? gs.allocated_ram_mb.toLocaleString() + ' MB' : 'kein Limit' %>
                                     </span>
                                 </td>
-                                <td class="text-right">
-                                    <span class="<%= (gs.allocated_cpu_percent || 0) > 0 ? '' : 'text-muted' %>">
+                                <td class="text-end">
+                                    <span class="<%= (gs.allocated_cpu_percent || 0) > 0 ? '' : 'text-secondary' %>">
                                         <%= gs.allocated_cpu_percent ? gs.allocated_cpu_percent + ' %' : 'kein Limit' %>
                                     </span>
                                 </td>
-                                <td class="text-right">
-                                    <span class="<%= (gs.allocated_disk_gb || 0) > 0 ? '' : 'text-muted' %>">
+                                <td class="text-end">
+                                    <span class="<%= (gs.allocated_disk_gb || 0) > 0 ? '' : 'text-secondary' %>">
                                         <%= gs.allocated_disk_gb ? gs.allocated_disk_gb + ' GB' : 'kein Limit' %>
                                     </span>
                                 </td>
@@ -315,15 +315,15 @@
                                         Hier standen vorher 'running'/'stopped' — Werte, die die
                                         Spalte nie annimmt; jede Zeile fiel in den Sonst-Zweig. %>
                                     <% if (gs.status === 'online') { %>
-                                        <span class="badge badge-success">online</span>
+                                        <span class="badge bg-success-lt">online</span>
                                     <% } else if (gs.status === 'offline') { %>
-                                        <span class="badge badge-secondary">offline</span>
+                                        <span class="badge bg-secondary-lt">offline</span>
                                     <% } else if (gs.status === 'starting' || gs.status === 'stopping') { %>
-                                        <span class="badge badge-warning"><%= gs.status %></span>
+                                        <span class="badge bg-warning-lt"><%= gs.status %></span>
                                     <% } else if (gs.status === 'error') { %>
-                                        <span class="badge badge-danger">Fehler</span>
+                                        <span class="badge bg-danger-lt">Fehler</span>
                                     <% } else { %>
-                                        <span class="badge badge-light"><%= gs.status || 'unbekannt' %></span>
+                                        <span class="badge bg-light-lt"><%= gs.status || 'unbekannt' %></span>
                                     <% } %>
                                 </td>
                             </tr>
@@ -333,8 +333,8 @@
                 </div>
                 <% } else { %>
                 <hr class="mt-3 mb-2">
-                <p class="text-muted text-sm mb-0">
-                    <i class="fas fa-info-circle mr-1"></i>
+                <p class="text-secondary text-sm mb-0">
+                    <i class="fas fa-info-circle me-1"></i>
                     Keine Gameserver auf diesem Node.
                 </p>
                 <% } %>

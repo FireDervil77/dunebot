@@ -4,15 +4,15 @@
         <div class="row mb-2">
             <div class="col-sm-6">
                 <h1 class="m-0">
-                    <i class="fa-solid fa-server mr-2"></i>
+                    <i class="fa-solid fa-server me-2"></i>
                     <%= rootserver.name %>
                     <% if (isOnline) { %>
-                        <span class="badge badge-success ml-2" style="font-size:0.6em;">
-                            <i class="fa-solid fa-circle mr-1"></i>Online
+                        <span class="badge bg-success-lt ms-2" style="font-size:0.6em;">
+                            <i class="fa-solid fa-circle me-1"></i>Online
                         </span>
                     <% } else { %>
-                        <span class="badge badge-secondary ml-2" style="font-size:0.6em;">
-                            <i class="fa-solid fa-circle mr-1"></i>Offline
+                        <span class="badge bg-secondary-lt ms-2" style="font-size:0.6em;">
+                            <i class="fa-solid fa-circle me-1"></i>Offline
                         </span>
                     <% } %>
                 </h1>
@@ -35,7 +35,7 @@
         <div class="row mb-3">
             <div class="col-12">
                 <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-secondary btn-sm">
-                    <i class="fa-solid fa-arrow-left mr-1"></i>Zurück zur Übersicht
+                    <i class="fa-solid fa-arrow-left me-1"></i>Zurück zur Übersicht
                 </a>
             </div>
         </div>
@@ -48,11 +48,11 @@
                 <div class="card card-outline <%= isOnline ? 'card-success' : 'card-secondary' %> h-100 mb-0">
                     <div class="card-header py-2 px-3">
                         <h3 class="card-title text-sm mb-0">
-                            <i class="fa-solid fa-microchip mr-1"></i>CPU
+                            <i class="fa-solid fa-microchip me-1"></i>CPU
                         </h3>
                         <div class="card-tools">
                             <% if (rootserver.cpu_model) { %>
-                                <small class="text-muted" title="<%= rootserver.cpu_model %>" style="font-size:.7rem;">
+                                <small class="text-secondary" title="<%= rootserver.cpu_model %>" style="font-size:.7rem;">
                                     <%= rootserver.cpu_model.length > 22 ? rootserver.cpu_model.substring(0,22)+'…' : rootserver.cpu_model %>
                                 </small>
                             <% } %>
@@ -68,12 +68,12 @@
                             </svg>
                             <div class="position-absolute d-flex align-items-center justify-content-center"
                                  style="top:0;left:0;right:0;bottom:0;">
-                                <span id="cpu-pct" class="font-weight-bold" style="font-size:1.1rem;">
+                                <span id="cpu-pct" class="fw-bold" style="font-size:1.1rem;">
                                     <%= rootserver.cpu_usage_percent != null ? Math.round(rootserver.cpu_usage_percent)+'%' : '–' %>
                                 </span>
                             </div>
                         </div>
-                        <div class="text-sm text-muted" style="font-size:.8rem;">
+                        <div class="text-sm text-secondary" style="font-size:.8rem;">
                             <%= rootserver.cpu_cores ? rootserver.cpu_cores + ' Kerne' : '' %><% if (rootserver.cpu_threads) { %> · <%= rootserver.cpu_threads %> Threads<% } %>
                         </div>
                     </div>
@@ -82,9 +82,10 @@
 
             <!-- RAM Widget -->
             <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card card-outline card-info h-100 mb-0">
+                <div class="card h-100 mb-0">
+                    <div class="card-status-top bg-info"></div>
                     <div class="card-header py-2 px-3">
-                        <h3 class="card-title text-sm mb-0"><i class="fa-solid fa-memory mr-1"></i>RAM</h3>
+                        <h3 class="card-title text-sm mb-0"><i class="fa-solid fa-memory me-1"></i>RAM</h3>
                     </div>
                     <div class="card-body text-center py-3">
                         <div class="position-relative d-inline-block mb-2" style="width:80px;height:80px;">
@@ -96,10 +97,10 @@
                             </svg>
                             <div class="position-absolute d-flex align-items-center justify-content-center"
                                  style="top:0;left:0;right:0;bottom:0;">
-                                <span id="ram-pct" class="font-weight-bold" style="font-size:1.1rem;">–</span>
+                                <span id="ram-pct" class="fw-bold" style="font-size:1.1rem;">–</span>
                             </div>
                         </div>
-                        <div class="text-muted" id="ram-detail" style="font-size:.8rem;">
+                        <div class="text-secondary" id="ram-detail" style="font-size:.8rem;">
                             <%
                                 const ramUsed = rootserver.ram_usage_gb != null ? parseFloat(rootserver.ram_usage_gb).toFixed(1) : null;
                                 const ramTot  = rootserver.ram_total_gb != null ? parseFloat(rootserver.ram_total_gb).toFixed(1) : null;
@@ -112,9 +113,10 @@
 
             <!-- Disk Widget -->
             <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card card-outline card-warning h-100 mb-0">
+                <div class="card h-100 mb-0">
+                    <div class="card-status-top bg-warning"></div>
                     <div class="card-header py-2 px-3">
-                        <h3 class="card-title text-sm mb-0"><i class="fa-solid fa-hard-drive mr-1"></i>Disk</h3>
+                        <h3 class="card-title text-sm mb-0"><i class="fa-solid fa-hard-drive me-1"></i>Disk</h3>
                     </div>
                     <div class="card-body text-center py-3">
                         <div class="position-relative d-inline-block mb-2" style="width:80px;height:80px;">
@@ -126,10 +128,10 @@
                             </svg>
                             <div class="position-absolute d-flex align-items-center justify-content-center"
                                  style="top:0;left:0;right:0;bottom:0;">
-                                <span id="disk-pct" class="font-weight-bold" style="font-size:1.1rem;">–</span>
+                                <span id="disk-pct" class="fw-bold" style="font-size:1.1rem;">–</span>
                             </div>
                         </div>
-                        <div class="text-muted" id="disk-detail" style="font-size:.8rem;">
+                        <div class="text-secondary" id="disk-detail" style="font-size:.8rem;">
                             <%
                                 const diskUsed = rootserver.disk_usage_gb != null ? Math.round(rootserver.disk_usage_gb) : null;
                                 const diskTot  = rootserver.disk_total_gb != null ? Math.round(rootserver.disk_total_gb) : null;
@@ -142,25 +144,26 @@
 
             <!-- Daemon/Gameserver-Widget -->
             <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card card-outline card-primary h-100 mb-0">
+                <div class="card h-100 mb-0">
+                    <div class="card-status-top bg-primary"></div>
                     <div class="card-header py-2 px-3">
-                        <h3 class="card-title text-sm mb-0"><i class="fa-solid fa-plug mr-1"></i>Daemon</h3>
+                        <h3 class="card-title text-sm mb-0"><i class="fa-solid fa-plug me-1"></i>Daemon</h3>
                     </div>
                     <div class="card-body text-center py-3">
                         <div class="mb-2">
                             <span class="badge badge-<%= isOnline ? 'success' : 'secondary' %>" style="font-size:.9rem;padding:.4em .8em;">
-                                <i class="fa-solid fa-circle mr-1" style="font-size:.6rem;"></i><%= isOnline ? 'Online' : 'Offline' %>
+                                <i class="fa-solid fa-circle me-1" style="font-size:.6rem;"></i><%= isOnline ? 'Online' : 'Offline' %>
                             </span>
                             <% if (rootserver.daemon_version) { %>
-                                <div class="text-muted mt-1" style="font-size:.8rem;">v<%= rootserver.daemon_version %></div>
+                                <div class="text-secondary mt-1" style="font-size:.8rem;">v<%= rootserver.daemon_version %></div>
                             <% } %>
                         </div>
                         <hr class="my-2">
                         <div>
                             <strong><%= gameserverStats.total || 0 %></strong>
-                            <div class="text-muted" style="font-size:.75rem;">Gameserver</div>
+                            <div class="text-secondary" style="font-size:.75rem;">Gameserver</div>
                             <% if (gameserverStats.running > 0) { %>
-                                <span class="badge badge-success mt-1" style="font-size:.7rem;"><i class="fa-solid fa-play mr-1"></i><%= gameserverStats.running %> laufend</span>
+                                <span class="badge bg-success-lt mt-1" style="font-size:.7rem;"><i class="fa-solid fa-play me-1"></i><%= gameserverStats.running %> laufend</span>
                             <% } %>
                         </div>
                     </div>
@@ -174,34 +177,34 @@
             <div class="card-header p-0 pt-1">
                 <ul class="nav nav-tabs" id="rootserverTabs">
                     <li class="nav-item">
-                        <a class="nav-link active" data-toggle="tab" href="#tab-overview">
-                            <i class="fa-solid fa-chart-line mr-1"></i>Übersicht
+                        <a class="nav-link active" data-bs-toggle="tab" href="#tab-overview">
+                            <i class="fa-solid fa-chart-line me-1"></i>Übersicht
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" data-toggle="tab" href="#tab-settings">
-                            <i class="fa-solid fa-sliders mr-1"></i>Einstellungen
+                        <a class="nav-link" data-bs-toggle="tab" href="#tab-settings">
+                            <i class="fa-solid fa-sliders me-1"></i>Einstellungen
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" data-toggle="tab" href="#tab-daemon">
-                            <i class="fa-solid fa-terminal mr-1"></i>Daemon-Info
+                        <a class="nav-link" data-bs-toggle="tab" href="#tab-daemon">
+                            <i class="fa-solid fa-terminal me-1"></i>Daemon-Info
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" data-toggle="tab" href="#tab-network" id="tab-network-link">
-                            <i class="fa-solid fa-network-wired mr-1"></i>Netzwerk / IPs
+                        <a class="nav-link" data-bs-toggle="tab" href="#tab-network" id="tab-network-link">
+                            <i class="fa-solid fa-network-wired me-1"></i>Netzwerk / IPs
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" data-toggle="tab" href="#tab-allocations" id="tab-allocations-link">
-                            <i class="fa-solid fa-plug mr-1"></i>Allocations
-                            <span class="badge badge-secondary ml-1" id="alloc-count-badge" style="font-size:.7rem;">0</span>
+                        <a class="nav-link" data-bs-toggle="tab" href="#tab-allocations" id="tab-allocations-link">
+                            <i class="fa-solid fa-plug me-1"></i>Allocations
+                            <span class="badge bg-secondary-lt ms-1" id="alloc-count-badge" style="font-size:.7rem;">0</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link text-danger" data-toggle="tab" href="#tab-danger">
-                            <i class="fa-solid fa-triangle-exclamation mr-1"></i>Gefahrenzone
+                        <a class="nav-link text-danger" data-bs-toggle="tab" href="#tab-danger">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i>Gefahrenzone
                         </a>
                     </li>
                 </ul>
@@ -216,47 +219,47 @@
                                 <table class="table table-sm table-borderless">
                                     <tbody>
                                         <tr>
-                                            <td class="text-muted" width="40%">Name</td>
+                                            <td class="text-secondary" width="40%">Name</td>
                                             <td><strong><%= rootserver.name %></strong></td>
                                         </tr>
                                         <% if (rootserver.description) { %>
                                         <tr>
-                                            <td class="text-muted">Beschreibung</td>
+                                            <td class="text-secondary">Beschreibung</td>
                                             <td><%= rootserver.description %></td>
                                         </tr>
                                         <% } %>
                                         <tr>
-                                            <td class="text-muted">Host / IP</td>
+                                            <td class="text-secondary">Host / IP</td>
                                             <td><code><%= rootserver.host || '–' %></code></td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Hostname</td>
+                                            <td class="text-secondary">Hostname</td>
                                             <td><%= rootserver.hostname || '–' %></td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Daemon-Port</td>
+                                            <td class="text-secondary">Daemon-Port</td>
                                             <td><code><%= rootserver.daemon_port || 9340 %></code></td>
                                         </tr>
 
                                         <tr>
-                                            <td class="text-muted">Standort</td>
+                                            <td class="text-secondary">Standort</td>
                                             <td>
                                                 <%= rootserver.datacenter || '–' %>
                                                 <% if (rootserver.country_code) { %>
-                                                    <span class="badge badge-light ml-1"><%= rootserver.country_code %></span>
+                                                    <span class="badge bg-light-lt ms-1"><%= rootserver.country_code %></span>
                                                 <% } %>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Disk</td>
+                                            <td class="text-secondary">Disk</td>
                                             <td><%= rootserver.disk_total_gb ? rootserver.disk_total_gb + ' GB' : '–' %></td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Erstellt</td>
+                                            <td class="text-secondary">Erstellt</td>
                                             <td><%= rootserver.created_at ? new Date(rootserver.created_at).toLocaleString('de-DE') : '–' %></td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Zuletzt gesehen</td>
+                                            <td class="text-secondary">Zuletzt gesehen</td>
                                             <td><%= rootserver.last_seen ? new Date(rootserver.last_seen).toLocaleString('de-DE') : 'Noch nie verbunden' %></td>
                                         </tr>
                                     </tbody>
@@ -265,14 +268,14 @@
                             <div class="col-md-6">
                                 <% if (!isOnline) { %>
                                     <div class="callout callout-warning">
-                                        <h6><i class="fa-solid fa-triangle-exclamation mr-1"></i>Daemon offline</h6>
+                                        <h6><i class="fa-solid fa-triangle-exclamation me-1"></i>Daemon offline</h6>
                                         <p class="mb-2">Der Daemon ist nicht verbunden. Prüfe ob der Service auf dem Server läuft:</p>
                                         <pre class="bg-dark text-white p-2 rounded" style="font-size:0.8rem;"><code>sudo systemctl status firebot-daemon
 sudo journalctl -u firebot-daemon -n 50</code></pre>
                                     </div>
                                 <% } else { %>
                                     <div class="callout callout-success">
-                                        <h6><i class="fa-solid fa-circle-check mr-1"></i>Daemon verbunden</h6>
+                                        <h6><i class="fa-solid fa-circle-check me-1"></i>Daemon verbunden</h6>
                                         <p class="mb-0">Der Daemon ist online und bereit. Gameserver können erstellt werden.</p>
                                     </div>
                                 <% } %>
@@ -282,7 +285,7 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                         <!-- Gameserver-Auslastung -->
                         <% if (typeof gameservers !== 'undefined' && gameservers.length > 0) { %>
                         <hr class="my-3">
-                        <h5 class="mb-3"><i class="fa-solid fa-chart-bar mr-2"></i>Gameserver-Auslastung</h5>
+                        <h5 class="mb-3"><i class="fa-solid fa-chart-bar me-2"></i>Gameserver-Auslastung</h5>
                         <div class="table-responsive">
                             <table class="table table-sm table-hover" id="gs-metrics-table">
                                 <thead class="thead-light">
@@ -309,7 +312,7 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                         <td>
                                             <strong><%= gs.display_name || gs.server_name %></strong>
                                             <% if (gs.game_name) { %>
-                                                <br><small class="text-muted"><%= gs.game_name %></small>
+                                                <br><small class="text-secondary"><%= gs.game_name %></small>
                                             <% } %>
                                         </td>
                                         <td>
@@ -319,7 +322,7 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">
-                                                <div class="progress flex-grow-1 mr-2" style="height:16px;">
+                                                <div class="progress flex-grow-1 me-2" style="height:16px;">
                                                     <div class="progress-bar bg-<%= cpuPct != null && cpuPct >= 80 ? 'danger' : cpuPct != null && cpuPct >= 60 ? 'warning' : 'success' %>"
                                                          role="progressbar"
                                                          style="width: <%= cpuPct != null ? cpuPct : 0 %>%"
@@ -330,7 +333,7 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">
-                                                <div class="progress flex-grow-1 mr-2" style="height:16px;">
+                                                <div class="progress flex-grow-1 me-2" style="height:16px;">
                                                     <div class="progress-bar bg-<%= ramPct != null && ramPct >= 85 ? 'danger' : ramPct != null && ramPct >= 65 ? 'warning' : 'info' %>"
                                                          role="progressbar"
                                                          style="width: <%= ramPct != null ? ramPct : 0 %>%"
@@ -355,7 +358,7 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                         </div>
                         <% } else { %>
                         <hr class="my-3">
-                        <div class="text-center text-muted py-3">
+                        <div class="text-center text-secondary py-3">
                             <i class="fa-solid fa-server fa-2x mb-2 d-block"></i>
                             Noch keine Gameserver auf diesem RootServer.
                         </div>
@@ -371,13 +374,13 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                               method="POST">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <div class="form-group">
+                                    <div class="mb-3">
                                         <label>Name</label>
                                         <input type="text" class="form-control" name="name" value="<%= rootserver.name %>" required>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="form-group">
+                                    <div class="mb-3">
                                         <label>Hostname / FQDN</label>
                                         <input type="text" class="form-control" name="hostname" value="<%= rootserver.hostname || '' %>" placeholder="server01.example.com">
                                     </div>
@@ -385,19 +388,19 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                             </div>
                             <div class="row">
                                 <div class="col-md-6">
-                                    <div class="form-group">
+                                    <div class="mb-3">
                                         <label>Host / IP</label>
                                         <input type="text" class="form-control" name="host" value="<%= rootserver.host || '' %>" placeholder="91.200.102.182">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="form-group">
+                                    <div class="mb-3">
                                         <label>Daemon-Port</label>
                                         <input type="number" class="form-control" name="daemon_port" value="<%= rootserver.daemon_port || 9340 %>">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="form-group">
+                                    <div class="mb-3">
                                         <label>Ländercode</label>
                                         <input type="text" class="form-control" name="country_code" value="<%= rootserver.country_code || '' %>" maxlength="2" placeholder="DE">
                                     </div>
@@ -405,30 +408,30 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                             </div>
                             <div class="row">
                                 <div class="col-md-6">
-                                    <div class="form-group">
+                                    <div class="mb-3">
                                         <label>Rechenzentrum</label>
                                         <input type="text" class="form-control" name="datacenter" value="<%= rootserver.datacenter || '' %>" placeholder="Hetzner Falkenstein">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="form-group">
+                                    <div class="mb-3">
                                         <label>RAM gesamt (GB)</label>
                                         <input type="number" class="form-control" name="ram_total_gb" value="<%= rootserver.ram_total_gb || '' %>" step="0.5">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="form-group">
+                                    <div class="mb-3">
                                         <label>Disk gesamt (GB)</label>
                                         <input type="number" class="form-control" name="disk_total_gb" value="<%= rootserver.disk_total_gb || '' %>" step="1">
                                     </div>
                                 </div>
                             </div>
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label>Beschreibung</label>
                                 <textarea class="form-control" name="description" rows="2"><%= rootserver.description || '' %></textarea>
                             </div>
                             <button type="submit" class="btn btn-primary">
-                                <i class="fa-solid fa-save mr-1"></i>Speichern
+                                <i class="fa-solid fa-save me-1"></i>Speichern
                             </button>
                         </form>
                     </div>
@@ -440,15 +443,15 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                 <table class="table table-sm table-borderless">
                                     <tbody>
                                         <tr>
-                                            <td class="text-muted" width="40%">Daemon-ID</td>
+                                            <td class="text-secondary" width="40%">Daemon-ID</td>
                                             <td><code style="font-size:0.8rem;word-break:break-all;"><%= rootserver.daemon_id %></code></td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Version</td>
+                                            <td class="text-secondary">Version</td>
                                             <td><%= rootserver.daemon_version || '–' %></td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Install-Status</td>
+                                            <td class="text-secondary">Install-Status</td>
                                             <td>
                                                 <span class="badge badge-<%= rootserver.install_status === 'completed' ? 'success' : rootserver.install_status === 'pending' ? 'warning' : 'danger' %>">
                                                     <%= rootserver.install_status || 'unknown' %>
@@ -456,19 +459,19 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Letzter Ping</td>
+                                            <td class="text-secondary">Letzter Ping</td>
                                             <td id="rs-ping"><%= rootserver.last_ping_ms != null ? rootserver.last_ping_ms + ' ms' : '–' %></td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Verpasste Heartbeats</td>
+                                            <td class="text-secondary">Verpasste Heartbeats</td>
                                             <td><%= rootserver.missed_heartbeats || 0 %></td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Basis-Verzeichnis</td>
+                                            <td class="text-secondary">Basis-Verzeichnis</td>
                                             <td><code><%= rootserver.base_directory || '/opt/firebot-daemon' %></code></td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">Betriebssystem</td>
+                                            <td class="text-secondary">Betriebssystem</td>
                                             <td><%= rootserver.os_info || '–' %></td>
                                         </tr>
                                     </tbody>
@@ -476,7 +479,7 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                             </div>
                             <div class="col-md-6">
                                 <div class="callout callout-info">
-                                    <h6><i class="fa-solid fa-circle-info mr-1"></i>Service-Befehle</h6>
+                                    <h6><i class="fa-solid fa-circle-info me-1"></i>Service-Befehle</h6>
                                     <pre class="bg-dark text-white p-2 rounded mb-0" style="font-size:0.8rem;"><code>sudo systemctl status firebot-daemon
 sudo systemctl restart firebot-daemon
 sudo journalctl -u firebot-daemon -f</code></pre>
@@ -487,8 +490,8 @@ sudo journalctl -u firebot-daemon -f</code></pre>
 
                     <!-- Tab: Netzwerk / IPs -->
                     <div class="tab-pane fade" id="tab-network">
-                        <p class="text-muted mb-3">
-                            <i class="fa-solid fa-circle-info mr-1"></i>
+                        <p class="text-secondary mb-3">
+                            <i class="fa-solid fa-circle-info me-1"></i>
                             Alle IP-Adressen dieses Servers. Jede IP muss bereits auf dem Host konfiguriert sein (eth0, eth1, ...).
                             Bei der Gameserver-Erstellung kannst du dann wählen, auf welcher IP der Server lauscht.
                         </p>
@@ -506,22 +509,23 @@ sudo journalctl -u firebot-daemon -f</code></pre>
                             <tbody id="ip-list-body">
                                 <tr>
                                     <td><code><%= rootserver.host %></code></td>
-                                    <td><span class="text-muted">Primäre IP (aus Host-Feld)</span></td>
-                                    <td><span class="badge badge-primary"><i class="fa-solid fa-star mr-1"></i>Primär</span></td>
+                                    <td><span class="text-secondary">Primäre IP (aus Host-Feld)</span></td>
+                                    <td><span class="badge bg-primary-lt"><i class="fa-solid fa-star me-1"></i>Primär</span></td>
                                     <td></td>
                                 </tr>
                             </tbody>
                         </table>
 
                         <!-- IP hinzufügen -->
-                        <div class="card card-outline card-success mt-3">
+                        <div class="card mt-3">
+                            <div class="card-status-top bg-success"></div>
                             <div class="card-header py-2">
-                                <h3 class="card-title text-sm"><i class="fa-solid fa-plus mr-1"></i>Weitere IP hinzufügen</h3>
+                                <h3 class="card-title text-sm"><i class="fa-solid fa-plus me-1"></i>Weitere IP hinzufügen</h3>
                             </div>
                             <div class="card-body">
                                 <!-- Vom Daemon erkannte IPs als Vorschläge -->
                                 <div id="host-ip-suggestions" class="mb-3" style="display:none">
-                                    <small class="text-muted d-block mb-1"><i class="fa-solid fa-network-wired mr-1"></i>Auf dem Host verfügbare IPs (klicken zum Übernehmen):</small>
+                                    <small class="text-secondary d-block mb-1"><i class="fa-solid fa-network-wired me-1"></i>Auf dem Host verfügbare IPs (klicken zum Übernehmen):</small>
                                     <div id="host-ip-badges"></div>
                                 </div>
                                 <div class="row">
@@ -532,8 +536,8 @@ sudo journalctl -u firebot-daemon -f</code></pre>
                                         <input type="text" id="new-ip-label" class="form-control" placeholder="Bezeichnung (optional, z.B. Game-IP)">
                                     </div>
                                     <div class="col-md-2">
-                                        <button class="btn btn-success btn-block" onclick="addIP()">
-                                            <i class="fa-solid fa-plus mr-1"></i>Hinzufügen
+                                        <button class="btn btn-success w-100" onclick="addIP()">
+                                            <i class="fa-solid fa-plus me-1"></i>Hinzufügen
                                         </button>
                                     </div>
                                 </div>
@@ -543,8 +547,8 @@ sudo journalctl -u firebot-daemon -f</code></pre>
 
                     <!-- Tab: Allocations (Pterodactyl-Style Port-Management) -->
                     <div class="tab-pane fade" id="tab-allocations">
-                        <p class="text-muted mb-3">
-                            <i class="fa-solid fa-circle-info mr-1"></i>
+                        <p class="text-secondary mb-3">
+                            <i class="fa-solid fa-circle-info me-1"></i>
                             Port-Allocations für diesen RootServer. Jeder Port wird einzeln verwaltet.
                             Freie Ports werden bei der Gameserver-Erstellung automatisch zugewiesen.
                         </p>
@@ -553,14 +557,15 @@ sudo journalctl -u firebot-daemon -f</code></pre>
                         <div id="alloc-table-container"></div>
 
                         <!-- Allocations hinzufügen -->
-                        <div class="card card-outline card-success mt-3">
+                        <div class="card mt-3">
+                            <div class="card-status-top bg-success"></div>
                             <div class="card-header py-2">
-                                <h3 class="card-title text-sm"><i class="fa-solid fa-plus mr-1"></i>Ports hinzufügen</h3>
+                                <h3 class="card-title text-sm"><i class="fa-solid fa-plus me-1"></i>Ports hinzufügen</h3>
                             </div>
                             <div class="card-body">
                                 <div class="row">
                                     <div class="col-md-4">
-                                        <div class="form-group mb-2">
+                                        <div class="mb-3 mb-2">
                                             <label class="mb-1">IP-Adresse</label>
                                             <select id="alloc-ip" class="form-control">
                                                 <option value="<%= rootserver.host %>"><%= rootserver.host %> (Primär)</option>
@@ -568,21 +573,21 @@ sudo journalctl -u firebot-daemon -f</code></pre>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="form-group mb-2">
+                                        <div class="mb-3 mb-2">
                                             <label class="mb-1">Ports</label>
                                             <input type="text" id="alloc-ports" class="form-control" placeholder="z.B. 25565-25600 oder 27015,27016,27017">
-                                            <small class="form-text text-muted">Einzelne Ports (komma-separiert) oder Ranges (z.B. 25565-25600)</small>
+                                            <small class="form-text text-secondary">Einzelne Ports (komma-separiert) oder Ranges (z.B. 25565-25600)</small>
                                         </div>
                                     </div>
                                     <div class="col-md-2">
-                                        <div class="form-group mb-2">
+                                        <div class="mb-3 mb-2">
                                             <label class="mb-1">Alias (optional)</label>
                                             <input type="text" id="alloc-alias" class="form-control" placeholder="z.B. Game-IP">
                                         </div>
                                     </div>
                                     <div class="col-md-2 d-flex align-items-end">
-                                        <button class="btn btn-success btn-block mb-2" onclick="addAllocations()">
-                                            <i class="fa-solid fa-plus mr-1"></i>Hinzufügen
+                                        <button class="btn btn-success w-100 mb-2" onclick="addAllocations()">
+                                            <i class="fa-solid fa-plus me-1"></i>Hinzufügen
                                         </button>
                                     </div>
                                 </div>
@@ -593,11 +598,11 @@ sudo journalctl -u firebot-daemon -f</code></pre>
                     <!-- Tab: Gefahrenzone -->
                     <div class="tab-pane fade" id="tab-danger">
                         <div class="callout callout-danger">
-                            <h5><i class="fa-solid fa-triangle-exclamation mr-2"></i>RootServer löschen</h5>
+                            <h5><i class="fa-solid fa-triangle-exclamation me-2"></i>RootServer löschen</h5>
                             <p class="mb-3">Diese Aktion löscht den RootServer permanent und kann <strong>nicht rückgängig gemacht werden</strong>.</p>
-                            <p class="text-muted" style="font-size:.85rem;">Alle zugehörigen Gameserver müssen vorher entfernt werden.</p>
+                            <p class="text-secondary" style="font-size:.85rem;">Alle zugehörigen Gameserver müssen vorher entfernt werden.</p>
                             <button class="btn btn-danger" onclick="confirmDeleteRootserver()">
-                                <i class="fa-solid fa-trash mr-1"></i><%= rootserver.name %> löschen
+                                <i class="fa-solid fa-trash me-1"></i><%= rootserver.name %> löschen
                             </button>
                         </div>
                     </div>
@@ -840,8 +845,8 @@ async function loadHostIPSuggestions() {
         toShow.forEach(d => {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'btn btn-sm btn-outline-secondary mr-1 mb-1';
-            btn.innerHTML = `<i class="fa-solid fa-ethernet mr-1"></i><code>${d.ip}</code> <small class="text-muted">${d.interface}</small>`;
+            btn.className = 'btn btn-sm btn-outline-secondary me-1 mb-1';
+            btn.innerHTML = `<i class="fa-solid fa-ethernet me-1"></i><code>${d.ip}</code> <small class="text-secondary">${d.interface}</small>`;
             btn.onclick = () => { document.getElementById('new-ip-address').value = d.ip; };
             badges.appendChild(btn);
         });
@@ -862,10 +867,10 @@ async function loadIPs() {
             tr.dataset.ipId = ip.id;
             tr.innerHTML = `
                 <td><code>${ip.ip_address}</code></td>
-                <td>${ip.label || '<span class="text-muted">–</span>'}</td>
-                <td><span class="badge badge-secondary">Zusatz-IP</span></td>
-                <td class="text-right">
-                    <button class="btn btn-xs btn-outline-danger" onclick="removeIP(${ip.id})">
+                <td>${ip.label || '<span class="text-secondary">–</span>'}</td>
+                <td><span class="badge bg-secondary-lt">Zusatz-IP</span></td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeIP(${ip.id})">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>`;
@@ -892,10 +897,10 @@ async function addIP() {
         tr.dataset.ipId = d.data.id;
         tr.innerHTML = `
             <td><code>${ip}</code></td>
-            <td>${label || '<span class="text-muted">–</span>'}</td>
-            <td><span class="badge badge-secondary">Zusatz-IP</span></td>
-            <td class="text-right">
-                <button class="btn btn-xs btn-outline-danger" onclick="removeIP(${d.data.id})">
+            <td>${label || '<span class="text-secondary">–</span>'}</td>
+            <td><span class="badge bg-secondary-lt">Zusatz-IP</span></td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-danger" onclick="removeIP(${d.data.id})">
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </td>`;
@@ -936,18 +941,18 @@ const allocTable = new DuneDataTable({
     searchable: true,
     columns: [
         { key: 'ip', label: 'IP-Adresse', sortable: true, render: (val, row) => 
-            `<code>${val}</code>${row.ip_alias ? ' <small class="text-muted">(' + row.ip_alias + ')</small>' : ''}`
+            `<code>${val}</code>${row.ip_alias ? ' <small class="text-secondary">(' + row.ip_alias + ')</small>' : ''}`
         },
         { key: 'port', label: 'Port', sortable: true, render: (val) => `<code>${val}</code>` },
         { key: 'server_name', label: 'Zugewiesen an', render: (val, row) => 
             row.server_id 
-                ? '<span class="badge badge-warning"><i class="fa-solid fa-server mr-1"></i>' + (val || 'Server #' + row.server_id) + '</span>'
-                : '<span class="badge badge-success"><i class="fa-solid fa-circle-check mr-1"></i>Frei</span>'
+                ? '<span class="badge bg-warning-lt"><i class="fa-solid fa-server me-1"></i>' + (val || 'Server #' + row.server_id) + '</span>'
+                : '<span class="badge bg-success-lt"><i class="fa-solid fa-circle-check me-1"></i>Frei</span>'
         },
-        { key: 'notes', label: 'Notizen', render: (val) => val ? `<small class="text-muted">${val}</small>` : '' },
+        { key: 'notes', label: 'Notizen', render: (val) => val ? `<small class="text-secondary">${val}</small>` : '' },
         { key: '_actions', label: '', render: (_, row) => 
             !row.server_id 
-                ? `<button class="btn btn-xs btn-outline-danger" onclick="deleteAllocation(${row.id})"><i class="fa-solid fa-trash"></i></button>`
+                ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteAllocation(${row.id})"><i class="fa-solid fa-trash"></i></button>`
                 : ''
         }
     ],

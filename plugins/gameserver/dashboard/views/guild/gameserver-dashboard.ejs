@@ -135,29 +135,29 @@
                                             <tr data-server-id="<%= server.id %>" <% if (server.status === 'online' && server.gamedig_type) { %>data-has-query="1"<% } %>>
                                                 <td><%= server.name %></td>
                                                 <td>
-                                                    <span class="badge badge-info">
+                                                    <span class="badge bg-info-lt">
                                                         <%= server.game_name || 'Unknown' %>
                                                     </span>
                                                 </td>
                                                 <td>
                                                     <% if (server.status === 'online') { %>
-                                                        <span class="badge badge-success server-status-badge" data-status="online">
+                                                        <span class="badge bg-success-lt server-status-badge" data-status="online">
                                                             <i class="fa-solid fa-circle"></i> Online
                                                         </span>
                                                     <% } else if (server.status === 'offline') { %>
-                                                        <span class="badge badge-secondary server-status-badge" data-status="offline">
+                                                        <span class="badge bg-secondary-lt server-status-badge" data-status="offline">
                                                             <i class="fa-solid fa-circle"></i> Offline
                                                         </span>
                                                     <% } else if (server.status === 'starting') { %>
-                                                        <span class="badge badge-warning server-status-badge" data-status="starting">
+                                                        <span class="badge bg-warning-lt server-status-badge" data-status="starting">
                                                             <i class="fa-solid fa-spinner fa-spin"></i> Starting
                                                         </span>
                                                     <% } else if (server.status === 'error') { %>
-                                                        <span class="badge badge-danger server-status-badge" data-status="error">
+                                                        <span class="badge bg-danger-lt server-status-badge" data-status="error">
                                                             <i class="fa-solid fa-exclamation-triangle"></i> Error
                                                         </span>
                                                     <% } else { %>
-                                                        <span class="badge badge-secondary server-status-badge" data-status="<%= server.status %>">
+                                                        <span class="badge bg-secondary-lt server-status-badge" data-status="<%= server.status %>">
                                                             <%= server.status %>
                                                         </span>
                                                     <% } %>
@@ -196,7 +196,7 @@
                                     </tbody>
                                 </table>
                             <% } else { %>
-                                <div class="p-4 text-center text-muted">
+                                <div class="p-4 text-center text-secondary">
                                     <i class="fa-solid fa-inbox fa-3x mb-3"></i>
                                     <p><%= tr('gameserver:DASHBOARD.NO_SERVERS') %></p>
                                     <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1" class="btn btn-primary">
@@ -227,7 +227,7 @@
                                                     <strong>#<%= index + 1 %></strong>
                                                     <%= addon.game_name || 'Unknown' %>
                                                 </div>
-                                                <span class="badge badge-primary badge-pill">
+                                                <span class="badge bg-primary-lt badge-pill">
                                                     <%= addon.server_count %> Server
                                                 </span>
                                             </div>
@@ -244,7 +244,7 @@
                                     <% }) %>
                                 </ul>
                             <% } else { %>
-                                <p class="text-muted text-center">
+                                <p class="text-secondary text-center">
                                     <%= tr('gameserver:DASHBOARD.NO_GAME_STATS') %>
                                 </p>
                             <% } %>
@@ -393,31 +393,31 @@ function updateServerUI(serverId, newStatus) {
     console.log(`[Dashboard] Server ${serverId}: ${currentStatus} → ${newStatus}`);
     
     // Badge aktualisieren
-    statusBadge.classList.remove('badge-success', 'badge-warning', 'badge-danger', 'badge-secondary', 'badge-info');
+    statusBadge.classList.remove('bg-success-lt', 'bg-warning-lt', 'bg-danger-lt', 'bg-secondary-lt', 'bg-info-lt');
     
     switch(newStatus) {
         case 'online':
-            statusBadge.classList.add('badge-success');
+            statusBadge.classList.add('bg-success-lt');
             statusBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Online';
             break;
         case 'starting':
-            statusBadge.classList.add('badge-info');
+            statusBadge.classList.add('bg-info-lt');
             statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting';
             break;
         case 'stopping':
-            statusBadge.classList.add('badge-warning');
+            statusBadge.classList.add('bg-warning-lt');
             statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Stopping';
             break;
         case 'offline':
-            statusBadge.classList.add('badge-secondary');
+            statusBadge.classList.add('bg-secondary-lt');
             statusBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Offline';
             break;
         case 'error':
-            statusBadge.classList.add('badge-danger');
+            statusBadge.classList.add('bg-danger-lt');
             statusBadge.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Error';
             break;
         default:
-            statusBadge.classList.add('badge-secondary');
+            statusBadge.classList.add('bg-secondary-lt');
             statusBadge.innerHTML = '<i class="fa-solid fa-circle"></i> ' + newStatus;
     }
     

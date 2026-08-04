@@ -42,7 +42,7 @@
                             SFTP-Zugang
                         </h5>
                         <p class="mb-3">
-                            <small class="text-muted">
+                            <small class="text-secondary">
                                 Der Web File-Manager ist noch in Entwicklung. Nutze SFTP für vollständigen Dateizugriff.
                             </small>
                         </p>
@@ -137,7 +137,7 @@
                                 <%= server.status %>
                             </span>
                             <br>
-                            <small class="text-muted">
+                            <small class="text-secondary">
                                 <i class="bi bi-hdd me-1"></i>
                                 Install-Pfad: <%= server.install_path || 'N/A' %>
                             </small>
@@ -159,7 +159,7 @@
                                     <!-- Parent-Directory (..) -->
                                     <% if (parentPath !== null) { %>
                                         <tr>
-                                            <td><i class="fas fa-level-up-alt text-muted"></i></td>
+                                            <td><i class="fas fa-level-up-alt text-secondary"></i></td>
                                             <td>
                                                 <a href="?path=<%= parentPath || '/' %>">
                                                     <strong>..</strong> (Übergeordneter Ordner)
@@ -183,7 +183,7 @@
                                                         <% } else if (['sh', 'bat', 'cmd'].includes(ext)) { %>
                                                             <i class="fas fa-file-code text-success"></i>
                                                         <% } else { %>
-                                                            <i class="fas fa-file text-muted"></i>
+                                                            <i class="fas fa-file text-secondary"></i>
                                                         <% } %>
                                                     <% } %>
                                                 </td>
@@ -201,11 +201,11 @@
                                                     <% if (!file.is_directory) { %>
                                                         <%= file.size_human || (file.size ? (file.size / 1024 / 1024).toFixed(2) + ' MB' : '-') %>
                                                     <% } else { %>
-                                                        <span class="text-muted">-</span>
+                                                        <span class="text-secondary">-</span>
                                                     <% } %>
                                                 </td>
                                                 <td>
-                                                    <small class="text-muted">
+                                                    <small class="text-secondary">
                                                         <%= file.modified_at ? new Date(file.modified_at).toLocaleString('de-DE') : '-' %>
                                                     </small>
                                                 </td>
@@ -255,7 +255,7 @@
                                     <!-- Empty State -->
                                     <% if (!files || files.length === 0) { %>
                                         <tr>
-                                            <td colspan="5" class="text-center text-muted py-5">
+                                            <td colspan="5" class="text-center text-secondary py-5">
                                                 <i class="fas fa-folder-open fa-3x mb-3 d-block"></i>
                                                 <p>Verzeichnis ist leer</p>
                                             </td>
@@ -633,7 +633,7 @@ function copyToClipboard(elementId) {
                                required 
                                minlength="8"
                                placeholder="Mindestens 8 Zeichen">
-                        <small class="form-text text-muted">
+                        <small class="form-text text-secondary">
                             Empfehlung: Nutze einen Passwort-Manager!
                         </small>
                     </div>

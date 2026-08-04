@@ -64,7 +64,7 @@
                     <i class="fas fa-paper-plane me-1"></i> Senden
                 </button>
             </div>
-            <small class="text-muted">
+            <small class="text-secondary">
                 <i class="fas fa-info-circle me-1"></i>
                 Tipp: Drücke <kbd>↑</kbd> / <kbd>↓</kbd> für Command-History
             </small>
@@ -75,14 +75,14 @@
             <strong>Befehle laufen bei diesem Spiel über RCON.</strong>
             Die Konsole reicht Eingaben nur an RCON weiter – benutze den
             <strong>RCON-Tab</strong>, dort landen sie ohnehin.
-            <div class="small text-muted mt-1"><%= transport.begruendung %></div>
+            <div class="small text-secondary mt-1"><%= transport.begruendung %></div>
         </div>
     <% } else { %>
         <div class="alert alert-secondary mt-3 mb-0">
             <i class="fas fa-info-circle me-2"></i>
             <strong>Dieses Spiel nimmt über die Konsole keine Befehle entgegen.</strong>
             Hier siehst du nur die Ausgabe.
-            <div class="small text-muted mt-1"><%= transport.begruendung %></div>
+            <div class="small text-secondary mt-1"><%= transport.begruendung %></div>
         </div>
     <% } %>
 </div>

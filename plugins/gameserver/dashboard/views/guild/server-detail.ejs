@@ -32,7 +32,7 @@
                                 <!-- Server Info -->
                                 <div>
                                     <h3 class="mb-1"><%= server.name %></h3>
-                                    <p class="text-muted mb-1">
+                                    <p class="text-secondary mb-1">
                                         <i class="fas fa-server me-1"></i>
                                         <%= server.game_name || 'Unbekanntes Spiel' %>
                                     </p>
@@ -133,8 +133,8 @@
                                     (installing/updating/starting/stopping) ausblenden. %>
                                 <% if (userPermissions.permissions['GAMESERVER.EDIT']) { %>
                                     <button class="btn btn-info"
-                                            data-toggle="modal"
-                                            data-target="#migrationModal"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#migrationModal"
                                             title="Server zu anderem RootServer verschieben"
                                             style="display: <%= ['offline', 'error', 'installed', 'online'].includes(displayStatus) ? '' : 'none' %>;">
                                         <i class="fas fa-exchange-alt me-1"></i> Move
@@ -180,7 +180,7 @@
                         <li class="nav-item">
                             <a class="nav-link active" 
                                id="overview-tab" 
-                               data-toggle="tab" 
+                               data-bs-toggle="tab" 
                                href="#overview" 
                                role="tab">
                                 <i class="fas fa-info-circle me-1"></i>
@@ -193,7 +193,7 @@
                             <li class="nav-item">
                                 <a class="nav-link" 
                                    id="console-tab" 
-                                   data-toggle="tab" 
+                                   data-bs-toggle="tab" 
                                    href="#console" 
                                    role="tab">
                                     <i class="fas fa-terminal me-1"></i>
@@ -207,7 +207,7 @@
                             <li class="nav-item">
                                 <a class="nav-link" 
                                    id="files-tab" 
-                                   data-toggle="tab" 
+                                   data-bs-toggle="tab" 
                                    href="#files" 
                                    role="tab">
                                     <i class="fas fa-folder me-1"></i>
@@ -221,7 +221,7 @@
                             <li class="nav-item">
                                 <a class="nav-link" 
                                    id="logs-tab" 
-                                   data-toggle="tab" 
+                                   data-bs-toggle="tab" 
                                    href="#logs" 
                                    role="tab">
                                     <i class="fas fa-file-alt me-1"></i>
@@ -235,7 +235,7 @@
                             <li class="nav-item">
                                 <a class="nav-link" 
                                    id="backups-tab" 
-                                   data-toggle="tab" 
+                                   data-bs-toggle="tab" 
                                    href="#backups" 
                                    role="tab">
                                     <i class="fas fa-save me-1"></i>
@@ -249,7 +249,7 @@
                             <li class="nav-item">
                                 <a class="nav-link"
                                    id="cronjobs-tab"
-                                   data-toggle="tab"
+                                   data-bs-toggle="tab"
                                    href="#cronjobs"
                                    role="tab">
                                     <i class="fas fa-clock me-1"></i>
@@ -263,7 +263,7 @@
                             <li class="nav-item">
                                 <a class="nav-link"
                                    id="variables-tab"
-                                   data-toggle="tab"
+                                   data-bs-toggle="tab"
                                    href="#variables"
                                    role="tab">
                                     <i class="fas fa-sliders-h me-1"></i>
@@ -277,7 +277,7 @@
                             <li class="nav-item">
                                 <a class="nav-link"
                                    id="rcon-tab"
-                                   data-toggle="tab"
+                                   data-bs-toggle="tab"
                                    href="#rcon"
                                    role="tab">
                                     <i class="fas fa-terminal me-1"></i>
@@ -291,7 +291,7 @@
                             <li class="nav-item">
                                 <a class="nav-link"
                                    id="panels-tab"
-                                   data-toggle="tab"
+                                   data-bs-toggle="tab"
                                    href="#panels"
                                    role="tab">
                                     <i class="fab fa-discord me-1"></i>
@@ -301,7 +301,7 @@
                             <li class="nav-item">
                                 <a class="nav-link"
                                    id="public-tab"
-                                   data-toggle="tab"
+                                   data-bs-toggle="tab"
                                    href="#public"
                                    role="tab">
                                     <i class="fas fa-globe me-1"></i>
@@ -382,12 +382,12 @@
                                 <!-- Log Output -->
                                 <div class="card bg-dark">
                                     <div class="card-body p-0">
-                                        <div id="log-status" class="text-center text-muted py-3">
+                                        <div id="log-status" class="text-center text-secondary py-3">
                                             <i class="fas fa-info-circle me-1"></i> Klicke "Aktualisieren" um Logs zu laden
                                         </div>
                                         <pre id="log-output" class="mb-0 p-3" style="max-height: 600px; overflow-y: auto; font-size: 13px; line-height: 1.4; color: #e0e0e0; background: #1e1e1e; display: none; white-space: pre-wrap; word-break: break-all;"></pre>
                                     </div>
-                                    <div class="card-footer text-muted d-flex justify-content-between">
+                                    <div class="card-footer text-secondary d-flex justify-content-between">
                                         <span id="log-count">0 Zeilen</span>
                                         <span id="log-filtered" style="display: none;">Gefiltert: <span id="log-filtered-count">0</span> Treffer</span>
                                     </div>
@@ -857,9 +857,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <i class="fas fa-exchange-alt me-2"></i>
                     Server verschieben
                 </h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
                 <!-- Migration Form (Initial) -->
@@ -920,10 +918,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
                         <!-- Detailzeile: Laufzeit / übertragene MB, damit lange Schritte nicht eingefroren wirken -->
-                        <small id="migration-detail" class="text-muted d-block mt-2">
+                        <small id="migration-detail" class="text-secondary d-block mt-2">
                             <i class="fas fa-circle-notch fa-spin me-1"></i>Migration wird vorbereitet...
                         </small>
-                        <small class="text-muted d-block mt-1">
+                        <small class="text-secondary d-block mt-1">
                             <i class="fas fa-info-circle me-1"></i>
                             Du kannst dieses Fenster schließen – die Migration läuft im Hintergrund weiter.
                         </small>
@@ -932,27 +930,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     <!-- Phase Indicators -->
                     <div class="row text-center mb-3">
                         <div class="col" data-phase="stopping_server">
-                            <i class="fas fa-stop-circle fa-2x text-muted"></i>
+                            <i class="fas fa-stop-circle fa-2x text-secondary"></i>
                             <p class="small mb-0">Stoppen</p>
                         </div>
                         <div class="col" data-phase="backing_up">
-                            <i class="fas fa-archive fa-2x text-muted"></i>
+                            <i class="fas fa-archive fa-2x text-secondary"></i>
                             <p class="small mb-0">Backup</p>
                         </div>
                         <div class="col" data-phase="transferring">
-                            <i class="fas fa-exchange-alt fa-2x text-muted"></i>
+                            <i class="fas fa-exchange-alt fa-2x text-secondary"></i>
                             <p class="small mb-0">Transfer</p>
                         </div>
                         <div class="col" data-phase="restoring">
-                            <i class="fas fa-box-open fa-2x text-muted"></i>
+                            <i class="fas fa-box-open fa-2x text-secondary"></i>
                             <p class="small mb-0">Restore</p>
                         </div>
                         <div class="col" data-phase="updating_db">
-                            <i class="fas fa-database fa-2x text-muted"></i>
+                            <i class="fas fa-database fa-2x text-secondary"></i>
                             <p class="small mb-0">DB-Update</p>
                         </div>
                         <div class="col" data-phase="completed">
-                            <i class="fas fa-check-circle fa-2x text-muted"></i>
+                            <i class="fas fa-check-circle fa-2x text-secondary"></i>
                             <p class="small mb-0">Fertig</p>
                         </div>
                     </div>
@@ -973,7 +971,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="migration-close-btn">Schließen</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="migration-close-btn">Schließen</button>
                 <button type="button" class="btn btn-primary" onclick="startMigration()" id="migration-start-btn">
                     <i class="fas fa-rocket me-1"></i> Migration starten
                 </button>
@@ -1107,14 +1105,14 @@ function updateMigrationProgress(step, progress, detail) {
         const icon = el.querySelector('i');
         if (!icon) return;
         const elIndex = MIGRATION_PHASES.indexOf(el.dataset.phase);
-        icon.classList.remove('text-muted', 'text-primary', 'text-success');
+        icon.classList.remove('text-secondary', 'text-primary', 'text-success');
 
         if (currentIndex >= 0 && elIndex >= 0 && elIndex < currentIndex) {
             icon.classList.add('text-success');   // erledigt
         } else if (elIndex === currentIndex) {
             icon.classList.add('text-primary');   // läuft gerade
         } else {
-            icon.classList.add('text-muted');     // steht noch aus
+            icon.classList.add('text-secondary');     // steht noch aus
         }
     });
 }
@@ -1146,7 +1144,7 @@ function showMigrationSuccess() {
     
     // Alle Phasen als erfolgreich markieren
     document.querySelectorAll('[data-phase]').forEach(el => {
-        el.querySelector('i').classList.remove('text-muted', 'text-primary');
+        el.querySelector('i').classList.remove('text-secondary', 'text-primary');
         el.querySelector('i').classList.add('text-success');
     });
     
@@ -1220,7 +1218,7 @@ async function initMigrationPageState() {
     const migration = await fetchMigrationStatus();
     if (!migration || !MIGRATION_RUNNING_STATES.includes(migration.status)) return;
 
-    const moveBtn = document.querySelector('[data-target="#migrationModal"]');
+    const moveBtn = document.querySelector('[data-bs-target="#migrationModal"]');
     if (moveBtn) {
         moveBtn.classList.remove('btn-info');
         moveBtn.classList.add('btn-warning');

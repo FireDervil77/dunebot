@@ -7,7 +7,7 @@
         <i class="fa-solid fa-server text-primary me-2"></i>
         <%= tr('masterserver:DASHBOARD.TITLE') %>
       </h2>
-      <p class="text-muted">Übersicht über deinen Masterserver-Daemon und registrierte Server</p>
+      <p class="text-secondary">Übersicht über deinen Masterserver-Daemon und registrierte Server</p>
     </div>
   </div>
 
@@ -94,22 +94,22 @@
         <div class="card-body">
           <div class="row">
             <div class="col-md-3 col-sm-6 mb-2">
-              <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-outline-primary btn-block">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-outline-primary w-100">
                 <i class="fa-solid fa-cog me-2"></i> Daemon-Setup
               </a>
             </div>
             <div class="col-md-3 col-sm-6 mb-2">
-              <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-outline-secondary btn-block">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-outline-secondary w-100">
                 <i class="fa-solid fa-server me-2"></i> RootServer
               </a>
             </div>
             <div class="col-md-3 col-sm-6 mb-2">
-              <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-outline-info btn-block">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-outline-info w-100">
                 <i class="fa-solid fa-list me-2"></i> Server-Registry
               </a>
             </div>
             <div class="col-md-3 col-sm-6 mb-2">
-              <a href="/guild/<%= guildId %>/plugins/masterserver/logs" class="btn btn-outline-warning btn-block">
+              <a href="/guild/<%= guildId %>/plugins/masterserver/logs" class="btn btn-outline-warning w-100">
                 <i class="fa-solid fa-file-lines me-2"></i> Daemon-Logs
               </a>
             </div>
@@ -162,7 +162,7 @@
                     <% if (daemon.registered_at) { %>
                       <%= new Date(daemon.registered_at).toLocaleString('de-DE') %>
                     <% } else { %>
-                      <span class="text-muted">Nicht verfügbar</span>
+                      <span class="text-secondary">Nicht verfügbar</span>
                     <% } %>
                   </td>
                 </tr>
@@ -172,7 +172,7 @@
                     <% if (daemon.last_heartbeat) { %>
                       <%= new Date(daemon.last_heartbeat).toLocaleString('de-DE') %>
                     <% } else { %>
-                      <span class="text-muted">Noch kein Heartbeat</span>
+                      <span class="text-secondary">Noch kein Heartbeat</span>
                     <% } %>
                   </td>
                 </tr>

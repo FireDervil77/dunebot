@@ -8,7 +8,7 @@
             <i class="fa-solid fa-ticket me-2"></i>
             <%= tr('ticket:TITLE') %>
           </h3>
-          <p class="text-muted mb-0 mt-2">
+          <p class="text-secondary mb-0 mt-2">
             <%= tr('ticket:DESCRIPTION') %>
           </p>
         </div>
@@ -17,26 +17,26 @@
           <!-- Bootstrap 4 Nav Tabs -->
           <ul class="nav nav-tabs" id="ticketTabs" role="tablist">
             <li class="nav-item">
-              <a class="nav-link active" id="settings-tab" data-toggle="tab" href="#tab-settings" role="tab">
+              <a class="nav-link active" id="settings-tab" data-bs-toggle="tab" href="#tab-settings" role="tab">
                 <i class="fa-solid fa-cog me-1"></i>
                 <%= tr('ticket:SETTINGS_TITLE') %>
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="categories-tab" data-toggle="tab" href="#tab-categories" role="tab">
+              <a class="nav-link" id="categories-tab" data-bs-toggle="tab" href="#tab-categories" role="tab">
                 <i class="fa-solid fa-folder-tree me-1"></i>
                 <%= tr('ticket:CATEGORY_TITLE') %>
                 <% if (categories.length > 0) { %>
-                  <span class="badge bg-info ml-1"><%= categories.length %></span>
+                  <span class="badge bg-info ms-1"><%= categories.length %></span>
                 <% } %>
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="tickets-tab" data-toggle="tab" href="#tab-tickets" role="tab">
+              <a class="nav-link" id="tickets-tab" data-bs-toggle="tab" href="#tab-tickets" role="tab">
                 <i class="fa-solid fa-list-ul me-1"></i>
                 <%= tr('ticket:TICKETS_TITLE') %>
                 <% if (stats.total > 0) { %>
-                  <span class="badge bg-secondary ml-1"><%= stats.total %></span>
+                  <span class="badge bg-secondary ms-1"><%= stats.total %></span>
                 <% } %>
               </a>
             </li>
@@ -60,7 +60,7 @@
                   <!-- Log Channel -->
                   <div class="col-md-6 mb-3">
                     <label class="form-label"><%= tr('ticket:LOGS_TITLE') %></label>
-                    <p class="text-muted small"><%= tr('ticket:LOGS_DESC') %></p>
+                    <p class="text-secondary small"><%= tr('ticket:LOGS_DESC') %></p>
                     <select name="log_channel" class="form-control">
                       <option value="">-- Kein Log-Kanal --</option>
                       <% channels.filter(c => c.type === 0).forEach(ch => { %>
@@ -74,7 +74,7 @@
                   <!-- Ticket Limit -->
                   <div class="col-md-6 mb-3">
                     <label class="form-label"><%= tr('ticket:LIMIT_TITLE') %></label>
-                    <p class="text-muted small"><%= tr('ticket:LIMIT_DESC') %></p>
+                    <p class="text-secondary small"><%= tr('ticket:LIMIT_DESC') %></p>
                     <input type="number" name="ticket_limit" class="form-control" 
                            value="<%= settings.ticket_limit || 50 %>" min="5" max="500">
                   </div>
@@ -84,7 +84,7 @@
                   <!-- Create Embed Color -->
                   <div class="col-md-6 mb-3">
                     <label class="form-label"><%= tr('ticket:CREATE_EMBED_TITLE') %></label>
-                    <p class="text-muted small"><%= tr('ticket:CREATE_EMBED_DESC') %></p>
+                    <p class="text-secondary small"><%= tr('ticket:CREATE_EMBED_DESC') %></p>
                     <input type="color" name="embed_color_create" class="form-control form-control-color" 
                            value="<%= settings.embed_color_create || '#068ADD' %>" style="width: 60px; height: 38px;">
                   </div>
@@ -92,7 +92,7 @@
                   <!-- Close Embed Color -->
                   <div class="col-md-6 mb-3">
                     <label class="form-label"><%= tr('ticket:CLOSE_EMBED_TITLE') %></label>
-                    <p class="text-muted small"><%= tr('ticket:CLOSE_EMBED_DESC') %></p>
+                    <p class="text-secondary small"><%= tr('ticket:CLOSE_EMBED_DESC') %></p>
                     <input type="color" name="embed_color_close" class="form-control form-control-color" 
                            value="<%= settings.embed_color_close || '#068ADD' %>" style="width: 60px; height: 38px;">
                   </div>
@@ -112,12 +112,12 @@
                   <i class="fa-solid fa-folder-tree text-info me-2"></i>
                   <%= tr('ticket:CATEGORY_TITLE') %>
                 </h5>
-                <button class="btn btn-success btn-sm" data-toggle="modal" data-target="#categoryModal" onclick="openCategoryModal()">
+                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal" onclick="openCategoryModal()">
                   <i class="fa-solid fa-plus me-1"></i>
                   <%= tr('ticket:CREATE_MODAL_BTN') %>
                 </button>
               </div>
-              <p class="text-muted small"><%= tr('ticket:CATEGORY_DESC') %></p>
+              <p class="text-secondary small"><%= tr('ticket:CATEGORY_DESC') %></p>
 
               <div class="table-responsive">
                 <table class="table table-hover table-striped" id="categoriesTable">
@@ -134,7 +134,7 @@
                   </thead>
                   <tbody>
                     <% if (categories.length === 0) { %>
-                      <tr><td colspan="7" class="text-center text-muted"><%= tr('ticket:CATEGORY_DESC') %></td></tr>
+                      <tr><td colspan="7" class="text-center text-secondary"><%= tr('ticket:CATEGORY_DESC') %></td></tr>
                     <% } %>
                     <% categories.forEach(cat => { %>
                       <tr data-category-id="<%= cat.id %>">
@@ -147,7 +147,7 @@
                               <span class="badge bg-primary"><%= role ? role.name : roleId %></span>
                             <% }); %>
                           <% } else { %>
-                            <span class="text-muted">-</span>
+                            <span class="text-secondary">-</span>
                           <% } %>
                         </td>
                         <td>
@@ -157,7 +157,7 @@
                               <span class="badge bg-info"><%= mRole ? mRole.name : roleId %></span>
                             <% }); %>
                           <% } else { %>
-                            <span class="text-muted">-</span>
+                            <span class="text-secondary">-</span>
                           <% } %>
                         </td>
                         <td><span class="badge bg-secondary"><%= cat.channel_style || 'NUMBER' %></span></td>
@@ -238,7 +238,7 @@
                   </thead>
                   <tbody>
                     <% if (tickets.length === 0) { %>
-                      <tr><td colspan="9" class="text-center text-muted"><%= tr('ticket:NO_TICKETS') %></td></tr>
+                      <tr><td colspan="9" class="text-center text-secondary"><%= tr('ticket:NO_TICKETS') %></td></tr>
                     <% } %>
                     <% tickets.forEach(ticket => { %>
                       <tr>
@@ -249,7 +249,7 @@
                           <% if (ticket.claimed_by) { %>
                             <code><%= ticket.claimed_by %></code>
                           <% } else { %>
-                            <span class="text-muted">-</span>
+                            <span class="text-secondary">-</span>
                           <% } %>
                         </td>
                         <td><span class="badge bg-info"><%= ticket.category_name || 'Default' %></span></td>
@@ -271,7 +271,7 @@
                               <i class="fa-solid fa-scroll"></i>
                             </button>
                           <% } else { %>
-                            <span class="text-muted">-</span>
+                            <span class="text-secondary">-</span>
                           <% } %>
                         </td>
                       </tr>
@@ -294,7 +294,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="categoryModalTitle"><%= tr('ticket:CREATE_TITLE') %></h5>
-        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
       </div>
       <div class="modal-body">
         <form id="categoryForm">
@@ -334,7 +334,7 @@
           <div class="row">
             <div class="col-md-6 mb-3">
               <label class="form-label"><%= tr('ticket:STAFF_ROLE_TITLE') %></label>
-              <p class="text-muted small"><%= tr('ticket:STAFF_ROLE_DESC') %></p>
+              <p class="text-secondary small"><%= tr('ticket:STAFF_ROLE_DESC') %></p>
               <select id="catStaffRoles" class="form-control" multiple>
                 <% roles.forEach(role => { %>
                   <option value="<%= role.id %>"><%= role.name %></option>
@@ -343,7 +343,7 @@
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label"><%= tr('ticket:MEM_ROLE_TITLE') %></label>
-              <p class="text-muted small"><%= tr('ticket:MEM_ROLE_DESC') %></p>
+              <p class="text-secondary small"><%= tr('ticket:MEM_ROLE_DESC') %></p>
               <select id="catMemberRoles" class="form-control" multiple>
                 <% roles.forEach(role => { %>
                   <option value="<%= role.id %>"><%= role.name %></option>
@@ -371,18 +371,18 @@
           <h6><i class="fa-solid fa-envelope-open me-1"></i> <%= tr('ticket:OPEN_MSG') %></h6>
 
           <div class="callout callout-info py-2 px-3 mb-3">
-            <small class="text-muted d-block mb-1"><strong>Verfügbare Platzhalter:</strong></small>
+            <small class="text-secondary d-block mb-1"><strong>Verfügbare Platzhalter:</strong></small>
             <div class="d-flex flex-wrap" style="gap: 4px;">
-              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{server}</code>
-              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{count}</code>
-              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{member:name}</code>
-              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{member:tag}</code>
-              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{member:mention}</code>
-              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{ticket:category}</code>
-              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{ticket:number}</code>
-              <code class="badge badge-light border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{ticket:id}</code>
+              <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{server}</code>
+              <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{count}</code>
+              <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{member:name}</code>
+              <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{member:tag}</code>
+              <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{member:mention}</code>
+              <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{ticket:category}</code>
+              <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{ticket:number}</code>
+              <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPlaceholder(this)">{ticket:id}</code>
             </div>
-            <small class="text-muted d-block mt-1">Klicke zum Kopieren</small>
+            <small class="text-secondary d-block mt-1">Klicke zum Kopieren</small>
           </div>
 
           <div class="row">
@@ -402,7 +402,7 @@
 
           <hr>
           <h6><i class="fa-solid fa-clipboard-list me-1"></i> <%= tr('ticket:FORM_FIELDS_TITLE') %></h6>
-          <p class="text-muted small"><%= tr('ticket:FORM_FIELDS_DESC') %></p>
+          <p class="text-secondary small"><%= tr('ticket:FORM_FIELDS_DESC') %></p>
 
           <div id="formFieldsContainer"></div>
           <button type="button" class="btn btn-sm btn-outline-success mb-3" onclick="addFormField()">
@@ -416,7 +416,7 @@
         </form>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= tr('ticket:CLOSE_MODAL_BTN') %></button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><%= tr('ticket:CLOSE_MODAL_BTN') %></button>
         <button type="button" class="btn btn-primary" id="categorySubmitBtn" onclick="submitCategory()">
           <%= tr('ticket:CREATE_BTN') %>
         </button>
@@ -434,32 +434,32 @@
           <i class="fa-solid fa-scroll me-2"></i>
           <%= tr('ticket:TRANSCRIPT_TITLE') %> — <span id="transcriptTicketId"></span>
         </h5>
-        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Schließen"></button>
       </div>
       <div class="modal-body p-0">
         <!-- Loading -->
         <div id="transcriptLoading" class="text-center py-5">
-          <i class="fa-solid fa-spinner fa-spin fa-2x text-muted"></i>
-          <p class="text-muted mt-2"><%= tr('ticket:TRANSCRIPT_LOADING') %></p>
+          <i class="fa-solid fa-spinner fa-spin fa-2x text-secondary"></i>
+          <p class="text-secondary mt-2"><%= tr('ticket:TRANSCRIPT_LOADING') %></p>
         </div>
         <!-- No data -->
         <div id="transcriptEmpty" class="text-center py-5 d-none">
-          <i class="fa-solid fa-file-circle-xmark fa-3x text-muted mb-3"></i>
-          <p class="text-muted"><%= tr('ticket:TRANSCRIPT_NO_DATA') %></p>
+          <i class="fa-solid fa-file-circle-xmark fa-3x text-secondary mb-3"></i>
+          <p class="text-secondary"><%= tr('ticket:TRANSCRIPT_NO_DATA') %></p>
         </div>
         <!-- Chat container -->
         <div id="transcriptChat" class="d-none" style="max-height: 70vh; overflow-y: auto; background: #36393f; padding: 16px;">
         </div>
       </div>
       <div class="modal-footer d-none" id="transcriptFooter">
-        <span class="mr-auto text-muted" id="transcriptMsgCount"></span>
+        <span class="me-auto text-secondary" id="transcriptMsgCount"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportTranscript('txt')">
           <i class="fa-solid fa-file-lines me-1"></i> <%= tr('ticket:TRANSCRIPT_EXPORT_TXT') %>
         </button>
         <button type="button" class="btn btn-sm btn-outline-primary" onclick="exportTranscript('html')">
           <i class="fa-solid fa-file-code me-1"></i> <%= tr('ticket:TRANSCRIPT_EXPORT_HTML') %>
         </button>
-        <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= tr('ticket:CLOSE_MODAL_BTN') %></button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><%= tr('ticket:CLOSE_MODAL_BTN') %></button>
       </div>
     </div>
   </div>
@@ -586,7 +586,7 @@
     $(document).ready(function() {
         const storageKey = 'ticket_active_tab_' + guildId;
         
-        $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+        $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function(e) {
             localStorage.setItem(storageKey, $(e.target).attr('href'));
         });
 

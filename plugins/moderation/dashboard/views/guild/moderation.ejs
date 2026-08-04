@@ -9,7 +9,7 @@
             <i class="fa-solid fa-shield-halved me-2"></i>
             <%= tr('moderation:SETTINGS.PAGE_TITLE') %>
           </h3>
-          <p class="text-muted mb-0 mt-2">
+          <p class="text-secondary mb-0 mt-2">
             <%= tr('moderation:SETTINGS.PAGE_DESC') %>
           </p>
         </div>
@@ -18,35 +18,35 @@
           <!-- Bootstrap 4 Nav Tabs -->
           <ul class="nav nav-tabs" id="moderationTabs" role="tablist">
             <li class="nav-item">
-              <a class="nav-link active" id="settings-tab" data-toggle="tab" href="#tab-settings" role="tab">
+              <a class="nav-link active" id="settings-tab" data-bs-toggle="tab" href="#tab-settings" role="tab">
                 <i class="fa-solid fa-cog me-1"></i>
                 <%= tr('moderation:TAB_SETTINGS') %>
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="protected-tab" data-toggle="tab" href="#tab-protected" role="tab">
+              <a class="nav-link" id="protected-tab" data-bs-toggle="tab" href="#tab-protected" role="tab">
                 <i class="fa-solid fa-user-shield me-1"></i>
                 <%= tr('moderation:TAB_PROTECTED_ROLES') %>
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="channel-rules-tab" data-toggle="tab" href="#tab-channel-rules" role="tab">
+              <a class="nav-link" id="channel-rules-tab" data-bs-toggle="tab" href="#tab-channel-rules" role="tab">
                 <i class="fa-solid fa-hashtag me-1"></i>
                 <%= tr('moderation:TAB_CHANNEL_RULES') %>
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="notes-tab" data-toggle="tab" href="#tab-notes" role="tab">
+              <a class="nav-link" id="notes-tab" data-bs-toggle="tab" href="#tab-notes" role="tab">
                 <i class="fa-solid fa-sticky-note me-1"></i>
                 <%= tr('moderation:TAB_NOTES') %>
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="logs-tab" data-toggle="tab" href="#tab-logs" role="tab">
+              <a class="nav-link" id="logs-tab" data-bs-toggle="tab" href="#tab-logs" role="tab">
                 <i class="fa-solid fa-list-ul me-1"></i>
                 <%= tr('moderation:TAB_LOGS') %>
                 <% if (logsTotal > 0) { %>
-                  <span class="badge bg-secondary ml-1"><%= logsTotal %></span>
+                  <span class="badge bg-secondary ms-1"><%= logsTotal %></span>
                 <% } %>
               </a>
             </li>
@@ -68,7 +68,7 @@
                     <i class="fa-solid fa-cog text-primary me-2"></i>
                     <%= tr("moderation:SECTION_BASIC") %>
                   </h5>
-                  <p class="text-muted small mb-3"><%= tr("moderation:SECTION_BASIC_DESC") %></p>
+                  <p class="text-secondary small mb-3"><%= tr("moderation:SECTION_BASIC_DESC") %></p>
                   
                   <div class="row">
                     <!-- Modlog Channel -->
@@ -82,7 +82,7 @@
                         <option value="<%= ch.id %>" <%= settings.modlog_channel === ch.id ? 'selected' : '' %>><%= ch.name %></option>
                         <% }); %>
                       </select>
-                      <small class="form-text text-muted">
+                      <small class="form-text text-secondary">
                         <%= tr("moderation:MODLOG_CHANNEL_DESC") %>
                       </small>
                     </div>
@@ -101,7 +101,7 @@
                         class="form-control"
                         value="<%= settings.max_warn_limit || 5 %>"
                         required />
-                      <small class="form-text text-muted">
+                      <small class="form-text text-secondary">
                         <%= tr("moderation:MAXWARN_LIMIT_DESC") %>
                       </small>
                     </div>
@@ -116,7 +116,7 @@
                         <option value="KICK" <%= settings.max_warn_action === 'KICK' ? 'selected' : '' %>>KICK</option>
                         <option value="BAN" <%= settings.max_warn_action === 'BAN' ? 'selected' : '' %>>BAN</option>
                       </select>
-                      <small class="form-text text-muted">
+                      <small class="form-text text-secondary">
                         <%= tr("moderation:MAXWARN_ACTION_DESC") %>
                       </small>
                     </div>
@@ -135,7 +135,7 @@
                         class="form-control"
                         rows="3"
                         placeholder="<%= tr('moderation:DEFAULT_REASON_PLACEHOLDER') %>"><%= settings.default_reason || '' %></textarea>
-                      <small class="form-text text-muted">
+                      <small class="form-text text-secondary">
                         <%= tr("moderation:DEFAULT_REASON_DESC") %>
                       </small>
                     </div>
@@ -150,7 +150,7 @@
                     <i class="fa-solid fa-list-check text-info me-2"></i>
                     <%= tr("moderation:SECTION_MODLOG_EVENTS") %>
                   </h5>
-                  <p class="text-muted small mb-3"><%= tr("moderation:SECTION_MODLOG_EVENTS_DESC") %></p>
+                  <p class="text-secondary small mb-3"><%= tr("moderation:SECTION_MODLOG_EVENTS_DESC") %></p>
                   
                   <%
                     let modlogEvents = [];
@@ -176,15 +176,15 @@
                   <div class="row">
                     <% events.forEach(event => { %>
                     <div class="col-md-6 col-lg-4 col-xl-3 mb-2">
-                      <div class="custom-control custom-checkbox">
+                      <div class="form-check">
                         <input
                           type="checkbox"
-                          class="custom-control-input"
+                          class="form-check-input"
                           name="modlog_events[]"
                           value="<%= event.key %>"
                           id="event_<%= event.key %>"
                           <%= modlogEvents.includes(event.key) ? 'checked' : '' %>>
-                        <label class="custom-control-label" for="event_<%= event.key %>">
+                        <label class="form-check-label" for="event_<%= event.key %>">
                           <i class="fa-solid <%= event.icon %> me-1"></i>
                           <%= tr("moderation:" + event.label) %>
                         </label>
@@ -202,37 +202,37 @@
                     <i class="fa-solid fa-envelope text-success me-2"></i>
                     <%= tr("moderation:SECTION_DM_NOTIFICATIONS") %>
                   </h5>
-                  <p class="text-muted small mb-3"><%= tr("moderation:SECTION_DM_NOTIFICATIONS_DESC") %></p>
+                  <p class="text-secondary small mb-3"><%= tr("moderation:SECTION_DM_NOTIFICATIONS_DESC") %></p>
                   
                   <div class="row">
                     <div class="col-md-6 col-lg-3 mb-2">
-                      <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" name="dm_on_warn" value="1" id="dm_on_warn" <%= settings.dm_on_warn ? 'checked' : '' %>>
-                        <label class="custom-control-label" for="dm_on_warn">
+                      <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input" name="dm_on_warn" value="1" id="dm_on_warn" <%= settings.dm_on_warn ? 'checked' : '' %>>
+                        <label class="form-check-label" for="dm_on_warn">
                           <i class="fa-solid fa-triangle-exclamation me-1"></i> <%= tr("moderation:DM_ON_WARN") %>
                         </label>
                       </div>
                     </div>
                     <div class="col-md-6 col-lg-3 mb-2">
-                      <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" name="dm_on_kick" value="1" id="dm_on_kick" <%= settings.dm_on_kick ? 'checked' : '' %>>
-                        <label class="custom-control-label" for="dm_on_kick">
+                      <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input" name="dm_on_kick" value="1" id="dm_on_kick" <%= settings.dm_on_kick ? 'checked' : '' %>>
+                        <label class="form-check-label" for="dm_on_kick">
                           <i class="fa-solid fa-right-from-bracket me-1"></i> <%= tr("moderation:DM_ON_KICK") %>
                         </label>
                       </div>
                     </div>
                     <div class="col-md-6 col-lg-3 mb-2">
-                      <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" name="dm_on_ban" value="1" id="dm_on_ban" <%= settings.dm_on_ban ? 'checked' : '' %>>
-                        <label class="custom-control-label" for="dm_on_ban">
+                      <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input" name="dm_on_ban" value="1" id="dm_on_ban" <%= settings.dm_on_ban ? 'checked' : '' %>>
+                        <label class="form-check-label" for="dm_on_ban">
                           <i class="fa-solid fa-ban me-1"></i> <%= tr("moderation:DM_ON_BAN") %>
                         </label>
                       </div>
                     </div>
                     <div class="col-md-6 col-lg-3 mb-2">
-                      <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" name="dm_on_timeout" value="1" id="dm_on_timeout" <%= settings.dm_on_timeout ? 'checked' : '' %>>
-                        <label class="custom-control-label" for="dm_on_timeout">
+                      <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input" name="dm_on_timeout" value="1" id="dm_on_timeout" <%= settings.dm_on_timeout ? 'checked' : '' %>>
+                        <label class="form-check-label" for="dm_on_timeout">
                           <i class="fa-solid fa-clock me-1"></i> <%= tr("moderation:DM_ON_TIMEOUT") %>
                         </label>
                       </div>
@@ -246,16 +246,16 @@
                     <i class="fa-solid fa-pen-to-square text-info me-2"></i>
                     DM Nachrichtenvorlage
                   </h5>
-                  <p class="text-muted small mb-3">Anpassbare Beschreibung für die DM an den betroffenen User. Leer lassen für Standardtext.</p>
+                  <p class="text-secondary small mb-3">Anpassbare Beschreibung für die DM an den betroffenen User. Leer lassen für Standardtext.</p>
                   <textarea class="form-control" name="dm_embed_description" rows="3" placeholder="Du wurdest auf {guild:name} {action}. Grund: {reason}"><%= settings.dm_embed_description || '' %></textarea>
-                  <small class="form-text text-muted">
+                  <small class="form-text text-secondary">
                     Platzhalter:
-                    <code class="badge badge-light border" style="font-size: 0.75em;">{member:name}</code>
-                    <code class="badge badge-light border" style="font-size: 0.75em;">{member:mention}</code>
-                    <code class="badge badge-light border" style="font-size: 0.75em;">{guild:name}</code>
-                    <code class="badge badge-light border" style="font-size: 0.75em;">{action}</code>
-                    <code class="badge badge-light border" style="font-size: 0.75em;">{reason}</code>
-                    <code class="badge badge-light border" style="font-size: 0.75em;">{case}</code>
+                    <code class="badge bg-light-lt border" style="font-size: 0.75em;">{member:name}</code>
+                    <code class="badge bg-light-lt border" style="font-size: 0.75em;">{member:mention}</code>
+                    <code class="badge bg-light-lt border" style="font-size: 0.75em;">{guild:name}</code>
+                    <code class="badge bg-light-lt border" style="font-size: 0.75em;">{action}</code>
+                    <code class="badge bg-light-lt border" style="font-size: 0.75em;">{reason}</code>
+                    <code class="badge bg-light-lt border" style="font-size: 0.75em;">{case}</code>
                   </small>
                 </div>
 
@@ -275,7 +275,7 @@
                 <i class="fa-solid fa-user-shield text-warning me-2"></i>
                 <%= tr('moderation:PROTECTED.TITLE') %>
               </h5>
-              <p class="text-muted small mb-3"><%= tr('moderation:PROTECTED.DESC') %></p>
+              <p class="text-secondary small mb-3"><%= tr('moderation:PROTECTED.DESC') %></p>
 
               <!-- Rolle hinzufügen -->
               <div class="row mb-4">
@@ -292,7 +292,7 @@
                   </select>
                 </div>
                 <div class="col-md-4">
-                  <button type="button" class="btn btn-success btn-block" onclick="addProtectedRole()">
+                  <button type="button" class="btn btn-success w-100" onclick="addProtectedRole()">
                     <i class="fa-solid fa-plus me-1"></i>
                     <%= tr('moderation:PROTECTED.BTN_ADD') %>
                   </button>
@@ -309,7 +309,7 @@
                       <div>
                         <i class="fa-solid fa-shield-halved text-warning me-2"></i>
                         <strong><%= roleName ? roleName.name : pr.role_id %></strong>
-                        <small class="text-muted ml-2"><%= new Date(pr.created_at).toLocaleDateString('de-DE') %></small>
+                        <small class="text-secondary ms-2"><%= new Date(pr.created_at).toLocaleDateString('de-DE') %></small>
                       </div>
                       <button type="button" class="btn btn-sm btn-danger" onclick="removeProtectedRole('<%= pr.role_id %>')">
                         <i class="fa-solid fa-trash"></i>
@@ -331,10 +331,11 @@
                 <i class="fa-solid fa-hashtag text-primary me-2"></i>
                 <%= tr('moderation:CHANNEL_RULES.TITLE') %>
               </h5>
-              <p class="text-muted small mb-3"><%= tr('moderation:CHANNEL_RULES.DESC') %></p>
+              <p class="text-secondary small mb-3"><%= tr('moderation:CHANNEL_RULES.DESC') %></p>
 
               <!-- Channel-Regel hinzufügen -->
-              <div class="card card-outline card-primary mb-4">
+              <div class="card mb-4">
+                  <div class="card-status-top bg-primary"></div>
                 <div class="card-header">
                   <h3 class="card-title"><i class="fa-solid fa-plus me-1"></i> <%= tr('moderation:CHANNEL_RULES.ADD_TITLE') %></h3>
                 </div>
@@ -364,13 +365,13 @@
                     </div>
                     <div class="col-md-2 mb-3">
                       <label class="form-label"><%= tr('moderation:CHANNEL_RULES.AUTOMOD_EXEMPT') %></label>
-                      <div class="custom-control custom-switch mt-2">
-                        <input type="checkbox" class="custom-control-input" id="crAutomodExempt">
-                        <label class="custom-control-label" for="crAutomodExempt"><%= tr('moderation:CHANNEL_RULES.EXEMPT') %></label>
+                      <div class="form-check form-switch mt-2">
+                        <input type="checkbox" class="form-check-input" id="crAutomodExempt">
+                        <label class="form-check-label" for="crAutomodExempt"><%= tr('moderation:CHANNEL_RULES.EXEMPT') %></label>
                       </div>
                     </div>
                     <div class="col-md-2 mb-3 d-flex align-items-end">
-                      <button type="button" class="btn btn-success btn-block" onclick="addChannelRule()">
+                      <button type="button" class="btn btn-success w-100" onclick="addChannelRule()">
                         <i class="fa-solid fa-plus me-1"></i> <%= tr('moderation:CHANNEL_RULES.BTN_ADD') %>
                       </button>
                     </div>
@@ -394,16 +395,16 @@
                       <div class="flex-grow-1">
                         <strong><i class="fa-solid fa-hashtag text-primary me-1"></i><%= ch ? ch.name : rule.channel_id %></strong>
                         <% if (rule.max_warn_limit !== null) { %>
-                          <span class="badge bg-warning ml-2">Max <%= rule.max_warn_limit %> Warns → <%= rule.max_warn_action || 'Standard' %></span>
+                          <span class="badge bg-warning ms-2">Max <%= rule.max_warn_limit %> Warns → <%= rule.max_warn_action || 'Standard' %></span>
                         <% } %>
                         <% if (rule.automod_exempt) { %>
-                          <span class="badge bg-info ml-1">AutoMod Exempt</span>
+                          <span class="badge bg-info ms-1">AutoMod Exempt</span>
                         <% } %>
                         <% if (rule.notes) { %>
-                          <br><small class="text-muted"><%= rule.notes %></small>
+                          <br><small class="text-secondary"><%= rule.notes %></small>
                         <% } %>
                       </div>
-                      <button type="button" class="btn btn-sm btn-danger ml-2" onclick="removeChannelRule(<%= rule.id %>)">
+                      <button type="button" class="btn btn-sm btn-danger ms-2" onclick="removeChannelRule(<%= rule.id %>)">
                         <i class="fa-solid fa-trash"></i>
                       </button>
                     </div>
@@ -423,10 +424,11 @@
                 <i class="fa-solid fa-sticky-note text-success me-2"></i>
                 <%= tr('moderation:NOTES.TITLE') %>
               </h5>
-              <p class="text-muted small mb-3"><%= tr('moderation:NOTES.DESC') %></p>
+              <p class="text-secondary small mb-3"><%= tr('moderation:NOTES.DESC') %></p>
 
               <!-- Notiz erstellen -->
-              <div class="card card-outline card-success mb-4">
+              <div class="card mb-4">
+                  <div class="card-status-top bg-success"></div>
                 <div class="card-header">
                   <h3 class="card-title"><i class="fa-solid fa-plus me-1"></i> <%= tr('moderation:NOTES.ADD_TITLE') %></h3>
                 </div>
@@ -441,7 +443,7 @@
                       <input type="text" id="noteText" class="form-control" maxlength="1000" placeholder="<%= tr('moderation:NOTES.NOTE_PLACEHOLDER') %>">
                     </div>
                     <div class="col-md-2 mb-3 d-flex align-items-end">
-                      <button type="button" class="btn btn-success btn-block" onclick="addNote()">
+                      <button type="button" class="btn btn-success w-100" onclick="addNote()">
                         <i class="fa-solid fa-plus me-1"></i> <%= tr('moderation:NOTES.BTN_ADD') %>
                       </button>
                     </div>
@@ -528,7 +530,7 @@
                       <% }); %>
                     <% } else { %>
                       <tr>
-                        <td colspan="6" class="text-center text-muted py-4">
+                        <td colspan="6" class="text-center text-secondary py-4">
                           <i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>
                           <%= tr('moderation:LOGS.EMPTY') %>
                         </td>
@@ -556,7 +558,8 @@
     <!-- Rechte Spalte: Hilfe & Informationen (4 Spalten) -->
     <div class="col-lg-4">
       <!-- Help Card -->
-      <div class="card card-outline card-info">
+      <div class="card">
+          <div class="card-status-top bg-info"></div>
         <div class="card-header">
           <h3 class="card-title">
             <i class="fa-solid fa-circle-info me-2"></i>
@@ -566,37 +569,37 @@
         <div class="card-body">
           <div class="mb-4">
             <h6><i class="fa-solid fa-shield-halved text-primary me-2"></i><%= tr('moderation:HELP.MODERATION_TITLE') %></h6>
-            <p class="text-muted small">
+            <p class="text-secondary small">
               <%= tr('moderation:HELP.MODERATION_TEXT') %>
             </p>
           </div>
           <div class="mb-4">
             <h6><i class="fa-solid fa-list-check text-info me-2"></i><%= tr('moderation:HELP.MODLOG_TITLE') %></h6>
-            <p class="text-muted small">
+            <p class="text-secondary small">
               <%= tr('moderation:HELP.MODLOG_TEXT') %>
             </p>
           </div>
           <div class="mb-4">
             <h6><i class="fa-solid fa-user-shield text-warning me-2"></i><%= tr('moderation:HELP.PROTECTED_TITLE') %></h6>
-            <p class="text-muted small">
+            <p class="text-secondary small">
               <%= tr('moderation:HELP.PROTECTED_TEXT') %>
             </p>
           </div>
           <div class="mb-4">
             <h6><i class="fa-solid fa-envelope text-success me-2"></i><%= tr('moderation:HELP.DM_TITLE') %></h6>
-            <p class="text-muted small">
+            <p class="text-secondary small">
               <%= tr('moderation:HELP.DM_TEXT') %>
             </p>
           </div>
           <div class="mb-4">
             <h6><i class="fa-solid fa-hashtag text-primary me-2"></i><%= tr('moderation:HELP.CHANNEL_RULES_TITLE') %></h6>
-            <p class="text-muted small">
+            <p class="text-secondary small">
               <%= tr('moderation:HELP.CHANNEL_RULES_TEXT') %>
             </p>
           </div>
           <div class="mb-4">
             <h6><i class="fa-solid fa-sticky-note text-success me-2"></i><%= tr('moderation:HELP.NOTES_TITLE') %></h6>
-            <p class="text-muted small">
+            <p class="text-secondary small">
               <%= tr('moderation:HELP.NOTES_TEXT') %>
             </p>
           </div>
@@ -604,7 +607,7 @@
           <hr>
           
           <h6><i class="fa-solid fa-terminal me-2"></i><%= tr('moderation:HELP.COMMANDS_TITLE') %></h6>
-          <ul class="small pl-3">
+          <ul class="small ps-3">
             <li><code>/warn</code> - User warnen</li>
             <li><code>/kick</code> - User kicken</li>
             <li><code>/ban</code> - User bannen</li>
@@ -632,7 +635,7 @@
   $(document).ready(function() {
     const storageKey = 'moderation_active_tab_' + guildId;
     
-    $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+    $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function(e) {
       localStorage.setItem(storageKey, $(e.target).attr('href'));
     });
     
@@ -717,7 +720,7 @@
       };
       
       if (data.logs.length === 0 && !append) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>Keine Einträge</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary py-4"><i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>Keine Einträge</td></tr>';
         return;
       }
       
@@ -857,14 +860,14 @@
         '<div class="flex-grow-1">' +
         '<div class="d-flex align-items-center mb-1">' +
         '<strong class="text-primary"><i class="fa-solid fa-user me-1"></i>' + note.user_id + '</strong>' +
-        '<span class="text-muted mx-2">•</span>' +
-        '<small class="text-muted"><i class="fa-solid fa-pen me-1"></i>' + note.author_id + '</small>' +
-        '<span class="text-muted mx-2">•</span>' +
-        '<small class="text-muted">' + date + '</small>' +
+        '<span class="text-secondary mx-2">•</span>' +
+        '<small class="text-secondary"><i class="fa-solid fa-pen me-1"></i>' + note.author_id + '</small>' +
+        '<span class="text-secondary mx-2">•</span>' +
+        '<small class="text-secondary">' + date + '</small>' +
         '</div>' +
         '<p class="mb-0">' + escapeHtml(note.note) + '</p>' +
         '</div>' +
-        '<button type="button" class="btn btn-sm btn-danger ml-2" onclick="deleteNote(' + note.id + ')">' +
+        '<button type="button" class="btn btn-sm btn-danger ms-2" onclick="deleteNote(' + note.id + ')">' +
         '<i class="fa-solid fa-trash"></i></button>' +
         '</div>';
     });

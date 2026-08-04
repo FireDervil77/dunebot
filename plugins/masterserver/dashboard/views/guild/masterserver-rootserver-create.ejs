@@ -4,7 +4,7 @@
         <div class="row mb-2">
             <div class="col-sm-6">
                 <h1 class="m-0">
-                    <i class="fa-solid fa-server mr-2"></i>
+                    <i class="fa-solid fa-server me-2"></i>
                     RootServer hinzufügen
                 </h1>
             </div>
@@ -26,7 +26,7 @@
         <div class="row mb-3">
             <div class="col-12">
                 <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-secondary">
-                    <i class="fa-solid fa-arrow-left mr-2"></i>Zurück
+                    <i class="fa-solid fa-arrow-left me-2"></i>Zurück
                 </a>
             </div>
         </div>
@@ -35,7 +35,7 @@
         <div class="row mb-3">
             <div class="col-12">
                 <div class="callout callout-info">
-                    <h5><i class="fa-solid fa-circle-info mr-2"></i>Was ist ein RootServer?</h5>
+                    <h5><i class="fa-solid fa-circle-info me-2"></i>Was ist ein RootServer?</h5>
                     <p class="mb-0">
                         Ein RootServer repräsentiert eine physische oder virtuelle Maschine, auf der der 
                         <strong>FireBot-Daemon</strong> läuft. Auf einem RootServer können mehrere Gameserver 
@@ -59,13 +59,13 @@
             <div class="card card-primary card-outline">
                 <div class="card-header">
                     <h3 class="card-title">
-                        <i class="fa-solid fa-tag mr-2"></i>Basis-Informationen
+                        <i class="fa-solid fa-tag me-2"></i>Basis-Informationen
                     </h3>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="name">Name <span class="text-danger">*</span></label>
                                 <input type="text"
                                        class="form-control"
@@ -74,58 +74,58 @@
                                        placeholder="z.B. Hetzner-Node-1"
                                        minlength="3" maxlength="100"
                                        required>
-                                <small class="form-text text-muted">Eindeutiger Name für diesen RootServer</small>
+                                <small class="form-text text-secondary">Eindeutiger Name für diesen RootServer</small>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="hostname">Hostname (optional)</label>
                                 <input type="text"
                                        class="form-control"
                                        id="hostname"
                                        name="hostname"
                                        placeholder="z.B. node1.example.com">
-                                <small class="form-text text-muted">Öffentlicher Hostname (nur zur Anzeige)</small>
+                                <small class="form-text text-secondary">Öffentlicher Hostname (nur zur Anzeige)</small>
                             </div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="fqdn">FQDN (optional)</label>
                                 <input type="text"
                                        class="form-control"
                                        id="fqdn"
                                        name="fqdn"
                                        placeholder="z.B. node1.firenetworks.de">
-                                <small class="form-text text-muted">Vollqualifizierter Domainname (DNS muss auf die IP zeigen)</small>
+                                <small class="form-text text-secondary">Vollqualifizierter Domainname (DNS muss auf die IP zeigen)</small>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="fastdlEnabled">FastDL</label>
-                                <div class="custom-control custom-switch mt-2">
-                                    <input type="checkbox" class="custom-control-input" id="fastdlEnabled" name="fastdlEnabled" value="true">
-                                    <label class="custom-control-label" for="fastdlEnabled">FastDL aktivieren</label>
+                                <div class="form-check form-switch mt-2">
+                                    <input type="checkbox" class="form-check-input" id="fastdlEnabled" name="fastdlEnabled" value="true">
+                                    <label class="form-check-label" for="fastdlEnabled">FastDL aktivieren</label>
                                 </div>
-                                <small class="form-text text-muted">Stellt Downloads über HTTP bereit (benötigt Nginx)</small>
+                                <small class="form-text text-secondary">Stellt Downloads über HTTP bereit (benötigt Nginx)</small>
                             </div>
                         </div>
                     </div>
                     <div class="row" id="fastdlUrlRow" style="display: none;">
                         <div class="col-md-12">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="fastdlUrl">FastDL Base-URL</label>
                                 <input type="url"
                                        class="form-control"
                                        id="fastdlUrl"
                                        name="fastdlUrl"
                                        placeholder="z.B. https://fastdl.firenetworks.de">
-                                <small class="form-text text-muted">Base-URL für FastDL-Downloads (ohne abschließenden /)</small>
+                                <small class="form-text text-secondary">Base-URL für FastDL-Downloads (ohne abschließenden /)</small>
                             </div>
                         </div>
                     </div>
-                    <div class="form-group">
+                    <div class="mb-3">
                         <label for="description">Beschreibung (optional)</label>
                         <textarea class="form-control" id="description" name="description" rows="2"
                                   placeholder="z.B. Hetzner AX41, Frankfurt, 64 GB RAM"></textarea>
@@ -137,32 +137,32 @@
             <div class="card card-primary card-outline mt-3">
                 <div class="card-header">
                     <h3 class="card-title">
-                        <i class="fa-solid fa-network-wired mr-2"></i>Netzwerk
+                        <i class="fa-solid fa-network-wired me-2"></i>Netzwerk
                     </h3>
                 </div>
                 <div class="card-body">
                     <% if (daemonHardware && daemonHardware.network && daemonHardware.network.interfaces) { %>
                         <!-- Server-Typ Auswahl (nur wenn bereits ein Daemon online ist) -->
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label>Server-Typ <span class="text-danger">*</span></label>
                             <div class="row">
                                 <div class="col-md-6">
-                                    <div class="custom-control custom-radio">
+                                    <div class="form-check">
                                         <input type="radio" id="serverTypeExisting" name="serverType" value="existing" 
-                                               class="custom-control-input" checked>
-                                        <label class="custom-control-label" for="serverTypeExisting">
+                                               class="form-check-input" checked>
+                                        <label class="form-check-label" for="serverTypeExisting">
                                             <strong>Virtueller RootServer</strong><br>
-                                            <small class="text-muted">Auf bestehendem Daemon (shared Host)</small>
+                                            <small class="text-secondary">Auf bestehendem Daemon (shared Host)</small>
                                         </label>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="custom-control custom-radio">
+                                    <div class="form-check">
                                         <input type="radio" id="serverTypeNew" name="serverType" value="new" 
-                                               class="custom-control-input">
-                                        <label class="custom-control-label" for="serverTypeNew">
+                                               class="form-check-input">
+                                        <label class="form-check-label" for="serverTypeNew">
                                             <strong>Neuer physischer RootServer</strong><br>
-                                            <small class="text-muted">Eigener Daemon (dedizierter Host)</small>
+                                            <small class="text-secondary">Eigener Daemon (dedizierter Host)</small>
                                         </label>
                                     </div>
                                 </div>
@@ -172,7 +172,7 @@
 
                     <div class="row">
                         <div class="col-md-8">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="host">IP-Adresse / Host <span class="text-danger">*</span></label>
                                 
                                 <% if (daemonHardware && daemonHardware.network && daemonHardware.network.interfaces) { %>
@@ -198,10 +198,10 @@
                                            placeholder="z.B. 192.168.1.100 oder node2.example.com"
                                            style="display: none;">
                                     
-                                    <small class="form-text text-muted" id="hostHelpExisting">
+                                    <small class="form-text text-secondary" id="hostHelpExisting">
                                         IP-Adresse des bestehenden Daemons
                                     </small>
-                                    <small class="form-text text-muted" id="hostHelpNew" style="display: none;">
+                                    <small class="form-text text-secondary" id="hostHelpNew" style="display: none;">
                                         IP-Adresse oder Hostname des neuen Root-Servers
                                     </small>
                                 <% } else { %>
@@ -212,12 +212,12 @@
                                            name="host"
                                            placeholder="z.B. 192.168.1.100"
                                            required>
-                                    <small class="form-text text-muted">IP-Adresse, auf der der Daemon lauscht</small>
+                                    <small class="form-text text-secondary">IP-Adresse, auf der der Daemon lauscht</small>
                                 <% } %>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="daemonPort">Daemon-Port</label>
                                 <input type="number"
                                        class="form-control"
@@ -225,7 +225,7 @@
                                        name="daemonPort"
                                        value="9340"
                                        min="1024" max="65535">
-                                <small class="form-text text-muted">Standard: 9340 (WebSocket)</small>
+                                <small class="form-text text-secondary">Standard: 9340 (WebSocket)</small>
                             </div>
                         </div>
                     </div>
@@ -237,33 +237,33 @@
             <div class="card card-primary card-outline mt-3">
                 <div class="card-header">
                     <h3 class="card-title">
-                        <i class="fa-solid fa-microchip mr-2"></i>Hardware-Limits
+                        <i class="fa-solid fa-microchip me-2"></i>Hardware-Limits
                     </h3>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-4">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="cpuCores">CPU-Kerne</label>
                                 <input type="number" class="form-control" id="cpuCores" name="cpuCores"
                                        min="0" step="1" value="4" placeholder="z.B. 8">
-                                <small class="form-text text-muted">0 = automatisch ermitteln</small>
+                                <small class="form-text text-secondary">0 = automatisch ermitteln</small>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="ramTotal">RAM-Limit (GB) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="ramTotal" name="ramTotal"
                                        min="1" step="1" value="16" placeholder="z.B. 32" required>
-                                <small class="form-text text-muted">Maximaler RAM für Gameserver</small>
+                                <small class="form-text text-secondary">Maximaler RAM für Gameserver</small>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="diskTotal">Disk-Limit (GB) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="diskTotal" name="diskTotal"
                                        min="1" step="1" value="100" placeholder="z.B. 500" required>
-                                <small class="form-text text-muted">Maximaler Speicherplatz</small>
+                                <small class="form-text text-secondary">Maximaler Speicherplatz</small>
                             </div>
                         </div>
                     </div>
@@ -274,24 +274,24 @@
             <div class="card card-primary card-outline mt-3">
                 <div class="card-header">
                     <h3 class="card-title">
-                        <i class="fa-solid fa-location-dot mr-2"></i>Standort (optional)
+                        <i class="fa-solid fa-location-dot me-2"></i>Standort (optional)
                     </h3>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="datacenter">Rechenzentrum</label>
                                 <input type="text" class="form-control" id="datacenter" name="datacenter"
                                        placeholder="z.B. Hetzner Falkenstein">
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="form-group">
+                            <div class="mb-3">
                                 <label for="countryCode">Ländercode</label>
                                 <input type="text" class="form-control" id="countryCode" name="countryCode"
                                        placeholder="z.B. DE" maxlength="2">
-                                <small class="form-text text-muted">2-stelliger ISO-Code</small>
+                                <small class="form-text text-secondary">2-stelliger ISO-Code</small>
                             </div>
                         </div>
                     </div>
@@ -302,10 +302,10 @@
             <div class="row mt-4 mb-4">
                 <div class="col-12">
                     <button type="submit" class="btn btn-primary btn-lg">
-                        <i class="fa-solid fa-plus mr-2"></i>RootServer erstellen
+                        <i class="fa-solid fa-plus me-2"></i>RootServer erstellen
                     </button>
-                    <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-secondary btn-lg ml-2">
-                        <i class="fa-solid fa-times mr-2"></i>Abbrechen
+                    <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="btn btn-secondary btn-lg ms-2">
+                        <i class="fa-solid fa-times me-2"></i>Abbrechen
                     </a>
                 </div>
             </div>
@@ -324,7 +324,7 @@
 
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title" id="setupModalLabel">
-                    <i class="fa-solid fa-circle-check mr-2"></i>
+                    <i class="fa-solid fa-circle-check me-2"></i>
                     RootServer erstellt – jetzt Daemon einrichten
                 </h5>
             </div>
@@ -332,14 +332,14 @@
             <div class="modal-body">
 
                 <div class="alert alert-danger">
-                    <i class="fa-solid fa-triangle-exclamation mr-2"></i>
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i>
                     <strong>WICHTIG:</strong> Der API-Key wird nur <strong>einmal</strong> angezeigt! 
                     Kopiere ihn jetzt in deine <code>daemon.yaml</code>.
                 </div>
 
                 <div class="alert alert-warning border border-warning" style="font-size:1.05rem;">
                     <h5 class="alert-heading">
-                        <i class="fa-solid fa-window-restore mr-2"></i>
+                        <i class="fa-solid fa-window-restore me-2"></i>
                         <strong>⚠️ Dieses Fenster NICHT schließen!</strong>
                     </h5>
                     <hr>
@@ -354,7 +354,7 @@
                             <li>Daemon-ID und API-Key kopieren</li>
                             <li><code>daemon.yaml</code> auf dem Server speichern</li>
                             <li>Daemon installieren &amp; starten</li>
-                            <li>Warten bis der Status im Dashboard auf <span class="badge badge-success">Online</span> wechselt</li>
+                            <li>Warten bis der Status im Dashboard auf <span class="badge bg-success-lt">Online</span> wechselt</li>
                             <li><strong>Erst dann</strong> auf "Zur RootServer-Übersicht" klicken</li>
                         </ol>
                     </p>
@@ -363,8 +363,8 @@
                 <!-- Daemon-ID + API-Key -->
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="form-group">
-                            <label><i class="fa-solid fa-fingerprint mr-1"></i>Daemon-ID</label>
+                        <div class="mb-3">
+                            <label><i class="fa-solid fa-fingerprint me-1"></i>Daemon-ID</label>
                             <div class="input-group">
                                 <input type="text" class="form-control font-monospace" id="setup-daemon-id" readonly>
                                 <div class="input-group-append">
@@ -374,12 +374,12 @@
                                     </button>
                                 </div>
                             </div>
-                            <small class="text-muted">Zur Identifikation im Dashboard</small>
+                            <small class="text-secondary">Zur Identifikation im Dashboard</small>
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="form-group">
-                            <label><i class="fa-solid fa-key mr-1"></i>API-Key <span class="badge badge-danger">Nur einmal sichtbar!</span></label>
+                        <div class="mb-3">
+                            <label><i class="fa-solid fa-key me-1"></i>API-Key <span class="badge bg-danger-lt">Nur einmal sichtbar!</span></label>
                             <div class="input-group">
                                 <input type="text" class="form-control font-monospace" id="setup-api-key" readonly>
                                 <div class="input-group-append">
@@ -389,19 +389,19 @@
                                     </button>
                                 </div>
                             </div>
-                            <small class="text-muted">Trägt in <code>daemon.yaml</code> unter <code>daemon.token</code> ein</small>
+                            <small class="text-secondary">Trägt in <code>daemon.yaml</code> unter <code>daemon.token</code> ein</small>
                         </div>
                     </div>
                 </div>
 
                 <!-- daemon.yaml -->
-                <div class="form-group mt-2">
+                <div class="mb-3 mt-2">
                     <label>
-                        <i class="fa-solid fa-file-code mr-1"></i>
+                        <i class="fa-solid fa-file-code me-1"></i>
                         Fertige <code>daemon.yaml</code>
-                        <button class="btn btn-xs btn-outline-secondary ml-2" type="button"
+                        <button class="btn btn-sm btn-outline-secondary ms-2" type="button"
                                 onclick="copyFieldValue('setup-daemon-yaml')">
-                            <i class="fa-solid fa-copy mr-1"></i>Kopieren
+                            <i class="fa-solid fa-copy me-1"></i>Kopieren
                         </button>
                     </label>
                     <textarea class="form-control font-monospace" id="setup-daemon-yaml" rows="18" readonly
@@ -410,8 +410,8 @@
 
                 <!-- Installations-Anleitung -->
                 <div class="callout callout-info mt-3">
-                    <h6><i class="fa-solid fa-list-ol mr-1"></i><strong>Kurzanleitung</strong></h6>
-                    <ol class="mb-0 pl-3">
+                    <h6><i class="fa-solid fa-list-ol me-1"></i><strong>Kurzanleitung</strong></h6>
+                    <ol class="mb-0 ps-3">
                         <li>Daemon auf deinem Server installieren:<br>
                             <pre class="bg-dark text-white p-2 rounded mt-1 mb-2" style="font-size:0.8rem;"><code>curl -fsSL <%= process.env.DASHBOARD_BASE_URL || '' %>/downloads/daemon/install.sh | sudo bash</code></pre>
                         </li>
@@ -420,20 +420,20 @@
                             <pre class="bg-dark text-white p-2 rounded mt-1 mb-0" style="font-size:0.8rem;"><code>sudo systemctl start firebot-daemon
 sudo systemctl enable firebot-daemon</code></pre>
                         </li>
-                        <li>Im Dashboard erscheint der RootServer als <span class="badge badge-success">Online</span>, sobald der Daemon verbunden ist.</li>
+                        <li>Im Dashboard erscheint der RootServer als <span class="badge bg-success-lt">Online</span>, sobald der Daemon verbunden ist.</li>
                     </ol>
                 </div>
 
             </div>
 
             <div class="modal-footer">
-                <span class="text-muted mr-auto">
-                    <i class="fa-solid fa-circle-info mr-1"></i>
+                <span class="text-secondary me-auto">
+                    <i class="fa-solid fa-circle-info me-1"></i>
                     API-Key ist in der Datenbank gehasht – nicht wiederherstellbar.
                 </span>
                 <button type="button" class="btn btn-success" id="setup-continue-btn"
                         onclick="window.location.href = this.getAttribute('data-redirect') || window.location.href.replace('/create','')">
-                    <i class="fa-solid fa-arrow-right mr-1"></i>
+                    <i class="fa-solid fa-arrow-right me-1"></i>
                     Zur RootServer-Übersicht
                 </button>
             </div>

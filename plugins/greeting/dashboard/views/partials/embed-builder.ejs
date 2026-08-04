@@ -10,10 +10,10 @@
   const embTs     = emb.timestamp ? true : false;
 %>
 <div class="embed-builder mt-3 mb-3" id="<%= pfx %>_embed_builder">
-  <div class="d-flex align-items-center mb-2 cursor-pointer" data-toggle="collapse" data-target="#<%= pfx %>_embed_collapse" aria-expanded="false">
+  <div class="d-flex align-items-center mb-2 cursor-pointer" data-bs-toggle="collapse" data-bs-target="#<%= pfx %>_embed_collapse" aria-expanded="false">
     <i class="fa-solid fa-code me-1"></i>
     <strong><%= tr('greeting:EMBED.TITLE') %></strong>
-    <i class="fa-solid fa-chevron-down ml-2 small"></i>
+    <i class="fa-solid fa-chevron-down ms-2 small"></i>
   </div>
 
   <div class="collapse" id="<%= pfx %>_embed_collapse">
@@ -59,20 +59,20 @@
       <div class="row">
         <!-- Thumbnail Toggle -->
         <div class="col-md-6 mb-2">
-          <div class="custom-control custom-switch">
-            <input type="checkbox" class="custom-control-input embed-input" id="<%= pfx %>_embed_thumbnail"
+          <div class="form-check form-switch">
+            <input type="checkbox" class="form-check-input embed-input" id="<%= pfx %>_embed_thumbnail"
                    name="<%= pfx %>_embed_thumbnail" <%= embThumb ? 'checked' : '' %>
                    data-embed-field="thumbnail" data-prefix="<%= pfx %>">
-            <label class="custom-control-label" for="<%= pfx %>_embed_thumbnail"><%= tr('greeting:EMBED.THUMBNAIL') %></label>
+            <label class="form-check-label" for="<%= pfx %>_embed_thumbnail"><%= tr('greeting:EMBED.THUMBNAIL') %></label>
           </div>
         </div>
         <!-- Timestamp Toggle -->
         <div class="col-md-6 mb-2">
-          <div class="custom-control custom-switch">
-            <input type="checkbox" class="custom-control-input embed-input" id="<%= pfx %>_embed_timestamp"
+          <div class="form-check form-switch">
+            <input type="checkbox" class="form-check-input embed-input" id="<%= pfx %>_embed_timestamp"
                    name="<%= pfx %>_embed_timestamp" <%= embTs ? 'checked' : '' %>
                    data-embed-field="timestamp" data-prefix="<%= pfx %>">
-            <label class="custom-control-label" for="<%= pfx %>_embed_timestamp"><%= tr('greeting:EMBED.TIMESTAMP') %></label>
+            <label class="form-check-label" for="<%= pfx %>_embed_timestamp"><%= tr('greeting:EMBED.TIMESTAMP') %></label>
           </div>
         </div>
       </div>

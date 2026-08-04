@@ -28,15 +28,15 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
                     </h1>
                 </div>
                 <div class="col-sm-6">
-                    <div class="float-right">
+                    <div class="float-end">
                         <!-- Status Badge -->
-                        <span class="badge badge-<%= server.status === 'online' ? 'success' : server.status === 'starting' ? 'warning' : 'secondary' %> mr-2">
+                        <span class="badge badge-<%= server.status === 'online' ? 'success' : server.status === 'starting' ? 'warning' : 'secondary' %> me-2">
                             <i class="fas fa-circle"></i> 
                             <%= server.status.toUpperCase() %>
                         </span>
                         
                         <!-- Connection Status -->
-                        <span id="connection-status" class="badge badge-secondary">
+                        <span id="connection-status" class="badge bg-secondary-lt">
                             <i class="fas fa-plug"></i> Disconnected
                         </span>
                     </div>
@@ -57,9 +57,9 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
                     
                     <div class="card-tools">
                         <!-- Auto-Scroll Toggle -->
-                        <div class="custom-control custom-switch d-inline-block mr-2">
-                            <input type="checkbox" class="custom-control-input" id="autoscroll-toggle" checked>
-                            <label class="custom-control-label" for="autoscroll-toggle">
+                        <div class="form-check form-switch d-inline-block me-2">
+                            <input type="checkbox" class="form-check-input" id="autoscroll-toggle" checked>
+                            <label class="form-check-label" for="autoscroll-toggle">
                                 <i class="fas fa-arrow-down"></i> Auto-Scroll
                             </label>
                         </div>
@@ -104,7 +104,7 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
                             </button>
                         </div>
                     </form>
-                    <small class="text-muted mt-1 d-block">
+                    <small class="text-secondary mt-1 d-block">
                         <i class="fas fa-info-circle"></i> 
                         Use <kbd>↑</kbd> <kbd>↓</kbd> for command history
                         | Commands remaining: <span id="rate-limit-remaining">-</span>
@@ -144,11 +144,11 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
                         <dt class="col-sm-3">RCON Support:</dt>
                         <dd class="col-sm-9">
                             <% if (serverConfig.rconSupported !== false) { %>
-                                <span class="badge badge-success">
+                                <span class="badge bg-success-lt">
                                     <i class="fas fa-check"></i> Ja
                                 </span>
                             <% } else { %>
-                                <span class="badge badge-secondary">
+                                <span class="badge bg-secondary-lt">
                                     <i class="fas fa-times"></i> Nein
                                 </span>
                             <% } %>
@@ -156,10 +156,10 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
                         
                         <dt class="col-sm-3">Auto-Connect:</dt>
                         <dd class="col-sm-9">
-                            <span class="badge badge-info">
+                            <span class="badge bg-info-lt">
                                 <i class="fas fa-eye"></i> Tab-basiert
                             </span>
-                            <small class="text-muted d-block">
+                            <small class="text-secondary d-block">
                                 Console verbindet automatisch wenn Tab sichtbar ist und trennt bei Tab-Wechsel
                             </small>
                         </dd>

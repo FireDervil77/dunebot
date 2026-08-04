@@ -7,7 +7,7 @@
         <i class="fa-solid fa-file-lines text-primary me-2"></i>
         <%= tr('masterserver:LOGS.TITLE') %>
       </h2>
-      <p class="text-muted">Daemon-Logs zur Fehlersuche und Monitoring</p>
+      <p class="text-secondary">Daemon-Logs zur Fehlersuche und Monitoring</p>
     </div>
   </div>
 
@@ -17,8 +17,8 @@
       <div class="card">
         <div class="card-body p-2">
           <form method="GET" action="/guild/<%= guildId %>/plugins/masterserver/logs" class="form-inline">
-            <div class="form-group mr-3">
-              <label class="mr-2">Level:</label>
+            <div class="mb-3 me-3">
+              <label class="me-2">Level:</label>
               <select name="level" class="form-control form-control-sm" onchange="this.form.submit()">
                 <option value="">Alle</option>
                 <option value="debug" <%= level === 'debug' ? 'selected' : '' %>>Debug</option>
@@ -27,8 +27,8 @@
                 <option value="error" <%= level === 'error' ? 'selected' : '' %>>Error</option>
               </select>
             </div>
-            <div class="form-group mr-3">
-              <label class="mr-2">Limit:</label>
+            <div class="mb-3 me-3">
+              <label class="me-2">Limit:</label>
               <select name="limit" class="form-control form-control-sm" onchange="this.form.submit()">
                 <option value="50" <%= limit === 50 ? 'selected' : '' %>>50</option>
                 <option value="100" <%= limit === 100 ? 'selected' : '' %>>100</option>
@@ -39,14 +39,14 @@
             <button type="submit" class="btn btn-sm btn-primary">
               <i class="fa-solid fa-filter me-1"></i> Filtern
             </button>
-            <a href="/guild/<%= guildId %>/plugins/masterserver/logs" class="btn btn-sm btn-secondary ml-2">
+            <a href="/guild/<%= guildId %>/plugins/masterserver/logs" class="btn btn-sm btn-secondary ms-2">
               <i class="fa-solid fa-refresh me-1"></i> Zurücksetzen
             </a>
           </form>
         </div>
       </div>
     </div>
-    <div class="col-md-4 text-right">
+    <div class="col-md-4 text-end">
       <button type="button" class="btn btn-success" onclick="window.location.reload()">
         <i class="fa-solid fa-refresh me-1"></i> Aktualisieren
       </button>
@@ -110,7 +110,7 @@
             <i class="fa-solid fa-list me-2"></i>
             Log-Einträge 
             <% if (level) { %>
-              <span class="badge badge-info"><%= level.toUpperCase() %></span>
+              <span class="badge bg-info-lt"><%= level.toUpperCase() %></span>
             <% } %>
             (Zeige <%= logs.length %> von <%= stats.total %>)
           </h3>
@@ -168,7 +168,7 @@
                       <td>
                         <%= log.message %>
                         <% if (log.metadata && Object.keys(log.metadata).length > 0) { %>
-                          <br><small class="text-muted">
+                          <br><small class="text-secondary">
                             <% Object.entries(log.metadata).slice(0, 2).forEach(([key, value]) => { %>
                               <strong><%= key %>:</strong> <%= typeof value === 'object' ? JSON.stringify(value).substring(0, 50) + '...' : value %> 
                             <% }); %>
@@ -177,11 +177,11 @@
                       </td>
                       <td class="text-center">
                         <% if (log.metadata && Object.keys(log.metadata).length > 0) { %>
-                          <button type="button" class="btn btn-xs btn-info" onclick="showLogDetails(<%= index %>)">
+                          <button type="button" class="btn btn-sm btn-info" onclick="showLogDetails(<%= index %>)">
                             <i class="fa-solid fa-info-circle"></i> Details
                           </button>
                         <% } else { %>
-                          <span class="text-muted">-</span>
+                          <span class="text-secondary">-</span>
                         <% } %>
                       </td>
                     </tr>
@@ -190,7 +190,7 @@
               </table>
             </div>
           <% } else { %>
-            <div class="p-5 text-center text-muted">
+            <div class="p-5 text-center text-secondary">
               <i class="fa-solid fa-file-circle-question fa-4x mb-3"></i>
               <h5>Keine Logs gefunden</h5>
               <% if (level) { %>
@@ -204,7 +204,7 @@
         </div>
         <% if (logs.length > 0) { %>
           <div class="card-footer text-center">
-            <small class="text-muted">
+            <small class="text-secondary">
               Zeige die letzten <%= logs.length %> Einträge
               <% if (level) { %>
                 (gefiltert nach <%= level %>)
@@ -227,9 +227,7 @@
           <i class="fa-solid fa-info-circle me-2"></i>
           Log-Details
         </h5>
-        <button type="button" class="close" data-dismiss="modal">
-          <span>&times;</span>
-        </button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
       </div>
       <div class="modal-body">
         <div id="logDetailsContent">
@@ -237,7 +235,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Schließen</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
       </div>
     </div>
   </div>

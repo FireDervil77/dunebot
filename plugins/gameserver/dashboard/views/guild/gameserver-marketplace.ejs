@@ -36,11 +36,11 @@
                                         <i class="fa-solid fa-egg"></i>
                                         <%= tr('gameserver:MY_ADDONS.PROMO_TITLE') || 'Erstelle deine eigenen Addons!' %>
                                     </h4>
-                                    <p class="text-muted mb-0">
+                                    <p class="text-secondary mb-0">
                                         <%= tr('gameserver:MY_ADDONS.PROMO_TEXT') || 'Erstelle, bearbeite und teile deine eigenen Game-Server-Konfigurationen mit der Community. Nutze Templates oder starte von Grund auf!' %>
                                     </p>
                                 </div>
-                                <div class="col-md-4 text-right">
+                                <div class="col-md-4 text-end">
                                     <a href="/guild/<%= guildId %>/plugins/gameserver/addons/my-addons" class="btn btn-primary btn-lg">
                                         <i class="fa-solid fa-egg"></i>
                                         <%= tr('gameserver:MY_ADDONS.GO_TO_MY_ADDONS') || 'Zu meinen Addons' %>
@@ -69,7 +69,7 @@
                         <div class="card-body">
                             <form method="GET" action="/guild/<%= guildId %>/plugins/gameserver/addons">
                                 <!-- Search -->
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><%= tr('gameserver:MARKETPLACE.SEARCH') %></label>
                                     <input type="text" 
                                            class="form-control" 
@@ -79,7 +79,7 @@
                                 </div>
 
                                 <!-- Category -->
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><%= tr('gameserver:MARKETPLACE.CATEGORY') %></label>
                                     <select class="form-control" name="category">
                                         <option value="all" <%= filters.category === 'all' ? 'selected' : '' %>>
@@ -94,7 +94,7 @@
                                 </div>
 
                                 <!-- Sort -->
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><%= tr('gameserver:MARKETPLACE.SORT_BY') %></label>
                                     <select class="form-control" name="sort">
                                         <option value="default" <%= filters.sort === 'default' ? 'selected' : '' %>>
@@ -112,10 +112,10 @@
                                     </select>
                                 </div>
 
-                                <button type="submit" class="btn btn-primary btn-block">
+                                <button type="submit" class="btn btn-primary w-100">
                                     <i class="fa-solid fa-search"></i> <%= tr('gameserver:MARKETPLACE.APPLY_FILTER') %>
                                 </button>
-                                <a href="/guild/<%= guildId %>/plugins/gameserver/addons" class="btn btn-secondary btn-block">
+                                <a href="/guild/<%= guildId %>/plugins/gameserver/addons" class="btn btn-secondary w-100">
                                     <i class="fa-solid fa-times"></i> <%= tr('gameserver:MARKETPLACE.RESET_FILTER') %>
                                 </a>
                             </form>
@@ -132,34 +132,34 @@
                         </div>
                         <div class="card-body">
                             <div class="mb-2">
-                                <span class="badge badge-danger">
+                                <span class="badge bg-danger-lt">
                                     👑 OFFICIAL
                                 </span>
-                                <small class="d-block text-muted">
+                                <small class="d-block text-secondary">
                                     <%= tr('gameserver:MARKETPLACE.TRUST_OFFICIAL') %>
                                 </small>
                             </div>
                             <div class="mb-2">
-                                <span class="badge badge-success">
+                                <span class="badge bg-success-lt">
                                     🛡️ TRUSTED
                                 </span>
-                                <small class="d-block text-muted">
+                                <small class="d-block text-secondary">
                                     <%= tr('gameserver:MARKETPLACE.TRUST_TRUSTED') %>
                                 </small>
                             </div>
                             <div class="mb-2">
-                                <span class="badge badge-primary">
+                                <span class="badge bg-primary-lt">
                                     ✓ VERIFIED
                                 </span>
-                                <small class="d-block text-muted">
+                                <small class="d-block text-secondary">
                                     <%= tr('gameserver:MARKETPLACE.TRUST_VERIFIED') %>
                                 </small>
                             </div>
                             <div>
-                                <span class="badge badge-secondary">
+                                <span class="badge bg-secondary-lt">
                                     <i class="fa-solid fa-question-circle"></i> UNVERIFIED
                                 </span>
-                                <small class="d-block text-muted">
+                                <small class="d-block text-secondary">
                                     <%= tr('gameserver:MARKETPLACE.TRUST_UNVERIFIED') %>
                                 </small>
                             </div>
@@ -197,37 +197,37 @@
                                             <!-- Trust Level Badge -->
                                             <div class="mb-2">
                                                 <% if (addon.trust_level === 'official') { %>
-                                                    <span class="badge badge-danger">
+                                                    <span class="badge bg-danger-lt">
                                                         👑 OFFICIAL
                                                     </span>
                                                 <% } else if (addon.trust_level === 'trusted') { %>
-                                                    <span class="badge badge-success">
+                                                    <span class="badge bg-success-lt">
                                                         🛡️ TRUSTED
                                                     </span>
                                                 <% } else if (addon.trust_level === 'verified') { %>
-                                                    <span class="badge badge-primary">
+                                                    <span class="badge bg-primary-lt">
                                                         ✓ VERIFIED
                                                     </span>
                                                 <% } else { %>
-                                                    <span class="badge badge-secondary">
+                                                    <span class="badge bg-secondary-lt">
                                                         <i class="fa-solid fa-question-circle"></i> UNVERIFIED
                                                     </span>
                                                 <% } %>
 
-                                                <span class="badge badge-info ml-1">
+                                                <span class="badge bg-info-lt ms-1">
                                                     <%= addon.category.toUpperCase() %>
                                                 </span>
 
                                                 <% if (addon.runtime_type === 'docker_steam') { %>
-                                                    <span class="badge badge-dark ml-1">
+                                                    <span class="badge bg-dark-lt ms-1">
                                                         <i class="fa-brands fa-steam"></i> Steam
                                                     </span>
                                                 <% } else if (addon.runtime_type === 'docker_standalone') { %>
-                                                    <span class="badge badge-dark ml-1">
+                                                    <span class="badge bg-dark-lt ms-1">
                                                         <i class="fa-brands fa-docker"></i> Docker
                                                     </span>
                                                 <% } else if (addon.runtime_type === 'native_steamcmd') { %>
-                                                    <span class="badge badge-secondary ml-1">
+                                                    <span class="badge bg-secondary-lt ms-1">
                                                         <i class="fa-brands fa-steam"></i> Native
                                                     </span>
                                                 <% } %>
@@ -241,7 +241,7 @@
                                             </h5>
 
                                             <!-- Description -->
-                                            <p class="card-text text-muted small">
+                                            <p class="card-text text-secondary small">
                                                 <%= addon.description.substring(0, 100) %><%= addon.description.length > 100 ? '...' : '' %>
                                             </p>
 
@@ -249,15 +249,15 @@
                                             <div class="mb-3">
                                                 <!-- Rating -->
                                                 <% if (addon.rating_count > 0) { %>
-                                                    <div class="d-inline-block mr-3">
+                                                    <div class="d-inline-block me-3">
                                                         <i class="fa-solid fa-star text-warning"></i>
                                                         <%= addon.rating_avg ? addon.rating_avg.toFixed(1) : 0 %>
-                                                        <small class="text-muted">(<%= addon.rating_count %>)</small>
+                                                        <small class="text-secondary">(<%= addon.rating_count %>)</small>
                                                     </div>
                                                 <% } else { %>
-                                                    <div class="d-inline-block mr-3">
-                                                        <i class="fa-regular fa-star text-muted"></i>
-                                                        <small class="text-muted"><%= tr('gameserver:MARKETPLACE.NO_RATINGS') %></small>
+                                                    <div class="d-inline-block me-3">
+                                                        <i class="fa-regular fa-star text-secondary"></i>
+                                                        <small class="text-secondary"><%= tr('gameserver:MARKETPLACE.NO_RATINGS') %></small>
                                                     </div>
                                                 <% } %>
 
@@ -269,14 +269,14 @@
                                             </div>
 
                                             <!-- Author -->
-                                            <small class="text-muted">
+                                            <small class="text-secondary">
                                                 <%= tr('gameserver:MARKETPLACE.BY') %> <%= addon.author_name || 'Unknown' %>
                                             </small>
                                         </div>
 
                                         <div class="card-footer">
                                             <a href="/guild/<%= guildId %>/plugins/gameserver/addons/<%= addon.slug %>" 
-                                               class="btn btn-primary btn-block">
+                                               class="btn btn-primary w-100">
                                                 <i class="fa-solid fa-eye"></i> <%= tr('gameserver:MARKETPLACE.VIEW_DETAILS') %>
                                             </a>
                                         </div>
@@ -288,9 +288,9 @@
                         <!-- No Results -->
                         <div class="card">
                             <div class="card-body text-center p-5">
-                                <i class="fa-solid fa-inbox fa-4x text-muted mb-4"></i>
+                                <i class="fa-solid fa-inbox fa-4x text-secondary mb-4"></i>
                                 <h4><%= tr('gameserver:MARKETPLACE.NO_RESULTS') %></h4>
-                                <p class="text-muted">
+                                <p class="text-secondary">
                                     <%= tr('gameserver:MARKETPLACE.NO_RESULTS_DESC') %>
                                 </p>
                                 <a href="/guild/<%= guildId %>/plugins/gameserver/addons" class="btn btn-primary">

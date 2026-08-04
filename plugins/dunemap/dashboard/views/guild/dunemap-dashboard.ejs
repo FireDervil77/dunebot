@@ -21,7 +21,7 @@
       <div class="card-body">
         <i class="fa-solid fa-map-marker-alt text-danger fa-3x mb-2"></i>
         <h3 class="mb-0"><%= markerCount %></h3>
-        <p class="text-muted mb-0"><%= tr('dunemap:DASHBOARD.STATS.MARKERS_SET') %></p>
+        <p class="text-secondary mb-0"><%= tr('dunemap:DASHBOARD.STATS.MARKERS_SET') %></p>
       </div>
     </div>
   </div>
@@ -31,7 +31,7 @@
       <div class="card-body">
         <i class="fa-solid fa-th text-primary fa-3x mb-2"></i>
         <h3 class="mb-0">81</h3>
-        <p class="text-muted mb-0"><%= tr('dunemap:DASHBOARD.STATS.AVAILABLE_SECTORS') %></p>
+        <p class="text-secondary mb-0"><%= tr('dunemap:DASHBOARD.STATS.AVAILABLE_SECTORS') %></p>
       </div>
     </div>
   </div>
@@ -41,7 +41,7 @@
       <div class="card-body">
         <i class="fa-solid fa-gem text-warning fa-3x mb-2"></i>
         <h3 class="mb-0">14</h3>
-        <p class="text-muted mb-0"><%= tr('dunemap:DASHBOARD.STATS.MARKER_TYPES') %></p>
+        <p class="text-secondary mb-0"><%= tr('dunemap:DASHBOARD.STATS.MARKER_TYPES') %></p>
       </div>
     </div>
   </div>
@@ -51,7 +51,7 @@
       <div class="card-body">
         <i class="fa-solid fa-clock text-success fa-3x mb-2"></i>
         <h3 class="mb-0"><i class="fa-solid fa-infinity"></i></h3>
-        <p class="text-muted mb-0"><%= tr('dunemap:DASHBOARD.STATS.STORM_TIMER_ACTIVE') %></p>
+        <p class="text-secondary mb-0"><%= tr('dunemap:DASHBOARD.STATS.STORM_TIMER_ACTIVE') %></p>
       </div>
     </div>
   </div>
@@ -84,7 +84,7 @@
           <i class="fa-solid fa-arrow-right me-2"></i>
           <%= tr('dunemap:DASHBOARD.PLUGIN_SETTINGS.BUTTON') %>
         </a>
-        <small class="text-muted d-block mt-2">
+        <small class="text-secondary d-block mt-2">
           <i class="fa-solid fa-info-circle me-1"></i>
           <%= tr('dunemap:DASHBOARD.PLUGIN_SETTINGS.INFO') %>
         </small>
@@ -109,15 +109,15 @@
         <ul class="list-unstyled mb-3">
           <li class="mb-2">
             <code>/map show</code>
-            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.MAP_SHOW') %></small>
+            <small class="text-secondary d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.MAP_SHOW') %></small>
           </li>
           <li class="mb-2">
             <code>/map set A5 titan</code>
-            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.MAP_SET') %></small>
+            <small class="text-secondary d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.MAP_SET') %></small>
           </li>
           <li class="mb-2">
             <code>/map remove A5</code>
-            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.MAP_REMOVE') %></small>
+            <small class="text-secondary d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.MAP_REMOVE') %></small>
           </li>
         </ul>
         
@@ -125,11 +125,11 @@
         <ul class="list-unstyled mb-3">
           <li class="mb-2">
             <code>/storm set 05:12:30</code>
-            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.STORM_SET') %></small>
+            <small class="text-secondary d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.STORM_SET') %></small>
           </li>
           <li class="mb-2">
             <code>/storm reset</code>
-            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.STORM_RESET') %></small>
+            <small class="text-secondary d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.STORM_RESET') %></small>
           </li>
         </ul>
         
@@ -137,7 +137,7 @@
         <ul class="list-unstyled mb-0">
           <li class="mb-2">
             <code>/tutorial</code>
-            <small class="text-muted d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.TUTORIAL_DESC') %></small>
+            <small class="text-secondary d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.TUTORIAL_DESC') %></small>
           </li>
         </ul>
       </div>
@@ -178,11 +178,11 @@
                     <td>
                       <span class="badge bg-secondary"><%= marker.marker_type %></span>
                     </td>
-                    <td class="text-muted small">
+                    <td class="text-secondary small">
                       <i class="fa-solid fa-user me-1"></i>
                       <%= marker.placedByName || marker.placed_by || 'Bot' %>
                     </td>
-                    <td class="text-muted small">
+                    <td class="text-secondary small">
                       <%= new Date(marker.placed_at).toLocaleDateString('de-DE', { 
                         year: 'numeric', 
                         month: '2-digit', 
@@ -206,9 +206,9 @@
     <div class="col-12">
       <div class="card">
         <div class="card-body text-center py-5">
-          <i class="fa-solid fa-map fa-5x text-muted mb-3 d-block"></i>
+          <i class="fa-solid fa-map fa-5x text-secondary mb-3 d-block"></i>
           <h4 class="mb-2"><%= tr('dunemap:DASHBOARD.EMPTY_STATE.TITLE') %></h4>
-          <p class="text-muted mb-4">
+          <p class="text-secondary mb-4">
             <%- tr('dunemap:DASHBOARD.EMPTY_STATE.DESCRIPTION') %>
           </p>
           <div class="alert alert-info d-inline-block">
@@ -259,7 +259,7 @@
                   </li>
                   <% }) %>
                 <% } else { %>
-                  <li class="text-muted"><%= tr('dunemap:DASHBOARD.MARKER_TYPES.NO_RESOURCES') %></li>
+                  <li class="text-secondary"><%= tr('dunemap:DASHBOARD.MARKER_TYPES.NO_RESOURCES') %></li>
                 <% } %>
               </ul>
             </div>
@@ -291,7 +291,7 @@
             </div>
           </div>
           <% } else { %>
-          <p class="text-muted"><%= tr('dunemap:DASHBOARD.MARKER_TYPES.ERROR') %></p>
+          <p class="text-secondary"><%= tr('dunemap:DASHBOARD.MARKER_TYPES.ERROR') %></p>
           <% } %>
         </div>
       </div>

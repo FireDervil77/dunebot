@@ -43,7 +43,7 @@
                             
                             <div class="card-body">
                                 <!-- Server Name -->
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label for="name">
                                         <%= tr('gameserver:SERVER.NAME') %> <span class="text-danger">*</span>
                                     </label>
@@ -54,24 +54,24 @@
                                            value="<%= server.name %>"
                                            required
                                            maxlength="100">
-                                    <small class="form-text text-muted">
+                                    <small class="form-text text-secondary">
                                         <%= tr('gameserver:SERVER.NAME_DESC') %>
                                     </small>
                                 </div>
 
                                 <!-- Game & Template (read-only) -->
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><%= tr('gameserver:SERVER.GAME') %></label>
                                     <input type="text" 
                                            class="form-control" 
                                            value="<%= server.game_name %>" 
                                            disabled>
-                                    <small class="form-text text-muted">
+                                    <small class="form-text text-secondary">
                                         <%= tr('gameserver:SERVER.GAME_READONLY') %>
                                     </small>
                                 </div>
 
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><%= tr('gameserver:SERVER.TEMPLATE') %></label>
                                     <input type="text" 
                                            class="form-control" 
@@ -80,9 +80,9 @@
                                 </div>
 
                                 <!-- Ressourcen: reservierter Platz auf dem RootServer -->
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label class="mb-2">
-                                        <i class="fa-solid fa-gauge-high mr-1 text-muted"></i>
+                                        <i class="fa-solid fa-gauge-high me-1 text-secondary"></i>
                                         Reservierte Ressourcen
                                     </label>
                                     <%#
@@ -130,7 +130,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <small class="form-text text-muted">
+                                    <small class="form-text text-secondary">
                                         100 % entspricht einem CPU-Kern. Die Werte buchen Platz auf dem
                                         RootServer und begrenzen den Server im Betrieb — sie greifen beim
                                         nächsten Start. Alle drei zusammen ausfüllen oder alle leer lassen.
@@ -138,43 +138,43 @@
                                 </div>
 
                                 <!-- Auto Restart -->
-                                <div class="form-group">
-                                    <div class="custom-control custom-switch">
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
                                         <input type="checkbox"
-                                               class="custom-control-input"
+                                               class="form-check-input"
                                                id="auto_restart"
                                                name="auto_restart"
                                                value="1"
                                                <%= server.auto_restart ? 'checked' : '' %>>
-                                        <label class="custom-control-label" for="auto_restart">
+                                        <label class="form-check-label" for="auto_restart">
                                             <%= tr('gameserver:SERVER.AUTO_RESTART') %>
                                         </label>
                                     </div>
-                                    <small class="form-text text-muted">
+                                    <small class="form-text text-secondary">
                                         <%= tr('gameserver:SERVER.AUTO_RESTART_DESC') %>
                                     </small>
                                 </div>
 
                                 <!-- Auto Update -->
-                                <div class="form-group">
-                                    <div class="custom-control custom-switch">
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
                                         <input type="checkbox" 
-                                               class="custom-control-input" 
+                                               class="form-check-input" 
                                                id="auto_update"
                                                name="auto_update"
                                                value="1"
                                                <%= server.auto_update ? 'checked' : '' %>>
-                                        <label class="custom-control-label" for="auto_update">
+                                        <label class="form-check-label" for="auto_update">
                                             <%= tr('gameserver:SERVER.AUTO_UPDATE') %>
                                         </label>
                                     </div>
-                                    <small class="form-text text-muted">
+                                    <small class="form-text text-secondary">
                                         <%= tr('gameserver:SERVER.AUTO_UPDATE_DESC') %>
                                     </small>
                                 </div>
 
                                 <!-- Max Players: abgeleitet, nicht eingebbar (Konzept 23.1) -->
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label>
                                         <%= tr('gameserver:SERVER.MAX_PLAYERS') %>
                                     </label>
@@ -182,15 +182,15 @@
                                         <% if (locals.slots) { %>
                                             <strong><%= slots %></strong>
                                             <% if (locals.slotVariable) { %>
-                                                <span class="text-muted">
+                                                <span class="text-secondary">
                                                     &mdash; aus <code><%= slotVariable %></code>
                                                 </span>
                                             <% } %>
                                         <% } else { %>
-                                            <span class="text-muted">&ndash; keine Slot-Variable gesetzt</span>
+                                            <span class="text-secondary">&ndash; keine Slot-Variable gesetzt</span>
                                         <% } %>
                                     </div>
-                                    <small class="form-text text-muted">
+                                    <small class="form-text text-secondary">
                                         Die Slot-Anzahl steht in den Environment Variables weiter unten
                                         &ndash; nur die landet im Startbefehl des Spiels. Ein eigenes
                                         Feld gab es hier bis zum 01.08.2026; es schrieb in eine reine
@@ -199,7 +199,7 @@
                                 </div>
 
                                 <!-- Environment Variables (JSON Editor) -->
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label for="env_variables">
                                         <%= tr('gameserver:SERVER.ENV_VARIABLES') %>
                                     </label>
@@ -208,7 +208,7 @@
                                               name="env_variables" 
                                               rows="10"
                                               placeholder='{"KEY": "value"}'><%= JSON.stringify(server.env_variables, null, 2) %></textarea>
-                                    <small class="form-text text-muted">
+                                    <small class="form-text text-secondary">
                                         <%= tr('gameserver:SERVER.ENV_VARIABLES_DESC') %>
                                     </small>
 
@@ -234,7 +234,7 @@
                                                           title="<%= v.beschreibung || 'Keine Beschreibung im Addon' %>"><%= v.name %></code>
                                                 <% }); %>
                                             </div>
-                                            <div class="small text-muted">
+                                            <div class="small text-secondary">
                                                 Geprüft wurden Startbefehl, Stoppbefehl, Installationsskript und
                                                 Konfigurationsvorlagen &ndash; in den drei Schreibweisen
                                                 <code>{{NAME}}</code>, <code>${NAME}</code> und <code>$NAME</code>.
@@ -252,13 +252,13 @@
                                     <p>
                                         <strong><%= tr('gameserver:SERVER.STATUS') %>:</strong>
                                         <% if (server.status === 'online') { %>
-                                            <span class="badge badge-success">Online</span>
+                                            <span class="badge bg-success-lt">Online</span>
                                         <% } else if (server.status === 'offline') { %>
-                                            <span class="badge badge-secondary">Offline</span>
+                                            <span class="badge bg-secondary-lt">Offline</span>
                                         <% } else if (server.status === 'installing') { %>
-                                            <span class="badge badge-info">Installing</span>
+                                            <span class="badge bg-info-lt">Installing</span>
                                         <% } else { %>
-                                            <span class="badge badge-warning"><%= server.status %></span>
+                                            <span class="badge bg-warning-lt"><%= server.status %></span>
                                         <% } %>
                                     </p>
                                     <p class="mb-0">

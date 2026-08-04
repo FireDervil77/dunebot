@@ -35,25 +35,25 @@
                                     <!-- Title & Badges -->
                                     <div class="mb-3">
                                         <% if (addon.trust_level === 'official') { %>
-                                            <span class="badge badge-danger badge-lg">
+                                            <span class="badge bg-danger-lt badge-lg">
                                                 <i class="fa-solid fa-crown"></i> OFFICIAL
                                             </span>
                                         <% } else if (addon.trust_level === 'trusted') { %>
-                                            <span class="badge badge-success badge-lg">
+                                            <span class="badge bg-success-lt badge-lg">
                                                 <i class="fa-solid fa-shield-check"></i> TRUSTED
                                             </span>
                                         <% } else if (addon.trust_level === 'verified') { %>
-                                            <span class="badge badge-primary badge-lg">
+                                            <span class="badge bg-primary-lt badge-lg">
                                                 <i class="fa-solid fa-check-circle"></i> VERIFIED
                                             </span>
                                         <% } %>
 
-                                        <span class="badge badge-info badge-lg ml-2">
+                                        <span class="badge bg-info-lt badge-lg ms-2">
                                             <%= addon.category.toUpperCase() %>
                                         </span>
 
                                         <% if (addon.featured) { %>
-                                            <span class="badge badge-warning badge-lg ml-2">
+                                            <span class="badge bg-warning-lt badge-lg ms-2">
                                                 <i class="fa-solid fa-star"></i> FEATURED
                                             </span>
                                         <% } %>
@@ -66,7 +66,7 @@
                                     <% if (addon.tags) { %>
                                         <div class="mb-3">
                                             <% addon.tags.split(',').forEach(tag => { %>
-                                                <span class="badge badge-secondary mr-1">
+                                                <span class="badge bg-secondary-lt me-1">
                                                     <i class="fa-solid fa-tag"></i> <%= tag.trim() %>
                                                 </span>
                                             <% }) %>
@@ -74,7 +74,7 @@
                                     <% } %>
 
                                     <!-- Author -->
-                                    <p class="text-muted">
+                                    <p class="text-secondary">
                                         <i class="fa-solid fa-user"></i> 
                                         <%= tr('gameserver:ADDON.BY') %> <strong><%= addon.author_name || 'Unknown' %></strong>
                                     </p>
@@ -91,11 +91,11 @@
                                                         <i class="fa-solid fa-star text-warning"></i>
                                                         <%= addon.rating_avg ? addon.rating_avg.toFixed(1) : 0 %>/5
                                                     </div>
-                                                    <small class="text-muted">
+                                                    <small class="text-secondary">
                                                         <%= addon.rating_count %> <%= tr('gameserver:ADDON.REVIEWS') %>
                                                     </small>
                                                 <% } else { %>
-                                                    <p class="text-muted">
+                                                    <p class="text-secondary">
                                                         <%= tr('gameserver:ADDON.NO_RATINGS_YET') %>
                                                     </p>
                                                 <% } %>
@@ -111,7 +111,7 @@
 
                                             <div>
                                                 <h5><%= tr('gameserver:ADDON.LAST_UPDATED') %></h5>
-                                                <p class="text-muted">
+                                                <p class="text-secondary">
                                                     <%= new Date(addon.updated_at).toLocaleDateString('de-DE') %>
                                                 </p>
                                             </div>
@@ -120,7 +120,7 @@
 
                                     <!-- CTA Button -->
                                     <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1&addon=<%= addon.slug %>" 
-                                       class="btn btn-success btn-lg btn-block">
+                                       class="btn btn-success btn-lg w-100">
                                         <i class="fa-solid fa-plus"></i> <%= tr('gameserver:ADDON.CREATE_SERVER') %>
                                     </a>
                                 </div>
@@ -154,7 +154,7 @@
                                                         <% } %>
                                                         <%= template.label || template.name %>
                                                     </h5>
-                                                    <p class="text-muted small">
+                                                    <p class="text-secondary small">
                                                         <%= template.description %>
                                                     </p>
                                                     <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1&addon=<%= addon.slug %>&template=<%= template.name %>" 
@@ -194,14 +194,14 @@
                                                 <td>
                                                     <code>{{<%= variable.env_variable || variable.name %>}}</code>
                                                     <% if (variable.name && variable.name !== variable.env_variable) { %>
-                                                        <br><small class="text-muted"><%= variable.name %></small>
+                                                        <br><small class="text-secondary"><%= variable.name %></small>
                                                     <% } %>
                                                 </td>
                                                 <td><%= variable.description || '-' %></td>
                                                 <td>
                                                     <% const defVal = variable.default_value !== undefined ? variable.default_value : variable.default; %>
                                                     <% if (defVal === 'AUTOGENERATE' || defVal === 'changeme' || defVal === '') { %>
-                                                        <span class="badge badge-warning">
+                                                        <span class="badge bg-warning-lt">
                                                             <i class="fa-solid fa-exclamation-triangle"></i> <%= tr('gameserver:ADDON.CHANGE_REQUIRED') %>
                                                         </span>
                                                     <% } else { %>
@@ -262,18 +262,18 @@
                                         <ul class="list-unstyled mb-0">
                                             <% Object.entries(gameData.docker_images).forEach(([img, label], i) => { %>
                                                 <li class="mb-2">
-                                                    <% if (i === 0) { %><span class="badge badge-primary mr-1">Default</span><% } %>
+                                                    <% if (i === 0) { %><span class="badge bg-primary-lt me-1">Default</span><% } %>
                                                     <strong><%= label %></strong><br>
-                                                    <small class="font-monospace text-muted"><%= img %></small>
+                                                    <small class="font-monospace text-secondary"><%= img %></small>
                                                 </li>
                                             <% }) %>
                                         </ul>
                                         <% if (addon.runtime_type === 'docker_steam') { %>
                                             <hr class="my-2">
-                                            <span class="badge badge-dark"><i class="fa-brands fa-steam"></i> Steam-basiert</span>
+                                            <span class="badge bg-dark-lt"><i class="fa-brands fa-steam"></i> Steam-basiert</span>
                                         <% } else if (addon.runtime_type === 'docker_standalone') { %>
                                             <hr class="my-2">
-                                            <span class="badge badge-dark"><i class="fa-brands fa-docker"></i> Standalone</span>
+                                            <span class="badge bg-dark-lt"><i class="fa-brands fa-docker"></i> Standalone</span>
                                         <% } %>
                                     </div>
                                 </div>
@@ -295,7 +295,7 @@
                                             <% if (gameData.scripts.installation.container) { %>
                                                 <li class="mb-2">
                                                     <strong>Container:</strong><br>
-                                                    <small class="font-monospace text-muted"><%= gameData.scripts.installation.container %></small>
+                                                    <small class="font-monospace text-secondary"><%= gameData.scripts.installation.container %></small>
                                                 </li>
                                             <% } %>
                                             <% if (gameData.scripts.installation.entrypoint) { %>
@@ -306,7 +306,7 @@
                                             <% } %>
                                             <% if (gameData.scripts.installation.script) { %>
                                                 <li>
-                                                    <span class="badge badge-success">
+                                                    <span class="badge bg-success-lt">
                                                         <i class="fa-solid fa-check"></i> Install Script vorhanden
                                                     </span>
                                                 </li>
@@ -332,7 +332,7 @@
                                             <% if (gameData.meta.version) { %>
                                                 <li class="mb-2">
                                                     <strong>Format:</strong><br>
-                                                    <span class="badge badge-primary"><%= gameData.meta.version %></span>
+                                                    <span class="badge bg-primary-lt"><%= gameData.meta.version %></span>
                                                 </li>
                                             <% } %>
                                             <% if (gameData.meta.author) { %>
@@ -376,18 +376,18 @@
                                                     <% if (i <= rating.rating) { %>
                                                         <i class="fa-solid fa-star text-warning"></i>
                                                     <% } else { %>
-                                                        <i class="fa-regular fa-star text-muted"></i>
+                                                        <i class="fa-regular fa-star text-secondary"></i>
                                                     <% } %>
                                                 <% } %>
                                             </div>
-                                            <small class="text-muted">
+                                            <small class="text-secondary">
                                                 <%= new Date(rating.created_at).toLocaleDateString('de-DE') %>
                                             </small>
                                         </div>
                                         <% if (rating.review_text) { %>
                                             <p><%= rating.review_text %></p>
                                         <% } %>
-                                        <small class="text-muted">
+                                        <small class="text-secondary">
                                             <i class="fa-solid fa-clock"></i>
                                             <%= rating.usage_hours %> <%= tr('gameserver:ADDON.HOURS_USED') %>
                                             
@@ -420,7 +420,7 @@
                                             <strong><%= tr('gameserver:ADDON.RAM_MIN') %>:</strong><br>
                                             <%= (gameData.requirements.ram_min_mb / 1024).toFixed(1) %> GB
                                             <% if (gameData.requirements.ram_recommended_mb) { %>
-                                                <small class="text-muted">
+                                                <small class="text-secondary">
                                                     (<%= tr('gameserver:ADDON.RECOMMENDED') %>: <%= (gameData.requirements.ram_recommended_mb / 1024).toFixed(1) %> GB)
                                                 </small>
                                             <% } %>
@@ -439,7 +439,7 @@
                                             <strong><%= tr('gameserver:ADDON.DISK_MIN') %>:</strong><br>
                                             <%= gameData.requirements.disk_min_gb %> GB
                                             <% if (gameData.requirements.disk_recommended_gb) { %>
-                                                <small class="text-muted">
+                                                <small class="text-secondary">
                                                     (<%= tr('gameserver:ADDON.RECOMMENDED') %>: <%= gameData.requirements.disk_recommended_gb %> GB)
                                                 </small>
                                             <% } %>
@@ -474,7 +474,7 @@
                                 </ul>
                                 <a href="https://store.steampowered.com/app/<%= addon.steam_app_id %>" 
                                    target="_blank" 
-                                   class="btn btn-dark btn-sm btn-block mt-3">
+                                   class="btn btn-dark btn-sm w-100 mt-3">
                                     <i class="fa-brands fa-steam"></i> <%= tr('gameserver:ADDON.VIEW_ON_STEAM') %>
                                 </a>
                             </div>

@@ -9,9 +9,9 @@
               <i class="fa-solid fa-gift me-2"></i>
               <%= tr('giveaway:TITLE') %>
             </h3>
-            <p class="text-muted mb-0 mt-2"><%= tr('giveaway:DESCRIPTION') %></p>
+            <p class="text-secondary mb-0 mt-2"><%= tr('giveaway:DESCRIPTION') %></p>
           </div>
-          <button class="btn btn-primary" data-toggle="modal" data-target="#createGiveawayModal">
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGiveawayModal">
             <i class="fa-solid fa-plus me-1"></i> <%= tr('giveaway:CREATE_NEW_BTN') %>
           </button>
         </div>
@@ -20,44 +20,44 @@
           <!-- Nav Tabs -->
           <ul class="nav nav-tabs" id="giveawayTabs" role="tablist">
             <li class="nav-item">
-              <a class="nav-link active" id="active-tab" data-toggle="tab" href="#tab-active" role="tab">
+              <a class="nav-link active" id="active-tab" data-bs-toggle="tab" href="#tab-active" role="tab">
                 <i class="fa-solid fa-bolt me-1"></i> <%= tr('giveaway:LIST_TITLE') %>
                 <% if (active.length > 0) { %>
-                  <span class="badge bg-success ml-1"><%= active.length %></span>
+                  <span class="badge bg-success ms-1"><%= active.length %></span>
                 <% } %>
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="scheduled-tab" data-toggle="tab" href="#tab-scheduled" role="tab">
+              <a class="nav-link" id="scheduled-tab" data-bs-toggle="tab" href="#tab-scheduled" role="tab">
                 <i class="fa-solid fa-clock me-1"></i> <%= tr('giveaway:SCHEDULED_TITLE') || 'Geplant' %>
                 <% if (scheduled && scheduled.length > 0) { %>
-                  <span class="badge bg-info ml-1"><%= scheduled.length %></span>
+                  <span class="badge bg-info ms-1"><%= scheduled.length %></span>
                 <% } %>
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="recent-tab" data-toggle="tab" href="#tab-recent" role="tab">
+              <a class="nav-link" id="recent-tab" data-bs-toggle="tab" href="#tab-recent" role="tab">
                 <i class="fa-solid fa-history me-1"></i> <%= tr('giveaway:RECENT_TITLE') || 'Beendet' %>
                 <% if (recent.length > 0) { %>
-                  <span class="badge bg-secondary ml-1"><%= recent.length %></span>
+                  <span class="badge bg-secondary ms-1"><%= recent.length %></span>
                 <% } %>
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="templates-tab" data-toggle="tab" href="#tab-templates" role="tab">
+              <a class="nav-link" id="templates-tab" data-bs-toggle="tab" href="#tab-templates" role="tab">
                 <i class="fa-solid fa-copy me-1"></i> <%= tr('giveaway:TEMPLATES_TITLE') || 'Vorlagen' %>
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="blacklist-tab" data-toggle="tab" href="#tab-blacklist" role="tab">
+              <a class="nav-link" id="blacklist-tab" data-bs-toggle="tab" href="#tab-blacklist" role="tab">
                 <i class="fa-solid fa-ban me-1"></i> <%= tr('giveaway:BLACKLIST_TITLE') || 'Blacklist' %>
                 <% if (blacklist && blacklist.length > 0) { %>
-                  <span class="badge bg-danger ml-1"><%= blacklist.length %></span>
+                  <span class="badge bg-danger ms-1"><%= blacklist.length %></span>
                 <% } %>
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="analytics-tab" data-toggle="tab" href="#tab-analytics" role="tab">
+              <a class="nav-link" id="analytics-tab" data-bs-toggle="tab" href="#tab-analytics" role="tab">
                 <i class="fa-solid fa-chart-bar me-1"></i> <%= tr('giveaway:ANALYTICS_TITLE') || 'Statistiken' %>
               </a>
             </li>
@@ -67,7 +67,7 @@
             <!-- ═══════ TAB 1: Active Giveaways ═══════ -->
             <div class="tab-pane fade show active" id="tab-active" role="tabpanel">
               <% if (active.length === 0) { %>
-                <div class="text-center py-5 text-muted">
+                <div class="text-center py-5 text-secondary">
                   <i class="fa-solid fa-gift fa-3x mb-3"></i>
                   <p><%= tr('giveaway:LIST_EMPTY') || 'Keine aktiven Giveaways.' %></p>
                 </div>
@@ -138,7 +138,7 @@
             <!-- ═══════ TAB 2: Scheduled Giveaways ═══════ -->
             <div class="tab-pane fade" id="tab-scheduled" role="tabpanel">
               <% if (!scheduled || scheduled.length === 0) { %>
-                <div class="text-center py-5 text-muted">
+                <div class="text-center py-5 text-secondary">
                   <i class="fa-solid fa-clock fa-3x mb-3"></i>
                   <p><%= tr('giveaway:SCHEDULED_EMPTY') || 'Keine geplanten Giveaways.' %></p>
                 </div>
@@ -180,7 +180,7 @@
             <!-- ═══════ TAB 3: Recent Giveaways ═══════ -->
             <div class="tab-pane fade" id="tab-recent" role="tabpanel">
               <% if (recent.length === 0) { %>
-                <div class="text-center py-5 text-muted">
+                <div class="text-center py-5 text-secondary">
                   <i class="fa-solid fa-clock-rotate-left fa-3x mb-3"></i>
                   <p><%= tr('giveaway:RECENT_EMPTY') || 'Keine beendeten Giveaways.' %></p>
                 </div>
@@ -209,7 +209,7 @@
                           <td>
                             <% if (g.winner_details && g.winner_details.length > 0) { %>
                               <% g.winner_details.forEach(w => { %>
-                                <span class="badge <%= w.claim_status === 'claimed' ? 'bg-success' : w.claim_status === 'expired' ? 'bg-danger' : 'bg-warning' %> mr-1">
+                                <span class="badge <%= w.claim_status === 'claimed' ? 'bg-success' : w.claim_status === 'expired' ? 'bg-danger' : 'bg-warning' %> me-1">
                                   &lt;@<%= w.user_id %>&gt;
                                   <% if (w.claim_status && w.claim_status !== 'pending') { %>
                                     (<%= w.claim_status %>)
@@ -219,7 +219,7 @@
                             <% } else if (g.winners && g.winners.length > 0) { %>
                               <%= g.winners.map(id => '<@' + id + '>').join(', ') %>
                             <% } else { %>
-                              <span class="text-muted"><%= tr('giveaway:RECENT_NO_WINNERS') || 'Keine Gewinner' %></span>
+                              <span class="text-secondary"><%= tr('giveaway:RECENT_NO_WINNERS') || 'Keine Gewinner' %></span>
                             <% } %>
                           </td>
                           <td><%= g.ended_at ? new Date(g.ended_at).toLocaleString() : '-' %></td>
@@ -245,13 +245,13 @@
             <div class="tab-pane fade" id="tab-templates" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0"><%= tr('giveaway:TEMPLATES_TITLE') || 'Vorlagen' %></h5>
-                <button class="btn btn-sm btn-primary" data-toggle="modal" data-target="#createTemplateModal">
+                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createTemplateModal">
                   <i class="fa-solid fa-plus me-1"></i> <%= tr('giveaway:TEMPLATE_CREATE_BTN') || 'Vorlage erstellen' %>
                 </button>
               </div>
 
               <% if (!templates || templates.length === 0) { %>
-                <div class="text-center py-5 text-muted">
+                <div class="text-center py-5 text-secondary">
                   <i class="fa-solid fa-copy fa-3x mb-3"></i>
                   <p><%= tr('giveaway:TEMPLATES_EMPTY') || 'Keine Vorlagen vorhanden.' %></p>
                 </div>
@@ -259,7 +259,8 @@
                 <div class="row">
                   <% templates.forEach(t => { %>
                     <div class="col-md-4 mb-3">
-                      <div class="card card-outline card-info">
+                      <div class="card">
+                          <div class="card-status-top bg-info"></div>
                         <div class="card-header">
                           <h3 class="card-title"><i class="fa-solid fa-copy me-1"></i> <%= t.name %></h3>
                         </div>
@@ -271,7 +272,7 @@
                             <% if (t.config.claim_duration_ms) { %><p class="mb-1"><strong>Claim-Zeit:</strong> <%= Math.round(t.config.claim_duration_ms / 60000) %> Min</p><% } %>
                           <% } %>
                         </div>
-                        <div class="card-footer text-right">
+                        <div class="card-footer text-end">
                           <button class="btn btn-sm btn-danger" onclick="deleteTemplate(<%= t.id %>)">
                             <i class="fa-solid fa-trash"></i> Löschen
                           </button>
@@ -287,13 +288,13 @@
             <div class="tab-pane fade" id="tab-blacklist" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0"><%= tr('giveaway:BLACKLIST_TITLE') || 'Blacklist' %></h5>
-                <button class="btn btn-sm btn-danger" data-toggle="modal" data-target="#addBlacklistModal">
+                <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#addBlacklistModal">
                   <i class="fa-solid fa-plus me-1"></i> <%= tr('giveaway:BLACKLIST_ADD_BTN') || 'Zur Blacklist hinzufügen' %>
                 </button>
               </div>
 
               <% if (!blacklist || blacklist.length === 0) { %>
-                <div class="text-center py-5 text-muted">
+                <div class="text-center py-5 text-secondary">
                   <i class="fa-solid fa-ban fa-3x mb-3"></i>
                   <p><%= tr('giveaway:BLACKLIST_EMPTY') || 'Keine Einträge auf der Blacklist.' %></p>
                 </div>
@@ -332,7 +333,7 @@
             <!-- ═══════ TAB 6: Analytics ═══════ -->
             <div class="tab-pane fade" id="tab-analytics" role="tabpanel">
               <% if (!analytics) { %>
-                <div class="text-center py-5 text-muted">
+                <div class="text-center py-5 text-secondary">
                   <i class="fa-solid fa-chart-bar fa-3x mb-3"></i>
                   <p><%= tr('giveaway:ANALYTICS_EMPTY') || 'Keine Statistiken verfügbar.' %></p>
                 </div>
@@ -419,14 +420,14 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="fa-solid fa-gift me-2"></i> <%= tr('giveaway:CREATE_TITLE') %></h5>
-        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
       </div>
       <form id="createGiveawayForm">
         <div class="modal-body">
           <div class="row">
             <div class="col-md-6">
               <!-- Channel -->
-              <div class="form-group">
+              <div class="mb-3">
                 <label><%= tr('giveaway:CREATE_CHANNEL') %></label>
                 <select name="channel_id" class="form-control" required>
                   <option value=""><%= tr('giveaway:CREATE_CHANNEL_PLACEHOLDER') %></option>
@@ -437,13 +438,13 @@
               </div>
 
               <!-- Prize -->
-              <div class="form-group">
+              <div class="mb-3">
                 <label><%= tr('giveaway:CREATE_PRIZE') %></label>
                 <input type="text" name="prize" class="form-control" placeholder="Nitro, Game Key, ..." required maxlength="256">
               </div>
 
               <!-- Duration -->
-              <div class="form-group">
+              <div class="mb-3">
                 <label><%= tr('giveaway:CREATE_DURATION') %></label>
                 <select name="duration" class="form-control" required>
                   <option value="900000">15 Minuten</option>
@@ -459,7 +460,7 @@
               </div>
 
               <!-- Winners -->
-              <div class="form-group">
+              <div class="mb-3">
                 <label><%= tr('giveaway:CREATE_WINNERS') %></label>
                 <input type="number" name="winner_count" class="form-control" value="1" min="1" max="20">
               </div>
@@ -467,25 +468,25 @@
 
             <div class="col-md-6">
               <!-- Allowed Roles -->
-              <div class="form-group">
+              <div class="mb-3">
                 <label><%= tr('giveaway:CREATE_MEM_ROLE') %></label>
                 <select name="allowed_roles" class="form-control" multiple>
                   <% roles.filter(r => r.name !== '@everyone').forEach(role => { %>
                     <option value="<%= role.id %>"><%= role.name %></option>
                   <% }); %>
                 </select>
-                <small class="text-muted"><%= tr('giveaway:CREATE_MEM_ROLE_DESC') %></small>
+                <small class="text-secondary"><%= tr('giveaway:CREATE_MEM_ROLE_DESC') %></small>
               </div>
 
               <!-- Scheduled Start -->
-              <div class="form-group">
+              <div class="mb-3">
                 <label><i class="fa-solid fa-clock me-1"></i> <%= tr('giveaway:CREATE_SCHEDULED') || 'Geplanter Start' %></label>
                 <input type="datetime-local" name="scheduled_start" class="form-control">
-                <small class="text-muted"><%= tr('giveaway:CREATE_SCHEDULED_DESC') || 'Leer lassen für sofortigen Start' %></small>
+                <small class="text-secondary"><%= tr('giveaway:CREATE_SCHEDULED_DESC') || 'Leer lassen für sofortigen Start' %></small>
               </div>
 
               <!-- Claim Duration -->
-              <div class="form-group">
+              <div class="mb-3">
                 <label><i class="fa-solid fa-hand me-1"></i> <%= tr('giveaway:CREATE_CLAIM_DURATION') || 'Claim-Zeitlimit' %></label>
                 <select name="claim_duration" class="form-control">
                   <option value=""><%= tr('giveaway:CREATE_CLAIM_NONE') || 'Kein Claim erforderlich' %></option>
@@ -497,11 +498,11 @@
                   <option value="43200000">12 Stunden</option>
                   <option value="86400000">24 Stunden</option>
                 </select>
-                <small class="text-muted"><%= tr('giveaway:CREATE_CLAIM_DESC') || 'Gewinner müssen ihren Preis innerhalb dieser Zeit beanspruchen' %></small>
+                <small class="text-secondary"><%= tr('giveaway:CREATE_CLAIM_DESC') || 'Gewinner müssen ihren Preis innerhalb dieser Zeit beanspruchen' %></small>
               </div>
 
               <!-- Requirements -->
-              <div class="form-group">
+              <div class="mb-3">
                 <label><i class="fa-solid fa-shield-halved me-1"></i> <%= tr('giveaway:CREATE_REQUIREMENTS') || 'Anforderungen' %></label>
                 <div id="requirementsContainer">
                   <!-- Dynamic requirement rows will be added here -->
@@ -516,7 +517,7 @@
           <!-- Template Quick-Fill -->
           <% if (templates && templates.length > 0) { %>
             <hr>
-            <div class="form-group">
+            <div class="mb-3">
               <label><i class="fa-solid fa-copy me-1"></i> <%= tr('giveaway:CREATE_FROM_TEMPLATE') || 'Aus Vorlage laden' %></label>
               <select class="form-control" id="templateSelect" onchange="fillFromTemplate(this.value)">
                 <option value="">-- Vorlage wählen --</option>
@@ -529,7 +530,7 @@
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= tr('giveaway:CREATE_CLOSE_BTN') %></button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><%= tr('giveaway:CREATE_CLOSE_BTN') %></button>
           <button type="submit" class="btn btn-primary">
             <i class="fa-solid fa-rocket me-1"></i> <%= tr('giveaway:CREATE_BTN') %>
           </button>
@@ -545,19 +546,19 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="fa-solid fa-copy me-2"></i> <%= tr('giveaway:TEMPLATE_CREATE_TITLE') || 'Vorlage erstellen' %></h5>
-        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
       </div>
       <form id="createTemplateForm">
         <div class="modal-body">
-          <div class="form-group">
+          <div class="mb-3">
             <label>Name</label>
             <input type="text" name="template_name" class="form-control" required maxlength="100" placeholder="z.B. Nitro Standard">
           </div>
-          <div class="form-group">
+          <div class="mb-3">
             <label>Preis</label>
             <input type="text" name="template_prize" class="form-control" maxlength="256" placeholder="Nitro, Game Key, ...">
           </div>
-          <div class="form-group">
+          <div class="mb-3">
             <label>Dauer (ms)</label>
             <select name="template_duration" class="form-control">
               <option value="3600000">1 Stunde</option>
@@ -566,11 +567,11 @@
               <option value="604800000">1 Woche</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="mb-3">
             <label>Gewinner-Anzahl</label>
             <input type="number" name="template_winners" class="form-control" value="1" min="1" max="20">
           </div>
-          <div class="form-group">
+          <div class="mb-3">
             <label>Claim-Zeitlimit</label>
             <select name="template_claim" class="form-control">
               <option value="">Kein Claim</option>
@@ -581,7 +582,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
           <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save me-1"></i> Speichern</button>
         </div>
       </form>
@@ -595,21 +596,21 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="fa-solid fa-ban me-2"></i> <%= tr('giveaway:BLACKLIST_ADD_TITLE') || 'Zur Blacklist hinzufügen' %></h5>
-        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
       </div>
       <form id="addBlacklistForm">
         <div class="modal-body">
-          <div class="form-group">
+          <div class="mb-3">
             <label>User ID</label>
             <input type="text" name="user_id" class="form-control" required placeholder="Discord User ID">
           </div>
-          <div class="form-group">
+          <div class="mb-3">
             <label><%= tr('giveaway:BLACKLIST_REASON') || 'Grund' %></label>
             <input type="text" name="reason" class="form-control" maxlength="256" placeholder="Optional">
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
           <button type="submit" class="btn btn-danger"><i class="fa-solid fa-ban me-1"></i> Hinzufügen</button>
         </div>
       </form>
@@ -821,12 +822,12 @@ function addRequirement() {
     const row = document.createElement('div');
     row.className = 'requirement-row d-flex mb-2';
     row.innerHTML = `
-        <select name="req_type" class="form-control mr-2" style="width: 40%;">
+        <select name="req_type" class="form-control me-2" style="width: 40%;">
             <option value="role">Rolle benötigt</option>
             <option value="account_age">Account-Alter (Tage)</option>
             <option value="server_age">Server-Mitgliedschaft (Tage)</option>
         </select>
-        <input type="text" name="req_value" class="form-control mr-2" placeholder="Rolle-ID oder Tage" style="width: 45%;">
+        <input type="text" name="req_value" class="form-control me-2" placeholder="Rolle-ID oder Tage" style="width: 45%;">
         <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">
             <i class="fa-solid fa-times"></i>
         </button>

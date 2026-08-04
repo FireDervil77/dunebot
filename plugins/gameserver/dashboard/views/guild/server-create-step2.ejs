@@ -24,7 +24,7 @@
           <div class="progress-circle bg-success text-white">
             <i class="fa-solid fa-check"></i>
           </div>
-          <div class="text-muted"><%= tr('gameserver:SERVER.STEP1_LABEL') %></div>
+          <div class="text-secondary"><%= tr('gameserver:SERVER.STEP1_LABEL') %></div>
         </div>
       </div>
       <div class="col-md-4">
@@ -40,7 +40,7 @@
           <div class="progress-circle bg-secondary text-white">
             <strong>3</strong>
           </div>
-          <div class="text-muted"><%= tr('gameserver:SERVER.STEP3_LABEL') %></div>
+          <div class="text-secondary"><%= tr('gameserver:SERVER.STEP3_LABEL') %></div>
         </div>
       </div>
     </div>
@@ -52,12 +52,12 @@
         <div class="card mb-4">
           <div class="card-header">
             <h5 class="mb-0">
-              <i class="fa-solid fa-terminal mr-2"></i>
+              <i class="fa-solid fa-terminal me-2"></i>
               <%= tr('gameserver:SERVER.STARTUP_COMMAND') %>
             </h5>
           </div>
           <div class="card-body">
-            <div class="form-group">
+            <div class="mb-3">
               <textarea class="form-control font-monospace bg-dark text-white" 
                         id="startupCommandPreview" 
                         rows="3" 
@@ -67,7 +67,7 @@
                   ? gameData.startup.command 
                   : './start.sh';
               %><%= startupCmd %></textarea>
-              <small class="form-text text-muted">
+              <small class="form-text text-secondary">
                 <%= tr('gameserver:SERVER.STARTUP_COMMAND_HELP_WIZARD') %>
               </small>
             </div>
@@ -78,10 +78,10 @@
         <div class="card mb-4">
           <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">
-              <i class="fa-solid fa-sliders mr-2"></i>
+              <i class="fa-solid fa-sliders me-2"></i>
               <%= tr('gameserver:SERVER.VARIABLES') %>
             </h5>
-            <span class="badge badge-info">
+            <span class="badge bg-info-lt">
               <% 
                 // ✅ KONVERTIERUNG: Map/Object → Array
                 let variablesArray = [];
@@ -120,11 +120,11 @@
                   // user_editable: false → System-assigned (z.B. Ports) → im Formular ausblenden
                   if (variable.user_editable === false) return;
                 %>
-                  <div class="form-group">
+                  <div class="mb-3">
                     <label for="var_<%= varName %>">
                       <%= varDisplayName %> 
                       <% if (isRequired) { %><span class="text-danger">*</span><% } %>
-                      <code class="ml-2 text-muted">{{<%= varName %>}}</code>
+                      <code class="ms-2 text-secondary">{{<%= varName %>}}</code>
                     </label>
                     
                     <% if (varType === 'select' && varOptions.length > 0) { %>
@@ -175,14 +175,14 @@
                     <% } %>
                     
                     <% if (varDescription) { %>
-                      <small class="form-text text-muted"><%= varDescription %></small>
+                      <small class="form-text text-secondary"><%= varDescription %></small>
                     <% } %>
                   </div>
                 <% }); %>
                 <% const systemAssigned = variablesArray.filter(v => v.user_editable === false); %>
                 <% if (systemAssigned.length > 0) { %>
                   <div class="alert alert-secondary mt-3 mb-0">
-                    <i class="fa-solid fa-lock mr-2"></i>
+                    <i class="fa-solid fa-lock me-2"></i>
                     <strong><%= tr('gameserver:SERVER.SYSTEM_ASSIGNED') %></strong>
                     <%= systemAssigned.map(v => `<code>${v.env_variable || v.name}</code>`).join(', ') %>
                     &mdash; <%= tr('gameserver:SERVER.SYSTEM_ASSIGNED_DESC') %>
@@ -191,7 +191,7 @@
               </form>
             <% } else { %>
               <div class="alert alert-info mb-0">
-                <i class="fa-solid fa-info-circle mr-2"></i>
+                <i class="fa-solid fa-info-circle me-2"></i>
                 <%= tr('gameserver:SERVER.NO_VARIABLES') %>
               </div>
             <% } %>
@@ -203,12 +203,12 @@
           <div class="card-body">
             <div class="d-flex justify-content-between">
               <button type="button" id="btnBack" class="btn btn-secondary">
-                <i class="fa-solid fa-arrow-left mr-2"></i>
+                <i class="fa-solid fa-arrow-left me-2"></i>
                 <%= tr('gameserver:SERVER.BACK') %>
               </button>
               <button type="button" id="btnNext" class="btn btn-primary">
                 <%= tr('gameserver:SERVER.NEXT') %>
-                <i class="fa-solid fa-arrow-right ml-2"></i>
+                <i class="fa-solid fa-arrow-right ms-2"></i>
               </button>
             </div>
           </div>
@@ -220,22 +220,22 @@
         <div class="card sticky-top" style="top: 20px;">
           <div class="card-header bg-info text-white">
             <h6 class="mb-0">
-              <i class="fa-solid fa-eye mr-2"></i>
+              <i class="fa-solid fa-eye me-2"></i>
               <%= tr('gameserver:SERVER.LIVE_PREVIEW') %>
             </h6>
           </div>
           <div class="card-body">
-            <h6 class="text-muted mb-2"><%= tr('gameserver:SERVER.RESOLVED_COMMAND') %></h6>
+            <h6 class="text-secondary mb-2"><%= tr('gameserver:SERVER.RESOLVED_COMMAND') %></h6>
             <pre class="bg-dark text-white p-3 rounded" style="font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word;"><code id="livePreview"><%= startupCmd %></code></pre>
             <hr>
-            <h6 class="text-muted mb-2"><%= tr('gameserver:SERVER.SELECTED_ADDON') %></h6>
+            <h6 class="text-secondary mb-2"><%= tr('gameserver:SERVER.SELECTED_ADDON') %></h6>
             <div class="d-flex align-items-center">
               <% if (addon.icon_url) { %>
-                <img src="<%= addon.icon_url %>" alt="<%= addon.name %>" class="mr-2" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">
+                <img src="<%= addon.icon_url %>" alt="<%= addon.name %>" class="me-2" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">
               <% } %>
               <div>
                 <strong><%= addon.name %></strong><br>
-                <small class="text-muted"><%= addon.description || tr('gameserver:SERVER.NO_DESCRIPTION') %></small>
+                <small class="text-secondary"><%= addon.description || tr('gameserver:SERVER.NO_DESCRIPTION') %></small>
               </div>
             </div>
           </div>

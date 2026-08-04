@@ -11,19 +11,19 @@
     <div class="d-flex align-items-center mb-3">
         <div>
             <h6 class="mb-0"><i class="fas fa-terminal text-success me-2"></i> RCON-Konsole</h6>
-            <small class="text-muted">Sendet Befehle direkt über das <%= (server.rcon_protocol || 'Source') %> RCON-Protokoll an den Gameserver.</small>
+            <small class="text-secondary">Sendet Befehle direkt über das <%= (server.rcon_protocol || 'Source') %> RCON-Protokoll an den Gameserver.</small>
         </div>
         <div class="ms-auto">
             <% if (!server.rcon_available) { %>
-                <span class="badge badge-warning" id="rcon-status-badge">
+                <span class="badge bg-warning-lt" id="rcon-status-badge">
                     <i class="fas fa-triangle-exclamation"></i> Nicht verfügbar
                 </span>
             <% } else if (server.rcon_last_ok === 0) { %>
-                <span class="badge badge-warning" id="rcon-status-badge">
+                <span class="badge bg-warning-lt" id="rcon-status-badge">
                     <i class="fas fa-circle"></i> Letzter Befehl fehlgeschlagen
                 </span>
             <% } else { %>
-                <span class="badge badge-secondary" id="rcon-status-badge">
+                <span class="badge bg-secondary-lt" id="rcon-status-badge">
                     <i class="fas fa-circle"></i> Bereit
                 </span>
             <% } %>
@@ -61,7 +61,7 @@
     <!-- Eingabe -->
     <div class="input-group">
         <div class="input-group-prepend">
-            <span class="input-group-text bg-dark border-secondary text-success font-weight-bold">
+            <span class="input-group-text bg-dark border-secondary text-success fw-bold">
                 <i class="fas fa-chevron-right"></i>
             </span>
         </div>
@@ -80,7 +80,7 @@
             </button>
         </div>
     </div>
-    <small class="text-muted mt-1 d-block">
+    <small class="text-secondary mt-1 d-block">
         <i class="fas fa-info-circle me-1"></i>
         Der Server muss gestartet sein. RCON-Port und Passwort werden automatisch aus den Server-Variablen geladen.
     </small>

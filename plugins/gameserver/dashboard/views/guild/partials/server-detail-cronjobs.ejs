@@ -38,25 +38,23 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="cronjobModalTitle"><i class="fas fa-clock me-2"></i>Cronjob erstellen</h5>
-                <button type="button" class="close" data-dismiss="modal">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="cronjobEditId" value="">
 
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="cronjobName">Name <span class="text-danger">*</span></label>
                     <input type="text" id="cronjobName" class="form-control" placeholder="z.B. Nächtlicher Neustart" maxlength="128" required>
                 </div>
 
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="cronjobExpr">Cron-Expression <span class="text-danger">*</span></label>
                     <input type="text" id="cronjobExpr" class="form-control" placeholder="0 4 * * *" maxlength="64" required>
-                    <small class="form-text text-muted" id="cronjobExprDesc">Gib eine gültige 5-feldige Cron-Expression ein.</small>
+                    <small class="form-text text-secondary" id="cronjobExprDesc">Gib eine gültige 5-feldige Cron-Expression ein.</small>
                 </div>
 
-                <div class="form-group">
+                <div class="mb-3">
                     <label for="cronjobAction">Aktion <span class="text-danger">*</span></label>
                     <select id="cronjobAction" class="form-control" onchange="toggleCommandField()">
                         <option value="restart">Server neu starten</option>
@@ -67,16 +65,16 @@
                     </select>
                 </div>
 
-                <div class="form-group" id="cronjobCommandGroup" style="display:none;">
+                <div class="mb-3" id="cronjobCommandGroup" style="display:none;">
                     <label for="cronjobCommand">Befehl <span class="text-danger">*</span></label>
                     <input type="text" id="cronjobCommand" class="form-control" placeholder="say Server startet in 5 Minuten neu" maxlength="500">
-                    <small class="form-text text-muted">Wird direkt an die Konsole des Gameservers gesendet.</small>
+                    <small class="form-text text-secondary">Wird direkt an die Konsole des Gameservers gesendet.</small>
                 </div>
 
                 <div class="form-check mt-2">
                     <input type="checkbox" class="form-check-input" id="cronjobRunOnce">
                     <label class="form-check-label" for="cronjobRunOnce">Einmalig ausführen</label>
-                    <small class="form-text text-muted">Job wird nach der ersten Ausführung automatisch deaktiviert.</small>
+                    <small class="form-text text-secondary">Job wird nach der ersten Ausführung automatisch deaktiviert.</small>
                 </div>
 
                 <div class="form-check mt-2" id="cronjobEnabledGroup">
@@ -85,7 +83,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
                 <button type="button" class="btn btn-primary" id="cronjobSaveBtn" onclick="saveCronjob()">
                     <i class="fas fa-save me-1"></i> Speichern
                 </button>
@@ -97,12 +95,12 @@
 
 <!-- Cronjob-Tabelle -->
 <div id="cronjobs-container">
-    <div id="cronjobs-loading" class="text-center text-muted py-5">
+    <div id="cronjobs-loading" class="text-center text-secondary py-5">
         <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
         <p>Cronjobs werden geladen...</p>
     </div>
-    <div id="cronjobs-empty" class="text-center text-muted py-5" style="display:none;">
-        <i class="fas fa-clock fa-3x mb-3 text-muted"></i>
+    <div id="cronjobs-empty" class="text-center text-secondary py-5" style="display:none;">
+        <i class="fas fa-clock fa-3x mb-3 text-secondary"></i>
         <p>Keine Cronjobs konfiguriert.</p>
         <% if (userPermissions.permissions['GAMESERVER.CRONJOBS.MANAGE']) { %>
             <button class="btn btn-primary" onclick="openCronjobModal()">
@@ -141,17 +139,17 @@
     const CAN_MANAGE = <%= userPermissions.permissions['GAMESERVER.CRONJOBS.MANAGE'] ? 'true' : 'false' %>;
 
     const ACTION_LABELS = {
-        start:   '<span class="badge badge-success"><i class="fas fa-play me-1"></i>Start</span>',
-        stop:    '<span class="badge badge-secondary"><i class="fas fa-stop me-1"></i>Stop</span>',
-        restart: '<span class="badge badge-warning"><i class="fas fa-redo me-1"></i>Neustart</span>',
-        backup:  '<span class="badge badge-info"><i class="fas fa-save me-1"></i>Backup</span>',
-        command: '<span class="badge badge-dark"><i class="fas fa-terminal me-1"></i>Befehl</span>',
+        start:   '<span class="badge bg-success-lt"><i class="fas fa-play me-1"></i>Start</span>',
+        stop:    '<span class="badge bg-secondary-lt"><i class="fas fa-stop me-1"></i>Stop</span>',
+        restart: '<span class="badge bg-warning-lt"><i class="fas fa-redo me-1"></i>Neustart</span>',
+        backup:  '<span class="badge bg-info-lt"><i class="fas fa-save me-1"></i>Backup</span>',
+        command: '<span class="badge bg-dark-lt"><i class="fas fa-terminal me-1"></i>Befehl</span>',
     };
 
     const STATUS_LABELS = {
-        pending: '<span class="badge badge-secondary">Ausstehend</span>',
-        success: '<span class="badge badge-success"><i class="fas fa-check me-1"></i>Erfolg</span>',
-        failed:  '<span class="badge badge-danger"><i class="fas fa-times me-1"></i>Fehler</span>',
+        pending: '<span class="badge bg-secondary-lt">Ausstehend</span>',
+        success: '<span class="badge bg-success-lt"><i class="fas fa-check me-1"></i>Erfolg</span>',
+        failed:  '<span class="badge bg-danger-lt"><i class="fas fa-times me-1"></i>Fehler</span>',
     };
 
     function escHtml(s) {
@@ -192,23 +190,23 @@
                 <tr data-job-id="${j.id}">
                     <td>
                         <strong>${escHtml(j.name)}</strong>
-                        ${j.action === 'command' ? `<br><small class="text-muted"><code>${escHtml(j.command)}</code></small>` : ''}
+                        ${j.action === 'command' ? `<br><small class="text-secondary"><code>${escHtml(j.command)}</code></small>` : ''}
                     </td>
                     <td><code>${escHtml(j.cron_expr)}</code></td>
                     <td>${ACTION_LABELS[j.action] || j.action}</td>
                     <td><small>${fmtDate(j.last_run_at)}</small></td>
                     <td>${STATUS_LABELS[j.last_status] || j.last_status}</td>
-                    <td>${j.run_once ? '<span class="badge badge-info" title="Wird nach Ausführung deaktiviert"><i class="fas fa-bolt me-1"></i>Einmalig</span>' : '—'}</td>
+                    <td>${j.run_once ? '<span class="badge bg-info-lt" title="Wird nach Ausführung deaktiviert"><i class="fas fa-bolt me-1"></i>Einmalig</span>' : '—'}</td>
                     <td>
                         ${CAN_MANAGE ? `
-                        <div class="custom-control custom-switch">
-                            <input type="checkbox" class="custom-control-input" id="jobEnabled_${j.id}"
+                        <div class="form-check form-switch">
+                            <input type="checkbox" class="form-check-input" id="jobEnabled_${j.id}"
                                    ${j.enabled ? 'checked' : ''}
                                    onchange="toggleCronjob(${j.id}, this.checked)">
-                            <label class="custom-control-label" for="jobEnabled_${j.id}"></label>
+                            <label class="form-check-label" for="jobEnabled_${j.id}"></label>
                         </div>` : (j.enabled
-                            ? '<span class="badge badge-success">Ja</span>'
-                            : '<span class="badge badge-secondary">Nein</span>')}
+                            ? '<span class="badge bg-success-lt">Ja</span>'
+                            : '<span class="badge bg-secondary-lt">Nein</span>')}
                     </td>
                     ${CAN_MANAGE ? `
                     <td>

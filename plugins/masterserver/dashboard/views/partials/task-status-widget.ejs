@@ -38,7 +38,7 @@
             <div class="spinner-border text-primary" role="status">
               <span class="visually-hidden">Laden...</span>
             </div>
-            <p class="text-muted mt-2">Task-Daten werden geladen...</p>
+            <p class="text-secondary mt-2">Task-Daten werden geladen...</p>
           </div>
         </div>
       </div>
@@ -64,7 +64,7 @@
             <div class="spinner-border text-primary" role="status">
               <span class="visually-hidden">Laden...</span>
             </div>
-            <p class="text-muted mt-2">Task-Historie wird geladen...</p>
+            <p class="text-secondary mt-2">Task-Historie wird geladen...</p>
           </div>
         </div>
       </div>
@@ -80,9 +80,9 @@
         <div class="d-flex align-items-center mb-2">
           <span class="task-type-badge badge me-2"></span>
           <span class="task-status-badge badge"></span>
-          <small class="text-muted ms-auto task-created-time"></small>
+          <small class="text-secondary ms-auto task-created-time"></small>
         </div>
-        <div class="task-id text-muted small">
+        <div class="task-id text-secondary small">
           <i class="fas fa-fingerprint me-1"></i>
           <code class="task-id-text"></code>
         </div>
@@ -268,7 +268,7 @@
       const container = this.element.querySelector('.task-list');
       
       if (tasks.length === 0) {
-        container.innerHTML = '<div class="text-center py-4 text-muted">Keine Tasks vorhanden</div>';
+        container.innerHTML = '<div class="text-center py-4 text-secondary">Keine Tasks vorhanden</div>';
         return;
       }
 

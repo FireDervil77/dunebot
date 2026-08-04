@@ -34,9 +34,9 @@
                     </h3>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted"><%= tr('gameserver:ADDON_EDITOR.TEMPLATE_DESCRIPTION') %></p>
+                    <p class="text-secondary"><%= tr('gameserver:ADDON_EDITOR.TEMPLATE_DESCRIPTION') %></p>
 
-                    <div class="btn-group btn-group-toggle mb-3" data-toggle="buttons">
+                    <div class="btn-group btn-group-toggle mb-3" data-bs-toggle="buttons">
                         <label class="btn btn-outline-secondary active" id="template-blank-btn">
                             <input type="radio" name="template_source" value="blank" checked>
                             <i class="fa-solid fa-file"></i> <%= tr('gameserver:ADDON_EDITOR.TEMPLATE_BLANK') %>
@@ -55,7 +55,7 @@
 
                     <% if (myAddons && myAddons.length > 0) { %>
                     <div id="template-clone-area" class="template-area" style="display: none;">
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label><%= tr('gameserver:ADDON_EDITOR.TEMPLATE_CLONE_SELECT') %></label>
                             <select class="form-control" id="clone-addon-select">
                                 <option value="">-- <%= tr('gameserver:ADDON_EDITOR.TEMPLATE_CLONE_SELECT_PLACEHOLDER') %> --</option>
@@ -70,11 +70,11 @@
                     <% } %>
 
                     <div id="template-json-area" class="template-area" style="display: none;">
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label><%= tr('gameserver:ADDON_EDITOR.TEMPLATE_JSON_LABEL') %></label>
                             <textarea class="form-control font-monospace" id="json-import-textarea" rows="12"
                                 placeholder='<%= tr("gameserver:ADDON_EDITOR.TEMPLATE_JSON_PLACEHOLDER") %>'></textarea>
-                            <small class="form-text text-muted"><%= tr('gameserver:ADDON_EDITOR.TEMPLATE_JSON_HELP') %> — Erwartet FIREBOT_v2 Format.</small>
+                            <small class="form-text text-secondary"><%= tr('gameserver:ADDON_EDITOR.TEMPLATE_JSON_HELP') %> — Erwartet FIREBOT_v2 Format.</small>
                         </div>
                         <button type="button" class="btn btn-primary" id="json-import-btn">
                             <i class="fa-solid fa-file-import"></i> <%= tr('gameserver:ADDON_EDITOR.TEMPLATE_JSON_IMPORT') %>
@@ -106,25 +106,25 @@
                                 </h3>
                             </div>
                             <div class="card-body">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label for="addon-name">Name <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" id="addon-name" name="name"
                                            value="<%= mode === 'edit' ? addon.name : (template ? template.name + ' (Copy)' : '') %>" required>
                                 </div>
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label for="addon-slug">Slug <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" id="addon-slug" name="slug"
                                            value="<%= mode === 'edit' ? addon.slug : '' %>"
                                            <%= mode === 'edit' ? 'readonly' : '' %> required>
-                                    <small class="form-text text-muted">Kleinbuchstaben, Bindestriche (z.B. valheim-server). Kann nach dem Erstellen nicht geändert werden.</small>
+                                    <small class="form-text text-secondary">Kleinbuchstaben, Bindestriche (z.B. valheim-server). Kann nach dem Erstellen nicht geändert werden.</small>
                                 </div>
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label for="addon-description"><%= tr('gameserver:ADDON_EDITOR.DESCRIPTION') %> <span class="text-danger">*</span></label>
                                     <textarea class="form-control" id="addon-description" name="description" rows="3" required><%= mode === 'edit' ? addon.description : (template ? template.description : '') %></textarea>
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <div class="form-group">
+                                        <div class="mb-3">
                                             <label for="addon-category"><%= tr('gameserver:ADDON_EDITOR.CATEGORY') %> <span class="text-danger">*</span></label>
                                             <select class="form-control" id="addon-category" name="category" required>
                                                 <option value="fps"      <%= (mode === 'edit' && addon.category === 'fps')      || (template && template.category === 'fps')      ? 'selected' : '' %>>FPS</option>
@@ -138,25 +138,25 @@
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="form-group">
+                                        <div class="mb-3">
                                             <label for="addon-tags"><%= tr('gameserver:ADDON_EDITOR.TAGS') %></label>
                                             <input type="text" class="form-control" id="addon-tags" name="tags"
                                                    value="<%= mode === 'edit' ? addon.tags || '' : (template ? template.tags || '' : '') %>"
                                                    placeholder="fps, multiplayer, competitive">
-                                            <small class="form-text text-muted"><%= tr('gameserver:ADDON_EDITOR.TAGS_HELP') %></small>
+                                            <small class="form-text text-secondary"><%= tr('gameserver:ADDON_EDITOR.TAGS_HELP') %></small>
                                         </div>
                                     </div>
                                 </div>
                                 <!-- Icon -->
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label for="addon-icon-url"><%= tr('gameserver:ADDON_EDITOR.ICON_URL') %></label>
                                     <div class="d-flex align-items-center mb-2">
-                                        <div id="icon-preview" class="mr-3" style="width:64px;height:64px;border:2px dashed #555;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;background:#1e1e2d;">
+                                        <div id="icon-preview" class="me-3" style="width:64px;height:64px;border:2px dashed #555;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;background:#1e1e2d;">
                                             <% const iconVal = mode === 'edit' ? addon.icon_url || '' : (template ? template.icon_url || '' : ''); %>
                                             <% if (iconVal) { %>
                                                 <img src="<%- iconVal %>" style="max-width:100%;max-height:100%;object-fit:cover;">
                                             <% } else { %>
-                                                <i class="fa-solid fa-image text-muted" style="font-size:1.5rem;"></i>
+                                                <i class="fa-solid fa-image text-secondary" style="font-size:1.5rem;"></i>
                                             <% } %>
                                         </div>
                                         <div class="flex-grow-1">
@@ -178,14 +178,14 @@
                                 </div>
 
                                 <!-- Banner -->
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label for="addon-banner-url">Banner</label>
                                     <div id="banner-preview" class="mb-2" style="width:100%;height:120px;border:2px dashed #555;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#1e1e2d;">
                                         <% const bannerVal = mode === 'edit' ? addon.banner_url || '' : ''; %>
                                         <% if (bannerVal) { %>
                                             <img src="<%- bannerVal %>" style="max-width:100%;max-height:100%;object-fit:cover;">
                                         <% } else { %>
-                                            <i class="fa-solid fa-panorama text-muted" style="font-size:2rem;"></i>
+                                            <i class="fa-solid fa-panorama text-secondary" style="font-size:2rem;"></i>
                                         <% } %>
                                     </div>
                                     <div class="input-group">
@@ -216,14 +216,14 @@
                             <div class="card-body">
                                 <div class="row">
                                     <div class="col-md-8">
-                                        <div class="form-group mb-0">
+                                        <div class="mb-3 mb-0">
                                             <label for="meta-author"><%= tr('gameserver:ADDON_EDITOR.AUTHOR') %> <span class="text-danger">*</span></label>
                                             <input type="text" class="form-control" id="meta-author"
                                                    value="<%= (mode === 'edit' && gameData && gameData.meta) ? gameData.meta.author : (user ? user.info.username : 'Unknown') %>" required>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="form-group mb-0">
+                                        <div class="mb-3 mb-0">
                                             <label>Format</label>
                                             <input type="text" class="form-control" value="FIREBOT_v2" readonly>
                                         </div>
@@ -246,10 +246,10 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                <p class="text-muted mb-3">Docker-Images die für diesen Server verwendet werden können. Das erste Image ist das Standard-Image.</p>
+                                <p class="text-secondary mb-3">Docker-Images die für diesen Server verwendet werden können. Das erste Image ist das Standard-Image.</p>
                                 <div class="row mb-1">
-                                    <div class="col-md-7"><small class="text-muted font-weight-bold">Image (Registry:Tag)</small></div>
-                                    <div class="col-md-4"><small class="text-muted font-weight-bold">Anzeigename</small></div>
+                                    <div class="col-md-7"><small class="text-secondary fw-bold">Image (Registry:Tag)</small></div>
+                                    <div class="col-md-4"><small class="text-secondary fw-bold">Anzeigename</small></div>
                                 </div>
                                 <div id="docker-images-container"></div>
                                 <div id="no-docker-images-msg" class="alert alert-warning" style="display: none;">
@@ -267,23 +267,23 @@
                                 </h3>
                             </div>
                             <div class="card-body">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label for="startup-command"><%= tr('gameserver:ADDON_EDITOR.STARTUP_COMMAND') %> <span class="text-danger">*</span></label>
                                     <textarea class="form-control font-monospace" id="startup-command" rows="3" required><%= (gameData && gameData.startup) ? gameData.startup.command : '' %></textarea>
-                                    <small class="form-text text-muted"><%= tr('gameserver:ADDON_EDITOR.STARTUP_COMMAND_HELP') %></small>
+                                    <small class="form-text text-secondary"><%= tr('gameserver:ADDON_EDITOR.STARTUP_COMMAND_HELP') %></small>
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <div class="form-group">
+                                        <div class="mb-3">
                                             <label for="startup-done"><%= tr('gameserver:ADDON_EDITOR.DONE_INDICATOR') %> <span class="text-danger">*</span></label>
                                             <input type="text" class="form-control" id="startup-done"
                                                    value="<%= (gameData && gameData.startup) ? gameData.startup.done : '' %>"
                                                    placeholder="Server is listening" required>
-                                            <small class="form-text text-muted"><%= tr('gameserver:ADDON_EDITOR.DONE_INDICATOR_HELP') %></small>
+                                            <small class="form-text text-secondary"><%= tr('gameserver:ADDON_EDITOR.DONE_INDICATOR_HELP') %></small>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="form-group">
+                                        <div class="mb-3">
                                             <label for="startup-stop"><%= tr('gameserver:ADDON_EDITOR.STOP_COMMAND') %> <span class="text-danger">*</span></label>
                                             <input type="text" class="form-control" id="startup-stop"
                                                    value="<%= (gameData && gameData.startup) ? gameData.startup.stop : '' %>"
@@ -308,7 +308,7 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                <p class="text-muted"><%= tr('gameserver:ADDON_EDITOR.VARIABLES_HELP') || 'Variablen werden beim Server-Start als Umgebungsvariablen gesetzt. Nutze {{VARIABLE}} im Startup-Command.' %></p>
+                                <p class="text-secondary"><%= tr('gameserver:ADDON_EDITOR.VARIABLES_HELP') || 'Variablen werden beim Server-Start als Umgebungsvariablen gesetzt. Nutze {{VARIABLE}} im Startup-Command.' %></p>
                                 <div id="variables-container"></div>
                                 <div id="no-variables-message" class="alert alert-info" style="display: none;">
                                     <i class="fa-solid fa-info-circle"></i> <%= tr('gameserver:ADDON_EDITOR.NO_VARIABLES') || 'Keine Variablen definiert. Klicke "Variable hinzufügen" um zu starten.' %>
@@ -322,7 +322,7 @@
                                 <h3 class="card-title">
                                     <i class="fa-solid fa-file-pen"></i>
                                     Config-Files
-                                    <span class="badge badge-light ml-2" id="config-files-count">0</span>
+                                    <span class="badge bg-light-lt ms-2" id="config-files-count">0</span>
                                 </h3>
                                 <div class="card-tools">
                                     <button type="button" class="btn btn-sm btn-light" id="add-config-file-btn">
@@ -331,13 +331,13 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                <p class="text-muted">Config-Dateien werden beim Server-Start automatisch gepatcht. Keys werden in der Datei gesucht und mit dem angegebenen Wert ersetzt.</p>
+                                <p class="text-secondary">Config-Dateien werden beim Server-Start automatisch gepatcht. Keys werden in der Datei gesucht und mit dem angegebenen Wert ersetzt.</p>
                                 <div id="config-files-container"></div>
                                 <div id="no-config-files-msg" class="alert alert-info" style="display: none;">
                                     <i class="fa-solid fa-info-circle"></i> Keine Config-Dateien definiert.
                                 </div>
                             </div>
-                            <div class="card-footer text-muted small">
+                            <div class="card-footer text-secondary small">
                                 <i class="fa-solid fa-info-circle"></i> Werte können <code>{{VARIABLEN}}</code> enthalten, die beim Start durch Umgebungsvariablen ersetzt werden.
                             </div>
                         </div>
@@ -347,7 +347,7 @@
                             <div class="card-header bg-info">
                                 <h3 class="card-title">
                                     <i class="fa-solid fa-layer-group"></i> Templates
-                                    <span class="badge badge-light ml-2" id="templates-count">0</span>
+                                    <span class="badge bg-light-lt ms-2" id="templates-count">0</span>
                                 </h3>
                                 <div class="card-tools">
                                     <button type="button" class="btn btn-sm btn-light" id="btnAddTemplate">
@@ -356,11 +356,11 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                <p class="text-muted small mb-2">
+                                <p class="text-secondary small mb-2">
                                     Templates definieren Server-Vorlagen (z.B. "Competitive 5v5") mit vordefinierten Variablen und Config-Overrides.
                                 </p>
                                 <div id="templates-container"></div>
-                                <div id="no-templates-msg" class="text-muted small" style="display: none;">
+                                <div id="no-templates-msg" class="text-secondary small" style="display: none;">
                                     <i class="fa-solid fa-info-circle"></i> Keine Templates definiert.
                                 </div>
                             </div>
@@ -375,19 +375,19 @@
                                 </h3>
                             </div>
                             <div class="card-body">
-                                <p class="text-muted"><%= tr('gameserver:ADDON_EDITOR.INSTALLATION_HELP') || 'Bash-Script für die Installation des Gameservers. Wird einmalig beim Setup ausgeführt.' %></p>
+                                <p class="text-secondary"><%= tr('gameserver:ADDON_EDITOR.INSTALLATION_HELP') || 'Bash-Script für die Installation des Gameservers. Wird einmalig beim Setup ausgeführt.' %></p>
                                 <div class="row mb-3">
                                     <div class="col-md-8">
-                                        <div class="form-group mb-0">
+                                        <div class="mb-3 mb-0">
                                             <label for="install-container">Install Container Image</label>
                                             <input type="text" class="form-control font-monospace" id="install-container"
                                                    value="<%= (gameData && gameData.scripts && gameData.scripts.installation) ? gameData.scripts.installation.container : '' %>"
                                                    placeholder="ghcr.io/parkervcp/yolks:installer">
-                                            <small class="form-text text-muted">Docker Image das für den Installations-Schritt verwendet wird</small>
+                                            <small class="form-text text-secondary">Docker Image das für den Installations-Schritt verwendet wird</small>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="form-group mb-0">
+                                        <div class="mb-3 mb-0">
                                             <label for="install-entrypoint">Entrypoint</label>
                                             <input type="text" class="form-control font-monospace" id="install-entrypoint"
                                                    value="<%= (gameData && gameData.scripts && gameData.scripts.installation && gameData.scripts.installation.entrypoint) ? gameData.scripts.installation.entrypoint : '/bin/bash' %>"
@@ -395,11 +395,11 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label for="install-script"><%= tr('gameserver:ADDON_EDITOR.INSTALL_SCRIPT') %></label>
                                     <textarea class="form-control font-monospace" id="install-script" rows="20"
                                               placeholder="#!/bin/bash&#10;# Installation Script&#10;cd ${INSTALL_DIR}&#10;echo Installing server..."><%= (gameData && gameData.scripts && gameData.scripts.installation) ? gameData.scripts.installation.script : '' %></textarea>
-                                    <small class="form-text text-muted">
+                                    <small class="form-text text-secondary">
                                         <%= tr('gameserver:ADDON_EDITOR.INSTALL_SCRIPT_HELP') || 'Bash-Script für die Server-Installation. Umgebungsvariablen aus dem Variables-Builder sind verfügbar.' %>
                                     </small>
                                 </div>
@@ -415,7 +415,7 @@
                                 </h3>
                             </div>
                             <div class="card-body">
-                                <div class="form-group">
+                                <div class="mb-3">
                                     <label><%= tr('gameserver:ADDON_EDITOR.VISIBILITY') %> <span class="text-danger">*</span></label>
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="visibility"
@@ -423,7 +423,7 @@
                                                <%= (mode === 'edit' && addon.visibility === 'private') || mode === 'create' ? 'checked' : '' %>>
                                         <label class="form-check-label" for="visibility-private">
                                             <strong><%= tr('gameserver:ADDON_EDITOR.PRIVATE') %></strong>
-                                            <br><small class="text-muted">Nur für deine Guild sichtbar</small>
+                                            <br><small class="text-secondary">Nur für deine Guild sichtbar</small>
                                         </label>
                                     </div>
                                     <div class="form-check mt-2">
@@ -432,7 +432,7 @@
                                                <%= (mode === 'edit' && addon.visibility === 'public') ? 'checked' : '' %>>
                                         <label class="form-check-label" for="visibility-public">
                                             <strong><%= tr('gameserver:ADDON_EDITOR.PUBLIC') %></strong>
-                                            <br><small class="text-muted">Wird zur Freigabe eingereicht (Moderation erforderlich)</small>
+                                            <br><small class="text-secondary">Wird zur Freigabe eingereicht (Moderation erforderlich)</small>
                                         </label>
                                     </div>
                                 </div>
@@ -445,7 +445,7 @@
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fa-solid fa-save"></i> <%= tr('gameserver:ADDON_EDITOR.SAVE') %>
                                 </button>
-                                <a href="/guild/<%= guildId %>/plugins/gameserver/addons/my-addons" class="btn btn-secondary ml-2">
+                                <a href="/guild/<%= guildId %>/plugins/gameserver/addons/my-addons" class="btn btn-secondary ms-2">
                                     <i class="fa-solid fa-times"></i> <%= tr('gameserver:ADDON_EDITOR.CANCEL') %>
                                 </a>
                             </div>
@@ -467,7 +467,7 @@
                                      style="max-height: 600px; overflow-y: auto; font-size: 0.78rem;">{}</pre>
                             </div>
                             <div class="card-footer">
-                                <button type="button" class="btn btn-sm btn-secondary btn-block" onclick="copyJSON()">
+                                <button type="button" class="btn btn-sm btn-secondary w-100" onclick="copyJSON()">
                                     <i class="fa-solid fa-copy"></i> <%= tr('gameserver:ADDON_EDITOR.COPY_JSON') %>
                                 </button>
                             </div>
@@ -644,9 +644,9 @@ function createVariableRow(varData, index) {
             <div class="row align-items-center">
                 <div class="col-md-6">
                     <strong class="variable-name-display">${escHtml(varData.name) || 'Neue Variable'}</strong>
-                    <code class="ml-2 text-muted">{{${escHtml(varData.env_variable) || 'VAR_NAME'}}}</code>
+                    <code class="ms-2 text-secondary">{{${escHtml(varData.env_variable) || 'VAR_NAME'}}}</code>
                 </div>
-                <div class="col-md-6 text-right">
+                <div class="col-md-6 text-end">
                     <button type="button" class="btn btn-sm btn-danger remove-variable-btn">
                         <i class="fa-solid fa-trash"></i> Entfernen
                     </button>
@@ -659,36 +659,36 @@ function createVariableRow(varData, index) {
         <div class="card-body variable-details" style="display: none;">
             <div class="row">
                 <div class="col-md-6">
-                    <div class="form-group">
+                    <div class="mb-3">
                         <label>Name <span class="text-danger">*</span></label>
                         <input type="text" class="form-control var-name"
                                value="${escHtml(varData.name)}" placeholder="Server Name" required>
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <div class="form-group">
+                    <div class="mb-3">
                         <label>Umgebungsvariable <span class="text-danger">*</span></label>
                         <input type="text" class="form-control var-env"
                                value="${escHtml(varData.env_variable)}" placeholder="SERVER_NAME" required>
-                        <small class="text-muted">Großbuchstaben + Unterstriche</small>
+                        <small class="text-secondary">Großbuchstaben + Unterstriche</small>
                     </div>
                 </div>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Beschreibung</label>
                 <textarea class="form-control var-description" rows="2"
                           placeholder="Name des Servers im Server-Browser">${escHtml(varData.description)}</textarea>
             </div>
             <div class="row">
                 <div class="col-md-6">
-                    <div class="form-group">
+                    <div class="mb-3">
                         <label>Standard-Wert</label>
                         <input type="text" class="form-control var-default"
                                value="${escHtml(varData.default_value)}" placeholder="My Server">
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <div class="form-group">
+                    <div class="mb-3">
                         <label>Feld-Typ</label>
                         <select class="form-control var-field-type">
                             <option value="text"    ${!varData.field_type || varData.field_type === 'text'    ? 'selected' : ''}>Text</option>
@@ -698,11 +698,11 @@ function createVariableRow(varData, index) {
                     </div>
                 </div>
             </div>
-            <div class="form-group">
+            <div class="mb-3">
                 <label>Validierungs-Regeln</label>
                 <input type="text" class="form-control var-rules"
                        value="${escHtml(varData.rules)}" placeholder="required|string|max:60">
-                <small class="text-muted">Laravel-Syntax (z.B. "required|string|max:60")</small>
+                <small class="text-secondary">Laravel-Syntax (z.B. "required|string|max:60")</small>
             </div>
             <div class="row">
                 <div class="col-md-6">
@@ -823,7 +823,7 @@ function renderConfigFiles() {
                             <option value="xml"        ${parser === 'xml'        ? 'selected' : ''}>xml</option>
                         </select>
                     </div>
-                    <div class="col-md-3 text-right">
+                    <div class="col-md-3 text-end">
                         <button type="button" class="btn btn-sm btn-success cf-add-key">
                             <i class="fa-solid fa-plus"></i> Key
                         </button>
@@ -947,7 +947,7 @@ function renderTemplates() {
                         <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-ov"><i class="fa-solid fa-times"></i></button></div>
                     </div>`
                 ).join('')}</div>
-                <div class="card-footer py-1"><button type="button" class="btn btn-xs btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
+                <div class="card-footer py-1"><button type="button" class="btn btn-sm btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
             </div>`
         ).join('');
 
@@ -957,17 +957,17 @@ function renderTemplates() {
                     <div class="col-md-3"><input type="text" class="form-control form-control-sm tpl-name" value="${escHtml(tpl.name || '')}" placeholder="template-name"></div>
                     <div class="col-md-3"><input type="text" class="form-control form-control-sm tpl-label" value="${escHtml(tpl.label || '')}" placeholder="Anzeigename"></div>
                     <div class="col-md-3"><input type="text" class="form-control form-control-sm tpl-icon" value="${escHtml(tpl.icon || '')}" placeholder="fa-trophy"></div>
-                    <div class="col-md-3 text-right"><button type="button" class="btn btn-sm btn-danger tpl-remove"><i class="fa-solid fa-trash"></i></button></div>
+                    <div class="col-md-3 text-end"><button type="button" class="btn btn-sm btn-danger tpl-remove"><i class="fa-solid fa-trash"></i></button></div>
                 </div>
             </div>
             <div class="card-body py-2">
                 <input type="text" class="form-control form-control-sm mb-2 tpl-desc" value="${escHtml(tpl.description || '')}" placeholder="Beschreibung">
-                <p class="mb-1 text-muted small"><strong>Variable-Overrides:</strong></p>
+                <p class="mb-1 text-secondary small"><strong>Variable-Overrides:</strong></p>
                 <div class="tpl-vars-container">${varsHtml}</div>
-                <button type="button" class="btn btn-xs btn-outline-success mb-2 tpl-add-var"><i class="fa-solid fa-plus"></i> Variable</button>
-                <p class="mb-1 text-muted small"><strong>Config-Overrides:</strong></p>
+                <button type="button" class="btn btn-sm btn-outline-success mb-2 tpl-add-var"><i class="fa-solid fa-plus"></i> Variable</button>
+                <p class="mb-1 text-secondary small"><strong>Config-Overrides:</strong></p>
                 <div class="tpl-overrides-container">${ovHtml}</div>
-                <button type="button" class="btn btn-xs btn-outline-info tpl-add-ov-file"><i class="fa-solid fa-plus"></i> Config-Datei</button>
+                <button type="button" class="btn btn-sm btn-outline-info tpl-add-ov-file"><i class="fa-solid fa-plus"></i> Config-Datei</button>
             </div>
         `;
         container.appendChild(card);
@@ -1003,7 +1003,7 @@ function bindTemplateEvents() {
                 <div class="card-tools"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
             </div>
             <div class="card-body py-1 tpl-ov-keys"></div>
-            <div class="card-footer py-1"><button type="button" class="btn btn-xs btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
+            <div class="card-footer py-1"><button type="button" class="btn btn-sm btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
         </div>`);
         bindTemplateEvents();
     }));
@@ -1208,12 +1208,12 @@ function updateMediaPreview(inputId) {
         const preview = document.getElementById('icon-preview');
         preview.innerHTML = url
             ? `<img src="${escHtml(url)}" style="max-width:100%;max-height:100%;object-fit:cover;">`
-            : '<i class="fa-solid fa-image text-muted" style="font-size:1.5rem;"></i>';
+            : '<i class="fa-solid fa-image text-secondary" style="font-size:1.5rem;"></i>';
     } else if (inputId === 'addon-banner-url') {
         const preview = document.getElementById('banner-preview');
         preview.innerHTML = url
             ? `<img src="${escHtml(url)}" style="max-width:100%;max-height:100%;object-fit:cover;">`
-            : '<i class="fa-solid fa-panorama text-muted" style="font-size:2rem;"></i>';
+            : '<i class="fa-solid fa-panorama text-secondary" style="font-size:2rem;"></i>';
     }
 }
 
@@ -1253,7 +1253,7 @@ async function loadMediaPickerItems() {
 
         if (!json.success || !json.data.length) {
             grid.innerHTML = `
-                <div class="text-center py-5 text-muted">
+                <div class="text-center py-5 text-secondary">
                     <i class="fa-solid fa-images fa-3x mb-3"></i>
                     <p>Keine Medien gefunden.</p>
                     <p class="small">Lade zuerst Bilder im <a href="/guild/${GUILD_ID}/media" target="_blank">Media-Manager</a> hoch<br>oder nutze den Upload unten.</p>
@@ -1274,7 +1274,7 @@ async function loadMediaPickerItems() {
         let pagHtml = '';
         if (pag.pages > 1) {
             pagHtml += `<button class="btn btn-sm btn-outline-secondary" ${pag.page <= 1 ? 'disabled' : ''} onclick="_mediaPickerPage--;loadMediaPickerItems()"><i class="fa-solid fa-chevron-left"></i></button> `;
-            pagHtml += `<span class="mx-2 text-muted">${pag.page} / ${pag.pages}</span>`;
+            pagHtml += `<span class="mx-2 text-secondary">${pag.page} / ${pag.pages}</span>`;
             pagHtml += ` <button class="btn btn-sm btn-outline-secondary" ${pag.page >= pag.pages ? 'disabled' : ''} onclick="_mediaPickerPage++;loadMediaPickerItems()"><i class="fa-solid fa-chevron-right"></i></button>`;
         }
         document.getElementById('media-picker-pagination').innerHTML = pagHtml;
@@ -1355,7 +1355,7 @@ async function mediaPickerUpload(input) {
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="fa-solid fa-photo-film"></i> Bild aus Medien wählen</h5>
-                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
                 <!-- Toolbar -->
@@ -1372,7 +1372,7 @@ async function mediaPickerUpload(input) {
                                 onclick="document.getElementById('media-picker-file-input').click()">
                             <i class="fa-solid fa-upload"></i> Hochladen
                         </button>
-                        <a href="/guild/<%= guildId %>/media" target="_blank" class="btn btn-sm btn-outline-secondary ml-1" title="Media-Manager öffnen">
+                        <a href="/guild/<%= guildId %>/media" target="_blank" class="btn btn-sm btn-outline-secondary ms-1" title="Media-Manager öffnen">
                             <i class="fa-solid fa-external-link-alt"></i>
                         </a>
                     </div>

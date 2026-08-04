@@ -1,7 +1,7 @@
 <!-- Gameserver List -->
 <style>
 /* Copy-Connection Button Styling */
-.btn-xs {
+.btn-sm {
     padding: 0.125rem 0.375rem;
     font-size: 0.75rem;
     line-height: 1;
@@ -62,8 +62,8 @@
                     <div class="card">
                         <div class="card-body">
                             <form method="GET" action="/guild/<%= guildId %>/plugins/gameserver/servers" class="form-inline">
-                                <div class="form-group mr-3">
-                                    <label class="mr-2"><%= tr('gameserver:SERVER.FILTER_STATUS') %>:</label>
+                                <div class="mb-3 me-3">
+                                    <label class="me-2"><%= tr('gameserver:SERVER.FILTER_STATUS') %>:</label>
                                     <select class="form-control" name="status">
                                         <option value="all" <%= filters.status === 'all' ? 'selected' : '' %>>
                                             <%= tr('gameserver:SERVER.ALL_STATUS') %>
@@ -86,8 +86,8 @@
                                     </select>
                                 </div>
 
-                                <div class="form-group mr-3">
-                                    <label class="mr-2"><%= tr('gameserver:SERVER.FILTER_GAME') %>:</label>
+                                <div class="mb-3 me-3">
+                                    <label class="me-2"><%= tr('gameserver:SERVER.FILTER_GAME') %>:</label>
                                     <select class="form-control" name="game">
                                         <option value="all" <%= filters.game === 'all' ? 'selected' : '' %>>
                                             <%= tr('gameserver:SERVER.ALL_GAMES') %>
@@ -103,7 +103,7 @@
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fa-solid fa-filter"></i> <%= tr('gameserver:SERVER.APPLY_FILTER') %>
                                 </button>
-                                <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="btn btn-secondary ml-2">
+                                <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="btn btn-secondary ms-2">
                                     <i class="fa-solid fa-times"></i> <%= tr('gameserver:SERVER.RESET_FILTER') %>
                                 </a>
                             </form>
@@ -142,13 +142,13 @@
                                                 <td>
                                                     <strong><%= server.name %></strong>
                                                     <% if (server.update_available) { %>
-                                                        <span class="badge badge-warning badge-sm ml-1">
+                                                        <span class="badge bg-warning-lt badge-sm ms-1">
                                                             <i class="fa-solid fa-arrow-up"></i> Update
                                                         </span>
                                                     <% } %>
                                                 </td>
                                                 <td>
-                                                    <span class="badge badge-info">
+                                                    <span class="badge bg-info-lt">
                                                         <%= server.game_name || 'Unknown' %>
                                                     </span>
                                                 </td>
@@ -156,28 +156,28 @@
                                                     <% if (server.template_name) { %>
                                                         <code><%= server.template_name %></code>
                                                     <% } else { %>
-                                                        <span class="text-muted">-</span>
+                                                        <span class="text-secondary">-</span>
                                                     <% } %>
                                                 </td>
                                                 <td>
                                                     <% if (server.status === 'online') { %>
-                                                        <span class="badge badge-success server-status-badge" data-status="online">
+                                                        <span class="badge bg-success-lt server-status-badge" data-status="online">
                                                             <i class="fa-solid fa-circle"></i> Online
                                                         </span>
                                                     <% } else if (server.status === 'offline') { %>
-                                                        <span class="badge badge-secondary server-status-badge" data-status="offline">
+                                                        <span class="badge bg-secondary-lt server-status-badge" data-status="offline">
                                                             <i class="fa-solid fa-circle"></i> Offline
                                                         </span>
                                                     <% } else if (server.status === 'starting') { %>
-                                                        <span class="badge badge-warning server-status-badge" data-status="starting">
+                                                        <span class="badge bg-warning-lt server-status-badge" data-status="starting">
                                                             <i class="fa-solid fa-spinner fa-spin"></i> Starting
                                                         </span>
                                                     <% } else if (server.status === 'stopping') { %>
-                                                        <span class="badge badge-warning server-status-badge" data-status="stopping">
+                                                        <span class="badge bg-warning-lt server-status-badge" data-status="stopping">
                                                             <i class="fa-solid fa-spinner fa-spin"></i> Stopping
                                                         </span>
                                                     <% } else if (server.status === 'installing') { %>
-                                                        <span class="badge badge-info server-status-badge" data-status="installing" data-install-phase="<%= server.install_phase || '' %>">
+                                                        <span class="badge bg-info-lt server-status-badge" data-status="installing" data-install-phase="<%= server.install_phase || '' %>">
                                                             <% if (server.install_phase === 'pulling_image') { %>
                                                                 <i class="fa-solid fa-cloud-arrow-down fa-spin"></i> Image wird geladen...
                                                             <% } else if (server.install_phase === 'installing_game') { %>
@@ -187,15 +187,15 @@
                                                             <% } %>
                                                         </span>
                                                     <% } else if (server.status === 'installed') { %>
-                                                        <span class="badge badge-success server-status-badge" data-status="installed">
+                                                        <span class="badge bg-success-lt server-status-badge" data-status="installed">
                                                             <i class="fa-solid fa-check-circle"></i> Installed
                                                         </span>
                                                     <% } else if (server.status === 'error') { %>
-                                                        <span class="badge badge-danger server-status-badge" data-status="error">
+                                                        <span class="badge bg-danger-lt server-status-badge" data-status="error">
                                                             <i class="fa-solid fa-exclamation-triangle"></i> Error
                                                         </span>
                                                     <% } else { %>
-                                                        <span class="badge badge-secondary server-status-badge" data-status="<%= server.status %>">
+                                                        <span class="badge bg-secondary-lt server-status-badge" data-status="<%= server.status %>">
                                                             <%= server.status %>
                                                         </span>
                                                     <% } %>
@@ -204,22 +204,22 @@
                                                     <% if (server.status === 'online') { %>
                                                         <%= server.current_players || 0 %>/<%= server.max_players || 0 %>
                                                     <% } else { %>
-                                                        <span class="text-muted">-</span>
+                                                        <span class="text-secondary">-</span>
                                                     <% } %>
                                                 </td>
                                                 <td>
                                                     <% if (server.server_ip && server.game_port) { %>
                                                         <div class="d-flex align-items-center">
-                                                            <code class="mr-2"><%= server.server_ip %>:<%= server.game_port %></code>
+                                                            <code class="me-2"><%= server.server_ip %>:<%= server.game_port %></code>
                                                             <div class="btn-group btn-group-sm">
-                                                                <button class="btn btn-xs btn-outline-secondary copy-connection-btn" 
+                                                                <button class="btn btn-sm btn-outline-secondary copy-connection-btn" 
                                                                         data-connection="<%= server.server_ip %>:<%= server.game_port %>"
                                                                         title="<%= tr('gameserver:SERVER.COPY_CONNECTION') || 'Connection kopieren' %>">
                                                                     <i class="fa-solid fa-copy"></i>
                                                                 </button>
                                                                 <% if (server.game_slug === 'csgo' || server.game_slug === 'cs2' || server.game_slug === 'tf2' || server.game_slug === 'left4dead2' || server.game_slug === 'rust' || server.game_slug === 'gmod' || server.game_slug === 'ark') { %>
                                                                     <a href="steam://connect/<%= server.server_ip %>:<%= server.game_port %>" 
-                                                                       class="btn btn-xs btn-success"
+                                                                       class="btn btn-sm btn-success"
                                                                        title="<%= tr('gameserver:SERVER.JOIN_STEAM') || 'Mit Steam beitreten' %>">
                                                                         <i class="fa-brands fa-steam"></i>
                                                                     </a>
@@ -229,7 +229,7 @@
                                                     <% } else if (server.game_port) { %>
                                                         <code>Port: <%= server.game_port %></code>
                                                     <% } else { %>
-                                                        <span class="text-muted">-</span>
+                                                        <span class="text-secondary">-</span>
                                                     <% } %>
                                                 </td>
                                                 <td>
@@ -308,9 +308,9 @@
                                 </table>
                             <% } else { %>
                                 <div class="p-5 text-center">
-                                    <i class="fa-solid fa-inbox fa-4x text-muted mb-3"></i>
+                                    <i class="fa-solid fa-inbox fa-4x text-secondary mb-3"></i>
                                     <h4><%= tr('gameserver:SERVER.NO_SERVERS') %></h4>
-                                    <p class="text-muted">
+                                    <p class="text-secondary">
                                         <%= tr('gameserver:SERVER.NO_SERVERS_DESC') %>
                                     </p>
                                     <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1" class="btn btn-success">
@@ -601,24 +601,24 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`[StatusPoll] Server ${serverId}: ${currentStatus} → ${newStatus}`);
         
         // Badge-Klassen updaten
-        statusBadge.classList.remove('badge-success', 'badge-warning', 'badge-danger', 'badge-secondary', 'badge-info');
+        statusBadge.classList.remove('bg-success-lt', 'bg-warning-lt', 'bg-danger-lt', 'bg-secondary-lt', 'bg-info-lt');
         
         // Status-Mapping (DB verwendet 'online' statt 'running')
         switch(newStatus) {
             case 'online':
-                statusBadge.classList.add('badge-success');
+                statusBadge.classList.add('bg-success-lt');
                 statusBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Online';
                 break;
             case 'starting':
-                statusBadge.classList.add('badge-info');
+                statusBadge.classList.add('bg-info-lt');
                 statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting';
                 break;
             case 'stopping':
-                statusBadge.classList.add('badge-warning');
+                statusBadge.classList.add('bg-warning-lt');
                 statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Stopping';
                 break;
             case 'installing': {
-                statusBadge.classList.add('badge-info');
+                statusBadge.classList.add('bg-info-lt');
                 const phase = statusBadge.dataset.installPhase || '';
                 if (phase === 'pulling_image') {
                     statusBadge.innerHTML = '<i class="fa-solid fa-cloud-arrow-down fa-spin"></i> Image wird geladen...';
@@ -630,16 +630,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             }
             case 'installed':
-                statusBadge.classList.add('badge-success');
+                statusBadge.classList.add('bg-success-lt');
                 statusBadge.innerHTML = '<i class="fa-solid fa-check-circle"></i> Installed';
                 break;
             case 'error':
-                statusBadge.classList.add('badge-danger');
+                statusBadge.classList.add('bg-danger-lt');
                 statusBadge.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i> Error';
                 break;
             case 'offline':
             default:
-                statusBadge.classList.add('badge-secondary');
+                statusBadge.classList.add('bg-secondary-lt');
                 statusBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Offline';
         }
         
@@ -801,8 +801,8 @@ function initSSE() {
         if (!badge || badge.dataset.status !== 'installing') return;
 
         badge.dataset.installPhase = data.phase;
-        badge.classList.remove('badge-success', 'badge-warning', 'badge-danger', 'badge-secondary', 'badge-info');
-        badge.classList.add('badge-info');
+        badge.classList.remove('bg-success-lt', 'bg-warning-lt', 'bg-danger-lt', 'bg-secondary-lt', 'bg-info-lt');
+        badge.classList.add('bg-info-lt');
 
         if (data.phase === 'pulling_image') {
             badge.innerHTML = '<i class="fa-solid fa-cloud-arrow-down fa-spin"></i> Image wird geladen...';

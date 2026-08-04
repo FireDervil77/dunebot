@@ -13,7 +13,7 @@
         <h3 class="card-title mb-0"><i class="fas fa-globe me-2"></i>Öffentlicher Status</h3>
       </div>
       <div class="card-body">
-        <p class="text-muted small">
+        <p class="text-secondary small">
           Gibt den Status dieses Servers ohne Anmeldung frei – für die eigene Website,
           ein Wiki oder ein Forum. Solange der Schalter aus ist, existiert keine
           öffentliche Adresse.
@@ -36,7 +36,7 @@
 
         <div id="public-details" style="display:none">
           <hr>
-          <label class="form-label small text-muted mb-1">Widget zum Einbetten</label>
+          <label class="form-label small text-secondary mb-1">Widget zum Einbetten</label>
           <div class="input-group input-group-sm mb-2">
             <input type="text" class="form-control font-monospace" id="public-embed" readonly>
             <button class="btn btn-outline-secondary" type="button" data-copy="public-embed">
@@ -44,7 +44,7 @@
             </button>
           </div>
 
-          <label class="form-label small text-muted mb-1">Direkte Adresse (JSON)</label>
+          <label class="form-label small text-secondary mb-1">Direkte Adresse (JSON)</label>
           <div class="input-group input-group-sm mb-3">
             <input type="text" class="form-control font-monospace" id="public-api" readonly>
             <button class="btn btn-outline-secondary" type="button" data-copy="public-api">
@@ -72,7 +72,7 @@
         <h3 class="card-title mb-0"><i class="fas fa-eye me-2"></i>Vorschau</h3>
       </div>
       <div class="card-body">
-        <div id="public-vorschau" class="text-muted small">
+        <div id="public-vorschau" class="text-secondary small">
           Schalte die öffentliche Statusseite ein, um die Vorschau zu sehen.
         </div>
       </div>
@@ -113,7 +113,7 @@
                          + 'style="border:1px solid rgba(0,0,0,.1);border-radius:6px"></iframe>';
     } else {
       details.style.display = 'none';
-      vorschau.innerHTML = '<div class="text-muted small">Schalte die öffentliche Statusseite ein, '
+      vorschau.innerHTML = '<div class="text-secondary small">Schalte die öffentliche Statusseite ein, '
                          + 'um die Vorschau zu sehen.</div>';
     }
   }

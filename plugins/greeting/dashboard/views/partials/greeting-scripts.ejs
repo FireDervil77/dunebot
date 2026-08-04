@@ -200,7 +200,7 @@
         $(tabLink).tab('show');
       }
     }
-    document.querySelectorAll('#greetingTabs a[data-toggle="tab"]').forEach(tab => {
+    document.querySelectorAll('#greetingTabs a[data-bs-toggle="tab"]').forEach(tab => {
       tab.addEventListener('shown.bs.tab', function(e) {
         localStorage.setItem(TAB_KEY, e.target.getAttribute('href'));
         renderLivePreview();
@@ -229,7 +229,7 @@
       .replace(/\{member:nick\}/g, '<span class="text-info">ExampleUser</span>')
       .replace(/\{member:mention\}/g, '<span class="text-info">@ExampleUser</span>')
       .replace(/\{member:tag\}/g, '<span class="text-info">ExampleUser#0001</span>')
-      .replace(/\{member:avatar\}/g, '<span class="text-muted">[Avatar-URL]</span>')
+      .replace(/\{member:avatar\}/g, '<span class="text-secondary">[Avatar-URL]</span>')
       .replace(/\{member:dis\}/g, '<span class="text-info">0001</span>')
       .replace(/\{member:id\}/g, '<span class="text-info">123456789</span>')
       .replace(/\{member:joinedAt\}/g, '<span class="text-info">11.04.2026</span>')
@@ -240,7 +240,7 @@
       .replace(/\{count\}/g, '42')
       .replace(/\{guild:memberCount\}/g, '42')
       .replace(/\{guild:id\}/g, '<span class="text-info">123456789</span>')
-      .replace(/\{guild:icon\}/g, '<span class="text-muted">[Icon-URL]</span>')
+      .replace(/\{guild:icon\}/g, '<span class="text-secondary">[Icon-URL]</span>')
       .replace(/\{guild:boostCount\}/g, '3')
       .replace(/\{guild:boostLevel\}/g, '2')
       // Inviter
@@ -274,7 +274,7 @@
     // Replace placeholders for preview
     const preview = previewPlaceholders(content);
 
-    previewContent.innerHTML = preview || '<span class="text-muted">Kein Text</span>';
+    previewContent.innerHTML = preview || '<span class="text-secondary">Kein Text</span>';
 
     // Verification-Tab hat kein Embed-Builder-Formular → Embed-Bereich leeren
     if (type === 'verification') {
@@ -463,15 +463,15 @@
     const container = document.getElementById('rrMappingsList');
     if (!container) return;
     if (rrMappings.length === 0) {
-      container.innerHTML = '<p class="text-muted small">Noch keine Zuordnungen hinzugefügt.</p>';
+      container.innerHTML = '<p class="text-secondary small">Noch keine Zuordnungen hinzugefügt.</p>';
       return;
     }
     let html = '<div class="d-flex flex-wrap mb-2" style="gap: 6px;">';
     rrMappings.forEach((m, i) => {
-      html += `<span class="badge badge-light border p-2" style="font-size: 0.9em;">
+      html += `<span class="badge bg-light-lt border p-2" style="font-size: 0.9em;">
         ${escapeHTML(m.emoji)} → <strong>${escapeHTML(m.role_name)}</strong>
-        ${m.description ? '<small class="text-muted ml-1">(' + escapeHTML(m.description) + ')</small>' : ''}
-        <button type="button" class="btn btn-xs btn-link text-danger p-0 ml-1" onclick="removeRRMapping(${i})">
+        ${m.description ? '<small class="text-secondary ms-1">(' + escapeHTML(m.description) + ')</small>' : ''}
+        <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="removeRRMapping(${i})">
           <i class="fa-solid fa-times"></i>
         </button>
       </span>`;

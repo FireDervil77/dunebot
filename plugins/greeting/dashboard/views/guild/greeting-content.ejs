@@ -1,6 +1,7 @@
 <% if (type === 'welcome') { %>
 <!-- ===== WELCOME ===== -->
-<div class="card card-outline card-primary">
+<div class="card">
+    <div class="card-status-top bg-primary"></div>
   <div class="card-body">
     <form id="welcomeForm">
       <div class="row">
@@ -16,12 +17,12 @@
         <div class="col-md-6 mb-3">
           <label class="form-label"><i class="fa-solid fa-circle-info me-1"></i> <%= tr('greeting:STATUS') %></label>
           <div>
-            <div class="custom-control custom-switch">
-              <input type="checkbox" class="custom-control-input" id="welcomeEnabledToggle"
+            <div class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" id="welcomeEnabledToggle"
                      <%= settings.welcome.enabled ? 'checked' : '' %>
                      onchange="toggleGreeting('welcome', this.checked)">
-              <label class="custom-control-label" for="welcomeEnabledToggle">
-                <span class="badge <%= settings.welcome.enabled ? 'badge-success' : 'badge-secondary' %>">
+              <label class="form-check-label" for="welcomeEnabledToggle">
+                <span class="badge <%= settings.welcome.enabled ? 'bg-success-lt' : 'bg-secondary-lt' %>">
                   <%= settings.welcome.enabled ? tr('greeting:STATUS_ENABLED') : tr('greeting:STATUS_DISABLED') %>
                 </span>
               </label>
@@ -34,7 +35,7 @@
       <% const welcomeMode = (settings.welcome.embed && (settings.welcome.embed.title || settings.welcome.embed.description)) ? 'embed' : 'text'; %>
       <div class="mb-3">
         <label class="form-label"><i class="fa-solid fa-toggle-on me-1"></i> Nachrichtentyp</label>
-        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+        <div class="btn-group btn-group-toggle" data-bs-toggle="buttons">
           <label class="btn btn-outline-primary btn-sm <%= welcomeMode === 'text' ? 'active' : '' %>">
             <input type="radio" name="welcome_message_mode" value="text" <%= welcomeMode === 'text' ? 'checked' : '' %>> <i class="fa-solid fa-align-left me-1"></i> Nachricht
           </label>
@@ -48,7 +49,7 @@
         <div class="mb-3">
           <label class="form-label"><i class="fa-solid fa-message me-1"></i> <%= tr('greeting:WELCOME.MESSAGE') %></label>
           <textarea class="form-control msg-input" name="welcome_content" rows="3" data-preview-type="welcome"><%= settings.welcome.content || '' %></textarea>
-          <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+          <small class="form-text text-secondary"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
         </div>
       </div>
 
@@ -59,13 +60,13 @@
       <!-- Welcome Image Section -->
       <hr>
       <h6><i class="fa-solid fa-image me-1"></i> <%= tr('greeting:IMAGE.TITLE') %></h6>
-      <p class="text-muted small"><%= tr('greeting:IMAGE.DESC') %></p>
+      <p class="text-secondary small"><%= tr('greeting:IMAGE.DESC') %></p>
       <div class="row">
         <div class="col-md-3 mb-3">
-          <div class="custom-control custom-switch">
-            <input type="checkbox" class="custom-control-input" id="welcomeImageToggle"
+          <div class="form-check form-switch">
+            <input type="checkbox" class="form-check-input" id="welcomeImageToggle"
                    name="welcome_image_enabled" <%= settings.welcome_image.enabled ? 'checked' : '' %>>
-            <label class="custom-control-label" for="welcomeImageToggle"><%= tr('greeting:IMAGE.ENABLE') %></label>
+            <label class="form-check-label" for="welcomeImageToggle"><%= tr('greeting:IMAGE.ENABLE') %></label>
           </div>
         </div>
         <div class="col-md-3 mb-3">
@@ -104,7 +105,8 @@
 
 <% } else if (type === 'farewell') { %>
 <!-- ===== FAREWELL ===== -->
-<div class="card card-outline card-warning">
+<div class="card">
+    <div class="card-status-top bg-warning"></div>
   <div class="card-body">
     <form id="farewellForm">
       <div class="row">
@@ -120,12 +122,12 @@
         <div class="col-md-6 mb-3">
           <label class="form-label"><i class="fa-solid fa-circle-info me-1"></i> <%= tr('greeting:STATUS') %></label>
           <div>
-            <div class="custom-control custom-switch">
-              <input type="checkbox" class="custom-control-input" id="farewellEnabledToggle"
+            <div class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" id="farewellEnabledToggle"
                      <%= settings.farewell.enabled ? 'checked' : '' %>
                      onchange="toggleGreeting('farewell', this.checked)">
-              <label class="custom-control-label" for="farewellEnabledToggle">
-                <span class="badge <%= settings.farewell.enabled ? 'badge-success' : 'badge-secondary' %>">
+              <label class="form-check-label" for="farewellEnabledToggle">
+                <span class="badge <%= settings.farewell.enabled ? 'bg-success-lt' : 'bg-secondary-lt' %>">
                   <%= settings.farewell.enabled ? tr('greeting:STATUS_ENABLED') : tr('greeting:STATUS_DISABLED') %>
                 </span>
               </label>
@@ -138,7 +140,7 @@
       <% const farewellMode = (settings.farewell.embed && (settings.farewell.embed.title || settings.farewell.embed.description)) ? 'embed' : 'text'; %>
       <div class="mb-3">
         <label class="form-label"><i class="fa-solid fa-toggle-on me-1"></i> Nachrichtentyp</label>
-        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+        <div class="btn-group btn-group-toggle" data-bs-toggle="buttons">
           <label class="btn btn-outline-warning btn-sm <%= farewellMode === 'text' ? 'active' : '' %>">
             <input type="radio" name="farewell_message_mode" value="text" <%= farewellMode === 'text' ? 'checked' : '' %>> <i class="fa-solid fa-align-left me-1"></i> Nachricht
           </label>
@@ -152,7 +154,7 @@
         <div class="mb-3">
           <label class="form-label"><i class="fa-solid fa-message me-1"></i> <%= tr('greeting:FAREWELL.MESSAGE') %></label>
           <textarea class="form-control msg-input" name="farewell_content" rows="3" data-preview-type="farewell"><%= settings.farewell.content || '' %></textarea>
-          <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+          <small class="form-text text-secondary"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
         </div>
       </div>
 
@@ -171,7 +173,8 @@
 
 <% } else if (type === 'dm_welcome') { %>
 <!-- ===== DM WELCOME ===== -->
-<div class="card card-outline card-info">
+<div class="card">
+    <div class="card-status-top bg-info"></div>
   <div class="card-body">
     <form id="dmWelcomeForm">
       <div class="alert alert-info">
@@ -180,12 +183,12 @@
 
       <div class="mb-3">
         <label class="form-label"><i class="fa-solid fa-circle-info me-1"></i> <%= tr('greeting:STATUS') %></label>
-        <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input" id="dmWelcomeEnabledToggle"
+        <div class="form-check form-switch">
+          <input type="checkbox" class="form-check-input" id="dmWelcomeEnabledToggle"
                  <%= settings.dm_welcome.enabled ? 'checked' : '' %>
                  onchange="toggleGreeting('dm_welcome', this.checked)">
-          <label class="custom-control-label" for="dmWelcomeEnabledToggle">
-            <span class="badge <%= settings.dm_welcome.enabled ? 'badge-success' : 'badge-secondary' %>">
+          <label class="form-check-label" for="dmWelcomeEnabledToggle">
+            <span class="badge <%= settings.dm_welcome.enabled ? 'bg-success-lt' : 'bg-secondary-lt' %>">
               <%= settings.dm_welcome.enabled ? tr('greeting:STATUS_ENABLED') : tr('greeting:STATUS_DISABLED') %>
             </span>
           </label>
@@ -196,7 +199,7 @@
       <% const dmMode = (settings.dm_welcome.embed && (settings.dm_welcome.embed.title || settings.dm_welcome.embed.description)) ? 'embed' : 'text'; %>
       <div class="mb-3">
         <label class="form-label"><i class="fa-solid fa-toggle-on me-1"></i> Nachrichtentyp</label>
-        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+        <div class="btn-group btn-group-toggle" data-bs-toggle="buttons">
           <label class="btn btn-outline-info btn-sm <%= dmMode === 'text' ? 'active' : '' %>">
             <input type="radio" name="dm_welcome_message_mode" value="text" <%= dmMode === 'text' ? 'checked' : '' %>> <i class="fa-solid fa-align-left me-1"></i> Nachricht
           </label>
@@ -210,7 +213,7 @@
         <div class="mb-3">
           <label class="form-label"><i class="fa-solid fa-envelope me-1"></i> <%= tr('greeting:DM_WELCOME.MESSAGE') %></label>
           <textarea class="form-control msg-input" name="dm_welcome_content" rows="3" data-preview-type="dm_welcome"><%= settings.dm_welcome.content || '' %></textarea>
-          <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+          <small class="form-text text-secondary"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
         </div>
       </div>
 
@@ -229,12 +232,13 @@
 
 <% } else if (type === 'autorole') { %>
 <!-- ===== AUTOROLE (Multi) ===== -->
-<div class="card card-outline card-success">
+<div class="card">
+    <div class="card-status-top bg-success"></div>
   <div class="card-body">
     <form id="autoroleForm">
       <div class="mb-3">
         <label class="form-label"><i class="fa-solid fa-user-shield me-1"></i> <%= tr('greeting:AUTOROLE_SELECT') %></label>
-        <p class="text-muted small"><%= tr('greeting:AUTOROLE_MULTI_HINT') %></p>
+        <p class="text-secondary small"><%= tr('greeting:AUTOROLE_MULTI_HINT') %></p>
         <select class="form-control" name="autorole_ids" multiple size="8">
           <% roles.forEach(role => { %>
             <option value="<%= role.id %>"
@@ -255,7 +259,7 @@
           <div class="mt-1">
             <% settings.autorole_ids.forEach(rid => { %>
               <% const roleName = (roles.find(r => r.id === rid) || {}).name || rid; %>
-              <span class="badge badge-info mr-1"><%= roleName %></span>
+              <span class="badge bg-info-lt me-1"><%= roleName %></span>
             <% }); %>
           </div>
         </div>
@@ -272,7 +276,8 @@
 
 <% } else if (type === 'boost') { %>
 <!-- ===== BOOST ===== -->
-<div class="card card-outline card-danger">
+<div class="card">
+    <div class="card-status-top bg-danger"></div>
   <div class="card-body">
     <form id="boostForm">
       <div class="alert alert-info">
@@ -291,12 +296,12 @@
         </div>
         <div class="col-md-6 mb-3">
           <label class="form-label"><i class="fa-solid fa-circle-info me-1"></i> <%= tr('greeting:STATUS') %></label>
-          <div class="custom-control custom-switch">
-            <input type="checkbox" class="custom-control-input" id="boostEnabledToggle"
+          <div class="form-check form-switch">
+            <input type="checkbox" class="form-check-input" id="boostEnabledToggle"
                    <%= settings.boost.enabled ? 'checked' : '' %>
                    onchange="toggleGreeting('boost', this.checked)">
-            <label class="custom-control-label" for="boostEnabledToggle">
-              <span class="badge <%= settings.boost.enabled ? 'badge-success' : 'badge-secondary' %>">
+            <label class="form-check-label" for="boostEnabledToggle">
+              <span class="badge <%= settings.boost.enabled ? 'bg-success-lt' : 'bg-secondary-lt' %>">
                 <%= settings.boost.enabled ? tr('greeting:STATUS_ENABLED') : tr('greeting:STATUS_DISABLED') %>
               </span>
             </label>
@@ -308,7 +313,7 @@
       <% const boostMode = (settings.boost.embed && (settings.boost.embed.title || settings.boost.embed.description)) ? 'embed' : 'text'; %>
       <div class="mb-3">
         <label class="form-label"><i class="fa-solid fa-toggle-on me-1"></i> Nachrichtentyp</label>
-        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+        <div class="btn-group btn-group-toggle" data-bs-toggle="buttons">
           <label class="btn btn-outline-danger btn-sm <%= boostMode === 'text' ? 'active' : '' %>">
             <input type="radio" name="boost_message_mode" value="text" <%= boostMode === 'text' ? 'checked' : '' %>> <i class="fa-solid fa-align-left me-1"></i> Nachricht
           </label>
@@ -322,7 +327,7 @@
         <div class="mb-3">
           <label class="form-label"><i class="fa-solid fa-rocket me-1"></i> <%= tr('greeting:BOOST.MESSAGE') %></label>
           <textarea class="form-control msg-input" name="boost_content" rows="3" data-preview-type="boost"><%= settings.boost.content || '' %></textarea>
-          <small class="form-text text-muted"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
+          <small class="form-text text-secondary"><%= tr('greeting:PLACEHOLDERS_HINT') %></small>
         </div>
       </div>
 
