@@ -1,34 +1,10 @@
 <!-- Addon Detail Page -->
-<div class="content-wrapper">
-    <!-- Content Header -->
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">
-                        <%= addon.name %>
-                    </h1>
-                </div>
-                <div class="col-sm-6">
-                    <ol class="breadcrumb float-sm-right">
-                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
-                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a></li>
-                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver/addons"><%= tr('gameserver:NAV.ADDONS') %></a></li>
-                        <li class="breadcrumb-item active"><%= addon.name %></li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Main content -->
-    <section class="content">
-        <div class="container-fluid">
 
             <!-- Hero Section -->
             <div class="row mb-4">
                 <div class="col-12">
-                    <div class="card card-outline">
+                    <div class="card">
                         <div class="card-status-top bg-primary"></div>
                         <div class="card-body">
                             <div class="row">
@@ -348,7 +324,7 @@
                                             </li>
                                             <li>
                                                 <strong>Source:</strong><br>
-                                                <span class="badge badge-<%= addon.source_type === 'pelican' ? 'info' : addon.source_type === 'custom' ? 'secondary' : 'dark' %>">
+                                                <span class="badge bg-<%= addon.source_type === 'pelican' ? 'info' : addon.source_type === 'custom' ? 'secondary' : 'dark' %>-lt">
                                                     <%= (addon.source_type || 'custom').toUpperCase() %>
                                                 </span>
                                             </li>
@@ -484,6 +460,3 @@
                 </div>
             </div>
 
-        </div>
-    </section>
-</div>

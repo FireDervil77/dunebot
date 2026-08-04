@@ -1,36 +1,5 @@
 <!-- RootServer Detail-Seite -->
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-6">
-                <h1 class="m-0">
-                    <i class="fa-solid fa-server me-2"></i>
-                    <%= rootserver.name %>
-                    <% if (isOnline) { %>
-                        <span class="badge bg-success-lt ms-2" style="font-size:0.6em;">
-                            <i class="fa-solid fa-circle me-1"></i>Online
-                        </span>
-                    <% } else { %>
-                        <span class="badge bg-secondary-lt ms-2" style="font-size:0.6em;">
-                            <i class="fa-solid fa-circle me-1"></i>Offline
-                        </span>
-                    <% } %>
-                </h1>
-            </div>
-            <div class="col-sm-6">
-                <ol class="breadcrumb float-sm-right">
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/dashboard">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver">Masterserver</a></li>
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver/rootservers">RootServer</a></li>
-                    <li class="breadcrumb-item active"><%= rootserver.name %></li>
-                </ol>
-            </div>
-        </div>
-    </div>
-</div>
 
-<section class="content">
-    <div class="container-fluid">
 
         <div class="row mb-3">
             <div class="col-12">
@@ -45,7 +14,8 @@
 
             <!-- CPU Widget -->
             <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card card-outline <%= isOnline ? 'card-success' : 'card-secondary' %> h-100 mb-0">
+                <div class="card h-100 mb-0">
+                    <div class="card-status-top bg-<%= isOnline ? 'success' : 'secondary' %>"></div>
                     <div class="card-header py-2 px-3">
                         <h3 class="card-title text-sm mb-0">
                             <i class="fa-solid fa-microchip me-1"></i>CPU
@@ -151,7 +121,7 @@
                     </div>
                     <div class="card-body text-center py-3">
                         <div class="mb-2">
-                            <span class="badge badge-<%= isOnline ? 'success' : 'secondary' %>" style="font-size:.9rem;padding:.4em .8em;">
+                            <span class="badge bg-<%= isOnline ? 'success' : 'secondary' %>-lt" style="font-size:.9rem;padding:.4em .8em;">
                                 <i class="fa-solid fa-circle me-1" style="font-size:.6rem;"></i><%= isOnline ? 'Online' : 'Offline' %>
                             </span>
                             <% if (rootserver.daemon_version) { %>
@@ -173,7 +143,7 @@
         </div>
 
         <!-- Tabs -->
-        <div class="card card-outline">
+        <div class="card">
             <div class="card-status-top bg-primary"></div>
             <div class="card-header p-0 pt-1">
                 <ul class="nav nav-tabs" id="rootserverTabs">
@@ -317,7 +287,7 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                             <% } %>
                                         </td>
                                         <td>
-                                            <span class="badge badge-<%= gsColor %>" data-gs-status>
+                                            <span class="badge bg-<%= gsColor %>-lt" data-gs-status>
                                                 <%= gs.status %>
                                             </span>
                                         </td>
@@ -454,7 +424,7 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                         <tr>
                                             <td class="text-secondary">Install-Status</td>
                                             <td>
-                                                <span class="badge badge-<%= rootserver.install_status === 'completed' ? 'success' : rootserver.install_status === 'pending' ? 'warning' : 'danger' %>">
+                                                <span class="badge bg-<%= rootserver.install_status === 'completed' ? 'success' : rootserver.install_status === 'pending' ? 'warning' : 'danger' %>-lt">
                                                     <%= rootserver.install_status || 'unknown' %>
                                                 </span>
                                             </td>
@@ -612,8 +582,6 @@ sudo journalctl -u firebot-daemon -f</code></pre>
             </div>
         </div>
 
-    </div>
-</section>
 
 <!-- Live-Widget Script -->
 <script>
@@ -710,7 +678,7 @@ sudo journalctl -u firebot-daemon -f</code></pre>
             const statusEl = row.querySelector('[data-gs-status]');
             if (statusEl) {
                 const colors = { online: 'success', offline: 'secondary', starting: 'warning', stopping: 'warning', error: 'danger' };
-                statusEl.className = 'badge badge-' + (colors[data.status] || 'secondary');
+                statusEl.className = 'badge bg-' + (colors[data.status] || 'secondary' + '-lt');
                 statusEl.textContent = data.status;
             }
         }

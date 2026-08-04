@@ -1,32 +1,9 @@
 <!-- Addon Editor — FIREBOT_v2 -->
-<div class="content-wrapper">
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">
-                        <i class="fa-solid fa-<%= mode === 'edit' ? 'edit' : 'plus' %>"></i>
-                        <%= mode === 'edit' ? tr('gameserver:ADDON_EDITOR.TITLE_EDIT') : tr('gameserver:ADDON_EDITOR.TITLE_CREATE') %>
-                    </h1>
-                </div>
-                <div class="col-sm-6">
-                    <ol class="breadcrumb float-sm-right">
-                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
-                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a></li>
-                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/gameserver/addons/my-addons"><%= tr('gameserver:NAV.MY_ADDONS') %></a></li>
-                        <li class="breadcrumb-item active"><%= mode === 'edit' ? tr('gameserver:ADDON_EDITOR.TITLE_EDIT') : tr('gameserver:ADDON_EDITOR.TITLE_CREATE') %></li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <section class="content">
-        <div class="container-fluid">
 
             <% if (mode === 'create') { %>
             <!-- Template Selection (nur Create) -->
-            <div class="card card-outline mb-4">
+            <div class="card mb-4">
                 <div class="card-status-top bg-info"></div>
                 <div class="card-header">
                     <h3 class="card-title">
@@ -473,11 +450,18 @@
 
                 </div><!-- /row -->
             </form>
-        </div>
-    </section>
-</div>
 
 <script>
+/**
+ * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
+ * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
+ * Aufruf warf, und alles danach im selben Block lief nicht mehr.
+ */
+function fenster(id) {
+    const el = document.getElementById(id);
+    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+}
+
 // ── Initiale Daten vom Server ──────────────────────────────────────────────────
 const INITIAL_GAME_DATA = <%- JSON.stringify(gameData || {}) %>;
 const EDITOR_MODE = '<%= mode %>';
@@ -800,7 +784,7 @@ function renderConfigFiles() {
         const parser = cfg.parser || 'file';
         const find   = cfg.find   || {};
         const card   = document.createElement('div');
-        card.className = 'config-file-card card card-outline card-warning mb-3';
+        card.className = 'config-file-card card border-warning mb-3';
         card.innerHTML = `
             <div class="card-header py-2">
                 <div class="row align-items-center">
@@ -916,19 +900,19 @@ function renderTemplates() {
     const templates = INITIAL_GAME_DATA.templates || [];
     templates.forEach((tpl, idx) => {
         const card = document.createElement('div');
-        card.className = 'tpl-card card card-outline card-info mb-3';
+        card.className = 'tpl-card card border-info mb-3';
         card.dataset.idx = idx;
 
         const varsHtml = Object.entries(tpl.variables || {}).map(([k, v]) =>
             `<div class="input-group input-group-sm mb-1 tpl-var-row">
                 <input type="text" class="form-control font-monospace tpl-var-key" value="${escHtml(k)}" placeholder="ENV_KEY">
                 <input type="text" class="form-control font-monospace tpl-var-val" value="${escHtml(v)}" placeholder="Wert">
-                <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-var"><i class="fa-solid fa-times"></i></button></div>
+                <button type="button" class="btn btn-outline-danger tpl-remove-var"><i class="fa-solid fa-times"></i></button>
             </div>`
         ).join('');
 
         const ovHtml = Object.entries(tpl.config_overrides || {}).map(([fname, keys]) =>
-            `<div class="tpl-ov-file card card-outline card-secondary mb-2">
+            `<div class="tpl-ov-file card mb-2">
                 <div class="card-header py-1">
                     <input type="text" class="form-control form-control-sm font-monospace tpl-ov-filename" value="${escHtml(fname)}" placeholder="config/server.cfg">
                     <div class="card-actions"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
@@ -937,7 +921,7 @@ function renderTemplates() {
                     `<div class="input-group input-group-sm mb-1 tpl-ov-row">
                         <input type="text" class="form-control font-monospace tpl-ov-key" value="${escHtml(k)}" placeholder="key">
                         <input type="text" class="form-control font-monospace tpl-ov-val" value="${escHtml(v)}" placeholder="value">
-                        <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-ov"><i class="fa-solid fa-times"></i></button></div>
+                        <button type="button" class="btn btn-outline-danger tpl-remove-ov"><i class="fa-solid fa-times"></i></button>
                     </div>`
                 ).join('')}</div>
                 <div class="card-footer py-1"><button type="button" class="btn btn-sm btn-outline-success tpl-add-ov-key"><i class="fa-solid fa-plus"></i> Key</button></div>
@@ -978,7 +962,7 @@ function bindTemplateEvents() {
         vc.insertAdjacentHTML('beforeend', `<div class="input-group input-group-sm mb-1 tpl-var-row">
             <input type="text" class="form-control font-monospace tpl-var-key" value="" placeholder="ENV_KEY">
             <input type="text" class="form-control font-monospace tpl-var-val" value="" placeholder="Wert">
-            <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-var"><i class="fa-solid fa-times"></i></button></div>
+            <button type="button" class="btn btn-outline-danger tpl-remove-var"><i class="fa-solid fa-times"></i></button>
         </div>`);
         bindTemplateEvents();
     }));
@@ -990,7 +974,7 @@ function bindTemplateEvents() {
             ? this.closest('.card-body').querySelector('.tpl-overrides-container')
             : this.previousElementSibling;
         if (!oc) return;
-        oc.insertAdjacentHTML('beforeend', `<div class="tpl-ov-file card card-outline card-secondary mb-2">
+        oc.insertAdjacentHTML('beforeend', `<div class="tpl-ov-file card mb-2">
             <div class="card-header py-1">
                 <input type="text" class="form-control form-control-sm font-monospace tpl-ov-filename" value="" placeholder="config/server.cfg">
                 <div class="card-actions"><button type="button" class="btn btn-sm btn-outline-danger tpl-remove-ov-file"><i class="fa-solid fa-trash"></i></button></div>
@@ -1008,7 +992,7 @@ function bindTemplateEvents() {
         kc.insertAdjacentHTML('beforeend', `<div class="input-group input-group-sm mb-1 tpl-ov-row">
             <input type="text" class="form-control font-monospace tpl-ov-key" value="" placeholder="key">
             <input type="text" class="form-control font-monospace tpl-ov-val" value="" placeholder="value">
-            <div class="input-group-append"><button type="button" class="btn btn-outline-danger tpl-remove-ov"><i class="fa-solid fa-times"></i></button></div>
+            <button type="button" class="btn btn-outline-danger tpl-remove-ov"><i class="fa-solid fa-times"></i></button>
         </div>`);
         bindTemplateEvents();
     }));
@@ -1226,7 +1210,7 @@ function openMediaPicker(targetInputId) {
     _mediaPickerSearch = '';
     document.getElementById('media-picker-search').value = '';
     loadMediaPickerItems();
-    $('#mediaPickerModal').modal('show');
+    fenster('mediaPickerModal')?.show();
 }
 
 // ── Medien laden (AJAX) ──
@@ -1284,7 +1268,7 @@ function selectMediaItem(url) {
         updateMediaPreview(_mediaPickerTarget);
         updateJSONPreview();
     }
-    $('#mediaPickerModal').modal('hide');
+    fenster('mediaPickerModal')?.hide();
 }
 
 // ── Suche mit Debounce ──

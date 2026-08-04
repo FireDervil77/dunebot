@@ -5,28 +5,8 @@
  */
 %>
 
-<!-- Content Header -->
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-6">
-                <h1 class="m-0">
-                    <i class="fas fa-tachometer-alt me-2"></i>Ressourcen-Management
-                </h1>
-            </div>
-            <div class="col-sm-6">
-                <ol class="breadcrumb float-sm-right">
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver">Masterserver</a></li>
-                    <li class="breadcrumb-item active">Ressourcen</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Main Content -->
-<section class="content">
-    <div class="container-fluid">
 
         <% if (!nodes || nodes.length === 0) { %>
         <div class="alert alert-warning">
@@ -44,7 +24,8 @@
             const cpuBarClass  = u.cpuPct  >= 90 ? 'danger' : u.cpuPct  >= 75 ? 'warning' : 'success';
         %>
 
-        <div class="card card-outline <%= isOnline ? 'card-success' : 'card-secondary' %> mb-4">
+        <div class="card mb-4">
+            <div class="card-status-top bg-<%= isOnline ? 'success' : 'secondary' %>"></div>
 
             <!-- Card Header -->
             <div class="card-header">
@@ -328,8 +309,6 @@
 
         <% }); %>
 
-    </div><!-- /.container-fluid -->
-</section>
 
 <!-- ── JavaScript ── -->
 <script>

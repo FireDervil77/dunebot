@@ -215,7 +215,7 @@ function renderToastTable(toasts) {
         return `
             <tr data-toast-id="${toast.id}">
                 <td><small>${timestamp}</small></td>
-                <td><span class="badge badge-${typeBadge}">${typeIcon} ${typeName}</span></td>
+                <td><span class="badge bg-${typeBadge}-lt">${typeIcon} ${typeName}</span></td>
                 <td>${toast.message}</td>
                 <td><small><code>${urlPath}</code></small></td>
                 <td>${metadataHtml}</td>

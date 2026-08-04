@@ -132,6 +132,16 @@
 </div>
 
 <script>
+/**
+ * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
+ * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
+ * Aufruf warf, und alles danach im selben Block lief nicht mehr.
+ */
+function fenster(id) {
+    const el = document.getElementById(id);
+    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+}
+
 (function() {
     const GUILD_ID  = '<%= guildId %>';
     const SERVER_ID = '<%= server.id %>';
@@ -240,7 +250,7 @@
         document.getElementById('cronjobRunOnce').checked = false;
         document.getElementById('cronjobEnabled').checked = true;
         toggleCommandField();
-        $('#cronjobModal').modal('show');
+        fenster('cronjobModal')?.show();
     };
 
     window.editCronjob = function(job) {
@@ -254,7 +264,7 @@
         document.getElementById('cronjobRunOnce').checked = !!job.run_once;
         document.getElementById('cronjobEnabled').checked = !!job.enabled;
         toggleCommandField();
-        $('#cronjobModal').modal('show');
+        fenster('cronjobModal')?.show();
     };
 
     window.saveCronjob = async function() {
@@ -292,7 +302,7 @@
                 body: JSON.stringify({ name, cron_expr, action, command, run_once, enabled })
             });
             const data = await resp.json();
-            $('#cronjobModal').modal('hide');
+            fenster('cronjobModal')?.hide();
             if (data.success) {
                 if (typeof showToast === 'function') showToast('success', editId ? 'Cronjob aktualisiert' : 'Cronjob erstellt');
                 loadCronjobs();

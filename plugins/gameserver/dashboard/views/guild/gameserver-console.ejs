@@ -17,39 +17,12 @@ const server = locals.server; // Server-Daten vom Backend
 const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, etc.)
 %>
 
-<div class="content-wrapper">
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">
-                        <i class="fas fa-terminal"></i> 
-                        Live Console - <%= server.name %>
-                    </h1>
-                </div>
-                <div class="col-sm-6">
-                    <div class="float-end">
-                        <!-- Status Badge -->
-                        <span class="badge badge-<%= server.status === 'online' ? 'success' : server.status === 'starting' ? 'warning' : 'secondary' %> me-2">
-                            <i class="fas fa-circle"></i> 
-                            <%= server.status.toUpperCase() %>
-                        </span>
-                        
-                        <!-- Connection Status -->
-                        <span id="connection-status" class="badge bg-secondary-lt">
-                            <i class="fas fa-plug"></i> Disconnected
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div class="content">
         <div class="container-fluid">
             
             <!-- Console Card -->
-            <div class="card card-outline">
+            <div class="card">
                 <div class="card-status-top bg-dark"></div>
                 <div class="card-header">
                     <h3 class="card-title">
@@ -167,7 +140,6 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
             
         </div>
     </div>
-</div>
 
 <!-- xterm.js CSS + JS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
@@ -503,10 +475,9 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
     
     function updateConnectionStatus(status, text) {
         const badge = document.getElementById('connection-status');
-        badge.className = 'badge badge-' + 
-            (status === 'connected' ? 'success' : 
+        badge.className = 'badge bg-' + (status === 'connected' ? 'success' : 
              status === 'connecting' ? 'warning' : 
-             status === 'error' ? 'danger' : 'secondary');
+             status === 'error' ? 'danger' : 'secondary' + '-lt');
         badge.innerHTML = '<i class="fas fa-' + 
             (status === 'connected' ? 'check-circle' : 
              status === 'connecting' ? 'spinner fa-spin' : 

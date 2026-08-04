@@ -46,7 +46,7 @@
                             <% changelogs.forEach(changelog => { %>
                                 <tr>
                                     <td>
-                                        <span class="badge badge-<%= changelog.type === 'major' ? 'danger' : changelog.type === 'minor' ? 'warning' : 'info' %> badge-lg">
+                                        <span class="badge bg-<%= changelog.type === 'major' ? 'danger' : changelog.type === 'minor' ? 'warning' : 'info' %>-lt badge-lg">
                                             v<%= changelog.version %>
                                         </span>
                                     </td>

@@ -274,6 +274,16 @@
 </div>
 
 <script>
+/**
+ * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
+ * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
+ * Aufruf warf, und alles danach im selben Block lief nicht mehr.
+ */
+function fenster(id) {
+    const el = document.getElementById(id);
+    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+}
+
 async function savePorts() {
     const btn = document.getElementById('ports-save-btn');
     const inputs = document.querySelectorAll('.port-input');
@@ -295,7 +305,7 @@ async function savePorts() {
         const r = await resp.json();
         if (r.success) {
             toastr.success('Ports gespeichert – wird beim nächsten Start wirksam.');
-            $('#portsEditModal').modal('hide');
+            fenster('portsEditModal')?.hide();
             // Port-Anzeige aktualisieren ohne Reload
             Object.entries(ports).forEach(([k, v]) => {
                 if (k === 'game') document.querySelector('[data-port-game]') && (document.querySelector('[data-port-game]').textContent = v);

@@ -16,29 +16,7 @@
 <!-- Gameserver Plugin Styles -->
 <link rel="stylesheet" href="/assets/plugins/gameserver/css/gameserver.css">
 
-<div class="content-wrapper">
     <!-- Header -->
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">
-                        <i class="bi bi-server"></i> Gameserver
-                    </h1>
-                </div>
-                <div class="col-sm-6">
-                    <div class="float-end">
-                        <% if (userPermissions.permissions['GAMESERVER.CREATE']) { %>
-                            <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1" 
-                               class="btn btn-primary">
-                                <i class="bi bi-plus-circle"></i> Neuer Server
-                            </a>
-                        <% } %>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Content -->
     <div class="content">
@@ -147,7 +125,6 @@
 
         </div>
         </div>
-</div>
 
 <!-- ✅ Scripts werden über AssetManager geladen (gameserver-sse, gameserver-actions, gameserver-overview) -->
 <script>

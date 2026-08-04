@@ -171,7 +171,7 @@
                   %>
                     <tr class="log-row" data-log-index="<%= index %>">
                       <td>
-                        <span class="badge badge-<%= levelColor %>">
+                        <span class="badge bg-<%= levelColor %>-lt">
                           <i class="fa-solid <%= levelIcon %>"></i>
                           <%= log.level.toUpperCase() %>
                         </span>
@@ -267,6 +267,16 @@
 
 <!-- Scripts -->
 <script>
+/**
+ * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
+ * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
+ * Aufruf warf, und alles danach im selben Block lief nicht mehr.
+ */
+function fenster(id) {
+    const el = document.getElementById(id);
+    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+}
+
 const logsData = <%- JSON.stringify(logs) %>;
 
 function showLogDetails(index) {
@@ -294,7 +304,7 @@ function showLogDetails(index) {
         </tr>
         <tr>
           <th>Level:</th>
-          <td><span class="badge badge-${levelColor}">${log.level.toUpperCase()}</span></td>
+          <td><span class="badge bg-${levelColor}-lt">${log.level.toUpperCase()}</span></td>
         </tr>
         <tr>
           <th>Timestamp:</th>
@@ -318,7 +328,7 @@ function showLogDetails(index) {
   `;
   
   document.getElementById('logDetailsContent').innerHTML = content;
-  $('#logDetailsModal').modal('show');
+  fenster('logDetailsModal')?.show();
 }
 
 function exportLogs() {

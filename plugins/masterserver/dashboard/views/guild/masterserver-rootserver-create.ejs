@@ -1,27 +1,5 @@
 <!-- RootServer erstellen – Wizard -->
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-6">
-                <h1 class="m-0">
-                    <i class="fa-solid fa-server me-2"></i>
-                    RootServer hinzufügen
-                </h1>
-            </div>
-            <div class="col-sm-6">
-                <ol class="breadcrumb float-sm-right">
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/dashboard">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver">Masterserver</a></li>
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver/rootservers">RootServer</a></li>
-                    <li class="breadcrumb-item active">Erstellen</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-</div>
 
-<section class="content">
-    <div class="container-fluid">
 
         <div class="row mb-3">
             <div class="col-12">
@@ -56,7 +34,7 @@
               data-loading-toast-message="⚙️ RootServer wird angelegt...">
 
             <!-- Basis-Informationen -->
-            <div class="card card-outline">
+            <div class="card">
                 <div class="card-status-top bg-primary"></div>
                 <div class="card-header">
                     <h3 class="card-title">
@@ -135,7 +113,7 @@
             </div>
 
             <!-- Netzwerk -->
-            <div class="card card-outline mt-3">
+            <div class="card mt-3">
                 <div class="card-status-top bg-primary"></div>
                 <div class="card-header">
                     <h3 class="card-title">
@@ -236,7 +214,7 @@
             </div>
 
             <!-- Hardware -->
-            <div class="card card-outline mt-3">
+            <div class="card mt-3">
                 <div class="card-status-top bg-primary"></div>
                 <div class="card-header">
                     <h3 class="card-title">
@@ -274,7 +252,7 @@
             </div>
 
             <!-- Standort (optional) -->
-            <div class="card card-outline mt-3">
+            <div class="card mt-3">
                 <div class="card-status-top bg-primary"></div>
                 <div class="card-header">
                     <h3 class="card-title">
@@ -315,8 +293,6 @@
             </div>
 
         </form>
-    </div>
-</section>
 
 <!-- ============================================================
      SETUP-MODAL – wird nach erfolgreicher Erstellung befüllt

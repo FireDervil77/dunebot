@@ -118,7 +118,7 @@
                                         <% } %>
                                     </td>
                                     <td>
-                                        <span class="badge badge-<%= n.status === 'published' ? 'success' : 'warning' %>">
+                                        <span class="badge bg-<%= n.status === 'published' ? 'success' : 'warning' %>-lt">
                                             <%= n.status || 'draft' %>
                                         </span>
                                     </td>
@@ -186,7 +186,7 @@
                                     </td>
                                     <td><span class="badge badge-secondary"><%= p.category || 'gaming' %></span></td>
                                     <td>
-                                        <span class="badge badge-<%= p.status === 'published' ? 'success' : 'warning' %>">
+                                        <span class="badge bg-<%= p.status === 'published' ? 'success' : 'warning' %>-lt">
                                             <%= p.status || 'draft' %>
                                         </span>
                                     </td>
@@ -242,12 +242,12 @@
                             <tbody>
                             <% changelogsList.forEach(c => { %>
                                 <tr>
-                                    <td><span class="badge badge-<%= c.typeBadge?.color || 'secondary' %>">v<%= c.version %></span></td>
+                                    <td><span class="badge bg-<%= c.typeBadge?.color || 'secondary' %>-lt">v<%= c.version %></span></td>
                                     <td><strong><%= c.title || 'Ohne Titel' %></strong></td>
                                     <td><%= c.type || 'minor' %></td>
                                     <td><%= c.component || 'system' %></td>
                                     <td>
-                                        <span class="badge badge-<%= c.status === 'published' ? 'success' : 'warning' %>">
+                                        <span class="badge bg-<%= c.status === 'published' ? 'success' : 'warning' %>-lt">
                                             <%= c.status || 'draft' %>
                                         </span>
                                     </td>

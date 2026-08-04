@@ -1,25 +1,5 @@
 <!-- RootServer Übersicht -->
-<div class="content-header">
-    <div class="container-fluid">
-        <div class="row mb-2">
-            <div class="col-sm-6">
-                <h1 class="m-0">
-                    <i class="fa-solid fa-server me-2"></i>RootServer
-                </h1>
-            </div>
-            <div class="col-sm-6">
-                <ol class="breadcrumb float-sm-right">
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/dashboard">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="/guild/<%= guildId %>/plugins/masterserver">Masterserver</a></li>
-                    <li class="breadcrumb-item active">RootServer</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-</div>
 
-<section class="content">
-    <div class="container-fluid">
 
         <!-- Stats-Leiste -->
         <div class="row mb-3">
@@ -115,17 +95,19 @@
                         const diskPct = (diskUsed && diskTot && parseFloat(diskTot) > 0) ? Math.round(parseFloat(diskUsed)/parseFloat(diskTot)*100) : null;
                     %>
                     <div class="col-lg-4 col-md-6">
-                        <div class="card card-outline <%= rs.isOnline ? 'card-success' : 'card-secondary' %>"
+                        <div class="card"
                              id="rs-card-<%= rs.id %>"
                              data-rs-id="<%= rs.id %>"
                              data-online="<%= rs.isOnline ? '1' : '0' %>">
+                            <%# Der Streifen traegt den Zustand; das Skript unten faerbt ihn um. %>
+                            <div class="card-status-top bg-<%= rs.isOnline ? 'success' : 'secondary' %>" id="rs-status-<%= rs.id %>"></div>
                             <div class="card-header">
                                 <h3 class="card-title">
                                     <i class="fa-solid fa-server me-1"></i>
                                     <%= rs.name %>
                                 </h3>
                                 <div class="card-actions">
-                                    <span class="badge badge-<%= rs.isOnline ? 'success' : 'secondary' %>"
+                                    <span class="badge bg-<%= rs.isOnline ? 'success' : 'secondary' %>-lt"
                                           id="rs-badge-<%= rs.id %>">
                                         <i class="fa-solid fa-circle me-1" style="font-size:.6em;"></i>
                                         <span id="rs-badge-txt-<%= rs.id %>"><%= rs.isOnline ? 'Online' : 'Offline' %></span>
@@ -228,8 +210,6 @@
             </div>
         <% } %>
 
-    </div>
-</section>
 
 <!-- Live-Stats Poll -->
 <script>
@@ -264,12 +244,14 @@
 
         // Badge + Card-Border
         if (badge) {
-            badge.className = 'badge badge-' + (online ? 'success' : 'secondary');
+            badge.className = 'badge bg-' + (online ? 'success' : 'secondary') + '-lt';
         }
         if (badgeTxt) badgeTxt.textContent = online ? 'Online' : 'Offline';
-        if (card) {
-            card.classList.remove('card-success', 'card-secondary');
-            card.classList.add(online ? 'card-success' : 'card-secondary');
+        // Statusstreifen oben auf der Karte — Tabler kennt keine farbigen
+        // Kartenklassen, die Farbe traegt ein eigenes Kind.
+        const streifen = document.getElementById('rs-status-' + rsId);
+        if (streifen) {
+            streifen.className = 'card-status-top bg-' + (online ? 'success' : 'secondary');
         }
 
         if (!hw) return;

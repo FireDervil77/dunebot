@@ -278,8 +278,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <strong>${questName}</strong>
                         ${quest.chain_name_en ? `<br><small class="text-secondary"><i class="fa-solid fa-link"></i> ${quest.chain_name_de || quest.chain_name_en} (${quest.quest_chain_position || '?'}/${quest.total_quests || '?'})</small>` : ''}
                     </td>
-                    <td><span class="badge badge-${typeColor}">${quest.quest_type}</span></td>
-                    <td><span class="badge badge-${factionColor}">${quest.faction}</span></td>
+                    <td><span class="badge bg-${typeColor}-lt">${quest.quest_type}</span></td>
+                    <td><span class="badge bg-${factionColor}-lt">${quest.faction}</span></td>
                     <td>
                         ${npcName}
                         <br><small class="text-secondary"><i class="fa-solid fa-map-marker-alt"></i> ${location}</small>

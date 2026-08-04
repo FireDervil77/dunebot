@@ -81,6 +81,16 @@
 </div>
 
 <script>
+/**
+ * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
+ * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
+ * Aufruf warf, und alles danach im selben Block lief nicht mehr.
+ */
+function fenster(id) {
+    const el = document.getElementById(id);
+    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+}
+
 (function() {
     const GUILD_ID    = '<%= guildId %>';
     const SERVER_ID   = '<%= server.id %>';
@@ -172,7 +182,7 @@
     window.createBackup = function() {
         if (!CAN_CREATE) return;
         document.getElementById('backupNote').value = '';
-        $('#backupNoteModal').modal('show');
+        fenster('backupNoteModal')?.show();
     };
 
     window.confirmCreateBackup = async function() {
@@ -189,7 +199,7 @@
             });
             const data = await resp.json();
 
-            $('#backupNoteModal').modal('hide');
+            fenster('backupNoteModal')?.hide();
 
             if (data.success) {
                 if (typeof showToast === 'function') showToast('success', 'Backup gestartet');

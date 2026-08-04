@@ -1,28 +1,5 @@
 <!-- Gameserver Dashboard -->
-<div class="content-wrapper">
-    <!-- Content Header -->
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">
-                        <i class="fa-solid fa-server"></i> 
-                        <%= tr('gameserver:DASHBOARD.TITLE') %>
-                    </h1>
-                </div>
-                <div class="col-sm-6">
-                    <ol class="breadcrumb float-sm-right">
-                        <li class="breadcrumb-item"><a href="/guild/<%= guildId %>"><%= tr('core:NAV.DASHBOARD') %></a></li>
-                        <li class="breadcrumb-item active"><%= tr('gameserver:NAV.GAMESERVER') %></li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Main content -->
-    <section class="content">
-        <div class="container-fluid">
             
             <!-- Quick Action Buttons -->
             <div class="row mb-3">
@@ -298,9 +275,6 @@
                 </div>
             </div>
 
-        </div>
-    </section>
-</div>
 
 <!-- ✅ SSE-Script wird über AssetManager geladen (enqueueScript in Route) -->
 <script>
