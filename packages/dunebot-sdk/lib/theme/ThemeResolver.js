@@ -143,6 +143,22 @@ class ThemeResolver {
     }
 
     /**
+     * Dateipfad eines Theme-Assets entlang der Kette — Gegenstück zu
+     * `resolveAssetUrl`, nur eben auf der Festplatte.
+     *
+     * @param {string} assetPath - z. B. 'js/guild.js'
+     * @param {string[]} [chain]
+     * @returns {string|null}
+     */
+    resolveAssetPath(assetPath, chain = this.manager._themeChain) {
+        for (const themeName of chain) {
+            const pfad = path.join(this.manager.PathConfig.getPath('theme', themeName).assets, assetPath);
+            if (fs.existsSync(pfad)) return pfad;
+        }
+        return null;
+    }
+
+    /**
      * Template-Hierarchie für eine View aufbauen (WordPress-Stil).
      *
      * @param {string} view    - Basis-View-Name (z.B. 'guild/settings')

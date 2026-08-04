@@ -120,7 +120,7 @@ const _bekannt = _bereiche.map(b => b.id);
         <% if (_heimatlos.length > 0) { %>
           <div class="row g-3 mb-3" data-widget-area="unbekannt">
             <% _heimatlos.forEach(widget => { %>
-              <div class="col-md-<%= widget.size || 12 %>">
+              <div class="col-md-<%= widget.size || 12 %>" data-widget-id="<%= widget.id %>" data-widget-hidden="0">
                 <%- _widgetCard(widget) %>
               </div>
             <% }); %>

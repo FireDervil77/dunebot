@@ -142,7 +142,7 @@ class AssetManager {
             handle,
             src: this._resolveAssetPath(src, options.plugin, 'js'),
             deps: options.deps || [],
-            version: options.version || '1.0.0',
+            version: this._dateiVersion(src, 'js') || options.version || '1.0.0',
             inFooter: options.inFooter !== false,
             plugin: options.plugin,
             localize: options.localize,
@@ -187,7 +187,7 @@ class AssetManager {
             handle,
             src: this._resolveAssetPath(src, options.plugin, 'css'),
             deps: options.deps || [],
-            version: options.version || '1.0.0',
+            version: this._dateiVersion(src, 'css') || options.version || '1.0.0',
             media: options.media || 'all',
             plugin: options.plugin,
             type: 'style',
@@ -463,6 +463,42 @@ class AssetManager {
      * @param {string} version
      * @returns {string}
      */
+    /**
+     * Version eines Theme-Assets aus seiner Dateizeit ableiten.
+     *
+     * Theme-Dateien werden 24 Stunden zwischengespeichert. Steht in der URL
+     * eine feste Version (`?ver=1.0.0`), bekommt der Browser nach einer
+     * Aenderung tagelang die alte Datei — man muesste bei jeder Bearbeitung
+     * daran denken, die Theme-Version hochzuzaehlen. Die Dateizeit erledigt
+     * das von selbst: Sie aendert sich beim Speichern, und der naechste Start
+     * liefert damit eine neue URL.
+     *
+     * Gilt nur fuer Dateien, die uns gehoeren. Fremdbibliotheken behalten ihre
+     * echte Versionsnummer — die ist dort aussagekraeftiger.
+     *
+     * @private
+     * @param {string} src - relativer Name, wie beim Anmelden angegeben
+     * @param {string} type - 'js' oder 'css'
+     * @returns {string|null}
+     */
+    _dateiVersion(src, type) {
+        if (!src || src.startsWith('/') || src.startsWith('http')) return null;
+
+        const themeManager = ServiceManager.get('themeManager');
+        if (!themeManager?.resolver?.resolveAssetPath) return null;
+
+        try {
+            const pfad = themeManager.resolver.resolveAssetPath(
+                `${type}/${src}`,
+                themeManager._registeringChain || undefined
+            );
+            if (!pfad) return null;
+            return String(Math.floor(require('fs').statSync(pfad).mtimeMs));
+        } catch {
+            return null;
+        }
+    }
+
     _withVersion(src, version) {
         if (!version) return src;
         return `${src}${src.includes('?') ? '&' : '?'}ver=${version}`;
