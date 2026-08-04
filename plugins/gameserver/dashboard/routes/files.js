@@ -13,11 +13,44 @@ const multer = require('multer');
 const path = require('path');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
-// File-Upload konfigurieren (Max 500MB, Memory-Storage)
+/**
+ * Groesste Datei, die durch die Daemon-Verbindung passt.
+ *
+ * Der Inhalt geht base64-kodiert in EINER WebSocket-Nachricht zum Daemon, wird
+ * dabei also um ein Drittel groesser. Die Nachrichtengrenze liegt bei 64 MiB
+ * (MAX_NACHRICHT_BYTES im IPMServer, MaxNachrichtBytes im Daemon) — 45 MB
+ * Rohgroesse landen bei rund 60 MiB und bleiben sicher darunter.
+ *
+ * Bis zum 2026-08-04 stand hier 500 MB. Das war eine Zusage, die die Leitung
+ * nicht halten konnte: Ueberschreitet eine Nachricht die Grenze der Gegenseite,
+ * schliesst diese die Verbindung (Status 1009), statt zu antworten. Der Daemon
+ * verschwand also mitten im Upload und galt als offline.
+ */
+const MAX_UPLOAD_BYTES = 45 * 1024 * 1024;
+
+/**
+ * Upload-Middleware mit verstaendlicher Fehlermeldung.
+ *
+ * Ohne diesen Mantel landet ein zu grosser Upload als MulterError im
+ * allgemeinen Fehlerpfad — der Nutzer sieht einen 500er ohne Grund.
+ */
+function nimmDatei(req, res, next) {
+    upload.single('file')(req, res, (err) => {
+        if (err && err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({
+                success: false,
+                error: `Datei zu gross. Ueber die Daemon-Verbindung passen hoechstens ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`
+            });
+        }
+        if (err) return next(err);
+        next();
+    });
+}
+
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { 
-        fileSize: 500 * 1024 * 1024,  // 500MB
+    limits: {
+        fileSize: MAX_UPLOAD_BYTES,
         files: 1
     }
 });
@@ -197,6 +230,17 @@ router.post('/servers/:serverId/files/write', requirePermission('GAMESERVER.FILE
         }
 
         const contentBase64 = Buffer.from(content, 'utf8').toString('base64');
+
+        // Dieselbe Grenze wie beim Upload: Der Inhalt geht in einer einzigen
+        // Nachricht zum Daemon. Wird sie zu gross, schliesst die Gegenseite die
+        // Verbindung, statt zu antworten.
+        if (Buffer.byteLength(contentBase64) > MAX_UPLOAD_BYTES) {
+            return res.status(413).json({
+                success: false,
+                error: `Datei zu gross zum Speichern (Grenze: ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB).`
+            });
+        }
+
         
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.write', {
             server_id: serverId.toString(),
@@ -433,7 +477,7 @@ router.post('/servers/:serverId/files/bulk-move', requirePermission('GAMESERVER.
     }
 });
 
-router.post('/servers/:serverId/files/upload', requirePermission('GAMESERVER.FILES.MANAGE'), upload.single('file'), async (req, res) => {
+router.post('/servers/:serverId/files/upload', requirePermission('GAMESERVER.FILES.MANAGE'), nimmDatei, async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');
     try {

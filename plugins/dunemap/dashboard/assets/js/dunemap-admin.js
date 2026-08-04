@@ -95,7 +95,7 @@
       const markerList = document.getElementById('markerList');
       
       if (sectorMarkers.length === 0) {
-        markerList.innerHTML = '<p class="text-muted small">Keine Marker</p>';
+        markerList.innerHTML = '<p class="text-secondary small">Keine Marker</p>';
       } else {
         markerList.innerHTML = sectorMarkers.map(m => `
           <div class="d-flex align-items-center justify-content-between mb-2 p-2 bg-light rounded">

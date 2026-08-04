@@ -1,4 +1,19 @@
 /**
+ * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
+ *
+ * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
+ * Aufruf wirft, und alles danach im selben Block laeuft nicht mehr.
+ *
+ * @param {string|Element} ziel - id (mit oder ohne #) oder das Element selbst
+ */
+function fenster(ziel) {
+    const el = typeof ziel === 'string'
+        ? document.getElementById(ziel.replace(/^#/, ''))
+        : ziel;
+    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+}
+
+/**
  * Guild-AJAX-Handler
  * Universeller Handler für alle AJAX-Aktionen im Guild-Dashboard
  * @author FireDervil
@@ -353,7 +368,7 @@ class GuildAjaxHandler {
             this.showToast('success', result.message || 'Benutzer erfolgreich hinzugefügt');
             
             // Modal schließen (Bootstrap 4 API)
-            $('#addStaffModal').modal('hide');
+            fenster('#addStaffModal')?.hide();
             
             // Formular zurücksetzen
             form.reset();
@@ -565,8 +580,9 @@ class GuildAjaxHandler {
                 }
 
                 // Modal anzeigen
-                $(modal).modal({ backdrop: 'static', keyboard: false });
-                $(modal).modal('show');
+                modal.setAttribute('data-bs-backdrop', 'static');
+                modal.setAttribute('data-bs-keyboard', 'false');
+                fenster(modal)?.show();
             } else {
                 // Kein Modal → direkt weiterleiten
                 const url = result.data?.redirectUrl;
@@ -848,7 +864,7 @@ class GuildAjaxHandler {
         if (result.success) {
             this.showToast('success', result.message || 'Gruppe erfolgreich erstellt');
             // Modal schließen (Bootstrap 4 API)
-            $('#createGroupModal').modal('hide');
+            fenster('#createGroupModal')?.hide();
             // Form zurücksetzen
             form.reset();
             // Seite nach 1,5s neu laden
@@ -867,7 +883,7 @@ class GuildAjaxHandler {
             this.showToast('success', result.message || 'Gruppe erfolgreich aktualisiert');
             
             // Modal schließen (Bootstrap 4 API)
-            $('#editGroupModal').modal('hide');
+            fenster('#editGroupModal')?.hide();
             
             // Seite nach 1,5s neu laden
             setTimeout(() => window.location.reload(), 1500);
@@ -884,7 +900,7 @@ class GuildAjaxHandler {
         if (result.success) {
             this.showToast('success', result.message || 'Gruppe erfolgreich gelöscht');
             // Modal schließen (Bootstrap 4 API)
-            $('#deleteGroupModal').modal('hide');
+            fenster('#deleteGroupModal')?.hide();
             // Seite nach 1,5s neu laden
             setTimeout(() => window.location.reload(), 1500);
         } else {
@@ -901,7 +917,7 @@ class GuildAjaxHandler {
             this.showToast('success', result.message || 'Benutzer erfolgreich aktualisiert');
             
             // Modal schließen (Bootstrap 4 API)
-            $('#editUserModal').modal('hide');
+            fenster('#editUserModal')?.hide();
             
             // Seite nach 1,5s neu laden
             setTimeout(() => window.location.reload(), 1500);
@@ -925,7 +941,7 @@ class GuildAjaxHandler {
         if (result.success) {
             this.showToast('success', result.message || 'Benutzer erfolgreich entfernt');
             // Modal schließen (Bootstrap 4 API)
-            $('#removeUserModal').modal('hide');
+            fenster('#removeUserModal')?.hide();
             // Seite nach 1,5s neu laden
             setTimeout(() => window.location.reload(), 1500);
         } else {

@@ -105,6 +105,22 @@ const SCHWEREN = ['TOT', 'ADMINLTE', 'BS4'];
 // Dateien einsammeln
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Eigene Fremdbibliotheken, die nicht uns gehoeren und nicht umgebaut werden.
+ * `adminlte.js` ist das Geruest selbst — unter Tabler laedt es niemand.
+ */
+const FREMDE_JS = /(\.min\.js|adminlte\.js|jquery|bootstrap|chart|toastr|sortable)/i;
+
+/**
+ * Alle Dateien eines Bereichs, die Markup enthalten koennen.
+ *
+ * Seit dem 2026-08-04 auch `.js` aus den Asset-Verzeichnissen. Der Grund:
+ * `guild.js` und `file-manager.js` bauen Markup zusammen und sprechen Fenster
+ * ueber die jQuery-Schnittstelle von Bootstrap 4 an. Weil das Skript nur `.ejs`
+ * las, standen diese Dateien nie im Bericht — und der Datei-Editor des
+ * Datei-Managers liess sich unter Tabler nicht oeffnen, ohne dass es jemand
+ * bemerkte.
+ */
 function ejsDateien(startPfad) {
     const treffer = [];
     const voll = path.join(WURZEL, startPfad);
@@ -114,9 +130,13 @@ function ejsDateien(startPfad) {
         for (const eintrag of fs.readdirSync(verzeichnis, { withFileTypes: true })) {
             const p = path.join(verzeichnis, eintrag.name);
             if (eintrag.isDirectory()) {
-                if (eintrag.name === 'node_modules') continue;
+                if (eintrag.name === 'node_modules' || eintrag.name === 'vendor') continue;
                 laufen(p);
             } else if (eintrag.name.endsWith('.ejs')) {
+                treffer.push(p);
+            } else if (eintrag.name.endsWith('.js')
+                       && verzeichnis.includes(`${path.sep}assets${path.sep}`)
+                       && !FREMDE_JS.test(eintrag.name)) {
                 treffer.push(p);
             }
         }
@@ -173,7 +193,12 @@ function dateiPruefen(datei) {
         }
     });
 
-    return { datei: relativ, befunde, bilanz: divBilanz(inhalt) };
+    // Die Div-Bilanz gilt nur fuer Vorlagen. Eine `.js`-Datei enthaelt nie
+    // vollstaendiges Markup — dort zaehlt jedes `</div>` in einem Kommentar
+    // oder einer Zeichenkette mit und ergibt eine Zahl ohne Aussage.
+    const bilanz = datei.endsWith('.ejs') ? divBilanz(inhalt) : 0;
+
+    return { datei: relativ, befunde, bilanz };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

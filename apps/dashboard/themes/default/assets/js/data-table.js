@@ -121,7 +121,7 @@ class DuneDataTable {
         // Search
         if (this.searchable) {
             html += `<div class="input-group input-group-sm" style="max-width:280px;">
-                <div class="input-group-prepend"><span class="input-group-text"><i class="fa-solid fa-search"></i></span></div>
+                <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
                 <input type="text" class="form-control dune-dt-search" placeholder="Suchen…">
             </div>`;
         }
@@ -136,15 +136,15 @@ class DuneDataTable {
         });
 
         // Spacer
-        html += '<div class="ml-auto"></div>';
+        html += '<div class="ms-auto"></div>';
 
         // Bulk Actions (hidden by default, shown when items selected)
         if (this.selectable && this.bulkActions.length > 0) {
             html += '<div class="dune-dt-bulk-bar" style="display:none;">';
-            html += '<span class="text-muted mr-2 dune-dt-sel-count">0 ausgewählt</span>';
+            html += '<span class="text-secondary me-2 dune-dt-sel-count">0 ausgewählt</span>';
             this.bulkActions.forEach(a => {
-                html += `<button class="btn btn-sm ${a.class || 'btn-secondary'} mr-1 dune-dt-bulk-btn" data-action="${a.key}" title="${a.label}">
-                    <i class="fa-solid ${a.icon || 'fa-cog'} mr-1"></i>${a.label}
+                html += `<button class="btn btn-sm ${a.class || 'btn-secondary'} me-1 dune-dt-bulk-btn" data-action="${a.key}" title="${a.label}">
+                    <i class="fa-solid ${a.icon || 'fa-cog'} me-1"></i>${a.label}
                 </button>`;
             });
             html += '</div>';
@@ -159,7 +159,7 @@ class DuneDataTable {
         html += '</select>';
 
         // Page info (right-aligned)
-        html += '<small class="text-muted dune-dt-showing"></small>';
+        html += '<small class="text-secondary dune-dt-showing"></small>';
         html += '</div>';
 
         // Summary cards (optional, filled via _updateSummary)
@@ -172,15 +172,15 @@ class DuneDataTable {
         }
         this.columns.forEach(col => {
             const sortAttr = col.sortable ? `style="cursor:pointer;" data-sort-key="${col.key}"` : '';
-            html += `<th ${sortAttr}>${col.label}${col.sortable ? ' <i class="fa-solid fa-sort text-muted" style="font-size:.7rem;"></i>' : ''}</th>`;
+            html += `<th ${sortAttr}>${col.label}${col.sortable ? ' <i class="fa-solid fa-sort text-secondary" style="font-size:.7rem;"></i>' : ''}</th>`;
         });
         html += '</tr></thead><tbody class="dune-dt-body">';
-        html += `<tr><td colspan="${this.columns.length + (this.selectable ? 1 : 0)}" class="text-center text-muted py-3"><i class="fa-solid fa-spinner fa-spin mr-1"></i>${this.loadingText}</td></tr>`;
+        html += `<tr><td colspan="${this.columns.length + (this.selectable ? 1 : 0)}" class="text-center text-secondary py-3"><i class="fa-solid fa-spinner fa-spin me-1"></i>${this.loadingText}</td></tr>`;
         html += '</tbody></table></div>';
 
         // Pagination
         html += '<div class="d-flex justify-content-between align-items-center mt-2">';
-        html += '<small class="text-muted dune-dt-page-info"></small>';
+        html += '<small class="text-secondary dune-dt-page-info"></small>';
         html += '<nav><ul class="pagination pagination-sm mb-0 dune-dt-pagination"></ul></nav>';
         html += '</div>';
 
@@ -262,7 +262,7 @@ class DuneDataTable {
 
                 if (this.onBulkAction) {
                     btn.disabled = true;
-                    btn.querySelector('i').className = 'fa-solid fa-spinner fa-spin mr-1';
+                    btn.querySelector('i').className = 'fa-solid fa-spinner fa-spin me-1';
                     try {
                         await this.onBulkAction(action, ids);
                         this._selected.clear();
@@ -272,7 +272,7 @@ class DuneDataTable {
                     } finally {
                         btn.disabled = false;
                         const icon = this.bulkActions.find(a => a.key === action)?.icon || 'fa-cog';
-                        btn.querySelector('i').className = `fa-solid ${icon} mr-1`;
+                        btn.querySelector('i').className = `fa-solid ${icon} me-1`;
                     }
                 }
             });
@@ -353,7 +353,7 @@ class DuneDataTable {
         // Empty state
         if (total === 0) {
             const colSpan = this.columns.length + (this.selectable ? 1 : 0);
-            tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted py-3"><i class="${this.emptyIcon} mr-1"></i>${this.emptyText}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-secondary py-3"><i class="${this.emptyIcon} me-1"></i>${this.emptyText}</td></tr>`;
             this._renderPagination(0);
             this._updateBulkBar();
             return;
@@ -473,11 +473,17 @@ class DuneDataTable {
         let html = '';
         items.forEach(item => {
             html += `<div class="col-md-${Math.max(2, Math.floor(12 / items.length))} mb-2">
-                <div class="info-box bg-${item.color || 'info'} mb-0">
-                    <span class="info-box-icon"><i class="fa-solid ${item.icon || 'fa-circle-info'}"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">${item.label}</span>
-                        <span class="info-box-number">${item.value}</span>
+                <div class="card card-sm">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <span class="bg-${item.color || 'info'} text-white avatar"><i class="fa-solid ${item.icon || 'fa-circle-info'}"></i></span>
+                            </div>
+                            <div class="col">
+                                <div class="h2 fw-medium mb-0">${item.value}</div>
+                                <div class="text-secondary">${item.label}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>`;
@@ -491,7 +497,7 @@ class DuneDataTable {
         const tbody = this._container.querySelector('.dune-dt-body');
         if (tbody) {
             const colSpan = this.columns.length + (this.selectable ? 1 : 0);
-            tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted py-3"><i class="fa-solid fa-spinner fa-spin mr-1"></i>${this.loadingText}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-secondary py-3"><i class="fa-solid fa-spinner fa-spin me-1"></i>${this.loadingText}</td></tr>`;
         }
     }
 

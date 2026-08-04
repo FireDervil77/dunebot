@@ -1,4 +1,19 @@
 /**
+ * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
+ *
+ * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
+ * Aufruf wirft, und alles danach im selben Block laeuft nicht mehr.
+ *
+ * @param {string|Element} ziel - id (mit oder ohne #) oder das Element selbst
+ */
+function fenster(ziel) {
+    const el = typeof ziel === 'string'
+        ? document.getElementById(ziel.replace(/^#/, ''))
+        : ziel;
+    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+}
+
+/**
  * File-Manager Client-Side Logic
  * Monaco Editor, Multi-Select, AJAX, Toast-Notifications
  * @author FireBot Team
@@ -247,7 +262,7 @@ class FileManager {
                 : `${this.currentPath}/${file.name}`;
             
             const icon = file.is_dir ? 'fa-folder' : this.getFileIcon(file.name);
-            const iconColor = file.is_dir ? 'text-warning' : 'text-muted';
+            const iconColor = file.is_dir ? 'text-warning' : 'text-secondary';
             
             html += `
                 <tr data-file-path="${this.escapeHtml(path)}" 
@@ -277,8 +292,8 @@ class FileManager {
                             `}
                         `}
                     </td>
-                    <td class="text-muted">${file.size_formatted || '-'}</td>
-                    <td class="text-muted">${this.formatDate(file.mod_time)}</td>
+                    <td class="text-secondary">${file.size_formatted || '-'}</td>
+                    <td class="text-secondary">${this.formatDate(file.mod_time)}</td>
                     <td class="text-end">
                         ${this.renderActions(file, path)}
                     </td>
@@ -374,7 +389,7 @@ class FileManager {
             document.getElementById('editor-file-name').textContent = path.split('/').pop();
             
             // Modal öffnen
-            $('#editor-modal').modal('show');
+            fenster('#editor-modal')?.show();
             
         } catch (error) {
             console.error('[FileManager] Edit error:', error);
@@ -597,7 +612,7 @@ class FileManager {
             select.innerHTML += `<option value="${this.escapeHtml(path)}">${this.escapeHtml(folder.name)}</option>`;
         });
         
-        $('#bulk-move-modal').modal('show');
+        fenster('#bulk-move-modal')?.show();
     }
     
     /**
@@ -621,7 +636,7 @@ class FileManager {
             }
             
             this.showToast('success', data.message || `${sourcePaths.length} Dateien verschoben`);
-            $('#bulk-move-modal').modal('hide');
+            fenster('#bulk-move-modal')?.hide();
             await this.reload();
             
         } catch (error) {
@@ -639,7 +654,7 @@ class FileManager {
      */
     showNewFileModal() {
         document.getElementById('new-file-name').value = '';
-        $('#new-file-modal').modal('show');
+        fenster('#new-file-modal')?.show();
     }
 
     /**
@@ -669,7 +684,7 @@ class FileManager {
             }
 
             this.showToast('success', `Datei "${name}" erstellt`);
-            $('#new-file-modal').modal('hide');
+            fenster('#new-file-modal')?.hide();
             await this.reload();
 
         } catch (error) {
@@ -683,7 +698,7 @@ class FileManager {
      */
     showNewFolderModal() {
         document.getElementById('new-folder-name').value = '';
-        $('#new-folder-modal').modal('show');
+        fenster('#new-folder-modal')?.show();
     }
     
     /**
@@ -713,7 +728,7 @@ class FileManager {
             }
             
             this.showToast('success', 'Ordner erstellt');
-            $('#new-folder-modal').modal('hide');
+            fenster('#new-folder-modal')?.hide();
             await this.reload();
             
         } catch (error) {
@@ -734,7 +749,7 @@ class FileManager {
         document.getElementById('upload-queue').style.display = 'none';
         document.getElementById('start-upload-btn').disabled = true;
         
-        $('#upload-modal').modal('show');
+        fenster('#upload-modal')?.show();
     }
     
     /**
@@ -803,7 +818,7 @@ class FileManager {
                     <div>
                         <i class="fas fa-file me-2"></i>
                         ${this.escapeHtml(file.name)}
-                        <small class="text-muted ms-2">(${this.formatBytes(file.size)})</small>
+                        <small class="text-secondary ms-2">(${this.formatBytes(file.size)})</small>
                     </div>
                     <button class="btn btn-sm btn-danger" onclick="fileManager.removeFromQueue(${index})">
                         <i class="fas fa-times"></i>
@@ -840,7 +855,7 @@ class FileManager {
         }
         
         this.showToast('success', `${this.uploadQueue.length} Dateien hochgeladen`);
-        $('#upload-modal').modal('hide');
+        fenster('#upload-modal')?.hide();
         await this.reload();
     }
     
@@ -930,7 +945,7 @@ class FileManager {
         
         this.currentRenameFile = path;
         
-        $('#rename-modal').modal('show');
+        fenster('#rename-modal')?.show();
     }
     
     /**
@@ -961,7 +976,7 @@ class FileManager {
             }
             
             this.showToast('success', 'Umbenannt');
-            $('#rename-modal').modal('hide');
+            fenster('#rename-modal')?.hide();
             await this.reload();
             
         } catch (error) {
@@ -1002,11 +1017,11 @@ class FileManager {
         
         const btn = document.getElementById('confirm-action-btn');
         btn.onclick = () => {
-            $('#confirm-modal').modal('hide');
+            fenster('#confirm-modal')?.hide();
             onConfirm();
         };
         
-        $('#confirm-modal').modal('show');
+        fenster('#confirm-modal')?.show();
     }
     
     /**

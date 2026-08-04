@@ -30,6 +30,15 @@ const RootServer = require('../../../plugins/masterserver/dashboard/models/RootS
 // Pfad zur version.json (Dashboard-Download-Verzeichnis)
 const VERSION_JSON_PATH = path.join(__dirname, '..', 'downloads', 'daemon', 'version.json');
 
+/**
+ * Groesste Nachricht, die ueber die Daemon-Verbindung passt.
+ *
+ * Muss mit `MaxNachrichtBytes` im Daemon uebereinstimmen
+ * (internal/websocket/client.go). 64 MiB tragen eine base64-kodierte Datei von
+ * rund 47 MB Rohgroesse — deshalb begrenzt die Upload-Route auf 45 MB.
+ */
+const MAX_NACHRICHT_BYTES = 64 * 1024 * 1024;
+
 class IPMServer {
     /**
      * @param {number} port - WebSocket Port (Standard: 9340)
@@ -143,7 +152,13 @@ class IPMServer {
 
         this.wss = new WebSocket.Server({
             port: this.port,
-            perMessageDeflate: false // Performance
+            perMessageDeflate: false, // Performance
+            // Ausdruecklich gesetzt, damit beide Seiten dieselbe Grenze kennen:
+            // Der Standard von `ws` waere 100 MiB, der Daemon liest
+            // MaxNachrichtBytes (internal/websocket/client.go). Laufen die Werte
+            // auseinander, stirbt die Verbindung mitten in der Uebertragung,
+            // statt eine saubere Fehlermeldung zu liefern.
+            maxPayload: MAX_NACHRICHT_BYTES
         });
 
         this.wss.on('connection', this._handleConnection.bind(this));
@@ -1406,3 +1421,6 @@ class IPMServer {
 }
 
 module.exports = IPMServer;
+// Auch einzeln, damit Routen ihre Upload-Grenze aus derselben Quelle nehmen
+// koennen statt sie ein zweites Mal hinzuschreiben.
+module.exports.MAX_NACHRICHT_BYTES = MAX_NACHRICHT_BYTES;

@@ -109,7 +109,7 @@
         // Liste aktualisieren
         if (allToasts.length === 0) {
             list.innerHTML = `
-                <li class="dropdown-item text-center text-muted py-3">
+                <li class="dropdown-item text-center text-secondary py-3">
                     <i class="bi bi-check-circle me-2"></i>
                     Keine Benachrichtigungen
                 </li>
@@ -153,10 +153,10 @@
                                     ${icon}
                                 </div>
                                 <div class="flex-grow-1">
-                                    <div class="small text-muted">${timeAgo}</div>
+                                    <div class="small text-secondary">${timeAgo}</div>
                                     <div class="text-dark">${truncatedMessage}</div>
                                 </div>
-                                <button class="btn btn-sm btn-link text-muted dismiss-toast-btn p-0 ml-2" 
+                                <button class="btn btn-sm btn-link text-secondary dismiss-toast-btn p-0 ms-2" 
                                         data-id="${toast.id}" 
                                         title="Entfernen">
                                     <i class="bi bi-x-lg"></i>
