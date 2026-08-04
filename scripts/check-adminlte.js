@@ -132,16 +132,23 @@ function ejsDateien(startPfad) {
 /**
  * Div-Bilanz einer Datei.
  *
- * EJS-Bloecke fliegen vorher raus: In `<% %>` steht JavaScript, und ein
- * `</div>` in einer Zeichenkette dort ist kein Markup-Fehler. Uebrig bleibt,
- * was der Browser sieht.
+ * Zwei Sorten Text fliegen vorher raus, weil dort `<div>` kein Markup ist:
+ *
+ *   - EJS-Bloecke `<% … %>` — dort steht JavaScript
+ *   - `<script>`-Bloecke — auch dort. Und zwar reichlich: `$('<div>')`,
+ *     `container.innerHTML = '<div class="…">' + …`, Template-Literale mit
+ *     ganzen Kartenbaeumen darin. Ohne diesen Schnitt meldete das Skript
+ *     `ticket-settings.ejs` mit 11 offenen `<div>` und `moderation.ejs` mit
+ *     einem zu viel — beides Fehlalarme aus dem Skriptteil.
  *
  * @returns {number} 0 = ausgeglichen, positiv = offene, negativ = zu viele
  */
 function divBilanz(inhalt) {
-    const ohneEjs = inhalt.replace(/<%[\s\S]*?%>/g, '');
-    const auf = (ohneEjs.match(/<div\b/g) || []).length;
-    const zu  = (ohneEjs.match(/<\/div\s*>/g) || []).length;
+    const nurMarkup = inhalt
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<%[\s\S]*?%>/g, '');
+    const auf = (nurMarkup.match(/<div\b/g) || []).length;
+    const zu  = (nurMarkup.match(/<\/div\s*>/g) || []).length;
     return auf - zu;
 }
 
