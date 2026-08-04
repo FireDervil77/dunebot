@@ -454,14 +454,12 @@
               <!-- Notiz-Suche per User -->
               <div class="input-group mb-3">
                 <input type="text" id="noteSearchUserId" class="form-control" placeholder="<%= tr('moderation:NOTES.SEARCH_PLACEHOLDER') %>" pattern="[0-9]+" maxlength="20">
-                <div class="input-group-append">
-                  <button type="button" class="btn btn-primary" onclick="searchNotes()">
-                    <i class="fa-solid fa-search me-1"></i> <%= tr('moderation:NOTES.BTN_SEARCH') %>
-                  </button>
-                  <button type="button" class="btn btn-outline-secondary" onclick="loadAllNotes()">
-                    <i class="fa-solid fa-list me-1"></i> <%= tr('moderation:NOTES.BTN_ALL') %>
-                  </button>
-                </div>
+                <button type="button" class="btn btn-primary" onclick="searchNotes()">
+                  <i class="fa-solid fa-search me-1"></i> <%= tr('moderation:NOTES.BTN_SEARCH') %>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="loadAllNotes()">
+                  <i class="fa-solid fa-list me-1"></i> <%= tr('moderation:NOTES.BTN_ALL') %>
+                </button>
               </div>
 
               <!-- Notizen-Liste -->
@@ -641,7 +639,9 @@
     
     const lastTab = localStorage.getItem(storageKey);
     if (lastTab) {
-      $('a[href="' + lastTab + '"]').tab('show');
+      // Bootstrap-5-Schnittstelle: jQuery hat unter Tabler kein .tab()
+      const wiederher = document.querySelector('a[href="' + lastTab + '"]');
+      if (wiederher && window.bootstrap) bootstrap.Tab.getOrCreateInstance(wiederher).show();
     }
   });
   

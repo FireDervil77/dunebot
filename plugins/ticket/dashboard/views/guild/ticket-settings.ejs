@@ -193,30 +193,48 @@
               <!-- Statistiken -->
               <div class="row mb-4">
                 <div class="col-md-4">
-                  <div class="small-box bg-success">
-                    <div class="inner">
-                      <h3><%= stats.open %></h3>
-                      <p><%= tr('ticket:STATS_OPEN') %></p>
+                  <div class="card card-sm">
+                    <div class="card-body">
+                      <div class="row align-items-center">
+                        <div class="col-auto">
+                          <span class="bg-success text-white avatar"><i class="fa-solid fa-envelope-open"></i></span>
+                        </div>
+                        <div class="col">
+                          <div class="h2 fw-medium mb-0"><%= stats.open %></div>
+                          <div class="text-secondary"><%= tr('ticket:STATS_OPEN') %></div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="icon"><i class="fa-solid fa-envelope-open"></i></div>
                   </div>
                 </div>
                 <div class="col-md-4">
-                  <div class="small-box bg-danger">
-                    <div class="inner">
-                      <h3><%= stats.closed %></h3>
-                      <p><%= tr('ticket:STATS_CLOSED') %></p>
+                  <div class="card card-sm">
+                    <div class="card-body">
+                      <div class="row align-items-center">
+                        <div class="col-auto">
+                          <span class="bg-danger text-white avatar"><i class="fa-solid fa-envelope"></i></span>
+                        </div>
+                        <div class="col">
+                          <div class="h2 fw-medium mb-0"><%= stats.closed %></div>
+                          <div class="text-secondary"><%= tr('ticket:STATS_CLOSED') %></div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="icon"><i class="fa-solid fa-envelope"></i></div>
                   </div>
                 </div>
                 <div class="col-md-4">
-                  <div class="small-box bg-info">
-                    <div class="inner">
-                      <h3><%= stats.total %></h3>
-                      <p><%= tr('ticket:STATS_TOTAL') %></p>
+                  <div class="card card-sm">
+                    <div class="card-body">
+                      <div class="row align-items-center">
+                        <div class="col-auto">
+                          <span class="bg-info text-white avatar"><i class="fa-solid fa-ticket"></i></span>
+                        </div>
+                        <div class="col">
+                          <div class="h2 fw-medium mb-0"><%= stats.total %></div>
+                          <div class="text-secondary"><%= tr('ticket:STATS_TOTAL') %></div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="icon"><i class="fa-solid fa-ticket"></i></div>
                   </div>
                 </div>
               </div>

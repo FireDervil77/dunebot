@@ -340,39 +340,63 @@
               <% } else { %>
                 <div class="row">
                   <div class="col-md-3">
-                    <div class="small-box bg-info">
-                      <div class="inner">
-                        <h3><%= analytics.total_giveaways || 0 %></h3>
-                        <p><%= tr('giveaway:ANALYTICS_TOTAL') || 'Giveaways gesamt' %></p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-info text-white avatar"><i class="fa-solid fa-gift"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= analytics.total_giveaways || 0 %></div>
+                            <div class="text-secondary"><%= tr('giveaway:ANALYTICS_TOTAL') || 'Giveaways gesamt' %></div>
+                          </div>
+                        </div>
                       </div>
-                      <div class="icon"><i class="fa-solid fa-gift"></i></div>
                     </div>
                   </div>
                   <div class="col-md-3">
-                    <div class="small-box bg-success">
-                      <div class="inner">
-                        <h3><%= analytics.active_giveaways || 0 %></h3>
-                        <p><%= tr('giveaway:ANALYTICS_ACTIVE') || 'Aktive Giveaways' %></p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-success text-white avatar"><i class="fa-solid fa-bolt"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= analytics.active_giveaways || 0 %></div>
+                            <div class="text-secondary"><%= tr('giveaway:ANALYTICS_ACTIVE') || 'Aktive Giveaways' %></div>
+                          </div>
+                        </div>
                       </div>
-                      <div class="icon"><i class="fa-solid fa-bolt"></i></div>
                     </div>
                   </div>
                   <div class="col-md-3">
-                    <div class="small-box bg-warning">
-                      <div class="inner">
-                        <h3><%= analytics.total_participants || 0 %></h3>
-                        <p><%= tr('giveaway:ANALYTICS_PARTICIPANTS') || 'Teilnehmer gesamt' %></p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-warning text-white avatar"><i class="fa-solid fa-users"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= analytics.total_participants || 0 %></div>
+                            <div class="text-secondary"><%= tr('giveaway:ANALYTICS_PARTICIPANTS') || 'Teilnehmer gesamt' %></div>
+                          </div>
+                        </div>
                       </div>
-                      <div class="icon"><i class="fa-solid fa-users"></i></div>
                     </div>
                   </div>
                   <div class="col-md-3">
-                    <div class="small-box bg-danger">
-                      <div class="inner">
-                        <h3><%= analytics.total_winners || 0 %></h3>
-                        <p><%= tr('giveaway:ANALYTICS_WINNERS') || 'Gewinner gesamt' %></p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-danger text-white avatar"><i class="fa-solid fa-trophy"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= analytics.total_winners || 0 %></div>
+                            <div class="text-secondary"><%= tr('giveaway:ANALYTICS_WINNERS') || 'Gewinner gesamt' %></div>
+                          </div>
+                        </div>
                       </div>
-                      <div class="icon"><i class="fa-solid fa-trophy"></i></div>
                     </div>
                   </div>
                 </div>

@@ -43,65 +43,81 @@
             <div class="row">
                 <!-- Total Servers -->
                 <div class="col-lg-3 col-6">
-                    <div class="small-box bg-info">
-                        <div class="inner">
-                            <h3><%= serverStats.total_servers || 0 %></h3>
-                            <p><%= tr('gameserver:DASHBOARD.TOTAL_SERVERS') %></p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-info text-white avatar"><i class="fa-solid fa-server"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= serverStats.total_servers || 0 %></div>
+                            <div class="text-secondary"><%= tr('gameserver:DASHBOARD.TOTAL_SERVERS') %></div>
+                          </div>
                         </div>
-                        <div class="icon">
-                            <i class="fa-solid fa-server"></i>
-                        </div>
-                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="small-box-footer">
-                            <%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i>
-                        </a>
+                      </div>
+                      <div class="card-footer">
+                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="text-reset"><%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i></a>
+                      </div>
                     </div>
                 </div>
 
                 <!-- Online Servers -->
                 <div class="col-lg-3 col-6">
-                    <div class="small-box bg-success">
-                        <div class="inner">
-                            <h3><%= serverStats.online_servers || 0 %></h3>
-                            <p><%= tr('gameserver:DASHBOARD.ONLINE_SERVERS') %></p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-success text-white avatar"><i class="fa-solid fa-circle-check"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= serverStats.online_servers || 0 %></div>
+                            <div class="text-secondary"><%= tr('gameserver:DASHBOARD.ONLINE_SERVERS') %></div>
+                          </div>
                         </div>
-                        <div class="icon">
-                            <i class="fa-solid fa-circle-check"></i>
-                        </div>
-                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers?status=online" class="small-box-footer">
-                            <%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i>
-                        </a>
+                      </div>
+                      <div class="card-footer">
+                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers?status=online" class="text-reset"><%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i></a>
+                      </div>
                     </div>
                 </div>
 
                 <!-- Offline Servers -->
                 <div class="col-lg-3 col-6">
-                    <div class="small-box bg-warning">
-                        <div class="inner">
-                            <h3><%= serverStats.offline_servers || 0 %></h3>
-                            <p><%= tr('gameserver:DASHBOARD.OFFLINE_SERVERS') %></p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-warning text-white avatar"><i class="fa-solid fa-circle-xmark"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= serverStats.offline_servers || 0 %></div>
+                            <div class="text-secondary"><%= tr('gameserver:DASHBOARD.OFFLINE_SERVERS') %></div>
+                          </div>
                         </div>
-                        <div class="icon">
-                            <i class="fa-solid fa-circle-xmark"></i>
-                        </div>
-                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers?status=offline" class="small-box-footer">
-                            <%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i>
-                        </a>
+                      </div>
+                      <div class="card-footer">
+                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers?status=offline" class="text-reset"><%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i></a>
+                      </div>
                     </div>
                 </div>
 
                 <!-- Total Players -->
                 <div class="col-lg-3 col-6">
-                    <div class="small-box bg-danger">
-                        <div class="inner">
-                            <h3><%= serverStats.total_players || 0 %></h3>
-                            <p><%= tr('gameserver:DASHBOARD.TOTAL_PLAYERS') %></p>
+                    <div class="card card-sm">
+                      <div class="card-body">
+                        <div class="row align-items-center">
+                          <div class="col-auto">
+                            <span class="bg-danger text-white avatar"><i class="fa-solid fa-users"></i></span>
+                          </div>
+                          <div class="col">
+                            <div class="h2 fw-medium mb-0"><%= serverStats.total_players || 0 %></div>
+                            <div class="text-secondary"><%= tr('gameserver:DASHBOARD.TOTAL_PLAYERS') %></div>
+                          </div>
                         </div>
-                        <div class="icon">
-                            <i class="fa-solid fa-users"></i>
-                        </div>
-                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="small-box-footer">
-                            <%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i>
-                        </a>
+                      </div>
+                      <div class="card-footer">
+                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="text-reset"><%= tr('gameserver:DASHBOARD.MORE_INFO') %> <i class="fas fa-arrow-circle-right"></i></a>
+                      </div>
                     </div>
                 </div>
             </div>

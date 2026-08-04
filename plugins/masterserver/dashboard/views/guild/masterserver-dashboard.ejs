@@ -15,65 +15,81 @@
   <div class="row">
     <!-- Daemon Status Card -->
     <div class="col-lg-3 col-md-6">
-      <div class="small-box <%= isOnline ? 'bg-success' : 'bg-danger' %>">
-        <div class="inner">
-          <h3><%= isOnline ? 'Online' : 'Offline' %></h3>
-          <p><%= tr('masterserver:DASHBOARD.STATS.DAEMON_STATUS') %></p>
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="<%= isOnline ? 'bg-success' : 'bg-danger' %> text-white avatar"><i class="fa-solid <%= isOnline ? 'fa-circle-check' : 'fa-circle-xmark' %>"></i></span>
+            </div>
+            <div class="col">
+              <div class="h2 fw-medium mb-0"><%= isOnline ? 'Online' : 'Offline' %></div>
+              <div class="text-secondary"><%= tr('masterserver:DASHBOARD.STATS.DAEMON_STATUS') %></div>
+            </div>
+          </div>
         </div>
-        <div class="icon">
-          <i class="fa-solid <%= isOnline ? 'fa-circle-check' : 'fa-circle-xmark' %>"></i>
+        <div class="card-footer">
+          <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="text-reset">Daemon verwalten <i class="fas fa-arrow-circle-right"></i></a>
         </div>
-        <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="small-box-footer">
-          Daemon verwalten <i class="fas fa-arrow-circle-right"></i>
-        </a>
       </div>
     </div>
 
     <!-- Total Servers Card -->
     <div class="col-lg-3 col-md-6">
-      <div class="small-box bg-info">
-        <div class="inner">
-          <h3><%= serverStats.total %></h3>
-          <p><%= tr('masterserver:DASHBOARD.STATS.TOTAL_SERVERS') %></p>
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="bg-info text-white avatar"><i class="fa-solid fa-server"></i></span>
+            </div>
+            <div class="col">
+              <div class="h2 fw-medium mb-0"><%= serverStats.total %></div>
+              <div class="text-secondary"><%= tr('masterserver:DASHBOARD.STATS.TOTAL_SERVERS') %></div>
+            </div>
+          </div>
         </div>
-        <div class="icon">
-          <i class="fa-solid fa-server"></i>
+        <div class="card-footer">
+          <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="text-reset">Zur Server-Liste <i class="fas fa-arrow-circle-right"></i></a>
         </div>
-        <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="small-box-footer">
-          Zur Server-Liste <i class="fas fa-arrow-circle-right"></i>
-        </a>
       </div>
     </div>
 
     <!-- Active Servers Card -->
     <div class="col-lg-3 col-md-6">
-      <div class="small-box bg-success">
-        <div class="inner">
-          <h3><%= serverStats.active %></h3>
-          <p>Aktive Server</p>
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="bg-success text-white avatar"><i class="fa-solid fa-circle-check"></i></span>
+            </div>
+            <div class="col">
+              <div class="h2 fw-medium mb-0"><%= serverStats.active %></div>
+              <div class="text-secondary">Aktive Server</div>
+            </div>
+          </div>
         </div>
-        <div class="icon">
-          <i class="fa-solid fa-circle-check"></i>
+        <div class="card-footer">
+          <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="text-reset">Details anzeigen <i class="fas fa-arrow-circle-right"></i></a>
         </div>
-        <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="small-box-footer">
-          Details anzeigen <i class="fas fa-arrow-circle-right"></i>
-        </a>
       </div>
     </div>
 
     <!-- Total Gameservers Card -->
     <div class="col-lg-3 col-md-6">
-      <div class="small-box bg-warning">
-        <div class="inner">
-          <h3><%= serverStats.totalGameservers %></h3>
-          <p>Gameserver gesamt</p>
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="bg-warning text-white avatar"><i class="fa-solid fa-gamepad"></i></span>
+            </div>
+            <div class="col">
+              <div class="h2 fw-medium mb-0"><%= serverStats.totalGameservers %></div>
+              <div class="text-secondary">Gameserver gesamt</div>
+            </div>
+          </div>
         </div>
-        <div class="icon">
-          <i class="fa-solid fa-gamepad"></i>
+        <div class="card-footer">
+          <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="text-reset">Server-Details <i class="fas fa-arrow-circle-right"></i></a>
         </div>
-        <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="small-box-footer">
-          Server-Details <i class="fas fa-arrow-circle-right"></i>
-        </a>
       </div>
     </div>
   </div>

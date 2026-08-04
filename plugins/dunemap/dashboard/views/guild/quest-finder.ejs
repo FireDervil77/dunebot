@@ -31,36 +31,48 @@
         <!-- Statistiken -->
         <div class="row mb-3">
             <div class="col-lg-4 col-6">
-                <div class="small-box bg-info">
-                    <div class="inner">
-                        <h3><%= stats.totalQuests %></h3>
-                        <p>Quests in Datenbank</p>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-info text-white avatar"><i class="fa-solid fa-scroll"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= stats.totalQuests %></div>
+                        <div class="text-secondary">Quests in Datenbank</div>
+                      </div>
                     </div>
-                    <div class="icon">
-                        <i class="fa-solid fa-scroll"></i>
-                    </div>
+                  </div>
                 </div>
             </div>
             <div class="col-lg-4 col-6">
-                <div class="small-box bg-success">
-                    <div class="inner">
-                        <h3><%= stats.totalChains %></h3>
-                        <p>Quest-Chains</p>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-success text-white avatar"><i class="fa-solid fa-link"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= stats.totalChains %></div>
+                        <div class="text-secondary">Quest-Chains</div>
+                      </div>
                     </div>
-                    <div class="icon">
-                        <i class="fa-solid fa-link"></i>
-                    </div>
+                  </div>
                 </div>
             </div>
             <div class="col-lg-4 col-6">
-                <div class="small-box bg-warning">
-                    <div class="inner">
-                        <h3><%= stats.totalNpcs %></h3>
-                        <p>Quest-Geber (NPCs)</p>
+                <div class="card card-sm">
+                  <div class="card-body">
+                    <div class="row align-items-center">
+                      <div class="col-auto">
+                        <span class="bg-warning text-white avatar"><i class="fa-solid fa-user"></i></span>
+                      </div>
+                      <div class="col">
+                        <div class="h2 fw-medium mb-0"><%= stats.totalNpcs %></div>
+                        <div class="text-secondary">Quest-Geber (NPCs)</div>
+                      </div>
                     </div>
-                    <div class="icon">
-                        <i class="fa-solid fa-user"></i>
-                    </div>
+                  </div>
                 </div>
             </div>
         </div>

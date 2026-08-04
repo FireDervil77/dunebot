@@ -3,7 +3,8 @@
     Zeigt Donation-Button und Supporter-Badge
 -->
 
-<div class="card card-danger card-outline">
+<div class="card">
+    <div class="card-status-top bg-danger"></div>
     <div class="card-header">
         <h3 class="card-title">
             <i class="fas fa-heart text-danger me-2"></i>Unterstütze FireBot
@@ -53,15 +54,15 @@
         <!-- Community-Stats -->
         <div class="row text-center">
             <div class="col-6">
-                <div class="small-box bg-success p-2">
-                    <h4 class="mb-0">€<%= (communityStats.total_amount || 0).toFixed(0) %></h4>
-                    <small>Gesamt</small>
+                <div class="p-2 rounded bg-success-lt">
+                    <div class="h3 mb-0">€<%= (communityStats.total_amount || 0).toFixed(0) %></div>
+                    <small class="text-secondary">Gesamt</small>
                 </div>
             </div>
             <div class="col-6">
-                <div class="small-box bg-info p-2">
-                    <h4 class="mb-0"><%= communityStats.supporter_count || 0 %></h4>
-                    <small>Supporter</small>
+                <div class="p-2 rounded bg-info-lt">
+                    <div class="h3 mb-0"><%= communityStats.supporter_count || 0 %></div>
+                    <small class="text-secondary">Supporter</small>
                 </div>
             </div>
         </div>

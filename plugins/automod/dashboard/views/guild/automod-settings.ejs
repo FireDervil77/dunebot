@@ -101,7 +101,9 @@
         // Letzten aktiven Tab wiederherstellen
         const lastActiveTab = localStorage.getItem(storageKey);
         if (lastActiveTab) {
-            $(`a[href="${lastActiveTab}"]`).tab('show');
+            // Bootstrap-5-Schnittstelle: jQuery hat unter Tabler kein .tab()
+            const wiederher = document.querySelector(`a[href="${lastActiveTab}"]`);
+            if (wiederher && window.bootstrap) bootstrap.Tab.getOrCreateInstance(wiederher).show();
             console.log('[AutoMod Tabs] Restored tab:', lastActiveTab);
         }
     });

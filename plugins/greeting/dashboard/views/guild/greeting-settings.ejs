@@ -279,7 +279,8 @@
                 <div class="card-body">
                   <% if (reactionPanels && reactionPanels.length > 0) { %>
                     <% reactionPanels.forEach(panel => { %>
-                      <div class="card card-outline mb-3 <%= panel.message_id ? 'card-success' : 'card-warning' %>" id="rr-panel-<%= panel.id %>">
+                      <div class="card mb-3" id="rr-panel-<%= panel.id %>">
+                        <div class="card-status-top bg-<%= panel.message_id ? 'success' : 'warning' %>"></div>
                         <div class="card-header d-flex justify-content-between align-items-center">
                           <h5 class="mb-0">
                             <% if (panel.message_id) { %>
@@ -493,7 +494,8 @@
       </div>
 
       <!-- Live Preview Card -->
-      <div class="card card-outline card-dark mt-3" id="previewCard">
+      <div class="card mt-3" id="previewCard">
+        <div class="card-status-top bg-dark"></div>
         <div class="card-header">
           <h3 class="card-title"><i class="fa-solid fa-eye me-2"></i><%= tr('greeting:PREVIEW.TITLE') %></h3>
         </div>
