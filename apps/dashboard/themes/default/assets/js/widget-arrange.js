@@ -56,6 +56,10 @@
     }
 
     function sortiererStarten() {
+        // Ebenfalls frisch: sonst laesst sich in einen Bereich, der beim
+        // Seitenaufbau leer war, nichts hineinziehen.
+        bereiche = Array.prototype.slice.call(document.querySelectorAll('[data-widget-area]'));
+
         bereiche.forEach(function (bereich) {
             sortierer.push(new Sortable(bereich, {
                 group: 'dashboard-widgets',   // erlaubt das Ziehen zwischen Bereichen
@@ -186,9 +190,16 @@
     function standSammeln() {
         var widgets = [];
 
-        bereiche.forEach(function (bereich) {
+        // Bewusst frisch abfragen: `bereiche` stammt vom Seitenaufbau. Wird
+        // waehrend des Anordnens etwas nachgezeichnet, ginge sonst ein ganzer
+        // Bereich beim Speichern verloren.
+        var aktuelleBereiche = Array.prototype.slice.call(
+            document.querySelectorAll('[data-widget-area]')
+        );
+
+        aktuelleBereiche.forEach(function (bereich) {
             var areaId = bereich.dataset.widgetArea;
-            if (!areaId || areaId === 'unbekannt') return;
+            if (!areaId) return;
 
             Array.prototype.slice.call(bereich.children).forEach(function (huelle, i) {
                 var id = huelle.dataset.widgetId;

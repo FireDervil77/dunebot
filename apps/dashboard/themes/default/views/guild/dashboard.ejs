@@ -116,7 +116,9 @@ const _bekannt = _bereiche.map(b => b.id);
               && w.visible !== false
            ); %>
         <% if (_heimatlos.length > 0) { %>
-          <div class="row g-3 mb-3" data-widget-area="unbekannt">
+          <%# Heimatlose Karten landen im ersten Bereich des Themes — mit einem
+              erfundenen Bereichsnamen liessen sie sich nicht speichern. %>
+          <div class="row g-3 mb-3" data-widget-area="<%= _bereiche[0] && _bereiche[0].id %>">
             <% _heimatlos.forEach(widget => { %>
               <div class="col-md-<%= widget.size || 12 %>" data-widget-id="<%= widget.id %>" data-widget-hidden="0">
                 <%- _widgetCard(widget) %>
