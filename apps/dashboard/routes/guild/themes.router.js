@@ -3,7 +3,6 @@
  * 
  * Stellt Theme-Verwaltung auf Guild-Level bereit:
  * - GET  /themes            → Theme-Übersicht (Galerie)
- * - GET  /themes/widgets    → Widget-Bereiche verwalten
  * - GET  /themes/editor     → Child-Theme Editor (CSS + Live-Preview)
  * - POST /themes/editor     → Custom CSS + Variablen speichern
  * - DELETE /themes/editor   → Customization zurücksetzen
@@ -57,47 +56,6 @@ router.get('/', requirePermission('CORE.THEMES.VIEW'), async (req, res) => {
     } catch (error) {
         Logger.error('[Themes] Fehler beim Laden:', error);
         res.status(500).send('Fehler beim Laden der Themes');
-    }
-});
-
-// =====================================================
-// GET /guild/:guildId/themes/widgets — Widget-Bereiche
-// =====================================================
-router.get('/widgets', requirePermission('CORE.THEMES.EDIT'), async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const themeManager = ServiceManager.get('themeManager');
-    const guildId = res.locals.guildId;
-
-    try {
-        const { getInstance: getWidgetManager } = require('dunebot-sdk/lib/WidgetManager');
-        const wm = getWidgetManager();
-        const areas = wm.getAreas();
-        const allRegistered = Array.from(wm._registeredWidgets.values());
-
-        // Guild-spezifische Overrides laden
-        const dbService = ServiceManager.get('dbService');
-        const guildConfigs = await dbService.query(
-            'SELECT * FROM guild_widget_config WHERE guild_id = ?',
-            [guildId]
-        );
-
-        // Overrides als Map (widget_id → config)
-        const overrides = {};
-        if (guildConfigs) {
-            guildConfigs.forEach(c => { overrides[c.widget_id] = c; });
-        }
-
-        return themeManager.renderView(res, 'guild/themes/widgets', {
-            title: 'Widget-Bereiche',
-            activeMenu: `/guild/${guildId}/themes/widgets`,
-            guildId,
-            areas,
-            registeredWidgets: allRegistered,
-            overrides
-        });
-    } catch (error) {
-        Logger.error('[Themes/Widgets] Fehler beim Laden:', error);
-        res.status(500).send('Fehler beim Laden der Widget-Konfiguration');
     }
 });
 

@@ -156,17 +156,7 @@ async function registerKernNavigation(guildId) {
                 guildId,
                 parent: `/guild/${guildId}/themes`
             },
-            {
-                title: 'NAV.THEMES_WIDGETS',
-                url: `/guild/${guildId}/themes/widgets`,
-                icon: 'fa-solid fa-puzzle-piece',
-                order: 20,
-                type: navigationManager.menuTypes.MAIN,
-                capability: 'CORE.THEMES.EDIT',
-                visible: true,
-                guildId,
-                parent: `/guild/${guildId}/themes`
-            },
+            
             {
                 title: 'NAV.THEMES_EDITOR',
                 url: `/guild/${guildId}/themes/editor`,
