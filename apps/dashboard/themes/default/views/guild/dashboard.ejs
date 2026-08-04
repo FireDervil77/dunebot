@@ -43,9 +43,7 @@ const _bereiche = (typeof widgetAreasFor === 'function' && widgetAreasFor('guild
 const _bekannt = _bereiche.map(b => b.id);
 %>
 
-<!--begin::App Content-->
-<div class="app-content">
-    <div class="container-fluid">
+<%# Kein eigener Seitenrahmen: den stellt das Layout des Themes %>
 
         <!-- Hook: before_guild_dashboard -->
 <%- hookArea('before_guild_dashboard', { guild, guildId }) %>
@@ -130,9 +128,7 @@ const _bekannt = _bereiche.map(b => b.id);
         <!-- Hook: after_guild_dashboard -->
 <%- hookArea('after_guild_dashboard', { guild, guildId }) %>
 
-    </div>
-</div>
-<!--end::App Content-->
+
 
 <%#
  * Hilfsfunktion: Karte eines Widgets erzeugen

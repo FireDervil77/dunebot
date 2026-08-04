@@ -85,8 +85,17 @@
         
         <!--end::Breadcrumb-->  
 
-            <%- body %>
-
+            <%#
+              Seitenrahmen des Themes — die Views bringen nur noch Inhalt.
+              AdminLTE 4 erwartet <main class="app-main"> um den Inhalt; das
+              schliessende Tag stand hier, das oeffnende fehlte seit jeher.
+            %>
+            <main class="app-main">
+                <div class="app-content">
+                    <div class="container-fluid">
+                        <%- body %>
+                    </div>
+                </div>
             </main>
             <!--end::App Main-->
 

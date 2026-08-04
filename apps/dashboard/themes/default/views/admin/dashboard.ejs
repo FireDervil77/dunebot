@@ -32,8 +32,7 @@ const _bereiche = (typeof widgetAreasFor === 'function' && widgetAreasFor('admin
 const _bekannt = _bereiche.map(b => b.id);
 %>
 
-<div class="app-content">
-    <div class="container-fluid">
+<%# Kein eigener Seitenrahmen: den stellt das Layout des Themes %>
 
         <% _bereiche.forEach(bereich => { %>
           <% const _widgets = _bereich(bereich.id); %>
@@ -60,8 +59,6 @@ const _bekannt = _bereiche.map(b => b.id);
           </div>
         <% } %>
 
-    </div>
-</div>
 
 <%
 function _widgetCard(widget) {
