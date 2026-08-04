@@ -91,6 +91,33 @@
               schliessende Tag stand hier, das oeffnende fehlte seit jeher.
             %>
             <main class="app-main">
+
+                <%#
+                  Titelzeile — dasselbe Versprechen wie im Tabler-Layout: Die
+                  View bringt Inhalt, den Titel stellt das Theme aus
+                  `locals.title`. Ohne diese Zeilen verloere jede auf Tabler
+                  gezogene View unter diesem Theme ihre Ueberschrift, weil sie
+                  ihren eigenen `content-header` dabei abgibt.
+                %>
+                <% if (locals.title) { %>
+                <div class="app-content-header">
+                    <div class="container-fluid">
+                        <div class="row align-items-center">
+                            <div class="col-sm-6">
+                                <h3 class="mb-0"><%= locals.title %></h3>
+                                <% if (locals.subtitle) { %>
+                                    <div class="text-muted small"><%= locals.subtitle %></div>
+                                <% } %>
+                            </div>
+                            <div class="col-sm-6 text-sm-end">
+                                <%- locals.pageActions || '' %>
+                                <%- hookArea('content_header_actions') %>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <% } %>
+
                 <div class="app-content">
                     <div class="container-fluid">
                         <%- body %>
