@@ -1166,7 +1166,7 @@ const MIGRATION_RUNNING_STATES = ['pending', 'stopping_server', 'backing_up', 't
 async function fetchMigrationStatus() {
     try {
         const res = await fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/migration/status`);
-        if (!res.ok) return null;                 // 404 = noch nie migriert
+        if (!res.ok) return null;                 // echter Fehler — "nie migriert" kommt als 200
         const data = await res.json();
         return (data && data.success && data.migration) ? data.migration : null;
     } catch (_) {

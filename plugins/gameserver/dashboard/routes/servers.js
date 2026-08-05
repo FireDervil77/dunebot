@@ -3720,10 +3720,6 @@ router.get('/:serverId/migration/status', requirePermission('GAMESERVER.VIEW'), 
             [serverId]
         );
 
-        if (!migration) {
-            return res.status(404).json({ success: false, message: 'Keine Migration gefunden' });
-        }
-
         // Server-Infos hinzufügen
         const [server] = await dbService.query(
             'SELECT id, name, status FROM gameservers WHERE id = ? AND guild_id = ?',
@@ -3732,6 +3728,20 @@ router.get('/:serverId/migration/status', requirePermission('GAMESERVER.VIEW'), 
 
         if (!server) {
             return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+        }
+
+        // "Noch nie migriert" ist der Normalfall, kein Fehler.
+        //
+        // Die Antwort war hier ein 404. Die Seite ruft den Status bei jedem
+        // Aufruf ab, also erschien in den Entwicklerwerkzeugen bei praktisch
+        // jedem Server ein roter Fehler — fuer einen voellig gesunden Zustand.
+        // Das verdeckt echte Fehler, und genau dafuer schaut man dort hin.
+        if (!migration) {
+            return res.json({ success: true, migration: null, server: {
+                id: server.id,
+                name: server.name,
+                status: server.status
+            } });
         }
 
         return res.json({
