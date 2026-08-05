@@ -1,4 +1,18 @@
 /**
+ * Bootstrap-Schnittstelle, egal welches Theme laeuft.
+ *
+ * Das alte Theme laedt bootstrap.bundle.min.js, das legt `window.bootstrap` an.
+ * Tabler bringt dasselbe Bootstrap mit, exportiert es aber unter seinem eigenen
+ * Namen: `window.tabler.bootstrap`. Ein globales `window.bootstrap` gibt es
+ * dort nicht — wer danach greift, bekommt "bootstrap is not defined".
+ *
+ * @returns {object|null} Die Bootstrap-Schnittstelle oder null
+ */
+function bootstrapAPI() {
+    return window.bootstrap || (window.tabler && window.tabler.bootstrap) || null;
+}
+
+/**
  * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
  *
  * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
@@ -10,7 +24,8 @@ function fenster(ziel) {
     const el = typeof ziel === 'string'
         ? document.getElementById(ziel.replace(/^#/, ''))
         : ziel;
-    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
+    const bs = bootstrapAPI();
+    return (el && bs) ? bs.Modal.getOrCreateInstance(el) : null;
 }
 
 /**
@@ -713,42 +728,30 @@ class GuildAjaxHandler {
         }
     }
 
+    /**
+     * Meldung anzeigen.
+     *
+     * Reicht an window.showToast aus global-toast.js weiter. Diese Datei baute
+     * frueher selbst ein Bootstrap-Toast zusammen — und stuerzte unter Tabler
+     * ab, weil es dort kein globales `bootstrap` gibt. global-toast.js setzt
+     * auf toastr auf, das in beiden Themes geladen wird, und kennt dieselbe
+     * Reihenfolge der Parameter.
+     *
+     * `logToServer: true` erhaelt das bisherige Verhalten dieser Datei: Jede
+     * Meldung landet in guild_toast_logs, nicht nur die Fehler.
+     */
     static showToast(type, message) {
-        const toast = document.createElement('div');
-        // Toast-spezifische Styles für zentrierte Position
-        toast.className = `toast toast-${type} align-items-center`;
-        toast.innerHTML = `
-            <div class="toast-header">
-                <i class="fas ${this.getIconForType(type)} me-2"></i>
-                <strong class="me-auto">${this.getTextForType(type)}</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-            </div>
-            <div class="toast-body">${message}</div>
-        `;
-        
-        document.getElementById('toast-container').appendChild(toast);
-        
-        // Bootstrap 5 Toast mit angepassten Optionen
-        const bsToast = new bootstrap.Toast(toast, { 
-            delay: 2500,  // 2,5 Sekunden Auto-Close
-            animation: true,
-            autohide: true  // Auto-Close aktivieren
-        });
-        
-        bsToast.show();
-        toast.addEventListener('hidden.bs.toast', () => toast.remove());
+        if (typeof window.showToast === 'function') {
+            window.showToast(type, message, { logToServer: true });
+            return;
+        }
 
-        // Automatisches Logging für alle Toasts an zentrale DB
+        // Ohne global-toast.js bleibt nur die Konsole. Der eigene Nachbau ist
+        // bewusst nicht zurueckgekehrt: Er haette dieselbe Abhaengigkeit.
+        console.warn(`[Toast] global-toast.js nicht geladen — ${type}: ${message}`);
         this.logToastToAPI(type, message).catch(err => {
             console.error('[Toast] DB-Logging fehlgeschlagen:', err);
         });
-
-        // Event für Notification Center (falls vorhanden)
-        if (window.dispatchEvent) {
-            window.dispatchEvent(new CustomEvent('toastShown', { 
-                detail: { type, message } 
-            }));
-        }
     }
 
     /**
@@ -819,24 +822,6 @@ class GuildAjaxHandler {
         }
 
         return null;
-    }
-
-    static getIconForType(type) {
-        return {
-            success: 'fa-check-circle',
-            error: 'fa-exclamation-circle',
-            warning: 'fa-exclamation-triangle',
-            info: 'fa-info-circle'
-        }[type] || 'fa-info-circle';
-    }
-
-    static getTextForType(type) {
-        return {
-            success: 'Erfolg',
-            error: 'Fehler',
-            warning: 'Warnung',
-            info: 'Info'
-        }[type] || 'Info';
     }
 
     static async handlePluginBadgeCreateResponse(form, result) {

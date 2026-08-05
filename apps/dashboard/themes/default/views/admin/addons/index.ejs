@@ -2,7 +2,41 @@
 
     <div class="content">
         <div class="container-fluid">
-            
+
+            <%#
+              Aktionsleiste.
+
+              Sie fiel beim Umstellen auf Tabler heraus (19efb60). Damit gab es
+              keinen Weg mehr, ein Addon anzulegen oder zu importieren: Der
+              einzige verbliebene Knopf steckt weiter unten im Leer-Zustand und
+              erscheint nur, wenn ueberhaupt kein Addon vorhanden ist.
+
+              Die Attribute heissen jetzt data-bs-*: Tabler bringt Bootstrap 5
+              mit, die alte Schreibweise data-toggle/data-target stammt aus
+              Bootstrap 4 und oeffnet dort gar nichts.
+            %>
+            <div class="row align-items-center mb-3">
+                <div class="col">
+                    <h2 class="page-title mb-0">
+                        <i class="fa-solid fa-puzzle-piece me-2"></i>
+                        Addon Marketplace Management
+                    </h2>
+                </div>
+                <div class="col-auto ms-auto">
+                    <div class="btn-list">
+                        <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalJsonPaste">
+                            <i class="fa-solid fa-code me-1"></i> Per JSON einfügen
+                        </button>
+                        <a href="/admin/addons/import" class="btn btn-primary">
+                            <i class="fa-solid fa-download me-1"></i> Egg importieren
+                        </a>
+                        <a href="/admin/addons/create" class="btn btn-success">
+                            <i class="fa-solid fa-plus me-1"></i> Manuell erstellen
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             <%# Stats-Cards %>
             <div class="row">
                 <div class="col-lg-3 col-6">

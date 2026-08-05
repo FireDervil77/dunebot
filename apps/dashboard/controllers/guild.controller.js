@@ -358,7 +358,10 @@ exports.getPlugins = async (req, res) => {
                         fs.existsSync(path.join(pluginPath, "dashboard", "views", "admin"));
 
                     // Icon optional suchen (Fallback auf Theme-Icon)
-                    let icon = "/themes/default/assets/images/DuneBot.png";
+                    // DuneBot.png gibt es seit der Umbenennung nicht mehr — jedes
+                    // Plugin ohne eigenes Icon erzeugte damit einen 404 auf der
+                    // Pluginseite.
+                    let icon = "/themes/default/assets/images/firebot.png";
                     const iconCandidates = [
                         path.join(pluginPath, "dashboard", "public", "images", "icon.png"),
                         path.join(pluginPath, "dashboard", "public", "icon.png"),
