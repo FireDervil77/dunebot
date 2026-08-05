@@ -1,5 +1,6 @@
 const { Server, ServerStatus } = require("veza");
 const { ServiceManager } = require("dunebot-core");
+const bcrypt = require("bcrypt");
 // Welche Aktion in welchem Zustand erlaubt ist, steht an genau einer Stelle.
 // Ein Discord-Knopf ist ein Abbild der Vergangenheit und kann jederzeit im
 // ungünstigsten Moment geklickt werden – die Prüfung gehört deshalb hierher.
@@ -719,18 +720,22 @@ class IPCServer {
                         await dbService.query('UPDATE gameservers SET bind_ip = ? WHERE id = ?', [rootserver.host, newServerId]);
                     }
 
-                    // SFTP-Credentials
+                    // SFTP-Credentials. Gespeichert und übertragen wird nur der
+                    // bcrypt-Hash — der Klartext existiert hier nur bis zum Ende
+                    // dieses Blocks und wird nirgends ausgegeben. Wer das
+                    // Passwort braucht, setzt es im Dashboard einmal zurück.
                     const sftpUsername = rootserver.system_user || `gs-${String(newServerId).padStart(8, '0')}`;
                     const sftpPassword = require('crypto').randomBytes(10).toString('hex');
-                    await dbService.query('UPDATE gameservers SET sftp_username = ?, sftp_password = ? WHERE id = ?', [sftpUsername, sftpPassword, newServerId]);
+                    const sftpHash = await bcrypt.hash(sftpPassword, 10);
+                    await dbService.query('UPDATE gameservers SET sftp_username = ?, sftp_password_hash = ? WHERE id = ?', [sftpUsername, sftpHash, newServerId]);
 
                     // SFTP-User an Daemon synchronisieren (identisch zum Dashboard-Flow)
                     if (ipmServer?.isDaemonOnline(rootserver.daemon_id)) {
                         ipmServer.sendCommand(rootserver.daemon_id, 'sftp.user.sync', {
-                            server_id: String(newServerId),
-                            guild_id:  guildId,
-                            username:  sftpUsername,
-                            password:  sftpPassword,
+                            server_id:     String(newServerId),
+                            guild_id:      guildId,
+                            username:      sftpUsername,
+                            password_hash: sftpHash,
                         }).catch(e => Logger.warn(`[IPC/Gameserver] SFTP-Sync fehlgeschlagen für ${newServerId}:`, e));
                     }
 

@@ -891,16 +891,33 @@ async function savePorts() {
                             </button>
                         </div>
                     </div>
+                    <%#
+                      Das Passwort steht hier NICHT.
+
+                      Gespeichert ist nur sein bcrypt-Hash — es liesse sich also
+                      gar nicht mehr anzeigen. Frueher stand der Klartext im
+                      value-Attribut: Das Feld verbarg ihn nur optisch, im
+                      Quelltext jeder Seitenauslieferung stand er lesbar.
+
+                      Sichtbar wird ein Passwort nur einmal, direkt nachdem
+                      "Zurücksetzen" ein neues erzeugt hat.
+                    %>
                     <div class="col-md-4 col-sm-6 mb-2">
                         <label class="text-secondary small mb-1 d-block">PASSWORT</label>
-                        <div class="input-group input-group-sm">
-                            <input type="password" class="form-control font-italic" id="sftp-pass" value="<%= server.sftp_password || '' %>" readonly>
-                            <button class="btn btn-outline-secondary" id="sftp-pass-toggle" onclick="toggleSftpPassword()" title="Anzeigen/Verbergen">
-                            <i class="fas fa-eye" id="sftp-pass-icon"></i>
-                            </button>
+                        <div class="input-group input-group-sm" id="sftp-pass-gruppe" style="display: none;">
+                            <input type="text" class="form-control font-monospace" id="sftp-pass" value="" readonly>
                             <button class="btn btn-outline-secondary" onclick="copyToClipboard(document.getElementById('sftp-pass').value)" title="Kopieren">
                             <i class="fas fa-copy"></i>
                             </button>
+                        </div>
+                        <div class="form-control form-control-sm bg-transparent text-secondary" id="sftp-pass-hinweis">
+                            <% if (server.sftp_passwort_gesetzt) { %>
+                                <i class="fas fa-check-circle text-success me-1"></i>
+                                Gesetzt — bei Verlust zurücksetzen
+                            <% } else { %>
+                                <i class="fas fa-triangle-exclamation text-warning me-1"></i>
+                                Noch keines vergeben
+                            <% } %>
                         </div>
                     </div>
                 </div>
@@ -944,16 +961,16 @@ async function savePorts() {
 </div>
 
 <script>
-function toggleSftpPassword() {
-    const input = document.getElementById('sftp-pass');
-    const icon  = document.getElementById('sftp-pass-icon');
-    if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.replace('fa-eye', 'fa-eye-slash');
-    } else {
-        input.type = 'password';
-        icon.classList.replace('fa-eye-slash', 'fa-eye');
-    }
+// Zeigt das frisch erzeugte Passwort. Es kommt nur mit dieser einen Antwort —
+// gespeichert ist nur der Hash, ein spaeteres Nachschlagen gibt es nicht.
+function zeigeNeuesSftpPasswort(passwort) {
+    const gruppe  = document.getElementById('sftp-pass-gruppe');
+    const hinweis = document.getElementById('sftp-pass-hinweis');
+
+    document.getElementById('sftp-pass').value = passwort;
+    gruppe.style.display = '';
+    hinweis.innerHTML = '<i class="fas fa-triangle-exclamation text-warning me-1"></i> '
+        + 'Jetzt kopieren — nach dem Neuladen ist es nicht mehr abrufbar.';
 }
 
 async function sftpResetPassword() {
@@ -969,9 +986,7 @@ async function sftpResetPassword() {
         const data = await resp.json();
         if (data.success) {
             document.getElementById('sftp-user').value = data.sftp_username;
-            document.getElementById('sftp-pass').value = data.sftp_password;
-            document.getElementById('sftp-pass').type  = 'text';
-            document.getElementById('sftp-pass-icon').classList.replace('fa-eye', 'fa-eye-slash');
+            zeigeNeuesSftpPasswort(data.sftp_password);
             toastr.success('SFTP-Passwort erfolgreich zurückgesetzt!');
         } else {
             toastr.error(data.message || 'Passwort-Reset fehlgeschlagen.');

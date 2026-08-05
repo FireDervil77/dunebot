@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
 const { buildStartPayload, loadServerForStart } = require('../helpers/StartPayload');
@@ -1085,17 +1086,23 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
 
         // ✅ SFTP-Credentials direkt beim Server-Erstellen setzen
         // Username = system_user des Rootservers (Linux-User dem das Verzeichnis gehört)
+        // Das Passwort wird hier nur gehasht abgelegt; der Nutzer holt es sich
+        // über "Zurücksetzen" auf der Detailseite.
         const sftpUsername = rootserver.system_user || `gs-${String(serverId).padStart(8, '0')}`;
-        const sftpPassword = require('crypto').randomBytes(10).toString('hex'); // 20 Zeichen hex
-        await dbService.query(
-            'UPDATE gameservers SET sftp_username = ?, sftp_password = ? WHERE id = ?',
-            [sftpUsername, sftpPassword, serverId]
-        );
-        Logger.info(`[Gameserver] SFTP-Credentials gesetzt für Server ${serverId} (User: ${sftpUsername})`);
-
-        // SFTP-Credentials per IPM an Daemon übermitteln
-        _syncSftpUserToDaemon(daemonId, String(serverId), sftpUsername, sftpPassword, guildId)
-            .catch(err => Logger.warn(`[Gameserver] SFTP-Sync zum Daemon fehlgeschlagen: ${err.message}`));
+        _setzeSftpPasswort(dbService, {
+            serverId,
+            username: sftpUsername,
+            daemonId,
+            guildId
+        })
+            .then(({ synchronisiert, fehler }) => {
+                if (synchronisiert) {
+                    Logger.info(`[Gameserver] SFTP-Credentials gesetzt für Server ${serverId} (User: ${sftpUsername})`);
+                } else {
+                    Logger.warn(`[Gameserver] SFTP-Credentials für Server ${serverId} nicht zum Daemon übertragen: ${fehler?.message}`);
+                }
+            })
+            .catch(err => Logger.warn(`[Gameserver] SFTP-Credentials fehlgeschlagen: ${err.message}`));
 
         // IPC-Command an Daemon senden für Installation
         try {
@@ -1745,7 +1752,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.created_at,
                 gs.updated_at,
                 gs.sftp_username,
-                gs.sftp_password,
+                gs.sftp_password_hash,
                 gs.env_variables,
                 am.name as game_name,
                 am.slug as game_slug,
@@ -1877,16 +1884,25 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
 
         // SFTP-Credentials: Normally set at creation time. Lazy-fallback only if missing.
         if (!server.sftp_username && server.system_user) {
-            // Fallback für ältere Server die vor dem direkten SFTP-Setup angelegt wurden
+            // Fallback für ältere Server die vor dem direkten SFTP-Setup angelegt wurden.
+            // Das erzeugte Passwort wird bewusst nicht angezeigt — es taucht in
+            // keiner Antwort auf, der Nutzer holt es sich über "Zurücksetzen".
             server.sftp_username = server.system_user;
-            server.sftp_password = crypto.randomBytes(10).toString('hex');
-            await dbService.query(
-                'UPDATE gameservers SET sftp_username = ?, sftp_password = ? WHERE id = ?',
-                [server.sftp_username, server.sftp_password, server.id]
-            );
-            _syncSftpUserToDaemon(server.daemon_id, String(server.id), server.sftp_username, server.sftp_password, guildId)
-                .catch(err => Logger.warn(`[Gameserver] SFTP-Sync zum Daemon fehlgeschlagen: ${err.message}`));
-            Logger.info(`[Gameserver] SFTP-Credentials (Fallback) generiert für Server ${server.id} (User: ${server.sftp_username})`);
+            const nachgezogen = await _setzeSftpPasswort(dbService, {
+                serverId: server.id,
+                username: server.sftp_username,
+                daemonId: server.daemon_id,
+                guildId
+            }).catch(err => {
+                Logger.warn(`[Gameserver] SFTP-Credentials fehlgeschlagen: ${err.message}`);
+                return null;
+            });
+            server.sftp_passwort_gesetzt = Boolean(nachgezogen);
+            if (nachgezogen && !nachgezogen.synchronisiert) {
+                Logger.warn(`[Gameserver] SFTP-Credentials (Fallback) für Server ${server.id} nicht zum Daemon übertragen: ${nachgezogen.fehler?.message}`);
+            } else if (nachgezogen) {
+                Logger.info(`[Gameserver] SFTP-Credentials (Fallback) generiert für Server ${server.id} (User: ${server.sftp_username})`);
+            }
         } else if (server.sftp_username && server.system_user && server.sftp_username !== server.system_user) {
             // Username korrigieren falls abweichend
             server.sftp_username = server.system_user;
@@ -1896,6 +1912,12 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             );
             Logger.info(`[Gameserver] SFTP-Username korrigiert für Server ${server.id} → ${server.sftp_username}`);
         }
+        // Die View erfährt nur, OB ein Passwort gesetzt ist. Der Hash selbst hat
+        // in der Antwort nichts verloren — er ist zwar nicht umkehrbar, aber
+        // offline angreifbar, und die Seite braucht ihn für nichts.
+        server.sftp_passwort_gesetzt = server.sftp_passwort_gesetzt || Boolean(server.sftp_password_hash);
+        delete server.sftp_password_hash;
+
         // SFTP-Verbindungsinfo anfügen (IP bevorzugen – Hostname ist oft nicht konfiguriert)
         server.sftp_host = server.rootserver_ip || server.rootserver_hostname || 'N/A';
         server.sftp_port = 2022;
@@ -3748,19 +3770,30 @@ router.post('/:serverId/sftp/reset-password', requirePermission('GAMESERVER.EDIT
 
         // Username = immer der system_user des RootServers
         const sftp_username = server.system_user || server.sftp_username || `gs-${String(server.id).padStart(8, '0')}`;
-        const sftp_password = crypto.randomBytes(10).toString('hex');
 
-        await dbService.query(
-            'UPDATE gameservers SET sftp_username = ?, sftp_password = ? WHERE id = ?',
-            [sftp_username, sftp_password, server.id]
-        );
+        const { klartext, synchronisiert, fehler } = await _setzeSftpPasswort(dbService, {
+            serverId: server.id,
+            username: sftp_username,
+            daemonId: server.daemon_id,
+            guildId
+        });
 
-        _syncSftpUserToDaemon(server.daemon_id, String(server.id), sftp_username, sftp_password, guildId)
-            .catch(err => Logger.warn(`[Gameserver] SFTP-Sync-Fehler: ${err.message}`));
+        if (!synchronisiert) {
+            // Das alte Passwort gilt auf dem Rootserver weiter, das neue steht
+            // schon in der Datenbank. Beides auszusprechen ist ehrlicher, als
+            // ein Passwort auszugeben, das gerade nirgends funktioniert.
+            Logger.warn(`[Gameserver] SFTP-Passwort für Server ${serverId} nicht zum Daemon übertragen: ${fehler?.message}`);
+            return res.status(503).json({
+                success: false,
+                message: 'Der Rootserver war nicht erreichbar. Das neue Passwort ist noch nicht aktiv — '
+                       + 'bitte erneut zurücksetzen, sobald er wieder online ist.'
+            });
+        }
 
         Logger.info(`[Gameserver] SFTP-Passwort zurückgesetzt für Server ${serverId}`);
 
-        return res.json({ success: true, sftp_username, sftp_password });
+        // Einzige Gelegenheit, den Klartext zu sehen — gespeichert ist nur der Hash.
+        return res.json({ success: true, sftp_username, sftp_password: klartext });
 
     } catch (error) {
         Logger.error('[Gameserver] Fehler beim Zurücksetzen des SFTP-Passworts:', error);
@@ -3771,7 +3804,9 @@ router.post('/:serverId/sftp/reset-password', requirePermission('GAMESERVER.EDIT
 // ============================================================
 // SFTP-Helper: Credentials per IPM an Daemon synchronisieren
 // ============================================================
-async function _syncSftpUserToDaemon(daemonId, serverId, username, password, guildId) {
+// Übertragen wird der bcrypt-Hash, nicht das Passwort. Der Daemon vergleicht
+// beim Anmelden dagegen — das Klartext-Passwort verlässt das Dashboard nie.
+async function _syncSftpUserToDaemon(daemonId, serverId, username, passwordHash, guildId) {
     if (!daemonId) return;
     const ipmServer = ServiceManager.get('ipmServer');
     if (!ipmServer) return;
@@ -3779,8 +3814,36 @@ async function _syncSftpUserToDaemon(daemonId, serverId, username, password, gui
         server_id: serverId,
         guild_id: guildId,
         username,
-        password
+        password_hash: passwordHash
     });
+}
+
+// Erzeugt ein neues SFTP-Passwort, legt nur dessen Hash ab und meldet ihn dem
+// Daemon. Der zurückgegebene Klartext ist die einzige Gelegenheit, ihn zu
+// zeigen — danach ist er nirgends mehr abrufbar.
+//
+// `synchronisiert` sagt, ob der Rootserver das neue Passwort auch bekommen hat.
+// Ist er offline, gilt dort weiter das alte: Das Dashboard darf dann kein
+// funktionierendes Passwort vortäuschen.
+async function _setzeSftpPasswort(dbService, { serverId, username, daemonId, guildId }) {
+    const klartext = crypto.randomBytes(10).toString('hex'); // 20 Zeichen hex
+    const hash = await bcrypt.hash(klartext, 10);
+
+    await dbService.query(
+        'UPDATE gameservers SET sftp_username = ?, sftp_password_hash = ? WHERE id = ?',
+        [username, hash, serverId]
+    );
+
+    let synchronisiert = true;
+    let fehler = null;
+    try {
+        await _syncSftpUserToDaemon(daemonId, String(serverId), username, hash, guildId);
+    } catch (err) {
+        synchronisiert = false;
+        fehler = err;
+    }
+
+    return { klartext, synchronisiert, fehler };
 }
 
 // ============================================================
