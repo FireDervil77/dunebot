@@ -945,34 +945,44 @@ router.post('/changelogs/save', async (req, res) => {
             try {
                 const announcementTitle_de = `📢 Update v${version} veröffentlicht!`;
                 const announcementTitle_en = `📢 Update v${version} released!`;
-                // Beschreibung UND Aenderungsliste. Bis hierher ging nur die
-                // Beschreibung raus — die Ankuendigung nannte also, dass es ein
-                // Update gibt, aber nicht, was darin steht.
+                // Zwei Empfaenger, zwei Formate — dasselbe Feld.
                 //
-                // Passt nicht alles in ein Embed, kuerzt htmlZuDiscordMarkdown
-                // am Ende sichtbar und verweist auf den Changelog; der Knopf
-                // darunter fuehrt ohnehin dorthin.
-                const mitAenderungen = (beschreibung, aenderungen) => {
-                    const teile = [beschreibung, changelogZuDiscordMarkdown(aenderungen)]
-                        .map(t => (t || '').trim())
-                        .filter(Boolean);
+                // Das Dashboard gibt die Nachricht mit <%- aus, erwartet also
+                // HTML. Discord kann kein HTML, dort braucht es Markdown. Wer
+                // nur eine Fassung ablegt, macht die andere kaputt: Markdown im
+                // Dashboard zeigt "#" und "**" im Klartext, HTML in Discord
+                // zeigt die Tags.
+                //
+                // Gespeichert wird deshalb die HTML-Fassung (das Dashboard
+                // liest aus der Datenbank), und die Markdown-Fassung geht nur
+                // in die Nachricht an den Bot.
+                const beschreibung_de = description_de || `<p>Version ${version} ist jetzt verfügbar.</p>`;
+                const beschreibung_en = description_en || `<p>Version ${version} is now available.</p>`;
+
+                // Fuer Discord: Beschreibung UND Aenderungsliste. Bis hierher
+                // ging nur die Beschreibung raus — die Ankuendigung nannte
+                // also, DASS es ein Update gibt, aber nicht, was darin steht.
+                const fuerDiscord = (beschreibung, aenderungen) => {
+                    const teile = [
+                        htmlZuDiscordMarkdown(beschreibung),
+                        changelogZuDiscordMarkdown(aenderungen)
+                    ].map(t => (t || '').trim()).filter(Boolean);
                     // NUR kuerzen — beide Teile sind bereits umgewandelt.
                     return kuerzeFuerDiscord(teile.join('\n\n'));
                 };
 
-                const cleanDesc_de = mitAenderungen(
-                    htmlZuDiscordMarkdown(description_de || `Version ${version} ist jetzt verfügbar.`),
-                    changes_de
-                );
-                const cleanDesc_en = mitAenderungen(
-                    htmlZuDiscordMarkdown(description_en || `Version ${version} is now available.`),
-                    changes_en
-                );
-
                 const announcementTranslations = {
                     title: { 'de-DE': announcementTitle_de, 'en-GB': announcementTitle_en },
-                    message: { 'de-DE': cleanDesc_de, 'en-GB': cleanDesc_en },
+                    message: { 'de-DE': beschreibung_de, 'en-GB': beschreibung_en },
                     action_text: { 'de-DE': 'Changelog anzeigen', 'en-GB': 'View Changelog' }
+                };
+
+                const discordTranslations = {
+                    ...announcementTranslations,
+                    message: {
+                        'de-DE': fuerDiscord(beschreibung_de, changes_de),
+                        'en-GB': fuerDiscord(beschreibung_en, changes_en)
+                    }
                 };
 
                 const methods = [];
@@ -1017,8 +1027,13 @@ router.post('/changelogs/save', async (req, res) => {
 
                 if (wantDiscord) {
                     const ipcServer = ServiceManager.get('ipcServer');
+                    // Der Bot bekommt die Markdown-Fassung; in der Datenbank
+                    // bleibt das HTML fuer die Anzeige im Dashboard stehen.
+                    const discordData = NotificationHelper.prepareNotificationForDB(
+                        discordTranslations, announcementMeta
+                    );
                     await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', {
-                        id: result.insertId, ...notificationData, ...announcementMeta,
+                        id: result.insertId, ...discordData, ...announcementMeta,
                         base_url: baseUrl
                     }, true);
                 }
