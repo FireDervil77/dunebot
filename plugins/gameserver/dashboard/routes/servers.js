@@ -1911,6 +1911,19 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 'UPDATE gameservers SET sftp_username = ? WHERE id = ?',
                 [server.sftp_username, server.id]
             );
+
+            // Der Daemon muss den neuen Namen auch erfahren. Ohne das zeigte
+            // die Seite ab hier einen Benutzernamen an, den der Rootserver
+            // nicht kennt — anmelden konnte man sich damit nicht.
+            //
+            // Auffallen kann das seit es den Umzug zwischen Rootservern gibt:
+            // Der Name leitet sich vom system_user des Rootservers ab, und der
+            // ist am Ziel oft ein anderer. Der Abgleich schickt den ganzen
+            // Bestand, wodurch der alte Eintrag dort verschwindet; das
+            // Passwort bleibt dasselbe.
+            ServiceManager.get('ipmServer')?.syncSftpUsers(server.daemon_id)
+                .catch(err => Logger.warn(`[Gameserver] SFTP-Abgleich nach Namensänderung fehlgeschlagen: ${err.message}`));
+
             Logger.info(`[Gameserver] SFTP-Username korrigiert für Server ${server.id} → ${server.sftp_username}`);
         }
         // Die View erfährt nur, OB ein Passwort gesetzt ist. Der Hash selbst hat

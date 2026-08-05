@@ -592,7 +592,32 @@ class MigrationManager {
                 this.Logger.error(`[MigrationManager] Cronjobs konnten nicht neu eingeplant werden: ${cronErr.message}`);
             }
 
-            // Schritt 8: Cleanup
+            // Schritt 8: SFTP-Zugang mitnehmen.
+            //
+            // Der Zugang lebt in der SQLite-Datei des jeweiligen Daemons, nicht
+            // in der Dashboard-Datenbank. Ohne diesen Abgleich bliebe er nach
+            // einem Umzug auf dem ALTEN Rootserver gültig — und der Daemon
+            // nähme ihn weiter an, weil ResolveBasePath den Verzeichnisnamen
+            // nur zusammensetzt und nicht prüft, ob es ihn noch gibt. Am Ziel
+            // gäbe es zugleich gar keinen Zugang; der Kunde käme dort nicht an
+            // seine Dateien.
+            //
+            // Beide Seiten bekommen ihren vollständigen Bestand geschickt: Der
+            // alte Rootserver meldet den Server nicht mehr und verliert ihn
+            // dadurch, der neue meldet ihn und legt ihn an. Muss NACH dem
+            // DB-Update laufen — vorher stünde dort noch die alte Zuordnung.
+            for (const [rolle, daemonId] of [
+                ['Quelle', sourceRootServer.daemon_id],
+                ['Ziel',   targetRootServer.daemon_id]
+            ]) {
+                try {
+                    await this.ipmServer.syncSftpUsers(daemonId);
+                } catch (sftpErr) {
+                    this.Logger.error(`[MigrationManager] SFTP-Abgleich (${rolle}, Daemon ${daemonId}) fehlgeschlagen: ${sftpErr.message}`);
+                }
+            }
+
+            // Schritt 9: Cleanup
             await this._cleanup(migrationId, sourceRootServer, targetRootServer, backupPath, targetBackupPath);
 
             this._sendSSE(guildId, server.id, { 
