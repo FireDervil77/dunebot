@@ -337,6 +337,26 @@ router.get('/blog/:slug', async (req, res) => {
 });
 
 // ── CMS-Seiten: /page/:slug ──
+/**
+ * Seiten, die es als CMS-Eintrag GAB, aber eine eigene Route haben.
+ *
+ * Datenschutz und Nutzungsbedingungen lagen doppelt vor: einmal als
+ * CMS-Seite (deutsch, am 2026-03-21 aus der gerenderten Fassung
+ * herauskopiert, seitdem unveraendert) und einmal unter /privacy bzw. /tos,
+ * wo der Text aus den Sprachdateien kommt — zweisprachig gepflegt, 58 bzw. 32
+ * Schluessel je Sprache.
+ *
+ * Die CMS-Kopien stehen jetzt auf "draft", damit es eine Quelle gibt. Alte
+ * Verweise auf /page/privacy sollen deshalb nicht ins Leere laufen: Sie
+ * bekommen einen dauerhaften Umzug auf die gepflegte Fassung. Bei
+ * Rechtstexten ist das wichtiger als bei anderen Seiten — sie werden verlinkt
+ * und zitiert.
+ */
+const UMGEZOGENE_SEITEN = {
+    privacy: '/privacy',
+    tos:     '/tos'
+};
+
 router.get('/page/:slug', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const themeManager = ServiceManager.get('themeManager');
@@ -346,6 +366,10 @@ router.get('/page/:slug', async (req, res) => {
         const page = await FrontendPage.getBySlug(req.params.slug);
 
         if (!page) {
+            const ziel = UMGEZOGENE_SEITEN[req.params.slug];
+            if (ziel) {
+                return res.redirect(301, ziel);
+            }
             return res.status(404).render('frontend/404');
         }
 

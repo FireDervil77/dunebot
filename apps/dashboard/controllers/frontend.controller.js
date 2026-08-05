@@ -231,6 +231,13 @@ exports.getChangelog = async (req, res) => {
 
 /**
  * Datenschutz-Seite anzeigen
+ *
+ * Der Text steht in den Sprachdateien (PRIVACY.*, 58 Schlüssel je Sprache) und
+ * wird von der View über tr() geholt — deshalb gibt es hier nichts zu laden.
+ * Frueher stand hier ein `privacyContent: await getPrivacyContent()`; die
+ * Funktion gab eine leere Zeichenkette zurueck und die View benutzte den Wert
+ * nicht einmal.
+ *
  * @param {Object} req - Express Request
  * @param {Object} res - Express Response
  */
@@ -241,8 +248,7 @@ exports.privacy = async (req, res) => {
     try {
         await themeManager.renderView(res, 'frontend/privacy', {
             title: 'Datenschutz - FireBot',
-            user: req.session.user || null,
-            privacyContent: await getPrivacyContent(req.app)
+            user: req.session.user || null
         });
     } catch (error) {
         Logger.error('Fehler beim Rendern der Datenschutz-Seite:', error);
@@ -252,6 +258,10 @@ exports.privacy = async (req, res) => {
 
 /**
  * AGB-Seite anzeigen
+ *
+ * Wie bei der Datenschutz-Seite: Der Text kommt aus den Sprachdateien
+ * (TERMS.*, 32 Schlüssel je Sprache), nicht aus einer Ladefunktion.
+ *
  * @param {Object} req - Express Request
  * @param {Object} res - Express Response
  */
@@ -262,8 +272,7 @@ exports.tos = async (req, res) => {
     try {
         await themeManager.renderView(res, 'frontend/tos', {
             title: 'Terms of Service - FireBot',
-            user: req.session.user || null,
-            termsContent: await getTermsContent(req.app)
+            user: req.session.user || null
         });
     } catch (error) {
         Logger.error('Fehler beim Rendern der Terms of Service-Seite:', error);
@@ -335,24 +344,4 @@ async function loadNews(req) {
     }
 }
 
-/**
- * Datenschutz-Text laden
- * @private
- * @param {Object} app - Express App
- * @returns {Promise<string>} Datenschutz-Text
- */
-async function getPrivacyContent(app) {
-    // Implementierung für Datenschutz
-    return '';
-}
 
-/**
- * AGB-Text laden
- * @private
- * @param {Object} app - Express App
- * @returns {Promise<string>} AGB-Text
- */
-async function getTermsContent(app) {
-    // Implementierung für AGB
-    return '';
-}
