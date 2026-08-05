@@ -80,9 +80,6 @@
       const _adminPath = (typeof activeMenu === 'string' && activeMenu.startsWith('/admin')) ? activeMenu : '';
     %>
 
-    <%# DEBUG — bitte danach entfernen %>
-    <!-- DEBUG: user=<%= _u ? JSON.stringify({id:_u.id,isOwner:_u.isOwner,hasSystemAccess:_u.hasSystemAccess}) : 'null' %> | _isSystemUser=<%= _isSystemUser %> -->
-
     <% if (_isSystemUser) { %>
     <nav class="mt-3 sidebar-admin-section">
       <ul class="nav nav-pills nav-sidebar flex-column" role="menu" data-accordion="false">
@@ -99,8 +96,8 @@
         </li>
 
         <!-- Content Management -->
-        <li class="nav-item <%= _adminPath.startsWith('/admin/content') || _adminPath.startsWith('/admin/docs') ? 'menu-open' : '' %>">
-          <a href="/admin/content" class="nav-link <%= _adminPath.startsWith('/admin/content') || _adminPath.startsWith('/admin/docs') ? 'active' : '' %>">
+        <li class="nav-item <%= _adminPath.startsWith('/admin/content') || _adminPath.startsWith('/admin/docs') || _adminPath.startsWith('/admin/themes/pages') ? 'menu-open' : '' %>">
+          <a href="/admin/content" class="nav-link <%= _adminPath.startsWith('/admin/content') || _adminPath.startsWith('/admin/docs') || _adminPath.startsWith('/admin/themes/pages') ? 'active' : '' %>">
             <i class="nav-icon fa-solid fa-layer-group"></i>
             <p>Content Management <i class="bi bi-chevron-right right"></i></p>
           </a>
@@ -109,6 +106,12 @@
               <a href="/admin/content?tab=news" class="nav-link <%= _adminPath === '/admin/content' || _adminPath.startsWith('/admin/content/news') ? 'active' : '' %>">
                 <i class="nav-icon fa-regular fa-dot-circle"></i>
                 <p>News</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="/admin/content?tab=blog" class="nav-link">
+                <i class="nav-icon fa-regular fa-dot-circle"></i>
+                <p>Blog</p>
               </a>
             </li>
             <li class="nav-item">
@@ -124,15 +127,21 @@
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/content?tab=settings" class="nav-link">
+              <a href="/admin/themes/pages" class="nav-link <%= _adminPath.startsWith('/admin/themes/pages') ? 'active' : '' %>">
                 <i class="nav-icon fa-regular fa-dot-circle"></i>
-                <p>Einstellungen</p>
+                <p>Seiten</p>
               </a>
             </li>
             <li class="nav-item">
               <a href="/admin/docs" class="nav-link <%= _adminPath.startsWith('/admin/docs') ? 'active' : '' %>">
                 <i class="nav-icon fa-regular fa-dot-circle"></i>
                 <p>Dokumentation</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="/admin/content?tab=settings" class="nav-link">
+                <i class="nav-icon fa-regular fa-dot-circle"></i>
+                <p>Einstellungen</p>
               </a>
             </li>
           </ul>
@@ -201,12 +210,6 @@
               <a href="/admin/themes/frontpage" class="nav-link <%= _adminPath.startsWith('/admin/themes/frontpage') ? 'active' : '' %>">
                 <i class="nav-icon fa-regular fa-dot-circle"></i>
                 <p>Frontpage</p>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="/admin/themes/pages" class="nav-link <%= _adminPath.startsWith('/admin/themes/pages') ? 'active' : '' %>">
-                <i class="nav-icon fa-regular fa-dot-circle"></i>
-                <p>Seiten</p>
               </a>
             </li>
             <li class="nav-item">

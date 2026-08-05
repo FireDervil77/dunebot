@@ -24,23 +24,30 @@
   // Systembereich als Daten — Reihenfolge und Inhalt an einem Ort
   const _system = [
     { url: '/admin',               titel: 'Übersicht',          icon: 'fa-solid fa-gauge-high' },
+    // Was der Besucher liest, steht hier — unabhaengig davon, welcher Router
+    // es zufaellig bedient. "Seiten" lag unter Themes, obwohl es reiner Inhalt
+    // ist; wer eine Seite anlegen wollte, suchte sie unter dem Aussehen. Der
+    // Blog stand in keiner Seitenleiste, obwohl es ihn samt Editor gibt.
     { url: '/admin/content',       titel: 'Content Management', icon: 'fa-solid fa-layer-group', kinder: [
         { url: '/admin/content?tab=news',          titel: 'News' },
+        { url: '/admin/content?tab=blog',          titel: 'Blog' },
         { url: '/admin/content?tab=changelogs',    titel: 'Changelogs' },
         { url: '/admin/content?tab=notifications', titel: 'Benachrichtigungen' },
-        { url: '/admin/content?tab=settings',      titel: 'Einstellungen' },
-        { url: '/admin/docs',                      titel: 'Dokumentation' }
+        { url: '/admin/themes/pages',              titel: 'Seiten' },
+        { url: '/admin/docs',                      titel: 'Dokumentation' },
+        { url: '/admin/content?tab=settings',      titel: 'Einstellungen' }
     ] },
     { url: '/admin/stats',         titel: 'Statistiken',        icon: 'fa-solid fa-chart-bar' },
     { url: '/admin/feedback',      titel: 'Feedback',           icon: 'fa-solid fa-comments' },
     { url: '/admin/donations',     titel: 'Spenden',            icon: 'fa-solid fa-hand-holding-heart' },
     { url: '/admin/addons',        titel: 'Addon-Marketplace',  icon: 'fa-solid fa-puzzle-piece' },
     { url: '/admin/plugin-badges', titel: 'Plugin Badges',      icon: 'fa-solid fa-tags' },
+    // Hier bleibt, was den AUFBAU der Seite bestimmt: welche Abschnitte die
+    // Startseite hat, wie Navigation und Footer aussehen, wo Widgets landen.
     { url: '/admin/themes',        titel: 'Themes',             icon: 'fa-solid fa-palette', kinder: [
         { url: '/admin/themes',           titel: 'Übersicht' },
         { url: '/admin/themes/widgets',   titel: 'Widget-Bereiche' },
         { url: '/admin/themes/frontpage', titel: 'Frontpage' },
-        { url: '/admin/themes/pages',     titel: 'Seiten' },
         { url: '/admin/themes/menu',      titel: 'Navigation' },
         { url: '/admin/themes/footer',    titel: 'Footer' }
     ] }
