@@ -177,6 +177,11 @@ class RootServer {
         // Anmeldung; er aendert sich nur, wenn der Schluessel neu erzeugt wurde
         // — dann soll auch die Anzeige sofort den neuen Wert nennen.
         if (daten.sftpFingerprint) { fields.push('sftp_fingerprint = ?'); values.push(daten.sftpFingerprint); }
+        // Port, auf dem der SFTP-Server dort wirklich lauscht. Er stand im
+        // Dashboard fest im Code und stimmte nicht mehr, sobald jemand die
+        // daemon.yaml anpasste — der Kunde bekam dann einen Port angezeigt,
+        // an dem niemand antwortet.
+        if (daten.sftpPort) { fields.push('sftp_port = ?'); values.push(parseInt(daten.sftpPort, 10)); }
         if (daten.installStatus) { fields.push('install_status = ?'); values.push(daten.installStatus); }
         if (daten.sessionToken) {
             fields.push('session_token = ?');
