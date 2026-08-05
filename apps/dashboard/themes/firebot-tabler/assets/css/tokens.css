@@ -260,3 +260,26 @@
 .widget-arrange-griff:active { cursor: grabbing; }
 
 .widget-arrange-ghost { opacity: .35; }
+
+/* ── Hinweiskästen aus der Zeit vor Tabler ───────────────────────────────────
+ *
+ * Tabler legt `.alert` als Flex-Zeile an (display:flex; flex-direction:row;
+ * gap:1rem). Das passt zu SEINEM Aufbau, bei dem der Inhalt in genau einem
+ * Kindelement steckt.
+ *
+ * Unsere 172 Hinweiskästen stammen aus der AdminLTE-Zeit und schreiben Text
+ * direkt in den Kasten, mit <strong>, <a> und <br> dazwischen. Jedes dieser
+ * Stücke — auch die blanken Textabschnitte — wird dadurch zu einer eigenen
+ * Spalte. Aus einem Satz werden acht nebeneinanderstehende Fetzen; auf der
+ * Egg-Import-Seite war der Hinweis dadurch unlesbar.
+ *
+ * Deshalb hier zurück auf Blocksatz. Wer Tablers Zeilenaufbau will, setzt
+ * innen ein `.d-flex` — das ist ohnehin Tablers eigenes Muster und bleibt
+ * davon unberührt.
+ *
+ * Das Schließkreuz braucht dabei nichts: Tabler stellt es ohnehin absolut und
+ * hält mit `.alert-dismissible { padding-right: 3rem }` den Platz frei.
+ */
+.alert {
+    display: block;
+}
