@@ -15,6 +15,16 @@
  * @class GameserverSSEClient
  * @author FireBot Team
  */
+
+/**
+ * Ereignisse, die zeilenweise Ausgabe transportieren.
+ *
+ * Sie laufen waehrend eines Vorgangs dauerhaft und werden nur dort ausgewertet,
+ * wo sie auch angezeigt werden. Fehlt ein Handler, ist das kein Hinweis auf
+ * einen Verdrahtungsfehler — anders als bei allen uebrigen Ereignissen.
+ */
+const STROM_AKTIONEN = new Set(['console', 'install_output']);
+
 class GameserverSSEClient {
     /**
      * @param {string} guildId - Discord Guild ID
@@ -259,12 +269,13 @@ class GameserverSSEClient {
                     console.error(`[GameserverSSE] Handler-Fehler (${action}):`, error);
                 }
             });
-        } else {
-            // Console-Events haben normalerweise keinen Handler hier
-            // (werden von console-client.js separat behandelt)
-            if (action !== 'console') {
-                console.warn(`[GameserverSSE] Kein Handler für Action: ${action}`);
-            }
+        } else if (!STROM_AKTIONEN.has(action)) {
+            // Die Warnung soll falsch verdrahtete Ereignisse aufdecken. Reine
+            // Ausgabestroeme gehoeren nicht dazu: Sie laufen zeilenweise und
+            // werden nur auf den Seiten ausgewertet, die sie auch anzeigen —
+            // eine Seite ohne Anzeige ist kein Fehler. Ohne diese Ausnahme
+            // meldete eine einzige Installation hunderte Male "Kein Handler".
+            console.warn(`[GameserverSSE] Kein Handler für Action: ${action}`);
         }
     }
 

@@ -291,6 +291,85 @@ setup_docker_network() {
     fi
 }
 
+### SFTP-Port in der Firewall oeffnen
+#
+# Der Daemon lauscht auf genau einem Port: 2022 fuer SFTP. Alles andere laeuft
+# ueber die WebSocket-Verbindung, die er selbst nach aussen aufbaut — dafuer
+# muss nichts geoeffnet werden.
+#
+# Bis hierher tat der Installer dazu gar nichts. Auf einem Rootserver mit
+# aktiver Firewall stand der Zugang damit still: Das Dashboard zeigte Host,
+# Port und Benutzer an, der SFTP-Client lief in einen Zeitueberlauf, und nichts
+# im Protokoll deutete auf die Ursache.
+#
+# Absichtlich zurueckhaltend: Ist keine bekannte Firewall aktiv, wird keine
+# eingerichtet — auf einem fremden System eine Firewall hochzuziehen waere ein
+# groesserer Eingriff, als dieser Installer tun darf. Dann gibt es nur einen
+# Hinweis.
+setup_firewall() {
+    local port="${1:-2022}"
+
+    if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "^Status: active"; then
+        if ufw status | grep -qE "^${port}(/tcp)?[[:space:]]+ALLOW"; then
+            log_info "Firewall (ufw): Port ${port} ist bereits offen"
+            return 0
+        fi
+        if ufw allow "${port}/tcp" comment "FireBot SFTP" &>/dev/null; then
+            log_success "Firewall (ufw): Port ${port}/tcp geoeffnet"
+        else
+            log_warn "Firewall (ufw): Port ${port} konnte nicht geoeffnet werden — bitte von Hand nachholen"
+        fi
+        return 0
+    fi
+
+    if command -v firewall-cmd &>/dev/null && firewall-cmd --state &>/dev/null; then
+        if firewall-cmd --query-port="${port}/tcp" &>/dev/null; then
+            log_info "Firewall (firewalld): Port ${port} ist bereits offen"
+            return 0
+        fi
+        if firewall-cmd --permanent --add-port="${port}/tcp" &>/dev/null \
+           && firewall-cmd --reload &>/dev/null; then
+            log_success "Firewall (firewalld): Port ${port}/tcp geoeffnet"
+        else
+            log_warn "Firewall (firewalld): Port ${port} konnte nicht geoeffnet werden — bitte von Hand nachholen"
+        fi
+        return 0
+    fi
+
+    # Keine der beiden bekannten Firewalls aktiv. Das kann heissen: gar keine
+    # Firewall (dann ist alles gut) oder eine andere Loesung, etwa nftables von
+    # Hand oder eine vorgelagerte Firewall beim Anbieter. Beides ist nichts,
+    # worin dieser Installer herumschreiben sollte.
+    log_warn "Keine aktive ufw/firewalld gefunden — Port ${port}/tcp ggf. selbst freigeben (SFTP-Dateizugang)"
+}
+
+### SFTP-Port beim Deinstallieren wieder schliessen
+#
+# Nur die Regel, die setup_firewall gesetzt hat. Fehlt sie, passiert nichts —
+# dann hat sie jemand von Hand entfernt oder es gab nie eine.
+teardown_firewall() {
+    local port="${1:-2022}"
+
+    if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "^Status: active"; then
+        if ufw status | grep -qE "^${port}(/tcp)?[[:space:]]+ALLOW"; then
+            ufw delete allow "${port}/tcp" &>/dev/null \
+                && log_success "Firewall (ufw): Port ${port}/tcp geschlossen" \
+                || log_warn "Firewall (ufw): Port ${port} konnte nicht geschlossen werden"
+        fi
+        return 0
+    fi
+
+    if command -v firewall-cmd &>/dev/null && firewall-cmd --state &>/dev/null; then
+        if firewall-cmd --query-port="${port}/tcp" &>/dev/null; then
+            firewall-cmd --permanent --remove-port="${port}/tcp" &>/dev/null \
+                && firewall-cmd --reload &>/dev/null \
+                && log_success "Firewall (firewalld): Port ${port}/tcp geschlossen" \
+                || log_warn "Firewall (firewalld): Port ${port} konnte nicht geschlossen werden"
+        fi
+        return 0
+    fi
+}
+
 install_dependencies() {
     local deps=("$@")
     log_info "Installiere Dependencies: ${deps[*]}..."
@@ -729,7 +808,11 @@ uninstall() {
         rm "/etc/sudoers.d/firebot-daemon"
         log_success "Sudoers-Datei entfernt"
     fi
-    
+
+    # SFTP-Port wieder schliessen. Er wurde nur fuer diesen Daemon geoeffnet;
+    # ohne ihn lauscht dort niemand mehr.
+    teardown_firewall 2022
+
     # Lese Config und entferne Daten-Verzeichnisse
     CONFIG_PATH="$INSTALL_DIR/$CONFIG_FILE"
     if [[ -f "$CONFIG_PATH" ]]; then
@@ -932,6 +1015,9 @@ main() {
     # Ownership für Install-Dir setzen (root, da Daemon als root läuft)
     chown -R root:root "$INSTALL_DIR"
     
+    # SFTP-Port freigeben (der einzige Port, auf dem der Daemon lauscht)
+    setup_firewall 2022
+
     # Systemd Service
     create_systemd_service
     enable_service

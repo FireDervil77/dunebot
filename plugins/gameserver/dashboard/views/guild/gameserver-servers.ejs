@@ -785,6 +785,32 @@ function initSSE() {
             badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Installiere...';
         }
     });
+
+    /*
+     * Fortschritt beim Laden der Spieldateien.
+     *
+     * Der Daemon schickt jede Zeile von SteamCMD als Ereignis mit — darunter
+     * "Update state (0x61) downloading, progress: 65.25 (724796072 / 1110760610)".
+     * Diese Zeilen kamen bisher im Browser an, ohne dass jemand zuhoerte: Die
+     * Konsole meldete pro Zeile "Kein Handler fuer Action: install_output", bei
+     * einem Spiel von gut einem Gigabyte hunderte Male.
+     *
+     * Statt die Meldung stumm zu schalten, wird die Zahl jetzt benutzt. Der
+     * Balken ersetzt das unbewegte "Spieldateien..." — bei mehreren Minuten
+     * Ladezeit ist das der Unterschied zwischen "es laeuft" und "haengt es?".
+     */
+    window.gameserverSSE.on('install_output', (data) => {
+        const treffer = /progress:\s*([\d.]+)/.exec(data.line || '');
+        if (!treffer) return; // Zeile ohne Fortschrittsangabe — nichts zu tun
+
+        const row = document.querySelector(`tr[data-server-id="${data.server_id}"]`);
+        if (!row) return;
+        const badge = row.querySelector('.server-status-badge');
+        if (!badge || badge.dataset.status !== 'installing') return;
+
+        const prozent = Math.min(100, Math.round(parseFloat(treffer[1])));
+        badge.innerHTML = `<i class="fa-solid fa-gear fa-spin"></i> Spieldateien... ${prozent}%`;
+    });
     
     // Verbindung aufbauen
     window.gameserverSSE.connect();
