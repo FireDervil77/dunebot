@@ -19,21 +19,183 @@ const router = Router();
 // Erweiterte Kategorie-Liste (inkl. 'news')
 const CONTENT_CATEGORIES = ['announcement', 'changelog', 'news', 'status', 'maintenance', 'other'];
 
+/** Groesste Beschreibung, die Discord in einem Embed annimmt. */
+const DISCORD_EMBED_MAX = 4096;
+
 /**
- * Entfernt HTML-Tags und dekodiert HTML-Entities (inkl. Umlaute)
+ * Wandelt die HTML-Beschreibung in Discord-Markdown.
+ *
+ * Vorher wurden hier schlicht ALLE Tags entfernt (`.replace(/<[^>]+>/g, '')`).
+ * Das kostete nicht nur die Auszeichnung — es zog auch Bloecke zusammen: Fuer
+ * </p> und </li> kam kein Zeilenumbruch nach, also lief eine Liste aus fuenf
+ * Punkten als ein einziger Satz durch. Genau so kamen die Ankuendigungen in
+ * Discord an.
+ *
+ * Der Bot verschickt die Beschreibung in einem Embed (EmbedBuilder in
+ * apps/bot/ipc/SEND_NOTIFICATION.js), und Embeds verstehen Markdown. Also wird
+ * umgewandelt statt weggeworfen.
+ *
+ * @param {string} html
+ * @returns {string} Discord-Markdown
  */
-function stripHtmlForDiscord(html) {
+function htmlZuDiscordMarkdown(html) {
     if (!html || typeof html !== 'string') return '';
-    return html
-        .replace(/<[^>]+>/g, '')
+
+    // Umbrueche werden zunaechst nur VORGEMERKT.
+    //
+    // Der Grund: In HTML ist ein Zeilenumbruch im Quelltext bedeutungslos —
+    // der Editor bricht lange Absaetze um, ohne dass das etwas heissen soll.
+    // Ein echter Umbruch steht in <br> oder ergibt sich aus einem Block. Wer
+    // beides gleich behandelt, zerreisst jeden umbrochenen Absatz.
+    //
+    // Also: echte Umbrueche als Platzhalter merken, danach den Quelltext-
+    // Weissraum zusammenziehen, und erst zum Schluss die Platzhalter einsetzen.
+    const ZEILE = '@@FB_ZEILE@@';
+    const ABSATZ = '@@FB_ABSATZ@@';
+
+    let text = html;
+    text = text.replace(/<br\s*\/?>/gi, ZEILE);
+    text = text.replace(/<\/(p|div)>/gi, ABSATZ);
+    text = text.replace(/<li[^>]*>/gi, ZEILE + '- ').replace(/<\/li>/gi, '');
+    text = text.replace(/<\/(ul|ol)>/gi, ABSATZ);
+
+    // Ueberschriften: Discord kennt # bis ###
+    text = text.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_, i) => `${ABSATZ}# ${i.trim()}${ABSATZ}`);
+    text = text.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_, i) => `${ABSATZ}## ${i.trim()}${ABSATZ}`);
+    text = text.replace(/<h[3-6][^>]*>([\s\S]*?)<\/h[3-6]>/gi, (_, i) => `${ABSATZ}### ${i.trim()}${ABSATZ}`);
+
+    // Auszeichnung
+    text = text.replace(/<(strong|b)[^>]*>([\s\S]*?)<\/\1>/gi, (_, __, i) => `**${i.trim()}**`);
+    text = text.replace(/<(em|i)[^>]*>([\s\S]*?)<\/\1>/gi, (_, __, i) => `*${i.trim()}*`);
+    text = text.replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, (_, i) => `__${i.trim()}__`);
+    text = text.replace(/<(s|del|strike)[^>]*>([\s\S]*?)<\/\1>/gi, (_, __, i) => `~~${i.trim()}~~`);
+    text = text.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, (_, i) => `\`${i.trim()}\``);
+    text = text.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, i) => `${ZEILE}> ${i.trim()}${ABSATZ}`);
+
+    // Links: [Text](Adresse) — ohne Text bleibt die Adresse allein stehen
+    text = text.replace(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+        (_, url, beschriftung) => {
+            const t = beschriftung.replace(/<[^>]+>/g, '').trim();
+            return t ? `[${t}](${url})` : url;
+        });
+
+    // Was jetzt noch an Tags uebrig ist, traegt keine Bedeutung mehr
+    text = text.replace(/<[^>]+>/g, '');
+
+    // Entities aufloesen (unveraendert aus der frueheren Fassung)
+    text = text
         .replace(/&auml;/g, 'ä').replace(/&ouml;/g, 'ö').replace(/&uuml;/g, 'ü')
         .replace(/&Auml;/g, 'Ä').replace(/&Ouml;/g, 'Ö').replace(/&Uuml;/g, 'Ü')
         .replace(/&szlig;/g, 'ß')
+        .replace(/&mdash;/g, '—').replace(/&ndash;/g, '–').replace(/&hellip;/g, '…')
+        .replace(/&eacute;/g, 'é').replace(/&laquo;/g, '«').replace(/&raquo;/g, '»')
+        .replace(/&bdquo;/g, '„').replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"')
         .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&nbsp;/g, ' ')
         .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-        .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
-        .trim();
+        .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+
+    // Weissraum aus dem Quelltext (auch die dort gesetzten Umbrueche) zu je
+    // einem Leerzeichen zusammenziehen — er trug nie Bedeutung.
+    text = text.replace(/\s+/g, ' ');
+
+    // Jetzt die vorgemerkten Umbrueche einsetzen
+    text = text.split(ABSATZ).map(t => t.trim()).filter(Boolean).join('\n\n');
+    text = text.split(ZEILE).map(t => t.trim()).join('\n');
+
+    // Aufraeumen: hoechstens eine Leerzeile, keine leeren Zeilen am Rand
+    text = text.split('\n').map(z => z.replace(/[ \t]+$/, '')).join('\n');
+    text = text.replace(/\n{3,}/g, '\n\n').replace(/^\n+|\n+$/g, '').trim();
+
+    return kuerzeFuerDiscord(text);
+}
+
+/**
+ * Kuerzt auf die Laenge, die Discord in einem Embed annimmt.
+ *
+ * Eigene Funktion, weil sie auch auf zusammengesetzten Text angewandt werden
+ * muss. Den fertigen Text ein zweites Mal durch htmlZuDiscordMarkdown zu
+ * schicken waere falsch: Dort werden Umbrueche aus dem Quelltext zu
+ * Leerzeichen zusammengezogen — sinnvoll bei HTML, aber es macht aus dem
+ * bereits umgewandelten Markdown wieder einen einzigen Absatz.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function kuerzeFuerDiscord(text) {
+    if (!text) return '';
+    if (text.length <= DISCORD_EMBED_MAX) return text;
+
+    // Zu lange Beschreibungen weist Discord ZURUECK — die Ankuendigung ginge
+    // dann gar nicht raus. Lieber sichtbar gekuerzt als stillschweigend nicht
+    // gesendet. Abgeschnitten wird an einem Zeilenende, damit kein halber
+    // Eintrag stehen bleibt.
+    const hinweis = '\n\n… (gekürzt — vollständig im Changelog)';
+    let gekuerzt = text.slice(0, DISCORD_EMBED_MAX - hinweis.length);
+    const letzterUmbruch = gekuerzt.lastIndexOf('\n');
+    if (letzterUmbruch > DISCORD_EMBED_MAX / 2) {
+        gekuerzt = gekuerzt.slice(0, letzterUmbruch);
+    }
+    return gekuerzt.trimEnd() + hinweis;
+}
+
+/** Zeichen fuer die vier Eintragsarten in Discord. */
+const DISCORD_SYMBOLE = {
+    fix:     '🐛',
+    feature: '✨',
+    change:  '🔧',
+    removed: '🗑️'
+};
+
+/**
+ * Rendert die Aenderungsliste eines Changelogs als Discord-Markdown.
+ *
+ * Bisher ging nur die BESCHREIBUNG nach Discord — die eigentliche Liste der
+ * Aenderungen blieb im Dashboard. Wer die Ankuendigung las, sah einen
+ * Einleitungstext und sonst nichts, obwohl der Changelog selbst nach Gruppen,
+ * Untergruppen und Art der Aenderung gegliedert ist.
+ *
+ * Die Gliederung wird eine Ebene nach unten gereicht: Aus `#` wird `##`, aus
+ * `##` wird `###`. Die oberste Ebene bleibt dem Titel der Ankuendigung.
+ *
+ * @param {string} changesText - Reintext im Changelog-Format
+ * @returns {string} Discord-Markdown, leer wenn nichts zu zeigen ist
+ */
+function changelogZuDiscordMarkdown(changesText) {
+    if (!changesText) return '';
+
+    let baum;
+    try {
+        baum = ChangelogHelper.parseHierarchicalChangelog(String(changesText));
+    } catch (_) {
+        return '';
+    }
+    if (!Array.isArray(baum) || baum.length === 0) return '';
+
+    const zeilen = [];
+    for (const gruppe of baum) {
+        if (gruppe.title) zeilen.push(`## ${gruppe.title}`);
+
+        for (const untergruppe of gruppe.children || []) {
+            // "Allgemein" ist erfunden, wenn Eintraege direkt unter einer
+            // Gruppe stehen — die Ueberschrift hat niemand geschrieben.
+            if (untergruppe.title && !untergruppe.synthetic) {
+                zeilen.push(`### ${untergruppe.title}`);
+            }
+            if (untergruppe.description) {
+                zeilen.push(untergruppe.description.replace(/<br\s*\/?>/gi, '\n'));
+            }
+
+            for (const eintrag of untergruppe.items || []) {
+                const symbol = DISCORD_SYMBOLE[eintrag.type] || '•';
+                // Der Text darf HTML enthalten (der Parser laesst es stehen)
+                const text = htmlZuDiscordMarkdown(eintrag.text || '');
+                if (text) zeilen.push(`${symbol} ${text}`);
+            }
+        }
+    }
+
+    return zeilen.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 // ================================================================
@@ -396,10 +558,13 @@ router.post('/news/save', async (req, res) => {
         if (wantDiscord || wantBadge) {
             try {
                 const baseUrl = process.env.DASHBOARD_BASE_URL || '';
-                const newsUrl = `${baseUrl}/news/${slug || 'news'}`;
+                // Die oeffentliche Route heisst /news-details/:slug, nicht
+                // /news/:slug. Der Knopf unter jeder Discord-Ankuendigung
+                // fuehrte deshalb auf eine Seite, die es nicht gibt.
+                const newsUrl = `${baseUrl}/news-details/${slug || ''}`;
 
-                const cleanExcerpt_de = stripHtmlForDiscord(excerpt_de || title_de || '');
-                const cleanExcerpt_en = stripHtmlForDiscord(excerpt_en || title_en || '');
+                const cleanExcerpt_de = htmlZuDiscordMarkdown(excerpt_de || title_de || '');
+                const cleanExcerpt_en = htmlZuDiscordMarkdown(excerpt_en || title_en || '');
 
                 const notifTranslations = {
                     title: { 'de-DE': `📰 ${title_de || 'Neue News'}`, 'en-GB': `📰 ${title_en || 'New Article'}` },
@@ -780,8 +945,29 @@ router.post('/changelogs/save', async (req, res) => {
             try {
                 const announcementTitle_de = `📢 Update v${version} veröffentlicht!`;
                 const announcementTitle_en = `📢 Update v${version} released!`;
-                const cleanDesc_de = stripHtmlForDiscord(description_de || `Version ${version} ist jetzt verfügbar.`);
-                const cleanDesc_en = stripHtmlForDiscord(description_en || `Version ${version} is now available.`);
+                // Beschreibung UND Aenderungsliste. Bis hierher ging nur die
+                // Beschreibung raus — die Ankuendigung nannte also, dass es ein
+                // Update gibt, aber nicht, was darin steht.
+                //
+                // Passt nicht alles in ein Embed, kuerzt htmlZuDiscordMarkdown
+                // am Ende sichtbar und verweist auf den Changelog; der Knopf
+                // darunter fuehrt ohnehin dorthin.
+                const mitAenderungen = (beschreibung, aenderungen) => {
+                    const teile = [beschreibung, changelogZuDiscordMarkdown(aenderungen)]
+                        .map(t => (t || '').trim())
+                        .filter(Boolean);
+                    // NUR kuerzen — beide Teile sind bereits umgewandelt.
+                    return kuerzeFuerDiscord(teile.join('\n\n'));
+                };
+
+                const cleanDesc_de = mitAenderungen(
+                    htmlZuDiscordMarkdown(description_de || `Version ${version} ist jetzt verfügbar.`),
+                    changes_de
+                );
+                const cleanDesc_en = mitAenderungen(
+                    htmlZuDiscordMarkdown(description_en || `Version ${version} is now available.`),
+                    changes_en
+                );
 
                 const announcementTranslations = {
                     title: { 'de-DE': announcementTitle_de, 'en-GB': announcementTitle_en },
