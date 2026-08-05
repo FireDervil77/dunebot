@@ -281,6 +281,16 @@ class IPMServer {
                                 });
                             });
                         }
+
+                        // SFTP-Zugänge abgleichen — bei JEDER Registrierung, nicht nur
+                        // beim Reconnect. Gerade die Erstregistrierung nach einer
+                        // Neuinstallation ist der Fall, in dem die Daemon-Datenbank
+                        // leer ist und sonst niemand mehr etwas hineinschreibt.
+                        setImmediate(() => {
+                            this.syncSftpUsers(daemonId).catch(err => {
+                                this.Logger.error(`[IPMServer] SFTP-Abgleich fehlgeschlagen für Daemon ${daemonId}:`, err);
+                            });
+                        });
                     } else {
                         // ✅ SECURITY: Fehlversuch zählen (Brute-Force-Bremse)
                         this._recordRegisterFailure(rateKey, clientIp);
@@ -1181,9 +1191,67 @@ class IPMServer {
     }
 
     /**
+     * SFTP-Zugänge eines Rootservers abgleichen.
+     *
+     * Der Daemon hält seine SFTP-Nutzer in einer lokalen SQLite-Datei. Bisher
+     * bekam er sie nur in drei Momenten: beim Anlegen eines Gameservers, beim
+     * Öffnen der Detailseite (Nachzieh-Fall) und beim Zurücksetzen des
+     * Passworts. Ging diese Datei verloren — Neuinstallation, neuer Rootserver,
+     * geleertes Verzeichnis —, konnte sich niemand mehr per SFTP anmelden, und
+     * es fiel erst auf, wenn ein Kunde es meldete.
+     *
+     * Geschickt wird der vollständige Bestand dieses Rootservers; der Daemon
+     * löscht alles, was nicht dabei ist. Damit verschwindet der Zugang eines
+     * gelöschten Gameservers, und bei einem künftigen Umzug auf einen anderen
+     * Rootserver genügt ein Aufruf je beteiligtem Daemon — der alte verliert
+     * den Zugang, der neue bekommt ihn.
+     *
+     * Übertragen wird ausschließlich der bcrypt-Hash. Genau deshalb ist dieser
+     * Abgleich überhaupt möglich: Ein Klartext-Passwort liegt hier nicht mehr
+     * vor und könnte gar nicht erneut verschickt werden.
+     *
+     * @param {string} daemonId - Daemon ID
+     */
+    async syncSftpUsers(daemonId) {
+        if (!(await this.dbService.tableExists('gameservers'))) {
+            return; // Gameserver-Plugin nicht installiert
+        }
+
+        const zugaenge = await this.dbService.query(
+            `SELECT gs.id AS server_id,
+                    gs.guild_id,
+                    gs.sftp_username,
+                    gs.sftp_password_hash
+             FROM gameservers gs
+             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+             WHERE r.daemon_id = ?
+               AND gs.sftp_username IS NOT NULL
+               AND gs.sftp_password_hash IS NOT NULL
+               AND gs.sftp_password_hash != ''`,
+            [daemonId]
+        );
+
+        // Eine leere Liste ist eine gültige Aussage ("dieser Rootserver hat
+        // keine Zugänge mehr") und wird bewusst mitgeschickt — sonst bliebe
+        // der letzte gelöschte Gameserver dort für immer anmeldefähig.
+        const nutzer = (zugaenge || []).map(z => ({
+            server_id:     String(z.server_id),
+            guild_id:      String(z.guild_id),
+            username:      z.sftp_username,
+            password_hash: z.sftp_password_hash
+        }));
+
+        // 30s statt der üblichen 60s: Auf der Gegenseite ist das eine einzelne
+        // Transaktion, kein langlaufender Vorgang.
+        await this.sendCommand(daemonId, 'sftp.users.replace', { users: nutzer }, 30000);
+
+        this.Logger.info(`[IPMServer] SFTP-Abgleich für Daemon ${daemonId}: ${nutzer.length} Zugänge übertragen`);
+    }
+
+    /**
      * Re-trigger Gameserver-Installationen die auf 'installing' hängen
      * Wird bei Daemon-Reconnect aufgerufen
-     * 
+     *
      * @param {string} daemonId - Daemon ID
      * @private
      */

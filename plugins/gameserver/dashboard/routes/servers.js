@@ -2480,6 +2480,19 @@ router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, 
             await dbService.query('DELETE FROM gameservers WHERE id = ?', [serverId]);
             Logger.success(`[Gameserver] Server ${serverId} aus DB gelöscht`);
 
+            // Der SFTP-Zugang muss mit dem Server verschwinden. Er lebt in der
+            // Datenbank des Daemons weiter und würde sonst weiter angenommen:
+            // Der Pfad-Auflöser setzt den Verzeichnisnamen nur zusammen und
+            // meldet keinen Fehler, wenn es das Verzeichnis nicht mehr gibt.
+            //
+            // Der Abgleich schickt den verbliebenen Bestand des Rootservers und
+            // löscht dort alles andere — deshalb genügt ein Aufruf ohne
+            // eigenen Lösch-Befehl.
+            if (server.daemon_id && ipmServer?.isDaemonOnline(server.daemon_id)) {
+                ipmServer.syncSftpUsers(server.daemon_id)
+                    .catch(err => Logger.warn(`[Gameserver] SFTP-Abgleich nach Löschen fehlgeschlagen: ${err.message}`));
+            }
+
             res.json({
                 success: true,
                 message: `Server "${server.name}" wurde erfolgreich gelöscht`
