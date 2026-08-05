@@ -338,15 +338,29 @@ class GuildAjaxHandler {
     static async handlePluginResponse(form, result) {
         const pluginName = form.querySelector('input[name="plugins[]"]')?.value;
         const action = form.querySelector('input[name="action"]')?.value;
-        
+
         if (result.success) {
-            const message = action === 'enable' 
+            const message = action === 'enable'
                 ? (window.i18n?.TOAST_MESSAGES?.PLUGIN_ENABLED || `Plugin "${pluginName}" aktiviert`)
                 : (window.i18n?.TOAST_MESSAGES?.PLUGIN_DISABLED || `Plugin "${pluginName}" deaktiviert`);
-            this.showToast('success', message);
+
+            // Das Neuladen wird ZUERST eingeplant, die Meldung kommt danach.
+            //
+            // Die Navigation entsteht beim Seitenaufbau auf dem Server. Ohne
+            // Neuladen bleibt sie nach dem Einschalten eines Plugins so
+            // stehen, wie sie war — die neuen Einträge fehlen, obwohl das
+            // Plugin laeuft.
+            //
+            // Die Reihenfolge ist kein Zufall: Vorher stand showToast davor,
+            // und solange dieser Aufruf unter Tabler mit "bootstrap is not
+            // defined" abbrach, wurde die Zeile darunter nie erreicht. Das
+            // Neuladen war damit von einer Meldung abhaengig, mit der es
+            // nichts zu tun hat.
             if (result.requiresReload) {
                 setTimeout(() => window.location.reload(), 1500);
             }
+
+            this.showToast('success', message);
         } else {
             this.showToast('error', 
                 result.message || (window.i18n?.TOAST_MESSAGES?.PLUGIN_ERROR || 'Fehler bei Plugin-Operation')
@@ -356,10 +370,13 @@ class GuildAjaxHandler {
 
     static async handleLocaleResponse(form, result) {
         if (result.success) {
-            this.showToast('success', window.i18n?.TOAST_MESSAGES?.LOCALE_UPDATED || 'Spracheinstellungen wurden aktualisiert');
+            // Gleiche Reihenfolge wie bei den Plugins: Das Neuladen darf nicht
+            // daran haengen, dass die Meldung durchlaeuft.
             if (result.requiresReload) {
                 setTimeout(() => window.location.reload(), 1500);
             }
+
+            this.showToast('success', window.i18n?.TOAST_MESSAGES?.LOCALE_UPDATED || 'Spracheinstellungen wurden aktualisiert');
         } else {
             this.showToast('error', 
                 result.message || (window.i18n?.TOAST_MESSAGES?.LOCALE_ERROR || 'Fehler beim Speichern der Spracheinstellungen')
