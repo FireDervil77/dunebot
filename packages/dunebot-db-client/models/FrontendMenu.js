@@ -38,11 +38,66 @@ class FrontendMenu {
             'SELECT * FROM frontend_menu_items WHERE visible = 1 ORDER BY position ASC'
         );
         const topLevel = rows.filter(r => !r.parent_id);
-        return topLevel.map(item => ({
+        const baum = topLevel.map(item => ({
             ...item,
             children: rows.filter(r => r.parent_id === item.id)
                 .sort((a, b) => a.position - b.position)
         }));
+
+        return baum.concat(await this._seitenFuersMenue(db, rows));
+    }
+
+    /**
+     * Veröffentlichte Seiten, die ins Menü gehören.
+     *
+     * `frontend_pages` hat seit jeher ein Feld `visible_in_menu`. Es wird im
+     * Seiten-Editor als Schalter angeboten, gespeichert und in der Seitenliste
+     * als Abzeichen angezeigt — gelesen hat es beim Aufbau des Menüs aber
+     * niemand. Wer eine Seite anlegte und den Schalter setzte, wartete
+     * vergeblich; sichtbar wurde sie erst, wenn man zusätzlich von Hand einen
+     * Menüpunkt anlegte. Genau das ist mit den vorhandenen Seiten passiert.
+     *
+     * Ab hier trägt der Schalter. Ein von Hand angelegter Menüpunkt hat
+     * weiterhin Vorrang: Zeigt bereits einer auf dieselbe Adresse, kommt die
+     * Seite nicht zusätzlich dazu — sonst stünde sie nach dem Umlegen des
+     * Schalters doppelt im Menü.
+     *
+     * @private
+     * @param {object} db
+     * @param {Array} vorhandene - bereits geladene Menüpunkte
+     * @returns {Promise<Array>}
+     */
+    static async _seitenFuersMenue(db, vorhandene) {
+        let seiten;
+        try {
+            seiten = await db.query(
+                `SELECT title, slug, position FROM frontend_pages
+                 WHERE status = 'published' AND visible_in_menu = 1
+                 ORDER BY position ASC`
+            );
+        } catch (_) {
+            // Tabelle gibt es erst nach der Migration — kein Grund, das
+            // gesamte Menü zu verlieren.
+            return [];
+        }
+
+        const belegt = new Set((vorhandene || []).map(m => m.url));
+
+        return (seiten || [])
+            .map(s => ({ ...s, url: `/page/${s.slug}` }))
+            .filter(s => !belegt.has(s.url))
+            .map(s => ({
+                id:        `seite-${s.slug}`,
+                parent_id: null,
+                label:     s.title,
+                url:       s.url,
+                icon:      null,
+                target:    '_self',
+                position:  s.position || 0,
+                visible:   1,
+                css_class: null,
+                children:  []
+            }));
     }
 
     /**
