@@ -229,9 +229,18 @@ class EggImporter {
     async fetchEgg(url) {
         Logger.info(`[EggImporter] Lade Egg von: ${url}`);
         const data = await this._fetch(url);
-        if (typeof data !== 'object' || !data.startup) {
-            throw new Error('Ungültiges Egg-Format — kein startup-Feld vorhanden');
+
+        if (typeof data !== 'object' || data === null) {
+            // _fetch gibt bei einer Antwort, die kein JSON ist, den Rohtext
+            // zurück. Das ist etwas anderes als ein Egg ohne Startbefehl —
+            // vorher nannten beide Fälle dieselbe, irreführende Ursache.
+            throw new Error('Antwort war kein JSON — Egg-Datei nicht lesbar');
         }
+
+        if (!this._startBefehl(data)) {
+            throw new Error('Ungültiges Egg-Format — weder startup noch startup_commands vorhanden');
+        }
+
         return data;
     }
 
@@ -268,8 +277,8 @@ class EggImporter {
             // Startup-Command im Pelican-Format: {{VARNAME}} Platzhalter
             // {{server.build.*}} Variablen werden auf unsere ENV-Variablen umgemappt
             startup: {
-                command: this._remapPterodactylVariable(egg.startup || ''),
-                done:    egg.config?.startup?.done           || '',
+                command: this._remapPterodactylVariable(this._startBefehl(egg)),
+                done:    this._startAbschnitt(egg).done      || '',
                 stop:    egg.config?.stop                    || 'stop',
             },
 
@@ -319,6 +328,71 @@ class EggImporter {
     // ─────────────────────────────────────────────────────────────────────────
     // Hilfsmethoden
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Holt den Startbefehl aus einem Egg — egal welcher Schema-Fassung.
+     *
+     * Die aelteren Fassungen (PTDL_v2, PLCN_v1) haben `startup` als Zeichenkette.
+     * Ab PLCN_v3 steht dort stattdessen `startup_commands`: ein Objekt mit
+     * benannten Befehlen, ueblicherweise nur "Default".
+     *
+     * Ohne diesen Fall brach der Import mit "kein startup-Feld vorhanden" ab —
+     * unter anderem bei ARK: Survival Evolved, Don't Starve Together,
+     * Nightingale, NeoForge und Modrinth. Am 2026-08-05 waren 12 der 250 Eggs
+     * in den fuenf angebotenen Repositories betroffen, Tendenz steigend, denn
+     * PLCN_v3 ist die neuere Fassung.
+     *
+     * @param {object} egg
+     * @returns {string} Startbefehl oder '' wenn keiner vorhanden
+     */
+    _startBefehl(egg) {
+        if (typeof egg?.startup === 'string' && egg.startup.trim()) {
+            return egg.startup;
+        }
+
+        const befehle = egg?.startup_commands;
+        if (befehle && typeof befehle === 'object') {
+            // "Default" ist der uebliche Name. Gibt es ihn nicht, nimmt der
+            // Import den ersten Eintrag — besser als gar keiner, und
+            // nachbearbeiten muss man ein importiertes Egg ohnehin.
+            const werte = befehle.Default ? [befehle.Default] : Object.values(befehle);
+            const treffer = werte.find(w => typeof w === 'string' && w.trim());
+            if (treffer) return treffer;
+        }
+
+        return '';
+    }
+
+    /**
+     * Liest den config.startup-Abschnitt eines Eggs.
+     *
+     * Pelican legt ihn als JSON-Zeichenkette ab, nicht als Objekt — in beiden
+     * Schema-Fassungen. Der Import griff aber mit `egg.config?.startup?.done`
+     * darauf zu, was bei einer Zeichenkette immer undefined ergibt. Die
+     * Fertig-Erkennung ("done") ging deshalb bei JEDEM Import verloren, ohne
+     * dass etwas fehlschlug: Der Server galt danach nie als hochgefahren,
+     * solange niemand das Feld von Hand nachtrug.
+     *
+     * @param {object} egg
+     * @returns {object} geparster Abschnitt, im Zweifel leer
+     */
+    _startAbschnitt(egg) {
+        const roh = egg?.config?.startup;
+        if (!roh) return {};
+        if (typeof roh === 'object') return roh;
+
+        if (typeof roh === 'string') {
+            try {
+                const geparst = JSON.parse(roh);
+                return (geparst && typeof geparst === 'object') ? geparst : {};
+            } catch {
+                Logger.warn('[EggImporter] config.startup ist weder Objekt noch gültiges JSON — Fertig-Erkennung fehlt');
+                return {};
+            }
+        }
+
+        return {};
+    }
 
     /**
      * Normalisiert docker_images aus dem Egg.
