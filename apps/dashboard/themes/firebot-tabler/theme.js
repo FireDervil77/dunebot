@@ -52,6 +52,8 @@ class TablerTheme {
         am.registerVendorStyle('tabler-css', TABLER.css, { version: '1.4.0' });
         am.registerVendorStyle('tabler-themes-css', TABLER.themes, { deps: ['tabler-css'], version: '1.4.0' });
         am.registerVendorScript('tabler-js', TABLER.js, { version: '1.4.0' });
+        // Muss direkt hinter tabler-js laufen: legt window.bootstrap an
+        am.registerScript('bootstrap-alias', 'bootstrap-alias.js', { deps: ['tabler-js'], version: this.version });
 
         // ── Was Tabler (noch) nicht abdeckt ─────────────────────────────────
         // Font Awesome bleibt vorerst: die Icon-Namen stecken über alle Views
@@ -156,6 +158,7 @@ class TablerTheme {
         am.enqueueStyle('toastr-css');
 
         am.enqueueScript('tabler-js');
+        am.enqueueScript('bootstrap-alias');
         am.enqueueScript('jquery');
         am.enqueueScript('toastr-js');
         am.enqueueScript('sortable');
