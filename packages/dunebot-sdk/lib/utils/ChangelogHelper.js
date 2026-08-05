@@ -339,10 +339,22 @@ function parseHierarchicalChangelog(changesText) {
     processedText = processedText.replace(/&Auml;/g, 'Ä');
     processedText = processedText.replace(/&szlig;/g, 'ß');
 
-    const lines = processedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    // Leerzeilen bleiben erhalten — sie tragen Bedeutung.
+    //
+    // Sie unterscheiden eine Fortsetzung von einem neuen Absatz: Steht eine
+    // Zeile ohne Marker DIREKT unter einem Eintrag, gehoert sie zu ihm (ein
+    // umgebrochener langer Satz). Steht eine Leerzeile dazwischen, ist es ein
+    // freistehender Text, der wie bisher verworfen wird.
+    //
+    // Vorher wurden Leerzeilen hier weggefiltert. Damit ging diese
+    // Unterscheidung verloren — und jede umgebrochene Zeile fiel still heraus,
+    // der Eintrag erschien abgeschnitten.
+    const lines = processedText.split('\n').map(line => line.trim());
     const result = [];
     let currentGroup = null;
     let currentSubgroup = null;
+    // Der zuletzt angelegte Eintrag, an den eine Fortsetzungszeile anschliesst.
+    let letzterEintrag = null;
 
     // Mapping für Item-Typen
     const itemTypeMap = {
@@ -353,8 +365,16 @@ function parseHierarchicalChangelog(changesText) {
     };
 
     for (const line of lines) {
+        // Leerzeile beendet den laufenden Eintrag: Was danach kommt, ist keine
+        // Fortsetzung mehr.
+        if (line.length === 0) {
+            letzterEintrag = null;
+            continue;
+        }
+
         // # Header erkennen (Hauptgruppe)
         if (line.startsWith('# ')) {
+            letzterEintrag = null;
             const title = line.substring(2).trim();
             currentGroup = {
                 type: 'group',
@@ -369,6 +389,7 @@ function parseHierarchicalChangelog(changesText) {
 
         // ## Sub-Header erkennen (Untergruppe)
         if (line.startsWith('## ')) {
+            letzterEintrag = null;
             const title = line.substring(3).trim();
             currentSubgroup = {
                 type: 'subgroup',
@@ -395,6 +416,7 @@ function parseHierarchicalChangelog(changesText) {
 
         // ✅ NEU: Description-Zeilen erkennen (DESC: ...)
         if (line.startsWith('DESC: ')) {
+            letzterEintrag = null;
             const descText = line.substring(6).trim();
             
             // Füge Description zur aktuellen Subgroup hinzu
@@ -452,6 +474,7 @@ function parseHierarchicalChangelog(changesText) {
                 category: itemMeta.category,
                 text  // Text MIT HTML!
             };
+            letzterEintrag = item;
 
             // Wenn Subgroup existiert, füge Item zur Subgroup hinzu
             if (currentSubgroup) {
@@ -499,7 +522,19 @@ function parseHierarchicalChangelog(changesText) {
                 currentSubgroup.items.push(item);
             }
         }
-        // Zeile ohne erkanntes Format wird ignoriert (kann erweitert werden für plain text)
+        // Zeile ohne erkannten Marker: Fortsetzung des Eintrags darueber.
+        //
+        // Der Text wird zeilenweise gelesen, ein Eintrag ist also eine Zeile.
+        // Wer einen langen Satz umbricht — beim Schreiben naheliegend —, verlor
+        // vorher alles nach dem Umbruch, ohne Hinweis. Jetzt wird angehaengt.
+        //
+        // Nur direkt unter einem Eintrag: Nach einer Leerzeile oder einer
+        // Ueberschrift ist letzterEintrag null, und die Zeile wird wie bisher
+        // verworfen. So bleiben freistehende Absaetze aus alten Changelogs
+        // unveraendert draussen.
+        else if (letzterEintrag) {
+            letzterEintrag.text = (letzterEintrag.text + ' ' + line).trim();
+        }
     }
 
     return result;
