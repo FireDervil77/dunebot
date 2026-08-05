@@ -565,9 +565,21 @@ class MigrationManager {
                 // Port-Allocations updaten (falls Tabelle existiert)
                 const [tables] = await tx.query("SHOW TABLES LIKE 'port_allocations'");
                 if (tables.length > 0) {
+                    // Die IP muss mitziehen, nicht nur die Rootserver-ID.
+                    //
+                    // Der Portvorrat wird je IP gefuehrt: Eine Belegung sagt
+                    // "auf DIESER Adresse ist DIESER Port vergeben". Blieb die
+                    // alte IP stehen, war die Belegung auf dem Ziel unsichtbar
+                    // — die Vergabe hielt den Port dort fuer frei und gab ihn
+                    // ein zweites Mal aus. Docker lehnt den Start dann ab:
+                    // "Bind for <ip>:<port> failed: port is already allocated".
+                    //
+                    // Genau so ist es Server 157 (Rust) ergangen: Er bekam
+                    // Port 25000, den auf derselben Adresse bereits Server 155
+                    // hielt — dessen Belegung noch die IP des Quellservers trug.
                     await tx.query(
-                        'UPDATE port_allocations SET rootserver_id = ? WHERE server_id = ?',
-                        [targetRootServer.id, server.id]
+                        'UPDATE port_allocations SET rootserver_id = ?, ip = ? WHERE server_id = ?',
+                        [targetRootServer.id, targetRootServer.host, server.id]
                     );
                 }
 
