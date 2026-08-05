@@ -858,7 +858,22 @@ router.post('/changelogs/save', async (req, res) => {
 
     } catch (error) {
         Logger.error('[Content] Fehler beim Speichern des Changelogs:', error);
-        req.session.toast = { type: 'danger', message: 'Fehler beim Speichern: ' + error.message };
+
+        // Der haeufigste Fall verdient eine Meldung, mit der man etwas anfangen
+        // kann. "Duplicate entry 'v2-2-5' for key 'idx_slug'" sagt einem Menschen
+        // nicht, WAS er aendern soll — und die Ursache ist meist gar nicht die
+        // Version, sondern ein Slug, der nicht zu ihr passt. Genau so ist es
+        // beim Eintrag 2.2.4 passiert: Er trug den Slug v2-2-5 und blockierte
+        // damit den naechsten Changelog.
+        let meldung = 'Fehler beim Speichern: ' + error.message;
+        if (error?.code === 'ER_DUP_ENTRY') {
+            const kurzname = slug || `v${(version || '').replace(/\./g, '-')}`;
+            meldung = `Es gibt bereits einen Changelog mit dem Kurznamen „${kurzname}". `
+                    + 'Vergib im Reiter „Einstellungen" einen anderen Kurznamen — '
+                    + 'oder pruefe, ob dieser Changelog schon angelegt wurde.';
+        }
+
+        req.session.toast = { type: 'danger', message: meldung };
         res.redirect('/admin/content?tab=changelogs');
     }
 });
