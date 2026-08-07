@@ -158,9 +158,11 @@ class AutoModPlugin extends DashboardPlugin {
     /**
      * Plugin-Update in einer Guild
      *
-     * Ohne diesen Haken erreicht eine geaenderte Navigation nur neu
-     * aktivierte Guilds - bestehende behalten ewig das alte Menue. Genau so
-     * fehlten anderswo schon Menuepunkte bei 9 von 11 Guilds.
+     * Achtung: Diesen Haken ruft im Projekt derzeit niemand auf - er ist wie
+     * bei core und gameserver totes Gewicht (Punkt 17 in Baustellen.md). Auf
+     * die Navigation wirkt sich das nicht aus, die schreibt `onGuildEnable`
+     * bei jedem Start neu. Die Methode steht hier fuer den Tag, an dem der
+     * Aufrufer gebaut wird, und macht nichts, worauf sich etwas verlaesst.
      *
      * @param {string} oldVersion Vorherige Version
      * @param {string} newVersion Neue Version
@@ -206,10 +208,17 @@ class AutoModPlugin extends DashboardPlugin {
     /**
      * Navigation registrieren.
      *
+     * Laeuft bei jedem Start des Dashboards: `enableGuildSpecificPlugins()`
+     * geht ueber alle Guilds und ruft fuer jedes eingeschaltete Plugin
+     * `enableInGuild` auf, das wiederum `onGuildEnable` aufruft.
+     *
      * Vor dem Anlegen wird die alte Navigation des Plugins ausdruecklich
      * entfernt. `registerNavigation` ueberspringt vorhandene Eintraege, loescht
      * aber nie - der alte Einzeleintrag (Ziel `/settings`, direkt unter der
-     * Guild) wuerde sonst neben dem neuen Bereich stehen bleiben.
+     * Guild) stuende sonst weiter neben dem neuen Bereich. Das ist gefahrlos:
+     * auf `guild_nav_items` gibt es projektweit keine einzige UPDATE-Anweisung,
+     * es gibt also keine von Hand gesetzte Sortierung, die verloren gehen
+     * koennte.
      *
      * @param {string} guildId Discord-Guild-ID
      * @private
