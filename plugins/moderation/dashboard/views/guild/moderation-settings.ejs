@@ -1,0 +1,195 @@
+<%- include('partials/moderation-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-gavel',
+  titel: tr('moderation:SETTINGS.PAGE_TITLE'),
+  beschreibung: tr('moderation:SETTINGS.PAGE_DESC')
+}) %>
+
+<%
+  const basis = `/guild/${guildId}/plugins/moderation`;
+
+  let gewaehlteEreignisse = [];
+  try {
+    if (typeof settings.modlog_events === 'string') {
+      gewaehlteEreignisse = JSON.parse(settings.modlog_events);
+    } else if (Array.isArray(settings.modlog_events)) {
+      gewaehlteEreignisse = settings.modlog_events;
+    }
+  } catch (e) { gewaehlteEreignisse = []; }
+
+  const ereignisse = [
+    ['WARN',      'fa-triangle-exclamation'],
+    ['KICK',      'fa-right-from-bracket'],
+    ['BAN',       'fa-ban'],
+    ['TIMEOUT',   'fa-clock'],
+    ['UNTIMEOUT', 'fa-clock-rotate-left'],
+    ['SOFTBAN',   'fa-user-slash'],
+    ['UNBAN',     'fa-user-check']
+  ];
+
+  const dmSchalter = [
+    ['dm_on_warn',    settings.dm_on_warn,    'DM_ON_WARN'],
+    ['dm_on_kick',    settings.dm_on_kick,    'DM_ON_KICK'],
+    ['dm_on_ban',     settings.dm_on_ban,     'DM_ON_BAN'],
+    ['dm_on_timeout', settings.dm_on_timeout, 'DM_ON_TIMEOUT']
+  ];
+%>
+
+<form class="guild-ajax-form"
+      data-moderation-form
+      data-form-type="moderation-settings"
+      data-method="PUT"
+      action="<%= basis %>/settings"
+      method="POST">
+
+  <div class="row row-cards">
+    <div class="col-lg-7">
+      <!-- Grundlagen -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-gear me-2"></i>
+            <%= tr('moderation:SECTION_BASIC') %>
+          </h3>
+        </div>
+        <div class="card-body">
+          <p class="text-secondary"><%= tr('moderation:SECTION_BASIC_DESC') %></p>
+
+          <div class="mb-3">
+            <label for="log_channel" class="form-label"><%= tr('moderation:MODLOG_CHANNEL_TITLE') %></label>
+            <select name="log_channel" id="log_channel" class="form-select">
+              <option value=""><%= tr('moderation:CHANNEL_SELECT') %></option>
+              <% (channels || []).forEach(kanal => { %>
+                <option value="<%= kanal.id %>" <%= String(settings.modlog_channel) === String(kanal.id) ? 'selected' : '' %>>
+                  #<%= kanal.name %>
+                </option>
+              <% }); %>
+            </select>
+            <div class="form-hint"><%= tr('moderation:MODLOG_CHANNEL_DESC') %></div>
+          </div>
+
+          <div class="row">
+            <div class="col-sm-6 mb-3">
+              <label for="maxwarn_count" class="form-label"><%= tr('moderation:MAXWARN_LIMIT_TITLE') %></label>
+              <input name="maxwarn_count" type="number" min="0" max="100" id="maxwarn_count"
+                     class="form-control" value="<%= settings.max_warn_limit || 5 %>" required>
+              <div class="form-hint"><%= tr('moderation:MAXWARN_LIMIT_DESC') %></div>
+            </div>
+            <div class="col-sm-6 mb-3">
+              <label for="maxwarn_action" class="form-label"><%= tr('moderation:MAXWARN_ACTION_TITLE') %></label>
+              <select name="maxwarn_action" id="maxwarn_action" class="form-select">
+                <% ['TIMEOUT', 'KICK', 'BAN'].forEach(a => { %>
+                  <option value="<%= a %>" <%= settings.max_warn_action === a ? 'selected' : '' %>><%= a %></option>
+                <% }); %>
+              </select>
+              <div class="form-hint"><%= tr('moderation:MAXWARN_ACTION_DESC') %></div>
+            </div>
+          </div>
+
+          <div class="mb-0">
+            <label for="default_reason" class="form-label"><%= tr('moderation:DEFAULT_REASON_TITLE') %></label>
+            <textarea name="default_reason" id="default_reason" class="form-control" rows="2"
+                      placeholder="<%= tr('moderation:DEFAULT_REASON_PLACEHOLDER') %>"><%= settings.default_reason || '' %></textarea>
+            <div class="form-hint"><%= tr('moderation:DEFAULT_REASON_DESC') %></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Was ins Protokoll geht -->
+      <div class="card mt-3">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-list-check me-2"></i>
+            <%= tr('moderation:SECTION_MODLOG_EVENTS') %>
+          </h3>
+        </div>
+        <div class="card-body">
+          <p class="text-secondary"><%= tr('moderation:SECTION_MODLOG_EVENTS_DESC') %></p>
+          <div class="row">
+            <% ereignisse.forEach(([schluessel, icon]) => { %>
+              <div class="col-sm-6 col-lg-4">
+                <label class="form-check">
+                  <input type="checkbox" class="form-check-input"
+                         data-moderation-liste="modlog_events"
+                         name="modlog_events" value="<%= schluessel %>"
+                         <%= gewaehlteEreignisse.includes(schluessel) ? 'checked' : '' %>>
+                  <span class="form-check-label">
+                    <i class="fa-solid <%= icon %> me-1"></i>
+                    <%= tr('moderation:EVENT_' + schluessel) %>
+                  </span>
+                </label>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <!-- Nachricht an das Mitglied -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-envelope me-2"></i>
+            <%= tr('moderation:SECTION_DM_NOTIFICATIONS') %>
+          </h3>
+        </div>
+        <div class="card-body">
+          <p class="text-secondary"><%= tr('moderation:SECTION_DM_NOTIFICATIONS_DESC') %></p>
+
+          <% dmSchalter.forEach(([name, wert, schluessel]) => { %>
+            <label class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" name="<%= name %>" value="1" <%= wert ? 'checked' : '' %>>
+              <span class="form-check-label"><%= tr('moderation:' + schluessel) %></span>
+            </label>
+          <% }); %>
+
+          <hr class="my-3">
+
+          <label for="dm_embed_description" class="form-label"><%= tr('moderation:DM_TEMPLATE.LABEL') %></label>
+          <textarea class="form-control" id="dm_embed_description" name="dm_embed_description" rows="3"
+                    placeholder="<%= tr('moderation:DM_TEMPLATE.PLACEHOLDER') %>"><%= settings.dm_embed_description || '' %></textarea>
+          <div class="form-hint">
+            <%= tr('moderation:DM_TEMPLATE.HELP') %><br>
+            <%= tr('moderation:DM_TEMPLATE.VARIABLES') %>:
+            <code>{member:name}</code>
+            <code>{member:mention}</code>
+            <code>{guild:name}</code>
+            <code>{action}</code>
+            <code>{reason}</code>
+            <code>{case}</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wegweiser in den eigenen Bereich -->
+      <div class="card mt-3">
+        <div class="card-header">
+          <h3 class="card-title"><%= tr('moderation:SETTINGS.MORE_TITLE') %></h3>
+        </div>
+        <div class="list-group list-group-flush">
+          <%
+            const bereiche = [
+              ['/faelle',      'fa-solid fa-folder-open',  'moderation:NAV.CASES'],
+              ['/notizen',     'fa-solid fa-note-sticky',  'moderation:NAV.NOTES'],
+              ['/kanalregeln', 'fa-solid fa-hashtag',      'moderation:NAV.CHANNEL_RULES'],
+              ['/rollen',      'fa-solid fa-user-shield',  'moderation:NAV.PROTECTED']
+            ];
+          %>
+          <% bereiche.forEach(([pfad, icon, titel]) => { %>
+            <a href="<%= basis %><%= pfad %>" class="list-group-item list-group-item-action">
+              <i class="<%= icon %> me-3 text-secondary"></i><%= tr(titel) %>
+            </a>
+          <% }); %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <button type="submit" class="btn btn-primary">
+      <i class="fa-solid fa-floppy-disk me-2"></i>
+      <%= tr('moderation:BTN_SAVE') %>
+    </button>
+  </div>
+</form>

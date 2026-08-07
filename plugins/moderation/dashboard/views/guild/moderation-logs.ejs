@@ -1,0 +1,96 @@
+<%- include('partials/moderation-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-folder-open',
+  titel: tr('moderation:NAV.CASES'),
+  beschreibung: tr('moderation:LOGS.SUBTITLE')
+}) %>
+
+<%
+  const zeitpunkt = (w) => w ? new Date(w).toLocaleString('de-DE') : '—';
+  const farbe = {
+    WARN: 'orange', KICK: 'blue', BAN: 'red', TIMEOUT: 'secondary',
+    SOFTBAN: 'dark', UNBAN: 'green', UNTIMEOUT: 'green'
+  };
+  const arten = ['WARN', 'KICK', 'BAN', 'TIMEOUT', 'UNTIMEOUT', 'SOFTBAN', 'UNBAN'];
+
+  /** Adresse fuer einen Seitenwechsel, Filter bleibt erhalten. */
+  const seitenLink = (nr) => {
+    const teile = [`seite=${nr}`];
+    if (art) teile.push(`art=${encodeURIComponent(art)}`);
+    return '?' + teile.join('&');
+  };
+%>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">
+      <%= tr('moderation:LOGS.TITLE') %>
+      <span class="badge bg-secondary-lt ms-2"><%= seiten.gesamt %></span>
+    </h3>
+    <div class="card-actions">
+      <select id="logTypeFilter" class="form-select form-select-sm" style="width: auto;">
+        <option value=""><%= tr('moderation:LOGS.FILTER_ALL') %></option>
+        <% arten.forEach(a => { %>
+          <option value="<%= a %>" <%= art === a ? 'selected' : '' %>><%= a %></option>
+        <% }); %>
+      </select>
+    </div>
+  </div>
+
+  <% if (faelle && faelle.length > 0) { %>
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter">
+        <thead>
+          <tr>
+            <th><%= tr('moderation:LOGS.COL_CASE') %></th>
+            <th><%= tr('moderation:LOGS.COL_TYPE') %></th>
+            <th><%= tr('moderation:LOGS.COL_USER') %></th>
+            <th><%= tr('moderation:LOGS.COL_MODERATOR') %></th>
+            <th><%= tr('moderation:LOGS.COL_REASON') %></th>
+            <th class="text-end"><%= tr('moderation:LOGS.COL_DATE') %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% faelle.forEach(fall => { %>
+            <tr>
+              <td class="text-secondary">#<%= fall.case_number || '—' %></td>
+              <td><span class="badge bg-<%= farbe[fall.type] || 'secondary' %>-lt"><%= fall.type %></span></td>
+              <td class="font-monospace text-secondary"><%= fall.member_id || '—' %></td>
+              <td class="font-monospace text-secondary"><%= fall.admin_id || '—' %></td>
+              <td class="text-truncate" style="max-width: 18rem;"><%= fall.reason || '—' %></td>
+              <td class="text-end text-secondary"><%= zeitpunkt(fall.created_at) %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (seiten.anzahl > 1) { %>
+      <div class="card-footer d-flex align-items-center">
+        <p class="m-0 text-secondary">
+          <%= tr('moderation:LOGS.PAGE_OF', { aktuell: seiten.aktuell, anzahl: seiten.anzahl }) %>
+        </p>
+        <ul class="pagination m-0 ms-auto">
+          <li class="page-item <%= seiten.aktuell <= 1 ? 'disabled' : '' %>">
+            <a class="page-link" href="<%= seitenLink(seiten.aktuell - 1) %>">
+              <i class="fa-solid fa-chevron-left"></i>
+            </a>
+          </li>
+          <li class="page-item <%= seiten.aktuell >= seiten.anzahl ? 'disabled' : '' %>">
+            <a class="page-link" href="<%= seitenLink(seiten.aktuell + 1) %>">
+              <i class="fa-solid fa-chevron-right"></i>
+            </a>
+          </li>
+        </ul>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon"><i class="fa-solid fa-inbox fs-1 text-secondary"></i></div>
+        <p class="empty-title"><%= tr('moderation:LOGS.EMPTY') %></p>
+        <p class="empty-subtitle text-secondary"><%= tr('moderation:LOGS.EMPTY_HINT') %></p>
+      </div>
+    </div>
+  <% } %>
+</div>

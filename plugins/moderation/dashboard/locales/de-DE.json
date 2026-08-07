@@ -1,38 +1,36 @@
 {
   "NAV": {
-    "MODERATION": "Moderation"
+    "MODERATION": "Moderation",
+    "DASHBOARD": "Übersicht",
+    "CASES": "Fälle",
+    "NOTES": "Notizen",
+    "CHANNEL_RULES": "Kanalregeln",
+    "PROTECTED": "Geschützte Rollen"
   },
   "SETTINGS": {
     "PAGE_TITLE": "Moderation Einstellungen",
-    "PAGE_DESC": "Konfiguriere Moderation, Logs und Benachrichtigungen"
+    "PAGE_DESC": "Konfiguriere Moderation, Logs und Benachrichtigungen",
+    "MORE_TITLE": "Weitere Bereiche"
   },
-
   "TAB_SETTINGS": "Einstellungen",
   "TAB_PROTECTED_ROLES": "Geschützte Rollen",
   "TAB_CHANNEL_RULES": "Channel-Regeln",
   "TAB_NOTES": "Mod-Notizen",
   "TAB_LOGS": "Moderation-Logs",
-
   "SECTION_BASIC": "Basis-Einstellungen",
   "SECTION_BASIC_DESC": "Grundlegende Moderations-Konfiguration",
-  
   "MODLOG_CHANNEL_TITLE": "Modlog-Channel",
   "MODLOG_CHANNEL_DESC": "Channel für Moderations-Logs",
   "CHANNEL_SELECT": "Channel auswählen",
-  
   "MAXWARN_LIMIT_TITLE": "Max. Warnungen",
   "MAXWARN_LIMIT_DESC": "Anzahl der Warnungen bevor eine Aktion ausgeführt wird",
-  
   "MAXWARN_ACTION_TITLE": "Aktion bei Max. Warnungen",
   "MAXWARN_ACTION_DESC": "Welche Aktion soll bei Erreichen der maximalen Warnungen ausgeführt werden?",
-  
   "DEFAULT_REASON_TITLE": "Standard-Begründung",
   "DEFAULT_REASON_DESC": "Diese Begründung wird automatisch bei Kicks/Bans verwendet, wenn keine spezifische Begründung angegeben wird.",
   "DEFAULT_REASON_PLACEHOLDER": "z.B. Verstoß gegen die Server-Regeln",
-  
   "SECTION_MODLOG_EVENTS": "Modlog Events",
   "SECTION_MODLOG_EVENTS_DESC": "Wähle welche Aktionen im Modlog-Channel geloggt werden sollen",
-  
   "EVENT_WARN": "Warnungen",
   "EVENT_KICK": "Kicks",
   "EVENT_BAN": "Bans",
@@ -40,24 +38,25 @@
   "EVENT_UNTIMEOUT": "Timeout aufheben",
   "EVENT_SOFTBAN": "Softbans",
   "EVENT_UNBAN": "Unbans",
-  
   "SECTION_DM_NOTIFICATIONS": "DM Benachrichtigungen",
   "SECTION_DM_NOTIFICATIONS_DESC": "Soll der betroffene User per Direktnachricht informiert werden?",
-  
   "DM_ON_WARN": "Bei Warnung",
   "DM_ON_KICK": "Bei Kick",
   "DM_ON_BAN": "Bei Ban",
   "DM_ON_TIMEOUT": "Bei Timeout",
-
   "PROTECTED": {
     "TITLE": "Geschützte Rollen",
     "DESC": "Mitglieder mit einer geschützten Rolle können nicht durch Moderations-Commands bestraft werden (Warn, Kick, Ban, Timeout).",
     "SELECT_ROLE": "Rolle auswählen...",
     "BTN_ADD": "Hinzufügen",
     "EMPTY": "Keine geschützten Rollen konfiguriert. Alle Rollen können moderiert werden.",
-    "CONFIRM_REMOVE": "Möchtest du diese geschützte Rolle wirklich entfernen?"
+    "CONFIRM_REMOVE": "Möchtest du diese geschützte Rolle wirklich entfernen?",
+    "ADD_TITLE": "Rolle aufnehmen",
+    "BTN_REMOVE": "Aus dem Schutz nehmen",
+    "ALL_ADDED": "Alle Rollen sind bereits geschützt.",
+    "HINT": "Wer eine geschützte Rolle trägt, lässt sich über die Moderationsbefehle nicht verwarnen, kicken oder bannen.",
+    "EMPTY_HINT": "Ohne geschützte Rollen kann jedes Mitglied moderiert werden."
   },
-
   "LOGS": {
     "TITLE": "Moderation-Logs",
     "FILTER_ALL": "Alle Typen",
@@ -68,9 +67,12 @@
     "COL_DATE": "Datum",
     "EMPTY": "Keine Moderation-Logs vorhanden.",
     "LOAD_MORE": "Mehr laden",
-    "REMAINING": "weitere"
+    "REMAINING": "weitere",
+    "SUBTITLE": "Jede Verwarnung, jeder Kick, jeder Bann mit Fallnummer",
+    "COL_CASE": "Fall",
+    "EMPTY_HINT": "Sobald die Moderation eingreift, steht es hier.",
+    "PAGE_OF": "Seite {{aktuell}} von {{anzahl}}"
   },
-
   "CHANNEL_RULES": {
     "TITLE": "Channel-spezifische Regeln",
     "DESC": "Definiere abweichende Moderations-Einstellungen für einzelne Channels. Hier kannst du z.B. in Meme-Channels lockerere Regeln setzen oder Channels vom AutoMod ausnehmen.",
@@ -84,9 +86,13 @@
     "NOTES_PLACEHOLDER": "Optionale Notiz zur Regel...",
     "BTN_ADD": "Hinzufügen",
     "EMPTY": "Keine channel-spezifischen Regeln konfiguriert. Es gelten die globalen Einstellungen.",
-    "CONFIRM_REMOVE": "Möchtest du diese Channel-Regel wirklich entfernen?"
+    "CONFIRM_REMOVE": "Möchtest du diese Channel-Regel wirklich entfernen?",
+    "LIST_TITLE": "Vorhandene Regeln",
+    "BTN_DELETE": "Regel löschen",
+    "BADGE_LIMIT": "Ab {{limit}} Verwarnungen → {{aktion}}",
+    "DEFAULT_ACTION": "Standardaktion",
+    "EMPTY_HINT": "Ohne eigene Regel gelten überall die Grundeinstellungen."
   },
-
   "NOTES": {
     "TITLE": "Moderator-Notizen",
     "DESC": "Interne Notizen zu Usern – nur für Moderatoren sichtbar. Kann z.B. Hintergrundinformationen oder Beobachtungen enthalten.",
@@ -100,9 +106,12 @@
     "BTN_SEARCH": "Suchen",
     "BTN_ALL": "Alle",
     "HINT": "Verwende die Suche oben um Notizen für einen bestimmten User anzuzeigen, oder klicke 'Alle' um alle Notizen zu laden.",
-    "CONFIRM_DELETE": "Möchtest du diese Notiz wirklich löschen?"
+    "CONFIRM_DELETE": "Möchtest du diese Notiz wirklich löschen?",
+    "LIST_TITLE": "Vorhandene Notizen",
+    "AUTHOR": "Angelegt von",
+    "BTN_DELETE": "Notiz löschen",
+    "EMPTY": "Noch keine Notizen"
   },
-  
   "HELP": {
     "TITLE": "Hilfe & Tipps",
     "MODERATION_TITLE": "Moderation",
@@ -119,7 +128,42 @@
     "NOTES_TEXT": "Erstelle interne Notizen zu Usern, die nur für Moderatoren sichtbar sind.",
     "COMMANDS_TITLE": "Verfügbare Commands"
   },
-  
   "BTN_SAVE": "Speichern",
-  "BTN_SAVING": "Wird gespeichert..."
+  "BTN_SAVING": "Wird gespeichert...",
+  "TITLE": "Moderation",
+  "DASHBOARD": {
+    "SUBTITLE": "Was die Moderation zuletzt getan hat",
+    "CASES_30": "Fälle (30 Tage)",
+    "CASES_TOTAL": "{{count}} insgesamt",
+    "BY_TYPE": "Nach Art, letzte 30 Tage",
+    "RECENT": "Zuletzt geschehen",
+    "QUIET": "Ruhig geblieben",
+    "QUIET_HINT": "In den letzten 30 Tagen war kein Eingreifen nötig.",
+    "TO_CASES": "Alle Fälle ansehen",
+    "TO_SETTINGS": "Zu den Einstellungen",
+    "NO_LOG_CHANNEL": "Kein Protokoll-Kanal gesetzt",
+    "NO_LOG_CHANNEL_HINT": "Ohne Kanal laufen Verwarnungen und Banns zwar, es sieht sie aber niemand im Server."
+  },
+  "DM_TEMPLATE": {
+    "LABEL": "Nachricht an das Mitglied",
+    "PLACEHOLDER": "Du wurdest auf {guild:name} {action}. Grund: {reason}",
+    "HELP": "Beschreibung in der Direktnachricht. Leer lassen für den Standardtext.",
+    "VARIABLES": "Platzhalter"
+  },
+  "MESSAGES": {
+    "SETTINGS_SAVED": "Moderations-Einstellungen gespeichert",
+    "SETTINGS_ERROR": "Fehler beim Speichern der Moderations-Einstellungen"
+  },
+  "JS": {
+    "FEHLER": "Die Aktion ist fehlgeschlagen.",
+    "AUSWAHL_FEHLT": "Bitte zuerst eine Rolle auswählen.",
+    "ROLLE_ENTFERNEN": "Diese Rolle wirklich aus dem Schutz nehmen?",
+    "ROLLE_ENTFERNT": "Rolle entfernt.",
+    "KANAL_FEHLT": "Bitte zuerst einen Kanal auswählen.",
+    "REGEL_LOESCHEN": "Diese Kanalregel wirklich löschen?",
+    "REGEL_GELOESCHT": "Kanalregel gelöscht.",
+    "NOTIZ_UNVOLLSTAENDIG": "Mitglieds-ID und Text sind erforderlich.",
+    "NOTIZ_LOESCHEN": "Diese Notiz wirklich löschen?",
+    "NOTIZ_GELOESCHT": "Notiz gelöscht."
+  }
 }

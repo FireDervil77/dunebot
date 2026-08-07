@@ -1,0 +1,119 @@
+<%- include('partials/moderation-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-hashtag',
+  titel: tr('moderation:NAV.CHANNEL_RULES'),
+  beschreibung: tr('moderation:CHANNEL_RULES.DESC')
+}) %>
+
+<div class="row row-cards">
+  <!-- Neue Regel -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-plus me-2"></i>
+          <%= tr('moderation:CHANNEL_RULES.ADD_TITLE') %>
+        </h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label for="crChannelSelect" class="form-label"><%= tr('moderation:CHANNEL_RULES.CHANNEL') %></label>
+          <select id="crChannelSelect" class="form-select">
+            <option value=""><%= tr('moderation:CHANNEL_SELECT') %></option>
+            <% (channels || []).forEach(kanal => { %>
+              <option value="<%= kanal.id %>">#<%= kanal.name %></option>
+            <% }); %>
+          </select>
+        </div>
+
+        <div class="row">
+          <div class="col-6 mb-3">
+            <label for="crWarnLimit" class="form-label"><%= tr('moderation:CHANNEL_RULES.WARN_LIMIT') %></label>
+            <input type="number" id="crWarnLimit" class="form-control" min="0" max="100" placeholder="—">
+          </div>
+          <div class="col-6 mb-3">
+            <label for="crWarnAction" class="form-label"><%= tr('moderation:CHANNEL_RULES.WARN_ACTION') %></label>
+            <select id="crWarnAction" class="form-select">
+              <option value="">—</option>
+              <% ['TIMEOUT', 'KICK', 'BAN'].forEach(a => { %>
+                <option value="<%= a %>"><%= a %></option>
+              <% }); %>
+            </select>
+          </div>
+        </div>
+
+        <label class="form-check form-switch mb-3">
+          <input type="checkbox" class="form-check-input" id="crAutomodExempt">
+          <span class="form-check-label"><%= tr('moderation:CHANNEL_RULES.AUTOMOD_EXEMPT') %></span>
+        </label>
+
+        <div class="mb-3">
+          <label for="crNotes" class="form-label"><%= tr('moderation:CHANNEL_RULES.NOTES') %></label>
+          <input type="text" id="crNotes" class="form-control" maxlength="500"
+                 placeholder="<%= tr('moderation:CHANNEL_RULES.NOTES_PLACEHOLDER') %>">
+        </div>
+
+        <button type="button" class="btn btn-success w-100" onclick="addChannelRule()">
+          <i class="fa-solid fa-plus me-2"></i><%= tr('moderation:CHANNEL_RULES.BTN_ADD') %>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vorhandene Regeln -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <%= tr('moderation:CHANNEL_RULES.LIST_TITLE') %>
+          <span class="badge bg-secondary-lt ms-2"><%= (kanalregeln || []).length %></span>
+        </h3>
+      </div>
+
+      <% if (kanalregeln && kanalregeln.length > 0) { %>
+        <div class="list-group list-group-flush" id="channelRulesList">
+          <% kanalregeln.forEach(regel => {
+               const kanal = (channels || []).find(c => String(c.id) === String(regel.channel_id));
+          %>
+            <div class="list-group-item" id="channel-rule-<%= regel.id %>">
+              <div class="d-flex align-items-start justify-content-between">
+                <div class="flex-grow-1">
+                  <div class="mb-1">
+                    <strong><i class="fa-solid fa-hashtag me-1 text-secondary"></i><%= kanal ? kanal.name : regel.channel_id %></strong>
+                    <% if (regel.max_warn_limit !== null && regel.max_warn_limit !== undefined) { %>
+                      <span class="badge bg-orange-lt ms-2">
+                        <%= tr('moderation:CHANNEL_RULES.BADGE_LIMIT', {
+                              limit: regel.max_warn_limit,
+                              aktion: regel.max_warn_action || tr('moderation:CHANNEL_RULES.DEFAULT_ACTION')
+                            }) %>
+                      </span>
+                    <% } %>
+                    <% if (regel.automod_exempt) { %>
+                      <span class="badge bg-blue-lt ms-1"><%= tr('moderation:CHANNEL_RULES.EXEMPT') %></span>
+                    <% } %>
+                  </div>
+                  <% if (regel.notes) { %>
+                    <div class="text-secondary small"><%= regel.notes %></div>
+                  <% } %>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger ms-2"
+                        onclick="removeChannelRule(<%= regel.id %>)"
+                        title="<%= tr('moderation:CHANNEL_RULES.BTN_DELETE') %>">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <div class="card-body">
+          <div class="empty">
+            <div class="empty-icon"><i class="fa-solid fa-hashtag fs-1 text-secondary"></i></div>
+            <p class="empty-title"><%= tr('moderation:CHANNEL_RULES.EMPTY') %></p>
+            <p class="empty-subtitle text-secondary"><%= tr('moderation:CHANNEL_RULES.EMPTY_HINT') %></p>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>

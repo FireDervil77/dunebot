@@ -1,38 +1,36 @@
 {
   "NAV": {
-    "MODERATION": "Moderation"
+    "MODERATION": "Moderation",
+    "DASHBOARD": "Overview",
+    "CASES": "Cases",
+    "NOTES": "Notes",
+    "CHANNEL_RULES": "Channel rules",
+    "PROTECTED": "Protected roles"
   },
   "SETTINGS": {
     "PAGE_TITLE": "Moderation Settings",
-    "PAGE_DESC": "Configure moderation, logs and notifications"
+    "PAGE_DESC": "Configure moderation, logs and notifications",
+    "MORE_TITLE": "Other areas"
   },
-
   "TAB_SETTINGS": "Settings",
   "TAB_PROTECTED_ROLES": "Protected Roles",
   "TAB_CHANNEL_RULES": "Channel Rules",
   "TAB_NOTES": "Mod Notes",
   "TAB_LOGS": "Moderation Logs",
-
   "SECTION_BASIC": "Basic Settings",
   "SECTION_BASIC_DESC": "Basic moderation configuration",
-  
   "MODLOG_CHANNEL_TITLE": "Modlog Channel",
   "MODLOG_CHANNEL_DESC": "Channel for moderation logs",
   "CHANNEL_SELECT": "Select channel",
-  
   "MAXWARN_LIMIT_TITLE": "Max. Warnings",
   "MAXWARN_LIMIT_DESC": "Number of warnings before action is taken",
-  
   "MAXWARN_ACTION_TITLE": "Action on Max. Warnings",
   "MAXWARN_ACTION_DESC": "Which action should be executed when maximum warnings are reached?",
-  
   "DEFAULT_REASON_TITLE": "Default Reason",
   "DEFAULT_REASON_DESC": "This reason will be automatically used for kicks/bans when no specific reason is provided.",
   "DEFAULT_REASON_PLACEHOLDER": "e.g. Violation of server rules",
-  
   "SECTION_MODLOG_EVENTS": "Modlog Events",
   "SECTION_MODLOG_EVENTS_DESC": "Choose which actions should be logged in the modlog channel",
-  
   "EVENT_WARN": "Warnings",
   "EVENT_KICK": "Kicks",
   "EVENT_BAN": "Bans",
@@ -40,24 +38,25 @@
   "EVENT_UNTIMEOUT": "Remove Timeout",
   "EVENT_SOFTBAN": "Softbans",
   "EVENT_UNBAN": "Unbans",
-  
   "SECTION_DM_NOTIFICATIONS": "DM Notifications",
   "SECTION_DM_NOTIFICATIONS_DESC": "Should the affected user be notified via direct message?",
-  
   "DM_ON_WARN": "On Warning",
   "DM_ON_KICK": "On Kick",
   "DM_ON_BAN": "On Ban",
   "DM_ON_TIMEOUT": "On Timeout",
-
   "PROTECTED": {
     "TITLE": "Protected Roles",
     "DESC": "Members with a protected role cannot be punished by moderation commands (Warn, Kick, Ban, Timeout).",
     "SELECT_ROLE": "Select role...",
     "BTN_ADD": "Add",
     "EMPTY": "No protected roles configured. All roles can be moderated.",
-    "CONFIRM_REMOVE": "Do you really want to remove this protected role?"
+    "CONFIRM_REMOVE": "Do you really want to remove this protected role?",
+    "ADD_TITLE": "Add a role",
+    "BTN_REMOVE": "Remove protection",
+    "ALL_ADDED": "All roles are already protected.",
+    "HINT": "Anyone holding a protected role cannot be warned, kicked or banned through the moderation commands.",
+    "EMPTY_HINT": "Without protected roles, every member can be moderated."
   },
-
   "LOGS": {
     "TITLE": "Moderation Logs",
     "FILTER_ALL": "All types",
@@ -68,9 +67,12 @@
     "COL_DATE": "Date",
     "EMPTY": "No moderation logs available.",
     "LOAD_MORE": "Load more",
-    "REMAINING": "remaining"
+    "REMAINING": "remaining",
+    "SUBTITLE": "Every warning, kick and ban with its case number",
+    "COL_CASE": "Case",
+    "EMPTY_HINT": "Once moderation steps in, it shows up here.",
+    "PAGE_OF": "Page {{aktuell}} of {{anzahl}}"
   },
-
   "CHANNEL_RULES": {
     "TITLE": "Channel-specific Rules",
     "DESC": "Define different moderation settings for individual channels. For example, set relaxed rules in meme channels or exempt channels from AutoMod.",
@@ -84,9 +86,13 @@
     "NOTES_PLACEHOLDER": "Optional note about this rule...",
     "BTN_ADD": "Add",
     "EMPTY": "No channel-specific rules configured. Global settings apply.",
-    "CONFIRM_REMOVE": "Do you really want to remove this channel rule?"
+    "CONFIRM_REMOVE": "Do you really want to remove this channel rule?",
+    "LIST_TITLE": "Existing rules",
+    "BTN_DELETE": "Delete rule",
+    "BADGE_LIMIT": "From {{limit}} warnings → {{aktion}}",
+    "DEFAULT_ACTION": "default action",
+    "EMPTY_HINT": "Without a specific rule, the basic settings apply everywhere."
   },
-
   "NOTES": {
     "TITLE": "Moderator Notes",
     "DESC": "Internal notes about users – only visible to moderators. Can contain background information or observations.",
@@ -100,9 +106,12 @@
     "BTN_SEARCH": "Search",
     "BTN_ALL": "All",
     "HINT": "Use the search above to find notes for a specific user, or click 'All' to load all notes.",
-    "CONFIRM_DELETE": "Do you really want to delete this note?"
+    "CONFIRM_DELETE": "Do you really want to delete this note?",
+    "LIST_TITLE": "Existing notes",
+    "AUTHOR": "Created by",
+    "BTN_DELETE": "Delete note",
+    "EMPTY": "No notes yet"
   },
-  
   "HELP": {
     "TITLE": "Help & Tips",
     "MODERATION_TITLE": "Moderation",
@@ -119,7 +128,42 @@
     "NOTES_TEXT": "Create internal notes about users that are only visible to moderators.",
     "COMMANDS_TITLE": "Available Commands"
   },
-  
   "BTN_SAVE": "Save",
-  "BTN_SAVING": "Saving..."
+  "BTN_SAVING": "Saving...",
+  "TITLE": "Moderation",
+  "DASHBOARD": {
+    "SUBTITLE": "What moderation did most recently",
+    "CASES_30": "Cases (30 days)",
+    "CASES_TOTAL": "{{count}} in total",
+    "BY_TYPE": "By type, last 30 days",
+    "RECENT": "Most recent",
+    "QUIET": "All quiet",
+    "QUIET_HINT": "No action was needed in the last 30 days.",
+    "TO_CASES": "View all cases",
+    "TO_SETTINGS": "Go to settings",
+    "NO_LOG_CHANNEL": "No log channel set",
+    "NO_LOG_CHANNEL_HINT": "Without a channel, warnings and bans still work, but nobody on the server sees them."
+  },
+  "DM_TEMPLATE": {
+    "LABEL": "Message to the member",
+    "PLACEHOLDER": "You were {action} on {guild:name}. Reason: {reason}",
+    "HELP": "Description used in the direct message. Leave empty for the default text.",
+    "VARIABLES": "Placeholders"
+  },
+  "MESSAGES": {
+    "SETTINGS_SAVED": "Moderation settings saved",
+    "SETTINGS_ERROR": "Failed to save moderation settings"
+  },
+  "JS": {
+    "FEHLER": "The action failed.",
+    "AUSWAHL_FEHLT": "Please choose a role first.",
+    "ROLLE_ENTFERNEN": "Really remove protection from this role?",
+    "ROLLE_ENTFERNT": "Role removed.",
+    "KANAL_FEHLT": "Please choose a channel first.",
+    "REGEL_LOESCHEN": "Really delete this channel rule?",
+    "REGEL_GELOESCHT": "Channel rule deleted.",
+    "NOTIZ_UNVOLLSTAENDIG": "Member ID and text are required.",
+    "NOTIZ_LOESCHEN": "Really delete this note?",
+    "NOTIZ_GELOESCHT": "Note deleted."
+  }
 }

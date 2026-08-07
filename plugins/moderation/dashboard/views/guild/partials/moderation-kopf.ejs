@@ -1,0 +1,38 @@
+<%
+/**
+ * Gemeinsamer Seitenkopf der Moderations-Seiten.
+ *
+ * Traegt Basisadresse und Meldungstexte fuer die Skripte, damit keine View
+ * einen eigenen Inline-Block mitschleppen muss.
+ *
+ * Erwartet: guildId, tr, titel, beschreibung, icon
+ */
+const jsTexte = {
+  FEHLER:               tr('moderation:JS.FEHLER'),
+  AUSWAHL_FEHLT:        tr('moderation:JS.AUSWAHL_FEHLT'),
+  ROLLE_ENTFERNEN:      tr('moderation:JS.ROLLE_ENTFERNEN'),
+  ROLLE_ENTFERNT:       tr('moderation:JS.ROLLE_ENTFERNT'),
+  KANAL_FEHLT:          tr('moderation:JS.KANAL_FEHLT'),
+  REGEL_LOESCHEN:       tr('moderation:JS.REGEL_LOESCHEN'),
+  REGEL_GELOESCHT:      tr('moderation:JS.REGEL_GELOESCHT'),
+  NOTIZ_UNVOLLSTAENDIG: tr('moderation:JS.NOTIZ_UNVOLLSTAENDIG'),
+  NOTIZ_LOESCHEN:       tr('moderation:JS.NOTIZ_LOESCHEN'),
+  NOTIZ_GELOESCHT:      tr('moderation:JS.NOTIZ_GELOESCHT')
+};
+%>
+<div class="page-header d-print-none mb-3"
+     data-moderation-basis="/guild/<%= guildId %>/plugins/moderation"
+     data-moderation-texte="<%= JSON.stringify(jsTexte) %>">
+  <div class="row align-items-center">
+    <div class="col">
+      <div class="page-pretitle"><%= tr('moderation:TITLE') %></div>
+      <h2 class="page-title">
+        <i class="<%= icon %> me-2"></i>
+        <%= titel %>
+      </h2>
+      <% if (beschreibung) { %>
+        <div class="text-secondary mt-1"><%= beschreibung %></div>
+      <% } %>
+    </div>
+  </div>
+</div>

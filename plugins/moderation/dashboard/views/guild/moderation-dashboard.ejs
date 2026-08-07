@@ -1,0 +1,152 @@
+<%- include('partials/moderation-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-gauge-high',
+  titel: tr('moderation:NAV.DASHBOARD'),
+  beschreibung: tr('moderation:DASHBOARD.SUBTITLE')
+}) %>
+
+<%
+  const basis = `/guild/${guildId}/plugins/moderation`;
+  const zeitpunkt = (w) => w ? new Date(w).toLocaleString('de-DE') : '—';
+
+  /** Farbe je Fallart - dieselbe Zuordnung wie auf der Fallseite. */
+  const farbe = {
+    WARN: 'orange', KICK: 'blue', BAN: 'red', TIMEOUT: 'secondary',
+    SOFTBAN: 'dark', UNBAN: 'green', UNTIMEOUT: 'green'
+  };
+
+  const nachArt = {};
+  (zaehler || []).forEach(z => { nachArt[z.type] = z.anzahl; });
+  const summe30 = Object.values(nachArt).reduce((s, n) => s + Number(n), 0);
+%>
+
+<!-- Kennzahlen -->
+<div class="row row-cards mb-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('moderation:DASHBOARD.CASES_30') %></div>
+        <div class="h1 mb-0"><%= summe30 %></div>
+        <div class="text-secondary small"><%= tr('moderation:DASHBOARD.CASES_TOTAL', { count: anzahl.faelleGesamt }) %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('moderation:NAV.NOTES') %></div>
+        <div class="h1 mb-0"><%= anzahl.notizen %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('moderation:NAV.CHANNEL_RULES') %></div>
+        <div class="h1 mb-0"><%= anzahl.kanalregeln %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('moderation:NAV.PROTECTED') %></div>
+        <div class="h1 mb-0"><%= anzahl.geschuetzteRollen %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hinweis, wenn nirgends protokolliert wird -->
+<% if (!settings.modlog_channel) { %>
+  <div class="alert alert-warning" role="alert">
+    <div class="d-flex align-items-center">
+      <i class="fa-solid fa-triangle-exclamation fs-2 me-3"></i>
+      <div>
+        <h4 class="alert-title mb-1"><%= tr('moderation:DASHBOARD.NO_LOG_CHANNEL') %></h4>
+        <div class="text-secondary"><%= tr('moderation:DASHBOARD.NO_LOG_CHANNEL_HINT') %></div>
+      </div>
+      <a href="<%= basis %>/settings" class="btn btn-warning ms-auto">
+        <%= tr('moderation:DASHBOARD.TO_SETTINGS') %>
+      </a>
+    </div>
+  </div>
+<% } %>
+
+<div class="row row-cards">
+  <!-- Verteilung der letzten 30 Tage -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('moderation:DASHBOARD.BY_TYPE') %></h3>
+      </div>
+      <% if (summe30 > 0) { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <tbody>
+              <% Object.entries(nachArt).sort((a, b) => b[1] - a[1]).forEach(([art, n]) => { %>
+                <tr>
+                  <td><span class="badge bg-<%= farbe[art] || 'secondary' %>-lt"><%= art %></span></td>
+                  <td class="text-end"><%= n %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="card-body">
+          <div class="empty">
+            <div class="empty-icon"><i class="fa-solid fa-scale-balanced fs-1 text-secondary"></i></div>
+            <p class="empty-title"><%= tr('moderation:DASHBOARD.QUIET') %></p>
+            <p class="empty-subtitle text-secondary"><%= tr('moderation:DASHBOARD.QUIET_HINT') %></p>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Zuletzt geschehen -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('moderation:DASHBOARD.RECENT') %></h3>
+      </div>
+      <% if (letzteFaelle && letzteFaelle.length > 0) { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th><%= tr('moderation:LOGS.COL_CASE') %></th>
+                <th><%= tr('moderation:LOGS.COL_TYPE') %></th>
+                <th><%= tr('moderation:LOGS.COL_USER') %></th>
+                <th class="text-end"><%= tr('moderation:LOGS.COL_DATE') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% letzteFaelle.forEach(fall => { %>
+                <tr>
+                  <td class="text-secondary">#<%= fall.case_number || '—' %></td>
+                  <td><span class="badge bg-<%= farbe[fall.type] || 'secondary' %>-lt"><%= fall.type %></span></td>
+                  <td class="font-monospace text-secondary"><%= fall.member_id || '—' %></td>
+                  <td class="text-end text-secondary"><%= zeitpunkt(fall.created_at) %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-footer">
+          <a href="<%= basis %>/faelle" class="btn btn-outline-primary w-100">
+            <i class="fa-solid fa-folder-open me-2"></i><%= tr('moderation:DASHBOARD.TO_CASES') %>
+          </a>
+        </div>
+      <% } else { %>
+        <div class="card-body">
+          <div class="empty">
+            <div class="empty-icon"><i class="fa-solid fa-inbox fs-1 text-secondary"></i></div>
+            <p class="empty-title"><%= tr('moderation:LOGS.EMPTY') %></p>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
