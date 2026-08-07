@@ -1,0 +1,220 @@
+<%- include('partials/automod-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-file-lines',
+  titel: tr('automod:NAV.LOGS'),
+  beschreibung: tr('automod:LOGS.SUBTITLE')
+}) %>
+
+<%
+  /** Rollen- und Mitgliedsnamen kennen wir nicht immer - dann zeigen wir die ID. */
+  const zeitpunkt = (wert) => wert ? new Date(wert).toLocaleString('de-DE') : '—';
+%>
+
+<!-- Zeitraum und Aufraeumen -->
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label for="protokoll-zeitraum" class="form-label"><%= tr('automod:LOGS.PERIOD') %></label>
+        <select class="form-select" id="protokoll-zeitraum">
+          <% [1, 7, 30, 90].forEach(wert => { %>
+            <option value="<%= wert %>" <%= tage === wert ? 'selected' : '' %>>
+              <%= tr('automod:LOGS.PERIOD_DAYS', { count: wert }) %>
+            </option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="cleanup-tage" class="form-label"><%= tr('automod:LOGS.KEEP_DAYS') %></label>
+        <input type="number" class="form-control" id="cleanup-tage" value="30" min="1" max="365">
+      </div>
+      <div class="col-md-3">
+        <button type="button" class="btn btn-outline-danger w-100" onclick="automodProtokollAufraeumen()">
+          <i class="fa-solid fa-broom me-2"></i><%= tr('automod:LOGS.CLEANUP') %>
+        </button>
+      </div>
+    </div>
+    <div class="form-hint mt-2"><%= tr('automod:LOGS.CLEANUP_HINT') %></div>
+  </div>
+</div>
+
+<!-- Kennzahlen -->
+<div class="row row-cards mb-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('automod:DASHBOARD.VIOLATIONS') %></div>
+        <div class="h1 mb-0"><%= statistik ? statistik.total : 0 %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('automod:DASHBOARD.STRIKES_GIVEN') %></div>
+        <div class="h1 mb-0"><%= statistik ? (statistik.total_strikes || 0) : 0 %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('automod:LOGS.MEMBERS_WITH_STRIKES') %></div>
+        <div class="h1 mb-0"><%= (strikes || []).length %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('automod:LOGS.RAID_EVENTS') %></div>
+        <div class="h1 mb-0"><%= (raidEreignisse || []).length %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row row-cards">
+  <!-- Haeufigste Gruende -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('automod:LOGS.TOP_REASONS') %></h3>
+      </div>
+      <% if (statistik && statistik.by_type && statistik.by_type.length > 0) { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <tbody>
+              <% statistik.by_type.forEach(zeile => { %>
+                <tr>
+                  <td><%= zeile.violation_reasons %></td>
+                  <td class="text-end"><span class="badge bg-secondary-lt"><%= zeile.count %></span></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="card-body text-secondary"><%= tr('automod:LOGS.EMPTY') %></div>
+      <% } %>
+    </div>
+
+    <!-- Offene Strikes -->
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('automod:LOGS.STRIKES_TITLE') %></h3>
+      </div>
+      <% if (strikes && strikes.length > 0) { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th><%= tr('automod:LOGS.MEMBER') %></th>
+                <th><%= tr('automod:LOGS.STRIKES') %></th>
+                <th style="width: 4rem;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% strikes.forEach(eintrag => { %>
+                <tr data-strike-member="<%= eintrag.member_id %>">
+                  <td class="font-monospace text-secondary"><%= eintrag.member_id %></td>
+                  <td><span class="badge bg-red-lt"><%= eintrag.strikes %></span></td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            onclick="automodStrikesZuruecksetzen('<%= eintrag.member_id %>')"
+                            title="<%= tr('automod:LOGS.RESET_STRIKES') %>">
+                      <i class="fa-solid fa-rotate-left"></i>
+                    </button>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="card-body text-secondary"><%= tr('automod:LOGS.STRIKES_EMPTY') %></div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Verstoesse -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('automod:LOGS.VIOLATIONS_TITLE') %></h3>
+      </div>
+      <% if (logs && logs.length > 0) { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th><%= tr('automod:LOGS.MEMBER') %></th>
+                <th><%= tr('automod:LOGS.REASON') %></th>
+                <th><%= tr('automod:LOGS.STRIKES') %></th>
+                <th class="text-end"><%= tr('automod:LOGS.WHEN') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% logs.forEach(eintrag => { %>
+                <tr>
+                  <td class="font-monospace text-secondary"><%= eintrag.member_id %></td>
+                  <td>
+                    <div><%= eintrag.violation_reasons %></div>
+                    <% if (eintrag.message_content) { %>
+                      <div class="text-secondary small text-truncate" style="max-width: 22rem;">
+                        <%= eintrag.message_content %>
+                      </div>
+                    <% } %>
+                  </td>
+                  <td><%= eintrag.strikes_given %></td>
+                  <td class="text-end text-secondary"><%= zeitpunkt(eintrag.logged_at) %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="card-body">
+          <div class="empty">
+            <div class="empty-icon"><i class="fa-solid fa-inbox fs-1 text-secondary"></i></div>
+            <p class="empty-title"><%= tr('automod:LOGS.EMPTY') %></p>
+            <p class="empty-subtitle text-secondary"><%= tr('automod:LOGS.EMPTY_HINT') %></p>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Raid-Ereignisse -->
+<div class="card mt-3">
+  <div class="card-header">
+    <h3 class="card-title"><%= tr('automod:RAID.EVENTS_TITLE') %></h3>
+  </div>
+  <% if (raidEreignisse && raidEreignisse.length > 0) { %>
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter">
+        <thead>
+          <tr>
+            <th><%= tr('automod:RAID.EVENT_TYPE') %></th>
+            <th><%= tr('automod:RAID.EVENT_DETAILS') %></th>
+            <th class="text-end"><%= tr('automod:LOGS.WHEN') %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% raidEreignisse.forEach(ereignis => { %>
+            <tr>
+              <td><span class="badge bg-orange-lt"><%= ereignis.event_type %></span></td>
+              <td class="text-secondary small font-monospace">
+                <%= ereignis.metadata ? JSON.stringify(ereignis.metadata) : '—' %>
+              </td>
+              <td class="text-end text-secondary"><%= zeitpunkt(ereignis.created_at) %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %>
+    <div class="card-body text-secondary"><%= tr('automod:RAID.EVENTS_EMPTY') %></div>
+  <% } %>
+</div>

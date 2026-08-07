@@ -1,0 +1,286 @@
+<%- include('partials/automod-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-code',
+  titel: tr('automod:NAV.RULES'),
+  beschreibung: tr('automod:RULES.SUBTITLE'),
+  bedingungen: conditionTypes
+}) %>
+
+<!-- ==================== Stichwortlisten ==================== -->
+<form class="guild-ajax-form mb-3"
+      data-automod-form
+      data-form-type="automod-keywords"
+      data-method="PUT"
+      action="/guild/<%= guildId %>/plugins/automod/settings"
+      method="POST">
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fa-solid fa-list-check me-2"></i>
+        <%= tr('automod:KEYWORDS.TITLE') %>
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-secondary"><%= tr('automod:KEYWORDS.DESC') %></p>
+
+      <% if (keywordLists && keywordLists.length > 0) { %>
+        <div class="row row-cards">
+          <% keywordLists.forEach(liste => {
+               const aktiv = (activeKeywordLists || []).includes(liste.id);
+          %>
+            <div class="col-md-6">
+              <div class="card <%= aktiv ? 'automod-liste-aktiv' : '' %>">
+                <div class="card-body">
+                  <label class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox"
+                           data-automod-liste="active_keyword_lists"
+                           id="kwl_<%= liste.id %>" value="<%= liste.id %>"
+                           <%= aktiv ? 'checked' : '' %>>
+                    <span class="form-check-label fw-bold"><%= liste.name %></span>
+                  </label>
+                  <p class="text-secondary small mb-2"><%= liste.description %></p>
+                  <span class="badge bg-secondary me-1">
+                    <i class="fa-solid fa-globe me-1"></i><%= liste.language %>
+                  </span>
+                  <span class="badge bg-blue-lt">
+                    <%= tr('automod:KEYWORDS.COUNT', { count: liste.count }) %>
+                  </span>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <div class="alert alert-warning" role="alert">
+          <i class="fa-solid fa-triangle-exclamation me-2"></i>
+          <%= tr('automod:KEYWORDS.NONE') %>
+        </div>
+      <% } %>
+    </div>
+    <div class="card-footer">
+      <button type="submit" class="btn btn-primary">
+        <i class="fa-solid fa-floppy-disk me-2"></i>
+        <%= tr('automod:SETTINGS.SAVE_BUTTON') %>
+      </button>
+    </div>
+  </div>
+</form>
+
+<!-- ==================== Regex-Regeln ==================== -->
+<div class="card mb-3">
+  <div class="card-header">
+    <h3 class="card-title">
+      <i class="fa-solid fa-code me-2"></i>
+      <%= tr('automod:REGEX.TITLE') %>
+    </h3>
+  </div>
+  <div class="card-body">
+    <p class="text-secondary"><%= tr('automod:REGEX.DESC') %></p>
+
+    <div class="row g-2 align-items-end mb-3">
+      <div class="col-md-4">
+        <label for="regex-new-name" class="form-label"><%= tr('automod:REGEX.NAME') %></label>
+        <input type="text" class="form-control" id="regex-new-name"
+               placeholder="<%= tr('automod:REGEX.NAME_PLACEHOLDER') %>">
+      </div>
+      <div class="col-md-4">
+        <label for="regex-new-pattern" class="form-label"><%= tr('automod:REGEX.PATTERN') %></label>
+        <input type="text" class="form-control font-monospace" id="regex-new-pattern"
+               placeholder="<%= tr('automod:REGEX.PATTERN_PLACEHOLDER') %>">
+      </div>
+      <div class="col-md-3">
+        <label for="regex-new-action" class="form-label"><%= tr('automod:REGEX.ACTION') %></label>
+        <select class="form-select" id="regex-new-action">
+          <option value="DELETE"><%= tr('automod:REGEX.ACTION_DELETE') %></option>
+          <option value="WARN"><%= tr('automod:REGEX.ACTION_WARN') %></option>
+          <option value="STRIKE"><%= tr('automod:REGEX.ACTION_STRIKE') %></option>
+        </select>
+      </div>
+      <div class="col-md-1">
+        <button type="button" class="btn btn-success w-100" onclick="addRegexRule()"
+                title="<%= tr('automod:REGEX.ADD') %>">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+      </div>
+    </div>
+
+    <div id="regex-rules-list">
+      <% if (regexRules && regexRules.length > 0) { %>
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th style="width: 5rem;"><%= tr('automod:RULES.ENABLED') %></th>
+                <th><%= tr('automod:REGEX.NAME') %></th>
+                <th><%= tr('automod:REGEX.ACTION') %></th>
+                <th style="width: 4rem;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% regexRules.forEach(regel => { %>
+                <tr id="regex-rule-<%= regel.id %>">
+                  <td>
+                    <label class="form-check form-switch mb-0">
+                      <input class="form-check-input" type="checkbox"
+                             <%= regel.enabled ? 'checked' : '' %>
+                             onchange="toggleRegexRule(<%= regel.id %>, this.checked)">
+                    </label>
+                  </td>
+                  <td>
+                    <div><strong><%= regel.name %></strong></div>
+                    <code class="small text-secondary"><%= regel.pattern %></code>
+                  </td>
+                  <td>
+                    <span class="badge bg-<%= regel.action === 'STRIKE' ? 'red' : (regel.action === 'DELETE' ? 'orange' : 'blue') %>-lt">
+                      <%= regel.action %>
+                    </span>
+                  </td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            onclick="deleteRegexRule(<%= regel.id %>)"
+                            title="<%= tr('automod:RULES.DELETE') %>">
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="alert alert-secondary mb-0" role="alert">
+          <i class="fa-solid fa-circle-info me-2"></i>
+          <%= tr('automod:REGEX.EMPTY') %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== Kombinations-Regeln ==================== -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">
+      <i class="fa-solid fa-diagram-project me-2"></i>
+      <%= tr('automod:TABS.COMPOUND.TITLE') %>
+    </h3>
+  </div>
+  <div class="card-body">
+    <p class="text-secondary"><%= tr('automod:TABS.COMPOUND.SUBTITLE') %></p>
+
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <label for="compoundName" class="form-label"><%= tr('automod:COMPOUND.NAME') %></label>
+        <input type="text" id="compoundName" class="form-control" maxlength="100"
+               placeholder="<%= tr('automod:COMPOUND.NAME_PLACEHOLDER') %>">
+      </div>
+      <div class="col-md-4">
+        <label for="compoundLogic" class="form-label"><%= tr('automod:COMPOUND.LOGIC') %></label>
+        <select id="compoundLogic" class="form-select">
+          <option value="AND"><%= tr('automod:COMPOUND.LOGIC_AND') %></option>
+          <option value="OR"><%= tr('automod:COMPOUND.LOGIC_OR') %></option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label for="compoundAction" class="form-label"><%= tr('automod:COMPOUND.ACTION') %></label>
+        <select id="compoundAction" class="form-select">
+          <option value="DELETE">DELETE</option>
+          <option value="WARN">WARN</option>
+          <option value="STRIKE" selected>STRIKE</option>
+          <option value="TIMEOUT">TIMEOUT</option>
+          <option value="KICK">KICK</option>
+          <option value="BAN">BAN</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-md-8">
+        <label for="compoundDesc" class="form-label"><%= tr('automod:COMPOUND.DESCRIPTION') %></label>
+        <input type="text" id="compoundDesc" class="form-control" maxlength="500"
+               placeholder="<%= tr('automod:COMPOUND.DESC_PLACEHOLDER') %>">
+      </div>
+      <div class="col-md-4" id="compoundDurationWrap" style="display:none;">
+        <label for="compoundDuration" class="form-label"><%= tr('automod:COMPOUND.DURATION') %></label>
+        <input type="number" id="compoundDuration" class="form-control" min="1" max="40320">
+      </div>
+    </div>
+
+    <label class="form-label"><%= tr('automod:COMPOUND.CONDITIONS') %></label>
+    <div id="compoundConditions"></div>
+    <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="addCompoundCondition()">
+      <i class="fa-solid fa-plus me-1"></i> <%= tr('automod:COMPOUND.ADD_CONDITION') %>
+    </button>
+
+    <div class="mt-3">
+      <button type="button" class="btn btn-success" onclick="saveCompoundRule()">
+        <i class="fa-solid fa-floppy-disk me-2"></i> <%= tr('automod:COMPOUND.BTN_SAVE') %>
+      </button>
+    </div>
+
+    <hr class="my-4">
+
+    <div id="compoundRulesList">
+      <% if (compoundRules && compoundRules.length > 0) { %>
+        <% compoundRules.forEach(regel => { %>
+          <div class="card mb-2" id="compound-rule-<%= regel.id %>">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                  <div class="mb-1">
+                    <strong><%= regel.name %></strong>
+                    <span class="badge bg-<%= regel.enabled ? 'green' : 'secondary' %>-lt ms-2">
+                      <%= regel.enabled ? tr('automod:COMPOUND.ENABLED') : tr('automod:COMPOUND.DISABLED') %>
+                    </span>
+                    <span class="badge bg-blue-lt ms-1"><%= regel.logic %></span>
+                    <span class="badge bg-orange-lt ms-1">
+                      <%= regel.action %><%= regel.duration ? ' (' + regel.duration + ' min)' : '' %>
+                    </span>
+                  </div>
+                  <% if (regel.description) { %>
+                    <p class="text-secondary small mb-1"><%= regel.description %></p>
+                  <% } %>
+                  <div class="small">
+                    <% regel.conditions.forEach((bedingung, i) => { %>
+                      <span class="badge bg-secondary-lt me-1 mb-1">
+                        <%= bedingung.type %> <%= bedingung.operator %> <%= bedingung.value %>
+                      </span>
+                      <% if (i < regel.conditions.length - 1) { %>
+                        <span class="text-secondary me-1"><%= regel.logic %></span>
+                      <% } %>
+                    <% }); %>
+                  </div>
+                </div>
+                <div class="btn-list flex-nowrap">
+                  <button type="button"
+                          class="btn btn-sm btn-outline-<%= regel.enabled ? 'warning' : 'success' %>"
+                          onclick="toggleCompoundRule(<%= regel.id %>, <%= !regel.enabled %>)"
+                          title="<%= regel.enabled ? tr('automod:COMPOUND.DISABLED') : tr('automod:COMPOUND.ENABLED') %>">
+                    <i class="fa-solid fa-<%= regel.enabled ? 'pause' : 'play' %>"></i>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-danger"
+                          onclick="deleteCompoundRule(<%= regel.id %>)"
+                          title="<%= tr('automod:RULES.DELETE') %>">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      <% } else { %>
+        <div class="alert alert-secondary mb-0" role="alert">
+          <i class="fa-solid fa-circle-info me-2"></i>
+          <%= tr('automod:COMPOUND.EMPTY') %>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="alert alert-info mt-3 mb-0" role="alert">
+      <i class="fa-solid fa-lightbulb me-2"></i>
+      <strong><%= tr('automod:COMPOUND.TIP_TITLE') %>:</strong>
+      <%= tr('automod:COMPOUND.TIP_TEXT') %>
+    </div>
+  </div>
+</div>

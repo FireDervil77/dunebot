@@ -1,0 +1,174 @@
+<%- include('partials/automod-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-gauge-high',
+  titel: tr('automod:NAV.DASHBOARD'),
+  beschreibung: tr('automod:DASHBOARD.SUBTITLE')
+}) %>
+
+<% const basis = `/guild/${guildId}/plugins/automod`; %>
+
+<!-- Kennzahlen -->
+<div class="row row-cards mb-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('automod:DASHBOARD.VIOLATIONS') %></div>
+        <div class="h1 mb-0"><%= statistik ? statistik.total : 0 %></div>
+        <div class="text-secondary small"><%= tr('automod:DASHBOARD.LAST_DAYS', { count: 7 }) %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('automod:DASHBOARD.STRIKES_GIVEN') %></div>
+        <div class="h1 mb-0"><%= statistik ? (statistik.total_strikes || 0) : 0 %></div>
+        <div class="text-secondary small"><%= tr('automod:DASHBOARD.LAST_DAYS', { count: 7 }) %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('automod:DASHBOARD.ACTIVE_RULES') %></div>
+        <div class="h1 mb-0"><%= anzahl.regexRegeln + anzahl.kombiRegeln %></div>
+        <div class="text-secondary small">
+          <%= tr('automod:DASHBOARD.RULES_BREAKDOWN', { regex: anzahl.regexRegeln, kombi: anzahl.kombiRegeln }) %>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('automod:DASHBOARD.KEYWORD_LISTS') %></div>
+        <div class="h1 mb-0"><%= anzahl.stichwortlisten %></div>
+        <div class="text-secondary small"><%= tr('automod:DASHBOARD.ESCALATION_LEVELS', { count: anzahl.eskalation }) %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lockdown-Warnung: die dringendste Information zuerst -->
+<% if (settings.raid_lockdown_active) { %>
+  <div class="alert alert-danger" role="alert">
+    <div class="d-flex align-items-center">
+      <i class="fa-solid fa-lock fs-2 me-3"></i>
+      <div>
+        <h4 class="alert-title mb-1"><%= tr('automod:TABS.RAID.LOCKDOWN_ACTIVE') %></h4>
+        <div class="text-secondary"><%= tr('automod:DASHBOARD.LOCKDOWN_HINT') %></div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<div class="row row-cards">
+  <!-- Was gerade scharf geschaltet ist -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('automod:DASHBOARD.STATUS_TITLE') %></h3>
+      </div>
+      <div class="list-group list-group-flush">
+        <%
+          const schalter = [
+            ['automod:SETTINGS.ANTI_SPAM.LABEL',        settings.anti_spam],
+            ['automod:SETTINGS.ANTI_LINKS.LABEL',       settings.anti_links],
+            ['automod:SETTINGS.ANTI_INVITES.LABEL',     settings.anti_invites],
+            ['automod:SETTINGS.ANTI_MASSMENTION.LABEL', settings.anti_massmention],
+            ['automod:SETTINGS.ANTI_ATTACHMENTS.LABEL', settings.anti_attachments],
+            ['automod:SETTINGS.ANTI_GHOSTPING.LABEL',   settings.anti_ghostping],
+            ['automod:TABS.RAID.ENABLE',                settings.raid_protection_enabled]
+          ];
+        %>
+        <% schalter.forEach(([schluessel, an]) => { %>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span><%= tr(schluessel) %></span>
+            <span class="badge <%= an ? 'bg-success' : 'bg-secondary' %>">
+              <%= an ? tr('automod:DASHBOARD.ON') : tr('automod:DASHBOARD.OFF') %>
+            </span>
+          </div>
+        <% }); %>
+      </div>
+      <div class="card-footer">
+        <a href="<%= basis %>/filter" class="btn btn-primary w-100">
+          <i class="fa-solid fa-filter me-2"></i><%= tr('automod:DASHBOARD.TO_FILTER') %>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Was zuletzt passiert ist -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('automod:DASHBOARD.RECENT_TITLE') %></h3>
+      </div>
+      <% if (letzteLogs && letzteLogs.length > 0) { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th><%= tr('automod:LOGS.MEMBER') %></th>
+                <th><%= tr('automod:LOGS.REASON') %></th>
+                <th class="text-end"><%= tr('automod:LOGS.WHEN') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% letzteLogs.forEach(eintrag => { %>
+                <tr>
+                  <td class="font-monospace text-secondary"><%= eintrag.member_id %></td>
+                  <td><%= eintrag.violation_reasons %></td>
+                  <td class="text-end text-secondary">
+                    <%= eintrag.logged_at ? new Date(eintrag.logged_at).toLocaleString('de-DE') : '' %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-footer">
+          <a href="<%= basis %>/protokoll" class="btn btn-outline-primary w-100">
+            <i class="fa-solid fa-file-lines me-2"></i><%= tr('automod:DASHBOARD.TO_LOGS') %>
+          </a>
+        </div>
+      <% } else { %>
+        <div class="card-body">
+          <div class="empty">
+            <div class="empty-icon"><i class="fa-solid fa-inbox fs-1 text-secondary"></i></div>
+            <p class="empty-title"><%= tr('automod:DASHBOARD.NO_RECENT') %></p>
+            <p class="empty-subtitle text-secondary"><%= tr('automod:DASHBOARD.NO_RECENT_HINT') %></p>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Raid-Ereignisse -->
+<% if (raidEreignisse && raidEreignisse.length > 0) { %>
+  <div class="row row-cards mt-3">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><%= tr('automod:DASHBOARD.RAID_TITLE') %></h3>
+        </div>
+        <div class="list-group list-group-flush">
+          <% raidEreignisse.forEach(ereignis => { %>
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <span>
+                <span class="badge bg-orange me-2"><%= ereignis.event_type %></span>
+                <span class="text-secondary small">
+                  <%= ereignis.created_at ? new Date(ereignis.created_at).toLocaleString('de-DE') : '' %>
+                </span>
+              </span>
+              <a href="<%= basis %>/raid" class="btn btn-sm btn-outline-secondary">
+                <%= tr('automod:DASHBOARD.TO_RAID') %>
+              </a>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>

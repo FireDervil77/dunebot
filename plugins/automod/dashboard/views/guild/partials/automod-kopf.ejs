@@ -1,0 +1,54 @@
+<%
+/**
+ * Gemeinsamer Seitenkopf der AutoMod-Seiten.
+ *
+ * Traegt die Basisadresse und die Meldungstexte fuer die Skripte - die lesen
+ * beides aus den data-Attributen, statt dass jede View einen eigenen
+ * Inline-Block mitschleppt.
+ *
+ * Erwartet: guildId, tr, titel, beschreibung, icon
+ * Optional:  bedingungen (Bedingungstypen der Kombinations-Regeln)
+ */
+const jsTexte = {
+  FEHLER:                    tr('automod:JS.FEHLER'),
+  AUSWAHL_FEHLT:             tr('automod:JS.AUSWAHL_FEHLT'),
+  AUSNAHME_ANGELEGT:         tr('automod:JS.AUSNAHME_ANGELEGT'),
+  AUSNAHME_ENTFERNT:         tr('automod:JS.AUSNAHME_ENTFERNT'),
+  AUSNAHME_LOESCHEN:         tr('automod:JS.AUSNAHME_LOESCHEN'),
+  REGEX_UNVOLLSTAENDIG:      tr('automod:JS.REGEX_UNVOLLSTAENDIG'),
+  REGEL_ANGELEGT:            tr('automod:JS.REGEL_ANGELEGT'),
+  REGEL_AKTIV:               tr('automod:JS.REGEL_AKTIV'),
+  REGEL_INAKTIV:             tr('automod:JS.REGEL_INAKTIV'),
+  REGEL_LOESCHEN:            tr('automod:JS.REGEL_LOESCHEN'),
+  REGEL_GELOESCHT:           tr('automod:JS.REGEL_GELOESCHT'),
+  SCHWELLE_UNGUELTIG:        tr('automod:JS.SCHWELLE_UNGUELTIG'),
+  STUFE_ANGELEGT:            tr('automod:JS.STUFE_ANGELEGT'),
+  STUFE_LOESCHEN:            tr('automod:JS.STUFE_LOESCHEN'),
+  STUFE_GELOESCHT:           tr('automod:JS.STUFE_GELOESCHT'),
+  STANDARD_ESKALATION:       tr('automod:JS.STANDARD_ESKALATION'),
+  STANDARD_ANGELEGT:         tr('automod:JS.STANDARD_ANGELEGT'),
+  KOMBI_UNVOLLSTAENDIG:      tr('automod:JS.KOMBI_UNVOLLSTAENDIG'),
+  KOMBI_LOESCHEN:            tr('automod:JS.KOMBI_LOESCHEN'),
+  STRIKES_ZURUECKSETZEN_FRAGE: tr('automod:JS.STRIKES_ZURUECKSETZEN_FRAGE'),
+  STRIKES_ZURUECKGESETZT:    tr('automod:JS.STRIKES_ZURUECKGESETZT'),
+  AUFRAEUMEN_FRAGE:          tr('automod:JS.AUFRAEUMEN_FRAGE'),
+  AUFGERAEUMT:               tr('automod:JS.AUFGERAEUMT')
+};
+%>
+<div class="page-header d-print-none mb-3"
+     data-automod-basis="/guild/<%= guildId %>/plugins/automod"
+     data-automod-texte="<%= JSON.stringify(jsTexte) %>"
+     <% if (typeof bedingungen !== 'undefined' && bedingungen) { %>data-automod-bedingungen="<%= JSON.stringify(bedingungen) %>"<% } %>>
+  <div class="row align-items-center">
+    <div class="col">
+      <div class="page-pretitle"><%= tr('automod:TITLE') %></div>
+      <h2 class="page-title">
+        <i class="<%= icon %> me-2"></i>
+        <%= titel %>
+      </h2>
+      <% if (beschreibung) { %>
+        <div class="text-secondary mt-1"><%= beschreibung %></div>
+      <% } %>
+    </div>
+  </div>
+</div>

@@ -1,236 +1,362 @@
 {
-    "TITLE": "Auto-moderation",
-    "DESCRIPTION": "Automatically moderate your server",
-
-    "NAV": {
-        "AUTOMOD": "AutoMod"
+  "TITLE": "Auto-moderation",
+  "DESCRIPTION": "Automatically moderate your server",
+  "NAV": {
+    "AUTOMOD": "AutoMod",
+    "DASHBOARD": "Overview",
+    "FILTER": "Filters",
+    "RULES": "Rules",
+    "ESCALATION": "Escalation",
+    "EXEMPTIONS": "Exemptions",
+    "RAID": "Raid protection",
+    "LOGS": "Log"
+  },
+  "SETTINGS": {
+    "PAGE_TITLE": "AutoMod Settings",
+    "LOG_CHANNEL": {
+      "LABEL": "Log Channel",
+      "NO_SELECTION": "No channel selected",
+      "HELP": "The channel where AutoMod logs will be sent",
+      "ID_PLACEHOLDER": "Enter a channel ID"
     },
-
-    "SETTINGS": {
-        "PAGE_TITLE": "AutoMod Settings",
-        
-        "LOG_CHANNEL": {
-            "LABEL": "Log Channel",
-            "NO_SELECTION": "No channel selected",
-            "HELP": "The channel where AutoMod logs will be sent"
-        },
-        
-        "MAX_STRIKES": {
-            "LABEL": "Maximum Strikes",
-            "HELP": "Number of strikes before a user is punished"
-        },
-        
-        "ACTION": {
-            "LABEL": "Action on Max Strikes",
-            "TIMEOUT": "Timeout",
-            "KICK": "Kick",
-            "BAN": "Ban",
-            "HELP": "The action to take when a user reaches the maximum number of strikes"
-        },
-        
-        "DEBUG_MODE": {
-            "LABEL": "Debug Mode",
-            "HELP": "Don't moderate messages from moderators (for testing)"
-        },
-        
-        "ANTI_FEATURES": {
-            "TITLE": "Anti Features"
-        },
-        
-        "ANTI_GHOSTPING": {
-            "LABEL": "Anti Ghost-Ping",
-            "HELP": "Log and moderate ghost pings (deleted mentions)"
-        },
-        
-        "ANTI_SPAM": {
-            "LABEL": "Anti-Spam",
-            "HELP": "Automatically delete spam messages"
-        },
-        
-        "ANTI_MASSMENTION": {
-            "LABEL": "Anti Mass-Mention",
-            "HELP": "Moderate messages with many mentions"
-        },
-        
-        "ANTI_MASSMENTION_THRESHOLD": {
-            "LABEL": "Mass-Mention Threshold",
-            "HELP": "Number of mentions before a message is considered mass-mention"
-        },
-        
-        "ANTI_ATTACHMENTS": {
-            "LABEL": "Anti-Attachments",
-            "HELP": "Automatically delete messages with file attachments"
-        },
-        
-        "ANTI_INVITES": {
-            "LABEL": "Anti-Invites",
-            "HELP": "Automatically delete messages with Discord invites"
-        },
-        
-        "ANTI_LINKS": {
-            "LABEL": "Anti-Links",
-            "HELP": "Automatically delete messages with links"
-        },
-        
-        "LIMITS": {
-            "TITLE": "Limits & Thresholds"
-        },
-        
-        "MAX_LINES": {
-            "LABEL": "Maximum Lines",
-            "HELP": "Delete messages with more lines (0 = disabled)"
-        },
-        
-        "MAX_MENTIONS": {
-            "LABEL": "Maximum User Mentions",
-            "HELP": "Maximum allowed user mentions (0 = unlimited)"
-        },
-        
-        "MAX_ROLE_MENTIONS": {
-            "LABEL": "Maximum Role Mentions",
-            "HELP": "Maximum allowed role mentions (0 = unlimited)"
-        },
-        
-        "WHITELISTED_CHANNELS": {
-            "LABEL": "Whitelisted Channels",
-            "HELP": "Channels where AutoMod is not active (Ctrl+Click for multi-select)",
-            "NO_CHANNELS": "No channels available"
-        },
-        
-        "SAVE_BUTTON": "Save Settings",
-        
-        "INFO": {
-            "TITLE": "Info",
-            "DESC": "AutoMod protects your server from spam, unwanted links and mass mentions.",
-            "VERSION": "Version"
-        },
-
-        "GUIDE": {
-            "TITLE": "💡 Quick Guide",
-            "STEP1": {
-                "TITLE": "1. Setup Log Channel",
-                "DESC": "Select a channel where AutoMod logs should appear"
-            },
-            "STEP2": {
-                "TITLE": "2. Configure Strike System",
-                "DESC": "Set how many strikes a user can receive before being punished"
-            },
-            "STEP3": {
-                "TITLE": "3. Enable Anti Features",
-                "DESC": "Activate desired protection features (Anti-Spam, Anti-Links, etc.)"
-            },
-            "STEP4": {
-                "TITLE": "4. Adjust Limits",
-                "DESC": "Optional: Set limits for line length and mentions"
-            },
-            "TIP": {
-                "TITLE": "💡 Tip",
-                "DESC": "Enable Debug Mode to test settings without affecting moderators"
-            }
-        }
+    "MAX_STRIKES": {
+      "LABEL": "Maximum Strikes",
+      "HELP": "Number of strikes before a user is punished"
     },
-
-    "TABS": {
-        "COMING_SOON": "Coming Soon",
-        
-        "BASIC": {
-            "TITLE": "Basic Settings",
-            "SUBTITLE": "Core Configuration"
-        },
-        
-        "CONTENT": {
-            "TITLE": "Content Filter",
-            "SUBTITLE": "Anti Features & Filters"
-        },
-        
-        "LIMITS": {
-            "TITLE": "Limits",
-            "SUBTITLE": "Thresholds & Boundaries"
-        },
-        
-        "WHITELIST": {
-            "TITLE": "Whitelisting",
-            "SUBTITLE": "Exceptions & Exemptions",
-            "ROLE_WHITELIST_TITLE": "Role Whitelist",
-            "ROLE_WHITELIST_DESC": "Coming soon: Exclude specific roles from AutoMod (e.g. Moderators, Trusted Members)"
-        },
-        
-        "RAID": {
-            "TITLE": "Raid Protection",
-            "SUBTITLE": "Raid Protection & Join Spam",
-            "PLANNED_FEATURES": "Planned Features",
-            "FEATURE_1": "Join Spam Detection (X users in Y seconds)",
-            "FEATURE_2": "Account Age Check (Min. 7 days old)",
-            "FEATURE_3": "Lockdown Mode on raid detection",
-            "FEATURE_4": "Automatic Actions (Kick/Ban new users)",
-            "ETA": "Available in approx. 1-2 weeks"
-        },
-
-        "COMPOUND": {
-            "TITLE": "Compound Rules",
-            "SUBTITLE": "Create rules that combine multiple conditions"
-        }
+    "ACTION": {
+      "LABEL": "Action on Max Strikes",
+      "TIMEOUT": "Timeout",
+      "KICK": "Kick",
+      "BAN": "Ban",
+      "HELP": "The action to take when a user reaches the maximum number of strikes"
     },
-
-    "MESSAGES": {
-        "SETTINGS_SAVED": "AutoMod settings saved successfully",
-        "SETTINGS_ERROR": "Error saving AutoMod settings"
+    "DEBUG_MODE": {
+      "LABEL": "Debug Mode",
+      "HELP": "Don't moderate messages from moderators (for testing)"
     },
-
-    "BASIC_TITLE": "Basic Settings",
-    "LOGS_TITLE": "Logs Channel",
-    "LOGS_DESC": "The channel where the bot has to send automod logs",
-    "STRIKES_TITLE": "Max Strikes",
-    "STRIKES_DESC": "The maximum amount of strikes a user can have before being punished",
-    "ACTION_TITLE": "Action",
-    "ACTION_DESC": "The action to take when a user reaches the max amount of strikes",
-    "LOG_EMBED_TITLE": "Log Embed Color",
-    "LOG_EMBED_DESC": "The color of the embeds sent in the logs channel",
-    "DM_EMBED_TITLE": "DM Embed Color",
-    "DM_EMBED_DESC": "The color of the embeds sent in the DMs of the punished user",
-    "WHITELIST_CH_TITLE": "Whitelisted Channels",
-    "WHITELIST_CH_DESC": "The channels where the bot won't moderate",
-
-    "TOGGLE_TITLE": "Quick Automod Toggles",
-    "DEBUG_TITLE": "Debug Mode",
-    "DEBUG_DESC": "Skip moderating messages sent by moderators",
-    "ATTACH_TITLE": "Anti Attachments",
-    "ATTACH_DESC": "Automatically delete messages with attachments",
-    "INVITES_TITLE": "Anti Invites",
-    "INVITES_DESC": "Automatically delete messages with discord invites",
-    "LINKS_TITLE": "Anti Links",
-    "LINKS_DESC": "Automatically delete messages with links",
-    "SPAM_TITLE": "Anti Spam",
-    "SPAM_DESC": "Automatically delete messages that are considered spam",
-    "GHOST_TITLE": "Anti Ghost Ping",
-    "GHOST_DESC": "Log and moderate ghost pings",
-    "MASSMENTION_TITLE": "Anti Mass Mention",
-    "MASSMENTION_DESC": "Automatically moderate messages with mass mentions",
-    "MASSMENTION_THRES_TITLE": "Mass Mention Threshold",
-    "MASSMENTION_THRES_DESC": "The amount of mentions a message must have to be considered a mass mention",
-    "MAXLINES_TITLE": "Max Lines",
-    "MAXLINES_DESC": "Automatically delete messages with more than the specified amount of lines",
-
-    "COMPOUND": {
-        "ADD_TITLE": "New Compound Rule",
-        "NAME": "Rule Name",
-        "NAME_PLACEHOLDER": "e.g. New Account + Link",
-        "LOGIC": "Logic",
-        "LOGIC_AND": "AND (all conditions must match)",
-        "LOGIC_OR": "OR (any condition must match)",
-        "ACTION": "Action",
-        "DESCRIPTION": "Description",
-        "DESC_PLACEHOLDER": "Optional description of the rule...",
-        "DURATION": "Timeout Duration (Minutes)",
-        "CONDITIONS": "Conditions",
-        "ADD_CONDITION": "Add Condition",
-        "BTN_SAVE": "Save Rule",
-        "EMPTY": "No compound rules found. Create your first rule above.",
-        "TIP_TITLE": "Tip",
-        "TIP_TEXT": "Compound rules allow you to combine multiple conditions. E.g. 'Account younger than 7 days AND message contains link' → Timeout.",
-        "ENABLED": "Enabled",
-        "DISABLED": "Disabled",
-        "CONDITIONS_LABEL": "Conditions",
-        "CONFIRM_DELETE": "Do you really want to delete this compound rule?"
+    "ANTI_FEATURES": {
+      "TITLE": "Anti Features"
+    },
+    "ANTI_GHOSTPING": {
+      "LABEL": "Anti Ghost-Ping",
+      "HELP": "Log and moderate ghost pings (deleted mentions)"
+    },
+    "ANTI_SPAM": {
+      "LABEL": "Anti-Spam",
+      "HELP": "Automatically delete spam messages"
+    },
+    "ANTI_MASSMENTION": {
+      "LABEL": "Anti Mass-Mention",
+      "HELP": "Moderate messages with many mentions"
+    },
+    "ANTI_MASSMENTION_THRESHOLD": {
+      "LABEL": "Mass-Mention Threshold",
+      "HELP": "Number of mentions before a message is considered mass-mention"
+    },
+    "ANTI_ATTACHMENTS": {
+      "LABEL": "Anti-Attachments",
+      "HELP": "Automatically delete messages with file attachments"
+    },
+    "ANTI_INVITES": {
+      "LABEL": "Anti-Invites",
+      "HELP": "Automatically delete messages with Discord invites"
+    },
+    "ANTI_LINKS": {
+      "LABEL": "Anti-Links",
+      "HELP": "Automatically delete messages with links"
+    },
+    "LIMITS": {
+      "TITLE": "Limits & Thresholds"
+    },
+    "MAX_LINES": {
+      "LABEL": "Maximum Lines",
+      "HELP": "Delete messages with more lines (0 = disabled)"
+    },
+    "MAX_MENTIONS": {
+      "LABEL": "Maximum User Mentions",
+      "HELP": "Maximum allowed user mentions (0 = unlimited)"
+    },
+    "MAX_ROLE_MENTIONS": {
+      "LABEL": "Maximum Role Mentions",
+      "HELP": "Maximum allowed role mentions (0 = unlimited)"
+    },
+    "WHITELISTED_CHANNELS": {
+      "LABEL": "Whitelisted Channels",
+      "HELP": "Channels where AutoMod is not active (Ctrl+Click for multi-select)",
+      "NO_CHANNELS": "No channels available"
+    },
+    "SAVE_BUTTON": "Save Settings",
+    "INFO": {
+      "TITLE": "Info",
+      "DESC": "AutoMod protects your server from spam, unwanted links and mass mentions.",
+      "VERSION": "Version"
+    },
+    "GUIDE": {
+      "TITLE": "💡 Quick Guide",
+      "STEP1": {
+        "TITLE": "1. Setup Log Channel",
+        "DESC": "Select a channel where AutoMod logs should appear"
+      },
+      "STEP2": {
+        "TITLE": "2. Configure Strike System",
+        "DESC": "Set how many strikes a user can receive before being punished"
+      },
+      "STEP3": {
+        "TITLE": "3. Enable Anti Features",
+        "DESC": "Activate desired protection features (Anti-Spam, Anti-Links, etc.)"
+      },
+      "STEP4": {
+        "TITLE": "4. Adjust Limits",
+        "DESC": "Optional: Set limits for line length and mentions"
+      },
+      "TIP": {
+        "TITLE": "💡 Tip",
+        "DESC": "Enable Debug Mode to test settings without affecting moderators"
+      }
+    },
+    "SUBTITLE": "The basics: where things are logged and what happens on too many strikes",
+    "MORE_TITLE": "Other areas",
+    "MORE_DESC": "Filters, rules and the log have their own pages in the AutoMod area.",
+    "DM_MESSAGE": {
+      "LABEL": "Message to the member",
+      "PLACEHOLDER": "You received a strike on {guild:name}. Strikes: {strikes}/{max_strikes}",
+      "HELP": "Sent to the member as a direct message. Leave empty for the default text.",
+      "VARIABLES": "Placeholders"
     }
+  },
+  "TABS": {
+    "COMING_SOON": "Coming Soon",
+    "BASIC": {
+      "TITLE": "Basic Settings",
+      "SUBTITLE": "Core Configuration"
+    },
+    "CONTENT": {
+      "TITLE": "Content Filter",
+      "SUBTITLE": "Anti Features & Filters"
+    },
+    "LIMITS": {
+      "TITLE": "Limits",
+      "SUBTITLE": "Thresholds & Boundaries"
+    },
+    "WHITELIST": {
+      "TITLE": "Whitelisting",
+      "SUBTITLE": "Exceptions & Exemptions",
+      "ROLE_WHITELIST_TITLE": "Role Whitelist",
+      "ROLE_WHITELIST_DESC": "Coming soon: Exclude specific roles from AutoMod (e.g. Moderators, Trusted Members)"
+    },
+    "RAID": {
+      "TITLE": "Raid Protection",
+      "SUBTITLE": "Raid Protection & Join Spam",
+      "PLANNED_FEATURES": "Planned Features",
+      "FEATURE_1": "Join Spam Detection (X users in Y seconds)",
+      "FEATURE_2": "Account Age Check (Min. 7 days old)",
+      "FEATURE_3": "Lockdown Mode on raid detection",
+      "FEATURE_4": "Automatic Actions (Kick/Ban new users)",
+      "ETA": "Available in approx. 1-2 weeks"
+    },
+    "COMPOUND": {
+      "TITLE": "Compound Rules",
+      "SUBTITLE": "Create rules that combine multiple conditions"
+    }
+  },
+  "MESSAGES": {
+    "SETTINGS_SAVED": "AutoMod settings saved successfully",
+    "SETTINGS_ERROR": "Error saving AutoMod settings"
+  },
+  "BASIC_TITLE": "Basic Settings",
+  "LOGS_TITLE": "Logs Channel",
+  "LOGS_DESC": "The channel where the bot has to send automod logs",
+  "STRIKES_TITLE": "Max Strikes",
+  "STRIKES_DESC": "The maximum amount of strikes a user can have before being punished",
+  "ACTION_TITLE": "Action",
+  "ACTION_DESC": "The action to take when a user reaches the max amount of strikes",
+  "LOG_EMBED_TITLE": "Log Embed Color",
+  "LOG_EMBED_DESC": "The color of the embeds sent in the logs channel",
+  "DM_EMBED_TITLE": "DM Embed Color",
+  "DM_EMBED_DESC": "The color of the embeds sent in the DMs of the punished user",
+  "WHITELIST_CH_TITLE": "Whitelisted Channels",
+  "WHITELIST_CH_DESC": "The channels where the bot won't moderate",
+  "TOGGLE_TITLE": "Quick Automod Toggles",
+  "DEBUG_TITLE": "Debug Mode",
+  "DEBUG_DESC": "Skip moderating messages sent by moderators",
+  "ATTACH_TITLE": "Anti Attachments",
+  "ATTACH_DESC": "Automatically delete messages with attachments",
+  "INVITES_TITLE": "Anti Invites",
+  "INVITES_DESC": "Automatically delete messages with discord invites",
+  "LINKS_TITLE": "Anti Links",
+  "LINKS_DESC": "Automatically delete messages with links",
+  "SPAM_TITLE": "Anti Spam",
+  "SPAM_DESC": "Automatically delete messages that are considered spam",
+  "GHOST_TITLE": "Anti Ghost Ping",
+  "GHOST_DESC": "Log and moderate ghost pings",
+  "MASSMENTION_TITLE": "Anti Mass Mention",
+  "MASSMENTION_DESC": "Automatically moderate messages with mass mentions",
+  "MASSMENTION_THRES_TITLE": "Mass Mention Threshold",
+  "MASSMENTION_THRES_DESC": "The amount of mentions a message must have to be considered a mass mention",
+  "MAXLINES_TITLE": "Max Lines",
+  "MAXLINES_DESC": "Automatically delete messages with more than the specified amount of lines",
+  "COMPOUND": {
+    "ADD_TITLE": "New Compound Rule",
+    "NAME": "Rule Name",
+    "NAME_PLACEHOLDER": "e.g. New Account + Link",
+    "LOGIC": "Logic",
+    "LOGIC_AND": "AND (all conditions must match)",
+    "LOGIC_OR": "OR (any condition must match)",
+    "ACTION": "Action",
+    "DESCRIPTION": "Description",
+    "DESC_PLACEHOLDER": "Optional description of the rule...",
+    "DURATION": "Timeout Duration (Minutes)",
+    "CONDITIONS": "Conditions",
+    "ADD_CONDITION": "Add Condition",
+    "BTN_SAVE": "Save Rule",
+    "EMPTY": "No compound rules found. Create your first rule above.",
+    "TIP_TITLE": "Tip",
+    "TIP_TEXT": "Compound rules allow you to combine multiple conditions. E.g. 'Account younger than 7 days AND message contains link' → Timeout.",
+    "ENABLED": "Enabled",
+    "DISABLED": "Disabled",
+    "CONDITIONS_LABEL": "Conditions",
+    "CONFIRM_DELETE": "Do you really want to delete this compound rule?"
+  },
+  "DASHBOARD": {
+    "SUBTITLE": "What AutoMod is doing and what it did last",
+    "VIOLATIONS": "Violations",
+    "STRIKES_GIVEN": "Strikes given",
+    "ACTIVE_RULES": "Active rules",
+    "RULES_BREAKDOWN": "{{regex}} regex, {{kombi}} compound",
+    "KEYWORD_LISTS": "Active keyword lists",
+    "ESCALATION_LEVELS": "{{count}} escalation levels",
+    "LAST_DAYS": "last {{count}} days",
+    "LOCKDOWN_HINT": "The server is locked down. The lockdown has to be lifted by hand — use /automod unlock.",
+    "STATUS_TITLE": "Currently armed",
+    "ON": "On",
+    "OFF": "Off",
+    "TO_FILTER": "Edit filters",
+    "RECENT_TITLE": "Recent actions",
+    "NO_RECENT": "Nothing logged yet",
+    "NO_RECENT_HINT": "Once AutoMod steps in, it shows up here.",
+    "TO_LOGS": "Full log",
+    "RAID_TITLE": "Raid events",
+    "TO_RAID": "View"
+  },
+  "FILTER": {
+    "SUBTITLE": "Which content AutoMod objects to, and from what amount",
+    "ZERO_MEANS_OFF": "A value of 0 turns the limit off."
+  },
+  "RULES": {
+    "SUBTITLE": "Keyword lists, custom patterns and combined conditions",
+    "ENABLED": "Active",
+    "DELETE": "Delete"
+  },
+  "KEYWORDS": {
+    "TITLE": "Keyword lists",
+    "DESC": "Enable prepared word lists. Messages that match are deleted and earn a strike.",
+    "COUNT": "{{count}} keywords",
+    "NONE": "No keyword lists found. The JSON files are missing from the bot directory."
+  },
+  "REGEX": {
+    "TITLE": "Custom patterns",
+    "DESC": "Your own regex filters for special cases. Every pattern is checked for ReDoS exposure before it is saved.",
+    "NAME": "Name",
+    "NAME_PLACEHOLDER": "e.g. No Discord tokens",
+    "PATTERN": "Pattern",
+    "PATTERN_PLACEHOLDER": "e.g. [A-Za-z0-9]{24}\\.",
+    "ACTION": "Action",
+    "ACTION_DELETE": "Delete",
+    "ACTION_WARN": "Warn",
+    "ACTION_STRIKE": "Strike and delete",
+    "ADD": "Add rule",
+    "EMPTY": "No custom patterns yet."
+  },
+  "ESCALATION": {
+    "SUBTITLE": "Graduated responses based on the number of strikes",
+    "ADD_TITLE": "New level",
+    "THRESHOLD": "From how many strikes",
+    "THRESHOLD_PLACEHOLDER": "e.g. 3",
+    "THRESHOLD_HELP": "The level applies from this count upwards.",
+    "ACTION": "Action",
+    "DURATION": "Duration in minutes",
+    "DURATION_HELP": "Only used for timeouts.",
+    "ADD": "Add level",
+    "DEFAULTS": "Create default levels (3, 5, 8)",
+    "LIST_TITLE": "Configured levels",
+    "MINUTES": "{{count}} min",
+    "EMPTY": "No levels configured",
+    "EMPTY_HINT": "Without levels the action from the basic settings applies.",
+    "TIP": "The highest level whose threshold is reached wins. With 5 strikes and levels 3 and 5, level 5 applies."
+  },
+  "EXEMPTIONS": {
+    "SUBTITLE": "Who and what AutoMod leaves alone",
+    "ROLES_TITLE": "Exempt roles",
+    "ROLES_DESC": "Members holding one of these roles are not checked.",
+    "ROLES_EMPTY": "No role exempted.",
+    "PICK_ROLE": "Choose a role …",
+    "CHANNELS_TITLE": "Exempt channels",
+    "CHANNELS_DESC": "AutoMod does not act in these channels at all.",
+    "CHANNELS_EMPTY": "No channel exempted.",
+    "PICK_CHANNEL": "Choose a channel …"
+  },
+  "RAID": {
+    "LOCKDOWN_HINT": "The lockdown stays in place until it is lifted by hand.",
+    "DETECTION_TITLE": "Detection",
+    "ENABLE_HELP": "Guards against join waves and very young accounts.",
+    "JOIN_THRESHOLD_HELP": "This many joins within the window counts as a raid.",
+    "JOIN_TIMESPAN_HELP": "Window used for counting.",
+    "MIN_ACCOUNT_AGE_HELP": "Younger accounts are turned away. 0 disables the check.",
+    "ACTION_TITLE": "Response",
+    "ACTION_HELP": "Kick runs automatically; ban is meant for manual follow-up.",
+    "LOCKDOWN_HELP": "Raises verification and removes @everyone write access.",
+    "ALERT_CHANNEL_HELP": "Raid warnings go here.",
+    "ALERT_MENTION_MODS_HELP": "Mentions the moderation roles in the warning.",
+    "TRUSTED_INVITES_HELP": "One invite code per line. Anyone joining through these is not covered by raid protection. Enter the code only, not the full address.",
+    "EVENTS_TITLE": "Raid events",
+    "EVENT_TYPE": "Type",
+    "EVENT_DETAILS": "Details",
+    "EVENTS_EMPTY": "No raid events recorded so far."
+  },
+  "LOGS": {
+    "SUBTITLE": "What AutoMod actually did",
+    "PERIOD": "Period",
+    "PERIOD_DAYS": "last {{count}} days",
+    "KEEP_DAYS": "Keep (days)",
+    "CLEANUP": "Clean up",
+    "CLEANUP_HINT": "Deletes violations and raid events older than the given age. This cannot be undone.",
+    "MEMBERS_WITH_STRIKES": "Members with strikes",
+    "RAID_EVENTS": "Raid events",
+    "TOP_REASONS": "Most common reasons",
+    "STRIKES_TITLE": "Open strikes",
+    "STRIKES": "Strikes",
+    "MEMBER": "Member",
+    "REASON": "Reason",
+    "WHEN": "When",
+    "RESET_STRIKES": "Reset strikes",
+    "STRIKES_EMPTY": "Nobody currently has open strikes.",
+    "VIOLATIONS_TITLE": "Violations",
+    "EMPTY": "Nothing logged for this period.",
+    "EMPTY_HINT": "Either there was nothing to do, or AutoMod is not armed yet."
+  },
+  "JS": {
+    "FEHLER": "The action failed.",
+    "AUSWAHL_FEHLT": "Please make a selection first.",
+    "AUSNAHME_ANGELEGT": "Exemption added.",
+    "AUSNAHME_ENTFERNT": "Exemption removed.",
+    "AUSNAHME_LOESCHEN": "Really remove this exemption?",
+    "REGEX_UNVOLLSTAENDIG": "Name and pattern are required.",
+    "REGEL_ANGELEGT": "Rule created.",
+    "REGEL_AKTIV": "Rule enabled.",
+    "REGEL_INAKTIV": "Rule disabled.",
+    "REGEL_LOESCHEN": "Really delete this rule?",
+    "REGEL_GELOESCHT": "Rule deleted.",
+    "SCHWELLE_UNGUELTIG": "Please enter a valid threshold.",
+    "STUFE_ANGELEGT": "Escalation level added.",
+    "STUFE_LOESCHEN": "Really delete this escalation level?",
+    "STUFE_GELOESCHT": "Escalation level deleted.",
+    "STANDARD_ESKALATION": "Create default levels? Existing levels are kept.",
+    "STANDARD_ANGELEGT": "Default levels created.",
+    "KOMBI_UNVOLLSTAENDIG": "Name and at least one condition are required.",
+    "KOMBI_LOESCHEN": "Really delete this compound rule?",
+    "STRIKES_ZURUECKSETZEN_FRAGE": "Really reset this member's strikes?",
+    "STRIKES_ZURUECKGESETZT": "Strikes reset.",
+    "AUFRAEUMEN_FRAGE": "Permanently delete entries older than {tage} days?",
+    "AUFGERAEUMT": "{logs} violations and {events} raid events deleted."
+  }
 }

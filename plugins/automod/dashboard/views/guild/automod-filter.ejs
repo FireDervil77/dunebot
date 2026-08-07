@@ -1,0 +1,111 @@
+<%- include('partials/automod-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-filter',
+  titel: tr('automod:NAV.FILTER'),
+  beschreibung: tr('automod:FILTER.SUBTITLE')
+}) %>
+
+<form class="guild-ajax-form"
+      data-automod-form
+      data-form-type="automod-filter"
+      data-method="PUT"
+      action="/guild/<%= guildId %>/plugins/automod/settings"
+      method="POST">
+
+  <div class="row row-cards">
+    <!-- Inhaltsfilter -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-shield-halved me-2"></i>
+            <%= tr('automod:TABS.CONTENT.TITLE') %>
+          </h3>
+        </div>
+        <div class="card-body">
+          <%
+            const filter = [
+              ['anti_spam',        settings.anti_spam,        'automod:SETTINGS.ANTI_SPAM'],
+              ['anti_links',       settings.anti_links,       'automod:SETTINGS.ANTI_LINKS'],
+              ['anti_invites',     settings.anti_invites,     'automod:SETTINGS.ANTI_INVITES'],
+              ['anti_attachments', settings.anti_attachments, 'automod:SETTINGS.ANTI_ATTACHMENTS'],
+              ['anti_ghostping',   settings.anti_ghostping,   'automod:SETTINGS.ANTI_GHOSTPING']
+            ];
+          %>
+          <% filter.forEach(([name, wert, schluessel]) => { %>
+            <label class="form-check form-switch mb-1">
+              <input class="form-check-input" type="checkbox" name="<%= name %>" value="1" <%= wert ? 'checked' : '' %>>
+              <span class="form-check-label"><%= tr(schluessel + '.LABEL') %></span>
+            </label>
+            <div class="text-secondary small mb-3"><%= tr(schluessel + '.HELP') %></div>
+          <% }); %>
+
+          <hr class="my-3">
+
+          <label class="form-check form-switch mb-1">
+            <input class="form-check-input" type="checkbox" name="anti_massmention" value="1"
+                   <%= settings.anti_massmention ? 'checked' : '' %>>
+            <span class="form-check-label"><%= tr('automod:SETTINGS.ANTI_MASSMENTION.LABEL') %></span>
+          </label>
+          <div class="text-secondary small mb-3"><%= tr('automod:SETTINGS.ANTI_MASSMENTION.HELP') %></div>
+
+          <div class="mb-0">
+            <label for="anti_massmention_threshold" class="form-label">
+              <%= tr('automod:SETTINGS.ANTI_MASSMENTION_THRESHOLD.LABEL') %>
+            </label>
+            <input type="number" class="form-control" id="anti_massmention_threshold"
+                   name="anti_massmention_threshold"
+                   value="<%= settings.anti_massmention_threshold || 3 %>" min="1" max="50">
+            <div class="form-hint"><%= tr('automod:SETTINGS.ANTI_MASSMENTION_THRESHOLD.HELP') %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grenzwerte -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fa-solid fa-sliders me-2"></i>
+            <%= tr('automod:TABS.LIMITS.TITLE') %>
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info" role="alert">
+            <i class="fa-solid fa-circle-info me-2"></i>
+            <%= tr('automod:FILTER.ZERO_MEANS_OFF') %>
+          </div>
+
+          <div class="mb-3">
+            <label for="max_lines" class="form-label"><%= tr('automod:SETTINGS.MAX_LINES.LABEL') %></label>
+            <input type="number" class="form-control" id="max_lines" name="max_lines"
+                   value="<%= settings.max_lines || 0 %>" min="0" max="100">
+            <div class="form-hint"><%= tr('automod:SETTINGS.MAX_LINES.HELP') %></div>
+          </div>
+
+          <div class="mb-3">
+            <label for="max_mentions" class="form-label"><%= tr('automod:SETTINGS.MAX_MENTIONS.LABEL') %></label>
+            <input type="number" class="form-control" id="max_mentions" name="max_mentions"
+                   value="<%= settings.max_mentions || 0 %>" min="0" max="50">
+            <div class="form-hint"><%= tr('automod:SETTINGS.MAX_MENTIONS.HELP') %></div>
+          </div>
+
+          <div class="mb-0">
+            <label for="max_role_mentions" class="form-label"><%= tr('automod:SETTINGS.MAX_ROLE_MENTIONS.LABEL') %></label>
+            <input type="number" class="form-control" id="max_role_mentions" name="max_role_mentions"
+                   value="<%= settings.max_role_mentions || 0 %>" min="0" max="50">
+            <div class="form-hint"><%= tr('automod:SETTINGS.MAX_ROLE_MENTIONS.HELP') %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <button type="submit" class="btn btn-primary">
+      <i class="fa-solid fa-floppy-disk me-2"></i>
+      <%= tr('automod:SETTINGS.SAVE_BUTTON') %>
+    </button>
+  </div>
+</form>

@@ -1,0 +1,114 @@
+<%- include('partials/automod-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-stairs',
+  titel: tr('automod:NAV.ESCALATION'),
+  beschreibung: tr('automod:ESCALATION.SUBTITLE')
+}) %>
+
+<div class="row row-cards">
+  <div class="col-lg-5">
+    <!-- Neue Stufe -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-plus me-2"></i>
+          <%= tr('automod:ESCALATION.ADD_TITLE') %>
+        </h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label for="esc-new-threshold" class="form-label"><%= tr('automod:ESCALATION.THRESHOLD') %></label>
+          <input type="number" class="form-control" id="esc-new-threshold" min="1" max="100"
+                 placeholder="<%= tr('automod:ESCALATION.THRESHOLD_PLACEHOLDER') %>">
+          <div class="form-hint"><%= tr('automod:ESCALATION.THRESHOLD_HELP') %></div>
+        </div>
+
+        <div class="mb-3">
+          <label for="esc-new-action" class="form-label"><%= tr('automod:ESCALATION.ACTION') %></label>
+          <select class="form-select" id="esc-new-action" onchange="toggleEscDuration()">
+            <option value="TIMEOUT"><%= tr('automod:SETTINGS.ACTION.TIMEOUT') %></option>
+            <option value="KICK"><%= tr('automod:SETTINGS.ACTION.KICK') %></option>
+            <option value="BAN"><%= tr('automod:SETTINGS.ACTION.BAN') %></option>
+          </select>
+        </div>
+
+        <div class="mb-3" id="esc-duration-group">
+          <label for="esc-new-duration" class="form-label"><%= tr('automod:ESCALATION.DURATION') %></label>
+          <input type="number" class="form-control" id="esc-new-duration" min="1" max="40320" value="10">
+          <div class="form-hint"><%= tr('automod:ESCALATION.DURATION_HELP') %></div>
+        </div>
+
+        <button type="button" class="btn btn-success w-100" onclick="addEscalation()">
+          <i class="fa-solid fa-plus me-2"></i><%= tr('automod:ESCALATION.ADD') %>
+        </button>
+      </div>
+      <div class="card-footer">
+        <button type="button" class="btn btn-outline-primary w-100" onclick="createDefaultEscalation()">
+          <i class="fa-solid fa-wand-magic-sparkles me-2"></i>
+          <%= tr('automod:ESCALATION.DEFAULTS') %>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <!-- Bestehende Stufen -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('automod:ESCALATION.LIST_TITLE') %></h3>
+      </div>
+
+      <div id="escalation-list">
+        <% if (escalationConfig && escalationConfig.length > 0) { %>
+          <div class="table-responsive">
+            <table class="table card-table table-vcenter">
+              <thead>
+                <tr>
+                  <th><%= tr('automod:ESCALATION.THRESHOLD') %></th>
+                  <th><%= tr('automod:ESCALATION.ACTION') %></th>
+                  <th><%= tr('automod:ESCALATION.DURATION') %></th>
+                  <th style="width: 4rem;"></th>
+                </tr>
+              </thead>
+              <tbody id="escalation-tbody">
+                <% escalationConfig.forEach(stufe => { %>
+                  <tr id="esc-row-<%= stufe.id %>">
+                    <td><strong><%= stufe.threshold %></strong></td>
+                    <td>
+                      <span class="badge bg-<%= stufe.action === 'BAN' ? 'red' : (stufe.action === 'KICK' ? 'orange' : 'blue') %>-lt">
+                        <%= stufe.action %>
+                      </span>
+                    </td>
+                    <td class="text-secondary">
+                      <%= stufe.duration ? tr('automod:ESCALATION.MINUTES', { count: stufe.duration }) : '—' %>
+                    </td>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-outline-danger"
+                              onclick="deleteEscalation(<%= stufe.id %>)"
+                              title="<%= tr('automod:RULES.DELETE') %>">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <div class="card-body">
+            <div class="empty">
+              <div class="empty-icon"><i class="fa-solid fa-stairs fs-1 text-secondary"></i></div>
+              <p class="empty-title"><%= tr('automod:ESCALATION.EMPTY') %></p>
+              <p class="empty-subtitle text-secondary"><%= tr('automod:ESCALATION.EMPTY_HINT') %></p>
+            </div>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="card-footer">
+        <i class="fa-solid fa-lightbulb me-2 text-secondary"></i>
+        <span class="text-secondary"><%= tr('automod:ESCALATION.TIP') %></span>
+      </div>
+    </div>
+  </div>
+</div>

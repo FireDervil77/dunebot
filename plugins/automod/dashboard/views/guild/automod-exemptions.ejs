@@ -1,0 +1,168 @@
+<%- include('partials/automod-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-user-check',
+  titel: tr('automod:NAV.EXEMPTIONS'),
+  beschreibung: tr('automod:EXEMPTIONS.SUBTITLE')
+}) %>
+
+<%
+  const rollenAusnahmen  = (exemptions || []).filter(e => e.type === 'role');
+  const channelAusnahmen = (exemptions || []).filter(e => e.type === 'channel');
+
+  const whitelistIds = settings.whitelisted_channels
+    ? (Array.isArray(settings.whitelisted_channels)
+        ? settings.whitelisted_channels.map(String)
+        : (() => { try { return JSON.parse(settings.whitelisted_channels || '[]').map(String); } catch { return []; } })())
+    : [];
+%>
+
+<div class="row row-cards">
+  <!-- Ausgenommene Rollen -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-user-shield me-2"></i>
+          <%= tr('automod:EXEMPTIONS.ROLES_TITLE') %>
+        </h3>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary"><%= tr('automod:EXEMPTIONS.ROLES_DESC') %></p>
+
+        <div id="exemptions-roles-list" class="mb-3">
+          <% if (rollenAusnahmen.length === 0) { %>
+            <p class="text-secondary small mb-0" id="no-role-exemptions">
+              <%= tr('automod:EXEMPTIONS.ROLES_EMPTY') %>
+            </p>
+          <% } else { %>
+            <% rollenAusnahmen.forEach(ausnahme => {
+                 const rolle = (guildRoles || []).find(r => String(r.id) === String(ausnahme.target_id));
+            %>
+              <span class="badge bg-secondary-lt me-1 mb-1" data-exemption-id="<%= ausnahme.id %>">
+                <i class="fa-solid fa-user-tag me-1"></i>
+                <%= rolle ? rolle.name : ausnahme.target_id %>
+                <button type="button" class="btn-close ms-2"
+                        style="font-size: .6rem;"
+                        aria-label="<%= tr('automod:RULES.DELETE') %>"
+                        onclick="deleteExemption(<%= ausnahme.id %>)"></button>
+              </span>
+            <% }); %>
+          <% } %>
+        </div>
+
+        <div class="input-group">
+          <select class="form-select" id="add-role-exemption">
+            <option value=""><%= tr('automod:EXEMPTIONS.PICK_ROLE') %></option>
+            <% (guildRoles || []).forEach(rolle => { %>
+              <option value="<%= rolle.id %>"><%= rolle.name %></option>
+            <% }); %>
+          </select>
+          <button type="button" class="btn btn-success"
+                  onclick="addExemption('role', document.getElementById('add-role-exemption').value)">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ausgenommene Channels -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-hashtag me-2"></i>
+          <%= tr('automod:EXEMPTIONS.CHANNELS_TITLE') %>
+        </h3>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary"><%= tr('automod:EXEMPTIONS.CHANNELS_DESC') %></p>
+
+        <div id="exemptions-channels-list" class="mb-3">
+          <% if (channelAusnahmen.length === 0) { %>
+            <p class="text-secondary small mb-0" id="no-channel-exemptions">
+              <%= tr('automod:EXEMPTIONS.CHANNELS_EMPTY') %>
+            </p>
+          <% } else { %>
+            <% channelAusnahmen.forEach(ausnahme => {
+                 const channel = (guildChannels || []).find(c => String(c.id) === String(ausnahme.target_id));
+            %>
+              <span class="badge bg-blue-lt me-1 mb-1" data-exemption-id="<%= ausnahme.id %>">
+                <i class="fa-solid fa-hashtag me-1"></i>
+                <%= channel ? channel.name : ausnahme.target_id %>
+                <button type="button" class="btn-close ms-2"
+                        style="font-size: .6rem;"
+                        aria-label="<%= tr('automod:RULES.DELETE') %>"
+                        onclick="deleteExemption(<%= ausnahme.id %>)"></button>
+              </span>
+            <% }); %>
+          <% } %>
+        </div>
+
+        <div class="input-group">
+          <select class="form-select" id="add-channel-exemption">
+            <option value=""><%= tr('automod:EXEMPTIONS.PICK_CHANNEL') %></option>
+            <% (guildChannels || []).forEach(channel => { %>
+              <option value="<%= channel.id %>">#<%= channel.name %></option>
+            <% }); %>
+          </select>
+          <button type="button" class="btn btn-success"
+                  onclick="addExemption('channel', document.getElementById('add-channel-exemption').value)">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Whitelist der Channels (Teil der Einstellungen) -->
+<form class="guild-ajax-form mt-3"
+      data-automod-form
+      data-form-type="automod-whitelist"
+      data-method="PUT"
+      action="/guild/<%= guildId %>/plugins/automod/settings"
+      method="POST">
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fa-solid fa-list-check me-2"></i>
+        <%= tr('automod:SETTINGS.WHITELISTED_CHANNELS.LABEL') %>
+      </h3>
+    </div>
+    <div class="card-body">
+      <% if (guildChannels && guildChannels.length > 0) { %>
+        <select class="form-select automod-kanalauswahl" id="whitelisted_channels"
+                name="whitelisted_channels" multiple size="10">
+          <%
+            let kategorie = null;
+            guildChannels.forEach(channel => {
+              if (channel.parentName && channel.parentName !== kategorie) {
+                kategorie = channel.parentName;
+          %>
+            <option disabled>── <%= kategorie %> ──</option>
+          <%  }
+              const gewaehlt = whitelistIds.includes(String(channel.id));
+          %>
+            <option value="<%= channel.id %>" <%= gewaehlt ? 'selected' : '' %>>
+              <%= channel.parentName ? '   ' : '' %>#<%= channel.name %>
+            </option>
+          <% }); %>
+        </select>
+        <div class="form-hint"><%= tr('automod:SETTINGS.WHITELISTED_CHANNELS.HELP') %></div>
+      <% } else { %>
+        <div class="alert alert-warning mb-0" role="alert">
+          <i class="fa-solid fa-triangle-exclamation me-2"></i>
+          <%= tr('automod:SETTINGS.WHITELISTED_CHANNELS.NO_CHANNELS') %>
+        </div>
+      <% } %>
+    </div>
+    <div class="card-footer">
+      <button type="submit" class="btn btn-primary">
+        <i class="fa-solid fa-floppy-disk me-2"></i>
+        <%= tr('automod:SETTINGS.SAVE_BUTTON') %>
+      </button>
+    </div>
+  </div>
+</form>
