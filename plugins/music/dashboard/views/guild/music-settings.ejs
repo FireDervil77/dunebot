@@ -7,9 +7,10 @@
 
 <%
   const basis = `/guild/${guildId}/plugins/music`;
-  // Nur Sprachkanaele; type 2 ist Sprache, 13 ist Buehne
-  const sprachKanaele = (channels || []).filter(c => c.type === 2 || c.type === 13);
-  const textKanaele = (channels || []).filter(c => c.type === 0);
+  // Sprachkanaele kommen aus einem eigenen IPC-Handler: der uebliche
+  // GET_GUILD_CHANNELS liefert ausdruecklich nur Textkanaele.
+  const sprachKanaele = sprachkanaele || [];
+  const textKanaele = channels || [];
   const erlaubte = (einstellungen.allowed_voice || []).map(String);
 %>
 

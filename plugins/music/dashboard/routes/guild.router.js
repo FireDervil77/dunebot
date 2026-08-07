@@ -18,7 +18,7 @@ const { requirePermission } = require('../../../../apps/dashboard/middlewares/pe
 const { MusicSettings, MusicHistory, MusicPlaylists } = require('../../shared/models');
 const klangfilter = require('../../bot/klangfilter');
 const {
-    makeTranslator, renderView, getGuildChannels, getGuildRoles,
+    makeTranslator, renderView, getGuildChannels, getSprachkanaele, getGuildRoles,
     zustandHolen, renderFehler, spielzeitText
 } = require('./_shared');
 
@@ -140,16 +140,19 @@ router.get('/settings', requirePermission('MUSIC.VIEW'), async (req, res) => {
     const tr = makeTranslator(req, res);
 
     try {
-        const [einstellungen, channels, roles] = await Promise.all([
+        // Textkanaele fuer die Ansage, Sprachkanaele fuer die Freigabe -
+        // die kommen aus zwei verschiedenen IPC-Handlern.
+        const [einstellungen, channels, sprachkanaele, roles] = await Promise.all([
             MusicSettings.getSettings(guildId),
             getGuildChannels(guildId),
+            getSprachkanaele(guildId),
             getGuildRoles(guildId)
         ]);
 
         skripteAnmelden(['music-steuerung']);
 
         await renderView(res, 'guild/music-settings', {
-            tr, guildId, einstellungen, channels, roles,
+            tr, guildId, einstellungen, channels, sprachkanaele, roles,
             filter: klangfilter.auswahl(),
             spotifyEingerichtet: Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET)
         });

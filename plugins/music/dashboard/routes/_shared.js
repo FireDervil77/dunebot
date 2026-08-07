@@ -50,6 +50,31 @@ async function getGuildChannels(guildId) {
     }
 }
 
+/**
+ * Sprachkanaele der Guild.
+ *
+ * `dashboard:GET_GUILD_CHANNELS` liefert ausdruecklich **nur Textkanaele** -
+ * es ist fuer Dropdowns gedacht, in die Nachrichten gehen. Fuer Musik brauchen
+ * wir Sprach- und Buehnenkanaele, die nur der ausfuehrliche Handler kennt.
+ * Dort ist `type` ein Text ('voice', 'stage'), keine Zahl.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @returns {Promise<Array>} Sprachkanaele oder []
+ */
+async function getSprachkanaele(guildId) {
+    const ipcServer = ServiceManager.get('ipcServer');
+    if (!ipcServer) return [];
+
+    try {
+        const antworten = await ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS_DETAILED', { guildId });
+        const kanaele = antworten?.[0]?.channels || [];
+        return kanaele.filter(k => k.type === 'voice' || k.type === 'stage');
+    } catch (err) {
+        ServiceManager.get('Logger').warn(`[Musik] Sprachkanaele nicht ladbar: ${err.message}`);
+        return [];
+    }
+}
+
 /** Rollen der Guild ueber IPC beim Bot erfragen. */
 async function getGuildRoles(guildId) {
     const ipcServer = ServiceManager.get('ipcServer');
@@ -164,6 +189,6 @@ function spielzeitText(sek) {
 }
 
 module.exports = {
-    makeTranslator, renderView, getGuildChannels, getGuildRoles,
+    makeTranslator, renderView, getGuildChannels, getSprachkanaele, getGuildRoles,
     zustandHolen, steuern, angemeldeterNutzer, renderFehler, fehler, spielzeitText
 };
