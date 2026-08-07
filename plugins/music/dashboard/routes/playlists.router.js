@@ -8,8 +8,7 @@ const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
-const { MusicPlaylists, MusicSettings } = require('../../shared/models');
-const { aufloesen } = require('../../bot/quellen');
+const { MusicPlaylists } = require('../../shared/models');
 const { angemeldeterNutzer, fehler } = require('./_shared');
 
 router.get('/', requirePermission('MUSIC.VIEW'), async (req, res) => {
@@ -79,20 +78,30 @@ router.post('/:id/titel', requirePermission('MUSIC.PLAYLISTS.MANAGE'), async (re
     if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungueltige ID' });
     if (!eingabe) return res.status(400).json({ success: false, error: 'Es fehlt eine Adresse oder ein Suchbegriff' });
 
+    const ipcServer = ServiceManager.get('ipcServer');
+    if (!ipcServer) return res.status(503).json({ success: false, error: 'Der Bot ist nicht erreichbar' });
+
     try {
         const liste = await MusicPlaylists.getWithTracks(id, res.locals.guildId);
         if (!liste) return res.status(404).json({ success: false, error: 'Liste nicht gefunden' });
 
-        const einstellungen = await MusicSettings.getSettings(res.locals.guildId);
         const nutzer = angemeldeterNutzer(req, res);
-        const ergebnis = await aufloesen(eingabe, { angefordertVon: nutzer, einstellungen });
 
-        if (ergebnis.titel.length === 0) {
-            return res.status(400).json({ success: false, error: 'Dazu habe ich nichts gefunden' });
+        // Aufgeloest wird im Bot: dort liegen die Spotify-Zugangsdaten, und
+        // sie sollen nicht in zwei .env-Dateien gepflegt werden muessen.
+        const antworten = await ipcServer.broadcast('music:resolve', {
+            guildId: res.locals.guildId,
+            eingabe,
+            angefordertVon: nutzer
+        });
+
+        const antwort = antworten?.[0];
+        if (!antwort?.success) {
+            return res.status(400).json({ success: false, error: antwort?.error || 'Dazu habe ich nichts gefunden' });
         }
 
-        await MusicPlaylists.addTracks(id, ergebnis.titel, nutzer);
-        res.json({ success: true, aufgenommen: ergebnis.titel.length, quelle: ergebnis.quelle });
+        await MusicPlaylists.addTracks(id, antwort.titel, nutzer);
+        res.json({ success: true, aufgenommen: antwort.titel.length, quelle: antwort.quelle });
     } catch (error) {
         fehler(res, error, 'Die Titel konnten nicht aufgenommen werden');
     }

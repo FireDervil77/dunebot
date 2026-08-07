@@ -77,12 +77,10 @@
             </label>
           <% }); %>
 
-          <% if (!spotifyEingerichtet) { %>
-            <div class="alert alert-warning mt-3 mb-0" role="alert">
-              <i class="fa-solid fa-triangle-exclamation me-2"></i>
-              <%= tr('music:SETTINGS.SPOTIFY_MISSING') %>
-            </div>
-          <% } %>
+          <div class="alert alert-<%= spotifyEingerichtet ? 'success' : 'info' %> mt-3 mb-0" role="alert">
+            <i class="fa-solid fa-<%= spotifyEingerichtet ? 'circle-check' : 'circle-info' %> me-2"></i>
+            <%= tr(spotifyEingerichtet ? 'music:SETTINGS.SPOTIFY_OK' : 'music:SETTINGS.SPOTIFY_MISSING') %>
+          </div>
 
           <div class="alert alert-info mt-3 mb-0" role="alert">
             <i class="fa-solid fa-circle-info me-2"></i>

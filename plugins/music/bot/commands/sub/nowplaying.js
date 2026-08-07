@@ -1,29 +1,15 @@
-const { FARBE, antwort, pruefen, melden, mitgliedAus, dauerText } = require('../utils');
+const { FARBE, antwort, pruefen, dauerText } = require('../../utils');
 
 /** Breite des Fortschrittsbalkens in Zeichen. */
 const BALKEN = 20;
 
-/**
- * @type {import('dunebot-sdk').CommandType}
- */
-module.exports = {
-    name: 'nowplaying',
-    description: 'music:NOWPLAYING.DESCRIPTION',
-    command: { enabled: true, aliases: ['np'], minArgsCount: 0 },
-    slashCommand: { enabled: true, options: [] },
-
-    async messageRun(ctx) { await zeigen(ctx); },
-    async interactionRun(ctx) { await zeigen(ctx); }
-};
-
-/** @param {Object} ctx Befehlskontext */
-async function zeigen(ctx) {
-    const mitglied = mitgliedAus(ctx);
+/** @param {Object} mitglied Discord-GuildMember */
+module.exports = async (mitglied) => {
     const p = await pruefen(mitglied, { brauchtSprachkanal: false });
-    if (!p.ok) return melden(ctx, antwort(p.fehler, 'warnung'));
+    if (!p.ok) return antwort(p.fehler, 'warnung');
 
     const zustand = p.manager.zustand(mitglied.guild.id);
-    if (!zustand.aktuell) return melden(ctx, antwort('Es laeuft gerade nichts.', 'warnung'));
+    if (!zustand.aktuell) return antwort('Es laeuft gerade nichts.', 'warnung');
 
     const t = zustand.aktuell;
     const gelaufen = t.positionSek || 0;
@@ -31,13 +17,12 @@ async function zeigen(ctx) {
     // Bei Radio gibt es keine Gesamtdauer, also auch keinen Balken
     let fortschritt = '';
     if (t.durationSec > 0) {
-        const anteil = Math.min(1, gelaufen / t.durationSec);
-        const stelle = Math.round(anteil * (BALKEN - 1));
+        const stelle = Math.round(Math.min(1, gelaufen / t.durationSec) * (BALKEN - 1));
         fortschritt = '\n`' + '─'.repeat(stelle) + '●' + '─'.repeat(BALKEN - 1 - stelle) +
-                      ` ${dauerText(gelaufen)} / ${dauerText(t.durationSec)}\``;
+                      ` ${dauerText(gelaufen)} / ${dauerText(t.durationSec)}\``;
     }
 
-    return melden(ctx, {
+    return {
         embeds: [{
             color: FARBE,
             author: { name: zustand.pausiert ? 'Angehalten' : 'Jetzt laeuft' },
@@ -52,5 +37,5 @@ async function zeigen(ctx) {
             ],
             footer: { text: `${zustand.warteschlangeLaenge} weitere in der Warteschlange` }
         }]
-    });
-}
+    };
+};

@@ -105,7 +105,7 @@
     "VOTE_SKIP_HELP": "Erlaubt es allen im Kanal, gemeinsam zu überspringen — auch ohne DJ-Rolle.",
     "VOTE_PERCENT": "Nötiger Anteil in Prozent",
     "SOURCES": "Quellen",
-    "SPOTIFY_MISSING": "Spotify ist nicht eingerichtet. Ohne SPOTIFY_CLIENT_ID und SPOTIFY_CLIENT_SECRET in der Umgebung bleibt es aus.",
+    "SPOTIFY_MISSING": "Spotify-Links sind nicht eingerichtet — für alles andere brauchst du nichts zu tun. Suche, YouTube- und SoundCloud-Links laufen ohne Zugangsdaten. Nur wer einen spotify.com-Link einfügen will (Titel, Album, eigene Wiedergabeliste), braucht SPOTIFY_CLIENT_ID und SPOTIFY_CLIENT_SECRET in apps/bot/.env.",
     "SPOTIFY_NOTE": "Spotify liefert über seine Schnittstelle keinen Ton, nur Titel und Künstler. Der Bot sucht den Titel danach auf YouTube — so arbeiten alle bekannten Musik-Bots.",
     "PLAYBACK": "Wiedergabe",
     "DEFAULT_VOLUME": "Standard-Lautstärke",
@@ -126,7 +126,8 @@
     "ANNOUNCE": "Ansagen, was gerade läuft",
     "LEAVE_EMPTY": "Kanal verlassen, wenn niemand mehr da ist",
     "LEAVE_AFTER": "Warten vor dem Verlassen (Sekunden)",
-    "SAVE": "Speichern"
+    "SAVE": "Speichern",
+    "SPOTIFY_OK": "Spotify-Links sind eingerichtet."
   },
   "MESSAGES": {
     "SETTINGS_SAVED": "Musik-Einstellungen gespeichert",

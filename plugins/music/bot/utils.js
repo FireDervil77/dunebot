@@ -1,14 +1,14 @@
 /**
- * Musik - gemeinsame Helfer der Befehle
+ * Musik - gemeinsame Helfer der Unterbefehle
  *
- * Jeder Musikbefehl braucht dieselben drei Vorpruefungen: laeuft das Plugin,
- * steht der Aufrufer in einem Sprachkanal, und darf er steuern. Damit das
- * nicht zwoelfmal danebensteht, liegt es hier.
+ * Seit dem 2026-08-07 liegen alle Musikbefehle unter `/music <unterbefehl>`.
+ * Die Unterbefehle geben ihre Antwort **zurueck**, statt selbst zu antworten -
+ * `music.js` schickt sie ab. Das haelt die Unterbefehle frei von der Frage,
+ * ob der Aufruf per Schraegstrich oder als Nachricht kam.
  *
  * @module music/bot/utils
  */
 
-const { ServiceManager } = require('dunebot-core');
 const GuildPlayer = require('./managers/GuildPlayer');
 
 /** Farbe der Antwort-Embeds. */
@@ -19,7 +19,7 @@ const FARBE = 0x1DB954;
  *
  * @param {string} text Meldung
  * @param {string} [art] 'ok' | 'warnung' | 'fehler'
- * @returns {Object} Nachricht fuer reply/followUp
+ * @returns {Object} Nachricht
  */
 function antwort(text, art = 'ok') {
     const farben = { ok: FARBE, warnung: 0xF59F00, fehler: 0xD63939 };
@@ -67,37 +67,6 @@ async function pruefen(mitglied, optionen = {}) {
     return { ok: true, fehler: null, manager, abspieler };
 }
 
-/**
- * Antworten, egal ob der Befehl per Nachricht oder Schraegstrich kam.
- *
- * @param {Object} ctx { message } oder { interaction }
- * @param {Object} inhalt Nachricht
- */
-async function melden(ctx, inhalt) {
-    if (ctx.interaction) return await ctx.interaction.followUp(inhalt);
-    return await ctx.message.reply(inhalt);
-}
-
-/**
- * Wer den Befehl abgesetzt hat.
- *
- * @param {Object} ctx { message } oder { interaction }
- * @returns {Object} GuildMember
- */
-function mitgliedAus(ctx) {
-    return ctx.interaction ? ctx.interaction.member : ctx.message.member;
-}
-
-/**
- * In welchem Textkanal die Ansage landen soll.
- *
- * @param {Object} ctx { message } oder { interaction }
- * @returns {string|null} Kanal-ID
- */
-function textKanalAus(ctx) {
-    return ctx.interaction ? ctx.interaction.channelId : ctx.message.channelId;
-}
-
 /** Dauer lesbar machen. */
 const dauerText = (sek) => GuildPlayer.dauerText(sek);
 
@@ -127,7 +96,7 @@ function spielzeitText(sek) {
 const HINWEISE = {
     KEINE_EINGABE: 'Du hast nichts angegeben.',
     QUELLE_AUS: 'Diese Quelle ist auf dem Server abgeschaltet.',
-    SPOTIFY_UNVERFUEGBAR: 'Spotify ist nicht eingerichtet. Es fehlen SPOTIFY_CLIENT_ID und SPOTIFY_CLIENT_SECRET.',
+    SPOTIFY_UNVERFUEGBAR: 'Spotify ist nicht eingerichtet. Es fehlen SPOTIFY_CLIENT_ID und SPOTIFY_CLIENT_SECRET in apps/bot/.env.',
     SOUNDCLOUD_UNVERFUEGBAR: 'SoundCloud ist gerade nicht erreichbar.',
     NICHTS_GEFUNDEN: 'Dazu habe ich nichts gefunden.',
     AUFLOESEN_FEHLGESCHLAGEN: 'Das konnte ich nicht aufloesen.'
@@ -143,7 +112,4 @@ function hinweisText(hinweis) {
     return HINWEISE[hinweis] || 'Das hat nicht geklappt.';
 }
 
-module.exports = {
-    FARBE, antwort, pruefen, melden, mitgliedAus, textKanalAus,
-    dauerText, titelZeile, spielzeitText, hinweisText
-};
+module.exports = { FARBE, antwort, pruefen, dauerText, titelZeile, spielzeitText, hinweisText };

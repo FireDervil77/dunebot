@@ -56,5 +56,6 @@
   },
   "VOTESKIP": {
     "DESCRIPTION": "Votes to skip"
-  }
+  },
+  "DESCRIPTION": "Play and control music"
 }

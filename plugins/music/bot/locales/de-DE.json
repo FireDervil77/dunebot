@@ -56,5 +56,6 @@
   },
   "VOTESKIP": {
     "DESCRIPTION": "Stimmt fürs Überspringen ab"
-  }
+  },
+  "DESCRIPTION": "Musik abspielen und steuern"
 }

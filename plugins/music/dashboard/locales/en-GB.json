@@ -105,7 +105,7 @@
     "VOTE_SKIP_HELP": "Lets everyone in the channel skip together, even without the DJ role.",
     "VOTE_PERCENT": "Required share in percent",
     "SOURCES": "Sources",
-    "SPOTIFY_MISSING": "Spotify is not set up. Without SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET it stays off.",
+    "SPOTIFY_MISSING": "Spotify links are not set up — for everything else you need to do nothing. Search, YouTube and SoundCloud links work without credentials. Only pasting a spotify.com link (track, album, your own playlist) needs SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in apps/bot/.env.",
     "SPOTIFY_NOTE": "Spotify serves no audio through its API, only title and artist. The bot then searches YouTube — this is how all known music bots work.",
     "PLAYBACK": "Playback",
     "DEFAULT_VOLUME": "Default volume",
@@ -126,7 +126,8 @@
     "ANNOUNCE": "Announce what is playing",
     "LEAVE_EMPTY": "Leave channel when nobody is left",
     "LEAVE_AFTER": "Wait before leaving (seconds)",
-    "SAVE": "Save"
+    "SAVE": "Save",
+    "SPOTIFY_OK": "Spotify links are set up."
   },
   "MESSAGES": {
     "SETTINGS_SAVED": "Music settings saved",
