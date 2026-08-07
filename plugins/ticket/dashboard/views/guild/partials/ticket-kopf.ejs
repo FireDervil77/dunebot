@@ -1,0 +1,38 @@
+<%
+/**
+ * Gemeinsamer Seitenkopf der Ticket-Seiten.
+ *
+ * Erwartet: guildId, tr, titel, beschreibung, icon
+ * Optional:  aktion (HTML fuer eine Schaltflaeche rechts im Kopf)
+ */
+const jsTexte = {
+  FEHLER:            tr('ticket:JS.FEHLER'),
+  KAT_LOESCHEN:      tr('ticket:JS.KAT_LOESCHEN'),
+  KAT_GELOESCHT:     tr('ticket:JS.KAT_GELOESCHT'),
+  KAT_UNVOLLSTAENDIG: tr('ticket:JS.KAT_UNVOLLSTAENDIG'),
+  BAUSTEIN_LOESCHEN: tr('ticket:JS.BAUSTEIN_LOESCHEN'),
+  BAUSTEIN_GELOESCHT: tr('ticket:JS.BAUSTEIN_GELOESCHT'),
+  BAUSTEIN_UNVOLLSTAENDIG: tr('ticket:JS.BAUSTEIN_UNVOLLSTAENDIG'),
+  GESPEICHERT:       tr('ticket:JS.GESPEICHERT'),
+  KEIN_TRANSKRIPT:   tr('ticket:JS.KEIN_TRANSKRIPT')
+};
+%>
+<div class="page-header d-print-none mb-3"
+     data-ticket-basis="/guild/<%= guildId %>/plugins/ticket"
+     data-ticket-texte="<%= JSON.stringify(jsTexte) %>">
+  <div class="row align-items-center">
+    <div class="col">
+      <div class="page-pretitle"><%= tr('ticket:TITLE') %></div>
+      <h2 class="page-title">
+        <i class="<%= icon %> me-2"></i>
+        <%= titel %>
+      </h2>
+      <% if (beschreibung) { %>
+        <div class="text-secondary mt-1"><%= beschreibung %></div>
+      <% } %>
+    </div>
+    <% if (typeof aktion !== 'undefined' && aktion) { %>
+      <div class="col-auto ms-auto d-print-none"><%- aktion %></div>
+    <% } %>
+  </div>
+</div>

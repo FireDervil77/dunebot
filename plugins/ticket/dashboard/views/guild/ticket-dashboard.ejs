@@ -1,0 +1,99 @@
+<%- include('partials/ticket-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-gauge-high',
+  titel: tr('ticket:NAV.DASHBOARD'),
+  beschreibung: tr('ticket:DASHBOARD.SUBTITLE')
+}) %>
+
+<%
+  const basis = `/guild/${guildId}/plugins/ticket`;
+  const zeitpunkt = (w) => w ? new Date(w).toLocaleString('de-DE') : '—';
+%>
+
+<div class="row row-cards mb-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="text-secondary small"><%= tr('ticket:STATS_OPEN') %></div>
+      <div class="h1 mb-0"><%= anzahl.offen %></div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="text-secondary small"><%= tr('ticket:STATS_CLOSED') %></div>
+      <div class="h1 mb-0"><%= anzahl.geschlossen %></div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="text-secondary small"><%= tr('ticket:NAV.CATEGORIES') %></div>
+      <div class="h1 mb-0"><%= anzahl.kategorien %></div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="text-secondary small"><%= tr('ticket:NAV.TAGS') %></div>
+      <div class="h1 mb-0"><%= anzahl.bausteine %></div>
+    </div></div>
+  </div>
+</div>
+
+<% if (anzahl.kategorien === 0) { %>
+  <div class="alert alert-warning" role="alert">
+    <div class="d-flex align-items-center">
+      <i class="fa-solid fa-triangle-exclamation fs-2 me-3"></i>
+      <div>
+        <h4 class="alert-title mb-1"><%= tr('ticket:DASHBOARD.NO_CATEGORY') %></h4>
+        <div class="text-secondary"><%= tr('ticket:DASHBOARD.NO_CATEGORY_HINT') %></div>
+      </div>
+      <a href="<%= basis %>/kategorien" class="btn btn-warning ms-auto"><%= tr('ticket:DASHBOARD.TO_CATEGORIES') %></a>
+    </div>
+  </div>
+<% } %>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><%= tr('ticket:DASHBOARD.RECENT') %></h3>
+    <div class="card-actions">
+      <a href="<%= basis %>/tickets" class="btn btn-sm btn-outline-primary"><%= tr('ticket:DASHBOARD.ALL') %></a>
+    </div>
+  </div>
+
+  <% if (letzteTickets && letzteTickets.length > 0) { %>
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter">
+        <thead>
+          <tr>
+            <th><%= tr('ticket:TICKET_ID_COL') %></th>
+            <th><%= tr('ticket:CREATED_BY_COL') %></th>
+            <th><%= tr('ticket:CATEGORY_COL') %></th>
+            <th><%= tr('ticket:IS_ACTIVE_TITLE') %></th>
+            <th class="text-end"><%= tr('ticket:DASHBOARD.CREATED_AT') %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% letzteTickets.forEach(t => { %>
+            <tr>
+              <td class="text-secondary">#<%= t.ticket_id || t.id %></td>
+              <td class="font-monospace text-secondary"><%= t.created_by || '—' %></td>
+              <td><%= t.category_name || '—' %></td>
+              <td>
+                <span class="badge bg-<%= t.status === 'open' ? 'green' : 'secondary' %>-lt">
+                  <%= t.status === 'open' ? tr('ticket:STATS_OPEN') : tr('ticket:STATS_CLOSED') %>
+                </span>
+              </td>
+              <td class="text-end text-secondary"><%= zeitpunkt(t.created_at) %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %>
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon"><i class="fa-solid fa-inbox fs-1 text-secondary"></i></div>
+        <p class="empty-title"><%= tr('ticket:DASHBOARD.NO_TICKETS') %></p>
+        <p class="empty-subtitle text-secondary"><%= tr('ticket:DASHBOARD.NO_TICKETS_HINT') %></p>
+      </div>
+    </div>
+  <% } %>
+</div>

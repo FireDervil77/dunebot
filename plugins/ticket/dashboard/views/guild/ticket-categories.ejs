@@ -1,0 +1,190 @@
+<%- include('partials/ticket-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-folder-tree',
+  titel: tr('ticket:NAV.CATEGORIES'),
+  beschreibung: tr('ticket:CATEGORY_DESC'),
+  aktion: `<button class="btn btn-primary" onclick="openCategoryModal()">
+             <i class="fa-solid fa-plus me-2"></i>${tr('ticket:CREATE_MODAL_BTN')}
+           </button>`
+}) %>
+
+<%
+  /** Rollennamen aufloesen, sonst bleibt die ID stehen. */
+  const rollenName = (id) => {
+    const r = (roles || []).find(x => String(x.id) === String(id));
+    return r ? r.name : id;
+  };
+%>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">
+      <%= tr('ticket:CATEGORY_TITLE') %>
+      <span class="badge bg-secondary-lt ms-2"><%= (kategorien || []).length %></span>
+    </h3>
+  </div>
+
+  <% if (kategorien && kategorien.length > 0) { %>
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter" id="categoriesTable">
+        <thead>
+          <tr>
+            <th><%= tr('ticket:CAT_COL') %></th>
+            <th><%= tr('ticket:STAFF_ROLE_TITLE') %></th>
+            <th><%= tr('ticket:CHANNEL_STYLE_TITLE') %></th>
+            <th><%= tr('ticket:IS_ACTIVE_TITLE') %></th>
+            <th class="text-end"><%= tr('ticket:ACTION_COL') %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% kategorien.forEach(kat => { %>
+            <tr data-category-id="<%= kat.id %>">
+              <td>
+                <div><strong><%= kat.name %></strong></div>
+                <% if (kat.description) { %>
+                  <div class="text-secondary small"><%= kat.description %></div>
+                <% } %>
+              </td>
+              <td>
+                <% if (kat.staff_roles && kat.staff_roles.length > 0) { %>
+                  <% kat.staff_roles.forEach(id => { %>
+                    <span class="badge bg-blue-lt me-1 mb-1"><%= rollenName(id) %></span>
+                  <% }); %>
+                <% } else { %>
+                  <span class="text-secondary">—</span>
+                <% } %>
+              </td>
+              <td><span class="badge bg-secondary-lt"><%= kat.channel_style || 'NUMBER' %></span></td>
+              <td>
+                <span class="badge bg-<%= kat.is_active ? 'green' : 'secondary' %>-lt">
+                  <%= kat.is_active ? tr('ticket:CATEGORIES.ACTIVE') : tr('ticket:CATEGORIES.INACTIVE') %>
+                </span>
+              </td>
+              <td class="text-end">
+                <div class="btn-list flex-nowrap justify-content-end">
+                  <button type="button" class="btn btn-sm btn-outline-primary"
+                          onclick="editCategory(<%= kat.id %>)"
+                          title="<%= tr('ticket:ACTION_UPDATE_BTN') %>">
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-danger"
+                          onclick="deleteCategory(<%= kat.id %>, '<%= kat.name.replace(/'/g, "\\'") %>')"
+                          title="<%= tr('ticket:ACTION_DELETE_BTN') %>">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %>
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon"><i class="fa-solid fa-folder-tree fs-1 text-secondary"></i></div>
+        <p class="empty-title"><%= tr('ticket:CATEGORIES.EMPTY') %></p>
+        <p class="empty-subtitle text-secondary"><%= tr('ticket:CATEGORIES.EMPTY_HINT') %></p>
+        <div class="empty-action">
+          <button class="btn btn-primary" onclick="openCategoryModal()">
+            <i class="fa-solid fa-plus me-2"></i><%= tr('ticket:CREATE_MODAL_BTN') %>
+          </button>
+        </div>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<!-- Die vorhandenen Kategorien als JSON, damit das Bearbeiten ohne zweite
+     Abfrage auskommt. -->
+<script type="application/json" id="categoriesData"><%- JSON.stringify(kategorien || []) %></script>
+
+<div class="modal modal-blur fade" id="categoryModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="categoryModalTitel"><%= tr('ticket:CREATE_MODAL_BTN') %></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schliessen"></button>
+      </div>
+      <form id="categoryForm">
+        <input type="hidden" id="catId">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="catName" class="form-label"><%= tr('ticket:CAT_COL') %></label>
+              <input type="text" id="catName" class="form-control" required maxlength="100">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="catStyle" class="form-label"><%= tr('ticket:CHANNEL_STYLE_TITLE') %></label>
+              <select id="catStyle" class="form-select">
+                <option value="NUMBER">NUMBER</option>
+                <option value="NAME">NAME</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="catDescription" class="form-label"><%= tr('ticket:CAT_DESC_COL') %></label>
+            <input type="text" id="catDescription" class="form-control" maxlength="255">
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="catStaffRoles" class="form-label"><%= tr('ticket:STAFF_ROLE_TITLE') %></label>
+              <select id="catStaffRoles" class="form-select" multiple size="5">
+                <% (roles || []).filter(r => r.name !== '@everyone').forEach(rolle => { %>
+                  <option value="<%= rolle.id %>"><%= rolle.name %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="catMemberRoles" class="form-label"><%= tr('ticket:MEMBER_ROLE_TITLE') %></label>
+              <select id="catMemberRoles" class="form-select" multiple size="5">
+                <% (roles || []).filter(r => r.name !== '@everyone').forEach(rolle => { %>
+                  <option value="<%= rolle.id %>"><%= rolle.name %></option>
+                <% }); %>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="catButtonLabel" class="form-label"><%= tr('ticket:CATEGORIES.BUTTON_LABEL') %></label>
+              <input type="text" id="catButtonLabel" class="form-control" maxlength="80" value="Ticket erstellen">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="catButtonEmoji" class="form-label"><%= tr('ticket:CATEGORIES.BUTTON_EMOJI') %></label>
+              <input type="text" id="catButtonEmoji" class="form-control" maxlength="8" value="🎫">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="catMaxOpen" class="form-label"><%= tr('ticket:CATEGORIES.MAX_OPEN') %></label>
+              <input type="number" id="catMaxOpen" class="form-control" min="1" max="20" value="1">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="catOpenTitle" class="form-label"><%= tr('ticket:CATEGORIES.OPEN_TITLE') %></label>
+            <input type="text" id="catOpenTitle" class="form-control" maxlength="255">
+          </div>
+          <div class="mb-0">
+            <label for="catOpenDescription" class="form-label"><%= tr('ticket:CATEGORIES.OPEN_DESC') %></label>
+            <textarea id="catOpenDescription" class="form-control" rows="3"></textarea>
+          </div>
+
+          <label class="form-check form-switch mt-3 mb-0">
+            <input type="checkbox" class="form-check-input" id="catActive" checked>
+            <span class="form-check-label"><%= tr('ticket:IS_ACTIVE_TITLE') %></span>
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">
+            <%= tr('ticket:CATEGORIES.CANCEL') %>
+          </button>
+          <button type="submit" class="btn btn-primary ms-auto">
+            <i class="fa-solid fa-floppy-disk me-2"></i><%= tr('ticket:SAVE_BTN') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

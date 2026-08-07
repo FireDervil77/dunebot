@@ -1,0 +1,94 @@
+<%- include('partials/ticket-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-inbox',
+  titel: tr('ticket:NAV.TICKETS'),
+  beschreibung: tr('ticket:TICKETS.SUBTITLE')
+}) %>
+
+<%
+  const zeitpunkt = (w) => w ? new Date(w).toLocaleString('de-DE') : '—';
+  const filter = [
+    ['',       'DASHBOARD.ALL',  anzahl.gesamt],
+    ['open',   'STATS_OPEN',     anzahl.offen],
+    ['closed', 'STATS_CLOSED',   anzahl.geschlossen]
+  ];
+%>
+
+<div class="card">
+  <div class="card-header">
+    <ul class="nav nav-pills card-header-pills">
+      <% filter.forEach(([wert, schluessel, n]) => { %>
+        <li class="nav-item">
+          <a class="nav-link <%= (zustand || '') === wert ? 'active' : '' %>"
+             href="?<%= wert ? 'zustand=' + wert : '' %>">
+            <%= tr('ticket:' + schluessel) %>
+            <span class="badge bg-secondary-lt ms-1"><%= n %></span>
+          </a>
+        </li>
+      <% }); %>
+    </ul>
+  </div>
+
+  <% if (tickets && tickets.length > 0) { %>
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter">
+        <thead>
+          <tr>
+            <th><%= tr('ticket:TICKET_ID_COL') %></th>
+            <th><%= tr('ticket:CREATED_BY_COL') %></th>
+            <th><%= tr('ticket:CLAIMED_BY_COL') %></th>
+            <th><%= tr('ticket:CATEGORY_COL') %></th>
+            <th><%= tr('ticket:IS_ACTIVE_TITLE') %></th>
+            <th><%= tr('ticket:DASHBOARD.CREATED_AT') %></th>
+            <th class="text-end"><%= tr('ticket:ACTION_COL') %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% tickets.forEach(t => { %>
+            <tr>
+              <td class="text-secondary">#<%= t.ticket_id || t.id %></td>
+              <td class="font-monospace text-secondary"><%= t.created_by || '—' %></td>
+              <td class="font-monospace text-secondary"><%= t.claimed_by || '—' %></td>
+              <td><%= t.category_name || '—' %></td>
+              <td>
+                <span class="badge bg-<%= t.status === 'open' ? 'green' : 'secondary' %>-lt">
+                  <%= t.status === 'open' ? tr('ticket:STATS_OPEN') : tr('ticket:STATS_CLOSED') %>
+                </span>
+              </td>
+              <td class="text-secondary"><%= zeitpunkt(t.created_at) %></td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-primary"
+                        onclick="showTranscript(<%= t.id %>)"
+                        title="<%= tr('ticket:TICKETS.TRANSCRIPT') %>">
+                  <i class="fa-solid fa-file-lines"></i>
+                </button>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %>
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon"><i class="fa-solid fa-inbox fs-1 text-secondary"></i></div>
+        <p class="empty-title"><%= tr('ticket:DASHBOARD.NO_TICKETS') %></p>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<!-- Transkript -->
+<div class="modal modal-blur fade" id="transcriptModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><%= tr('ticket:TICKETS.TRANSCRIPT') %></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schliessen"></button>
+      </div>
+      <div class="modal-body">
+        <pre id="transcriptInhalt" class="mb-0" style="white-space: pre-wrap;"></pre>
+      </div>
+    </div>
+  </div>
+</div>
