@@ -124,6 +124,100 @@
     --tblr-table-border-color: var(--fb-border);
 }
 
+/* --- Abzeichen auf farbigem Grund ----------------------------------------- */
+/*
+ * Grauer Text auf grauem Grund — 2026-08-07 gefunden, Verhältnis 1:1.
+ *
+ * Tabler baut ein Abzeichen so:
+ *
+ *     .badge          { --tblr-badge-color: var(--tblr-secondary);
+ *                       color: var(--tblr-badge-color); }
+ *     .bg-secondary   { background-color: var(--tblr-secondary) !important; }
+ *
+ * Wer beides kombiniert — `class="badge bg-secondary"` — setzt Vorder- und
+ * Hintergrund auf denselben Wert. Bei uns ist das `#667382`, also war der Text
+ * schlicht unsichtbar, nicht bloß schwach. Betroffen waren rund 27 Stellen
+ * quer durch alle Plugins ("Aus", "Deaktiviert", Zähler-Abzeichen).
+ *
+ * Die gemeinte Klasse heißt in Bootstrap 5.3 `text-bg-secondary` — die setzt
+ * beides passend. Statt 27 Views nachzuziehen und beim nächsten `bg-secondary`
+ * denselben Fehler zu bekommen, wird die Paarung hier einmal nachgereicht.
+ *
+ * Betroffen ist nicht nur Grau. Gemessen gegen unsere eigenen Markenfarben
+ * (nicht Tablers Standardwerte!) war heute jede solide Variante unlesbar:
+ *
+ *     Variante   Grund      heute   weiß   dunkel   gewählt
+ *     primary    #3498db     1,53   3,15    4,66    dunkel
+ *     secondary  #667382     1,00   4,84    3,03    weiß
+ *     success    #2fb344     1,76   2,74    5,35    dunkel
+ *     danger     #d63939     1,04   4,66    3,15    weiß
+ *     warning    #f76707     1,59   3,04    4,82    dunkel
+ *     info       #4299e1     1,58   3,05    4,81    dunkel
+ *     dark       #1e293b     3,02  14,63    1,00    weiß
+ *     light      #f8fafc     4,63   1,05   14,03    dunkel
+ *
+ * Gewählt ist je Farbe der bessere der beiden Werte; alle acht liegen damit
+ * über 4,5:1 und erfüllen WCAG AA für Fließtextgröße. Bei Grün, Orange und
+ * Blau ist das ausdrücklich NICHT Tablers eigene Wahl — dessen `.text-bg-*`
+ * setzt dort durchgängig fast-weiß und landet bei 2,7 bis 3,1:1.
+ *
+ * Die `-lt`-Varianten (`bg-secondary-lt` und Geschwister) sind nicht betroffen:
+ * die bringen ihre Textfarbe selbst mit und bleiben unangetastet.
+ */
+.badge.bg-secondary,
+.badge.bg-danger,
+.badge.bg-dark {
+    --tblr-badge-color: #ffffff;
+}
+
+.badge.bg-primary,
+.badge.bg-success,
+.badge.bg-warning,
+.badge.bg-info,
+.badge.bg-light {
+    --tblr-badge-color: #1f2937;
+}
+
+/*
+ * Die Seitenleiste ist die einzige dunkle Insel im sonst hellen Dashboard
+ * (`data-bs-theme="dark"` steht projektweit nur dort). Dort dreht Tabler
+ * `--tblr-secondary` auf ein helles Grau — ein Abzeichen in der Seitenleiste
+ * braucht deshalb den umgekehrten Kontrast.
+ */
+[data-bs-theme="dark"] .badge.bg-secondary {
+    --tblr-badge-color: #1f2937;
+}
+
+/*
+ * Weiß auf Weiß — derselbe Fehler in Tablers hellen Tönungen.
+ *
+ * Die `-lt`-Varianten setzen ihre Textfarbe zwar selbst, aber nach dem Muster
+ * „Text = die kräftige Farbe, Grund = deren helle Tönung". Für `light` heißt
+ * das:
+ *
+ *     .bg-light-lt { color:            #f9fafb !important;   ← fast weiß
+ *                    background-color: rgb(254,254,255) !important; }
+ *
+ * Verhältnis 1,04:1, der Text ist unsichtbar. Bei allen anderen Farben geht
+ * das Muster auf (grün auf hellgrün liest sich), nur `light` hat keine
+ * kräftige Variante, gegen die es sich absetzen könnte.
+ *
+ * Im Projekt steckt das an 44 Stellen, meist als Platzhalter-Knopf
+ * (`<code class="badge bg-light-lt border">{member:name}</code>`). An 27 davon
+ * steht bereits ein handgeschriebenes `style="color: #000"` daneben — jemand
+ * ist hier schon einmal gegen dieselbe Wand gelaufen und hat es örtlich
+ * geflickt. Die übrigen 17 waren schlicht leer.
+ *
+ * Das `!important` ist hier nötig, weil Tabler die Farbe selbst mit
+ * `!important` setzt. Die Inline-Notbehelfe in den Views bleiben wirksam
+ * (Inline schlägt Stylesheet) und können nach und nach raus.
+ *
+ * Schließt Punkt 11.2 (Greeting: „Buttons sieht man, den Text darin nicht").
+ */
+.bg-light-lt {
+    color: #1f2937 !important;
+}
+
 /* --- Obere Leiste --------------------------------------------------------- */
 .navbar:not(.navbar-vertical) {
     --tblr-navbar-bg: var(--fb-header-bg);
