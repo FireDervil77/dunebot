@@ -1,0 +1,19 @@
+<%- include('partials/greeting-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-user-tag',
+  titel: tr('greeting:NAV.ROLES'),
+  beschreibung: tr('greeting:ROLES.SUBTITLE')
+}) %>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-user-plus me-2"></i><%= tr('greeting:TAB_AUTOROLE') %></h3>
+  </div>
+  <div class="card-body">
+    <%- include('greeting-content', { type: 'autorole', channels, roles, settings, guildId }) %>
+  </div>
+</div>
+
+<%- include('partials/greeting-reaction-roles-inhalt') %>
+
+<%- includePluginPartial('greeting', 'greeting-scripts', locals) %>

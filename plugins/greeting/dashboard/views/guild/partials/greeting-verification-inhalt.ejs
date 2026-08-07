@@ -1,0 +1,105 @@
+<%#
+  Herausgeloest aus greeting-settings.ejs beim Umbau am 2026-08-07.
+  Erwartet: tr, guildId, settings, channels, roles, inviteMappings, reactionPanels
+%>
+<h4><i class="fa-solid fa-shield-check text-success me-2"></i><%= tr('greeting:VERIFICATION.TITLE') %></h4>
+<p class="text-secondary mb-4"><%= tr('greeting:VERIFICATION.DESC') %></p>
+
+<div class="card">
+
+    <div class="card-status-top bg-success"></div>
+  <div class="card-body">
+    <!-- Enable Toggle -->
+    <div class="mb-3">
+      <div class="form-check form-switch">
+        <input type="checkbox" class="form-check-input" id="verificationEnabled" <%= settings.verification.enabled ? 'checked' : '' %>>
+        <label class="form-check-label" for="verificationEnabled"><%= tr('greeting:VERIFICATION.ENABLE') %></label>
+      </div>
+    </div>
+
+    <!-- Verification Type -->
+    <div class="mb-3">
+      <label><%= tr('greeting:VERIFICATION.TYPE') %></label>
+      <select id="verificationType" class="form-control" onchange="toggleVerificationEmoji()">
+        <option value="button" <%= settings.verification.type === 'button' ? 'selected' : '' %>><%= tr('greeting:VERIFICATION.TYPE_BUTTON') %></option>
+        <option value="captcha" <%= settings.verification.type === 'captcha' ? 'selected' : '' %>><%= tr('greeting:VERIFICATION.TYPE_CAPTCHA') %></option>
+        <option value="reaction" <%= settings.verification.type === 'reaction' ? 'selected' : '' %>><%= tr('greeting:VERIFICATION.TYPE_REACTION') %></option>
+      </select>
+    </div>
+
+    <!-- Verification Emoji (only for reaction type) -->
+    <div class="mb-3" id="verificationEmojiGroup" style="<%= settings.verification.type === 'reaction' ? '' : 'display:none' %>">
+      <label><%= tr('greeting:VERIFICATION.EMOJI') %></label>
+      <input type="text" id="verificationEmoji" class="form-control" value="<%= settings.verification.emoji || '✅' %>" maxlength="50" placeholder="✅">
+      <small class="text-secondary"><%= tr('greeting:VERIFICATION.EMOJI_DESC') %></small>
+    </div>
+
+    <!-- Verification Channel -->
+    <div class="mb-3">
+      <label><%= tr('greeting:VERIFICATION.CHANNEL') %></label>
+      <select id="verificationChannel" class="form-control">
+        <option value=""><%= tr('greeting:CHANNEL_SELECT') %></option>
+        <% channels.forEach(ch => { %>
+          <option value="<%= ch.id %>" <%= settings.verification.channel === ch.id ? 'selected' : '' %>>#<%= ch.name %></option>
+        <% }); %>
+      </select>
+      <small class="text-secondary"><%= tr('greeting:VERIFICATION.CHANNEL_DESC') %></small>
+    </div>
+
+    <!-- Verified Role -->
+    <div class="mb-3">
+      <label><%= tr('greeting:VERIFICATION.VERIFIED_ROLE') %></label>
+      <select id="verificationRoleId" class="form-control">
+        <option value="">—</option>
+        <% roles.forEach(r => { %>
+          <option value="<%= r.id %>" <%= settings.verification.role_id === r.id ? 'selected' : '' %>><%= r.name %></option>
+        <% }); %>
+      </select>
+      <small class="text-secondary"><%= tr('greeting:VERIFICATION.VERIFIED_ROLE_DESC') %></small>
+    </div>
+
+    <!-- Unverified Role -->
+    <div class="mb-3">
+      <label><%= tr('greeting:VERIFICATION.UNVERIFIED_ROLE') %></label>
+      <select id="verificationRemoveRoleId" class="form-control">
+        <option value="">—</option>
+        <% roles.forEach(r => { %>
+          <option value="<%= r.id %>" <%= settings.verification.remove_role_id === r.id ? 'selected' : '' %>><%= r.name %></option>
+        <% }); %>
+      </select>
+      <small class="text-secondary"><%= tr('greeting:VERIFICATION.UNVERIFIED_ROLE_DESC') %></small>
+    </div>
+
+    <!-- Verification Message -->
+    <div class="mb-3">
+      <label><%= tr('greeting:VERIFICATION.MESSAGE') %></label>
+      <textarea id="verificationMessage" class="form-control" rows="3" placeholder="<%= tr('greeting:VERIFICATION.MESSAGE_PH') %>"><%= settings.verification.message %></textarea>
+      <small class="text-secondary">
+        Platzhalter: <code>{guild:name}</code> <code>{server}</code> <code>{guild:memberCount}</code> <code>{count}</code>
+      </small>
+    </div>
+
+    <!-- Verification Success Message -->
+    <div class="mb-3">
+      <label><%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE') %></label>
+      <textarea id="verificationSuccessMessage" class="form-control" rows="3" placeholder="<%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE_PH') %>"><%= settings.verification.success_message %></textarea>
+      <small class="text-secondary"><%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE_DESC') %></small>
+    </div>
+
+    <!-- Info -->
+    <div class="alert alert-info small mb-3">
+      <i class="fa-solid fa-info-circle me-1"></i> <%= tr('greeting:VERIFICATION.INFO') %>
+    </div>
+
+    <div class="d-flex justify-content-between">
+      <button type="button" class="btn btn-success" onclick="saveVerification()">
+        <i class="fa-solid fa-save me-1"></i> <%= tr('greeting:BTN_SAVE') %>
+      </button>
+      <button type="button" class="btn btn-outline-primary" onclick="sendVerificationPanel()">
+        <i class="fa-solid fa-paper-plane me-1"></i> <%= tr('greeting:VERIFICATION.SEND_PANEL') %>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== REACTION ROLES TAB ==================== -->

@@ -1,0 +1,22 @@
+<%
+/**
+ * Gemeinsamer Seitenkopf der Greeting-Seiten.
+ *
+ * Erwartet: guildId, tr, titel, beschreibung, icon
+ */
+%>
+<div class="page-header d-print-none mb-3"
+     data-greeting-basis="/guild/<%= guildId %>/plugins/greeting">
+  <div class="row align-items-center">
+    <div class="col">
+      <div class="page-pretitle"><%= tr('greeting:SETTINGS.PAGE_TITLE') %></div>
+      <h2 class="page-title">
+        <i class="<%= icon %> me-2"></i>
+        <%= titel %>
+      </h2>
+      <% if (beschreibung) { %>
+        <div class="text-secondary mt-1"><%= beschreibung %></div>
+      <% } %>
+    </div>
+  </div>
+</div>

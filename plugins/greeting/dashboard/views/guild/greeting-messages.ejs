@@ -1,0 +1,41 @@
+<%- include('partials/greeting-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-comment-dots',
+  titel: tr('greeting:NAV.MESSAGES'),
+  beschreibung: tr('greeting:MESSAGES.SUBTITLE')
+}) %>
+
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-hand-wave me-2"></i><%= tr('greeting:TAB_WELCOME') %></h3>
+      </div>
+      <div class="card-body">
+        <%- include('greeting-content', { type: 'welcome', channels, roles, settings, guildId }) %>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-door-open me-2"></i><%= tr('greeting:TAB_FAREWELL') %></h3>
+      </div>
+      <div class="card-body">
+        <%- include('greeting-content', { type: 'farewell', channels, roles, settings, guildId }) %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-envelope me-2"></i><%= tr('greeting:TAB_DM') %></h3>
+      </div>
+      <div class="card-body">
+        <%- include('greeting-content', { type: 'dm_welcome', channels, roles, settings, guildId }) %>
+      </div>
+    </div>
+  </div>
+
+  <%- include('partials/greeting-vorschau') %>
+</div>
+
+<%- includePluginPartial('greeting', 'greeting-scripts', locals) %>

@@ -1,30 +1,19 @@
 /**
- * Greeting Plugin - Basis Settings Router
- * Handles base-level plugin routes (non-guild-specific)
- * 
- * @module greeting/dashboard/routes/settings
- * @author FireBot Team
+ * Greeting - systemweite Routen
+ *
+ * Hier stand bis zum 2026-08-07 eine Route `GET /settings`, die
+ * `greeting/settings` rendern wollte - eine View, die es im ganzen Projekt
+ * nicht gibt. Der Aufruf waere also in einen Fehler gelaufen. Ihr eigener
+ * Kommentar sagte bereits: "Fuer Greeting gibt es aktuell keine
+ * system-weiten Settings, alle Settings sind guild-spezifisch."
+ *
+ * Die Datei bleibt als Platz fuer spaetere systemweite Routen bestehen; der
+ * Router ist absichtlich leer.
+ *
+ * @module greeting/routes/settings
  */
 
 const express = require('express');
 const router = express.Router();
-const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
-
-/**
- * GET /plugins/greeting/settings
- * Plugin-Einstellungen (system-weit, falls benötigt)
- */
-router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => {
-    const { ServiceManager } = require('dunebot-core');
-    const themeManager = ServiceManager.get('themeManager');
-    
-    // Für Greeting gibt es aktuell keine system-weiten Settings
-    // Alle Settings sind guild-spezifisch
-    
-    await themeManager.renderView(res, 'greeting/settings', {
-        title: 'Greeting Plugin - Einstellungen',
-        activeMenu: '/plugins/greeting/settings'
-    });
-});
 
 module.exports = router;

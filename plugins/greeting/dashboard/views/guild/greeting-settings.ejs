@@ -1,525 +1,67 @@
-<!-- Greeting Plugin Settings Page v2.0 -->
-<div class="container-fluid">
-  <div class="row">
-    <!-- Main Panel (8 Spalten) -->
-    <div class="col-lg-8">
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">
-            <i class="fa-solid fa-hand-wave me-2"></i>
-            <%= tr('greeting:SETTINGS.PAGE_TITLE') %>
-          </h3>
-          <p class="text-secondary mb-0 mt-2"><%= tr('greeting:SETTINGS.PAGE_DESC') %></p>
-        </div>
+<%- include('partials/greeting-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-hand-wave',
+  titel: tr('greeting:SETTINGS.PAGE_TITLE'),
+  beschreibung: tr('greeting:SETTINGS.PAGE_DESC')
+}) %>
 
-        <div class="card-body">
-          <!-- 5 Tabs -->
-          <ul class="nav nav-tabs" id="greetingTabs" role="tablist">
-            <li class="nav-item">
-              <a class="nav-link active" data-bs-toggle="tab" href="#welcome-pane" role="tab">
-                <i class="fa-solid fa-hand-wave me-1"></i> <%= tr('greeting:TAB_WELCOME') %>
-                <% if (settings.welcome.enabled) { %><span class="badge bg-success-lt ms-1">ON</span><% } %>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" data-bs-toggle="tab" href="#farewell-pane" role="tab">
-                <i class="fa-solid fa-door-open me-1"></i> <%= tr('greeting:TAB_FAREWELL') %>
-                <% if (settings.farewell.enabled) { %><span class="badge bg-success-lt ms-1">ON</span><% } %>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" data-bs-toggle="tab" href="#dm-pane" role="tab">
-                <i class="fa-solid fa-envelope me-1"></i> <%= tr('greeting:TAB_DM_WELCOME') %>
-                <% if (settings.dm_welcome.enabled) { %><span class="badge bg-success-lt ms-1">ON</span><% } %>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" data-bs-toggle="tab" href="#autorole-pane" role="tab">
-                <i class="fa-solid fa-user-shield me-1"></i> <%= tr('greeting:TAB_AUTOROLE') %>
-                <% if (settings.autorole_ids && settings.autorole_ids.length > 0) { %><span class="badge bg-info-lt ms-1"><%= settings.autorole_ids.length %></span><% } %>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" data-bs-toggle="tab" href="#boost-pane" role="tab">
-                <i class="fa-solid fa-rocket me-1"></i> <%= tr('greeting:TAB_BOOST') %>
-                <% if (settings.boost.enabled) { %><span class="badge bg-success-lt ms-1">ON</span><% } %>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" data-bs-toggle="tab" href="#verification-pane" role="tab">
-                <i class="fa-solid fa-shield-check me-1"></i> <%= tr('greeting:TAB_VERIFICATION') %>
-                <% if (settings.verification.enabled) { %><span class="badge bg-success-lt ms-1">ON</span><% } %>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" data-bs-toggle="tab" href="#reaction-roles-pane" role="tab">
-                <i class="fa-solid fa-icons me-1"></i> <%= tr('greeting:TAB_REACTION_ROLES') %>
-                <% if (reactionPanels && reactionPanels.length > 0) { %><span class="badge bg-info-lt ms-1"><%= reactionPanels.length %></span><% } %>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" data-bs-toggle="tab" href="#invite-tracking-pane" role="tab">
-                <i class="fa-solid fa-link me-1"></i> <%= tr('greeting:TAB_INVITE_TRACKING') %>
-                <% if (inviteMappings && inviteMappings.length > 0) { %><span class="badge bg-info-lt ms-1"><%= inviteMappings.length %></span><% } %>
-              </a>
-            </li>
-          </ul>
+<%
+  const basis = `/guild/${guildId}/plugins/greeting`;
 
-          <div class="tab-content mt-4" id="greetingTabContent">
+  /** Wegweiser in die Unterseiten, mit dem jeweiligen Zustand. */
+  const bereiche = [
+    ['NAV.MESSAGES',      '/nachrichten',   'fa-solid fa-comment-dots',
+      settings.welcome.enabled || settings.farewell.enabled || settings.dm_welcome.enabled, 'MESSAGES.SUBTITLE'],
+    ['NAV.ROLES',         '/rollen',        'fa-solid fa-user-tag',
+      settings.autorole_ids.length > 0 || (reactionPanels || []).length > 0, 'ROLES.SUBTITLE'],
+    ['NAV.VERIFICATION',  '/verifizierung', 'fa-solid fa-shield-halved',
+      settings.verification.enabled, 'VERIFICATION.DESC'],
+    ['NAV.BOOST',         '/boost',         'fa-solid fa-rocket',
+      settings.boost.enabled, 'BOOST.SUBTITLE'],
+    ['NAV.INVITES',       '/einladungen',   'fa-solid fa-link',
+      (inviteMappings || []).length > 0, 'INVITES.SUBTITLE']
+  ];
+%>
 
-            <!-- ==================== WELCOME TAB ==================== -->
-            <div class="tab-pane fade show active" id="welcome-pane" role="tabpanel">
-              <%- include('greeting-content', { type: 'welcome', channels, roles, settings, guildId }) %>
-            </div>
-
-            <!-- ==================== FAREWELL TAB ==================== -->
-            <div class="tab-pane fade" id="farewell-pane" role="tabpanel">
-              <%- include('greeting-content', { type: 'farewell', channels, roles, settings, guildId }) %>
-            </div>
-
-            <!-- ==================== DM WELCOME TAB ==================== -->
-            <div class="tab-pane fade" id="dm-pane" role="tabpanel">
-              <%- include('greeting-content', { type: 'dm_welcome', channels, roles, settings, guildId }) %>
-            </div>
-
-            <!-- ==================== AUTOROLE TAB ==================== -->
-            <div class="tab-pane fade" id="autorole-pane" role="tabpanel">
-              <%- include('greeting-content', { type: 'autorole', channels, roles, settings, guildId }) %>
-            </div>
-
-            <!-- ==================== BOOST TAB ==================== -->
-            <div class="tab-pane fade" id="boost-pane" role="tabpanel">
-              <%- include('greeting-content', { type: 'boost', channels, roles, settings, guildId }) %>
-            </div>
-
-            <!-- ==================== VERIFICATION TAB ==================== -->
-            <div class="tab-pane fade" id="verification-pane" role="tabpanel">
-              <h4><i class="fa-solid fa-shield-check text-success me-2"></i><%= tr('greeting:VERIFICATION.TITLE') %></h4>
-              <p class="text-secondary mb-4"><%= tr('greeting:VERIFICATION.DESC') %></p>
-
-              <div class="card">
-
-                  <div class="card-status-top bg-success"></div>
-                <div class="card-body">
-                  <!-- Enable Toggle -->
-                  <div class="mb-3">
-                    <div class="form-check form-switch">
-                      <input type="checkbox" class="form-check-input" id="verificationEnabled" <%= settings.verification.enabled ? 'checked' : '' %>>
-                      <label class="form-check-label" for="verificationEnabled"><%= tr('greeting:VERIFICATION.ENABLE') %></label>
-                    </div>
-                  </div>
-
-                  <!-- Verification Type -->
-                  <div class="mb-3">
-                    <label><%= tr('greeting:VERIFICATION.TYPE') %></label>
-                    <select id="verificationType" class="form-control" onchange="toggleVerificationEmoji()">
-                      <option value="button" <%= settings.verification.type === 'button' ? 'selected' : '' %>><%= tr('greeting:VERIFICATION.TYPE_BUTTON') %></option>
-                      <option value="captcha" <%= settings.verification.type === 'captcha' ? 'selected' : '' %>><%= tr('greeting:VERIFICATION.TYPE_CAPTCHA') %></option>
-                      <option value="reaction" <%= settings.verification.type === 'reaction' ? 'selected' : '' %>><%= tr('greeting:VERIFICATION.TYPE_REACTION') %></option>
-                    </select>
-                  </div>
-
-                  <!-- Verification Emoji (only for reaction type) -->
-                  <div class="mb-3" id="verificationEmojiGroup" style="<%= settings.verification.type === 'reaction' ? '' : 'display:none' %>">
-                    <label><%= tr('greeting:VERIFICATION.EMOJI') %></label>
-                    <input type="text" id="verificationEmoji" class="form-control" value="<%= settings.verification.emoji || '✅' %>" maxlength="50" placeholder="✅">
-                    <small class="text-secondary"><%= tr('greeting:VERIFICATION.EMOJI_DESC') %></small>
-                  </div>
-
-                  <!-- Verification Channel -->
-                  <div class="mb-3">
-                    <label><%= tr('greeting:VERIFICATION.CHANNEL') %></label>
-                    <select id="verificationChannel" class="form-control">
-                      <option value=""><%= tr('greeting:CHANNEL_SELECT') %></option>
-                      <% channels.forEach(ch => { %>
-                        <option value="<%= ch.id %>" <%= settings.verification.channel === ch.id ? 'selected' : '' %>>#<%= ch.name %></option>
-                      <% }); %>
-                    </select>
-                    <small class="text-secondary"><%= tr('greeting:VERIFICATION.CHANNEL_DESC') %></small>
-                  </div>
-
-                  <!-- Verified Role -->
-                  <div class="mb-3">
-                    <label><%= tr('greeting:VERIFICATION.VERIFIED_ROLE') %></label>
-                    <select id="verificationRoleId" class="form-control">
-                      <option value="">—</option>
-                      <% roles.forEach(r => { %>
-                        <option value="<%= r.id %>" <%= settings.verification.role_id === r.id ? 'selected' : '' %>><%= r.name %></option>
-                      <% }); %>
-                    </select>
-                    <small class="text-secondary"><%= tr('greeting:VERIFICATION.VERIFIED_ROLE_DESC') %></small>
-                  </div>
-
-                  <!-- Unverified Role -->
-                  <div class="mb-3">
-                    <label><%= tr('greeting:VERIFICATION.UNVERIFIED_ROLE') %></label>
-                    <select id="verificationRemoveRoleId" class="form-control">
-                      <option value="">—</option>
-                      <% roles.forEach(r => { %>
-                        <option value="<%= r.id %>" <%= settings.verification.remove_role_id === r.id ? 'selected' : '' %>><%= r.name %></option>
-                      <% }); %>
-                    </select>
-                    <small class="text-secondary"><%= tr('greeting:VERIFICATION.UNVERIFIED_ROLE_DESC') %></small>
-                  </div>
-
-                  <!-- Verification Message -->
-                  <div class="mb-3">
-                    <label><%= tr('greeting:VERIFICATION.MESSAGE') %></label>
-                    <textarea id="verificationMessage" class="form-control" rows="3" placeholder="<%= tr('greeting:VERIFICATION.MESSAGE_PH') %>"><%= settings.verification.message %></textarea>
-                    <small class="text-secondary">
-                      Platzhalter: <code>{guild:name}</code> <code>{server}</code> <code>{guild:memberCount}</code> <code>{count}</code>
-                    </small>
-                  </div>
-
-                  <!-- Verification Success Message -->
-                  <div class="mb-3">
-                    <label><%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE') %></label>
-                    <textarea id="verificationSuccessMessage" class="form-control" rows="3" placeholder="<%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE_PH') %>"><%= settings.verification.success_message %></textarea>
-                    <small class="text-secondary"><%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE_DESC') %></small>
-                  </div>
-
-                  <!-- Info -->
-                  <div class="alert alert-info small mb-3">
-                    <i class="fa-solid fa-info-circle me-1"></i> <%= tr('greeting:VERIFICATION.INFO') %>
-                  </div>
-
-                  <div class="d-flex justify-content-between">
-                    <button type="button" class="btn btn-success" onclick="saveVerification()">
-                      <i class="fa-solid fa-save me-1"></i> <%= tr('greeting:BTN_SAVE') %>
-                    </button>
-                    <button type="button" class="btn btn-outline-primary" onclick="sendVerificationPanel()">
-                      <i class="fa-solid fa-paper-plane me-1"></i> <%= tr('greeting:VERIFICATION.SEND_PANEL') %>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- ==================== REACTION ROLES TAB ==================== -->
-            <div class="tab-pane fade" id="reaction-roles-pane" role="tabpanel">
-              <h4><i class="fa-solid fa-icons text-primary me-2"></i><%= tr('greeting:REACTION_ROLES.TITLE') %></h4>
-              <p class="text-secondary mb-4"><%= tr('greeting:REACTION_ROLES.DESC') %></p>
-
-              <!-- Create New Panel -->
-              <div class="card">
-                  <div class="card-status-top bg-primary"></div>
-                <div class="card-header">
-                  <h3 class="card-title"><i class="fa-solid fa-plus me-1"></i> <%= tr('greeting:REACTION_ROLES.CREATE_TITLE') %></h3>
-                </div>
-                <div class="card-body">
-                  <div class="row">
-                    <div class="col-md-6">
-                      <div class="mb-3">
-                        <label><%= tr('greeting:REACTION_ROLES.PANEL_TITLE') %></label>
-                        <input type="text" id="rrPanelTitle" class="form-control" maxlength="255" placeholder="<%= tr('greeting:REACTION_ROLES.PANEL_TITLE_PH') %>">
-                      </div>
-                    </div>
-                    <div class="col-md-3">
-                      <div class="mb-3">
-                        <label><%= tr('greeting:REACTION_ROLES.PANEL_COLOR') %></label>
-                        <input type="color" id="rrPanelColor" class="form-control" value="#5865f2">
-                      </div>
-                    </div>
-                    <div class="col-md-3">
-                      <div class="mb-3">
-                        <label><%= tr('greeting:REACTION_ROLES.PANEL_CHANNEL') %></label>
-                        <select id="rrPanelChannel" class="form-control">
-                          <option value=""><%= tr('greeting:CHANNEL_SELECT') %></option>
-                          <% channels.forEach(ch => { %>
-                            <option value="<%= ch.id %>">#<%= ch.name %></option>
-                          <% }); %>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="mb-3">
-                    <label><%= tr('greeting:REACTION_ROLES.PANEL_DESC') %></label>
-                    <textarea id="rrPanelDesc" class="form-control" rows="2" placeholder="<%= tr('greeting:REACTION_ROLES.PANEL_DESC_PH') %>"></textarea>
-                  </div>
-
-                  <!-- Emoji-Role Mappings Builder -->
-                  <hr>
-                  <h6><i class="fa-solid fa-list me-1"></i> <%= tr('greeting:REACTION_ROLES.ADD_MAPPING') %></h6>
-                  <div id="rrMappingsList"></div>
-                  <div class="row mt-2">
-                    <div class="col-md-2">
-                      <input type="text" id="rrNewEmoji" class="form-control" maxlength="50" placeholder="<%= tr('greeting:REACTION_ROLES.EMOJI_PH') %>">
-                    </div>
-                    <div class="col-md-4">
-                      <select id="rrNewRole" class="form-control">
-                        <option value="">— <%= tr('greeting:REACTION_ROLES.ROLE') %> —</option>
-                        <% roles.forEach(r => { %>
-                          <option value="<%= r.id %>"><%= r.name %></option>
-                        <% }); %>
-                      </select>
-                    </div>
-                    <div class="col-md-4">
-                      <input type="text" id="rrNewDesc" class="form-control" maxlength="255" placeholder="<%= tr('greeting:REACTION_ROLES.MAPPING_DESC_PH') %>">
-                    </div>
-                    <div class="col-md-2">
-                      <button type="button" class="btn btn-info w-100" onclick="addRRMapping()">
-                        <i class="fa-solid fa-plus me-1"></i> <%= tr('greeting:REACTION_ROLES.BTN_ADD_MAPPING') %>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="mt-3 text-end">
-                    <button type="button" class="btn btn-primary" onclick="createReactionPanel()">
-                      <i class="fa-solid fa-plus-circle me-1"></i> <%= tr('greeting:REACTION_ROLES.BTN_CREATE_PANEL') %>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Existing Panels -->
-              <div class="card">
-                <div class="card-header">
-                  <h3 class="card-title"><i class="fa-solid fa-list me-1"></i> <%= tr('greeting:REACTION_ROLES.EXISTING_PANELS') %></h3>
-                </div>
-                <div class="card-body">
-                  <% if (reactionPanels && reactionPanels.length > 0) { %>
-                    <% reactionPanels.forEach(panel => { %>
-                      <div class="card mb-3" id="rr-panel-<%= panel.id %>">
-                        <div class="card-status-top bg-<%= panel.message_id ? 'success' : 'warning' %>"></div>
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                          <h5 class="mb-0">
-                            <% if (panel.message_id) { %>
-                              <span class="badge bg-success-lt me-2"><%= tr('greeting:REACTION_ROLES.STATUS_SENT') %></span>
-                            <% } else { %>
-                              <span class="badge bg-warning-lt me-2"><%= tr('greeting:REACTION_ROLES.STATUS_DRAFT') %></span>
-                            <% } %>
-                            <%= panel.title || 'Reaction Roles' %>
-                          </h5>
-                          <div>
-                            <% if (!panel.message_id) { %>
-                              <button class="btn btn-sm btn-success" onclick="sendReactionPanel(<%= panel.id %>)">
-                                <i class="fa-solid fa-paper-plane me-1"></i> <%= tr('greeting:REACTION_ROLES.BTN_SEND_PANEL') %>
-                              </button>
-                            <% } %>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteReactionPanel(<%= panel.id %>)">
-                              <i class="fa-solid fa-trash"></i>
-                            </button>
-                          </div>
-                        </div>
-                        <div class="card-body py-2">
-                          <% if (panel.description) { %>
-                            <p class="text-secondary small mb-2"><%= panel.description %></p>
-                          <% } %>
-                          <% if (panel.mappings && panel.mappings.length > 0) { %>
-                            <div class="d-flex flex-wrap" style="gap: 8px;">
-                              <% panel.mappings.forEach(m => { %>
-                                <span class="badge bg-light-lt border p-2" style="font-size: 0.9em;">
-                                  <%= m.emoji %> → <strong><%= m.role_name || m.role_id %></strong>
-                                  <% if (m.description) { %><small class="text-secondary ms-1">(<%= m.description %>)</small><% } %>
-                                </span>
-                              <% }); %>
-                            </div>
-                          <% } else { %>
-                            <p class="text-secondary small mb-0">Keine Zuordnungen</p>
-                          <% } %>
-                        </div>
-                      </div>
-                    <% }); %>
-                  <% } else { %>
-                    <p class="text-secondary text-center mb-0"><%= tr('greeting:REACTION_ROLES.EMPTY') %></p>
-                  <% } %>
-                </div>
-              </div>
-
-              <!-- Info -->
-              <div class="alert alert-info small">
-                <i class="fa-solid fa-info-circle me-1"></i> <%= tr('greeting:REACTION_ROLES.INFO') %>
-              </div>
-            </div>
-
-            <!-- ==================== INVITE TRACKING TAB ==================== -->
-            <div class="tab-pane fade" id="invite-tracking-pane" role="tabpanel">
-              <h4><i class="fa-solid fa-link text-info me-2"></i><%= tr('greeting:INVITE_TRACKING.TITLE') %></h4>
-              <p class="text-secondary mb-4"><%= tr('greeting:INVITE_TRACKING.DESC') %></p>
-
-              <!-- Add New Mapping -->
-              <div class="card">
-                  <div class="card-status-top bg-info"></div>
-                <div class="card-header">
-                  <h3 class="card-title"><i class="fa-solid fa-plus me-1"></i> <%= tr('greeting:INVITE_TRACKING.ADD_TITLE') %></h3>
-                </div>
-                <div class="card-body">
-                  <div class="row">
-                    <div class="col-md-4">
-                      <label class="form-label"><%= tr('greeting:INVITE_TRACKING.INVITE_CODE') %></label>
-                      <input type="text" id="inviteCode" class="form-control" maxlength="50" placeholder="<%= tr('greeting:INVITE_TRACKING.INVITE_CODE_PH') %>">
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label"><%= tr('greeting:INVITE_TRACKING.LABEL') %></label>
-                      <input type="text" id="inviteLabel" class="form-control" maxlength="100" placeholder="<%= tr('greeting:INVITE_TRACKING.LABEL_PH') %>">
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label"><%= tr('greeting:INVITE_TRACKING.CONTENT') %></label>
-                      <input type="text" id="inviteContent" class="form-control" placeholder="<%= tr('greeting:INVITE_TRACKING.CONTENT_PH') %>">
-                    </div>
-                  </div>
-                  <div class="mt-3 text-end">
-                    <button type="button" class="btn btn-info" onclick="addInviteMapping()">
-                      <i class="fa-solid fa-plus me-1"></i> <%= tr('greeting:INVITE_TRACKING.BTN_ADD') %>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Existing Mappings -->
-              <div class="card">
-                <div class="card-body">
-                  <% if (inviteMappings && inviteMappings.length > 0) { %>
-                    <table class="table table-hover table-sm">
-                      <thead>
-                        <tr>
-                          <th><%= tr('greeting:INVITE_TRACKING.INVITE_CODE') %></th>
-                          <th><%= tr('greeting:INVITE_TRACKING.LABEL') %></th>
-                          <th><%= tr('greeting:INVITE_TRACKING.CONTENT') %></th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <% inviteMappings.forEach(m => { %>
-                          <tr id="invite-mapping-<%= m.id %>">
-                            <td><code><%= m.invite_code %></code></td>
-                            <td><%= m.label || '—' %></td>
-                            <td><small class="text-secondary"><%= (m.welcome_content || '').substring(0, 60) %><%= (m.welcome_content || '').length > 60 ? '...' : '' %></small></td>
-                            <td class="text-end">
-                              <button class="btn btn-sm btn-outline-danger" onclick="deleteInviteMapping(<%= m.id %>)">
-                                <i class="fa-solid fa-trash"></i>
-                              </button>
-                            </td>
-                          </tr>
-                        <% }); %>
-                      </tbody>
-                    </table>
-                  <% } else { %>
-                    <p class="text-secondary text-center mb-0"><%= tr('greeting:INVITE_TRACKING.EMPTY') %></p>
-                  <% } %>
-                </div>
-              </div>
-
-              <!-- Info -->
-              <div class="alert alert-info small">
-                <i class="fa-solid fa-info-circle me-1"></i> <%= tr('greeting:INVITE_TRACKING.INFO') %>
-              </div>
-            </div>
-
-          </div>
-        </div>
+<div class="row row-cards">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('greeting:SETTINGS.AREAS_TITLE') %></h3>
       </div>
-    </div>
-
-    <!-- Sidebar (4 Spalten) -->
-    <div class="col-lg-4">
-      <!-- Help Card -->
-      <div class="card">
-          <div class="card-status-top bg-info"></div>
-        <div class="card-header">
-          <h3 class="card-title"><i class="fa-solid fa-circle-info me-2"></i><%= tr('greeting:HELP.TITLE') %></h3>
-        </div>
-        <div class="card-body">
-          <div class="mb-3">
-            <h6><i class="fa-solid fa-hand-wave text-primary me-1"></i> <%= tr('greeting:HELP.WELCOME_TITLE') %></h6>
-            <p class="text-secondary small mb-2"><%= tr('greeting:HELP.WELCOME_TEXT') %></p>
-          </div>
-          <div class="mb-3">
-            <h6><i class="fa-solid fa-door-open text-warning me-1"></i> <%= tr('greeting:HELP.FAREWELL_TITLE') %></h6>
-            <p class="text-secondary small mb-2"><%= tr('greeting:HELP.FAREWELL_TEXT') %></p>
-          </div>
-          <div class="mb-3">
-            <h6><i class="fa-solid fa-envelope text-info me-1"></i> <%= tr('greeting:HELP.DM_TITLE') %></h6>
-            <p class="text-secondary small mb-2"><%= tr('greeting:HELP.DM_TEXT') %></p>
-          </div>
-          <div class="mb-3">
-            <h6><i class="fa-solid fa-user-shield text-success me-1"></i> <%= tr('greeting:HELP.AUTOROLE_TITLE') %></h6>
-            <p class="text-secondary small mb-2"><%= tr('greeting:HELP.AUTOROLE_TEXT') %></p>
-          </div>
-          <div class="mb-3">
-            <h6><i class="fa-solid fa-rocket text-danger me-1"></i> <%= tr('greeting:HELP.BOOST_TITLE') %></h6>
-            <p class="text-secondary small mb-2"><%= tr('greeting:HELP.BOOST_TEXT') %></p>
-          </div>
-          <div class="mb-3">
-            <h6><i class="fa-solid fa-image text-secondary me-1"></i> <%= tr('greeting:HELP.IMAGE_TITLE') %></h6>
-            <p class="text-secondary small mb-2"><%= tr('greeting:HELP.IMAGE_TEXT') %></p>
-          </div>
-          <div class="mb-3">
-            <h6><i class="fa-solid fa-shield-check text-success me-1"></i> <%= tr('greeting:HELP.VERIFICATION_TITLE') %></h6>
-            <p class="text-secondary small mb-2"><%= tr('greeting:HELP.VERIFICATION_TEXT') %></p>
-          </div>
-          <div class="mb-3">
-            <h6><i class="fa-solid fa-icons text-primary me-1"></i> <%= tr('greeting:HELP.REACTION_ROLES_TITLE') %></h6>
-            <p class="text-secondary small mb-2"><%= tr('greeting:HELP.REACTION_ROLES_TEXT') %></p>
-          </div>
-          <div class="mb-3">
-            <h6><i class="fa-solid fa-link text-info me-1"></i> <%= tr('greeting:HELP.INVITE_TRACKING_TITLE') %></h6>
-            <p class="text-secondary small mb-2"><%= tr('greeting:HELP.INVITE_TRACKING_TEXT') %></p>
-          </div>
-          <hr>
-          <h6><i class="fa-solid fa-code me-2"></i><%= tr('greeting:HELP.PLACEHOLDERS_TITLE') %></h6>
-
-          <p class="text-secondary small mb-1"><i class="fa-solid fa-user me-1"></i> <strong>Member</strong></p>
-          <div class="d-flex flex-wrap mb-2" style="gap: 4px;">
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:name}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:nick}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:mention}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:tag}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:avatar}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:id}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:joinedAt}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{member:createdAt}</code>
-          </div>
-
-          <p class="text-secondary small mb-1"><i class="fa-solid fa-server me-1"></i> <strong>Server</strong></p>
-          <div class="d-flex flex-wrap mb-2" style="gap: 4px;">
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:name}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{server}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:memberCount}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{count}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:id}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:icon}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:boostCount}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{guild:boostLevel}</code>
-          </div>
-
-          <p class="text-secondary small mb-1"><i class="fa-solid fa-envelope me-1"></i> <strong>Inviter</strong> <span class="text-secondary">(nur Welcome)</span></p>
-          <div class="d-flex flex-wrap" style="gap: 4px;">
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{inviter:name}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{inviter:tag}</code>
-            <code class="badge bg-light-lt border" style="cursor:pointer; font-size: 0.8em; color: #000;" onclick="copyPH(this)">{invites}</code>
-          </div>
-          <small class="text-secondary d-block mt-1">Klicke zum Kopieren</small>
-        </div>
+      <div class="card-body">
+        <p class="text-secondary"><%= tr('greeting:SETTINGS.AREAS_DESC') %></p>
       </div>
-
-      <!-- Live Preview Card -->
-      <div class="card mt-3" id="previewCard">
-        <div class="card-status-top bg-dark"></div>
-        <div class="card-header">
-          <h3 class="card-title"><i class="fa-solid fa-eye me-2"></i><%= tr('greeting:PREVIEW.TITLE') %></h3>
-        </div>
-        <div class="card-body p-0">
-          <div id="livePreview" style="background: #36393f; padding: 12px; border-radius: 0 0 4px 4px; min-height: 80px;">
-            <div style="display: flex; gap: 12px;">
-              <div style="width: 40px; height: 40px; border-radius: 50%; background: #5865f2; display: flex; align-items: center; justify-content: center;">
-                <span style="color: #fff; font-weight: 700; font-size: 1rem;">D</span>
+      <div class="list-group list-group-flush">
+        <% bereiche.forEach(([titel, pfad, icon, an, hinweis]) => { %>
+          <a href="<%= basis %><%= pfad %>" class="list-group-item list-group-item-action">
+            <div class="d-flex align-items-center">
+              <i class="<%= icon %> me-3 text-secondary"></i>
+              <div class="flex-grow-1">
+                <div><%= tr('greeting:' + titel) %></div>
+                <div class="text-secondary small"><%= tr('greeting:' + hinweis) %></div>
               </div>
-              <div style="flex: 1;">
-                <div style="display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px;">
-                  <span style="color: #fff; font-weight: 600;">FireBot</span>
-                  <span style="background: #5865f2; color: #fff; font-size: 0.55rem; padding: 1px 4px; border-radius: 3px;">BOT</span>
-                  <span style="color: #72767d; font-size: 0.7rem;">Heute um 12:00</span>
-                </div>
-                <div id="previewContent" style="color: #dcddde; font-size: 0.9rem; white-space: pre-wrap;"></div>
-                <div id="previewEmbed" style="margin-top: 4px;"></div>
-              </div>
+              <span class="badge <%= an ? 'bg-success' : 'bg-secondary' %>">
+                <%= an ? tr('greeting:DASHBOARD.ON') : tr('greeting:DASHBOARD.OFF') %>
+              </span>
             </div>
-          </div>
-        </div>
+          </a>
+        <% }); %>
       </div>
     </div>
   </div>
 
-<%- includePluginPartial('greeting', 'greeting-scripts', locals) %>
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-circle-info me-2"></i><%= tr('greeting:HELP.TITLE') %></h3>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary"><%= tr('greeting:SETTINGS.HELP_TEXT') %></p>
+        <a href="<%= basis %>/dashboard" class="btn btn-primary w-100">
+          <i class="fa-solid fa-gauge-high me-2"></i><%= tr('greeting:NAV.DASHBOARD') %>
+        </a>
+      </div>
+    </div>
+  </div>
 </div>

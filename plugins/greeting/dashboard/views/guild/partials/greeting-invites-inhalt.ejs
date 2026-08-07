@@ -1,0 +1,77 @@
+<%#
+  Herausgeloest aus greeting-settings.ejs beim Umbau am 2026-08-07.
+  Erwartet: tr, guildId, settings, channels, roles, inviteMappings, reactionPanels
+%>
+<h4><i class="fa-solid fa-link text-info me-2"></i><%= tr('greeting:INVITE_TRACKING.TITLE') %></h4>
+<p class="text-secondary mb-4"><%= tr('greeting:INVITE_TRACKING.DESC') %></p>
+
+<!-- Add New Mapping -->
+<div class="card">
+    <div class="card-status-top bg-info"></div>
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-plus me-1"></i> <%= tr('greeting:INVITE_TRACKING.ADD_TITLE') %></h3>
+  </div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-4">
+        <label class="form-label"><%= tr('greeting:INVITE_TRACKING.INVITE_CODE') %></label>
+        <input type="text" id="inviteCode" class="form-control" maxlength="50" placeholder="<%= tr('greeting:INVITE_TRACKING.INVITE_CODE_PH') %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label"><%= tr('greeting:INVITE_TRACKING.LABEL') %></label>
+        <input type="text" id="inviteLabel" class="form-control" maxlength="100" placeholder="<%= tr('greeting:INVITE_TRACKING.LABEL_PH') %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label"><%= tr('greeting:INVITE_TRACKING.CONTENT') %></label>
+        <input type="text" id="inviteContent" class="form-control" placeholder="<%= tr('greeting:INVITE_TRACKING.CONTENT_PH') %>">
+      </div>
+    </div>
+    <div class="mt-3 text-end">
+      <button type="button" class="btn btn-info" onclick="addInviteMapping()">
+        <i class="fa-solid fa-plus me-1"></i> <%= tr('greeting:INVITE_TRACKING.BTN_ADD') %>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Existing Mappings -->
+<div class="card">
+  <div class="card-body">
+    <% if (inviteMappings && inviteMappings.length > 0) { %>
+      <table class="table table-hover table-sm">
+        <thead>
+          <tr>
+            <th><%= tr('greeting:INVITE_TRACKING.INVITE_CODE') %></th>
+            <th><%= tr('greeting:INVITE_TRACKING.LABEL') %></th>
+            <th><%= tr('greeting:INVITE_TRACKING.CONTENT') %></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% inviteMappings.forEach(m => { %>
+            <tr id="invite-mapping-<%= m.id %>">
+              <td><code><%= m.invite_code %></code></td>
+              <td><%= m.label || '—' %></td>
+              <td><small class="text-secondary"><%= (m.welcome_content || '').substring(0, 60) %><%= (m.welcome_content || '').length > 60 ? '...' : '' %></small></td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteInviteMapping(<%= m.id %>)">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } else { %>
+      <p class="text-secondary text-center mb-0"><%= tr('greeting:INVITE_TRACKING.EMPTY') %></p>
+    <% } %>
+  </div>
+</div>
+
+<!-- Info -->
+<div class="alert alert-info small">
+  <i class="fa-solid fa-info-circle me-1"></i> <%= tr('greeting:INVITE_TRACKING.INFO') %>
+</div>
+
+
+<!-- Sidebar (4 Spalten) -->

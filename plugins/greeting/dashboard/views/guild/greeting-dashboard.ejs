@@ -1,0 +1,124 @@
+<%- include('partials/greeting-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-gauge-high',
+  titel: tr('greeting:NAV.DASHBOARD'),
+  beschreibung: tr('greeting:DASHBOARD.SUBTITLE')
+}) %>
+
+<%
+  const basis = `/guild/${guildId}/plugins/greeting`;
+
+  /** Die sechs Bereiche mit ihrem Schaltzustand und ihrer Zielseite. */
+  const bereiche = [
+    ['TAB_WELCOME',      settings.welcome.enabled,      '/nachrichten',   'fa-solid fa-hand-wave'],
+    ['TAB_FAREWELL',     settings.farewell.enabled,     '/nachrichten',   'fa-solid fa-door-open'],
+    ['TAB_DM',           settings.dm_welcome.enabled,   '/nachrichten',   'fa-solid fa-envelope'],
+    ['TAB_AUTOROLE',     settings.autorole_ids.length > 0, '/rollen',     'fa-solid fa-user-plus'],
+    ['TAB_BOOST',        settings.boost.enabled,        '/boost',         'fa-solid fa-rocket'],
+    ['TAB_VERIFICATION', settings.verification.enabled, '/verifizierung', 'fa-solid fa-shield-halved']
+  ];
+
+  const aktiv = bereiche.filter(b => b[1]).length;
+%>
+
+<!-- Kennzahlen -->
+<div class="row row-cards mb-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('greeting:DASHBOARD.ACTIVE_AREAS') %></div>
+        <div class="h1 mb-0"><%= aktiv %> / <%= bereiche.length %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('greeting:TAB_AUTOROLE') %></div>
+        <div class="h1 mb-0"><%= settings.autorole_ids.length %></div>
+        <div class="text-secondary small"><%= tr('greeting:DASHBOARD.ROLES_ASSIGNED') %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('greeting:NAV.REACTION_ROLES') %></div>
+        <div class="h1 mb-0"><%= (reactionPanels || []).length %></div>
+        <div class="text-secondary small"><%= tr('greeting:DASHBOARD.PANELS') %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('greeting:NAV.INVITES') %></div>
+        <div class="h1 mb-0"><%= (inviteMappings || []).length %></div>
+        <div class="text-secondary small"><%= tr('greeting:DASHBOARD.MAPPINGS') %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row row-cards">
+  <!-- Was scharf geschaltet ist -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('greeting:DASHBOARD.STATUS_TITLE') %></h3>
+      </div>
+      <div class="list-group list-group-flush">
+        <% bereiche.forEach(([schluessel, an, pfad, icon]) => { %>
+          <a href="<%= basis %><%= pfad %>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+            <span><i class="<%= icon %> me-3 text-secondary"></i><%= tr('greeting:' + schluessel) %></span>
+            <span class="badge <%= an ? 'bg-success' : 'bg-secondary' %>">
+              <%= an ? tr('greeting:DASHBOARD.ON') : tr('greeting:DASHBOARD.OFF') %>
+            </span>
+          </a>
+        <% }); %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reaktionstafeln -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('greeting:NAV.REACTION_ROLES') %></h3>
+        <div class="card-actions">
+          <a href="<%= basis %>/rollen" class="btn btn-sm btn-outline-primary"><%= tr('greeting:DASHBOARD.MANAGE') %></a>
+        </div>
+      </div>
+
+      <% if (reactionPanels && reactionPanels.length > 0) { %>
+        <div class="list-group list-group-flush">
+          <% reactionPanels.forEach(tafel => { %>
+            <div class="list-group-item">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <strong><%= tafel.title || tr('greeting:DASHBOARD.PANEL_UNNAMED') %></strong>
+                  <div class="text-secondary small">
+                    <%= tr('greeting:DASHBOARD.PANEL_ROLES', { count: (tafel.mappings || []).length }) %>
+                  </div>
+                </div>
+                <% if (tafel.message_id) { %>
+                  <span class="badge bg-green-lt"><%= tr('greeting:REACTION_ROLES.STATUS_SENT') %></span>
+                <% } else { %>
+                  <span class="badge bg-orange-lt"><%= tr('greeting:REACTION_ROLES.STATUS_DRAFT') %></span>
+                <% } %>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <div class="card-body">
+          <div class="empty">
+            <div class="empty-icon"><i class="fa-solid fa-face-smile fs-1 text-secondary"></i></div>
+            <p class="empty-title"><%= tr('greeting:DASHBOARD.NO_PANELS') %></p>
+            <p class="empty-subtitle text-secondary"><%= tr('greeting:DASHBOARD.NO_PANELS_HINT') %></p>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>

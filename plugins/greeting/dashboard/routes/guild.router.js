@@ -1,269 +1,74 @@
 /**
- * Greeting Plugin - Guild Settings Router
- * Handles guild-specific greeting settings (Welcome, Farewell, Autorole)
- * 
- * @module greeting/dashboard/routes/guild
- * @author FireBot Team
+ * Greeting - Seitenrouten und JSON-Routen
+ *
+ * Bis zum 2026-08-07 eine einzige Seite mit acht Tabs. Jetzt traegt jeder
+ * Bereich eine eigene Adresse:
+ *
+ *   /                  -> Weiterleitung auf /dashboard
+ *   /dashboard         Uebersicht
+ *   /nachrichten       Begruessung, Verabschiedung und Direktnachricht
+ *   /rollen            Autorollen und Reaktionsrollen
+ *   /verifizierung     Verifizierung neuer Mitglieder
+ *   /boost             Nachricht beim Server-Boost
+ *   /einladungen       Wer ueber welche Einladung kam
+ *   /settings          Schalter je Bereich (unter Kern-Einstellungen)
+ *
+ * @module greeting/routes/guild
  */
 
 const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
+const { makeTranslator, renderView, ladeDaten, renderFehler } = require('./_shared');
+
+/** Skripte anmelden, die eine Seite braucht. */
+function skripteAnmelden(handles) {
+    const assetManager = ServiceManager.get('assetManager');
+    if (!assetManager) return;
+    handles.forEach(h => assetManager.enqueueScript(h));
+}
 
 /**
- * GET /guild/:guildId/plugins/greeting/settings
- * Zeigt Guild-spezifische Greeting-Einstellungen
+ * Eine Seite des Bereichs ausliefern.
+ *
+ * Alle Seiten brauchen denselben Datensatz - der Unterschied liegt nur in der
+ * View. Deshalb eine Fabrik statt sieben fast gleicher Routen.
+ *
+ * @param {string} view Name der View unterhalb von guild/
+ * @param {string} kontext Fehlertext, falls das Laden scheitert
+ * @returns {Function} Express-Handler
  */
-router.get('/settings', requirePermission('GREETING.VIEW'), async (req, res) => {
-    const themeManager = ServiceManager.get('themeManager');
-    const dbService = ServiceManager.get('dbService');
-    const ipcServer = ServiceManager.get('ipcServer');
-    const Logger = ServiceManager.get('Logger');
-    const guildId = res.locals.guildId;
-    
-    try {
-        // IPC-Calls für Channels und Roles parallel ausführen
-        const [channelsResponses, rolesResponses] = await Promise.all([
-            ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS', { guildId }),
-            ipcServer.broadcast('dashboard:GET_GUILD_ROLES', { guildId })
-        ]);
-        
-        // broadcast() gibt Array zurück - nehme erstes Element
-        const channelsResp = channelsResponses && channelsResponses.length > 0 ? channelsResponses[0] : null;
-        const rolesResp = rolesResponses && rolesResponses.length > 0 ? rolesResponses[0] : null;
-        
-        Logger.info('[Greeting] IPC Channels Response:', {
-            received: channelsResponses ? channelsResponses.length : 0,
-            first: channelsResp,
-            channels: channelsResp?.channels?.length || 0
-        });
-        
-        Logger.info('[Greeting] IPC Roles Response:', {
-            received: rolesResponses ? rolesResponses.length : 0,
-            first: rolesResp,
-            roles: rolesResp?.roles?.length || 0
-        });
-        
-        // Greeting Settings aus DB laden
-        const settings = await dbService.query(
-            'SELECT * FROM greeting_settings WHERE guild_id = ?',
-            [guildId]
-        );
-        
-        Logger.info('[Greeting] DB Query Result:', {
-            guildId,
-            rowCount: settings.length,
-            firstRow: settings[0] ? 'EXISTS' : 'NULL',
-            data: settings[0] || 'NO DATA'
-        });
-        
-        const dbSettings = settings[0] || {
-            welcome_enabled: false,
-            welcome_channel: null,
-            welcome_content: null,
-            welcome_embed: null,
-            farewell_enabled: false,
-            farewell_channel: null,
-            farewell_content: null,
-            farewell_embed: null,
-            autorole_id: null,
-            autorole_ids: null,
-            dm_welcome_enabled: false,
-            dm_welcome_content: null,
-            dm_welcome_embed: null,
-            welcome_image_enabled: false,
-            welcome_image_bg: 'default',
-            welcome_image_text: null,
-            welcome_image_color: '#5865f2',
-            boost_enabled: false,
-            boost_channel: null,
-            boost_content: null,
-            boost_embed: null
-        };
-        
-        // Parse JSON-Felder
-        let welcomeEmbed = {
-            title: null,
-            description: null,
-            color: null,
-            thumbnail: null,
-            image: null,
-            fields: [],
-            author: { name: null, iconURL: null },
-            footer: { text: null, iconURL: null },
-            timestamp: false
-        };
-        
-        let farewellEmbed = {
-            title: null,
-            description: null,
-            color: null,
-            thumbnail: null,
-            image: null,
-            fields: [],
-            author: { name: null, iconURL: null },
-            footer: { text: null, iconURL: null },
-            timestamp: false
-        };
-        
-        if (dbSettings.welcome_embed) {
-            try {
-                welcomeEmbed = typeof dbSettings.welcome_embed === 'string' 
-                    ? JSON.parse(dbSettings.welcome_embed) 
-                    : dbSettings.welcome_embed;
-            } catch (e) {
-                Logger.error('[Greeting] Fehler beim Parsen von welcome_embed:', e);
-            }
-        }
-        
-        if (dbSettings.farewell_embed) {
-            try {
-                farewellEmbed = typeof dbSettings.farewell_embed === 'string' 
-                    ? JSON.parse(dbSettings.farewell_embed) 
-                    : dbSettings.farewell_embed;
-            } catch (e) {
-                Logger.error('[Greeting] Fehler beim Parsen von farewell_embed:', e);
-            }
-        }
-        
-        // Parse DM welcome embed
-        let dmWelcomeEmbed = {
-            title: null, description: null, color: null, thumbnail: null, image: null,
-            fields: [], author: { name: null, iconURL: null }, footer: { text: null, iconURL: null }, timestamp: false
-        };
-        if (dbSettings.dm_welcome_embed) {
-            try {
-                dmWelcomeEmbed = typeof dbSettings.dm_welcome_embed === 'string'
-                    ? JSON.parse(dbSettings.dm_welcome_embed)
-                    : dbSettings.dm_welcome_embed;
-            } catch (e) {
-                Logger.error('[Greeting] Fehler beim Parsen von dm_welcome_embed:', e);
-            }
-        }
+function seite(view, kontext) {
+    return async (req, res) => {
+        const guildId = res.locals.guildId;
+        const tr = makeTranslator(req, res);
 
-        // Parse boost embed
-        let boostEmbed = {
-            title: null, description: null, color: null, thumbnail: null, image: null,
-            fields: [], author: { name: null, iconURL: null }, footer: { text: null, iconURL: null }, timestamp: false
-        };
-        if (dbSettings.boost_embed) {
-            try {
-                boostEmbed = typeof dbSettings.boost_embed === 'string'
-                    ? JSON.parse(dbSettings.boost_embed)
-                    : dbSettings.boost_embed;
-            } catch (e) {
-                Logger.error('[Greeting] Fehler beim Parsen von boost_embed:', e);
-            }
-        }
-
-        // Parse autorole_ids
-        let autoroleIds = [];
-        if (dbSettings.autorole_ids) {
-            try {
-                autoroleIds = typeof dbSettings.autorole_ids === 'string'
-                    ? JSON.parse(dbSettings.autorole_ids)
-                    : dbSettings.autorole_ids;
-            } catch { /* ignore */ }
-        }
-        if (autoroleIds.length === 0 && dbSettings.autorole_id) {
-            autoroleIds = [dbSettings.autorole_id];
-        }
-        
-        // Struktur für die View (nested objects wie in guild.ejs erwartet)
-        const greetingSettings = {
-            welcome: {
-                enabled: Boolean(dbSettings.welcome_enabled),
-                channel: dbSettings.welcome_channel || '',
-                content: dbSettings.welcome_content || '',
-                embed: welcomeEmbed
-            },
-            farewell: {
-                enabled: Boolean(dbSettings.farewell_enabled),
-                channel: dbSettings.farewell_channel || '',
-                content: dbSettings.farewell_content || '',
-                embed: farewellEmbed
-            },
-            dm_welcome: {
-                enabled: Boolean(dbSettings.dm_welcome_enabled),
-                content: dbSettings.dm_welcome_content || '',
-                embed: dmWelcomeEmbed
-            },
-            autorole_id: dbSettings.autorole_id || '',
-            autorole_ids: autoroleIds,
-            welcome_image: {
-                enabled: Boolean(dbSettings.welcome_image_enabled),
-                bg: dbSettings.welcome_image_bg || 'default',
-                text: dbSettings.welcome_image_text || '',
-                color: dbSettings.welcome_image_color || '#5865f2'
-            },
-            boost: {
-                enabled: Boolean(dbSettings.boost_enabled),
-                channel: dbSettings.boost_channel || '',
-                content: dbSettings.boost_content || '',
-                embed: boostEmbed
-            },
-            verification: {
-                enabled: Boolean(dbSettings.verification_enabled),
-                channel: dbSettings.verification_channel || '',
-                role_id: dbSettings.verification_role_id || '',
-                type: dbSettings.verification_type || 'button',
-                message: dbSettings.verification_message || '',
-                remove_role_id: dbSettings.verification_remove_role_id || '',
-                emoji: dbSettings.verification_emoji || '✅',
-                success_message: dbSettings.verification_success_message || ''
-            }
-        };
-
-        // Load invite mappings
-        let inviteMappings = [];
         try {
-            inviteMappings = await dbService.query(
-                'SELECT * FROM greeting_invite_mappings WHERE guild_id = ? ORDER BY created_at DESC',
-                [guildId]
-            );
-        } catch { /* table might not exist yet */ }
+            const daten = await ladeDaten(guildId);
+            skripteAnmelden(['greeting-forms']);
 
-        // Load reaction role panels with mappings
-        let reactionPanels = [];
-        try {
-            const panels = await dbService.query(
-                'SELECT * FROM greeting_reaction_panels WHERE guild_id = ? ORDER BY created_at DESC',
-                [guildId]
-            );
-            for (const panel of panels) {
-                const mappings = await dbService.query(
-                    'SELECT * FROM greeting_reaction_roles WHERE panel_id = ?',
-                    [panel.id]
-                );
-                // Resolve role names
-                const rolesData = (rolesResp && rolesResp.success) ? rolesResp.roles : [];
-                panel.mappings = mappings.map(m => ({
-                    ...m,
-                    role_name: rolesData.find(r => r.id === m.role_id)?.name || m.role_id
-                }));
-                reactionPanels.push(panel);
-            }
-        } catch { /* tables might not exist yet */ }
-        
-        await themeManager.renderView(res, 'guild/greeting-settings', {
-            title: 'Greeting Settings',
-            activeMenu: `/guild/${guildId}/plugins/greeting/settings`,
-            guildId,
-            channels: (channelsResp && channelsResp.success) ? channelsResp.channels : [],
-            roles: (rolesResp && rolesResp.success) ? rolesResp.roles : [],
-            settings: greetingSettings,
-            inviteMappings,
-            reactionPanels,
-            tabs: ['Welcome', 'Farewell', 'DM Welcome', 'Autorole', 'Boost', 'Verification', 'Reaction Roles', 'Invite Tracking']
-        });
-        
-    } catch (error) {
-        const Logger = ServiceManager.get('Logger');
-        Logger.error('[Greeting] Fehler beim Laden der Settings:', error);
-        res.status(500).send('Fehler beim Laden der Einstellungen');
-    }
+            await renderView(res, `guild/${view}`, { tr, guildId, ...daten });
+        } catch (error) {
+            return renderFehler(res, error, kontext);
+        }
+    };
+}
+
+// =====================================================
+// Seiten
+// =====================================================
+router.get('/', requirePermission('GREETING.VIEW'), (req, res) => {
+    res.redirect(`/guild/${res.locals.guildId}/plugins/greeting/dashboard`);
 });
+
+router.get('/dashboard',      requirePermission('GREETING.VIEW'), seite('greeting-dashboard',     'Die Greeting-Uebersicht konnte nicht geladen werden'));
+router.get('/nachrichten',    requirePermission('GREETING.VIEW'), seite('greeting-messages',      'Die Nachrichten konnten nicht geladen werden'));
+router.get('/rollen',         requirePermission('GREETING.VIEW'), seite('greeting-roles',         'Die Rollen konnten nicht geladen werden'));
+router.get('/verifizierung',  requirePermission('GREETING.VIEW'), seite('greeting-verification',  'Die Verifizierung konnte nicht geladen werden'));
+router.get('/boost',          requirePermission('GREETING.VIEW'), seite('greeting-boost',         'Die Boost-Nachricht konnte nicht geladen werden'));
+router.get('/einladungen',    requirePermission('GREETING.VIEW'), seite('greeting-invites',       'Die Einladungen konnten nicht geladen werden'));
+router.get('/settings',       requirePermission('GREETING.VIEW'), seite('greeting-settings',      'Die Greeting-Einstellungen konnten nicht geladen werden'));
 
 /**
  * PUT /guild/:guildId/plugins/greeting/settings

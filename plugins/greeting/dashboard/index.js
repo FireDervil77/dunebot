@@ -38,6 +38,7 @@ class GreetingDashboardPlugin extends DashboardPlugin {
         Logger.info('Aktiviere Greeting Dashboard-Plugin...');
 
         this.app = app;
+        this._registerAssets();
         this._setupRoutes();
         this._registerHooks();
         
@@ -78,6 +79,27 @@ class GreetingDashboardPlugin extends DashboardPlugin {
             Logger.error('[Greeting] Fehler beim Einrichten der Routen:', error);
             throw error;
         }
+    }
+
+    /**
+     * Skripte anmelden.
+     *
+     * `greeting-scripts` ist ein View-Partial und bleibt es - der Block haengt
+     * eng an den Formularen. Angemeldet wird hier nur, was seitenweise dazu
+     * kommt.
+     *
+     * @private
+     */
+    _registerAssets() {
+        const assetManager = ServiceManager.get('assetManager');
+        if (!assetManager) return;
+
+        assetManager.registerScript('greeting-forms', 'js/greeting-forms.js', {
+            plugin: 'greeting',
+            deps: [],
+            version: this.version,
+            inFooter: true
+        });
     }
 
     /**
@@ -139,22 +161,108 @@ class GreetingDashboardPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const navigationManager = ServiceManager.get('navigationManager');
 
+        const basis = `/guild/${guildId}/plugins/greeting`;
+        const haupt = navigationManager.menuTypes.MAIN;
+
         const navItems = [
             {
                 title: 'greeting:NAV.GREETING',
-                path: `/guild/${guildId}/plugins/greeting/settings`,
-                icon: 'fa-solid fa-hands',
-                order: 25,
-                parent: `/guild/${guildId}`,
-                type: 'main',
+                url: basis,
+                icon: 'fa-solid fa-hand-sparkles',
+                order: null,
+                type: haupt,
+                capability: 'GREETING.VIEW',
                 visible: true,
-                capability: 'GREETING.VIEW'
+                guildId,
+                parent: null
+            },
+            {
+                title: 'greeting:NAV.DASHBOARD',
+                url: `${basis}/dashboard`,
+                icon: 'fa-solid fa-gauge-high',
+                order: 10,
+                type: haupt,
+                capability: 'GREETING.VIEW',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'greeting:NAV.MESSAGES',
+                url: `${basis}/nachrichten`,
+                icon: 'fa-solid fa-comment-dots',
+                order: 20,
+                type: haupt,
+                capability: 'GREETING.VIEW',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'greeting:NAV.ROLES',
+                url: `${basis}/rollen`,
+                icon: 'fa-solid fa-user-tag',
+                order: 30,
+                type: haupt,
+                capability: 'GREETING.VIEW',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'greeting:NAV.VERIFICATION',
+                url: `${basis}/verifizierung`,
+                icon: 'fa-solid fa-shield-halved',
+                order: 40,
+                type: haupt,
+                capability: 'GREETING.VIEW',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'greeting:NAV.BOOST',
+                url: `${basis}/boost`,
+                icon: 'fa-solid fa-rocket',
+                order: 50,
+                type: haupt,
+                capability: 'GREETING.VIEW',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'greeting:NAV.INVITES',
+                url: `${basis}/einladungen`,
+                icon: 'fa-solid fa-link',
+                order: 60,
+                type: haupt,
+                capability: 'GREETING.VIEW',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            // Einstellungsseite haengt unter den Kern-Einstellungen
+            {
+                title: 'greeting:NAV.GREETING',
+                url: `${basis}/settings`,
+                icon: 'fa-solid fa-hand-sparkles',
+                order: null,
+                type: haupt,
+                capability: 'GREETING.VIEW',
+                visible: true,
+                guildId,
+                parent: `/guild/${guildId}/settings`
             }
         ];
 
         try {
+            // Erst aufraeumen: registerNavigation ueberspringt vorhandene
+            // Eintraege, loescht aber nie - der alte Einzeleintrag stuende
+            // sonst weiter neben dem neuen Bereich.
+            await navigationManager.removeNavigation(this.name, guildId);
             await navigationManager.registerNavigation(this.name, guildId, navItems);
-            Logger.debug('[Greeting] Navigation registriert (unter Dashboard)');
+            Logger.debug(`[Greeting] Navigation registriert (${navItems.length} Eintraege)`);
         } catch (error) {
             Logger.error('[Greeting] Fehler beim Registrieren der Navigation:', error);
         }

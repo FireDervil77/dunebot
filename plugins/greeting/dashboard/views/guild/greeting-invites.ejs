@@ -1,0 +1,10 @@
+<%- include('partials/greeting-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-link',
+  titel: tr('greeting:NAV.INVITES'),
+  beschreibung: tr('greeting:INVITES.SUBTITLE')
+}) %>
+
+<%- include('partials/greeting-invites-inhalt') %>
+
+<%- includePluginPartial('greeting', 'greeting-scripts', locals) %>
