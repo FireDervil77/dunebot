@@ -1,0 +1,93 @@
+<%
+/**
+ * Tabelle laufender oder geplanter Verlosungen.
+ *
+ * Erwartet: tr, channels, eintraege, modus ('laufend' | 'geplant')
+ */
+const kanalName = (id) => {
+  const k = (channels || []).find(c => String(c.id) === String(id));
+  return k ? '#' + k.name : id;
+};
+const zeitpunkt = (w) => w ? new Date(w).toLocaleString('de-DE') : '—';
+%>
+<div class="table-responsive">
+  <table class="table card-table table-vcenter">
+    <thead>
+      <tr>
+        <th><%= tr('giveaway:LIST_PRIZE') %></th>
+        <th><%= tr('giveaway:LIST_CHANNEL') %></th>
+        <th><%= tr('giveaway:LIST_WINNERS') %></th>
+        <% if (modus === 'laufend') { %>
+          <th><%= tr('giveaway:LIST_ENTRIES') %></th>
+          <th><%= tr('giveaway:LIST_ENDS_AT') %></th>
+          <th><%= tr('giveaway:LIST_STATUS') %></th>
+          <th class="text-end"><%= tr('giveaway:LIST_ACTION') %></th>
+        <% } else { %>
+          <th><%= tr('giveaway:LIST_STARTS_AT') %></th>
+          <th class="text-end"><%= tr('giveaway:LIST_ACTION') %></th>
+        <% } %>
+      </tr>
+    </thead>
+    <tbody>
+      <% eintraege.forEach(v => { %>
+        <tr>
+          <td><strong><%= v.prize %></strong></td>
+          <td class="text-secondary"><%= kanalName(v.channel_id) %></td>
+          <td><%= v.winner_count %></td>
+
+          <% if (modus === 'laufend') { %>
+            <td><span class="badge bg-secondary-lt"><%= v.entry_count || 0 %></span></td>
+            <td>
+              <% if (v.ends_at) { %>
+                <span data-countdown="<%= new Date(v.ends_at).toISOString() %>"><%= zeitpunkt(v.ends_at) %></span>
+              <% } else { %>—<% } %>
+            </td>
+            <td>
+              <% if (v.status === 'paused') { %>
+                <span class="badge bg-orange-lt"><%= tr('giveaway:STATUS_PAUSED') %></span>
+              <% } else { %>
+                <span class="badge bg-green-lt"><%= tr('giveaway:STATUS_ACTIVE') %></span>
+              <% } %>
+            </td>
+            <td class="text-end">
+              <div class="btn-list flex-nowrap justify-content-end">
+                <% if (v.status === 'paused') { %>
+                  <button type="button" class="btn btn-sm btn-outline-success"
+                          onclick="giveawayAction(<%= v.id %>, 'resume')"
+                          title="<%= tr('giveaway:BTN_RESUME') %>">
+                    <i class="fa-solid fa-play"></i>
+                  </button>
+                <% } else { %>
+                  <button type="button" class="btn btn-sm btn-outline-warning"
+                          onclick="giveawayAction(<%= v.id %>, 'pause')"
+                          title="<%= tr('giveaway:BTN_PAUSE') %>">
+                    <i class="fa-solid fa-pause"></i>
+                  </button>
+                <% } %>
+                <button type="button" class="btn btn-sm btn-outline-primary"
+                        onclick="giveawayAction(<%= v.id %>, 'end')"
+                        title="<%= tr('giveaway:BTN_END') %>">
+                  <i class="fa-solid fa-flag-checkered"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                        onclick="giveawayAction(<%= v.id %>, 'delete')"
+                        title="<%= tr('giveaway:BTN_DELETE') %>">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          <% } else { %>
+            <td class="text-secondary"><%= zeitpunkt(v.starts_at) %></td>
+            <td class="text-end">
+              <button type="button" class="btn btn-sm btn-outline-danger"
+                      onclick="giveawayAction(<%= v.id %>, 'delete')"
+                      title="<%= tr('giveaway:BTN_DELETE') %>">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </td>
+          <% } %>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>

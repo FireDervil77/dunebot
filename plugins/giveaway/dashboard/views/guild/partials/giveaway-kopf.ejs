@@ -1,0 +1,42 @@
+<%
+/**
+ * Gemeinsamer Seitenkopf der Giveaway-Seiten.
+ *
+ * Erwartet: guildId, tr, titel, beschreibung, icon
+ * Optional:  aktion (HTML fuer eine Schaltflaeche rechts im Kopf)
+ */
+const jsTexte = {
+  FEHLER:              tr('giveaway:JS.FEHLER'),
+  VERLOSUNG_BEENDEN:   tr('giveaway:JS.VERLOSUNG_BEENDEN'),
+  NEU_ZIEHEN:          tr('giveaway:JS.NEU_ZIEHEN'),
+  VERLOSUNG_LOESCHEN:  tr('giveaway:JS.VERLOSUNG_LOESCHEN'),
+  VORLAGE_LOESCHEN:    tr('giveaway:JS.VORLAGE_LOESCHEN'),
+  VORLAGE_GELOESCHT:   tr('giveaway:JS.VORLAGE_GELOESCHT'),
+  SPERRE_AUFHEBEN:     tr('giveaway:JS.SPERRE_AUFHEBEN'),
+  SPERRE_AUFGEHOBEN:   tr('giveaway:JS.SPERRE_AUFGEHOBEN'),
+  ABGELAUFEN:          tr('giveaway:JS.ABGELAUFEN'),
+  ANF_KONTOALTER:      tr('giveaway:JS.ANF_KONTOALTER'),
+  ANF_SERVERZEIT:      tr('giveaway:JS.ANF_SERVERZEIT'),
+  ANF_ROLLE:           tr('giveaway:JS.ANF_ROLLE'),
+  ANF_WERT:            tr('giveaway:JS.ANF_WERT')
+};
+%>
+<div class="page-header d-print-none mb-3"
+     data-giveaway-basis="/guild/<%= guildId %>/plugins/giveaway"
+     data-giveaway-texte="<%= JSON.stringify(jsTexte) %>">
+  <div class="row align-items-center">
+    <div class="col">
+      <div class="page-pretitle"><%= tr('giveaway:TITLE') %></div>
+      <h2 class="page-title">
+        <i class="<%= icon %> me-2"></i>
+        <%= titel %>
+      </h2>
+      <% if (beschreibung) { %>
+        <div class="text-secondary mt-1"><%= beschreibung %></div>
+      <% } %>
+    </div>
+    <% if (typeof aktion !== 'undefined' && aktion) { %>
+      <div class="col-auto ms-auto d-print-none"><%- aktion %></div>
+    <% } %>
+  </div>
+</div>

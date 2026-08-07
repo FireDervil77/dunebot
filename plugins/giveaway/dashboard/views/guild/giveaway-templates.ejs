@@ -1,0 +1,75 @@
+<%- include('partials/giveaway-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-copy',
+  titel: tr('giveaway:NAV.TEMPLATES'),
+  beschreibung: tr('giveaway:TEMPLATES.SUBTITLE'),
+  aktion: `<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTemplateModal">
+             <i class="fa-solid fa-plus me-2"></i>${tr('giveaway:TEMPLATE_CREATE_BTN')}
+           </button>`
+}) %>
+
+<% const minuten = (ms) => Math.round(Number(ms) / 60000); %>
+
+<% if (vorlagen && vorlagen.length > 0) { %>
+  <div class="row row-cards">
+    <% vorlagen.forEach(vorlage => { %>
+      <div class="col-md-6 col-lg-4" id="template-<%= vorlage.id %>">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <i class="fa-solid fa-copy me-2"></i><%= vorlage.name %>
+            </h3>
+          </div>
+          <div class="list-group list-group-flush">
+            <% if (vorlage.config.prize) { %>
+              <div class="list-group-item d-flex justify-content-between">
+                <span class="text-secondary"><%= tr('giveaway:CREATE_PRIZE') %></span>
+                <strong><%= vorlage.config.prize %></strong>
+              </div>
+            <% } %>
+            <% if (vorlage.config.duration) { %>
+              <div class="list-group-item d-flex justify-content-between">
+                <span class="text-secondary"><%= tr('giveaway:CREATE_DURATION') %></span>
+                <strong><%= tr('giveaway:MINUTES', { count: minuten(vorlage.config.duration) }) %></strong>
+              </div>
+            <% } %>
+            <% if (vorlage.config.winner_count) { %>
+              <div class="list-group-item d-flex justify-content-between">
+                <span class="text-secondary"><%= tr('giveaway:CREATE_WINNERS') %></span>
+                <strong><%= vorlage.config.winner_count %></strong>
+              </div>
+            <% } %>
+            <% if (vorlage.config.claim_duration_ms) { %>
+              <div class="list-group-item d-flex justify-content-between">
+                <span class="text-secondary"><%= tr('giveaway:CREATE_CLAIM_DURATION') %></span>
+                <strong><%= tr('giveaway:MINUTES', { count: minuten(vorlage.config.claim_duration_ms) }) %></strong>
+              </div>
+            <% } %>
+          </div>
+          <div class="card-footer text-end">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteTemplate(<%= vorlage.id %>)">
+              <i class="fa-solid fa-trash me-2"></i><%= tr('giveaway:TEMPLATE_DELETE_BTN') %>
+            </button>
+          </div>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+<% } else { %>
+  <div class="card">
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon"><i class="fa-solid fa-copy fs-1 text-secondary"></i></div>
+        <p class="empty-title"><%= tr('giveaway:TEMPLATES_EMPTY') %></p>
+        <p class="empty-subtitle text-secondary"><%= tr('giveaway:TEMPLATES.EMPTY_HINT') %></p>
+        <div class="empty-action">
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTemplateModal">
+            <i class="fa-solid fa-plus me-2"></i><%= tr('giveaway:TEMPLATE_CREATE_BTN') %>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<%- include('partials/giveaway-modals', { tr, channels: [], roles: [], vorlagen, nur: ['vorlage'] }) %>

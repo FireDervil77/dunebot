@@ -1,0 +1,153 @@
+<%- include('partials/giveaway-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-gauge-high',
+  titel: tr('giveaway:NAV.DASHBOARD'),
+  beschreibung: tr('giveaway:DASHBOARD.SUBTITLE'),
+  aktion: `<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGiveawayModal">
+             <i class="fa-solid fa-plus me-2"></i>${tr('giveaway:CREATE_NEW_BTN')}
+           </button>`
+}) %>
+
+<%
+  const basis = `/guild/${guildId}/plugins/giveaway`;
+  const teilnahmen = (laufende || []).reduce((s, v) => s + Number(v.entry_count || 0), 0);
+%>
+
+<!-- Kennzahlen -->
+<div class="row row-cards mb-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('giveaway:NAV.ACTIVE') %></div>
+        <div class="h1 mb-0"><%= (laufende || []).length %></div>
+        <div class="text-secondary small"><%= tr('giveaway:DASHBOARD.SCHEDULED_COUNT', { count: (geplante || []).length }) %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('giveaway:LIST_ENTRIES') %></div>
+        <div class="h1 mb-0"><%= teilnahmen %></div>
+        <div class="text-secondary small"><%= tr('giveaway:DASHBOARD.IN_RUNNING') %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('giveaway:NAV.TEMPLATES') %></div>
+        <div class="h1 mb-0"><%= (vorlagen || []).length %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small"><%= tr('giveaway:NAV.BLACKLIST') %></div>
+        <div class="h1 mb-0"><%= (sperrliste || []).length %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Laufende Verlosungen -->
+<div class="card mb-3">
+  <div class="card-header">
+    <h3 class="card-title"><%= tr('giveaway:LIST_TITLE') %></h3>
+    <div class="card-actions">
+      <a href="<%= basis %>/laufende" class="btn btn-sm btn-outline-primary"><%= tr('giveaway:DASHBOARD.ALL') %></a>
+    </div>
+  </div>
+
+  <% if (laufende && laufende.length > 0) { %>
+    <%- include('partials/giveaway-tabelle', { tr, channels, eintraege: laufende, modus: 'laufend' }) %>
+  <% } else { %>
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon"><i class="fa-solid fa-gift fs-1 text-secondary"></i></div>
+        <p class="empty-title"><%= tr('giveaway:LIST_EMPTY') %></p>
+        <p class="empty-subtitle text-secondary"><%= tr('giveaway:DASHBOARD.EMPTY_HINT') %></p>
+        <div class="empty-action">
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGiveawayModal">
+            <i class="fa-solid fa-plus me-2"></i><%= tr('giveaway:CREATE_NEW_BTN') %>
+          </button>
+        </div>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<div class="row row-cards">
+  <!-- Zuletzt beendet -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('giveaway:RECENT_TITLE') %></h3>
+        <div class="card-actions">
+          <a href="<%= basis %>/beendet" class="btn btn-sm btn-outline-primary"><%= tr('giveaway:DASHBOARD.ALL') %></a>
+        </div>
+      </div>
+      <% if (beendete && beendete.length > 0) { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th><%= tr('giveaway:LIST_PRIZE') %></th>
+                <th><%= tr('giveaway:LIST_WINNERS') %></th>
+                <th class="text-end"><%= tr('giveaway:LIST_ENDED_AT') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% beendete.forEach(v => { %>
+                <tr>
+                  <td><%= v.prize %></td>
+                  <td><span class="badge bg-secondary-lt"><%= (v.winners || []).length %></span></td>
+                  <td class="text-end text-secondary">
+                    <%= v.ended_at ? new Date(v.ended_at).toLocaleString('de-DE') : '—' %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="card-body text-secondary"><%= tr('giveaway:RECENT_EMPTY') %></div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Auswertung in Kurzform -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('giveaway:ANALYTICS_TITLE') %></h3>
+        <div class="card-actions">
+          <a href="<%= basis %>/auswertung" class="btn btn-sm btn-outline-primary"><%= tr('giveaway:DASHBOARD.ALL') %></a>
+        </div>
+      </div>
+      <% if (auswertung) { %>
+        <div class="list-group list-group-flush">
+          <%
+            const kennzahlen = [
+              ['ANALYTICS_TOTAL',        auswertung.total_giveaways],
+              ['ANALYTICS_ACTIVE',       auswertung.active_giveaways],
+              ['ANALYTICS_PARTICIPANTS', auswertung.total_participants],
+              ['ANALYTICS_WINNERS',      auswertung.total_winners]
+            ];
+          %>
+          <% kennzahlen.forEach(([schluessel, wert]) => { %>
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <span><%= tr('giveaway:' + schluessel) %></span>
+              <strong><%= wert || 0 %></strong>
+            </div>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <div class="card-body text-secondary"><%= tr('giveaway:ANALYTICS_EMPTY') %></div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/giveaway-modals', { tr, channels, roles, vorlagen, nur: ['anlegen'] }) %>

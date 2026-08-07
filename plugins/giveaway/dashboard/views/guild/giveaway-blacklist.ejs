@@ -1,0 +1,63 @@
+<%- include('partials/giveaway-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-ban',
+  titel: tr('giveaway:NAV.BLACKLIST'),
+  beschreibung: tr('giveaway:BLACKLIST.SUBTITLE'),
+  aktion: `<button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#addBlacklistModal">
+             <i class="fa-solid fa-plus me-2"></i>${tr('giveaway:BLACKLIST_ADD_BTN')}
+           </button>`
+}) %>
+
+<% const zeitpunkt = (w) => w ? new Date(w).toLocaleString('de-DE') : '—'; %>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">
+      <%= tr('giveaway:BLACKLIST_TITLE') %>
+      <span class="badge bg-secondary-lt ms-2"><%= (sperrliste || []).length %></span>
+    </h3>
+  </div>
+
+  <% if (sperrliste && sperrliste.length > 0) { %>
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter">
+        <thead>
+          <tr>
+            <th><%= tr('giveaway:BLACKLIST_USER') %></th>
+            <th><%= tr('giveaway:BLACKLIST_REASON') %></th>
+            <th><%= tr('giveaway:BLACKLIST_ADDED_BY') %></th>
+            <th><%= tr('giveaway:BLACKLIST_DATE') %></th>
+            <th class="text-end"><%= tr('giveaway:LIST_ACTION') %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% sperrliste.forEach(eintrag => { %>
+            <tr id="blacklist-<%= eintrag.user_id %>">
+              <td class="font-monospace"><%= eintrag.user_id %></td>
+              <td><%= eintrag.reason || '—' %></td>
+              <td class="font-monospace text-secondary small"><%= eintrag.added_by || '—' %></td>
+              <td class="text-secondary"><%= zeitpunkt(eintrag.created_at) %></td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-success"
+                        onclick="removeBlacklist('<%= eintrag.user_id %>')"
+                        title="<%= tr('giveaway:BLACKLIST_REMOVE_BTN') %>">
+                  <i class="fa-solid fa-user-check"></i>
+                </button>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %>
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon"><i class="fa-solid fa-ban fs-1 text-secondary"></i></div>
+        <p class="empty-title"><%= tr('giveaway:BLACKLIST_EMPTY') %></p>
+        <p class="empty-subtitle text-secondary"><%= tr('giveaway:BLACKLIST.EMPTY_HINT') %></p>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/giveaway-modals', { tr, channels: [], roles: [], vorlagen: [], nur: ['sperren'] }) %>

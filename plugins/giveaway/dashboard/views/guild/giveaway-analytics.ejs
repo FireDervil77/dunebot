@@ -1,0 +1,76 @@
+<%- include('partials/giveaway-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-chart-simple',
+  titel: tr('giveaway:NAV.ANALYTICS'),
+  beschreibung: tr('giveaway:ANALYTICS.SUBTITLE')
+}) %>
+
+<% if (!auswertung) { %>
+  <div class="card">
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon"><i class="fa-solid fa-chart-simple fs-1 text-secondary"></i></div>
+        <p class="empty-title"><%= tr('giveaway:ANALYTICS_EMPTY') %></p>
+        <p class="empty-subtitle text-secondary"><%= tr('giveaway:ANALYTICS.EMPTY_HINT') %></p>
+      </div>
+    </div>
+  </div>
+<% } else { %>
+  <%
+    const kennzahlen = [
+      ['ANALYTICS_TOTAL',        auswertung.total_giveaways,    'fa-gift'],
+      ['ANALYTICS_ACTIVE',       auswertung.active_giveaways,   'fa-bolt'],
+      ['ANALYTICS_PARTICIPANTS', auswertung.total_participants, 'fa-users'],
+      ['ANALYTICS_WINNERS',      auswertung.total_winners,      'fa-trophy']
+    ];
+  %>
+
+  <div class="row row-cards mb-3">
+    <% kennzahlen.forEach(([schluessel, wert, icon]) => { %>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <i class="fa-solid <%= icon %> fs-2 text-secondary me-3"></i>
+              <div>
+                <div class="h1 mb-0"><%= wert || 0 %></div>
+                <div class="text-secondary small"><%= tr('giveaway:' + schluessel) %></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+
+  <% if (auswertung.top_entrants && auswertung.top_entrants.length > 0) { %>
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-ranking-star me-2"></i>
+          <%= tr('giveaway:ANALYTICS_TOP_ENTRANTS') %>
+        </h3>
+      </div>
+      <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+          <thead>
+            <tr>
+              <th style="width: 3rem;">#</th>
+              <th><%= tr('giveaway:BLACKLIST_USER') %></th>
+              <th class="text-end"><%= tr('giveaway:ANALYTICS_ENTRIES') %></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% auswertung.top_entrants.forEach((eintrag, i) => { %>
+              <tr>
+                <td class="text-secondary"><%= i + 1 %></td>
+                <td class="font-monospace"><%= eintrag.user_id %></td>
+                <td class="text-end"><span class="badge bg-secondary-lt"><%= eintrag.entry_count %></span></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% } %>
+<% } %>

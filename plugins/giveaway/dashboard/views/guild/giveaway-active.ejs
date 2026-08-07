@@ -1,0 +1,59 @@
+<%- include('partials/giveaway-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-bolt',
+  titel: tr('giveaway:NAV.ACTIVE'),
+  beschreibung: tr('giveaway:ACTIVE.SUBTITLE'),
+  aktion: `<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGiveawayModal">
+             <i class="fa-solid fa-plus me-2"></i>${tr('giveaway:CREATE_NEW_BTN')}
+           </button>`
+}) %>
+
+<!-- Laufende -->
+<div class="card mb-3">
+  <div class="card-header">
+    <h3 class="card-title">
+      <%= tr('giveaway:LIST_TITLE') %>
+      <span class="badge bg-secondary-lt ms-2"><%= (laufende || []).length %></span>
+    </h3>
+  </div>
+
+  <% if (laufende && laufende.length > 0) { %>
+    <%- include('partials/giveaway-tabelle', { tr, channels, eintraege: laufende, modus: 'laufend' }) %>
+  <% } else { %>
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon"><i class="fa-solid fa-gift fs-1 text-secondary"></i></div>
+        <p class="empty-title"><%= tr('giveaway:LIST_EMPTY') %></p>
+        <div class="empty-action">
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGiveawayModal">
+            <i class="fa-solid fa-plus me-2"></i><%= tr('giveaway:CREATE_NEW_BTN') %>
+          </button>
+        </div>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<!-- Geplante -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">
+      <%= tr('giveaway:SCHEDULED_TITLE') %>
+      <span class="badge bg-secondary-lt ms-2"><%= (geplante || []).length %></span>
+    </h3>
+  </div>
+
+  <% if (geplante && geplante.length > 0) { %>
+    <%- include('partials/giveaway-tabelle', { tr, channels, eintraege: geplante, modus: 'geplant' }) %>
+  <% } else { %>
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon"><i class="fa-solid fa-clock fs-1 text-secondary"></i></div>
+        <p class="empty-title"><%= tr('giveaway:SCHEDULED_EMPTY') %></p>
+        <p class="empty-subtitle text-secondary"><%= tr('giveaway:ACTIVE.SCHEDULED_HINT') %></p>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/giveaway-modals', { tr, channels, roles, vorlagen, nur: ['anlegen'] }) %>

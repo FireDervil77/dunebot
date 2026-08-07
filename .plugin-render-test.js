@@ -72,6 +72,51 @@ const FAELLE = {
       leer: { guildId, tr, roles: [], geschuetzteRollen: [] }
     }
   }
+  ,giveaway: {
+    'giveaway-dashboard.ejs': {
+      voll: {
+        guildId, tr, channels: kanaele, roles: rollen,
+        laufende: [{ id: 1, prize: 'Nitro', channel_id: '111', winner_count: 2, entry_count: 12, status: 'active', ends_at: new Date(Date.now() + 3600000) }],
+        geplante: [{ id: 2, prize: 'Key', channel_id: '111', winner_count: 1, starts_at: new Date(Date.now() + 86400000) }],
+        beendete: [{ id: 3, prize: 'Alt', channel_id: '111', winner_count: 1, ended_at: new Date(), winners: ['5'], winner_details: [{ user_id: '5', claim_status: 'claimed' }] }],
+        vorlagen: [{ id: 1, name: 'Standard', config: { prize: 'Nitro', duration: 3600000, winner_count: 1, claim_duration_ms: 1800000 } }],
+        sperrliste: [{ user_id: '9', reason: 'Betrug', added_by: '6', created_at: new Date() }],
+        auswertung: { total_giveaways: 10, active_giveaways: 1, total_participants: 55, total_winners: 8, top_entrants: [{ user_id: '5', entry_count: 9 }] }
+      },
+      leer: {
+        guildId, tr, channels: [], roles: [], laufende: [], geplante: [], beendete: [],
+        vorlagen: [], sperrliste: [], auswertung: null
+      }
+    },
+    'giveaway-active.ejs': {
+      voll: {
+        guildId, tr, channels: kanaele, roles: rollen,
+        laufende: [{ id: 1, prize: 'Nitro', channel_id: '111', winner_count: 2, entry_count: 12, status: 'paused', ends_at: new Date() }],
+        geplante: [{ id: 2, prize: 'Key', channel_id: '111', winner_count: 1, starts_at: new Date() }],
+        vorlagen: [{ id: 1, name: 'Standard', config: { prize: 'Nitro' } }]
+      },
+      leer: { guildId, tr, channels: [], roles: [], laufende: [], geplante: [], vorlagen: [] }
+    },
+    'giveaway-ended.ejs': {
+      voll: {
+        guildId, tr, channels: kanaele,
+        beendete: [{ id: 3, prize: 'Alt', channel_id: '111', ended_at: new Date(), winners: ['5'], winner_details: [{ user_id: '5', claim_status: 'pending' }] }]
+      },
+      leer: { guildId, tr, channels: [], beendete: [] }
+    },
+    'giveaway-templates.ejs': {
+      voll: { guildId, tr, vorlagen: [{ id: 1, name: 'Standard', config: { prize: 'Nitro', duration: 3600000, winner_count: 1, claim_duration_ms: 1800000 } }] },
+      leer: { guildId, tr, vorlagen: [] }
+    },
+    'giveaway-blacklist.ejs': {
+      voll: { guildId, tr, sperrliste: [{ user_id: '9', reason: 'Betrug', added_by: '6', created_at: new Date() }] },
+      leer: { guildId, tr, sperrliste: [] }
+    },
+    'giveaway-analytics.ejs': {
+      voll: { guildId, tr, auswertung: { total_giveaways: 10, active_giveaways: 1, total_participants: 55, total_winners: 8, top_entrants: [{ user_id: '5', entry_count: 9 }] } },
+      leer: { guildId, tr, auswertung: null }
+    }
+  }
 };
 
 const faelle = FAELLE[plugin];

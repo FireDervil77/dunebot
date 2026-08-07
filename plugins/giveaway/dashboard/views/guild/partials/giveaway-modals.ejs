@@ -1,0 +1,239 @@
+<%
+/**
+ * Die drei Dialoge des Giveaway-Bereichs.
+ *
+ * Liegen als Partial, weil sie von mehreren Seiten gebraucht werden: die
+ * Uebersicht und die Seite "Laufende" oeffnen beide den Anlege-Dialog.
+ *
+ * Erwartet: tr, channels, roles, vorlagen
+ * Optional: nur (Liste der gewuenschten Dialoge, Standard: alle drei)
+ */
+const gewuenscht = (typeof nur !== 'undefined' && nur) ? nur : ['anlegen', 'vorlage', 'sperren'];
+
+/** Dauerstufen in Millisekunden, gemeinsam fuer Verlosung und Vorlage. */
+const DAUERN = [
+  ['900000',    'DUR_15M'],
+  ['1800000',   'DUR_30M'],
+  ['3600000',   'DUR_1H'],
+  ['7200000',   'DUR_2H'],
+  ['21600000',  'DUR_6H'],
+  ['43200000',  'DUR_12H'],
+  ['86400000',  'DUR_1D'],
+  ['259200000', 'DUR_3D'],
+  ['604800000', 'DUR_1W']
+];
+
+const CLAIM = [
+  ['300000',   'DUR_5M'],
+  ['900000',   'DUR_15M'],
+  ['1800000',  'DUR_30M'],
+  ['3600000',  'DUR_1H'],
+  ['7200000',  'DUR_2H'],
+  ['43200000', 'DUR_12H'],
+  ['86400000', 'DUR_1D']
+];
+%>
+
+<% if (gewuenscht.includes('anlegen')) { %>
+<div class="modal modal-blur fade" id="createGiveawayModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa-solid fa-gift me-2"></i><%= tr('giveaway:CREATE_TITLE') %></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= tr('giveaway:CREATE_CLOSE_BTN') %>"></button>
+      </div>
+      <form id="createGiveawayForm">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="ga-channel" class="form-label"><%= tr('giveaway:CREATE_CHANNEL') %></label>
+                <select id="ga-channel" name="channel_id" class="form-select" required>
+                  <option value=""><%= tr('giveaway:CREATE_CHANNEL_PLACEHOLDER') %></option>
+                  <% (channels || []).filter(c => c.type === 0).forEach(kanal => { %>
+                    <option value="<%= kanal.id %>">#<%= kanal.name %></option>
+                  <% }); %>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label for="ga-prize" class="form-label"><%= tr('giveaway:CREATE_PRIZE') %></label>
+                <input type="text" id="ga-prize" name="prize" class="form-control"
+                       placeholder="<%= tr('giveaway:CREATE_PRIZE_PLACEHOLDER') %>" required maxlength="256">
+              </div>
+
+              <div class="mb-3">
+                <label for="ga-duration" class="form-label"><%= tr('giveaway:CREATE_DURATION') %></label>
+                <select id="ga-duration" name="duration" class="form-select" required>
+                  <% DAUERN.forEach(([wert, schluessel]) => { %>
+                    <option value="<%= wert %>" <%= wert === '3600000' ? 'selected' : '' %>>
+                      <%= tr('giveaway:' + schluessel) %>
+                    </option>
+                  <% }); %>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label for="ga-winners" class="form-label"><%= tr('giveaway:CREATE_WINNERS') %></label>
+                <input type="number" id="ga-winners" name="winner_count" class="form-control" value="1" min="1" max="20">
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="ga-roles" class="form-label"><%= tr('giveaway:CREATE_MEM_ROLE') %></label>
+                <select id="ga-roles" name="allowed_roles" class="form-select" multiple size="5">
+                  <% (roles || []).filter(r => r.name !== '@everyone').forEach(rolle => { %>
+                    <option value="<%= rolle.id %>"><%= rolle.name %></option>
+                  <% }); %>
+                </select>
+                <div class="form-hint"><%= tr('giveaway:CREATE_MEM_ROLE_DESC') %></div>
+              </div>
+
+              <div class="mb-3">
+                <label for="ga-start" class="form-label"><%= tr('giveaway:CREATE_SCHEDULED') %></label>
+                <input type="datetime-local" id="ga-start" name="scheduled_start" class="form-control">
+                <div class="form-hint"><%= tr('giveaway:CREATE_SCHEDULED_DESC') %></div>
+              </div>
+
+              <div class="mb-3">
+                <label for="ga-claim" class="form-label"><%= tr('giveaway:CREATE_CLAIM_DURATION') %></label>
+                <select id="ga-claim" name="claim_duration" class="form-select">
+                  <option value=""><%= tr('giveaway:CREATE_CLAIM_NONE') %></option>
+                  <% CLAIM.forEach(([wert, schluessel]) => { %>
+                    <option value="<%= wert %>"><%= tr('giveaway:' + schluessel) %></option>
+                  <% }); %>
+                </select>
+                <div class="form-hint"><%= tr('giveaway:CREATE_CLAIM_DESC') %></div>
+              </div>
+
+              <div class="mb-0">
+                <label class="form-label"><%= tr('giveaway:CREATE_REQUIREMENTS') %></label>
+                <div id="requirementsContainer"></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="addRequirement()">
+                  <i class="fa-solid fa-plus me-1"></i><%= tr('giveaway:CREATE_ADD_REQUIREMENT') %>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <% if (vorlagen && vorlagen.length > 0) { %>
+            <hr>
+            <div class="mb-0">
+              <label for="templateSelect" class="form-label"><%= tr('giveaway:CREATE_FROM_TEMPLATE') %></label>
+              <select class="form-select" id="templateSelect" onchange="fillFromTemplate(this.value)">
+                <option value=""><%= tr('giveaway:CREATE_PICK_TEMPLATE') %></option>
+                <% vorlagen.forEach(vorlage => { %>
+                  <option value="<%= JSON.stringify(vorlage.config) %>"><%= vorlage.name %></option>
+                <% }); %>
+              </select>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">
+            <%= tr('giveaway:CREATE_CLOSE_BTN') %>
+          </button>
+          <button type="submit" class="btn btn-primary ms-auto">
+            <i class="fa-solid fa-rocket me-2"></i><%= tr('giveaway:CREATE_BTN') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<% if (gewuenscht.includes('vorlage')) { %>
+<div class="modal modal-blur fade" id="createTemplateModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa-solid fa-copy me-2"></i><%= tr('giveaway:TEMPLATE_CREATE_TITLE') %></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= tr('giveaway:CREATE_CLOSE_BTN') %>"></button>
+      </div>
+      <form id="createTemplateForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="tpl-name" class="form-label"><%= tr('giveaway:TEMPLATE_NAME') %></label>
+            <input type="text" id="tpl-name" name="template_name" class="form-control" required maxlength="100"
+                   placeholder="<%= tr('giveaway:TEMPLATE_NAME_PLACEHOLDER') %>">
+          </div>
+          <div class="mb-3">
+            <label for="tpl-prize" class="form-label"><%= tr('giveaway:CREATE_PRIZE') %></label>
+            <input type="text" id="tpl-prize" name="template_prize" class="form-control" maxlength="256"
+                   placeholder="<%= tr('giveaway:CREATE_PRIZE_PLACEHOLDER') %>">
+          </div>
+          <div class="mb-3">
+            <label for="tpl-duration" class="form-label"><%= tr('giveaway:CREATE_DURATION') %></label>
+            <select id="tpl-duration" name="template_duration" class="form-select">
+              <% ['3600000', '86400000', '259200000', '604800000'].forEach(wert => {
+                   const s = DAUERN.find(d => d[0] === wert); %>
+                <option value="<%= wert %>"><%= tr('giveaway:' + s[1]) %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="tpl-winners" class="form-label"><%= tr('giveaway:CREATE_WINNERS') %></label>
+            <input type="number" id="tpl-winners" name="template_winners" class="form-control" value="1" min="1" max="20">
+          </div>
+          <div class="mb-0">
+            <label for="tpl-claim" class="form-label"><%= tr('giveaway:CREATE_CLAIM_DURATION') %></label>
+            <select id="tpl-claim" name="template_claim" class="form-select">
+              <option value=""><%= tr('giveaway:CREATE_CLAIM_NONE') %></option>
+              <% ['1800000', '3600000', '86400000'].forEach(wert => {
+                   const s = CLAIM.find(c => c[0] === wert); %>
+                <option value="<%= wert %>"><%= tr('giveaway:' + s[1]) %></option>
+              <% }); %>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">
+            <%= tr('giveaway:CREATE_CLOSE_BTN') %>
+          </button>
+          <button type="submit" class="btn btn-primary ms-auto">
+            <i class="fa-solid fa-floppy-disk me-2"></i><%= tr('giveaway:TEMPLATE_SAVE_BTN') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<% if (gewuenscht.includes('sperren')) { %>
+<div class="modal modal-blur fade" id="addBlacklistModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa-solid fa-ban me-2"></i><%= tr('giveaway:BLACKLIST_ADD_TITLE') %></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= tr('giveaway:CREATE_CLOSE_BTN') %>"></button>
+      </div>
+      <form id="addBlacklistForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="bl-user" class="form-label"><%= tr('giveaway:BLACKLIST_USER') %></label>
+            <input type="text" id="bl-user" name="user_id" class="form-control font-monospace" required
+                   placeholder="<%= tr('giveaway:BLACKLIST_USER_PLACEHOLDER') %>">
+          </div>
+          <div class="mb-0">
+            <label for="bl-reason" class="form-label"><%= tr('giveaway:BLACKLIST_REASON') %></label>
+            <input type="text" id="bl-reason" name="reason" class="form-control" maxlength="256"
+                   placeholder="<%= tr('giveaway:BLACKLIST_REASON_PLACEHOLDER') %>">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">
+            <%= tr('giveaway:CREATE_CLOSE_BTN') %>
+          </button>
+          <button type="submit" class="btn btn-danger ms-auto">
+            <i class="fa-solid fa-ban me-2"></i><%= tr('giveaway:BLACKLIST_ADD_BTN') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<% } %>
