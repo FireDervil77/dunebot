@@ -1,0 +1,47 @@
+<%
+/**
+ * Eine Titelzeile - Bild, Name, Quelle, Dauer.
+ *
+ * Erwartet: t (Titel), tr
+ * Optional: nummer, aktionen (HTML)
+ */
+const adresse = t.herkunftUrl || t.url;
+const dauer = (sek) => {
+  if (!sek || sek <= 0) return 'live';
+  const m = Math.floor(sek / 60), s = sek % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
+const quellenFarbe = { youtube: 'red', spotify: 'green', soundcloud: 'orange', direct: 'blue' };
+%>
+<div class="d-flex align-items-center">
+  <% if (typeof nummer !== 'undefined' && nummer !== null) { %>
+    <span class="text-secondary me-3" style="min-width: 1.5rem;"><%= nummer %></span>
+  <% } %>
+
+  <% if (t.thumbnail) { %>
+    <span class="avatar me-3" style="background-image: url('<%= t.thumbnail %>')"></span>
+  <% } else { %>
+    <span class="avatar me-3"><i class="fa-solid fa-music"></i></span>
+  <% } %>
+
+  <div class="flex-grow-1 text-truncate">
+    <div class="text-truncate">
+      <% if (adresse) { %>
+        <a href="<%= adresse %>" target="_blank" rel="noopener"><%= t.title %></a>
+      <% } else { %>
+        <%= t.title %>
+      <% } %>
+    </div>
+    <div class="text-secondary small">
+      <span class="badge bg-<%= quellenFarbe[t.source] || 'secondary' %>-lt"><%= t.source %></span>
+      <span class="ms-2"><%= dauer(t.durationSec) %></span>
+      <% if (t.requestedBy) { %>
+        <span class="ms-2"><%= tr('music:REQUESTED_BY') %> <span class="font-monospace"><%= t.requestedBy %></span></span>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (typeof aktionen !== 'undefined' && aktionen) { %>
+    <div class="ms-3"><%- aktionen %></div>
+  <% } %>
+</div>

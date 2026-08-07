@@ -1,0 +1,60 @@
+{
+  "PLAY": {
+    "DESCRIPTION": "Plays a track or playlist",
+    "INPUT_DESC": "URL or search term",
+    "FIRST_DESC": "Play next"
+  },
+  "SKIP": {
+    "DESCRIPTION": "Skips the current track",
+    "COUNT_DESC": "How many tracks"
+  },
+  "STOP": {
+    "DESCRIPTION": "Stops playback and clears the queue"
+  },
+  "PAUSE": {
+    "DESCRIPTION": "Pauses playback"
+  },
+  "RESUME": {
+    "DESCRIPTION": "Resumes playback"
+  },
+  "DISCONNECT": {
+    "DESCRIPTION": "Leaves the voice channel"
+  },
+  "QUEUE": {
+    "DESCRIPTION": "Shows the queue",
+    "PAGE_DESC": "Page"
+  },
+  "NOWPLAYING": {
+    "DESCRIPTION": "Shows what is playing"
+  },
+  "VOLUME": {
+    "DESCRIPTION": "Sets the volume",
+    "VALUE_DESC": "Value between 0 and 200"
+  },
+  "LOOP": {
+    "DESCRIPTION": "Sets repeat mode",
+    "MODE_DESC": "off, track or queue"
+  },
+  "SHUFFLE": {
+    "DESCRIPTION": "Shuffles the queue"
+  },
+  "REMOVE": {
+    "DESCRIPTION": "Removes a track from the queue",
+    "POSITION_DESC": "Number from /queue"
+  },
+  "FILTER": {
+    "DESCRIPTION": "Sets an audio filter",
+    "NAME_DESC": "Filter name"
+  },
+  "MODE247": {
+    "DESCRIPTION": "Keeps the bot in the voice channel",
+    "STATE_DESC": "On or off"
+  },
+  "AUTOPLAY": {
+    "DESCRIPTION": "Keeps playing when the queue runs empty",
+    "STATE_DESC": "On or off"
+  },
+  "VOTESKIP": {
+    "DESCRIPTION": "Votes to skip"
+  }
+}

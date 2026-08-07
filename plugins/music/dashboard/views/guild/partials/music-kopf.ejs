@@ -1,0 +1,40 @@
+<%
+/**
+ * Gemeinsamer Seitenkopf der Musik-Seiten.
+ *
+ * Erwartet: guildId, tr, titel, beschreibung, icon
+ * Optional:  aktion (HTML rechts im Kopf)
+ */
+const jsTexte = {
+  FEHLER:            tr('music:JS.FEHLER'),
+  EINGABE_FEHLT:     tr('music:JS.EINGABE_FEHLT'),
+  AUFGENOMMEN:       tr('music:JS.AUFGENOMMEN'),
+  ENTFERNT:          tr('music:JS.ENTFERNT'),
+  GESPEICHERT:       tr('music:JS.GESPEICHERT'),
+  LISTE_LOESCHEN:    tr('music:JS.LISTE_LOESCHEN'),
+  LISTE_GELOESCHT:   tr('music:JS.LISTE_GELOESCHT'),
+  TITEL_ENTFERNEN:   tr('music:JS.TITEL_ENTFERNEN'),
+  LISTE_NAME_FEHLT:  tr('music:JS.LISTE_NAME_FEHLT'),
+  STOPPEN_FRAGE:     tr('music:JS.STOPPEN_FRAGE'),
+  TRENNEN_FRAGE:     tr('music:JS.TRENNEN_FRAGE')
+};
+%>
+<div class="page-header d-print-none mb-3"
+     data-music-basis="/guild/<%= guildId %>/plugins/music"
+     data-music-texte="<%= JSON.stringify(jsTexte) %>">
+  <div class="row align-items-center">
+    <div class="col">
+      <div class="page-pretitle"><%= tr('music:TITLE') %></div>
+      <h2 class="page-title">
+        <i class="<%= icon %> me-2"></i>
+        <%= titel %>
+      </h2>
+      <% if (beschreibung) { %>
+        <div class="text-secondary mt-1"><%= beschreibung %></div>
+      <% } %>
+    </div>
+    <% if (typeof aktion !== 'undefined' && aktion) { %>
+      <div class="col-auto ms-auto d-print-none"><%- aktion %></div>
+    <% } %>
+  </div>
+</div>

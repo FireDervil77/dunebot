@@ -1,0 +1,60 @@
+{
+  "PLAY": {
+    "DESCRIPTION": "Spielt einen Titel oder eine Liste ab",
+    "INPUT_DESC": "Adresse oder Suchbegriff",
+    "FIRST_DESC": "Als Nächstes einreihen"
+  },
+  "SKIP": {
+    "DESCRIPTION": "Überspringt den laufenden Titel",
+    "COUNT_DESC": "Wie viele Titel"
+  },
+  "STOP": {
+    "DESCRIPTION": "Beendet die Wiedergabe und leert die Warteschlange"
+  },
+  "PAUSE": {
+    "DESCRIPTION": "Hält die Wiedergabe an"
+  },
+  "RESUME": {
+    "DESCRIPTION": "Setzt die Wiedergabe fort"
+  },
+  "DISCONNECT": {
+    "DESCRIPTION": "Verlässt den Sprachkanal"
+  },
+  "QUEUE": {
+    "DESCRIPTION": "Zeigt die Warteschlange",
+    "PAGE_DESC": "Seite"
+  },
+  "NOWPLAYING": {
+    "DESCRIPTION": "Zeigt, was gerade läuft"
+  },
+  "VOLUME": {
+    "DESCRIPTION": "Setzt die Lautstärke",
+    "VALUE_DESC": "Wert zwischen 0 und 200"
+  },
+  "LOOP": {
+    "DESCRIPTION": "Setzt die Wiederholung",
+    "MODE_DESC": "aus, titel oder liste"
+  },
+  "SHUFFLE": {
+    "DESCRIPTION": "Mischt die Warteschlange"
+  },
+  "REMOVE": {
+    "DESCRIPTION": "Nimmt einen Titel aus der Warteschlange",
+    "POSITION_DESC": "Nummer aus /queue"
+  },
+  "FILTER": {
+    "DESCRIPTION": "Setzt einen Klangfilter",
+    "NAME_DESC": "Name des Filters"
+  },
+  "MODE247": {
+    "DESCRIPTION": "Lässt den Bot dauerhaft im Sprachkanal",
+    "STATE_DESC": "An oder aus"
+  },
+  "AUTOPLAY": {
+    "DESCRIPTION": "Spielt weiter, wenn die Warteschlange leer läuft",
+    "STATE_DESC": "An oder aus"
+  },
+  "VOTESKIP": {
+    "DESCRIPTION": "Stimmt fürs Überspringen ab"
+  }
+}

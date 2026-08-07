@@ -1,0 +1,114 @@
+<%- include('partials/music-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-clock-rotate-left',
+  titel: tr('music:NAV.HISTORY'),
+  beschreibung: tr('music:HISTORY.SUBTITLE')
+}) %>
+
+<% const zeitpunkt = (w) => w ? new Date(w).toLocaleString('de-DE') : '—'; %>
+
+<div class="row row-cards mb-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="text-secondary small"><%= tr('music:HISTORY.TRACKS') %></div>
+      <div class="h1 mb-0"><%= statistik.gesamt %></div>
+      <div class="text-secondary small"><%= tr('music:HISTORY.LAST_DAYS', { count: tage }) %></div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="text-secondary small"><%= tr('music:HISTORY.PLAYTIME') %></div>
+      <div class="h1 mb-0"><%= spielzeitText(statistik.spielzeitSek) %></div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-6">
+    <div class="card"><div class="card-body">
+      <div class="text-secondary small mb-2"><%= tr('music:HISTORY.BY_SOURCE') %></div>
+      <% if ((statistik.nachQuelle || []).length > 0) { %>
+        <% statistik.nachQuelle.forEach(q => { %>
+          <span class="badge bg-secondary-lt me-1"><%= q.source %>: <%= q.anzahl %></span>
+        <% }); %>
+      <% } else { %>
+        <span class="text-secondary">—</span>
+      <% } %>
+    </div></div>
+  </div>
+</div>
+
+<div class="row row-cards">
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('music:HISTORY.TOP') %></h3>
+        <div class="card-actions">
+          <select class="form-select form-select-sm" id="music-zeitraum" style="width: auto;">
+            <% [7, 30, 90, 365].forEach(w => { %>
+              <option value="<%= w %>" <%= tage === w ? 'selected' : '' %>>
+                <%= tr('music:HISTORY.LAST_DAYS', { count: w }) %>
+              </option>
+            <% }); %>
+          </select>
+        </div>
+      </div>
+      <% if ((statistik.top || []).length > 0) { %>
+        <div class="list-group list-group-flush">
+          <% statistik.top.forEach((t, i) => { %>
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <div class="text-truncate">
+                <span class="text-secondary me-2"><%= i + 1 %>.</span>
+                <% if (t.url) { %>
+                  <a href="<%= t.url %>" target="_blank" rel="noopener"><%= t.title %></a>
+                <% } else { %><%= t.title %><% } %>
+              </div>
+              <span class="badge bg-secondary-lt ms-2"><%= t.anzahl %>×</span>
+            </div>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <div class="card-body text-secondary"><%= tr('music:HISTORY.EMPTY') %></div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('music:HISTORY.RECENT') %></h3>
+      </div>
+      <% if (verlauf && verlauf.length > 0) { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th><%= tr('music:HISTORY.TRACK') %></th>
+                <th><%= tr('music:HISTORY.SOURCE') %></th>
+                <th class="text-end"><%= tr('music:HISTORY.WHEN') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% verlauf.forEach(e => { %>
+                <tr>
+                  <td class="text-truncate" style="max-width: 22rem;">
+                    <% if (e.url) { %>
+                      <a href="<%= e.url %>" target="_blank" rel="noopener"><%= e.title %></a>
+                    <% } else { %><%= e.title %><% } %>
+                  </td>
+                  <td><span class="badge bg-secondary-lt"><%= e.source %></span></td>
+                  <td class="text-end text-secondary"><%= zeitpunkt(e.played_at) %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="card-body">
+          <div class="empty">
+            <div class="empty-icon"><i class="fa-solid fa-clock-rotate-left fs-1 text-secondary"></i></div>
+            <p class="empty-title"><%= tr('music:HISTORY.EMPTY') %></p>
+            <p class="empty-subtitle text-secondary"><%= tr('music:HISTORY.EMPTY_HINT') %></p>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>

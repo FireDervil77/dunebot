@@ -1,0 +1,229 @@
+<%- include('partials/music-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-play',
+  titel: tr('music:NAV.DASHBOARD'),
+  beschreibung: tr('music:DASHBOARD.SUBTITLE')
+}) %>
+
+<%
+  const basis = `/guild/${guildId}/plugins/music`;
+  const dauer = (sek) => {
+    if (!sek || sek <= 0) return 'live';
+    const m = Math.floor(sek / 60), s = sek % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+  const t = zustand.aktuell;
+%>
+
+<% if (!zustand.botErreichbar) { %>
+  <div class="alert alert-warning" role="alert">
+    <div class="d-flex align-items-center">
+      <i class="fa-solid fa-plug-circle-xmark fs-2 me-3"></i>
+      <div>
+        <h4 class="alert-title mb-1"><%= tr('music:DASHBOARD.BOT_WEG') %></h4>
+        <div class="text-secondary"><%= tr('music:DASHBOARD.BOT_WEG_HINT') %></div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<div class="row row-cards">
+  <!-- Was gerade laeuft -->
+  <div class="col-lg-7">
+    <div class="card" id="music-spieler">
+      <div class="card-header">
+        <h3 class="card-title">
+          <%= zustand.pausiert ? tr('music:DASHBOARD.PAUSED') : tr('music:DASHBOARD.NOW_PLAYING') %>
+        </h3>
+        <div class="card-actions">
+          <% if (zustand.verbunden) { %>
+            <span class="badge bg-green-lt"><i class="fa-solid fa-volume-high me-1"></i><%= tr('music:DASHBOARD.CONNECTED') %></span>
+          <% } else { %>
+            <span class="badge bg-secondary-lt"><%= tr('music:DASHBOARD.NOT_CONNECTED') %></span>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <% if (t) { %>
+          <div class="d-flex align-items-center mb-3">
+            <% if (t.thumbnail) { %>
+              <span class="avatar avatar-lg me-3" style="background-image: url('<%= t.thumbnail %>')"></span>
+            <% } else { %>
+              <span class="avatar avatar-lg me-3"><i class="fa-solid fa-music"></i></span>
+            <% } %>
+            <div class="flex-grow-1 text-truncate">
+              <h3 class="mb-1 text-truncate">
+                <a href="<%= t.herkunftUrl || t.url %>" target="_blank" rel="noopener"><%= t.title %></a>
+              </h3>
+              <div class="text-secondary">
+                <span class="badge bg-secondary-lt"><%= t.source %></span>
+                <span class="ms-2" id="music-position"><%= dauer(t.positionSek) %> / <%= dauer(t.durationSec) %></span>
+              </div>
+            </div>
+          </div>
+
+          <% if (t.durationSec > 0) { %>
+            <div class="progress mb-3" style="height: .5rem;">
+              <div class="progress-bar" id="music-balken"
+                   style="width: <%= Math.min(100, Math.round((t.positionSek / t.durationSec) * 100)) %>%"></div>
+            </div>
+          <% } %>
+        <% } else { %>
+          <div class="empty">
+            <div class="empty-icon"><i class="fa-solid fa-music fs-1 text-secondary"></i></div>
+            <p class="empty-title"><%= tr('music:DASHBOARD.NOTHING') %></p>
+            <p class="empty-subtitle text-secondary"><%= tr('music:DASHBOARD.NOTHING_HINT') %></p>
+          </div>
+        <% } %>
+
+        <!-- Steuerung -->
+        <div class="btn-list justify-content-center mb-3">
+          <button type="button" class="btn btn-icon" onclick="musicSteuern('pause')" title="<%= tr('music:BTN.PAUSE') %>">
+            <i class="fa-solid fa-pause"></i>
+          </button>
+          <button type="button" class="btn btn-icon" onclick="musicSteuern('fortsetzen')" title="<%= tr('music:BTN.RESUME') %>">
+            <i class="fa-solid fa-play"></i>
+          </button>
+          <button type="button" class="btn btn-icon" onclick="musicSteuern('ueberspringen')" title="<%= tr('music:BTN.SKIP') %>">
+            <i class="fa-solid fa-forward-step"></i>
+          </button>
+          <button type="button" class="btn btn-icon" onclick="musicSteuern('mischen')" title="<%= tr('music:BTN.SHUFFLE') %>">
+            <i class="fa-solid fa-shuffle"></i>
+          </button>
+          <button type="button" class="btn btn-icon btn-outline-danger" onclick="musicStoppen()" title="<%= tr('music:BTN.STOP') %>">
+            <i class="fa-solid fa-stop"></i>
+          </button>
+          <button type="button" class="btn btn-icon btn-outline-danger" onclick="musicTrennen()" title="<%= tr('music:BTN.DISCONNECT') %>">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+
+        <!-- Lautstaerke -->
+        <div class="mb-3">
+          <label for="music-lautstaerke" class="form-label">
+            <%= tr('music:VOLUME') %> <span id="music-lautstaerke-wert"><%= zustand.lautstaerke %></span>%
+          </label>
+          <input type="range" class="form-range" id="music-lautstaerke"
+                 min="0" max="200" step="5" value="<%= zustand.lautstaerke %>">
+        </div>
+
+        <!-- Wiederholung und Filter -->
+        <div class="row">
+          <div class="col-sm-6 mb-2">
+            <label for="music-wiederholung" class="form-label"><%= tr('music:LOOP') %></label>
+            <select class="form-select" id="music-wiederholung">
+              <% [['aus', 'LOOP_OFF'], ['titel', 'LOOP_TRACK'], ['liste', 'LOOP_QUEUE']].forEach(([wert, schluessel]) => { %>
+                <option value="<%= wert %>" <%= zustand.wiederholung === wert ? 'selected' : '' %>>
+                  <%= tr('music:' + schluessel) %>
+                </option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="col-sm-6 mb-2">
+            <label for="music-filter" class="form-label"><%= tr('music:FILTER') %></label>
+            <select class="form-select" id="music-filter">
+              <% filter.forEach(f => { %>
+                <option value="<%= f.wert %>" <%= zustand.filter === f.wert ? 'selected' : '' %>><%= f.name %></option>
+              <% }); %>
+            </select>
+            <div class="form-hint"><%= tr('music:FILTER_HINT') %></div>
+          </div>
+        </div>
+
+        <!-- Dauerbetrieb und Autoplay -->
+        <div class="row mt-2">
+          <div class="col-sm-6">
+            <label class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" id="music-dauerbetrieb"
+                     <%= zustand.dauerbetrieb ? 'checked' : '' %>>
+              <span class="form-check-label"><%= tr('music:MODE247') %></span>
+            </label>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" id="music-autoplay"
+                     <%= zustand.autoplay ? 'checked' : '' %>>
+              <span class="form-check-label"><%= tr('music:AUTOPLAY') %></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Etwas hinzufuegen -->
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('music:ADD.TITLE') %></h3>
+      </div>
+      <div class="card-body">
+        <div class="input-group">
+          <input type="text" class="form-control" id="music-eingabe"
+                 placeholder="<%= tr('music:ADD.PLACEHOLDER') %>">
+          <button type="button" class="btn btn-primary" onclick="musicHinzufuegen(false)">
+            <i class="fa-solid fa-plus me-2"></i><%= tr('music:ADD.BUTTON') %>
+          </button>
+          <button type="button" class="btn btn-outline-primary" onclick="musicHinzufuegen(true)"
+                  title="<%= tr('music:ADD.FIRST') %>">
+            <i class="fa-solid fa-arrow-up"></i>
+          </button>
+        </div>
+        <div class="form-hint mt-2"><%= tr('music:ADD.HINT') %></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Als Naechstes und Zahlen -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <%= tr('music:DASHBOARD.NEXT_UP') %>
+          <span class="badge bg-secondary-lt ms-2"><%= zustand.warteschlangeLaenge %></span>
+        </h3>
+        <div class="card-actions">
+          <a href="<%= basis %>/warteschlange" class="btn btn-sm btn-outline-primary"><%= tr('music:DASHBOARD.ALL') %></a>
+        </div>
+      </div>
+
+      <% if (zustand.warteschlange && zustand.warteschlange.length > 0) { %>
+        <div class="list-group list-group-flush">
+          <% zustand.warteschlange.slice(0, 8).forEach((eintrag, i) => { %>
+            <div class="list-group-item">
+              <%- include('partials/music-titelzeile', { t: eintrag, tr, nummer: i + 1 }) %>
+            </div>
+          <% }); %>
+        </div>
+        <div class="card-footer text-secondary">
+          <%= tr('music:DASHBOARD.REMAINING', { zeit: spielzeitText(zustand.restspielzeitSek) }) %>
+        </div>
+      <% } else { %>
+        <div class="card-body text-secondary"><%= tr('music:QUEUE.EMPTY') %></div>
+      <% } %>
+    </div>
+
+    <% if (statistik) { %>
+      <div class="card mt-3">
+        <div class="card-header">
+          <h3 class="card-title"><%= tr('music:DASHBOARD.STATS_30') %></h3>
+        </div>
+        <div class="list-group list-group-flush">
+          <div class="list-group-item d-flex justify-content-between">
+            <span class="text-secondary"><%= tr('music:HISTORY.TRACKS') %></span>
+            <strong><%= statistik.gesamt %></strong>
+          </div>
+          <div class="list-group-item d-flex justify-content-between">
+            <span class="text-secondary"><%= tr('music:HISTORY.PLAYTIME') %></span>
+            <strong><%= spielzeitText(statistik.spielzeitSek) %></strong>
+          </div>
+          <% (statistik.nachQuelle || []).forEach(q => { %>
+            <div class="list-group-item d-flex justify-content-between">
+              <span class="badge bg-secondary-lt"><%= q.source %></span>
+              <span><%= q.anzahl %></span>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>

@@ -1,0 +1,55 @@
+{
+  "plugin": "music",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "MUSIC.VIEW",
+      "name": "Musik ansehen",
+      "description": "Berechtigung um den Musik-Bereich zu oeffnen",
+      "category": "music",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "MUSIC.PLAY",
+      "name": "Titel hinzufuegen",
+      "description": "Berechtigung um vom Dashboard aus Titel in die Warteschlange zu legen",
+      "category": "music",
+      "is_dangerous": 0,
+      "requires": "MUSIC.VIEW"
+    },
+    {
+      "key": "MUSIC.CONTROL",
+      "name": "Wiedergabe steuern",
+      "description": "Berechtigung um anzuhalten, zu ueberspringen, zu stoppen und die Lautstaerke zu setzen",
+      "category": "music",
+      "is_dangerous": 0,
+      "requires": "MUSIC.VIEW"
+    },
+    {
+      "key": "MUSIC.PLAYLISTS.MANAGE",
+      "name": "Wiedergabelisten verwalten",
+      "description": "Berechtigung um Wiedergabelisten anzulegen, zu aendern und zu loeschen",
+      "category": "music",
+      "is_dangerous": 0,
+      "requires": "MUSIC.VIEW"
+    },
+    {
+      "key": "MUSIC.HISTORY.VIEW",
+      "name": "Verlauf ansehen",
+      "description": "Berechtigung um zu sehen, was gespielt wurde",
+      "category": "music",
+      "is_dangerous": 0,
+      "requires": "MUSIC.VIEW"
+    },
+    {
+      "key": "MUSIC.SETTINGS.EDIT",
+      "name": "Musik-Einstellungen bearbeiten",
+      "description": "Berechtigung um DJ-Rolle, Quellen, Filter und Grenzwerte zu setzen",
+      "category": "music",
+      "is_dangerous": 0,
+      "requires": "MUSIC.VIEW"
+    }
+  ],
+  "default_groups": {}
+}
