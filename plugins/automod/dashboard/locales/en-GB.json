@@ -71,11 +71,11 @@
     },
     "ANTI_INVITES": {
       "LABEL": "Anti-Invites",
-      "HELP": "Deletes messages containing Discord invites. Has no effect while Anti-Links is on — that already covers invites."
+      "HELP": "Deletes messages containing Discord invites. Works independently of Anti-Links — an invite always counts as an invite, not as a link."
     },
     "ANTI_LINKS": {
       "LABEL": "Anti-Links",
-      "HELP": "Deletes messages containing links. Also disables Anti-Invites, because links already cover them."
+      "HELP": "Deletes messages containing links. Discord invites are excluded; Anti-Invites handles those."
     },
     "LIMITS": {
       "TITLE": "Limits & Thresholds"

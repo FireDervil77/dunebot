@@ -71,11 +71,11 @@
     },
     "ANTI_INVITES": {
       "LABEL": "Anti-Einladungen",
-      "HELP": "Löscht automatisch Nachrichten mit Discord-Einladungen. Wirkungslos, solange Anti-Links an ist — das erfasst Einladungen bereits."
+      "HELP": "Löscht Nachrichten mit Discord-Einladungen. Wirkt unabhängig von Anti-Links — eine Einladung gilt immer als Einladung, nicht als Link."
     },
     "ANTI_LINKS": {
       "LABEL": "Anti-Links",
-      "HELP": "Löscht automatisch Nachrichten mit Links. Schaltet Anti-Einladungen mit ab, weil Links diese bereits abdecken."
+      "HELP": "Löscht Nachrichten mit Links. Discord-Einladungen sind davon ausgenommen, die regelt Anti-Einladungen."
     },
     "LIMITS": {
       "TITLE": "Limits & Schwellenwerte"

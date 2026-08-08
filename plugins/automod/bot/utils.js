@@ -154,6 +154,29 @@ function pruefeSpam(message, settings) {
 }
 
 /**
+ * Discord-Einladungen im Text - dieselben Formen, die
+ * `MiscUtils.containsDiscordInvite` erkennt, nur als globale Fassung zum
+ * Herausschneiden. Die Punkte sind hier ordentlich maskiert.
+ */
+const EINLADUNG_MUSTER = /(https?:\/\/)?(www\.)?(discord\.(gg|io|me|li|link|plus)|discorda?p?p?\.com\/invite|invite\.gg|dsc\.gg|urlcord\.cf)\/[^\s/]+/gi;
+
+/**
+ * Den Text ohne seine Discord-Einladungen liefern.
+ *
+ * Damit laesst sich die Frage "steht hier ausser der Einladung noch ein Link?"
+ * sauber beantworten. Ohne das verschluckte der Linkfilter jede Einladung:
+ * `https://discord.gg/abc` ist nun einmal auch ein Link, und weil der
+ * Einladungsfilter zusaetzlich an `!anti_links` haengt, wurde die Einladung als
+ * "Links gefunden" protokolliert - die Meldung log also auch noch.
+ *
+ * @param {string} text Nachrichtentext
+ * @returns {string} Text ohne Einladungen
+ */
+function ohneEinladungen(text) {
+    return String(text || '').replace(EINLADUNG_MUSTER, ' ');
+}
+
+/**
  * Praefix je Guild, kurz zwischengespeichert.
  *
  * `dbService.getConfigs` fragt jedes Mal die Datenbank - und das hier laeuft
@@ -226,6 +249,7 @@ function shouldModerate(message) {
 module.exports = {
     nachrichtenVerlauf,
     pruefeSpam,
+    ohneEinladungen,
     istBefehlsnachricht,
     starteVerlaufAufraeumer,
     stoppeVerlaufAufraeumer,

@@ -1,6 +1,6 @@
 const { MiscUtils, Logger, EmbedUtils } = require("dunebot-sdk/utils");
 const { parsePlaceholders } = require("dunebot-core");
-const { pruefeSpam, istBefehlsnachricht, shouldModerate } = require("../utils");
+const { pruefeSpam, ohneEinladungen, istBefehlsnachricht, shouldModerate } = require("../utils");
 const { AutoModSettings, AutoModStrikes, AutoModLogs, AutoModEscalation, AutoModExemptions, AutoModRegexRules, AutoModCompoundRules } = require("../../shared/models");
 const { loadKeywordLists } = require("../keywordLoader");
 
@@ -146,17 +146,41 @@ module.exports = async (message) => {
         }
     }
 
-    // Anti links
-    if (settings.anti_links) {
-        if (MiscUtils.containsLink(content)) {
-            fields.push({
-                name: guild.getT("automod:HANDLER.FIELD_LINKS"),
-                value: "✓",
-                inline: true,
-            });
-            shouldDelete = true;
-            strikesTotal += 1;
-        }
+    // ════════════════════════════════════════════════════════════════════════
+    // Einladungen und Links - zwei Filter, zwei Zustaendigkeiten
+    //
+    // Vorher verschluckte der Linkfilter jede Einladung: `https://discord.gg/x`
+    // ist nun einmal auch ein Link. Weil der Einladungsfilter zusaetzlich an
+    // `!anti_links` haengte, war er dabei abgeschaltet - die Einladung wurde als
+    // "Links gefunden" protokolliert, und wer nur Einladungen sperren wollte,
+    // musste den Linkfilter ausschalten.
+    //
+    // Jetzt gilt: **Eine Einladung ist eine Einladung.** Sie gehoert dem
+    // Einladungsfilter, der Linkfilter fasst sie nicht an. Fuer die Linkpruefung
+    // wird der Text ohne seine Einladungen betrachtet - eine Nachricht mit
+    // Einladung *und* gewoehnlichem Link loest damit beides aus, je nachdem,
+    // welche Schalter an sind.
+    // ════════════════════════════════════════════════════════════════════════
+    const hatEinladung = MiscUtils.containsDiscordInvite(content);
+
+    if (settings.anti_invites && hatEinladung) {
+        fields.push({
+            name: guild.getT("automod:HANDLER.FIELD_INVITES"),
+            value: "✓",
+            inline: true,
+        });
+        shouldDelete = true;
+        strikesTotal += 1;
+    }
+
+    if (settings.anti_links && MiscUtils.containsLink(ohneEinladungen(content))) {
+        fields.push({
+            name: guild.getT("automod:HANDLER.FIELD_LINKS"),
+            value: "✓",
+            inline: true,
+        });
+        shouldDelete = true;
+        strikesTotal += 1;
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -181,19 +205,6 @@ module.exports = async (message) => {
                         count: spam.anzahl,
                         limit: spam.grenze,
                     }),
-                inline: true,
-            });
-            shouldDelete = true;
-            strikesTotal += 1;
-        }
-    }
-
-    // Anti Invites
-    if (!settings.anti_links && settings.anti_invites) {
-        if (MiscUtils.containsDiscordInvite(content)) {
-            fields.push({
-                name: guild.getT("automod:HANDLER.FIELD_INVITES"),
-                value: "✓",
                 inline: true,
             });
             shouldDelete = true;
