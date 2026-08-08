@@ -110,6 +110,10 @@ function titel(roh) {
         suchbegriff: roh.suchbegriff || null,
         // Bei Spotify die urspruengliche Adresse, sonst dieselbe wie url
         herkunftUrl: roh.herkunftUrl || roh.url || null,
+        // Nur bei hochgeladenen Dateien gesetzt. Der Abspieler traegt damit den
+        // Zeitstempel nach, an dem die Aufbewahrung haengt - aus dem Pfad
+        // zurueckzurechnen waere unnoetig zerbrechlich.
+        dateiId: roh.dateiId || null,
         requestedBy: roh.requestedBy || null
     };
 }
@@ -224,10 +228,58 @@ async function ueberSpotifyVerfeinern(text, e) {
 }
 
 /**
+ * Eine hochgeladene Tondatei zu einem Titel machen.
+ *
+ * Der Wert von `url` ist hier ein **Pfad auf der Platte**, keine Adresse. Das
+ * ist Absicht: Alles Weitere - Warteschlange, Verlauf, Wiederholung - arbeitet
+ * mit `url` als Kennung, und ein Pfad ist eine genauso brauchbare Kennung wie
+ * eine Adresse. Erkannt wird der Unterschied an `source === 'datei'`.
+ *
+ * Die Guild wird ausdruecklich gegengeprueft: Aus `datei:17` allein liesse sich
+ * sonst die Datei einer fremden Guild abspielen, indem man die Nummer raet.
+ *
+ * @param {string} id Datensatz-ID als Text
+ * @param {string} guildId Guild, die abspielen will
+ * @param {string|null} angefordertVon Wer es angefordert hat
+ * @returns {Promise<{titel: Array, quelle: string, hinweis: string|null}>}
+ */
+async function ausDatei(id, guildId, angefordertVon) {
+    const { MusicFiles } = require('../../shared/models');
+    const { pfadFuer } = require('../../shared/dateien');
+    const { existsSync } = require('fs');
+
+    const datensatz = await MusicFiles.getById(Number(id));
+
+    if (!datensatz) return { titel: [], quelle: 'datei', hinweis: 'DATEI_FEHLT' };
+    if (guildId && String(datensatz.guild_id) !== String(guildId)) {
+        return { titel: [], quelle: 'datei', hinweis: 'DATEI_FEHLT' };
+    }
+
+    const pfad = pfadFuer(datensatz.guild_id, datensatz.dateiname);
+
+    // Eintrag ohne Datei: kommt vor, wenn jemand von Hand aufgeraeumt hat.
+    // Besser hier ehrlich melden als im Sprachkanal verstummen.
+    if (!pfad || !existsSync(pfad)) return { titel: [], quelle: 'datei', hinweis: 'DATEI_FEHLT' };
+
+    return {
+        quelle: 'datei',
+        hinweis: null,
+        titel: [titel({
+            title: datensatz.originalname,
+            url: pfad,
+            source: 'datei',
+            durationSec: datensatz.dauer_sek || null,
+            dateiId: datensatz.id,
+            requestedBy: angefordertVon
+        })]
+    };
+}
+
+/**
  * Eingabe aufloesen.
  *
  * @param {string} eingabe Adresse oder Suchbegriff
- * @param {Object} optionen { angefordertVon, einstellungen }
+ * @param {Object} optionen { angefordertVon, einstellungen, guildId }
  * @returns {Promise<{titel: Array, quelle: string, hinweis: string|null}>}
  */
 async function aufloesen(eingabe, optionen = {}) {
@@ -237,6 +289,16 @@ async function aufloesen(eingabe, optionen = {}) {
     const text = String(eingabe || '').trim();
 
     if (!text) return { titel: [], quelle: 'leer', hinweis: 'KEINE_EINGABE' };
+
+    // --- Eigene Tondatei ---
+    // `datei:<id>` kommt aus dem Dashboard. Die Aufloesung gehoert hierher und
+    // nicht in die Route: So laeuft eine hochgeladene Datei durch genau
+    // denselben Weg wie jede Adresse - Warteschlange, Verlauf, Wiederholung und
+    // Wiedergabelisten brauchen keine Sonderbehandlung.
+    const dateiTreffer = /^datei:(\d+)$/i.exec(text);
+    if (dateiTreffer) {
+        return await ausDatei(dateiTreffer[1], optionen.guildId, angefordertVon);
+    }
 
     // --- Direkte Tonspur oder Internetradio ---
     // `play-dl` meldet dafuer schlicht `false`, also pruefen wir selbst.

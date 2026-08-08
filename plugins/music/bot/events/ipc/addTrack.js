@@ -21,7 +21,10 @@ module.exports = async (payload, client) => {
 
     try {
         const einstellungen = await MusicSettings.getSettings(guildId);
-        const ergebnis = await aufloesen(eingabe, { angefordertVon: angefordertVon || null, einstellungen });
+        // `guildId` muss mit: Eine hochgeladene Datei wird ueber `datei:<id>`
+        // angefordert, und ohne die Guild liesse sich durch Raten der Nummer
+        // die Datei einer fremden Guild abspielen.
+        const ergebnis = await aufloesen(eingabe, { angefordertVon: angefordertVon || null, einstellungen, guildId });
 
         if (ergebnis.titel.length === 0) {
             return { success: false, error: ergebnis.hinweis || 'Nichts gefunden' };

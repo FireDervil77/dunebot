@@ -26,7 +26,7 @@ const prism = require('prism-media');
 const { ServiceManager } = require('dunebot-core');
 const { MusicSettings, MusicHistory, MusicSession } = require('../../shared/models');
 const { aufloesenZumAbspielen, aehnlichenFinden } = require('../quellen');
-const { tonstromVonSeite, tonstromVonAdresse } = require('../quellen/strom');
+const { tonstromVonSeite, tonstromVonAdresse, tonstromVonDatei } = require('../quellen/strom');
 const klangfilter = require('../klangfilter');
 const steuerung = require('../steuerung');
 const { dauerText } = require('../format');
@@ -438,9 +438,16 @@ class GuildPlayer {
             // Direkte Tonspur und Internetradio zeigen schon auf die Bytes
             // selbst. Alles andere ist eine Seitenadresse - da laedt yt-dlp,
             // weil ein schlichter Abruf von Google gedrosselt wird.
-            const eingang = t.source === 'direct'
-                ? tonstromVonAdresse(t.url)
-                : tonstromVonSeite(t.url, this.qualitaet);
+            // Drei Herkuenfte, drei Wege zu den Bytes:
+            //   datei  - liegt bei uns auf der Platte, einfach lesen
+            //   direct - zeigt schon auf die Bytes selbst
+            //   sonst  - Seitenadresse, da laedt yt-dlp, weil ein schlichter
+            //            Abruf von Google gedrosselt wird
+            const eingang = t.source === 'datei'
+                ? tonstromVonDatei(t.url)
+                : t.source === 'direct'
+                    ? tonstromVonAdresse(t.url)
+                    : tonstromVonSeite(t.url, this.qualitaet);
 
             const quelle = this._tonquelle(eingang, klangfilter.ffmpegArgumente(this.filter));
 
@@ -453,6 +460,14 @@ class GuildPlayer {
             this.pausiert = false;
             this.stimmen.clear();
             this._leerlaufAbbrechen();
+
+            // Eine eigene Datei bekommt einen Zeitstempel: Der Aufraeumer geht
+            // nach dem letzten Abspielen, sonst wuerde er genau die Dateien
+            // loeschen, die staendig laufen.
+            if (t.source === 'datei' && t.dateiId) {
+                const { MusicFiles } = require('../../shared/models');
+                MusicFiles.gespielt(t.dateiId);
+            }
 
             // Merken, was lief - Autoplay soll nicht dasselbe nochmal bringen
             const gemerkt = this._zuletztGespielt();

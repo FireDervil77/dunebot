@@ -42,6 +42,11 @@ class MusicBotPlugin extends BotPlugin {
             Logger.debug(`[Musik] Tonwerkzeuge:\n${generateDependencyReport()}`);
         } catch { /* Bericht ist nur eine Hilfe, kein Muss */ }
 
+        // Hochgeladene Tondateien mit abgelaufener Aufbewahrung wegraeumen.
+        // Ohne diesen Lauf waechst der Ordner still weiter - und still wachsen
+        // ist die Sorte Fehler, die man erst bemerkt, wenn die Platte meldet.
+        require('./aufraeumer').starten();
+
         // Ohne yt-dlp gibt es keinen Ton. Das einmal beim Start deutlich
         // sagen ist allemal besser, als es bei jedem Titel einzeln zu
         // erfahren - und beim letzten Mal hat genau diese fehlende Ansage
@@ -87,6 +92,8 @@ class MusicBotPlugin extends BotPlugin {
             client.musicManager.zerstoeren();
             delete client.musicManager;
         }
+
+        require('./aufraeumer').stoppen();
 
         Logger.success('[Musik] Plugin deaktiviert');
     }

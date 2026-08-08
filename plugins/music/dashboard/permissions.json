@@ -49,6 +49,22 @@
       "category": "music",
       "is_dangerous": 0,
       "requires": "MUSIC.VIEW"
+    },
+    {
+      "key": "MUSIC.FILES.UPLOAD",
+      "name": "Eigene Tondateien hochladen",
+      "description": "Berechtigung um eigene Tondateien abzulegen und abzuspielen. Belegt Plattenplatz - bewusst ein eigenes Recht, damit nicht jeder, der Musik abspielen darf, auch etwas ablegt.",
+      "category": "music",
+      "is_dangerous": 1,
+      "requires": "MUSIC.VIEW"
+    },
+    {
+      "key": "MUSIC.FILES.DELETE",
+      "name": "Eigene Tondateien loeschen",
+      "description": "Berechtigung um hochgeladene Tondateien wieder zu entfernen",
+      "category": "music",
+      "is_dangerous": 0,
+      "requires": "MUSIC.VIEW"
     }
   ],
   "default_groups": {}

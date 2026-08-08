@@ -99,7 +99,11 @@ const HINWEISE = {
     SPOTIFY_UNVERFUEGBAR: 'Spotify ist nicht eingerichtet. Es fehlen SPOTIFY_CLIENT_ID und SPOTIFY_CLIENT_SECRET in apps/bot/.env.',
     SOUNDCLOUD_UNVERFUEGBAR: 'SoundCloud ist gerade nicht erreichbar.',
     NICHTS_GEFUNDEN: 'Dazu habe ich nichts gefunden.',
-    AUFLOESEN_FEHLGESCHLAGEN: 'Das konnte ich nicht aufloesen.'
+    AUFLOESEN_FEHLGESCHLAGEN: 'Das konnte ich nicht aufloesen.',
+    // Eintrag ohne Datei - etwa weil jemand von Hand aufgeraeumt hat oder die
+    // Aufbewahrung gerade abgelaufen ist. Ehrlich melden ist besser, als im
+    // Sprachkanal stumm zu bleiben.
+    DATEI_FEHLT: 'Diese Datei gibt es nicht mehr.'
 };
 
 /**

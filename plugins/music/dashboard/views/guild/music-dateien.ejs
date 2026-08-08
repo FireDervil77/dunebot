@@ -1,0 +1,122 @@
+<%- include('partials/music-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-file-audio',
+  titel: tr('music:NAV.FILES'),
+  beschreibung: tr('music:FILES.SUBTITLE')
+}) %>
+
+<div class="row row-cards">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-hard-drive me-2"></i>
+          <%= tr('music:FILES.STORAGE') %>
+        </h3>
+        <div class="card-actions text-secondary small">
+          <%#
+            Der Belegungsbalken ist nicht Zierde. Ohne sichtbaren Stand merkt
+            niemand, dass sich etwas ansammelt - und genau davor war die Sorge.
+          %>
+          <% if (quotaMB > 0) { %>
+            <%= groesse(belegung.bytes) %> / <%= quotaMB %> MB
+          <% } else { %>
+            <%= groesse(belegung.bytes) %> · <%= tr('music:FILES.UNLIMITED') %>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <% if (quotaMB > 0) { %>
+          <div class="progress mb-3" style="height:.5rem;">
+            <div class="progress-bar <%= belegtProzent >= 90 ? 'bg-danger' : (belegtProzent >= 70 ? 'bg-warning' : '') %>"
+                 style="width: <%= belegtProzent %>%"></div>
+          </div>
+        <% } %>
+
+        <div class="text-secondary small mb-3">
+          <i class="fa-solid fa-circle-info me-1"></i>
+          <% if (Number(einstellungen.datei_aufbewahrung_tage) > 0) { %>
+            <%= tr('music:FILES.RETENTION_HINT', { tage: einstellungen.datei_aufbewahrung_tage }) %>
+          <% } else { %>
+            <%= tr('music:FILES.RETENTION_OFF') %>
+          <% } %>
+        </div>
+
+        <%#
+          Das Feld ist immer sichtbar, aber nur bedienbar, wer das Recht hat.
+          Ein verstecktes Feld erklaert nichts; ein gesperrtes mit Hinweis schon.
+        %>
+        <div class="input-group" id="musik-datei-form">
+          <input type="file" class="form-control" id="musik-datei"
+                 accept="audio/*,.mp3,.ogg,.opus,.wav,.flac,.m4a,.aac,.webm"
+                 <%= locals.darfHochladen === false ? 'disabled' : '' %>>
+          <button type="button" class="btn btn-primary" id="musik-datei-knopf"
+                  <%= locals.darfHochladen === false ? 'disabled' : '' %>>
+            <i class="fa-solid fa-upload me-2"></i><%= tr('music:FILES.UPLOAD') %>
+          </button>
+        </div>
+
+        <div class="progress mt-2" id="musik-datei-fortschritt" hidden style="height:.4rem;">
+          <div class="progress-bar progress-bar-indeterminate"></div>
+        </div>
+
+        <div class="form-hint mt-2"><%= tr('music:FILES.UPLOAD_HINT') %></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-file-audio me-2"></i>
+          <%= tr('music:NAV.FILES') %>
+          <span class="badge bg-secondary-lt ms-2"><%= dateien.length %></span>
+        </h3>
+      </div>
+
+      <% if (dateien.length === 0) { %>
+        <div class="card-body text-secondary"><%= tr('music:FILES.EMPTY') %></div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr>
+                <th><%= tr('music:FILES.NAME') %></th>
+                <th class="text-end"><%= tr('music:FILES.SIZE') %></th>
+                <th><%= tr('music:FILES.LAST_PLAYED') %></th>
+                <th class="w-1"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% dateien.forEach(d => { %>
+                <tr id="musik-datei-<%= d.id %>">
+                  <td class="text-truncate" style="max-width:26rem;" title="<%= d.originalname %>">
+                    <i class="fa-solid fa-music me-2 text-secondary"></i><%= d.originalname %>
+                  </td>
+                  <td class="text-end text-secondary"><%= groesse(d.groesse_bytes) %></td>
+                  <td class="text-secondary">
+                    <%= d.zuletzt_gespielt
+                          ? new Date(d.zuletzt_gespielt).toLocaleString('de-DE')
+                          : tr('music:FILES.NEVER') %>
+                  </td>
+                  <td class="text-nowrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary"
+                            onclick="musicDateiAbspielen(<%= d.id %>)">
+                      <i class="fa-solid fa-play"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger ms-1"
+                            onclick="musicDateiLoeschen(<%= d.id %>)">
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>

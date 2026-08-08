@@ -316,6 +316,31 @@ function tonstromVonAdresse(adresse, optionen = {}) {
  *
  * @returns {Promise<{da: boolean, version: string|null, pfad: string}>}
  */
+/**
+ * Tonstrom aus einer Datei auf der Platte.
+ *
+ * Der einfachste Fall im ganzen Modul - und der zuverlaessigste: kein yt-dlp,
+ * kein Netz, keine Drosselung, kein Abriss. ffmpeg bekommt hier ohnehin einen
+ * Node-Strom und keine Adresse, also passt eine Datei ohne Umbau in denselben
+ * Weg wie alles andere.
+ *
+ * @param {string} pfad Absoluter Pfad zur Datei
+ * @returns {import('stream').Readable} Datenstrom
+ */
+function tonstromVonDatei(pfad) {
+    const { createReadStream } = require('fs');
+
+    const strom = createReadStream(pfad);
+
+    // Ohne diesen Zuhoerer beendet ein Lesefehler den ganzen Vorgang: ein
+    // `error` ohne Empfaenger ist in Node ein unbehandelter Ausnahmefall.
+    strom.on('error', (fehler) => {
+        protokoll('warn', `[Musik] Datei nicht lesbar (${pfad}): ${fehler.message}`);
+    });
+
+    return strom;
+}
+
 async function verfuegbar() {
     const pfad = ytdlpFinden();
     try {
@@ -327,4 +352,4 @@ async function verfuegbar() {
     }
 }
 
-module.exports = { tonstromVonSeite, tonstromVonAdresse, verfuegbar, ytdlpFinden, FORMATWAHL };
+module.exports = { tonstromVonSeite, tonstromVonAdresse, tonstromVonDatei, verfuegbar, ytdlpFinden, FORMATWAHL };

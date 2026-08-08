@@ -88,6 +88,7 @@ class MusicDashboardPlugin extends DashboardPlugin {
         this.guildRouter.use('/settings', require('./routes/settings.router'));
         this.guildRouter.use('/steuerung', require('./routes/control.router'));
         this.guildRouter.use('/listen/api', require('./routes/playlists.router'));
+        this.guildRouter.use('/dateien', require('./routes/dateien.router'));
 
         // Seiten zuletzt: der Seiten-Router faengt mit '/' auch die Startseite
         this.guildRouter.use('/', require('./routes/guild.router'));
@@ -127,6 +128,7 @@ class MusicDashboardPlugin extends DashboardPlugin {
                 'DELETE FROM music_playlist_tracks WHERE playlist_id IN (SELECT id FROM music_playlists WHERE guild_id = ?)',
                 'DELETE FROM music_playlists WHERE guild_id = ?',
                 'DELETE FROM music_history WHERE guild_id = ?',
+                'DELETE FROM music_files WHERE guild_id = ?',
                 'DELETE FROM music_settings WHERE guild_id = ?'
             ];
 
@@ -202,6 +204,17 @@ class MusicDashboardPlugin extends DashboardPlugin {
                 url: `${basis}/listen`,
                 icon: 'fa-solid fa-rectangle-list',
                 order: 30,
+                type: haupt,
+                capability: 'MUSIC.VIEW',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'music:NAV.FILES',
+                url: `${basis}/dateien`,
+                icon: 'fa-solid fa-file-audio',
+                order: 35,
                 type: haupt,
                 capability: 'MUSIC.VIEW',
                 visible: true,

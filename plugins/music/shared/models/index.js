@@ -10,5 +10,6 @@ module.exports = {
     MusicSettings: require('./MusicSettings'),
     MusicHistory: require('./MusicHistory'),
     MusicPlaylists: require('./MusicPlaylists'),
-    MusicSession: require('./MusicSession')
+    MusicSession: require('./MusicSession'),
+    MusicFiles: require('./MusicFiles')
 };

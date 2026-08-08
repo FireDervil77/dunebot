@@ -45,6 +45,13 @@ router.put('/', requirePermission('MUSIC.SETTINGS.EDIT'), async (req, res) => {
         if (b.allow_spotify !== undefined) updates.allow_spotify = zuBool(b.allow_spotify) ? 1 : 0;
         if (b.allow_direct !== undefined) updates.allow_direct = zuBool(b.allow_direct) ? 1 : 0;
 
+        // Eigene Tondateien: Obergrenze in MB, Aufbewahrung in Tagen.
+        // Beide 0 = unbegrenzt bzw. nie loeschen. Die Obergrenze deckelt
+        // bei 20 GB - darueber ist es keine Musikbibliothek mehr, sondern
+        // ein Dateiablage-Unfall.
+        if (b.datei_quota_mb !== undefined) updates.datei_quota_mb = zahl(b.datei_quota_mb, 250, 0, 20480);
+        if (b.datei_aufbewahrung_tage !== undefined) updates.datei_aufbewahrung_tage = zahl(b.datei_aufbewahrung_tage, 30, 0, 3650);
+
         // Betrieb
         if (b.mode_247 !== undefined) updates.mode_247 = zuBool(b.mode_247) ? 1 : 0;
         if (b.autoplay !== undefined) updates.autoplay = zuBool(b.autoplay) ? 1 : 0;

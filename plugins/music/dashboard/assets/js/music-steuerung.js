@@ -13,6 +13,17 @@
         return wurzel ? wurzel.dataset.musicBasis : '';
     }
 
+    /**
+     * CSRF-Token aus der Seite.
+     *
+     * An `fetch` haengt es der Theme-Helfer selbst an. Der Datei-Upload laeuft
+     * aber ueber `XMLHttpRequest` - nur damit gibt es einen Fortschritt - und
+     * muss es deshalb selbst mitschicken.
+     */
+    function csrf() {
+        return document.querySelector('meta[name="csrf-token"]')?.content || '';
+    }
+
     /** Text aus den Sprachdaten der Seite, mit Rueckfall. */
     function text(schluessel, ersatz) {
         const wurzel = document.querySelector('[data-music-texte]');
@@ -49,7 +60,10 @@
         }
 
         if (!antwort.ok || inhalt.success === false) {
-            throw new Error(inhalt.error || text('FEHLER', 'Die Aktion ist fehlgeschlagen'));
+            // Manche Routen nennen es `error`, andere `message` - beide gemeint.
+            // Ohne den zweiten Zweig sah eine abgelehnte Datei ("kein Platz
+            // mehr, 212 von 250 MB belegt") aus wie ein allgemeiner Fehler.
+            throw new Error(inhalt.error || inhalt.message || text('FEHLER', 'Die Aktion ist fehlgeschlagen'));
         }
         return inhalt;
     }
@@ -343,6 +357,84 @@
         feld.addEventListener('blur', function () { setTimeout(schliessen, 100); });
     }
 
+    // ==================== Eigene Tondateien ====================
+
+    window.musicDateiAbspielen = function (id) {
+        anfrage('POST', '/dateien/' + id + '/abspielen', {})
+            .then(function (antwort) {
+                melden(text('AUFGENOMMEN', 'In die Warteschlange gelegt.') + ' ' + (antwort.name || ''));
+            })
+            .catch(fehlerMelden);
+    };
+
+    window.musicDateiLoeschen = function (id) {
+        if (!window.confirm(text('DATEI_LOESCHEN', 'Diese Datei wirklich löschen?'))) return;
+
+        anfrage('DELETE', '/dateien/' + id)
+            .then(function () {
+                melden(text('ENTFERNT', 'Entfernt.'));
+                document.getElementById('musik-datei-' + id)?.remove();
+            })
+            .catch(fehlerMelden);
+    };
+
+    /**
+     * Datei hochladen.
+     *
+     * Bewusst `XMLHttpRequest` und nicht `fetch`: Nur damit gibt es einen
+     * Fortschritt beim Hochladen, und bei einer 300-MB-Datei ist ein Balken
+     * der Unterschied zwischen "laedt" und "haengt".
+     *
+     * Der Inhaltstyp wird **nicht** gesetzt - der Browser muss die Grenze des
+     * mehrteiligen Formulars selbst anhaengen, sonst kann der Server es nicht
+     * zerlegen.
+     */
+    function dateiHochladen() {
+        const feld = document.getElementById('musik-datei');
+        const knopf = document.getElementById('musik-datei-knopf');
+        const balken = document.getElementById('musik-datei-fortschritt');
+
+        const datei = feld?.files?.[0];
+        if (!datei) return melden(text('DATEI_FEHLT', 'Bitte zuerst eine Datei wählen.'), 'warning');
+
+        const formular = new FormData();
+        formular.append('datei', datei);
+
+        const anfrageObjekt = new XMLHttpRequest();
+        anfrageObjekt.open('POST', basis() + '/dateien/upload');
+        anfrageObjekt.setRequestHeader('X-CSRF-Token', csrf());
+        anfrageObjekt.setRequestHeader('Accept', 'application/json');
+
+        if (knopf) knopf.disabled = true;
+        if (balken) balken.hidden = false;
+
+        anfrageObjekt.onload = function () {
+            if (knopf) knopf.disabled = false;
+            if (balken) balken.hidden = true;
+
+            let antwort = {};
+            try { antwort = JSON.parse(anfrageObjekt.responseText || '{}'); } catch { /* egal */ }
+
+            if (anfrageObjekt.status >= 200 && anfrageObjekt.status < 300 && antwort.success) {
+                melden(text('DATEI_ABGELEGT', 'Datei abgelegt.') + ' ' + (antwort.name || ''));
+                // Die Liste und der Belegungsbalken kommen vom Server - einmal
+                // neu laden ist ehrlicher, als beides hier nachzubauen.
+                window.setTimeout(function () { window.location.reload(); }, 600);
+                return;
+            }
+
+            melden(antwort.message || text('FEHLER', 'Fehler'), 'error');
+        };
+
+        anfrageObjekt.onerror = function () {
+            if (knopf) knopf.disabled = false;
+            if (balken) balken.hidden = true;
+            melden(text('FEHLER', 'Fehler'), 'error');
+        };
+
+        anfrageObjekt.send(formular);
+    }
+
     window.musicListenTitelEntfernen = function (listeId, titelId) {
         if (!window.confirm(text('TITEL_ENTFERNEN', 'Diesen Titel aus der Liste nehmen?'))) return;
 
@@ -594,6 +686,10 @@
                 }
             });
         });
+
+        // Hochladen einer eigenen Tondatei
+        const dateiKnopf = document.getElementById('musik-datei-knopf');
+        if (dateiKnopf) dateiKnopf.addEventListener('click', dateiHochladen);
 
         // Fortschritt nachfuehren, solange die Seite offen ist
         if (document.getElementById('music-spieler')) {
