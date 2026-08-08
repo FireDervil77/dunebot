@@ -89,6 +89,38 @@ async function getGuildRoles(guildId) {
 }
 
 /**
+ * Die Antwort des Bots auf ein Plugin-Ereignis auspacken.
+ *
+ * **Zwei Umschlaege, nicht einer.** `IPCClient` legt das Ergebnis jedes
+ * Plugin-Handlers in eine eigene Huelle:
+ *
+ * ```
+ * { success: true, data: { success: true, zustand: {...} } }
+ *  ^ hat der Bot geantwortet?      ^ hat der Handler seine Arbeit getan?
+ * ```
+ *
+ * Wer nur die aeussere liest, bekommt **immer** `success: true`, sobald der Bot
+ * ueberhaupt erreichbar ist - auch wenn drinnen ein Fehler steht - und findet
+ * die Nutzdaten nie, weil sie eine Ebene tiefer liegen. Genau das war hier der
+ * Fall: `antwort.zustand` war `undefined`, das Dashboard zeigte darum einen
+ * Zustand ganz ohne Felder ("Nicht verbunden", nichts in der Liste), und die
+ * Suche reichte `undefined` an `addTracks` weiter, das still nichts tat.
+ *
+ * Die Ereignisse im Namensraum `dashboard:` gehen einen anderen Weg im
+ * `IPCClient` und antworten **ohne** diese zweite Huelle - fuer die gilt das
+ * hier ausdruecklich nicht.
+ *
+ * @param {Array} antworten Rueckgabe von `ipcServer.broadcast`
+ * @returns {Object} Was der Handler zurueckgab, oder ein Fehlerobjekt
+ */
+function auspacken(antworten) {
+    const umschlag = antworten?.[0];
+    if (!umschlag) return { success: false, error: 'Der Bot hat nicht geantwortet' };
+    if (!umschlag.success) return { success: false, error: umschlag.error || 'Der Bot meldet einen Fehler' };
+    return umschlag.data ?? { success: false, error: 'Der Bot hat nichts zurueckgegeben' };
+}
+
+/**
  * Was gerade laeuft.
  *
  * Antwortet der Bot nicht, liefern wir einen leeren Zustand statt eines
@@ -112,10 +144,9 @@ async function zustandHolen(guildId) {
     if (!ipcServer) return leer;
 
     try {
-        const antworten = await ipcServer.broadcast('music:getState', { guildId });
-        const antwort = antworten?.[0];
-        if (!antwort?.success) return leer;
-        return { ...antwort.zustand, botErreichbar: true };
+        const ergebnis = auspacken(await ipcServer.broadcast('music:getState', { guildId }));
+        if (!ergebnis.success || !ergebnis.zustand) return leer;
+        return { ...ergebnis.zustand, botErreichbar: true };
     } catch (err) {
         ServiceManager.get('Logger').warn(`[Musik] Zustand nicht abrufbar: ${err.message}`);
         return leer;
@@ -138,13 +169,12 @@ async function steuern(res, guildId, vorgang, wert = null) {
     }
 
     try {
-        const antworten = await ipcServer.broadcast('music:control', { guildId, vorgang, wert });
-        const antwort = antworten?.[0];
+        const ergebnis = auspacken(await ipcServer.broadcast('music:control', { guildId, vorgang, wert }));
 
-        if (!antwort?.success) {
-            return res.status(400).json({ success: false, error: antwort?.error || 'Die Aktion ist fehlgeschlagen' });
+        if (!ergebnis.success) {
+            return res.status(400).json({ success: false, error: ergebnis.error || 'Die Aktion ist fehlgeschlagen' });
         }
-        return res.json({ success: true, ...antwort });
+        return res.json({ success: true, ...ergebnis });
     } catch (error) {
         ServiceManager.get('Logger').error(`[Musik] Steuerbefehl ${vorgang} fehlgeschlagen:`, error);
         return res.status(500).json({ success: false, error: 'Die Aktion ist fehlgeschlagen' });
@@ -190,5 +220,5 @@ function spielzeitText(sek) {
 
 module.exports = {
     makeTranslator, renderView, getGuildChannels, getSprachkanaele, getGuildRoles,
-    zustandHolen, steuern, angemeldeterNutzer, renderFehler, fehler, spielzeitText
+    auspacken, zustandHolen, steuern, angemeldeterNutzer, renderFehler, fehler, spielzeitText
 };

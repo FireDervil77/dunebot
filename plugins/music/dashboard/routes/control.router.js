@@ -11,7 +11,7 @@ const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
-const { zustandHolen, steuern, angemeldeterNutzer, fehler } = require('./_shared');
+const { zustandHolen, steuern, angemeldeterNutzer, fehler, auspacken } = require('./_shared');
 
 /** Zustand abfragen - davon lebt die laufende Anzeige der Uebersicht. */
 router.get('/state', requirePermission('MUSIC.VIEW'), async (req, res) => {
@@ -91,18 +91,17 @@ router.post('/hinzufuegen', requirePermission('MUSIC.PLAY'), async (req, res) =>
     if (!ipcServer) return res.status(503).json({ success: false, error: 'Der Bot ist nicht erreichbar' });
 
     try {
-        const antworten = await ipcServer.broadcast('music:addTrack', {
+        const ergebnis = auspacken(await ipcServer.broadcast('music:addTrack', {
             guildId: res.locals.guildId,
             eingabe,
             angefordertVon: angemeldeterNutzer(req, res),
             anfang: Boolean(req.body.anfang)
-        });
+        }));
 
-        const antwort = antworten?.[0];
-        if (!antwort?.success) {
-            return res.status(400).json({ success: false, error: antwort?.error || 'Nichts gefunden' });
+        if (!ergebnis.success) {
+            return res.status(400).json({ success: false, error: ergebnis.error || 'Nichts gefunden' });
         }
-        return res.json({ success: true, ...antwort });
+        return res.json({ success: true, ...ergebnis });
     } catch (error) {
         fehler(res, error, 'Der Titel konnte nicht aufgenommen werden');
     }

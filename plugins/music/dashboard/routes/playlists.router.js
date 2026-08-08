@@ -9,7 +9,7 @@ const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { MusicPlaylists } = require('../../shared/models');
-const { angemeldeterNutzer, fehler } = require('./_shared');
+const { angemeldeterNutzer, fehler, auspacken } = require('./_shared');
 
 router.get('/', requirePermission('MUSIC.VIEW'), async (req, res) => {
     try {
@@ -89,19 +89,18 @@ router.post('/:id/titel', requirePermission('MUSIC.PLAYLISTS.MANAGE'), async (re
 
         // Aufgeloest wird im Bot: dort liegen die Spotify-Zugangsdaten, und
         // sie sollen nicht in zwei .env-Dateien gepflegt werden muessen.
-        const antworten = await ipcServer.broadcast('music:resolve', {
+        const ergebnis = auspacken(await ipcServer.broadcast('music:resolve', {
             guildId: res.locals.guildId,
             eingabe,
             angefordertVon: nutzer
-        });
+        }));
 
-        const antwort = antworten?.[0];
-        if (!antwort?.success) {
-            return res.status(400).json({ success: false, error: antwort?.error || 'Dazu habe ich nichts gefunden' });
+        if (!ergebnis.success || !Array.isArray(ergebnis.titel)) {
+            return res.status(400).json({ success: false, error: ergebnis.error || 'Dazu habe ich nichts gefunden' });
         }
 
-        await MusicPlaylists.addTracks(id, antwort.titel, nutzer);
-        res.json({ success: true, aufgenommen: antwort.titel.length, quelle: antwort.quelle });
+        await MusicPlaylists.addTracks(id, ergebnis.titel, nutzer);
+        res.json({ success: true, aufgenommen: ergebnis.titel.length, quelle: ergebnis.quelle });
     } catch (error) {
         fehler(res, error, 'Die Titel konnten nicht aufgenommen werden');
     }
@@ -148,17 +147,18 @@ router.post('/:id/abspielen', requirePermission('MUSIC.PLAY'), async (req, res) 
         // Titel einzeln uebergeben - der Bot kennt die Datenbank nicht
         let aufgenommen = 0;
         for (const t of liste.tracks) {
-            const antworten = await ipcServer.broadcast('music:addTrack', {
+            const ergebnis = auspacken(await ipcServer.broadcast('music:addTrack', {
                 guildId: res.locals.guildId,
                 eingabe: t.url,
                 angefordertVon: angemeldeterNutzer(req, res),
                 anfang: false
-            });
-            if (antworten?.[0]?.success) aufgenommen += antworten[0].aufgenommen || 0;
+            }));
+
+            if (ergebnis.success) aufgenommen += ergebnis.aufgenommen || 0;
             else if (aufgenommen === 0) {
                 // Schon der erste ging nicht durch - meist steht der Bot in
                 // keinem Sprachkanal. Dann brechen wir gleich ab.
-                return res.status(400).json({ success: false, error: antworten?.[0]?.error || 'Aufnahme fehlgeschlagen' });
+                return res.status(400).json({ success: false, error: ergebnis.error || 'Aufnahme fehlgeschlagen' });
             }
         }
 
