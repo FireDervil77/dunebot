@@ -1,9 +1,59 @@
 const { ServiceManager } = require('dunebot-core');
 
 /**
+ * Einen gespeicherten Listenwert zu einer Liste machen — was immer dort steht.
+ *
+ * Vorher stand an drei Stellen dasselbe Muster: JSON parsen, und wenn dabei
+ * kein Array herauskommt, den Wert durch `[]` ersetzen. Das wirft stillschweigend
+ * weg, was jemand eingestellt hat. Genau das ist in „Haus Ares" passiert: dort
+ * steht in `whitelisted_channels` die nackte Kanal-ID `1492418026161705000`
+ * statt einer Liste. `JSON.parse` macht daraus eine gültige *Zahl*, die
+ * Array-Prüfung schlägt fehl, und der Kanal war nie ausgenommen — ohne dass
+ * irgendwo etwas protokolliert wurde.
+ *
+ * Kein heutiger Schreibpfad erzeugt so etwas: die Dashboard-Route und die
+ * Bot-Befehle legen immer Arrays ab. Es ist eine Altlast aus einer früheren
+ * Fassung oder einem Import. Der Leser ist die richtige Stelle dafür — dann
+ * repariert sich der Bestand von selbst, ohne in fremde Daten zu schreiben.
+ *
+ * Einzelwerte werden bewusst aus dem **Rohtext** übernommen und nicht aus dem
+ * `JSON.parse`-Ergebnis: Discord-IDs liegen jenseits von
+ * `Number.MAX_SAFE_INTEGER`, und der Umweg über eine Zahl kann Stellen kosten.
+ *
+ * @param {*} roh Gespeicherter Wert (JSON-Text, Array, Zahl oder null)
+ * @returns {Array<string>} Liste, notfalls leer
+ */
+function zuListe(roh) {
+    if (roh === null || roh === undefined) return [];
+    if (Array.isArray(roh)) return roh.map(String);
+    if (typeof roh === 'number' || typeof roh === 'bigint') return [String(roh)];
+    if (typeof roh !== 'string') return [];
+
+    const text = roh.trim();
+    if (!text) return [];
+
+    // Angefangenes JSON: das war als Struktur gemeint und ist kaputt. Daraus
+    // einen Eintrag zu machen, würde nur Unsinn in die Liste tragen.
+    if (text.startsWith('[') || text.startsWith('{')) {
+        try {
+            const gelesen = JSON.parse(text);
+            return Array.isArray(gelesen) ? gelesen.map(String) : [];
+        } catch {
+            return [];
+        }
+    }
+
+    // Einzelwert oder kommagetrennte Aufzählung aus alten Beständen.
+    return text
+        .split(',')
+        .map(teil => teil.trim().replace(/^"|"$/g, ''))
+        .filter(teil => teil.length > 0);
+}
+
+/**
  * Model für AutoMod Settings
  * Verwaltet Guild-spezifische AutoMod-Konfiguration
- * 
+ *
  * @author FireBot Team
  */
 class AutoModSettings {
@@ -29,48 +79,13 @@ class AutoModSettings {
             }
             
             const settings = rows[0];
-            
-            // JSON-Felder parsen: whitelisted_channels
-            if (settings.whitelisted_channels && typeof settings.whitelisted_channels === 'string') {
-                try {
-                    settings.whitelisted_channels = JSON.parse(settings.whitelisted_channels);
-                } catch {
-                    settings.whitelisted_channels = [];
-                }
-            }
-            
-            // Sicherstellen dass es ein Array ist
-            if (!Array.isArray(settings.whitelisted_channels)) {
-                settings.whitelisted_channels = [];
-            }
-            
-            // JSON-Felder parsen: raid_trusted_invites
-            if (settings.raid_trusted_invites && typeof settings.raid_trusted_invites === 'string') {
-                try {
-                    settings.raid_trusted_invites = JSON.parse(settings.raid_trusted_invites);
-                } catch {
-                    settings.raid_trusted_invites = [];
-                }
-            }
-            
-            // Sicherstellen dass es ein Array ist
-            if (!Array.isArray(settings.raid_trusted_invites)) {
-                settings.raid_trusted_invites = [];
-            }
 
-            // JSON-Felder parsen: active_keyword_lists
-            if (settings.active_keyword_lists && typeof settings.active_keyword_lists === 'string') {
-                try {
-                    settings.active_keyword_lists = JSON.parse(settings.active_keyword_lists);
-                } catch {
-                    settings.active_keyword_lists = [];
-                }
-            }
+            // Die drei Listenfelder - siehe `zuListe` oben, warum das nicht
+            // mehr einfach `JSON.parse` mit `[]` als Auffanglösung ist.
+            settings.whitelisted_channels = zuListe(settings.whitelisted_channels);
+            settings.raid_trusted_invites = zuListe(settings.raid_trusted_invites);
+            settings.active_keyword_lists = zuListe(settings.active_keyword_lists);
 
-            if (!Array.isArray(settings.active_keyword_lists)) {
-                settings.active_keyword_lists = [];
-            }
-            
             return settings;
         } catch (error) {
             const Logger = ServiceManager.get('Logger');
