@@ -212,44 +212,135 @@
         const feld = document.getElementById(feldId);
         if (!feld) return;
 
-        const liste = document.createElement('datalist');
-        liste.id = feldId + '-vorschlaege';
-        feld.setAttribute('list', liste.id);
+        // ────────────────────────────────────────────────────────────────────
+        // Warum kein <datalist> mehr
+        //
+        // Das war die Ursache fuer "die Suche ist mega langsam". Die Treffer
+        // waren meist laengst da - <datalist> zeigt sie nur nicht: Der Browser
+        // klappt die Liste nicht von sich aus wieder auf, wenn die Eintraege
+        // waehrend des Tippens ausgetauscht werden. Sichtbar wurden sie erst
+        // beim naechsten Tastendruck, also immer einen Buchstaben zu spaet.
+        // Dazu kam eine Wartezeit von 350 ms und ein Mindestabstand von 800 ms
+        // im Bot, der fuer Discords Tastendruck-Sturm gedacht ist.
+        //
+        // Eine eigene Liste zeigt, was da ist, sobald es da ist.
+        // ────────────────────────────────────────────────────────────────────
         feld.setAttribute('autocomplete', 'off');
-        feld.parentNode.appendChild(liste);
+        feld.removeAttribute('list');
+
+        const kasten = document.createElement('div');
+        kasten.className = 'list-group position-absolute w-100 shadow';
+        kasten.style.zIndex = '1050';
+        kasten.style.maxHeight = '18rem';
+        kasten.style.overflowY = 'auto';
+        kasten.hidden = true;
+
+        // Der Kasten haengt unter dem Feld - dafuer muss der Rahmen ein
+        // Bezugspunkt sein, sonst richtet er sich an der ganzen Seite aus.
+        const rahmen = feld.parentNode;
+        if (getComputedStyle(rahmen).position === 'static') rahmen.style.position = 'relative';
+        rahmen.appendChild(kasten);
 
         let wecker = null;
         let zuletzt = '';
+        let treffer = [];
+        let markiert = -1;
+
+        /** Liste schliessen. */
+        function schliessen() {
+            kasten.hidden = true;
+            markiert = -1;
+        }
+
+        /** Einen Treffer uebernehmen. */
+        function uebernehmen(i) {
+            if (!treffer[i]) return;
+            feld.value = treffer[i].value;
+            zuletzt = feld.value.trim();
+            schliessen();
+            feld.focus();
+        }
+
+        /** Die Markierung verschieben. */
+        function markieren(neu) {
+            const eintraege = kasten.querySelectorAll('.list-group-item');
+            if (eintraege.length === 0) return;
+
+            markiert = (neu + eintraege.length) % eintraege.length;
+            eintraege.forEach(function (el, i) { el.classList.toggle('active', i === markiert); });
+            eintraege[markiert].scrollIntoView({ block: 'nearest' });
+        }
+
+        /** Treffer anzeigen. */
+        function zeichnen(neue) {
+            treffer = neue || [];
+            kasten.innerHTML = '';
+            markiert = -1;
+
+            if (treffer.length === 0) return schliessen();
+
+            treffer.forEach(function (t, i) {
+                const eintrag = document.createElement('button');
+                eintrag.type = 'button';
+                eintrag.className = 'list-group-item list-group-item-action text-truncate py-1';
+                eintrag.textContent = t.name;
+                eintrag.title = t.name;
+                // `mousedown` statt `click`: Ein Klick kaeme erst nach dem
+                // Fokusverlust - und der schliesst die Liste bereits.
+                eintrag.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    uebernehmen(i);
+                });
+                kasten.appendChild(eintrag);
+            });
+
+            kasten.hidden = false;
+        }
 
         feld.addEventListener('input', function () {
             const eingabe = feld.value.trim();
 
             // Adressen brauchen keine Suche, und unter drei Zeichen lohnt es
             // sich nicht - genau wie im Discord
-            if (eingabe.length < 3 || /^https?:\/\//i.test(eingabe)) return;
+            if (eingabe.length < 3 || /^https?:\/\//i.test(eingabe)) return schliessen();
             if (eingabe === zuletzt) return;
             zuletzt = eingabe;
 
-            // Nicht bei jedem Tastendruck losschicken
+            // Nicht bei jedem Tastendruck losschicken - aber deutlich kuerzer
+            // als vorher, der Bot bremst jetzt selbst kaum noch.
             clearTimeout(wecker);
             wecker = setTimeout(function () {
                 anfrage('GET', '/steuerung/vorschlaege?q=' + encodeURIComponent(eingabe))
                     .then(function (antwort) {
                         // Zwischenzeitlich weitergetippt: Antwort ist veraltet
                         if (feld.value.trim() !== eingabe) return;
-
-                        liste.innerHTML = '';
-                        (antwort.treffer || []).forEach(function (t) {
-                            const eintrag = document.createElement('option');
-                            eintrag.value = t.value;
-                            eintrag.label = t.name;
-                            eintrag.textContent = t.name;
-                            liste.appendChild(eintrag);
-                        });
+                        zeichnen(antwort.treffer || []);
                     })
                     .catch(function () { /* ohne Vorschlaege tippt man eben selbst */ });
-            }, 350);
+            }, 200);
         });
+
+        feld.addEventListener('keydown', function (e) {
+            if (kasten.hidden) return;
+
+            if (e.key === 'ArrowDown') { e.preventDefault(); markieren(markiert + 1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); markieren(markiert - 1); }
+            else if (e.key === 'Escape') { schliessen(); }
+            else if (e.key === 'Enter' && markiert >= 0) {
+                // Nur wenn wirklich etwas markiert ist - sonst gehoert Enter
+                // dem Abschicken.
+                //
+                // `stopImmediatePropagation`, nicht `stopPropagation`: Der
+                // Abschick-Zuhoerer haengt am **selben** Element, und den
+                // erreicht das gewoehnliche Anhalten nicht. Sonst uebernaehme
+                // Enter den Treffer und schickte im selben Zug ab.
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                uebernehmen(markiert);
+            }
+        });
+
+        feld.addEventListener('blur', function () { setTimeout(schliessen, 100); });
     }
 
     window.musicListenTitelEntfernen = function (listeId, titelId) {

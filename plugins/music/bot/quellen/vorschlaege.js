@@ -30,8 +30,24 @@ const HALTBAR_MS = 5 * 60 * 1000;
 /** Wie viele Suchbegriffe wir hoechstens vorhalten. */
 const MAX_BEGRIFFE = 300;
 
-/** Mindestabstand zwischen zwei echten Suchlaeufen desselben Nutzers. */
+/**
+ * Mindestabstand zwischen zwei echten Suchlaeufen desselben Nutzers.
+ *
+ * Der Wert ist auf Discord zugeschnitten: Dort kommt bei **jedem** Tastendruck
+ * eine eigene Anfrage, ungebremst und ohne Wartezeit. Ohne diesen Abstand loeste
+ * ein einziger gesuchter Titel ein Dutzend Suchlaeufe aus.
+ */
 const ABSTAND_MS = 800;
+
+/**
+ * Derselbe Abstand fuer das Dashboard - deutlich kleiner.
+ *
+ * Dort wartet das Feld schon selbst, bevor es losschickt, und verwirft
+ * ueberholte Antworten. Der grosse Abstand bremste dort nur: Wer zuegig tippt,
+ * bekam die Treffer des Wortanfangs zu sehen und musste warten, bis endlich
+ * wirklich gesucht wurde. Das war ein guter Teil des "mega langsam".
+ */
+const ABSTAND_DASHBOARD_MS = 250;
 
 /** Frist fuer die Antwort an Discord - deutlich unter den drei Sekunden. */
 const FRIST_MS = 2200;
@@ -254,9 +270,12 @@ async function youtubeFrei(guildId) {
  * @param {string} eingabe Was der Nutzer bisher getippt hat
  * @param {string} nutzerId Discord-Nutzer-ID, fuer den Mindestabstand
  * @param {string} [guildId] Discord-Guild-ID, fuer die Quellenfreigabe
+ * @param {Object} [optionen] Feinheiten
+ * @param {number} [optionen.mindestabstandMs] Eigener Mindestabstand - das
+ *   Dashboard bremst sich bereits selbst und braucht den grossen nicht.
  * @returns {Promise<Array<{name: string, value: string}>>} Hoechstens 25 Eintraege
  */
-async function holen(eingabe, nutzerId, guildId) {
+async function holen(eingabe, nutzerId, guildId, optionen = {}) {
     const text = String(eingabe || '').trim();
 
     // Eine Adresse braucht keine Suche - die geben wir unveraendert zurueck
@@ -277,8 +296,12 @@ async function holen(eingabe, nutzerId, guildId) {
     const bekannt = ausSpeicher(begriff);
 
     // Zu schnell hintereinander: zeigen, was da ist, statt erneut zu suchen
+    const abstand = Number(optionen.mindestabstandMs) > 0
+        ? Number(optionen.mindestabstandMs)
+        : ABSTAND_MS;
+
     const zuletzt = letzteSuche.get(nutzerId) || 0;
-    if (Date.now() - zuletzt < ABSTAND_MS) return bekannt || [];
+    if (Date.now() - zuletzt < abstand) return bekannt || [];
 
     letzteSuche.set(nutzerId, Date.now());
 
@@ -290,4 +313,4 @@ async function holen(eingabe, nutzerId, guildId) {
     }
 }
 
-module.exports = { holen };
+module.exports = { holen, ABSTAND_DASHBOARD_MS };

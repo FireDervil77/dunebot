@@ -1,4 +1,4 @@
-const { holen } = require('../../quellen/vorschlaege');
+const { holen, ABSTAND_DASHBOARD_MS } = require('../../quellen/vorschlaege');
 
 /**
  * IPC: Trefferliste waehrend des Tippens - fuer das Dashboard.
@@ -18,7 +18,13 @@ module.exports = async (payload) => {
     if (!eingabe) return { success: true, treffer: [] };
 
     try {
-        const treffer = await holen(eingabe, angefordertVon || 'dashboard', guildId);
+        // Das Dashboard bekommt den kleinen Mindestabstand: Das Eingabefeld dort
+        // wartet schon selbst, bevor es losschickt, und verwirft ueberholte
+        // Antworten. Der grosse Abstand (fuer Discords Tastendruck-Sturm) hat
+        // dort nur gebremst.
+        const treffer = await holen(eingabe, angefordertVon || 'dashboard', guildId, {
+            mindestabstandMs: ABSTAND_DASHBOARD_MS
+        });
         return { success: true, treffer };
     } catch (error) {
         return { success: false, error: error.message };
