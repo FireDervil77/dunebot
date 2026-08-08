@@ -28,6 +28,8 @@ const { MusicSettings, MusicHistory } = require('../../shared/models');
 const { aufloesenZumAbspielen, aehnlichenFinden } = require('../quellen');
 const { tonstromVonSeite, tonstromVonAdresse } = require('../quellen/strom');
 const klangfilter = require('../klangfilter');
+const steuerung = require('../steuerung');
+const { dauerText } = require('../format');
 
 // prism-media startet ffmpeg selbst. Ohne diesen Hinweis sucht es im
 // System-PATH - dort liegt keins, wir bringen es als Paket mit.
@@ -79,6 +81,9 @@ class GuildPlayer {
 
         this._verlassenZeitgeber = null;
         this._wirdBeendet = false;
+
+        /** Die stehende "Jetzt laeuft"-Nachricht mit der Mediensteuerung. */
+        this._ansageNachricht = null;
 
         this.spieler = createAudioPlayer({
             behaviors: {
@@ -307,6 +312,7 @@ class GuildPlayer {
             // Gegangen wird nur, wenn niemand mehr da ist - das entscheidet
             // `_verwaisungPruefen`, angestossen vom Sprachereignis.
             Logger.debug(`[Musik] Guild ${this.guildId}: Warteschlange leer, warte im Kanal`);
+            this.ansageAuffrischen();
             return false;
         }
 
@@ -359,7 +365,7 @@ class GuildPlayer {
             MusicHistory.add(this.guildId, { ...t, voiceChannelId: this.sprachKanalId })
                 .catch(err => Logger.warn(`[Musik] Verlauf nicht geschrieben: ${err.message}`));
 
-            this._ansagen(t);
+            this._ansagen();
             return true;
 
         } catch (err) {
@@ -414,12 +420,15 @@ class GuildPlayer {
     }
 
     /**
-     * Im Textkanal ansagen, was jetzt laeuft.
+     * Im Textkanal ansagen, was jetzt laeuft - mit Mediensteuerung.
      *
-     * @param {Object} t Titel
+     * Die vorige Ansage verliert dabei ihre Knoepfe. Sonst haengen im Kanal
+     * lauter alte Steuerungen herum, und ein Druck auf die von vorgestern
+     * wuerde den heutigen Titel ueberspringen.
+     *
      * @private
      */
-    _ansagen(t) {
+    _ansagen() {
         if (!this.textKanalId) return;
 
         MusicSettings.getSettings(this.guildId).then(einstellungen => {
@@ -429,21 +438,31 @@ class GuildPlayer {
             const kanal = this.client.channels.cache.get(kanalId);
             if (!kanal || !kanal.isTextBased()) return;
 
-            kanal.send({
-                embeds: [{
-                    color: 0x1db954,
-                    author: { name: 'Jetzt laeuft' },
-                    title: t.title.substring(0, 256),
-                    url: t.herkunftUrl || t.url,
-                    thumbnail: t.thumbnail ? { url: t.thumbnail } : undefined,
-                    fields: [
-                        { name: 'Quelle', value: t.source, inline: true },
-                        { name: 'Dauer', value: GuildPlayer.dauerText(t.durationSec), inline: true },
-                        ...(t.requestedBy ? [{ name: 'Gewuenscht von', value: `<@${t.requestedBy}>`, inline: true }] : [])
-                    ]
-                }]
-            }).catch(() => { /* Kein Schreibrecht - dann eben ohne Ansage */ });
+            // Der alten Ansage die Knoepfe nehmen
+            const alte = this._ansageNachricht;
+            this._ansageNachricht = null;
+            if (alte) {
+                alte.edit({ components: [] }).catch(() => { /* schon geloescht */ });
+            }
+
+            kanal.send(steuerung.nachricht(this.zustand()))
+                .then(gesendet => { this._ansageNachricht = gesendet; })
+                .catch(() => { /* Kein Schreibrecht - dann eben ohne Ansage */ });
         }).catch(() => { /* Einstellungen nicht lesbar - Ansage entfaellt */ });
+    }
+
+    /**
+     * Die stehende Ansage auf den neuesten Stand bringen.
+     *
+     * Fuer Aenderungen, die keinen neuen Titel bedeuten - angehalten,
+     * Lautstaerke, Wiederholung. Schlaegt still fehl, wenn die Nachricht
+     * inzwischen weg ist.
+     */
+    ansageAuffrischen() {
+        if (!this._ansageNachricht) return;
+        this._ansageNachricht
+            .edit(steuerung.nachricht(this.zustand()))
+            .catch(() => { this._ansageNachricht = null; });
     }
 
     /** Anhalten. */
@@ -453,6 +472,7 @@ class GuildPlayer {
         this.pausiert = true;
         this.gelaufenVorPause += Date.now() - (this.gestartetUm || Date.now());
         this.gestartetUm = null;
+        this.ansageAuffrischen();
         return true;
     }
 
@@ -462,6 +482,7 @@ class GuildPlayer {
         this.spieler.unpause();
         this.pausiert = false;
         this.gestartetUm = Date.now();
+        this.ansageAuffrischen();
         return true;
     }
 
@@ -496,6 +517,7 @@ class GuildPlayer {
         this._wirdBeendet = true;
         this.spieler.stop(true);
         this._wirdBeendet = false;
+        this.ansageAuffrischen();
         return true;
     }
 
@@ -510,6 +532,7 @@ class GuildPlayer {
 
         const quelle = this.spieler.state?.resource;
         if (quelle?.volume) quelle.volume.setVolume(neu / 100);
+        this.ansageAuffrischen();
         return neu;
     }
 
@@ -519,6 +542,7 @@ class GuildPlayer {
             const j = Math.floor(Math.random() * (i + 1));
             [this.warteschlange[i], this.warteschlange[j]] = [this.warteschlange[j], this.warteschlange[i]];
         }
+        this.ansageAuffrischen();
         return this.warteschlange.length;
     }
 
@@ -551,6 +575,7 @@ class GuildPlayer {
     wiederholungSetzen(modus) {
         if (!Object.values(WIEDERHOLUNG).includes(modus)) return false;
         this.wiederholung = modus;
+        this.ansageAuffrischen();
         return true;
     }
 
@@ -566,6 +591,7 @@ class GuildPlayer {
     filterSetzen(name) {
         if (!klangfilter.bekannt(name)) return false;
         this.filter = String(name).toLowerCase();
+        this.ansageAuffrischen();
         return true;
     }
 
@@ -734,6 +760,11 @@ class GuildPlayer {
         this._leerlaufAbbrechen();
         this._wirdBeendet = true;
 
+        // Die Knoepfe der stehenden Ansage steuerten sonst ins Leere
+        const ansage = this._ansageNachricht;
+        this._ansageNachricht = null;
+        if (ansage) ansage.edit({ components: [] }).catch(() => { /* schon weg */ });
+
         try { this.spieler.stop(true); } catch { /* schon gestoppt */ }
         try { this.verbindung?.destroy(); } catch { /* schon getrennt */ }
 
@@ -750,19 +781,14 @@ class GuildPlayer {
     /**
      * Sekunden als mm:ss oder h:mm:ss.
      *
+     * Liegt inzwischen in `format.js`; hier bleibt der Zugang stehen, weil
+     * `utils.js` und die Unterbefehle ihn ueber den Abspieler aufrufen.
+     *
      * @param {number|null} sek Sekunden
      * @returns {string} Lesbare Dauer
      */
     static dauerText(sek) {
-        if (!sek || sek <= 0) return 'live';
-
-        const stunden = Math.floor(sek / 3600);
-        const minuten = Math.floor((sek % 3600) / 60);
-        const rest = sek % 60;
-
-        return stunden > 0
-            ? `${stunden}:${String(minuten).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
-            : `${minuten}:${String(rest).padStart(2, '0')}`;
+        return dauerText(sek);
     }
 }
 
