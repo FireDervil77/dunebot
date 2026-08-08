@@ -52,6 +52,7 @@
     "SUBTITLE": "Was noch kommt, umsortieren oder entfernen",
     "EMPTY": "Die Warteschlange ist leer",
     "EMPTY_HINT": "Füge etwas hinzu, dann steht es hier.",
+    "ONLY_CURRENT": "Danach ist Schluss — füge etwas hinzu, dann geht es weiter.",
     "CLEAR": "Leeren",
     "REMOVE": "Entfernen",
     "TO_TOP": "Nach oben",

@@ -213,6 +213,7 @@ class MusicManager {
             wiederholung: 'aus',
             warteschlange: [],
             warteschlangeLaenge: 0,
+            titelGesamt: 0,
             restspielzeitSek: 0
         };
     }

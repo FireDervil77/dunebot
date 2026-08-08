@@ -11,7 +11,7 @@
   <div class="card-header">
     <h3 class="card-title">
       <%= tr('music:NAV.QUEUE') %>
-      <span class="badge bg-secondary-lt ms-2"><%= zustand.warteschlangeLaenge %></span>
+      <span class="badge bg-secondary-lt ms-2"><%= zustand.titelGesamt %></span>
     </h3>
     <div class="card-actions btn-list">
       <button type="button" class="btn btn-sm btn-outline-primary" onclick="musicSteuern('mischen')">
@@ -55,6 +55,12 @@
     </div>
     <div class="card-footer text-secondary">
       <%= tr('music:DASHBOARD.REMAINING', { zeit: spielzeitText(zustand.restspielzeitSek) }) %>
+    </div>
+  <% } else if (zustand.aktuell) { %>
+    <%# Ein Titel laeuft, es wartet nur keiner mehr. Die Seite darf hier nicht
+        "leer" sagen - oben steht sichtbar etwas drin. %>
+    <div class="card-footer text-secondary">
+      <%= tr('music:QUEUE.ONLY_CURRENT') %>
     </div>
   <% } else { %>
     <div class="card-body">

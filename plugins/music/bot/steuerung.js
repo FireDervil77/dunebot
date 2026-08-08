@@ -65,7 +65,9 @@ function knoepfe(z) {
     const reihe2 = new ActionRowBuilder().addComponents(
         knopf('vol_down', '🔉', 'Leiser', ButtonStyle.Secondary, z.lautstaerke <= 0),
         knopf('vol_up', '🔊', 'Lauter', ButtonStyle.Secondary, z.lautstaerke >= 200),
-        knopf('queue', '📜', `Warteschlange (${z.warteschlangeLaenge})`, ButtonStyle.Secondary),
+        // Der Knopf oeffnet die ganze Liste, also steht auch die ganze Zahl
+        // drauf - der laufende Titel eingerechnet.
+        knopf('queue', '📜', `Warteschlange (${z.titelGesamt ?? z.warteschlangeLaenge})`, ButtonStyle.Secondary),
         knopf('leave', '⏏️', 'Verlassen', ButtonStyle.Danger)
     );
 

@@ -39,7 +39,7 @@ module.exports = async (mitglied, seite = 1) => {
     }
 
     const fuss = [
-        `${zustand.warteschlange.length} in der Warteschlange`,
+        `${zustand.titelGesamt ?? zustand.warteschlange.length} Titel`,
         `Restspielzeit ${spielzeitText(zustand.restspielzeitSek)}`,
         `Lautstaerke ${zustand.lautstaerke}%`,
         zustand.wiederholung !== 'aus' ? `Wiederholung: ${zustand.wiederholung}` : null,

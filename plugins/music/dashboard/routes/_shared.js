@@ -105,7 +105,7 @@ async function zustandHolen(guildId) {
         guildId, verbunden: false, sprachKanalId: null, aktuell: null,
         pausiert: false, lautstaerke: 50, wiederholung: 'aus', filter: 'aus',
         qualitaet: 2, dauerbetrieb: false, autoplay: false, stimmen: 0,
-        warteschlange: [], warteschlangeLaenge: 0, restspielzeitSek: 0,
+        warteschlange: [], warteschlangeLaenge: 0, titelGesamt: 0, restspielzeitSek: 0,
         botErreichbar: false
     };
 

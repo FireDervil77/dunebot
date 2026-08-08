@@ -52,6 +52,7 @@
     "SUBTITLE": "What is still to come, reorder or remove",
     "EMPTY": "The queue is empty",
     "EMPTY_HINT": "Add something and it shows up here.",
+    "ONLY_CURRENT": "Nothing after this one — add something to keep it going.",
     "CLEAR": "Clear",
     "REMOVE": "Remove",
     "TO_TOP": "Move to top",

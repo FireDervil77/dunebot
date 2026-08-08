@@ -783,8 +783,27 @@ class GuildPlayer {
             autoplay: this.autoplay,
             stimmen: this.stimmen.size,
             warteschlange: this.warteschlange.map((t, i) => ({ ...t, position: i })),
+
+            // Zwei Zahlen, weil zwei Fragen gestellt werden:
+            //
+            // `warteschlangeLaenge` ist, was **noch kommt** - daran haengen die
+            // Nummern von `/music remove`, die Knopfsperren und das Feld
+            // "Danach". Der laufende Titel gehoert da nicht hinein, sonst
+            // zeigte `/music remove 1` auf den falschen.
+            //
+            // `titelGesamt` ist, was **da ist**, der laufende eingerechnet. Ohne
+            // diese Zahl stand ueberall eine 0, sobald genau ein Titel gewuenscht
+            // war: er lief ja schon und wartete deshalb nicht mehr. Die Liste
+            // meldete "leer", waehrend Ton aus dem Kanal kam.
             warteschlangeLaenge: this.warteschlange.length,
+            titelGesamt: this.warteschlange.length + (this.aktuell ? 1 : 0),
+
+            // Restspielzeit heisst: bis Stille eintritt. Der angefangene Titel
+            // zaehlt also mit, aber nur noch mit dem, was von ihm uebrig ist.
             restspielzeitSek: this.warteschlange.reduce((s, t) => s + (t.durationSec || 0), 0)
+                + (this.aktuell?.durationSec
+                    ? Math.max(0, this.aktuell.durationSec - this.positionSek())
+                    : 0)
         };
     }
 
