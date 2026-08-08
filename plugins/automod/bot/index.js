@@ -29,6 +29,13 @@ class AutoModBotPlugin extends BotPlugin {
     async onEnable(client) {
         const Logger = ServiceManager.get("Logger");
         Logger.info('[AutoMod]-Plugin wird aktiviert...');
+
+        // Der Aufraeumer des Anti-Spam-Verlaufs. Sein Vorgaenger (`cleanupCache`
+        // in bot/utils.js) wurde exportiert, aber nie aufgerufen - deshalb wuchs
+        // die Map unbegrenzt und alte Eintraege blieben ewig stehen.
+        const { starteVerlaufAufraeumer } = require('./utils');
+        starteVerlaufAufraeumer();
+
         Logger.success('[AutoMod]-Plugin aktiviert');
     }
 
@@ -42,9 +49,12 @@ class AutoModBotPlugin extends BotPlugin {
     async onDisable(client) {
         const Logger = ServiceManager.get("Logger");
         Logger.info('[AutoMod]-Plugin wird deaktiviert...');
-        
+
         // Keine Tabellen löschen hier - das macht das Dashboard-Plugin
         // Bot-Plugin kümmert sich nur um Commands/Events cleanup
+
+        const { stoppeVerlaufAufraeumer } = require('./utils');
+        stoppeVerlaufAufraeumer();
 
         Logger.success('[AutoMod]-Plugin deaktiviert');
     }

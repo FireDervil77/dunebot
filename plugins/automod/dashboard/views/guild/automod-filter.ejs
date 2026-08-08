@@ -38,6 +38,46 @@
               <span class="form-check-label"><%= tr(schluessel + '.LABEL') %></span>
             </label>
             <div class="text-secondary small mb-3"><%= tr(schluessel + '.HELP') %></div>
+
+            <%#
+              Die Anti-Spam-Schwellen stehen direkt unter ihrem Schalter, nicht
+              bei den Grenzwerten rechts - sie gehoeren nur zu diesem Schalter
+              und haben ohne ihn keine Bedeutung.
+            %>
+            <% if (name === 'anti_spam') { %>
+              <div class="row g-2 mb-3 ps-4">
+                <div class="col-4">
+                  <label for="anti_spam_messages" class="form-label small mb-1">
+                    <%= tr('automod:SETTINGS.ANTI_SPAM_MESSAGES.LABEL') %>
+                  </label>
+                  <input type="number" class="form-control form-control-sm" id="anti_spam_messages"
+                         name="anti_spam_messages" min="2" max="50"
+                         value="<%= settings.anti_spam_messages || 5 %>">
+                </div>
+                <div class="col-4">
+                  <label for="anti_spam_seconds" class="form-label small mb-1">
+                    <%= tr('automod:SETTINGS.ANTI_SPAM_SECONDS.LABEL') %>
+                  </label>
+                  <input type="number" class="form-control form-control-sm" id="anti_spam_seconds"
+                         name="anti_spam_seconds" min="1" max="60"
+                         value="<%= settings.anti_spam_seconds || 5 %>">
+                </div>
+                <div class="col-4">
+                  <label for="anti_spam_duplicates" class="form-label small mb-1">
+                    <%= tr('automod:SETTINGS.ANTI_SPAM_DUPLICATES.LABEL') %>
+                  </label>
+                  <input type="number" class="form-control form-control-sm" id="anti_spam_duplicates"
+                         name="anti_spam_duplicates" min="2" max="20"
+                         value="<%= settings.anti_spam_duplicates || 3 %>">
+                </div>
+                <div class="col-12">
+                  <div class="form-hint">
+                    <%= tr('automod:SETTINGS.ANTI_SPAM_MESSAGES.HELP') %> ·
+                    <%= tr('automod:SETTINGS.ANTI_SPAM_DUPLICATES.HELP') %>
+                  </div>
+                </div>
+              </div>
+            <% } %>
           <% }); %>
 
           <hr class="my-3">

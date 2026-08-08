@@ -39,11 +39,23 @@
     },
     "ANTI_GHOSTPING": {
       "LABEL": "Anti Ghost-Ping",
-      "HELP": "Log and moderate ghost pings (deleted mentions)"
+      "HELP": "Logs deleted messages containing mentions to the log channel. Requires a log channel and only covers messages still in the bot's cache. It only logs, it does not punish."
     },
     "ANTI_SPAM": {
       "LABEL": "Anti-Spam",
-      "HELP": "Automatically delete spam messages"
+      "HELP": "Deletes messages when someone posts too fast or repeats the same message. Thresholds below."
+    },
+    "ANTI_SPAM_MESSAGES": {
+      "LABEL": "Messages",
+      "HELP": "This many messages within the window counts as flooding"
+    },
+    "ANTI_SPAM_SECONDS": {
+      "LABEL": "Window (seconds)",
+      "HELP": "Messages are counted within this window"
+    },
+    "ANTI_SPAM_DUPLICATES": {
+      "LABEL": "Identical messages",
+      "HELP": "This many identical messages in a row — counted across channels"
     },
     "ANTI_MASSMENTION": {
       "LABEL": "Anti Mass-Mention",
@@ -59,11 +71,11 @@
     },
     "ANTI_INVITES": {
       "LABEL": "Anti-Invites",
-      "HELP": "Automatically delete messages with Discord invites"
+      "HELP": "Deletes messages containing Discord invites. Has no effect while Anti-Links is on — that already covers invites."
     },
     "ANTI_LINKS": {
       "LABEL": "Anti-Links",
-      "HELP": "Automatically delete messages with links"
+      "HELP": "Deletes messages containing links. Also disables Anti-Invites, because links already cover them."
     },
     "LIMITS": {
       "TITLE": "Limits & Thresholds"

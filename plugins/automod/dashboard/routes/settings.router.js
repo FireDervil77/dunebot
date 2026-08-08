@@ -65,6 +65,18 @@ router.put('/', requirePermission('AUTOMOD.SETTINGS.EDIT'), async (req, res) => 
         // --- Inhaltsfilter ---
         if (b.anti_ghostping !== undefined) updates.anti_ghostping = zuBool(b.anti_ghostping);
         if (b.anti_spam !== undefined) updates.anti_spam = zuBool(b.anti_spam);
+
+        // Anti-Spam-Schwellen. Untergrenzen bewusst hart: 1 Nachricht je
+        // Fenster oder 1 Wiederholung wuerde jede zweite Nachricht loeschen.
+        if (b.anti_spam_messages !== undefined) {
+            updates.anti_spam_messages = Math.min(50, Math.max(2, zuZahl(b.anti_spam_messages, 5)));
+        }
+        if (b.anti_spam_seconds !== undefined) {
+            updates.anti_spam_seconds = Math.min(60, Math.max(1, zuZahl(b.anti_spam_seconds, 5)));
+        }
+        if (b.anti_spam_duplicates !== undefined) {
+            updates.anti_spam_duplicates = Math.min(20, Math.max(2, zuZahl(b.anti_spam_duplicates, 3)));
+        }
         if (b.anti_massmention !== undefined) updates.anti_massmention = zuBool(b.anti_massmention);
         if (b.anti_massmention_threshold !== undefined) updates.anti_massmention_threshold = zuZahl(b.anti_massmention_threshold, 3);
         if (b.anti_attachments !== undefined) updates.anti_attachments = zuBool(b.anti_attachments);

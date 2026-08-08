@@ -108,6 +108,8 @@
         "FIELD_ATTACH": "Attachments Found",
         "FIELD_LINKS": "Links Found",
         "FIELD_ANTISPAM": "AntiSpam Detection",
+        "SPAM_RATE": "{{count}}/{{limit}} messages in {{seconds}}s",
+        "SPAM_DUPLICATE": "{{count}}/{{limit}}× the same message",
         "FIELD_INVITES": "Discord Invites",
         "FIELD_KEYWORD": "Keyword List: {{list}}",
         "FIELD_REGEX": "Regex Rule: {{rule}}",

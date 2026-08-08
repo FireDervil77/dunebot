@@ -1,6 +1,6 @@
 const { MiscUtils, Logger, EmbedUtils } = require("dunebot-sdk/utils");
 const { parsePlaceholders } = require("dunebot-core");
-const { antispamCache, MESSAGE_SPAM_THRESHOLD, shouldModerate } = require("../utils");
+const { pruefeSpam, istBefehlsnachricht, shouldModerate } = require("../utils");
 const { AutoModSettings, AutoModStrikes, AutoModLogs, AutoModEscalation, AutoModExemptions, AutoModRegexRules, AutoModCompoundRules } = require("../../shared/models");
 const { loadKeywordLists } = require("../keywordLoader");
 
@@ -31,7 +31,6 @@ try {
  * @param {import("discord.js").Message} message
  */
 module.exports = async (message) => {
-    if (message.isCommand) return;
     if (message.system || message.webhookId) return;
     if (message.author.bot && message.author.id === message.guild.members.me.id) return;
 
@@ -52,6 +51,10 @@ module.exports = async (message) => {
 
     if (!settings.debug_mode && !shouldModerate(message)) return;
 
+    // Praefix-Befehle nicht moderieren. Der alte Schutz dafuer (`message.isCommand`)
+    // war wirkungslos - siehe `istBefehlsnachricht` in ../utils.
+    if (await istBefehlsnachricht(message)) return;
+
     const { channel, member, guild, content, author, mentions } = message;
     const logChannel = settings.log_channel
         ? channel.guild.channels.cache.get(settings.log_channel)
@@ -62,25 +65,33 @@ module.exports = async (message) => {
 
     const fields = [];
 
+    // ════════════════════════════════════════════════════════════════════════
+    // Erwaehnungsgrenzen
+    //
+    // Die `> 0`-Pruefung fehlte hier, obwohl `max_lines` weiter unten sie hat
+    // und das Dashboard ausdruecklich "0 heisst aus" verspricht. Beide Spalten
+    // stehen per Vorgabe auf 0 - eine frisch aktivierte Guild gab damit fuer
+    // **jede** Nachricht mit einer einzigen Erwaehnung einen Strike, ohne dass
+    // irgendein Schalter an war. Nach zehn davon: Timeout.
+    // ════════════════════════════════════════════════════════════════════════
+
     // Max mentions
-    if (mentions.members.size > settings.max_mentions) {
+    if (settings.max_mentions > 0 && mentions.members.size > settings.max_mentions) {
         fields.push({
             name: guild.getT("automod:HANDLER.FIELD_MENTIONS"),
             value: `${mentions.members.size}/${settings.max_mentions}`,
             inline: true,
         });
-        // strikesTotal += mentions.members.size - settings.max_mentions;
         strikesTotal += 1;
     }
 
     // Maxrole mentions
-    if (mentions.roles.size > settings.max_role_mentions) {
+    if (settings.max_role_mentions > 0 && mentions.roles.size > settings.max_role_mentions) {
         fields.push({
             name: guild.getT("automod:HANDLER.FIELD_ROLE_MENTIONS"),
             value: `${mentions.roles.size}/${settings.max_role_mentions}`,
             inline: true,
         });
-        // strikesTotal += mentions.roles.size - settings.max_role_mentions;
         strikesTotal += 1;
     }
 
@@ -148,33 +159,32 @@ module.exports = async (message) => {
         }
     }
 
-    // Anti Spam
-    if (!settings.anti_links && settings.anti_spam) {
-        if (MiscUtils.containsLink(content)) {
-            const key = author.id + "|" + message.guildId;
-            if (antispamCache.has(key)) {
-                let antispamInfo = antispamCache.get(key);
-                if (
-                    antispamInfo.channelId !== message.channelId &&
-                    antispamInfo.content === content &&
-                    Date.now() - antispamInfo.timestamp < MESSAGE_SPAM_THRESHOLD
-                ) {
-                    fields.push({
-                        name: guild.getT("automod:HANDLER.FIELD_ANTISPAM"),
-                        value: "✓",
-                        inline: true,
-                    });
-                    shouldDelete = true;
-                    strikesTotal += 1;
-                }
-            } else {
-                let antispamInfo = {
-                    channelId: message.channelId,
-                    content,
-                    timestamp: Date.now(),
-                };
-                antispamCache.set(key, antispamInfo);
-            }
+    // ════════════════════════════════════════════════════════════════════════
+    // Anti-Spam
+    //
+    // Bewusst **nicht** mehr an `!settings.anti_links` gekoppelt: Wer Links
+    // sperrt, wollte damit nie den Spam-Schutz mit abschalten. Und geprueft
+    // wird jetzt eine Rate statt eines Links - Einzelheiten in ../utils.
+    // ════════════════════════════════════════════════════════════════════════
+    if (settings.anti_spam) {
+        const spam = pruefeSpam(message, settings);
+        if (spam.getroffen) {
+            fields.push({
+                name: guild.getT("automod:HANDLER.FIELD_ANTISPAM"),
+                value: spam.grund === 'RATE'
+                    ? guild.getT("automod:HANDLER.SPAM_RATE", {
+                        count: spam.anzahl,
+                        limit: spam.grenze,
+                        seconds: Number(settings.anti_spam_seconds) || 5,
+                    })
+                    : guild.getT("automod:HANDLER.SPAM_DUPLICATE", {
+                        count: spam.anzahl,
+                        limit: spam.grenze,
+                    }),
+                inline: true,
+            });
+            shouldDelete = true;
+            strikesTotal += 1;
         }
     }
 
@@ -283,10 +293,19 @@ module.exports = async (message) => {
     }
 
     // delete message if deletable
+    //
+    // Hier stand `channel.send(text, 5)` - die 5 sollte offenbar "nach fuenf
+    // Sekunden wieder weg" heissen, ist in discord.js aber kein zweiter
+    // Parameter und wurde verworfen. Der Hinweis blieb dadurch fuer immer
+    // stehen und muellte den Kanal zu, den er gerade aufgeraeumt hatte.
     if (shouldDelete && message.deletable) {
         message
             .delete()
-            .then(() => channel.send(guild.getT("automod:HANDLER.AUTO_DELETED"), 5))
+            .then(() => channel.send(guild.getT("automod:HANDLER.AUTO_DELETED")))
+            .then((hinweis) => {
+                if (!hinweis) return;
+                setTimeout(() => hinweis.delete().catch(() => {}), 5000);
+            })
             .catch(() => {});
     }
 

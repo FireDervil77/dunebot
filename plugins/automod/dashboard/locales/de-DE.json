@@ -39,11 +39,23 @@
     },
     "ANTI_GHOSTPING": {
       "LABEL": "Anti Ghost-Ping",
-      "HELP": "Loggt und moderiert Ghost-Pings (gelöschte Mentions)"
+      "HELP": "Protokolliert gelöschte Nachrichten mit Erwähnungen im Log-Kanal. Braucht einen gesetzten Log-Kanal und erfasst nur Nachrichten, die der Bot noch im Zwischenspeicher hat. Es wird nur protokolliert, nicht bestraft."
     },
     "ANTI_SPAM": {
       "LABEL": "Anti-Spam",
-      "HELP": "Löscht automatisch Spam-Nachrichten"
+      "HELP": "Löscht Nachrichten, wenn jemand zu schnell schreibt oder dieselbe Nachricht wiederholt. Schwellen siehe unten."
+    },
+    "ANTI_SPAM_MESSAGES": {
+      "LABEL": "Nachrichten",
+      "HELP": "Ab so vielen Nachrichten im Zeitfenster gilt es als Fluten"
+    },
+    "ANTI_SPAM_SECONDS": {
+      "LABEL": "Zeitfenster (Sekunden)",
+      "HELP": "In diesem Fenster werden die Nachrichten gezählt"
+    },
+    "ANTI_SPAM_DUPLICATES": {
+      "LABEL": "Gleiche Nachrichten",
+      "HELP": "Ab so vielen identischen Nachrichten hintereinander — kanalübergreifend gezählt"
     },
     "ANTI_MASSMENTION": {
       "LABEL": "Anti Mass-Mention",
@@ -59,11 +71,11 @@
     },
     "ANTI_INVITES": {
       "LABEL": "Anti-Einladungen",
-      "HELP": "Löscht automatisch Nachrichten mit Discord-Einladungen"
+      "HELP": "Löscht automatisch Nachrichten mit Discord-Einladungen. Wirkungslos, solange Anti-Links an ist — das erfasst Einladungen bereits."
     },
     "ANTI_LINKS": {
       "LABEL": "Anti-Links",
-      "HELP": "Löscht automatisch Nachrichten mit Links"
+      "HELP": "Löscht automatisch Nachrichten mit Links. Schaltet Anti-Einladungen mit ab, weil Links diese bereits abdecken."
     },
     "LIMITS": {
       "TITLE": "Limits & Schwellenwerte"

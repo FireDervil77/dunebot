@@ -260,9 +260,14 @@ async function activateLockdown(guild, settings) {
     try {
         Logger.warn(`[AutoMod Raid] 🔒 LOCKDOWN aktiviert für ${guild.name}`);
         
+        // Bisherige Pruefstufe merken, BEVOR sie ueberschrieben wird.
+        // Ohne das setzte `deactivateLockdown` sie fest auf LOW zurueck - eine
+        // Guild, die vorher auf HIGH stand, kam entschaerft aus dem Lockdown.
+        const originalVerificationLevel = guild.verificationLevel;
+
         // Verification Level auf HIGHEST setzen
         await guild.setVerificationLevel(4, '[AutoMod Raid] Lockdown aktiviert');
-        
+
         // @everyone Permissions backupen und entfernen
         const everyoneRole = guild.roles.everyone;
         const originalPerms = everyoneRole.permissions.toArray();
@@ -286,7 +291,7 @@ async function activateLockdown(guild, settings) {
         
         // Event loggen
         await AutoModRaidEvents.logEvent(guild.id, 'LOCKDOWN_ACTIVATED', {
-            metadata: { originalPerms }
+            metadata: { originalPerms, originalVerificationLevel }
         });
         
         // Alert senden
@@ -320,14 +325,22 @@ async function deactivateLockdown(guild) {
     try {
         Logger.info(`[AutoMod Raid] 🔓 LOCKDOWN deaktiviert für ${guild.name}`);
         
-        // Verification Level zurücksetzen (auf LOW)
-        await guild.setVerificationLevel(1, '[AutoMod Raid] Lockdown deaktiviert');
-        
-        // @everyone Permissions wiederherstellen
-        // Hole letzte Lockdown-Event für Original-Perms
+        // Zustand von vor dem Lockdown holen
         const events = await AutoModRaidEvents.getRecentEvents(guild.id, 100);
         const lockdownEvent = events.find(e => e.event_type === 'LOCKDOWN_ACTIVATED' && e.metadata?.originalPerms);
-        
+
+        // Pruefstufe auf den gemerkten Wert zurueck. Hier stand fest `1` (LOW) -
+        // wer vorher auf HIGH stand, kam entschaerft aus dem Lockdown heraus.
+        // Fehlt der gemerkte Wert (Lockdown vor dieser Aenderung), bleibt die
+        // Stufe unangetastet: lieber zu streng als heimlich zu lasch.
+        const alteStufe = lockdownEvent?.metadata?.originalVerificationLevel;
+        if (typeof alteStufe === 'number') {
+            await guild.setVerificationLevel(alteStufe, '[AutoMod Raid] Lockdown deaktiviert');
+        } else {
+            Logger.warn(`[AutoMod Raid] Keine gemerkte Pruefstufe für ${guild.name} - Stufe bleibt unveraendert`);
+        }
+
+        // @everyone Permissions wiederherstellen
         if (lockdownEvent) {
             const everyoneRole = guild.roles.everyone;
             await everyoneRole.setPermissions(
