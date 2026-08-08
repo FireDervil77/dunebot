@@ -126,9 +126,9 @@
     "MORE_TITLE": "Weitere Bereiche",
     "MORE_DESC": "Filter, Regeln und Protokoll haben eigene Seiten im AutoMod-Bereich.",
     "DM_MESSAGE": {
-      "LABEL": "Nachricht an das Mitglied",
-      "PLACEHOLDER": "Du hast auf {guild:name} einen Strike erhalten. Strikes: {strikes}/{max_strikes}",
-      "HELP": "Wird dem Mitglied als Direktnachricht geschickt. Leer lassen für den Standardtext.",
+      "LABEL": "Eigener Text der Direktnachricht",
+      "PLACEHOLDER": "z. B. {member:name}, du hast {strikes} Strikes bekommen ({total_strikes}/{max_strikes}).",
+      "HELP": "Ersetzt den Standardtext vollständig. Ohne Platzhalter stehen darin keine Strike-Zahlen mehr — der Stand steht aber immer als eigenes Feld darunter.",
       "VARIABLES": "Platzhalter"
     },
     "MAX_ROLE_MENTIONS": {

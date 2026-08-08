@@ -130,9 +130,9 @@
     "MORE_TITLE": "Other areas",
     "MORE_DESC": "Filters, rules and the log have their own pages in the AutoMod area.",
     "DM_MESSAGE": {
-      "LABEL": "Message to the member",
-      "PLACEHOLDER": "You received a strike on {guild:name}. Strikes: {strikes}/{max_strikes}",
-      "HELP": "Sent to the member as a direct message. Leave empty for the default text.",
+      "LABEL": "Custom direct message",
+      "PLACEHOLDER": "e.g. {member:name}, you received {strikes} strikes ({total_strikes}/{max_strikes}).",
+      "HELP": "Replaces the default text entirely. Without placeholders it contains no strike counts — the total is always shown as a separate field below.",
       "VARIABLES": "Placeholders"
     }
   },

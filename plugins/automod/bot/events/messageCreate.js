@@ -374,10 +374,25 @@ module.exports = async (message) => {
                 max: settings.max_strikes,
             });
 
+        // Der Strike-Stand gehoert als eigenes Feld in die Nachricht, nicht nur
+        // in den Standardtext.
+        //
+        // Sobald jemand einen eigenen `dm_message`-Text setzt, ersetzt der den
+        // Standardtext **vollstaendig** - und mit ihm die einzige Stelle, an der
+        // "x von y Strikes" stand. In der Nachricht blieben dann nur noch die
+        // Verstossfelder uebrig, und deren "3/3" (drei gleiche Nachrichten von
+        // drei erlaubten) sah aus wie ein Strike-Zaehler. Als Feld steht der
+        // Stand jetzt unabhaengig vom Text immer da.
+        const strikeFelder = fields.concat([{
+            name: guild.getT("automod:HANDLER.DM_FIELD_STRIKES"),
+            value: `${dbStrikes}/${settings.max_strikes}`,
+            inline: true,
+        }]);
+
         const strikeEmbed = EmbedUtils.embed()
             .setThumbnail(guild.iconURL())
             .setAuthor({ name: guild.getT("automod:HANDLER.AUTO_DM_TITLE") })
-            .addFields(fields)
+            .addFields(strikeFelder)
             .setDescription(dmDesc);
 
         if (settings.dm_embed_color) {
