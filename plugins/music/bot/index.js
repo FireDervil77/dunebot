@@ -42,6 +42,21 @@ class MusicBotPlugin extends BotPlugin {
             Logger.debug(`[Musik] Tonwerkzeuge:\n${generateDependencyReport()}`);
         } catch { /* Bericht ist nur eine Hilfe, kein Muss */ }
 
+        // Ohne yt-dlp gibt es keinen Ton. Das einmal beim Start deutlich
+        // sagen ist allemal besser, als es bei jedem Titel einzeln zu
+        // erfahren - und beim letzten Mal hat genau diese fehlende Ansage
+        // die Suche unnoetig lang gemacht.
+        const { verfuegbar } = require('./quellen/strom');
+        const ytdlp = await verfuegbar();
+        if (ytdlp.da) {
+            Logger.info(`[Musik] yt-dlp ${ytdlp.version} gefunden (${ytdlp.pfad})`);
+        } else {
+            Logger.error(
+                `[Musik] yt-dlp fehlt (gesucht als "${ytdlp.pfad}") - es wird kein Ton abgespielt. ` +
+                'Abhilfe: die eigenstaendige Datei nach ~/.local/bin/yt-dlp legen oder YTDLP_PATH setzen.'
+            );
+        }
+
         Logger.success('[Musik] Plugin aktiviert');
     }
 

@@ -22,11 +22,11 @@ const {
     entersState
 } = require('@discordjs/voice');
 
-const play = require('play-dl');
 const prism = require('prism-media');
 const { ServiceManager } = require('dunebot-core');
 const { MusicSettings, MusicHistory } = require('../../shared/models');
 const { aufloesenZumAbspielen, aehnlichenFinden } = require('../quellen');
+const { tonspurErmitteln, tonstromOeffnen } = require('../quellen/strom');
 const klangfilter = require('../klangfilter');
 
 // prism-media startet ffmpeg selbst. Ohne diesen Hinweis sucht es im
@@ -109,7 +109,7 @@ class GuildPlayer {
         });
 
         this.spieler.on('error', (err) => {
-            Logger.error(`[Musik] Abspielfehler in Guild ${this.guildId}:`, err.message);
+            Logger.error(`[Musik] Abspielfehler in Guild ${this.guildId}:`, err);
             // Ein kaputter Titel darf die Warteschlange nicht anhalten
             this._weiter().catch(e => Logger.error('[Musik] Weiterschalten nach Fehler fehlgeschlagen:', e));
         });
@@ -319,24 +319,17 @@ class GuildPlayer {
         const Logger = ServiceManager.get('Logger');
 
         try {
-            const filterArgumente = klangfilter.ffmpegArgumente(this.filter);
-            let quelle;
+            // Direkte Tonspur und Internetradio zeigen schon auf die Bytes
+            // selbst. Alles andere ist eine Seitenadresse, hinter der die
+            // Tonspur erst gesucht werden muss.
+            const adresse = t.source === 'direct'
+                ? t.url
+                : (await tonspurErmitteln(t.url, this.qualitaet)).url;
 
-            if (t.source === 'direct') {
-                // Direkte Tonspur und Internetradio gehen ohne play-dl
-                quelle = filterArgumente
-                    ? this._mitFilter(t.url, filterArgumente)
-                    : createAudioResource(t.url, { inlineVolume: true });
-            } else {
-                const strom = await play.stream(t.url, { quality: this.qualitaet });
-
-                quelle = filterArgumente
-                    ? this._mitFilter(strom.stream, filterArgumente)
-                    : createAudioResource(strom.stream, {
-                        inputType: strom.type ?? StreamType.Arbitrary,
-                        inlineVolume: true
-                    });
-            }
+            const quelle = this._tonquelle(
+                tonstromOeffnen(adresse),
+                klangfilter.ffmpegArgumente(this.filter)
+            );
 
             if (quelle.volume) quelle.volume.setVolume(this.lautstaerke / 100);
 
@@ -361,33 +354,41 @@ class GuildPlayer {
             return true;
 
         } catch (err) {
-            Logger.error(`[Musik] "${t.title}" liess sich nicht abspielen:`, err.message);
+            Logger.error(`[Musik] "${t.title}" (${t.source}, ${t.url}) liess sich nicht abspielen:`, err);
             // Nicht steckenbleiben - der naechste ist dran
             return await this._weiter();
         }
     }
 
     /**
-     * Einen Tonstrom durch ffmpeg schicken, um einen Klangfilter anzuwenden.
+     * Einen Datenstrom durch ffmpeg in einen abspielbaren Tonstrom verwandeln.
+     *
+     * Es geht immer durch ffmpeg, auch ohne Klangfilter: die Lautstaerke-
+     * regelung von @discordjs/voice arbeitet auf rohem PCM, also muesste
+     * ohnehin entpackt werden. Ein zweiter Weg daran vorbei braechte nichts
+     * ausser einer zweiten Stelle, an der etwas kaputtgehen kann.
+     *
+     * ffmpeg bekommt die Bytes ueber die Standardeingabe, niemals eine
+     * Adresse - warum, steht ausfuehrlich in `quellen/strom.js`. Kurz: das
+     * mitgelieferte statische ffmpeg stuerzt bei jeder Namensaufloesung ab.
      *
      * ffmpeg gibt rohes s16le aus, deshalb `StreamType.Raw`.
      *
-     * @param {string|Object} eingabe Adresse oder Datenstrom
-     * @param {Array<string>} argumente ffmpeg-Argumente
+     * @param {Object} eingang Datenstrom mit den Tonbytes
+     * @param {Array<string>} argumente ffmpeg-Ausgabeargumente
      * @returns {Object} Tonquelle
      * @private
      */
-    _mitFilter(eingabe, argumente) {
-        const istAdresse = typeof eingabe === 'string';
-        const wandler = new prism.FFmpeg({
-            args: istAdresse ? ['-i', eingabe, ...argumente] : argumente
+    _tonquelle(eingang, argumente) {
+        const wandler = new prism.FFmpeg({ args: argumente });
+        const strom = eingang.pipe(wandler);
+
+        // Bricht der Ton ab, muessen auch ffmpeg und die Leitung zu - sonst
+        // bleiben Vorgaenge und offene Verbindungen liegen.
+        strom.on('close', () => {
+            try { wandler.destroy(); } catch { /* schon zu */ }
+            try { eingang.destroy(); } catch { /* schon zu */ }
         });
-
-        const strom = istAdresse ? wandler : eingabe.pipe(wandler);
-
-        // Bricht der Ton ab, muss auch ffmpeg beendet werden - sonst bleiben
-        // Vorgaenge liegen.
-        strom.on('close', () => { try { wandler.destroy(); } catch { /* schon zu */ } });
 
         return createAudioResource(strom, { inputType: StreamType.Raw, inlineVolume: true });
     }

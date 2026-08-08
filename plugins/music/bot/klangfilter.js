@@ -91,26 +91,29 @@ function holen(name) {
 }
 
 /**
- * Die ffmpeg-Argumente fuer einen Filter.
+ * Die ffmpeg-Ausgabeargumente fuer einen Filter.
  *
- * Leer, wenn kein Filter gesetzt ist - dann laeuft der Ton unveraendert
- * durch und wir sparen uns den ffmpeg-Vorgang ganz.
+ * Kommen immer, auch ohne Filter: der Ton geht ohnehin durch ffmpeg, weil
+ * die Lautstaerkeregelung rohes PCM braucht. Ohne Filter faellt lediglich
+ * die `-af`-Kette weg.
  *
  * @param {string} name Filtername
- * @returns {Array<string>|null} Argumente oder null
+ * @returns {Array<string>} Argumente
  */
 function ffmpegArgumente(name) {
     const filter = holen(name);
-    if (!filter.ffmpeg) return null;
 
-    return [
+    const argumente = [
         '-analyzeduration', '0',
         '-loglevel', '0',
         '-f', 's16le',
         '-ar', '48000',
-        '-ac', '2',
-        '-af', filter.ffmpeg
+        '-ac', '2'
     ];
+
+    if (filter.ffmpeg) argumente.push('-af', filter.ffmpeg);
+
+    return argumente;
 }
 
 /**

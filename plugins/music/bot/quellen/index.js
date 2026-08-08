@@ -15,6 +15,10 @@
  *   ist (`aufloesenZumAbspielen`).
  * - SoundCloud braucht eine Client-ID. `play-dl` kann sich selbst eine
  *   besorgen; das passiert einmal beim ersten Zugriff.
+ * - **Freie Suchbegriffe laufen erst ueber Spotify.** "sandstorm darude"
+ *   wird dort zu "Darude - Sandstorm", und erst das geht an die YouTube-
+ *   Suche. Ohne Spotify-Zugangsdaten faellt der Schritt lautlos weg und der
+ *   Rohtext geht direkt an YouTube.
  *
  * @module music/bot/quellen
  */
@@ -124,6 +128,99 @@ function ausYouTubeVideo(video, angefordertVon) {
         artist: video.channel?.name || null,
         requestedBy: angefordertVon
     });
+}
+
+/**
+ * Text auf das Vergleichbare herunterbrechen.
+ *
+ * Kleinschreibung, Umlaute aufgeloest, Satzzeichen weg - damit
+ * "Björk – Army Of Me (Remaster)" und "bjoerk army of me" zusammenfinden.
+ *
+ * @param {string} text Beliebiger Text
+ * @returns {Array<string>} Einzelne Woerter
+ * @private
+ */
+function woerter(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+        .split(' ')
+        .filter(Boolean);
+}
+
+/**
+ * Passt der Spotify-Treffer ueberhaupt zur Anfrage?
+ *
+ * Der Wachhund gegen stille Vertauschungen: Wer "bohemian rhapsody muse
+ * cover" sucht, soll nicht Queens Original bekommen, nur weil Spotify das
+ * fuer den bekannteren Titel haelt. Spotify darf den Wunsch praezisieren,
+ * nicht ersetzen.
+ *
+ * @param {string} anfrage Was jemand eingegeben hat
+ * @param {string} kandidat Kuenstler und Titel des Spotify-Treffers
+ * @returns {boolean} Ob der Treffer uebernommen werden darf
+ * @private
+ */
+function aehnlichGenug(anfrage, kandidat) {
+    const gesucht = woerter(anfrage);
+    if (gesucht.length === 0) return false;
+
+    const gefunden = new Set(woerter(kandidat));
+    const gedeckt = gesucht.filter(w => gefunden.has(w)).length;
+
+    // Zwei Drittel der eingegebenen Woerter muessen im Treffer vorkommen.
+    // Ein einzelnes Wort mehr in der Anfrage ("live", "cover", "remix") kippt
+    // das Ergebnis damit, und genau so soll es sein.
+    return gedeckt / gesucht.length >= 0.67;
+}
+
+/**
+ * Einen freien Suchbegriff ueber Spotify aufraeumen.
+ *
+ * Wer "sandstorm darude" tippt, meint "Darude - Sandstorm". Spotify kennt
+ * Kuenstler, Titel und Dauer sauber getrennt; YouTube-Titel dagegen tragen
+ * Zusaetze wie "(Official Video)" oder "[4K Remaster]" mit sich herum.
+ * Deshalb fragen wir erst Spotify und schicken erst das aufgeraeumte
+ * Ergebnis an die YouTube-Suche.
+ *
+ * Spotify liefert weiterhin keinen Ton - nur die Angaben.
+ *
+ * @param {string} text Der eingegebene Suchbegriff
+ * @param {Object} e Einstellungen der Guild
+ * @returns {Promise<Object|null>} Aufgeraeumte Angaben oder null
+ * @private
+ */
+async function ueberSpotifyVerfeinern(text, e) {
+    // Ausdrueckliches Abschalten gilt auch fuer die reine Abfrage von Angaben
+    if (e.allow_spotify === false) return null;
+    // Ohne Zugangsdaten passiert hier gar nichts - dann bleibt es beim rohen Begriff
+    if (!(await spotifyVorbereiten())) return null;
+
+    try {
+        const treffer = await play.search(text, { limit: 1, source: { spotify: 'track' } });
+        const s = treffer?.[0];
+        if (!s || !s.name) return null;
+
+        const kuenstler = (s.artists || []).map(a => a.name).join(', ');
+        const voll = kuenstler ? `${kuenstler} ${s.name}` : s.name;
+
+        if (!aehnlichGenug(text, voll)) return null;
+
+        return {
+            suchbegriff: voll,
+            title: kuenstler ? `${kuenstler} - ${s.name}` : s.name,
+            artist: kuenstler || null,
+            durationSec: s.durationInSec || sekunden(s.durationInMs),
+            thumbnail: s.thumbnail?.url || null
+        };
+    } catch (err) {
+        // Verfeinern ist Kuer - faellt sie aus, sucht YouTube eben mit dem Rohtext
+        ServiceManager.get('Logger').debug(`[Musik] Spotify-Verfeinerung fuer "${text}" fehlgeschlagen: ${err.message}`);
+        return null;
+    }
 }
 
 /**
@@ -275,14 +372,35 @@ async function aufloesen(eingabe, optionen = {}) {
             return { titel: spuren.map(ausSpotify), quelle: 'spotify', hinweis: null };
         }
 
-        // --- Suchbegriff: auf YouTube nachschlagen ---
+        // --- Suchbegriff: erst bei Spotify aufraeumen, dann auf YouTube nachschlagen ---
         if (e.allow_youtube === false) return { titel: [], quelle: 'youtube', hinweis: 'QUELLE_AUS' };
 
-        const treffer = await play.search(text, { limit: 1, source: { youtube: 'video' } });
+        const verfeinert = await ueberSpotifyVerfeinern(text, e);
+        if (verfeinert) {
+            Logger.debug(`[Musik] "${text}" ueber Spotify praezisiert zu "${verfeinert.suchbegriff}"`);
+        }
+
+        const treffer = await play.search(verfeinert ? verfeinert.suchbegriff : text, {
+            limit: 1,
+            source: { youtube: 'video' }
+        });
         if (!treffer || treffer.length === 0) {
             return { titel: [], quelle: 'suche', hinweis: 'NICHTS_GEFUNDEN' };
         }
-        return { titel: [ausYouTubeVideo(treffer[0], angefordertVon)], quelle: 'youtube', hinweis: null };
+
+        const gefunden = ausYouTubeVideo(treffer[0], angefordertVon);
+
+        // Die Angaben von Spotify sind die besseren: sauber getrennter
+        // Kuenstler, Titel ohne "(Official Video)", verlaessliche Dauer.
+        // Die Adresse bleibt die von YouTube - von dort kommt der Ton.
+        if (verfeinert) {
+            gefunden.title = verfeinert.title;
+            gefunden.artist = verfeinert.artist || gefunden.artist;
+            gefunden.durationSec = verfeinert.durationSec || gefunden.durationSec;
+            gefunden.thumbnail = verfeinert.thumbnail || gefunden.thumbnail;
+        }
+
+        return { titel: [gefunden], quelle: 'youtube', hinweis: null };
 
     } catch (err) {
         Logger.error(`[Musik] Aufloesen von "${text}" fehlgeschlagen:`, err);
@@ -359,5 +477,7 @@ async function aehnlichenFinden(letzter, gemieden = []) {
 
 module.exports = {
     aufloesen, aufloesenZumAbspielen, aehnlichenFinden,
-    soundcloudVorbereiten, spotifyVorbereiten
+    soundcloudVorbereiten, spotifyVorbereiten,
+    // Nach aussen nur zum Pruefen - der Suchweg benutzt sie selbst
+    aehnlichGenug, ueberSpotifyVerfeinern
 };
