@@ -695,8 +695,12 @@ class GuildPlayer {
      * @returns {boolean} Ob der Name bekannt war
      */
     filterSetzen(name) {
-        if (!klangfilter.bekannt(name)) return false;
-        this.filter = String(name).toLowerCase();
+        // Den wirklichen Schluessel ablegen, nicht die getippte Schreibweise -
+        // sonst steht in der Datenbank etwas, das die Auswahlliste des
+        // Dashboards nicht wiedererkennt und deshalb nicht anhakt.
+        const kennung = klangfilter.schluessel(name);
+        if (!kennung) return false;
+        this.filter = kennung;
         this.ansageAuffrischen();
         this._sichern();
         return true;

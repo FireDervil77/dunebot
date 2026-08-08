@@ -51,7 +51,10 @@ router.put('/', requirePermission('MUSIC.SETTINGS.EDIT'), async (req, res) => {
         if (b.audio_quality !== undefined) updates.audio_quality = zahl(b.audio_quality, 2, 0, 2);
 
         if (b.audio_filter !== undefined) {
-            updates.audio_filter = klangfilter.bekannt(b.audio_filter) ? String(b.audio_filter).toLowerCase() : 'aus';
+            // Der Schluessel aus der Filterliste, nicht die kleingeschriebene
+            // Fassung davon - sonst landet ein Name in der Datenbank, den die
+            // Auswahlliste beim naechsten Aufruf nicht wiederfindet.
+            updates.audio_filter = klangfilter.schluessel(b.audio_filter) || 'aus';
         }
 
         // Abstimmung

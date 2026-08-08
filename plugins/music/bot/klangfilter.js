@@ -58,7 +58,12 @@ const FILTER = {
         ffmpeg: 'treble=g=8',
         tempo: 1
     },
-    lautstaerkeAusgleich: {
+    // Der Schluessel hiess `lautstaerkeAusgleich`, mit grossem A. Gesucht wird
+    // aber immer kleingeschrieben - der Filter war damit als einziger nicht
+    // auffindbar: die Auswahlliste bot ihn an, das Setzen antwortete "Diesen
+    // Filter kenne ich nicht", und das Dashboard speicherte still "aus".
+    // Alle Schluessel sind jetzt klein; `schluessel()` haelt es auch so.
+    ausgleich: {
         name: 'Lautstaerke ausgleichen',
         ffmpeg: 'dynaudnorm=f=200',
         tempo: 1
@@ -71,13 +76,32 @@ const FILTER = {
 };
 
 /**
+ * Nachschlagewerk: kleingeschriebener Name -> wirklicher Schluessel.
+ *
+ * Aufgebaut aus `FILTER` selbst, damit ein Schluessel mit Grossbuchstaben den
+ * Filter nicht noch einmal unauffindbar machen kann. Genau daran scheiterte
+ * `lautstaerkeAusgleich`: gesucht wurde klein, abgelegt war es gemischt.
+ */
+const INDEX = new Map(Object.keys(FILTER).map(k => [k.toLowerCase(), k]));
+
+/**
+ * Den wirklichen Schluessel zu einem Namen finden.
+ *
+ * @param {string} name Filtername in beliebiger Schreibweise
+ * @returns {string|null} Schluessel, oder null bei unbekanntem Namen
+ */
+function schluessel(name) {
+    return INDEX.get(String(name || '').toLowerCase()) || null;
+}
+
+/**
  * Ist der Name ein bekannter Filter?
  *
  * @param {string} name Filtername
  * @returns {boolean}
  */
 function bekannt(name) {
-    return Object.prototype.hasOwnProperty.call(FILTER, String(name || '').toLowerCase());
+    return schluessel(name) !== null;
 }
 
 /**
@@ -87,7 +111,7 @@ function bekannt(name) {
  * @returns {Object} Filter
  */
 function holen(name) {
-    return FILTER[String(name || '').toLowerCase()] || FILTER.aus;
+    return FILTER[schluessel(name)] || FILTER.aus;
 }
 
 /**
@@ -125,4 +149,4 @@ function auswahl() {
     return Object.entries(FILTER).map(([wert, f]) => ({ wert, name: f.name }));
 }
 
-module.exports = { FILTER, bekannt, holen, ffmpegArgumente, auswahl };
+module.exports = { FILTER, schluessel, bekannt, holen, ffmpegArgumente, auswahl };
