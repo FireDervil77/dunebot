@@ -149,6 +149,25 @@ class GuildPlayer {
         // Genau daran hing die Suche am 2026-08-08.
         this.verbindung.on('stateChange', (alt, neu) => {
             Logger.info(`[Musik] Guild ${this.guildId}: Sprachverbindung ${alt.status} -> ${neu.status}`);
+
+            // Den Schliesscode des Sprach-WebSockets mitschreiben.
+            //
+            // Der Uebergang connecting -> signalling sagt nur, dass der Socket
+            // mit irgendetwas ausser 4014 zuging - und das ist die eine Zahl,
+            // an der die Ursache haengt: 4006 heisst abgelaufene Sitzung, 4011
+            // Server nicht gefunden, 4016 unbekanntes Verschluesselungsverfahren,
+            // 1006 ein Abbruch auf dem Weg. Die Bibliothek behaelt den Code fuer
+            // sich, deshalb horchen wir an der Netzwerkschicht mit.
+            const netz = neu.networking;
+            if (netz && netz !== alt.networking) {
+                netz.once('close', (code) => {
+                    Logger.warn(`[Musik] Guild ${this.guildId}: Sprach-WebSocket geschlossen mit Code ${code}`);
+                });
+            }
+        });
+
+        this.verbindung.on('error', (err) => {
+            Logger.error(`[Musik] Guild ${this.guildId}: Fehler der Sprachverbindung: ${err.message}`);
         });
 
         // Discord verschiebt Sprachverbindungen gelegentlich. Ohne diese
