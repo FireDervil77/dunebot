@@ -24,7 +24,7 @@ const {
 
 const prism = require('prism-media');
 const { ServiceManager } = require('dunebot-core');
-const { MusicSettings, MusicHistory } = require('../../shared/models');
+const { MusicSettings, MusicHistory, MusicSession } = require('../../shared/models');
 const { aufloesenZumAbspielen, aehnlichenFinden } = require('../quellen');
 const { tonstromVonSeite, tonstromVonAdresse } = require('../quellen/strom');
 const klangfilter = require('../klangfilter');
@@ -85,6 +85,9 @@ class GuildPlayer {
         /** Die stehende "Jetzt laeuft"-Nachricht mit der Mediensteuerung. */
         this._ansageNachricht = null;
 
+        /** Buendelt das Sichern der Warteschlange. */
+        this._sicherungsZeitgeber = null;
+
         this.spieler = createAudioPlayer({
             behaviors: {
                 // Ohne Zuhoerer weiterlaufen zu lassen kostet nur Bandbreite
@@ -102,6 +105,74 @@ class GuildPlayer {
         });
 
         this._hakenSetzen();
+    }
+
+    /**
+     * Den Stand sichern - gebuendelt, nicht bei jedem Tastendruck einzeln.
+     *
+     * Ohne Buendelung wuerde ein Mischen von fuenfzig Titeln oder ein
+     * mehrfaches Lauterdrehen die Warteschlange jedes Mal komplett neu
+     * schreiben. Eine Sekunde Verzoegerung fasst das zusammen, ohne dass bei
+     * einem Absturz mehr als der letzte Handgriff verlorengeht.
+     *
+     * @private
+     */
+    _sichern() {
+        if (this._sicherungsZeitgeber) return;
+
+        this._sicherungsZeitgeber = setTimeout(() => {
+            this._sicherungsZeitgeber = null;
+            this._sichernSofort();
+        }, 1000);
+    }
+
+    /**
+     * Den Stand jetzt sichern.
+     *
+     * @returns {Promise<void>}
+     * @private
+     */
+    async _sichernSofort() {
+        if (!this.verbunden) return;
+
+        try {
+            await MusicSession.sichern(this.guildId, {
+                sprachKanalId: this.sprachKanalId,
+                textKanalId: this.textKanalId,
+                lautstaerke: this.lautstaerke,
+                wiederholung: this.wiederholung,
+                filter: this.filter,
+                autoplay: this.autoplay,
+                dauerbetrieb: this.dauerbetrieb,
+                positionSek: this.positionSek(),
+                aktuell: this.aktuell,
+                warteschlange: this.warteschlange
+            });
+        } catch (err) {
+            // Die Wiedergabe darf daran nicht haengen
+            ServiceManager.get('Logger').warn(`[Musik] Warteschlange nicht gesichert: ${err.message}`);
+        }
+    }
+
+    /**
+     * Einen gesicherten Stand uebernehmen.
+     *
+     * Setzt nur die Werte - das Beitreten und Anspielen macht der Aufrufer,
+     * der auch entscheidet, ob es sich ueberhaupt lohnt.
+     *
+     * @param {Object} stand Stand aus `MusicSession.laden`
+     */
+    standUebernehmen(stand) {
+        this.warteschlange = Array.isArray(stand.warteschlange) ? stand.warteschlange.slice() : [];
+        this.aktuell = null;   // laeuft erst, wenn wirklich angespielt wurde
+        this.textKanalId = stand.textKanalId || null;
+        this.lautstaerke = stand.lautstaerke ?? 50;
+        this.wiederholung = Object.values(WIEDERHOLUNG).includes(stand.wiederholung)
+            ? stand.wiederholung
+            : WIEDERHOLUNG.AUS;
+        this.filter = klangfilter.bekannt(stand.filter) ? stand.filter : 'aus';
+        this.autoplay = Boolean(stand.autoplay);
+        this.dauerbetrieb = Boolean(stand.dauerbetrieb);
     }
 
     /**
@@ -163,7 +234,16 @@ class GuildPlayer {
             channelId: sprachKanal.id,
             guildId: this.guildId,
             adapterCreator: sprachKanal.guild.voiceAdapterCreator,
-            selfDeaf: true
+
+            // Taubheit aus, weil der Bot sonst im Kanal durchgestrichen
+            // dasteht - das sah nach "kaputt" aus, obwohl es nur die
+            // Darstellung war. Kostet, dass Discord uns die Sprachdaten der
+            // Anwesenden schickt, die wir wegwerfen.
+            selfDeaf: false,
+
+            // Ausdruecklich **nicht** stumm: das Mikrofon ist die Leitung, ueber
+            // die die Musik geht. `selfMute: true` hiesse Stille.
+            selfMute: false
         });
 
         this.sprachKanalId = sprachKanal.id;
@@ -276,6 +356,7 @@ class GuildPlayer {
             aufgenommen++;
         }
 
+        this._sichern();
         return { aufgenommen, abgewiesen };
     }
 
@@ -329,6 +410,7 @@ class GuildPlayer {
             // `_verwaisungPruefen`, angestossen vom Sprachereignis.
             Logger.debug(`[Musik] Guild ${this.guildId}: Warteschlange leer, warte im Kanal`);
             this.ansageAuffrischen();
+            this._sichern();
             return false;
         }
 
@@ -382,6 +464,7 @@ class GuildPlayer {
                 .catch(err => Logger.warn(`[Musik] Verlauf nicht geschrieben: ${err.message}`));
 
             this._ansagen();
+            this._sichernSofort();
             return true;
 
         } catch (err) {
@@ -534,6 +617,7 @@ class GuildPlayer {
         this.spieler.stop(true);
         this._wirdBeendet = false;
         this.ansageAuffrischen();
+        this._sichern();
         return true;
     }
 
@@ -549,6 +633,7 @@ class GuildPlayer {
         const quelle = this.spieler.state?.resource;
         if (quelle?.volume) quelle.volume.setVolume(neu / 100);
         this.ansageAuffrischen();
+        this._sichern();
         return neu;
     }
 
@@ -559,6 +644,7 @@ class GuildPlayer {
             [this.warteschlange[i], this.warteschlange[j]] = [this.warteschlange[j], this.warteschlange[i]];
         }
         this.ansageAuffrischen();
+        this._sichern();
         return this.warteschlange.length;
     }
 
@@ -570,7 +656,9 @@ class GuildPlayer {
      */
     entfernen(position) {
         if (position < 0 || position >= this.warteschlange.length) return null;
-        return this.warteschlange.splice(position, 1)[0];
+        const entfernt = this.warteschlange.splice(position, 1)[0];
+        this._sichern();
+        return entfernt;
     }
 
     /**
@@ -584,6 +672,7 @@ class GuildPlayer {
         const ziel = Math.max(0, Math.min(this.warteschlange.length - 1, nach));
         const [t] = this.warteschlange.splice(von, 1);
         this.warteschlange.splice(ziel, 0, t);
+        this._sichern();
         return true;
     }
 
@@ -592,6 +681,7 @@ class GuildPlayer {
         if (!Object.values(WIEDERHOLUNG).includes(modus)) return false;
         this.wiederholung = modus;
         this.ansageAuffrischen();
+        this._sichern();
         return true;
     }
 
@@ -608,6 +698,7 @@ class GuildPlayer {
         if (!klangfilter.bekannt(name)) return false;
         this.filter = String(name).toLowerCase();
         this.ansageAuffrischen();
+        this._sichern();
         return true;
     }
 
@@ -624,6 +715,7 @@ class GuildPlayer {
             // Ohne Dauerbetrieb gilt wieder: ohne Menschen kein Bot
             this._verwaisungPruefen();
         }
+        this._sichern();
         return this.dauerbetrieb;
     }
 
@@ -634,6 +726,7 @@ class GuildPlayer {
      */
     autoplaySetzen(an) {
         this.autoplay = Boolean(an);
+        this._sichern();
         return this.autoplay;
     }
 

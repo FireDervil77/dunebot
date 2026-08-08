@@ -57,6 +57,23 @@ class MusicBotPlugin extends BotPlugin {
             );
         }
 
+        // Gesicherte Warteschlangen wieder aufnehmen.
+        //
+        // Erst wenn der Client bereit ist - vorher ist der Kanal-
+        // Zwischenspeicher leer, und die Pruefung "ist ueberhaupt jemand da"
+        // wuerde immer nein sagen. Wird das Plugin im Betrieb eingeschaltet,
+        // ist er das laengst, dann geht es sofort los.
+        const wiederaufnehmen = () => {
+            client.musicManager.wiederherstellen()
+                .then(anzahl => {
+                    if (anzahl > 0) Logger.info(`[Musik] ${anzahl} Warteschlange(n) wieder aufgenommen`);
+                })
+                .catch(err => Logger.warn(`[Musik] Wiederaufnahme fehlgeschlagen: ${err.message}`));
+        };
+
+        if (client.isReady()) wiederaufnehmen();
+        else client.once('ready', wiederaufnehmen);
+
         Logger.success('[Musik] Plugin aktiviert');
     }
 

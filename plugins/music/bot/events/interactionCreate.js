@@ -116,7 +116,8 @@ module.exports = async (interaction) => {
             }
 
             case 'leave':
-                manager.beenden(interaction.guildId);
+                // Wie /music disconnect: die Liste soll auch weg sein
+                manager.beenden(interaction.guildId, true);
                 return interaction.update({
                     embeds: [{ color: 0x6C757D, description: 'Ich habe den Sprachkanal verlassen.' }],
                     components: []

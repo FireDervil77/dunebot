@@ -7,8 +7,9 @@
  * @module music/bot/managers/MusicManager
  */
 
+const { ServiceManager } = require('dunebot-core');
 const GuildPlayer = require('./GuildPlayer');
-const { MusicSettings } = require('../../shared/models');
+const { MusicSettings, MusicSession } = require('../../shared/models');
 
 class MusicManager {
     /**
@@ -46,17 +47,107 @@ class MusicManager {
     }
 
     /**
-     * Abspieler beenden und vergessen.
+     * Abspieler beenden.
      *
      * @param {string} guildId Discord-Guild-ID
+     * @param {boolean} [vergessen=false] Auch den gesicherten Stand verwerfen
      */
-    beenden(guildId) {
+    beenden(guildId, vergessen = false) {
         const abspieler = this.abspieler.get(guildId);
+
+        // Der gesicherte Stand haengt nicht am Abspieler - er kann auch dann
+        // wegzuwerfen sein, wenn hier gerade keiner mehr laeuft
+        if (vergessen) {
+            MusicSession.loeschen(guildId).catch(err => {
+                ServiceManager.get('Logger').warn(`[Musik] Stand nicht verworfen: ${err.message}`);
+            });
+        }
+
         if (!abspieler) return false;
 
         abspieler.aufraeumen();
         this.abspieler.delete(guildId);
         return true;
+    }
+
+    /**
+     * Gesicherte Warteschlangen nach einem Neustart wieder aufnehmen.
+     *
+     * Zwei Bedingungen, damit daraus keine Ueberraschung wird:
+     *
+     * - **Nur wenn jemand da ist.** Ein Bot, der um vier Uhr morgens von
+     *   allein in einen leeren Kanal zurueckkehrt und Musik spielt, ist ein
+     *   Fehler, kein Dienst. Ausnahme ist der Dauerbetrieb - der ist
+     *   ausdruecklich dafuer gedacht.
+     * - **Nur frische Staende.** Was aelter als `HOECHSTALTER_STUNDEN` ist,
+     *   wird verworfen. Sonst holt ein Neustart nach drei Wochen eine
+     *   Warteschlange zurueck, an die sich niemand mehr erinnert.
+     *
+     * Der laufende Titel beginnt von vorn. Mitten im Stueck einzusteigen
+     * waere machbar, aber der gesicherte Sekundenstand ist nach einem
+     * Absturz ohnehin nur ungefaehr.
+     *
+     * @returns {Promise<number>} Wie viele Sitzungen wieder aufgenommen wurden
+     */
+    async wiederherstellen() {
+        const Logger = ServiceManager.get('Logger');
+
+        let staende;
+        try {
+            staende = await MusicSession.alle();
+        } catch (err) {
+            // Fehlt die Tabelle noch, ist das kein Grund, den Bot aufzuhalten
+            Logger.warn(`[Musik] Gesicherte Warteschlangen nicht lesbar: ${err.message}`);
+            return 0;
+        }
+
+        if (staende.length === 0) return 0;
+
+        let aufgenommen = 0;
+
+        for (const stand of staende) {
+            try {
+                const alter = (Date.now() - new Date(stand.gesichertUm || Date.now()).getTime()) / 3600000;
+                if (alter > MusicManager.HOECHSTALTER_STUNDEN) {
+                    await MusicSession.loeschen(stand.guildId);
+                    continue;
+                }
+
+                const kanal = this.client.channels.cache.get(stand.sprachKanalId);
+                if (!kanal || !kanal.members) {
+                    await MusicSession.loeschen(stand.guildId);
+                    continue;
+                }
+
+                const menschen = kanal.members.filter(m => !m.user.bot).size;
+                if (menschen === 0 && !stand.dauerbetrieb) continue;
+
+                // Nichts zu spielen - dann lohnt auch das Beitreten nicht
+                if (!stand.aktuell && stand.warteschlange.length === 0) {
+                    await MusicSession.loeschen(stand.guildId);
+                    continue;
+                }
+
+                const abspieler = this.holen(stand.guildId);
+                abspieler.standUebernehmen(stand);
+
+                // Der unterbrochene Titel kommt wieder nach vorn
+                if (stand.aktuell) abspieler.warteschlange.unshift(stand.aktuell);
+
+                await abspieler.beitreten(kanal, stand.textKanalId);
+                await abspieler.starten();
+
+                aufgenommen++;
+                Logger.info(
+                    `[Musik] Guild ${stand.guildId}: Warteschlange mit ` +
+                    `${abspieler.warteschlange.length + 1} Titeln wieder aufgenommen`
+                );
+            } catch (err) {
+                Logger.warn(`[Musik] Guild ${stand.guildId}: Wiederaufnahme fehlgeschlagen: ${err.message}`);
+            }
+        }
+
+        return aufgenommen;
     }
 
     /**
@@ -162,5 +253,12 @@ class MusicManager {
         }
     }
 }
+
+/**
+ * Wie alt ein gesicherter Stand hoechstens sein darf, um wieder
+ * aufgenommen zu werden. Danach erinnert sich ohnehin niemand mehr daran,
+ * was in der Liste stand.
+ */
+MusicManager.HOECHSTALTER_STUNDEN = 12;
 
 module.exports = MusicManager;
