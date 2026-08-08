@@ -72,6 +72,32 @@ const FILTER = {
         name: 'Tiefpass',
         ffmpeg: 'lowpass=f=1500',
         tempo: 1
+    },
+
+    // Tempo und Tonhoehe getrennt. `atempo` laesst die Tonhoehe in Ruhe und
+    // aendert nur die Geschwindigkeit; `rubberband` umgekehrt. Beides kann das
+    // mitgelieferte ffmpeg - nachgesehen, `rubberband` ist einkompiliert.
+    // Nightcore und Vaporwave aendern dagegen beides zugleich, weil sie genau
+    // das sein sollen.
+    schnell: {
+        name: 'Schneller',
+        ffmpeg: 'atempo=1.25',
+        tempo: 1.25
+    },
+    langsam: {
+        name: 'Langsamer',
+        ffmpeg: 'atempo=0.8',
+        tempo: 0.8
+    },
+    hoeher: {
+        name: 'Hoehere Tonlage',
+        ffmpeg: 'rubberband=pitch=1.15',
+        tempo: 1
+    },
+    tiefer: {
+        name: 'Tiefere Tonlage',
+        ffmpeg: 'rubberband=pitch=0.87',
+        tempo: 1
     }
 };
 

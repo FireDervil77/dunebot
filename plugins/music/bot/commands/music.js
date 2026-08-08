@@ -18,6 +18,15 @@ const filter = require('./sub/_filter');
 const mode247 = require('./sub/_mode247');
 const autoplay = require('./sub/_autoplay');
 const voteskip = require('./sub/_voteskip');
+const move = require('./sub/_move');
+const replay = require('./sub/_replay');
+const similar = require('./sub/_similar');
+const history = require('./sub/_history');
+const fix = require('./sub/_fix');
+const save = require('./sub/_save');
+const load = require('./sub/_load');
+const playlists = require('./sub/_playlists');
+const unsave = require('./sub/_unsave');
 
 /**
  * Musik - alle Befehle unter einem Dach.
@@ -27,7 +36,11 @@ const voteskip = require('./sub/_voteskip');
  * unuebersichtlich - Diva bringt allein rund 80 eigene Eintraege mit. Jetzt
  * haengt alles unter `/music <unterbefehl>`.
  *
- * Discord erlaubt hoechstens 25 Unterbefehle je Befehl; wir nutzen 16.
+ * Discord erlaubt hoechstens 25 Unterbefehle je Befehl - und **genau 25 sind
+ * es jetzt**. Wer einen weiteren braucht, muss zuerst zwei zusammenlegen oder
+ * eine Untergruppe aufmachen. Deshalb sind `removedupes` und `leavecleanup`
+ * keine eigenen Befehle geworden, sondern Schalter an `remove`, und `playfile`
+ * ist ein Anhang an `play`.
  *
  * @type {import('dunebot-sdk').CommandType}
  */
@@ -55,7 +68,16 @@ module.exports = {
             { trigger: '247 <an|aus>', description: 'music:MODE247.DESCRIPTION' },
             { trigger: 'autoplay <an|aus>', description: 'music:AUTOPLAY.DESCRIPTION' },
             { trigger: 'voteskip', description: 'music:VOTESKIP.DESCRIPTION' },
-            { trigger: 'leave', description: 'music:DISCONNECT.DESCRIPTION' }
+            { trigger: 'leave', description: 'music:DISCONNECT.DESCRIPTION' },
+            { trigger: 'move <von> <nach>', description: 'music:MOVE.DESCRIPTION' },
+            { trigger: 'replay', description: 'music:REPLAY.DESCRIPTION' },
+            { trigger: 'similar [Anzahl]', description: 'music:SIMILAR.DESCRIPTION' },
+            { trigger: 'history [Nummer]', description: 'music:HISTORY.DESCRIPTION' },
+            { trigger: 'fix', description: 'music:FIX.DESCRIPTION' },
+            { trigger: 'save <Name>', description: 'music:SAVE.DESCRIPTION' },
+            { trigger: 'load <Name>', description: 'music:LOAD.DESCRIPTION' },
+            { trigger: 'playlists [Name]', description: 'music:PLAYLISTS.DESCRIPTION' },
+            { trigger: 'unsave <Name>', description: 'music:UNSAVE.DESCRIPTION' }
         ]
     },
     slashCommand: {
@@ -66,8 +88,11 @@ module.exports = {
                 description: 'music:PLAY.DESCRIPTION',
                 type: ApplicationCommandOptionType.Subcommand,
                 options: [
-                    { name: 'eingabe', description: 'music:PLAY.INPUT_DESC', type: ApplicationCommandOptionType.String, required: true, autocomplete: true },
-                    { name: 'zuerst', description: 'music:PLAY.FIRST_DESC', type: ApplicationCommandOptionType.Boolean, required: false }
+                    { name: 'eingabe', description: 'music:PLAY.INPUT_DESC', type: ApplicationCommandOptionType.String, required: false, autocomplete: true },
+                    { name: 'zuerst', description: 'music:PLAY.FIRST_DESC', type: ApplicationCommandOptionType.Boolean, required: false },
+                    // Statt eines eigenen `playfile`: die Quelle `direct` traegt
+                    // Anhaenge ohnehin, es fehlte nur der Weg hinein.
+                    { name: 'datei', description: 'music:PLAY.FILE_DESC', type: ApplicationCommandOptionType.Attachment, required: false }
                 ]
             },
             {
@@ -120,7 +145,9 @@ module.exports = {
                 description: 'music:REMOVE.DESCRIPTION',
                 type: ApplicationCommandOptionType.Subcommand,
                 options: [
-                    { name: 'nummer', description: 'music:REMOVE.POSITION_DESC', type: ApplicationCommandOptionType.Integer, required: true, minValue: 1 }
+                    { name: 'nummer', description: 'music:REMOVE.POSITION_DESC', type: ApplicationCommandOptionType.Integer, required: false, minValue: 1 },
+                    { name: 'doppelte', description: 'music:REMOVE.DUPES_DESC', type: ApplicationCommandOptionType.Boolean, required: false },
+                    { name: 'abwesende', description: 'music:REMOVE.GONE_DESC', type: ApplicationCommandOptionType.Boolean, required: false }
                 ]
             },
             {
@@ -152,7 +179,66 @@ module.exports = {
                 ]
             },
             { name: 'voteskip', description: 'music:VOTESKIP.DESCRIPTION', type: ApplicationCommandOptionType.Subcommand },
-            { name: 'leave', description: 'music:DISCONNECT.DESCRIPTION', type: ApplicationCommandOptionType.Subcommand }
+            { name: 'leave', description: 'music:DISCONNECT.DESCRIPTION', type: ApplicationCommandOptionType.Subcommand },
+            {
+                name: 'move',
+                description: 'music:MOVE.DESCRIPTION',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    { name: 'von', description: 'music:MOVE.FROM_DESC', type: ApplicationCommandOptionType.Integer, required: true, minValue: 1 },
+                    { name: 'nach', description: 'music:MOVE.TO_DESC', type: ApplicationCommandOptionType.Integer, required: true, minValue: 1 }
+                ]
+            },
+            { name: 'replay', description: 'music:REPLAY.DESCRIPTION', type: ApplicationCommandOptionType.Subcommand },
+            {
+                name: 'similar',
+                description: 'music:SIMILAR.DESCRIPTION',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    { name: 'anzahl', description: 'music:SIMILAR.COUNT_DESC', type: ApplicationCommandOptionType.Integer, required: false, minValue: 1, maxValue: 10 }
+                ]
+            },
+            {
+                name: 'history',
+                description: 'music:HISTORY.DESCRIPTION',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    { name: 'nummer', description: 'music:HISTORY.POSITION_DESC', type: ApplicationCommandOptionType.Integer, required: false, minValue: 1 }
+                ]
+            },
+            { name: 'fix', description: 'music:FIX.DESCRIPTION', type: ApplicationCommandOptionType.Subcommand },
+            {
+                name: 'save',
+                description: 'music:SAVE.DESCRIPTION',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    { name: 'name', description: 'music:SAVE.NAME_DESC', type: ApplicationCommandOptionType.String, required: true }
+                ]
+            },
+            {
+                name: 'load',
+                description: 'music:LOAD.DESCRIPTION',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    { name: 'name', description: 'music:LOAD.NAME_DESC', type: ApplicationCommandOptionType.String, required: true }
+                ]
+            },
+            {
+                name: 'playlists',
+                description: 'music:PLAYLISTS.DESCRIPTION',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    { name: 'name', description: 'music:PLAYLISTS.NAME_DESC', type: ApplicationCommandOptionType.String, required: false }
+                ]
+            },
+            {
+                name: 'unsave',
+                description: 'music:UNSAVE.DESCRIPTION',
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    { name: 'name', description: 'music:UNSAVE.NAME_DESC', type: ApplicationCommandOptionType.String, required: true }
+                ]
+            }
         ]
     },
 
@@ -164,6 +250,8 @@ module.exports = {
         const antwort = await ausfuehren(unterbefehl, mitglied, {
             eingabe: rest.join(' '),
             zahl: parseInt(rest[0], 10),
+            // Fuer `move <von> <nach>`; alle anderen brauchen nur die erste Zahl
+            zahl2: parseInt(rest[1], 10),
             wort: (rest[0] || '').toLowerCase(),
             textKanalId: message.channelId
         });
@@ -174,16 +262,24 @@ module.exports = {
     async interactionRun({ interaction }) {
         const unterbefehl = interaction.options.getSubcommand();
 
+        // Ein Anhang ist auch nur eine Adresse. Die Quelle `direct` schickt sie
+        // ohne Umweg an ffmpeg - dafuer braucht es keinen eigenen Befehl.
+        const anhang = unterbefehl === 'play' ? interaction.options.getAttachment('datei') : null;
+
         const antwort = await ausfuehren(unterbefehl, interaction.member, {
-            eingabe: interaction.options.getString('eingabe'),
+            eingabe: anhang?.url || interaction.options.getString('eingabe'),
             zuerst: interaction.options.getBoolean('zuerst') || false,
             anzahl: interaction.options.getInteger('anzahl'),
             seite: interaction.options.getInteger('seite'),
             wert: interaction.options.getInteger('wert'),
             nummer: interaction.options.getInteger('nummer'),
+            von: interaction.options.getInteger('von'),
+            nach: interaction.options.getInteger('nach'),
             modus: interaction.options.getString('modus'),
             name: interaction.options.getString('name'),
             zustand: interaction.options.getBoolean('zustand'),
+            doppelte: interaction.options.getBoolean('doppelte'),
+            abwesende: interaction.options.getBoolean('abwesende'),
             textKanalId: interaction.channelId
         });
 
@@ -257,7 +353,40 @@ async function ausfuehren(unterbefehl, mitglied, o) {
         }
 
         case 'remove':
-            return await remove(mitglied, o.nummer ?? o.zahl);
+            return await remove(mitglied, {
+                nummer: o.nummer ?? (Number.isNaN(o.zahl) ? null : o.zahl),
+                // Im Chat: `!music remove doppelte`
+                doppelte: o.doppelte ?? o.wort === 'doppelte',
+                abwesende: o.abwesende ?? o.wort === 'abwesende'
+            });
+
+        case 'move':
+            return await move(
+                mitglied,
+                o.von ?? (Number.isNaN(o.zahl) ? null : o.zahl),
+                o.nach ?? (Number.isNaN(o.zahl2) ? null : o.zahl2)
+            );
+
+        case 'replay': return await replay(mitglied);
+        case 'fix':    return await fix(mitglied);
+
+        case 'similar':
+            return await similar(mitglied, o.anzahl ?? (Number.isNaN(o.zahl) ? 1 : o.zahl));
+
+        case 'history':
+            return await history(mitglied, o.nummer ?? (Number.isNaN(o.zahl) ? null : o.zahl));
+
+        case 'save':
+            return await save(mitglied, o.name ?? o.eingabe);
+
+        case 'load':
+            return await load(mitglied, o.name ?? o.eingabe, o.textKanalId);
+
+        case 'playlists':
+            return await playlists(mitglied, o.name ?? (o.eingabe || null));
+
+        case 'unsave':
+            return await unsave(mitglied, o.name ?? o.eingabe);
 
         case 'loop':
             return await loop(mitglied, o.modus ?? o.wort);

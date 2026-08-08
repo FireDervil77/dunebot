@@ -604,6 +604,133 @@ class GuildPlayer {
     }
 
     /**
+     * Den laufenden Titel von vorn.
+     *
+     * Nicht ueber die Warteschlange, sondern direkt: `spieler.play()` mit einer
+     * neuen Quelle loest den laufenden Ton ab, ohne dass der Abspieler
+     * zwischendurch auf `Idle` faellt - sonst wuerde `_weiter()` anspringen und
+     * uns den naechsten Titel unterschieben.
+     *
+     * @returns {Promise<boolean>} Ob etwas neu gestartet wurde
+     */
+    async wiederholen() {
+        if (!this.aktuell) return false;
+        return await this._abspielen(this.aktuell);
+    }
+
+    /**
+     * Doppelte aus der Warteschlange nehmen.
+     *
+     * Verglichen wird die Adresse; wo keine steht - Spotify-Titel warten noch
+     * auf ihre - der Suchbegriff. Der zuerst eingereihte bleibt stehen.
+     *
+     * @returns {number} Wie viele entfernt wurden
+     */
+    doppelteEntfernen() {
+        const gesehen = new Set();
+        const vorher = this.warteschlange.length;
+
+        this.warteschlange = this.warteschlange.filter(t => {
+            const kennung = t.url || t.suchbegriff || t.title;
+            if (gesehen.has(kennung)) return false;
+            gesehen.add(kennung);
+            return true;
+        });
+
+        const weg = vorher - this.warteschlange.length;
+        if (weg > 0) { this.ansageAuffrischen(); this._sichern(); }
+        return weg;
+    }
+
+    /**
+     * Titel derer entfernen, die den Sprachkanal verlassen haben.
+     *
+     * Wer nichts angefordert hat, ist nicht betroffen: Titel ohne `requestedBy`
+     * bleiben stehen. Sonst raeumte der Befehl alles weg, was ueber das
+     * Dashboard oder aus einer Liste kam.
+     *
+     * @returns {number} Wie viele entfernt wurden
+     */
+    abwesendeEntfernen() {
+        const kanal = this.sprachKanalId
+            ? this.client.channels.cache.get(this.sprachKanalId)
+            : null;
+        if (!kanal || !kanal.members) return 0;
+
+        const anwesend = new Set(kanal.members.map(m => m.id));
+        const vorher = this.warteschlange.length;
+
+        this.warteschlange = this.warteschlange.filter(
+            t => !t.requestedBy || anwesend.has(t.requestedBy)
+        );
+
+        const weg = vorher - this.warteschlange.length;
+        if (weg > 0) { this.ansageAuffrischen(); this._sichern(); }
+        return weg;
+    }
+
+    /**
+     * Passende Titel nachlegen - dasselbe, was Autoplay von allein tut.
+     *
+     * Grundlage ist der laufende Titel. Jeder gefundene wandert sofort in die
+     * Merkliste, sonst schlaegt die Suche fuenfmal denselben vor.
+     *
+     * @param {number} anzahl Wie viele
+     * @returns {Promise<Array<Object>>} Die aufgenommenen Titel
+     */
+    async aehnlichesAnhaengen(anzahl = 1) {
+        const grundlage = this.aktuell || this.warteschlange[this.warteschlange.length - 1];
+        if (!grundlage) return [];
+
+        const gefunden = [];
+
+        for (let i = 0; i < Math.max(1, Math.min(10, anzahl)); i++) {
+            const gemerkt = this._zuletztGespielt();
+            const naechster = await aehnlichenFinden(
+                grundlage,
+                [...gemerkt, ...gefunden.map(t => t.url)]
+            );
+            if (!naechster) break;
+
+            gefunden.push(naechster);
+        }
+
+        if (gefunden.length > 0) await this.hinzufuegen(gefunden);
+        return gefunden;
+    }
+
+    /**
+     * Die Sprachverbindung neu aufbauen, ohne die Warteschlange zu verlieren.
+     *
+     * Fuer den Fall, dass die Verbindung steht, aber nichts mehr durchkommt -
+     * das kam beim Aufspueren der Punkte 25 bis 27 oft genug vor, dass ein
+     * Handgriff dafuer seine Berechtigung hat. `aufraeumen()` raeumt die
+     * Warteschlange mit ab, deshalb wird sie hier vorher beiseitegelegt und
+     * danach zurueckgelegt - der laufende Titel vorneweg, damit er weiterlaeuft.
+     *
+     * @returns {Promise<boolean>} Ob wieder etwas laeuft
+     */
+    async neuVerbinden() {
+        const kanalId = this.sprachKanalId;
+        if (!kanalId) return false;
+
+        const kanal = this.client.channels.cache.get(kanalId);
+        if (!kanal) return false;
+
+        const gemerkt = this.aktuell
+            ? [this.aktuell, ...this.warteschlange]
+            : [...this.warteschlange];
+        const textKanalId = this.textKanalId;
+
+        this.aufraeumen();
+
+        await this.beitreten(kanal, textKanalId);
+        this.warteschlange = gemerkt;
+
+        return await this.starten();
+    }
+
+    /**
      * Alles anhalten und die Warteschlange leeren.
      *
      * Der Bot bleibt danach im Kanal - "Stopp" heisst anhalten, nicht
