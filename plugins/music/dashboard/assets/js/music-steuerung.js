@@ -67,7 +67,8 @@
      */
     window.musicSteuern = function (vorgang) {
         anfrage('POST', '/steuerung/' + vorgang)
-            .then(zustandHolen)
+            // Das Nachziehen darf keine zweite Fehlermeldung ausloesen
+            .then(() => zustandHolen().catch(() => {}))
             .catch(fehlerMelden);
     };
 
@@ -186,27 +187,75 @@
      * Zustand holen und Fortschritt nachfuehren.
      *
      * Nur auf der Uebersicht - anderswo gibt es die Anzeigefelder nicht.
+     *
+     * @returns {Promise<boolean>} Ob gerade etwas laeuft
      */
     async function zustandHolen() {
-        if (!document.getElementById('music-spieler')) return;
+        if (!document.getElementById('music-spieler')) return false;
 
-        try {
-            const antwort = await anfrage('GET', '/steuerung/state');
-            const z = antwort.zustand;
-            const t = z.aktuell;
+        const antwort = await anfrage('GET', '/steuerung/state');
+        const z = antwort.zustand;
+        const t = z.aktuell;
 
-            const positionFeld = document.getElementById('music-position');
-            const balken = document.getElementById('music-balken');
+        const positionFeld = document.getElementById('music-position');
+        const balken = document.getElementById('music-balken');
 
-            if (t && positionFeld) {
-                positionFeld.textContent = `${dauer(t.positionSek)} / ${dauer(t.durationSec)}`;
-            }
-            if (t && balken && t.durationSec > 0) {
-                balken.style.width = Math.min(100, Math.round((t.positionSek / t.durationSec) * 100)) + '%';
-            }
-        } catch {
-            // Der Bot antwortet gerade nicht - beim naechsten Mal wieder
+        if (t && positionFeld) {
+            positionFeld.textContent = `${dauer(t.positionSek)} / ${dauer(t.durationSec)}`;
         }
+        if (t && balken && t.durationSec > 0) {
+            balken.style.width = Math.min(100, Math.round((t.positionSek / t.durationSec) * 100)) + '%';
+        }
+
+        return Boolean(t) && !z.pausiert;
+    }
+
+    /**
+     * Den Fortschritt nachfuehren, aber nur so oft wie noetig.
+     *
+     * Ein fester Takt von einer Sekunde hat die Anfrage auch dann gestellt,
+     * wenn gar nichts lief oder der Bot ueberhaupt nicht antwortete - jede
+     * Anfrage ging als Rundruf ueber IPC und stand als Zeile im Bot-Protokoll.
+     *
+     * Deshalb: eine Sekunde nur bei laufender Wiedergabe, sonst fuenf, und bei
+     * ausbleibender Antwort schrittweise bis auf dreissig Sekunden zurueck.
+     * Ist die Seite im Hintergrund, ruht die Abfrage ganz.
+     */
+    function fortschrittVerfolgen() {
+        const TAKT_LAEUFT = 1000;
+        const TAKT_RUHT = 5000;
+        const TAKT_MAX = 30000;
+
+        let ruecklauf = TAKT_RUHT;
+        let geplant = null;
+
+        async function runde() {
+            geplant = null;
+            if (document.hidden) return planen(TAKT_RUHT);
+
+            try {
+                const laeuft = await zustandHolen();
+                ruecklauf = TAKT_RUHT;
+                planen(laeuft ? TAKT_LAEUFT : TAKT_RUHT);
+            } catch {
+                // Der Bot antwortet gerade nicht - langsamer nachfragen
+                ruecklauf = Math.min(ruecklauf * 2, TAKT_MAX);
+                planen(ruecklauf);
+            }
+        }
+
+        /** Nur ein Wecker gleichzeitig, sonst laufen mehrere Ketten nebeneinander. */
+        function planen(ms) {
+            if (geplant !== null) window.clearTimeout(geplant);
+            geplant = window.setTimeout(runde, ms);
+        }
+
+        // Kommt die Seite zurueck in den Vordergrund, sofort nachziehen
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) planen(0);
+        });
+
+        runde();
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -280,9 +329,9 @@
             });
         });
 
-        // Fortschritt jede Sekunde nachfuehren, solange die Seite offen ist
+        // Fortschritt nachfuehren, solange die Seite offen ist
         if (document.getElementById('music-spieler')) {
-            setInterval(zustandHolen, 1000);
+            fortschrittVerfolgen();
         }
     });
 })();

@@ -1,3 +1,4 @@
+'use strict';
 /**
  * Musik - Bot-Plugin
  *
@@ -59,4 +60,4 @@ class MusicBotPlugin extends BotPlugin {
     }
 }
 
-module.exports = MusicBotPlugin;
+module.exports = new MusicBotPlugin();

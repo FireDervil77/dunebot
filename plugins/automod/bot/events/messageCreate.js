@@ -316,8 +316,11 @@ module.exports = async (message) => {
                     iconURL: author.avatarURL(),
                 });
 
-            if (settings.embed_colors.log) {
-                logEmbed.setColor(settings.embed_colors.log);
+            // Die Spalte heisst log_embed_color. `settings.embed_colors.log`
+            // stammt aus einer Vorlage mit verschachtelter Einstellung - hier
+            // gab es das Feld nie, der Zugriff warf jedes Mal.
+            if (settings.log_embed_color) {
+                logEmbed.setColor(settings.log_embed_color);
             }
 
             logChannel.send({ embeds: [logEmbed] });
@@ -347,8 +350,8 @@ module.exports = async (message) => {
             .addFields(fields)
             .setDescription(dmDesc);
 
-        if (settings.embed_colors.dm) {
-            strikeEmbed.setColor(settings.embed_colors.dm);
+        if (settings.dm_embed_color) {
+            strikeEmbed.setColor(settings.dm_embed_color);
         }
 
         author.send({ embeds: [strikeEmbed] }).catch(() => {});
