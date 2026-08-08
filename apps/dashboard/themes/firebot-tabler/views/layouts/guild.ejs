@@ -74,7 +74,15 @@
                                         </a>
                                     </div>
                                 <% } %>
-                                <button type="button" class="btn-close dismiss-notification-btn" aria-label="Schließen"></button>
+                                <%#
+                                  `data-bs-dismiss="alert"` fehlte: Der Knopf sah
+                                  richtig aus, aber niemand hat den Kasten
+                                  geschlossen — der Zuhoerer unten meldet das
+                                  Wegklicken nur serverseitig. Sichtbar wurde es
+                                  erst beim naechsten Seitenaufruf.
+                                %>
+                                <button type="button" class="btn-close dismiss-notification-btn"
+                                        data-bs-dismiss="alert" aria-label="Schließen"></button>
                             </div>
                         <% }); %>
                     </div>
@@ -173,6 +181,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     credentials: 'same-origin'
                 }).catch(function () {});
             }
+
+            // Rueckfall, falls Bootstrap nicht bereitsteht: dann macht
+            // `data-bs-dismiss` nichts und der Kasten bliebe stehen.
+            var bs = window.bootstrap || (window.tabler && window.tabler.bootstrap) || null;
+            if (box && !(bs && bs.Alert)) box.remove();
         });
     });
 });

@@ -40,9 +40,14 @@
             <div class="container-fluid mt-3" id="global-notifications-container">
                 <% globalNotifications.forEach(notification => { %>
                     <div class="alert alert-<%= notification.type %> alert-dismissible fade show" role="alert" data-notification-id="<%= notification.id %>">
-                        <button type="button" class="close dismiss-notification-btn" aria-label="Schließen">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
+                        <%#
+                          `class="close"` war Bootstrap 4 (AdminLTE). Unter
+                          Bootstrap 5 heisst der Schliessknopf `btn-close` und
+                          bringt sein × selbst mit — die alte Klasse gibt es dort
+                          nicht mehr, der Knopf stand also unformatiert und an
+                          der falschen Stelle im Kasten.
+                        %>
+                        <button type="button" class="btn-close dismiss-notification-btn" aria-label="Schließen"></button>
                         <% if (notification.title) { %>
                             <h5><strong><%- notification.title %></strong></h5>
                         <% } %>
@@ -73,8 +78,26 @@
                                 credentials: 'same-origin'
                             }).catch(function() {});
                         }
+                        // Hier stand `$(alert).alert('close')` — die
+                        // jQuery-Schnittstelle von Bootstrap 4. jQuery ist unter
+                        // Tabler zwar geladen, dessen Bootstrap-Erweiterung aber
+                        // nicht: Der Aufruf warf `$(...).alert is not a function`,
+                        // und der Kasten blieb stehen. Weggeklickt wurde er
+                        // serverseitig trotzdem — sichtbar wurde das erst beim
+                        // naechsten Seitenaufruf. Dieselbe Leiche wie bei den
+                        // Fenstern in guild.js.
+                        //
+                        // Tabler exportiert Bootstrap unter `window.tabler.bootstrap`,
+                        // das alte Theme unter `window.bootstrap`. Gibt es keins
+                        // von beiden, wird der Kasten einfach entfernt — schliessen
+                        // ist wichtiger als die Ausblendung.
                         if (alert) {
-                            $(alert).alert('close');
+                            var bs = window.bootstrap || (window.tabler && window.tabler.bootstrap) || null;
+                            if (bs && bs.Alert) {
+                                bs.Alert.getOrCreateInstance(alert).close();
+                            } else {
+                                alert.remove();
+                            }
                         }
                     });
                 });
