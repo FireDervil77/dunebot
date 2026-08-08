@@ -7,7 +7,6 @@
  * @module music/bot/managers/MusicManager
  */
 
-const { ServiceManager } = require('dunebot-core');
 const GuildPlayer = require('./GuildPlayer');
 const { MusicSettings } = require('../../shared/models');
 
@@ -137,24 +136,23 @@ class MusicManager {
     }
 
     /**
-     * Wenn der letzte Mensch den Kanal verlaesst, hat der Bot dort nichts
-     * mehr verloren. Wird vom `voiceStateUpdate`-Ereignis aufgerufen.
+     * Die Kanalbelegung hat sich geaendert - jemand kam oder ging.
+     *
+     * Der Bot geht **nur**, wenn niemand mehr da ist, und auch dann erst nach
+     * der eingestellten Frist. Eine leere Warteschlange ist kein Grund: er
+     * soll im Kanal warten, bis jemand etwas moechte.
+     *
+     * Kommt in der Frist wieder jemand herein, wird der Rueckzug abgeblasen.
      *
      * @param {string} guildId Discord-Guild-ID
-     * @param {Object} kanal Sprachkanal, den jemand verlassen hat
+     * @param {Object} kanal Betroffener Sprachkanal
+     * @param {boolean} [jemandKam=false] Ob jemand hereinkam statt zu gehen
      */
-    async pruefeVerwaisung(guildId, kanal) {
+    async pruefeVerwaisung(guildId, kanal, jemandKam = false) {
         const abspieler = this.abspieler.get(guildId);
         if (!abspieler || !kanal || abspieler.sprachKanalId !== kanal.id) return;
 
-        const einstellungen = await MusicSettings.getSettings(guildId);
-        if (!einstellungen.leave_when_empty) return;
-
-        const menschen = kanal.members.filter(m => !m.user.bot).size;
-        if (menschen > 0) return;
-
-        ServiceManager.get('Logger').info(`[Musik] Guild ${guildId}: niemand mehr im Kanal`);
-        this.beenden(guildId);
+        abspieler.kanalbelegungGeaendert(jemandKam);
     }
 
     /** Alles beenden - beim Abschalten des Plugins. */

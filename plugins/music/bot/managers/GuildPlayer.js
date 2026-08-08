@@ -26,7 +26,7 @@ const prism = require('prism-media');
 const { ServiceManager } = require('dunebot-core');
 const { MusicSettings, MusicHistory } = require('../../shared/models');
 const { aufloesenZumAbspielen, aehnlichenFinden } = require('../quellen');
-const { tonspurErmitteln, tonstromOeffnen } = require('../quellen/strom');
+const { tonstromVonSeite, tonstromVonAdresse } = require('../quellen/strom');
 const klangfilter = require('../klangfilter');
 
 // prism-media startet ffmpeg selbst. Ohne diesen Hinweis sucht es im
@@ -83,7 +83,16 @@ class GuildPlayer {
         this.spieler = createAudioPlayer({
             behaviors: {
                 // Ohne Zuhoerer weiterlaufen zu lassen kostet nur Bandbreite
-                noSubscriber: NoSubscriberBehavior.Pause
+                noSubscriber: NoSubscriberBehavior.Pause,
+
+                // Der Vorgabewert ist 5, also gibt @discordjs/voice schon nach
+                // 100 ms ohne Nachschub auf und erklaert den Titel fuer
+                // beendet. Fuer Ton aus dem Netz ist das viel zu streng: ein
+                // kurzer Schluckauf der Leitung beendete so das ganze Stueck.
+                // 250 Rahmen sind fuenf Sekunden Nachsicht - lang genug fuer
+                // eine Delle, kurz genug, dass eine wirklich tote Quelle nicht
+                // ewig blockiert.
+                maxMissedFrames: 250
             }
         });
 
@@ -294,7 +303,10 @@ class GuildPlayer {
             this.gestartetUm = null;
             this.gelaufenVorPause = 0;
             this.stimmen.clear();
-            this._leerlaufPruefen();
+            // Der Bot bleibt im Kanal und wartet auf den naechsten Wunsch.
+            // Gegangen wird nur, wenn niemand mehr da ist - das entscheidet
+            // `_verwaisungPruefen`, angestossen vom Sprachereignis.
+            Logger.debug(`[Musik] Guild ${this.guildId}: Warteschlange leer, warte im Kanal`);
             return false;
         }
 
@@ -320,16 +332,13 @@ class GuildPlayer {
 
         try {
             // Direkte Tonspur und Internetradio zeigen schon auf die Bytes
-            // selbst. Alles andere ist eine Seitenadresse, hinter der die
-            // Tonspur erst gesucht werden muss.
-            const adresse = t.source === 'direct'
-                ? t.url
-                : (await tonspurErmitteln(t.url, this.qualitaet)).url;
+            // selbst. Alles andere ist eine Seitenadresse - da laedt yt-dlp,
+            // weil ein schlichter Abruf von Google gedrosselt wird.
+            const eingang = t.source === 'direct'
+                ? tonstromVonAdresse(t.url)
+                : tonstromVonSeite(t.url, this.qualitaet);
 
-            const quelle = this._tonquelle(
-                tonstromOeffnen(adresse),
-                klangfilter.ffmpegArgumente(this.filter)
-            );
+            const quelle = this._tonquelle(eingang, klangfilter.ffmpegArgumente(this.filter));
 
             if (quelle.volume) quelle.volume.setVolume(this.lautstaerke / 100);
 
@@ -474,7 +483,12 @@ class GuildPlayer {
         return true;
     }
 
-    /** Alles anhalten und die Warteschlange leeren. */
+    /**
+     * Alles anhalten und die Warteschlange leeren.
+     *
+     * Der Bot bleibt danach im Kanal - "Stopp" heisst anhalten, nicht
+     * weggehen. Zum Weggehen gibt es `/music disconnect`.
+     */
     stoppen() {
         this.warteschlange = [];
         this.wiederholung = WIEDERHOLUNG.AUS;
@@ -482,7 +496,6 @@ class GuildPlayer {
         this._wirdBeendet = true;
         this.spieler.stop(true);
         this._wirdBeendet = false;
-        this._leerlaufPruefen();
         return true;
     }
 
@@ -565,8 +578,9 @@ class GuildPlayer {
         this.dauerbetrieb = Boolean(an);
         if (this.dauerbetrieb) {
             this._leerlaufAbbrechen();
-        } else if (!this.aktuell && this.warteschlange.length === 0) {
-            this._leerlaufPruefen();
+        } else {
+            // Ohne Dauerbetrieb gilt wieder: ohne Menschen kein Bot
+            this._verwaisungPruefen();
         }
         return this.dauerbetrieb;
     }
@@ -640,27 +654,71 @@ class GuildPlayer {
     }
 
     /**
-     * Nach dem letzten Titel nicht ewig im Kanal stehen bleiben.
+     * Wie viele Menschen im Sprachkanal sind.
+     *
+     * @returns {number} Anzahl ohne Bots; 0 auch, wenn der Kanal weg ist
+     * @private
+     */
+    _menschenImKanal() {
+        if (!this.sprachKanalId) return 0;
+        const kanal = this.client.channels.cache.get(this.sprachKanalId);
+        if (!kanal || !kanal.members) return 0;
+        return kanal.members.filter(m => !m.user.bot).size;
+    }
+
+    /**
+     * Den Rueckzug einleiten, wenn niemand mehr im Kanal ist.
+     *
+     * **Eine leere Warteschlange ist ausdruecklich kein Grund zu gehen.** Der
+     * Bot soll im Kanal stehen bleiben und darauf warten, dass jemand etwas
+     * moechte - genau dafuer ist er da.
+     *
+     * Vorher hing `leave_when_empty` an der leeren Warteschlange, obwohl die
+     * Beschriftung "Kanal verlassen, wenn niemand mehr da ist" lautet. Der Bot
+     * verschwand deshalb Sekunden nach dem letzten Titel, auch wenn der halbe
+     * Server noch im Kanal sass.
+     *
+     * Die Frist wird zurueckgenommen, sobald wieder jemand hereinkommt.
      *
      * @private
      */
-    _leerlaufPruefen() {
+    _verwaisungPruefen() {
         this._leerlaufAbbrechen();
 
         // Im Dauerbetrieb bleibt der Bot im Kanal, egal wie leer es wird
         if (this.dauerbetrieb) return;
+        if (!this.verbindung) return;
+        // Noch jemand da - dann gibt es nichts zu tun
+        if (this._menschenImKanal() > 0) return;
 
         MusicSettings.getSettings(this.guildId).then(einstellungen => {
             if (!einstellungen.leave_when_empty) return;
             const sekunden = einstellungen.leave_after_seconds || 120;
 
             this._verlassenZeitgeber = setTimeout(() => {
-                if (!this.aktuell && this.warteschlange.length === 0) {
-                    ServiceManager.get('Logger').info(`[Musik] Guild ${this.guildId}: nichts mehr zu tun, verlasse den Kanal`);
-                    this.aufraeumen();
-                }
+                // In der Zwischenzeit koennte jemand zurueckgekommen sein
+                if (this._menschenImKanal() > 0) return;
+
+                ServiceManager.get('Logger').info(
+                    `[Musik] Guild ${this.guildId}: seit ${sekunden}s niemand mehr im Kanal, verlasse ihn`
+                );
+                this.aufraeumen();
             }, sekunden * 1000);
         }).catch(() => { /* Ohne Einstellungen bleiben wir eben stehen */ });
+    }
+
+    /**
+     * Von aussen anstossbar - das Sprachereignis meldet Kommen und Gehen.
+     *
+     * @param {boolean} [jemandKam=false] Ob gerade jemand hereinkam
+     */
+    kanalbelegungGeaendert(jemandKam = false) {
+        if (jemandKam) {
+            // Wieder jemand da: der Rueckzug ist abgeblasen
+            this._leerlaufAbbrechen();
+            return;
+        }
+        this._verwaisungPruefen();
     }
 
     /** @private */

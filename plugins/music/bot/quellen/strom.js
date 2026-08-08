@@ -51,6 +51,26 @@ const FORMATWAHL = {
 let ytdlpPfad = null;
 
 /**
+ * Protokollieren, ohne dabei etwas kaputtmachen zu koennen.
+ *
+ * `ServiceManager.get('Logger')` wirft, wenn der Dienst nicht registriert
+ * ist - etwa in einem Pruefskript ausserhalb des Bots. Steht so ein Aufruf
+ * mitten im Tonweg, reisst er den Datenstrom mit. Genau das ist am
+ * 08.08.2026 passiert.
+ *
+ * @param {string} stufe Logger-Methode
+ * @param {string} text Meldung
+ * @private
+ */
+function protokoll(stufe, text) {
+    try {
+        ServiceManager.get('Logger')[stufe](text);
+    } catch {
+        /* Ohne Logger laeuft der Ton trotzdem weiter - darauf kommt es an */
+    }
+}
+
+/**
  * yt-dlp finden.
  *
  * Reihenfolge: ausdrueckliche Angabe, eigenes Verzeichnis des Benutzers,
@@ -135,79 +155,92 @@ function ytdlpAufrufen(argumente) {
 }
 
 /**
- * Zu einer Adresse die abspielbare Tonspur ermitteln.
+ * Die Tonspur einer Seite als Datenstrom - yt-dlp laedt selbst.
  *
- * Liefert nur die Angaben - die Bytes holt der Aufrufer. So bleibt die
- * Entscheidung, ob durch ffmpeg oder direkt, beim Abspieler.
+ * Warum yt-dlp die Bytes holt und nicht wir:
+ *
+ * Nachgemessen am 08.08.2026 an derselben Adresse: ein schlichtes `fetch`
+ * bekommt **10,1 KB/s**, yt-dlp **272 KB/s** - Faktor 27. Gebraucht werden
+ * rund 16 KB/s, sonst verhungert der Abspieler. Google drosselt einfache
+ * Einzelabrufe; yt-dlp umgeht das mit stueckweisen Abrufen.
+ *
+ * Vorher stand hier ein eigener Abrufer mit Wiederholungen. Der war nicht
+ * kaputt, nur zu langsam - und weil `maxMissedFrames` bei 5 liegt, gibt
+ * @discordjs/voice schon nach 100 ms ohne Nachschub auf. Ergebnis war eine
+ * Sekunde Ton und dann Stille.
  *
  * @param {string} adresse Seitenadresse (YouTube, SoundCloud, ...)
  * @param {number} [qualitaet=2] 0 niedrig, 1 mittel, 2 hoch
- * @returns {Promise<{url: string, codec: string, container: string, opus: boolean}>}
+ * @returns {Object} Lesbarer Datenstrom mit der Tonspur
  */
-async function tonspurErmitteln(adresse, qualitaet = 2) {
+function tonstromVonSeite(adresse, qualitaet = 2) {
     const format = FORMATWAHL[qualitaet] ?? FORMATWAHL[2];
+    const pfad = ytdlpFinden();
 
-    const ausgabe = await ytdlpAufrufen([
+    const vorgang = spawn(pfad, [
         '-f', format,
         '--no-warnings',
         '--no-playlist',
-        // Wiedergabelisten und Kanaele wuerden hier sonst hunderte Zeilen liefern
+        // Wiedergabelisten wuerden sonst am Stueck durchlaufen
         '--playlist-items', '1',
-        '--print', '%(acodec)s|%(ext)s|%(url)s',
+        // Fortschrittsbalken gehen auf stderr und interessieren hier nicht
+        '--quiet',
+        '-o', '-',
         adresse
-    ]);
+    ], { stdio: ['ignore', 'pipe', 'pipe'] });
 
-    const zeile = ausgabe.split('\n').map(z => z.trim()).filter(Boolean)[0];
-    if (!zeile) throw new Error('yt-dlp lieferte keine Tonspur');
+    let fehlertext = '';
+    vorgang.stderr.on('data', (d) => { fehlertext += d; });
 
-    // Die Adresse enthaelt selbst senkrechte Striche, deshalb nur zweimal teilen
-    const ersterStrich = zeile.indexOf('|');
-    const zweiterStrich = zeile.indexOf('|', ersterStrich + 1);
-    if (ersterStrich < 0 || zweiterStrich < 0) {
-        throw new Error('yt-dlp lieferte eine unerwartete Ausgabe');
-    }
+    vorgang.on('error', (err) => {
+        const grund = err.code === 'ENOENT'
+            ? `yt-dlp wurde nicht gefunden (gesucht als "${pfad}")`
+            : err.message;
+        protokoll('error', `[Musik] yt-dlp liess sich nicht starten: ${grund}`);
+        try { vorgang.stdout.destroy(new Error(grund)); } catch { /* schon zu */ }
+    });
 
-    const codec = zeile.slice(0, ersterStrich);
-    const container = zeile.slice(ersterStrich + 1, zweiterStrich);
-    const url = zeile.slice(zweiterStrich + 1);
+    vorgang.on('close', (code, signal) => {
+        // Beim Ueberspringen beenden wir selbst - das ist kein Fehler
+        if (signal || code === 0 || code === null) return;
+        const grund = fehlertext.trim().split('\n').filter(Boolean).pop() || `Abbruchcode ${code}`;
+        protokoll('warn', `[Musik] yt-dlp brach ab: ${grund}`);
+    });
 
-    if (!/^https?:\/\//i.test(url)) throw new Error('yt-dlp lieferte keine brauchbare Adresse');
+    // Wird der Titel uebersprungen oder gestoppt, muss auch yt-dlp weg -
+    // sonst laedt es munter weiter und niemand liest mit.
+    vorgang.stdout.on('close', () => {
+        try { vorgang.kill('SIGKILL'); } catch { /* schon vorbei */ }
+    });
 
-    return {
-        url,
-        codec,
-        container,
-        // Nur webm mit Opus laesst sich ohne Umrechnen an Discord durchreichen
-        opus: codec === 'opus' && container === 'webm'
-    };
+    return vorgang.stdout;
 }
 
 /**
- * Die Bytes einer Tonspur als Datenstrom oeffnen.
+ * Eine direkte Tonspur als Datenstrom oeffnen.
  *
- * Warum node die Adresse holt und nicht ffmpeg:
+ * Fuer Internetradio und direkte Dateien - da gibt es keine Drosselung, und
+ * yt-dlp waere nur ein Umweg.
  *
- * Das mitgelieferte `ffmpeg-static` ist statisch gegen glibc gebaut. Solche
- * Programme stuerzen bei `getaddrinfo` mit SIGSEGV ab, weil die Namens-
- * aufloesung Bibliotheken nachladen will, die im statischen Programm nicht
- * vorhanden sind. Nachgemessen am 08.08.2026: `ffmpeg -i https://...` und
- * `ffmpeg -i http://...` sterben beide sofort mit Signal 11, waehrend
- * `ffmpeg -i http://127.0.0.1:.../` 384000 Bytes sauber durchreicht. Es
- * liegt also ausschliesslich am Aufloesen des Namens.
+ * Warum ueberhaupt node und nicht ffmpeg: Das mitgelieferte `ffmpeg-static`
+ * ist statisch gegen glibc gebaut. Solche Programme stuerzen bei
+ * `getaddrinfo` mit SIGSEGV ab, weil die Namensaufloesung Bibliotheken
+ * nachladen will, die im statischen Programm nicht vorhanden sind.
+ * Nachgemessen am 08.08.2026: `ffmpeg -i https://...` und `-i http://...`
+ * sterben beide sofort mit Signal 11, waehrend `-i http://127.0.0.1:.../`
+ * 384000 Bytes sauber durchreicht. Es liegt allein am Namen.
  *
- * Deshalb macht node das Netz und ffmpeg bekommt nur noch Bytes. Nebenbei
- * war das auch der Grund, warum Internetradio nie lief - der Weg gab ffmpeg
- * ebenfalls eine Adresse.
+ * Deshalb bekommt ffmpeg nie eine Adresse. Genau das war auch der Grund,
+ * warum Internetradio nie lief.
  *
- * Bricht die Leitung mitten im Stueck ab - was Googles Auslieferung durchaus
- * tut -, wird ab der zuletzt gelesenen Stelle neu angefragt statt den Titel
- * abzubrechen.
+ * Reisst die Leitung mitten im Stueck ab, wird ab der zuletzt gelesenen
+ * Stelle neu angefragt statt den Titel abzubrechen.
  *
  * @param {string} adresse Adresse der Tonspur
  * @param {Object} [optionen] { versuche: number }
  * @returns {Object} Lesbarer Datenstrom
  */
-function tonstromOeffnen(adresse, optionen = {}) {
+function tonstromVonAdresse(adresse, optionen = {}) {
     const maxVersuche = optionen.versuche ?? 3;
     const ziel = new PassThrough();
     const abbruch = new AbortController();
@@ -246,20 +279,26 @@ function tonstromOeffnen(adresse, optionen = {}) {
         return gesamt === null || gelesen >= gesamt;
     };
 
+    let letzterFehler = null;
+
     const lauf = async () => {
         while (!ziel.destroyed) {
             try {
+                letzterFehler = null;
                 if (await abschnittHolen()) { ziel.end(); return; }
                 // Vorzeitig zu Ende - das zaehlt als Fehlversuch
+                letzterFehler = 'Leitung endete vorzeitig';
             } catch (err) {
                 if (abbruch.signal.aborted) return;
+                letzterFehler = err.message;
                 if (versuche >= maxVersuche) { ziel.destroy(err); return; }
             }
 
             if (versuche >= maxVersuche) { ziel.end(); return; }
             versuche++;
-            ServiceManager.get('Logger').debug(
-                `[Musik] Tonstrom bei Byte ${gelesen} abgerissen, Versuch ${versuche} von ${maxVersuche}`
+            protokoll('warn',
+                `[Musik] Tonstrom bei Byte ${gelesen} von ${gesamt ?? '?'} abgerissen` +
+                `${letzterFehler ? ` (${letzterFehler})` : ''}, Versuch ${versuche} von ${maxVersuche}`
             );
         }
     };
@@ -283,9 +322,9 @@ async function verfuegbar() {
         const ausgabe = await ytdlpAufrufen(['--version']);
         return { da: true, version: ausgabe.trim(), pfad };
     } catch (err) {
-        ServiceManager.get('Logger').warn(`[Musik] yt-dlp nicht einsatzbereit: ${err.message}`);
+        protokoll('warn', `[Musik] yt-dlp nicht einsatzbereit: ${err.message}`);
         return { da: false, version: null, pfad };
     }
 }
 
-module.exports = { tonspurErmitteln, tonstromOeffnen, verfuegbar, ytdlpFinden, FORMATWAHL };
+module.exports = { tonstromVonSeite, tonstromVonAdresse, verfuegbar, ytdlpFinden, FORMATWAHL };
