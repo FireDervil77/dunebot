@@ -87,8 +87,11 @@
             <label for="action_duration" class="form-label">
               <%= tr('automod:SETTINGS.ACTION_DURATION.LABEL') %>
             </label>
-            <input type="number" class="form-control" id="action_duration" name="action_duration"
-                   min="1" max="40320" value="<%= settings.action_duration || 1440 %>">
+            <div class="input-group">
+              <input type="number" class="form-control" id="action_duration" name="action_duration"
+                     min="1" max="40320" value="<%= settings.action_duration || 1440 %>">
+              <span class="input-group-text"><%= tr('automod:SETTINGS.ACTION_DURATION.UNIT') %></span>
+            </div>
             <div class="form-hint"><%= tr('automod:SETTINGS.ACTION_DURATION.HELP') %></div>
           </div>
 

@@ -31,8 +31,9 @@
       "HELP": "Die Aktion, die ausgeführt wird, wenn ein Benutzer die maximale Anzahl an Strikes erreicht"
     },
     "ACTION_DURATION": {
-      "LABEL": "Timeout-Dauer (Minuten)",
-      "HELP": "Wie lange der Timeout gilt, wenn die maximale Strike-Zahl erreicht ist. Nur bei der Aktion „Timeout“ von Bedeutung. Höchstens 40320 Minuten (28 Tage) — mehr erlaubt Discord nicht. Eigene Eskalationsstufen haben ihre eigene Dauer und gehen vor."
+      "LABEL": "Timeout-Dauer",
+      "UNIT": "Minuten",
+      "HELP": "Wie lange der Timeout gilt, wenn die maximale Strike-Zahl erreicht ist — in Minuten. 60 = 1 Stunde, 1440 = 1 Tag, 10080 = 1 Woche. Höchstens 40320 (28 Tage), mehr erlaubt Discord nicht. Nur bei der Aktion „Timeout“ von Bedeutung; eigene Eskalationsstufen haben ihre eigene Dauer und gehen vor."
     },
     "DEBUG_MODE": {
       "LABEL": "Debug-Modus",

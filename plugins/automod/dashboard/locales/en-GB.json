@@ -31,8 +31,9 @@
       "HELP": "The action to take when a user reaches the maximum number of strikes"
     },
     "ACTION_DURATION": {
-      "LABEL": "Timeout duration (minutes)",
-      "HELP": "How long the timeout lasts once the maximum strike count is reached. Only relevant for the “Timeout” action. At most 40320 minutes (28 days) — Discord allows no more. Escalation levels carry their own duration and take precedence."
+      "LABEL": "Timeout duration",
+      "UNIT": "minutes",
+      "HELP": "How long the timeout lasts once the maximum strike count is reached — in minutes. 60 = 1 hour, 1440 = 1 day, 10080 = 1 week. At most 40320 (28 days), Discord allows no more. Only relevant for the “Timeout” action; escalation levels carry their own duration and take precedence."
     },
     "DEBUG_MODE": {
       "LABEL": "Debug mode",
