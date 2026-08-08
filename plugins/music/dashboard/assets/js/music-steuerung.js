@@ -280,6 +280,9 @@
      *
      * @returns {Promise<boolean>} Ob gerade etwas laeuft
      */
+    /** Kennung des zuletzt angezeigten Titels - erkennt den Wechsel. */
+    let angezeigterTitel = null;
+
     async function zustandHolen() {
         if (!document.getElementById('music-spieler')) return false;
 
@@ -287,17 +290,94 @@
         const z = antwort.zustand;
         const t = z.aktuell;
 
+        // ────────────────────────────────────────────────────────────────────
+        // Titelwechsel
+        //
+        // Hier wurden vorher nur Position und Balken nachgefuehrt. Beim
+        // Ueberspringen sprang deshalb der Balken zurueck, waehrend Titel, Bild
+        // und Quelle die des vorigen Titels blieben - bis jemand die Seite neu
+        // lud. Das sah aus, als haette der Knopf nicht funktioniert.
+        // ────────────────────────────────────────────────────────────────────
+        const kennung = t ? String(t.url || t.title || '') : null;
+
+        if (kennung !== angezeigterTitel) {
+            // Von "es laeuft nichts" auf "es laeuft etwas" (oder umgekehrt)
+            // aendert sich der ganze Aufbau der Karte, nicht nur ihr Inhalt.
+            // Das baut der Server sauberer als wir hier - einmal neu laden.
+            const hatteTitel = angezeigterTitel !== null;
+            if (hatteTitel !== Boolean(t) && document.getElementById('music-titel') === null) {
+                window.location.reload();
+                return false;
+            }
+
+            angezeigterTitel = kennung;
+            if (t) titelAnzeigen(t);
+        }
+
         const positionFeld = document.getElementById('music-position');
         const balken = document.getElementById('music-balken');
 
         if (t && positionFeld) {
             positionFeld.textContent = `${dauer(t.positionSek)} / ${dauer(t.durationSec)}`;
         }
-        if (t && balken && t.durationSec > 0) {
-            balken.style.width = Math.min(100, Math.round((t.positionSek / t.durationSec) * 100)) + '%';
+        if (t && balken) {
+            balken.style.width = t.durationSec > 0
+                ? Math.min(100, Math.round((t.positionSek / t.durationSec) * 100)) + '%'
+                : '0%';
         }
 
+        kopfzeileSetzen(z);
+
         return Boolean(t) && !z.pausiert;
+    }
+
+    /**
+     * Titel, Bild und Quelle austauschen.
+     *
+     * @param {Object} t Der laufende Titel aus dem Zustand
+     * @returns {void}
+     */
+    function titelAnzeigen(t) {
+        const titel = document.getElementById('music-titel');
+        if (titel) {
+            titel.textContent = t.title || '';
+            titel.href = t.herkunftUrl || t.url || '#';
+        }
+
+        const quelle = document.getElementById('music-quelle');
+        if (quelle) quelle.textContent = t.source || '';
+
+        const bild = document.getElementById('music-bild');
+        if (bild) {
+            if (t.thumbnail) {
+                bild.style.backgroundImage = `url('${t.thumbnail}')`;
+                bild.innerHTML = '';
+            } else {
+                // Kein Bild: das Notenzeichen zurueckholen, sonst bliebe das
+                // Bild des vorigen Titels stehen.
+                bild.style.backgroundImage = '';
+                bild.innerHTML = '<i class="fa-solid fa-music"></i>';
+            }
+        }
+
+        const balkenRahmen = document.getElementById('music-balken')?.parentElement;
+        if (balkenRahmen) {
+            balkenRahmen.style.visibility = t.durationSec > 0 ? '' : 'hidden';
+        }
+    }
+
+    /**
+     * Ueberschrift der Karte auf "Laeuft gerade" oder "Pausiert" setzen.
+     *
+     * @param {Object} z Zustand
+     * @returns {void}
+     */
+    function kopfzeileSetzen(z) {
+        const kopf = document.querySelector('#music-spieler .card-title');
+        if (!kopf) return;
+
+        const neu = z.pausiert ? text('PAUSIERT', 'Pausiert') : text('LAEUFT', 'Läuft gerade');
+        if (kopf.textContent.trim() !== neu) kopf.textContent = neu;
     }
 
     /**

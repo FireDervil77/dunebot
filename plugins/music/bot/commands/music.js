@@ -212,7 +212,7 @@ module.exports = {
                 description: 'music:SAVE.DESCRIPTION',
                 type: ApplicationCommandOptionType.Subcommand,
                 options: [
-                    { name: 'name', description: 'music:SAVE.NAME_DESC', type: ApplicationCommandOptionType.String, required: true },
+                    { name: 'name', description: 'music:SAVE.NAME_DESC', type: ApplicationCommandOptionType.String, required: true, autocomplete: true },
                     // Ohne diese Unterscheidung sind Listen kaum zu gebrauchen:
                     // man will oft genau den einen Titel behalten, nicht den
                     // ganzen Abend.
@@ -224,7 +224,7 @@ module.exports = {
                 description: 'music:LOAD.DESCRIPTION',
                 type: ApplicationCommandOptionType.Subcommand,
                 options: [
-                    { name: 'name', description: 'music:LOAD.NAME_DESC', type: ApplicationCommandOptionType.String, required: true }
+                    { name: 'name', description: 'music:LOAD.NAME_DESC', type: ApplicationCommandOptionType.String, required: true, autocomplete: true }
                 ]
             },
             {
@@ -232,7 +232,7 @@ module.exports = {
                 description: 'music:PLAYLISTS.DESCRIPTION',
                 type: ApplicationCommandOptionType.Subcommand,
                 options: [
-                    { name: 'name', description: 'music:PLAYLISTS.NAME_DESC', type: ApplicationCommandOptionType.String, required: false }
+                    { name: 'name', description: 'music:PLAYLISTS.NAME_DESC', type: ApplicationCommandOptionType.String, required: false, autocomplete: true }
                 ]
             },
             {
@@ -240,7 +240,7 @@ module.exports = {
                 description: 'music:UNSAVE.DESCRIPTION',
                 type: ApplicationCommandOptionType.Subcommand,
                 options: [
-                    { name: 'name', description: 'music:UNSAVE.NAME_DESC', type: ApplicationCommandOptionType.String, required: true }
+                    { name: 'name', description: 'music:UNSAVE.NAME_DESC', type: ApplicationCommandOptionType.String, required: true, autocomplete: true }
                 ]
             }
         ]
@@ -306,7 +306,17 @@ module.exports = {
         try {
             const feld = interaction.options.getFocused(true);
 
-            // Nur das Eingabefeld von `play` bekommt eine Liste
+            // Das Namensfeld der Listenbefehle schlaegt die vorhandenen Listen
+            // vor. Vorher gab es das nirgends: Wer `/music load` tippte, musste
+            // den Namen auswendig wissen - und ein Tippfehler sah aus wie
+            // "Liste gibt es nicht".
+            if (feld?.name === 'name') {
+                return await interaction.respond(
+                    await listenVorschlaege(interaction.guildId, feld.value)
+                );
+            }
+
+            // Nur das Eingabefeld von `play` bekommt eine Titelsuche
             if (feld?.name !== 'eingabe') return await interaction.respond([]);
 
             const vorschlaege = await vorschlaegeHolen(feld.value, interaction.user.id, interaction.guildId);
@@ -317,6 +327,48 @@ module.exports = {
         }
     }
 };
+
+/**
+ * Die Wiedergabelisten der Guild als Auswahleintraege.
+ *
+ * Kommt aus der Datenbank, nicht von YouTube - also schnell genug, um sie bei
+ * jedem Tastendruck zu liefern, und ohne Zwischenspeicher. Wer gerade eine Liste
+ * anlegt oder loescht, soll das sofort sehen.
+ *
+ * Der Titelzusatz ist Absicht: Zwei Listen heissen schnell aehnlich, und die
+ * Anzahl der Titel ist das, woran man sie auseinanderhaelt.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {string} eingabe Was der Nutzer bisher getippt hat
+ * @returns {Promise<Array<{name: string, value: string}>>} Hoechstens 25 Eintraege
+ */
+async function listenVorschlaege(guildId, eingabe) {
+    if (!guildId) return [];
+
+    try {
+        const { MusicPlaylists } = require('../../shared/models');
+        const listen = await MusicPlaylists.getAll(guildId);
+        const suche = String(eingabe || '').trim().toLowerCase();
+
+        return (listen || [])
+            .filter(l => !suche || String(l.name || '').toLowerCase().includes(suche))
+            .slice(0, 25)
+            .map(l => {
+                const anzahl = Number(l.titel_anzahl) || 0;
+                const name = `${l.name} (${anzahl})`;
+
+                // Discord weist Eintraege ueber 100 Zeichen komplett ab. Der
+                // Wert muss der reine Name bleiben - er geht so an `load`.
+                return {
+                    name: name.length > 100 ? `${name.slice(0, 99)}…` : name,
+                    value: String(l.name || '').slice(0, 100)
+                };
+            });
+    } catch {
+        // Ohne Vorschlaege tippt man den Namen eben selbst
+        return [];
+    }
+}
 
 /** Wortformen, die als "an" gelten - fuer den Aufruf per Nachricht. */
 const JA = ['an', 'ein', 'on', 'true', 'ja'];

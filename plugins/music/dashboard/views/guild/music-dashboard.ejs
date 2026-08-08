@@ -45,30 +45,41 @@
       </div>
 
       <div class="card-body">
+        <%#
+          Die Kennungen unten sind nicht Zierde: Ohne sie konnte die Anzeige nur
+          Position und Balken nachfuehren. Beim Titelwechsel - Ueberspringen,
+          naechster Titel aus der Warteschlange - sprang der Balken zurueck,
+          waehrend Titel, Bild und Quelle die des vorigen Titels blieben, bis
+          jemand die Seite neu lud.
+        %>
         <% if (t) { %>
           <div class="d-flex align-items-center mb-3">
             <% if (t.thumbnail) { %>
-              <span class="avatar avatar-lg me-3" style="background-image: url('<%= t.thumbnail %>')"></span>
+              <span class="avatar avatar-lg me-3" id="music-bild" style="background-image: url('<%= t.thumbnail %>')"></span>
             <% } else { %>
-              <span class="avatar avatar-lg me-3"><i class="fa-solid fa-music"></i></span>
+              <span class="avatar avatar-lg me-3" id="music-bild"><i class="fa-solid fa-music"></i></span>
             <% } %>
             <div class="flex-grow-1 text-truncate">
               <h3 class="mb-1 text-truncate">
-                <a href="<%= t.herkunftUrl || t.url %>" target="_blank" rel="noopener"><%= t.title %></a>
+                <a id="music-titel" href="<%= t.herkunftUrl || t.url %>" target="_blank" rel="noopener"><%= t.title %></a>
               </h3>
               <div class="text-secondary">
-                <span class="badge bg-secondary-lt"><%= t.source %></span>
+                <span class="badge bg-secondary-lt" id="music-quelle"><%= t.source %></span>
                 <span class="ms-2" id="music-position"><%= dauer(t.positionSek) %> / <%= dauer(t.durationSec) %></span>
               </div>
             </div>
           </div>
 
-          <% if (t.durationSec > 0) { %>
-            <div class="progress mb-3" style="height: .5rem;">
-              <div class="progress-bar" id="music-balken"
-                   style="width: <%= Math.min(100, Math.round((t.positionSek / t.durationSec) * 100)) %>%"></div>
-            </div>
-          <% } %>
+          <%#
+            Der Balken steht jetzt immer da, auch bei unbekannter Laenge
+            (Live-Sendungen). Sonst gaebe es beim Wechsel von einem Live-Titel
+            auf einen normalen kein Element zum Nachfuehren, und der Fortschritt
+            bliebe bis zum naechsten Seitenaufbau unsichtbar.
+          %>
+          <div class="progress mb-3" style="height: .5rem;<%= t.durationSec > 0 ? '' : 'visibility:hidden' %>">
+            <div class="progress-bar" id="music-balken"
+                 style="width: <%= t.durationSec > 0 ? Math.min(100, Math.round((t.positionSek / t.durationSec) * 100)) : 0 %>%"></div>
+          </div>
 
           <%# Was laeuft, will man behalten koennen - ohne das ist der Player
               eine Sackgasse und die Listen bleiben leer. %>
