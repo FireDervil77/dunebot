@@ -1,13 +1,23 @@
 const { EmbedBuilder } = require("discord.js");
 const { AutoModSettings } = require("../../shared/models");
+const { warEigeneLoeschung } = require("../utils");
 
 /**
- * This function saves stats for a new message
+ * Ghost-Ping-Waechter: protokolliert geloeschte Nachrichten mit Erwaehnungen.
+ *
  * @param {import("discord.js").Message} message
  */
 module.exports = async (message) => {
     if (message.partial) return;
     if (message.author.bot || !message.guild) return;
+
+    // Eigene Loeschungen sind kein Ghost-Ping.
+    //
+    // `messageDelete` feuert auch dann, wenn AutoMod selbst geloescht hat - der
+    // Waechter sah bisher nur "geloeschte Nachricht mit Erwaehnungen" und meldete
+    // jede von einer Regel geloeschte Nachricht mit `@jemand` zusaetzlich als
+    // Ghost-Ping. Ein Verstoss, zwei Eintraege.
+    if (warEigeneLoeschung(message.id)) return;
 
     const settings = await AutoModSettings.getSettings(message.guild.id);
 

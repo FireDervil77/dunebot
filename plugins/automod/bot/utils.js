@@ -154,6 +154,63 @@ function pruefeSpam(message, settings) {
 }
 
 /**
+ * Nachrichten, die AutoMod **selbst** geloescht hat.
+ *
+ * Ohne das meldet der Ghost-Ping-Waechter jede eigene Loeschung als Ghost-Ping:
+ * `messageDelete` feuert auch dann, wenn der Bot geloescht hat, und der
+ * Waechter sieht nur "geloeschte Nachricht mit Erwaehnungen". Wer also eine
+ * Nachricht mit `@jemand` schreibt, die von einer Regel geloescht wird, bekommt
+ * zwei Eintraege: den Verstoss und einen erfundenen Ghost-Ping.
+ *
+ * Schluessel ist die Nachrichten-ID, Wert der Zeitpunkt. Der Zeitpunkt ist
+ * noetig, weil eine Loeschung fehlschlagen kann - dann bliebe die ID sonst
+ * ewig stehen.
+ *
+ * @type {Map<string, number>}
+ */
+const eigeneLoeschungen = new Map();
+
+/** Wie lange eine gemerkte Loeschung gilt. */
+const LOESCHUNG_HALTBAR_MS = 60 * 1000;
+
+/**
+ * Eine Loeschung als "von uns" vormerken.
+ *
+ * Muss **vor** `message.delete()` gerufen werden - `messageDelete` kann sonst
+ * schneller sein als der Eintrag.
+ *
+ * @param {string} nachrichtId ID der Nachricht
+ * @returns {void}
+ */
+function merkeEigeneLoeschung(nachrichtId) {
+    if (!nachrichtId) return;
+
+    const jetzt = Date.now();
+    eigeneLoeschungen.set(String(nachrichtId), jetzt);
+
+    // Beim Eintragen gleich aufraeumen - das spart einen eigenen Zeitgeber und
+    // die Menge bleibt klein, weil hier selten etwas landet.
+    for (const [id, zeit] of eigeneLoeschungen) {
+        if (jetzt - zeit > LOESCHUNG_HALTBAR_MS) eigeneLoeschungen.delete(id);
+    }
+}
+
+/**
+ * Kam diese Loeschung von uns? Verbraucht den Eintrag.
+ *
+ * @param {string} nachrichtId ID der Nachricht
+ * @returns {boolean} true, wenn AutoMod selbst geloescht hat
+ */
+function warEigeneLoeschung(nachrichtId) {
+    const id = String(nachrichtId || '');
+    const zeit = eigeneLoeschungen.get(id);
+    if (zeit === undefined) return false;
+
+    eigeneLoeschungen.delete(id);
+    return Date.now() - zeit <= LOESCHUNG_HALTBAR_MS;
+}
+
+/**
  * Discord-Einladungen im Text - dieselben Formen, die
  * `MiscUtils.containsDiscordInvite` erkennt, nur als globale Fassung zum
  * Herausschneiden. Die Punkte sind hier ordentlich maskiert.
@@ -249,6 +306,8 @@ function shouldModerate(message) {
 module.exports = {
     nachrichtenVerlauf,
     pruefeSpam,
+    merkeEigeneLoeschung,
+    warEigeneLoeschung,
     ohneEinladungen,
     istBefehlsnachricht,
     starteVerlaufAufraeumer,

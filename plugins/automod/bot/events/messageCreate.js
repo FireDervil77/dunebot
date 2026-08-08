@@ -1,6 +1,6 @@
 const { MiscUtils, Logger, EmbedUtils } = require("dunebot-sdk/utils");
 const { parsePlaceholders } = require("dunebot-core");
-const { pruefeSpam, ohneEinladungen, istBefehlsnachricht, shouldModerate } = require("../utils");
+const { pruefeSpam, ohneEinladungen, istBefehlsnachricht, merkeEigeneLoeschung, shouldModerate } = require("../utils");
 const { AutoModSettings, AutoModStrikes, AutoModLogs, AutoModEscalation, AutoModExemptions, AutoModRegexRules, AutoModCompoundRules } = require("../../shared/models");
 const { loadKeywordLists } = require("../keywordLoader");
 
@@ -310,6 +310,11 @@ module.exports = async (message) => {
     // Parameter und wurde verworfen. Der Hinweis blieb dadurch fuer immer
     // stehen und muellte den Kanal zu, den er gerade aufgeraeumt hatte.
     if (shouldDelete && message.deletable) {
+        // Vor dem Loeschen vormerken, nicht danach: `messageDelete` kann
+        // schneller sein als die Antwort auf `delete()`. Ohne die Vormerkung
+        // meldet der Ghost-Ping-Waechter jede eigene Loeschung als Ghost-Ping.
+        merkeEigeneLoeschung(message.id);
+
         message
             .delete()
             .then(() => channel.send(guild.getT("automod:HANDLER.AUTO_DELETED")))
