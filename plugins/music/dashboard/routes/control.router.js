@@ -22,6 +22,37 @@ router.get('/state', requirePermission('MUSIC.VIEW'), async (req, res) => {
     }
 });
 
+/**
+ * Trefferliste waehrend des Tippens.
+ *
+ * Gesucht wird im Bot - dort liegen die Zugangsdaten und der Zwischenspeicher,
+ * den Discord schon benutzt. Ein eigener Sucher im Dashboard haette einen
+ * zweiten Speicher und damit doppelt so viele Anfragen an YouTube.
+ *
+ * Faellt die Suche aus, kommt eine **leere Liste** zurueck, kein Fehler: eine
+ * fehlende Trefferliste darf das Eingabefeld nicht blockieren, man kann ja
+ * weiterhin von Hand tippen.
+ */
+router.get('/vorschlaege', requirePermission('MUSIC.PLAY'), async (req, res) => {
+    const eingabe = String(req.query.q || '').trim();
+    const ipcServer = ServiceManager.get('ipcServer');
+
+    if (!eingabe || !ipcServer) return res.json({ success: true, treffer: [] });
+
+    try {
+        const ergebnis = auspacken(await ipcServer.broadcast('music:suggest', {
+            guildId: res.locals.guildId,
+            eingabe,
+            angefordertVon: angemeldeterNutzer(req, res)
+        }));
+
+        return res.json({ success: true, treffer: ergebnis.success ? (ergebnis.treffer || []) : [] });
+    } catch (error) {
+        ServiceManager.get('Logger').debug(`[Musik] Vorschlaege nicht abrufbar: ${error.message}`);
+        return res.json({ success: true, treffer: [] });
+    }
+});
+
 /** Die einfachen Vorgaenge ohne Beiwert. */
 const EINFACH = ['pause', 'fortsetzen', 'stoppen', 'trennen', 'mischen'];
 

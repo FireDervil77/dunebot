@@ -162,6 +162,96 @@
             .catch(fehlerMelden);
     };
 
+    /**
+     * Den laufenden Titel in eine Liste legen.
+     *
+     * Die Titeldaten holt sich der Server selbst aus dem Bot-Zustand - hier
+     * geht nur die Listen-ID hinaus. Was der Browser schickt, darf nicht
+     * bestimmen, was in der Datenbank landet.
+     */
+    window.musicAktuellInListe = function (listeId) {
+        anfrage('POST', '/listen/api/' + listeId + '/aktuell')
+            .then(function (antwort) {
+                melden(text('IN_LISTE', 'In "{liste}" aufgenommen: {titel}')
+                    .replace('{liste}', antwort.liste || '')
+                    .replace('{titel}', antwort.titel || ''));
+            })
+            .catch(fehlerMelden);
+    };
+
+    /** Einen Eintrag aus dem Verlauf in eine Liste legen. */
+    window.musicVerlaufInListe = function (listeId, verlaufId) {
+        anfrage('POST', '/listen/api/' + listeId + '/verlauf/' + verlaufId)
+            .then(function (antwort) {
+                melden(text('IN_LISTE', 'In "{liste}" aufgenommen: {titel}')
+                    .replace('{liste}', antwort.liste || '')
+                    .replace('{titel}', antwort.titel || ''));
+            })
+            .catch(fehlerMelden);
+    };
+
+    // ==================== Trefferliste beim Tippen ====================
+
+    /**
+     * Ein Eingabefeld mit Vorschlaegen versehen.
+     *
+     * Gesucht wird im Bot - dieselbe Funktion, die Discord bei jedem
+     * Tastendruck befragt, samt ihrem Zwischenspeicher.
+     *
+     * Der **Wert** eines Vorschlags ist die Adresse, nicht der Titel: so kommt
+     * genau das ins Feld, was in der Liste stand. Eine zweite Suche beim
+     * Abspielen koennte einen anderen Treffer liefern - denselben Grund hat
+     * die Trefferliste im Discord.
+     *
+     * Faellt die Suche aus, bleibt die Liste leer. Das Feld muss weiter von
+     * Hand benutzbar sein.
+     *
+     * @param {string} feldId ID des Eingabefeldes
+     */
+    function vorschlaegeAnhaengen(feldId) {
+        const feld = document.getElementById(feldId);
+        if (!feld) return;
+
+        const liste = document.createElement('datalist');
+        liste.id = feldId + '-vorschlaege';
+        feld.setAttribute('list', liste.id);
+        feld.setAttribute('autocomplete', 'off');
+        feld.parentNode.appendChild(liste);
+
+        let wecker = null;
+        let zuletzt = '';
+
+        feld.addEventListener('input', function () {
+            const eingabe = feld.value.trim();
+
+            // Adressen brauchen keine Suche, und unter drei Zeichen lohnt es
+            // sich nicht - genau wie im Discord
+            if (eingabe.length < 3 || /^https?:\/\//i.test(eingabe)) return;
+            if (eingabe === zuletzt) return;
+            zuletzt = eingabe;
+
+            // Nicht bei jedem Tastendruck losschicken
+            clearTimeout(wecker);
+            wecker = setTimeout(function () {
+                anfrage('GET', '/steuerung/vorschlaege?q=' + encodeURIComponent(eingabe))
+                    .then(function (antwort) {
+                        // Zwischenzeitlich weitergetippt: Antwort ist veraltet
+                        if (feld.value.trim() !== eingabe) return;
+
+                        liste.innerHTML = '';
+                        (antwort.treffer || []).forEach(function (t) {
+                            const eintrag = document.createElement('option');
+                            eintrag.value = t.value;
+                            eintrag.label = t.name;
+                            eintrag.textContent = t.name;
+                            liste.appendChild(eintrag);
+                        });
+                    })
+                    .catch(function () { /* ohne Vorschlaege tippt man eben selbst */ });
+            }, 350);
+        });
+    }
+
     window.musicListenTitelEntfernen = function (listeId, titelId) {
         if (!window.confirm(text('TITEL_ENTFERNEN', 'Diesen Titel aus der Liste nehmen?'))) return;
 
@@ -259,6 +349,11 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+        // Beide Eingabefelder bekommen dieselbe Trefferliste - eines legt in
+        // die Warteschlange, das andere in eine Wiedergabeliste
+        vorschlaegeAnhaengen('music-eingabe');
+        vorschlaegeAnhaengen('liste-eingabe');
+
         // Lautstaerke erst beim Loslassen senden, nicht bei jeder Bewegung
         const regler = document.getElementById('music-lautstaerke');
         const anzeige = document.getElementById('music-lautstaerke-wert');

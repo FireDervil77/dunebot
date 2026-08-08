@@ -48,6 +48,24 @@ class MusicHistory {
     }
 
     /**
+     * Ein einzelner Eintrag - fuer "nochmal in eine Liste".
+     *
+     * Die Guild steht mit in der Bedingung, damit sich ueber eine geratene ID
+     * nichts aus einem fremden Server holen laesst.
+     *
+     * @param {string} guildId Discord-Guild-ID
+     * @param {number} id Eintrags-ID
+     * @returns {Promise<Object|null>} Eintrag oder null
+     */
+    static async getById(guildId, id) {
+        const zeilen = await ServiceManager.get('dbService').query(
+            'SELECT * FROM music_history WHERE id = ? AND guild_id = ?',
+            [id, guildId]
+        );
+        return zeilen[0] || null;
+    }
+
+    /**
      * Zahlen fuer die Uebersicht.
      *
      * @param {string} guildId Discord-Guild-ID

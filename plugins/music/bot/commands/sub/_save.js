@@ -2,19 +2,22 @@ const { antwort, pruefen, spielzeitText } = require('../../utils');
 const { MusicPlaylists } = require('../../../shared/models');
 
 /**
- * Die laufende Warteschlange als Wiedergabeliste sichern.
+ * Titel als Wiedergabeliste sichern.
+ *
+ * **Zwei Umfaenge, und der Unterschied ist wichtig:** „alles" nimmt den
+ * laufenden Titel und die ganze Warteschlange, „nur den laufenden" nimmt genau
+ * einen. Ohne das Zweite ist mit Listen nicht vernuenftig zu arbeiten - man
+ * hoert etwas Gutes und will genau das behalten, nicht den ganzen Abend.
  *
  * Gibt es die Liste schon, werden die Titel angehaengt statt sie zu ersetzen -
  * Anhaengen laesst sich rueckgaengig machen, Ueberschreiben nicht.
  *
- * Der laufende Titel kommt mit, denn genau den will man beim Sichern meist
- * dabei haben.
- *
  * @param {Object} mitglied Discord-GuildMember
  * @param {string} name Listenname
+ * @param {boolean} nurAktuell Nur den laufenden Titel
  * @returns {Promise<Object>} Antwort
  */
-module.exports = async (mitglied, name) => {
+module.exports = async (mitglied, name, nurAktuell = false) => {
     const p = await pruefen(mitglied, { brauchtSprachkanal: false, brauchtAbspieler: true });
     if (!p.ok) return antwort(p.fehler, 'warnung');
 
@@ -22,10 +25,14 @@ module.exports = async (mitglied, name) => {
     if (!listenName) return antwort('Gib der Liste einen Namen.', 'warnung');
 
     const zustand = p.abspieler.zustand();
-    const alle = [
-        ...(zustand.aktuell ? [zustand.aktuell] : []),
-        ...zustand.warteschlange
-    ];
+
+    if (nurAktuell && !zustand.aktuell) {
+        return antwort('Gerade laeuft nichts, was sich sichern liesse.', 'warnung');
+    }
+
+    const alle = nurAktuell
+        ? [zustand.aktuell]
+        : [...(zustand.aktuell ? [zustand.aktuell] : []), ...zustand.warteschlange];
 
     if (alle.length === 0) return antwort('Es ist nichts da, was sich sichern liesse.', 'warnung');
 

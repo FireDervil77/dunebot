@@ -83,6 +83,7 @@
                 <th><%= tr('music:HISTORY.TRACK') %></th>
                 <th><%= tr('music:HISTORY.SOURCE') %></th>
                 <th class="text-end"><%= tr('music:HISTORY.WHEN') %></th>
+                <th class="w-1"></th>
               </tr>
             </thead>
             <tbody>
@@ -95,6 +96,29 @@
                   </td>
                   <td><span class="badge bg-secondary-lt"><%= e.source %></span></td>
                   <td class="text-end text-secondary"><%= zeitpunkt(e.played_at) %></td>
+                  <td class="text-end">
+                    <%# Gegenstueck zu /music history im Discord - nur legt es
+                        den Titel in eine Liste statt in die Warteschlange.
+                        Ohne Quelle laesst sich nichts uebernehmen. %>
+                    <% if (e.url && listen && listen.length > 0) { %>
+                      <div class="dropdown">
+                        <button type="button" class="btn btn-sm btn-icon btn-ghost-secondary"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                title="<%= tr('music:PLAYLISTS.ADD_TO') %>">
+                          <i class="fa-solid fa-plus"></i>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end">
+                          <span class="dropdown-header"><%= tr('music:PLAYLISTS.ADD_TO') %></span>
+                          <% listen.forEach(l => { %>
+                            <button type="button" class="dropdown-item"
+                                    onclick="musicVerlaufInListe(<%= l.id %>, <%= e.id %>)">
+                              <%= l.name %>
+                            </button>
+                          <% }); %>
+                        </div>
+                      </div>
+                    <% } %>
+                  </td>
                 </tr>
               <% }); %>
             </tbody>

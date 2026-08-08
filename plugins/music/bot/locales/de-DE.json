@@ -82,7 +82,8 @@
     },
     "SAVE": {
         "DESCRIPTION": "Sichert die Warteschlange als Wiedergabeliste",
-        "NAME_DESC": "Name der Liste"
+        "NAME_DESC": "Name der Liste",
+        "ONLY_CURRENT_DESC": "Nur den laufenden Titel sichern statt der ganzen Warteschlange"
     },
     "LOAD": {
         "DESCRIPTION": "Reiht eine gespeicherte Liste ein",

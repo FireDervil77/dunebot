@@ -69,6 +69,33 @@
                    style="width: <%= Math.min(100, Math.round((t.positionSek / t.durationSec) * 100)) %>%"></div>
             </div>
           <% } %>
+
+          <%# Was laeuft, will man behalten koennen - ohne das ist der Player
+              eine Sackgasse und die Listen bleiben leer. %>
+          <div class="mb-3">
+            <div class="dropdown">
+              <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle"
+                      data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fa-solid fa-plus me-2"></i><%= tr('music:PLAYLISTS.ADD_CURRENT') %>
+              </button>
+              <div class="dropdown-menu">
+                <% if (listen && listen.length > 0) { %>
+                  <% listen.forEach(l => { %>
+                    <button type="button" class="dropdown-item" onclick="musicAktuellInListe(<%= l.id %>)">
+                      <i class="fa-solid fa-rectangle-list me-2 text-secondary"></i><%= l.name %>
+                      <span class="text-secondary small ms-1">(<%= l.titel_anzahl %>)</span>
+                    </button>
+                  <% }); %>
+                  <div class="dropdown-divider"></div>
+                <% } else { %>
+                  <span class="dropdown-item-text text-secondary"><%= tr('music:PLAYLISTS.NONE_YET') %></span>
+                <% } %>
+                <a class="dropdown-item" href="<%= basis %>/listen">
+                  <i class="fa-solid fa-arrow-right me-2 text-secondary"></i><%= tr('music:PLAYLISTS.ALL') %>
+                </a>
+              </div>
+            </div>
+          </div>
         <% } else { %>
           <div class="empty">
             <div class="empty-icon"><i class="fa-solid fa-music fs-1 text-secondary"></i></div>

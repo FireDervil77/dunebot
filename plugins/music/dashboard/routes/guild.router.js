@@ -44,17 +44,19 @@ router.get('/dashboard', requirePermission('MUSIC.VIEW'), async (req, res) => {
     const tr = makeTranslator(req, res);
 
     try {
-        const [zustand, einstellungen, statistik, channels] = await Promise.all([
+        // Die Listen gehoeren dazu: was laeuft, will man behalten koennen
+        const [zustand, einstellungen, statistik, channels, listen] = await Promise.all([
             zustandHolen(guildId),
             MusicSettings.getSettings(guildId),
             MusicHistory.getStats(guildId, 30).catch(() => null),
-            getGuildChannels(guildId)
+            getGuildChannels(guildId),
+            MusicPlaylists.getAll(guildId).catch(() => [])
         ]);
 
         skripteAnmelden(['music-steuerung']);
 
         await renderView(res, 'guild/music-dashboard', {
-            tr, guildId, zustand, einstellungen, statistik, channels,
+            tr, guildId, zustand, einstellungen, statistik, channels, listen,
             filter: klangfilter.auswahl(),
             spielzeitText
         });
@@ -119,14 +121,16 @@ router.get('/verlauf', requirePermission('MUSIC.HISTORY.VIEW'), async (req, res)
     const tage = Math.min(Math.max(parseInt(req.query.tage, 10) || 30, 1), 365);
 
     try {
-        const [verlauf, statistik] = await Promise.all([
+        const [verlauf, statistik, listen] = await Promise.all([
             MusicHistory.getRecent(guildId, 100),
-            MusicHistory.getStats(guildId, tage)
+            MusicHistory.getStats(guildId, tage),
+            // Fuer "diesen Titel in eine Liste" an jeder Zeile
+            MusicPlaylists.getAll(guildId).catch(() => [])
         ]);
 
         skripteAnmelden(['music-steuerung']);
 
-        await renderView(res, 'guild/music-history', { tr, guildId, verlauf, statistik, tage, spielzeitText });
+        await renderView(res, 'guild/music-history', { tr, guildId, verlauf, statistik, tage, listen, spielzeitText });
     } catch (error) {
         return renderFehler(res, error, 'Der Verlauf konnte nicht geladen werden');
     }

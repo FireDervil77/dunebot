@@ -74,7 +74,7 @@ module.exports = {
             { trigger: 'similar [Anzahl]', description: 'music:SIMILAR.DESCRIPTION' },
             { trigger: 'history [Nummer]', description: 'music:HISTORY.DESCRIPTION' },
             { trigger: 'fix', description: 'music:FIX.DESCRIPTION' },
-            { trigger: 'save <Name>', description: 'music:SAVE.DESCRIPTION' },
+            { trigger: 'save <Name> [aktuell]', description: 'music:SAVE.DESCRIPTION' },
             { trigger: 'load <Name>', description: 'music:LOAD.DESCRIPTION' },
             { trigger: 'playlists [Name]', description: 'music:PLAYLISTS.DESCRIPTION' },
             { trigger: 'unsave <Name>', description: 'music:UNSAVE.DESCRIPTION' }
@@ -212,7 +212,11 @@ module.exports = {
                 description: 'music:SAVE.DESCRIPTION',
                 type: ApplicationCommandOptionType.Subcommand,
                 options: [
-                    { name: 'name', description: 'music:SAVE.NAME_DESC', type: ApplicationCommandOptionType.String, required: true }
+                    { name: 'name', description: 'music:SAVE.NAME_DESC', type: ApplicationCommandOptionType.String, required: true },
+                    // Ohne diese Unterscheidung sind Listen kaum zu gebrauchen:
+                    // man will oft genau den einen Titel behalten, nicht den
+                    // ganzen Abend.
+                    { name: 'nur_aktuell', description: 'music:SAVE.ONLY_CURRENT_DESC', type: ApplicationCommandOptionType.Boolean, required: false }
                 ]
             },
             {
@@ -278,6 +282,7 @@ module.exports = {
             modus: interaction.options.getString('modus'),
             name: interaction.options.getString('name'),
             zustand: interaction.options.getBoolean('zustand'),
+            nurAktuell: interaction.options.getBoolean('nur_aktuell'),
             doppelte: interaction.options.getBoolean('doppelte'),
             abwesende: interaction.options.getBoolean('abwesende'),
             textKanalId: interaction.channelId
@@ -376,8 +381,14 @@ async function ausfuehren(unterbefehl, mitglied, o) {
         case 'history':
             return await history(mitglied, o.nummer ?? (Number.isNaN(o.zahl) ? null : o.zahl));
 
-        case 'save':
-            return await save(mitglied, o.name ?? o.eingabe);
+        case 'save': {
+            // Im Chat: `!music save Abendliste aktuell`
+            const worte = String(o.eingabe || '').trim().split(/\s+/);
+            const letztes = (worte[worte.length - 1] || '').toLowerCase();
+            const nurAktuell = o.nurAktuell ?? (letztes === 'aktuell' && worte.length > 1);
+            const listenName = o.name ?? (nurAktuell ? worte.slice(0, -1).join(' ') : o.eingabe);
+            return await save(mitglied, listenName, nurAktuell);
+        }
 
         case 'load':
             return await load(mitglied, o.name ?? o.eingabe, o.textKanalId);

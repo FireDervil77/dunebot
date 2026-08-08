@@ -82,7 +82,8 @@
     },
     "SAVE": {
         "DESCRIPTION": "Saves the queue as a playlist",
-        "NAME_DESC": "Name of the playlist"
+        "NAME_DESC": "Name of the playlist",
+        "ONLY_CURRENT_DESC": "Save only the current track instead of the whole queue"
     },
     "LOAD": {
         "DESCRIPTION": "Queues a saved playlist",
