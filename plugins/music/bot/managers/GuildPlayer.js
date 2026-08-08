@@ -105,6 +105,22 @@ class GuildPlayer {
     }
 
     /**
+     * Ob eine Sprachverbindung steht.
+     *
+     * Muss ein Zugriff sein, kein Feld: `zustand()` gab `verbunden` zurueck,
+     * der Abspieler selbst hatte es aber nie. `abspieler.verbunden` war
+     * damit immer `undefined` - und weil `utils.pruefen` genau darauf prueft,
+     * brachen **zwoelf der sechzehn Unterbefehle** sofort mit "Es laeuft
+     * gerade nichts" ab, ohne je etwas zu tun. Auch die Pruefung auf den
+     * falschen Sprachkanal lief deshalb ins Leere.
+     *
+     * @returns {boolean}
+     */
+    get verbunden() {
+        return Boolean(this.verbindung);
+    }
+
+    /**
      * Auf die Zustaende des Abspielers hoeren.
      *
      * @private
@@ -659,7 +675,7 @@ class GuildPlayer {
     zustand() {
         return {
             guildId: this.guildId,
-            verbunden: Boolean(this.verbindung),
+            verbunden: this.verbunden,
             sprachKanalId: this.sprachKanalId,
             textKanalId: this.textKanalId,
             aktuell: this.aktuell
