@@ -59,6 +59,11 @@ router.put('/', requirePermission('AUTOMOD.SETTINGS.EDIT'), async (req, res) => 
         if (b.action !== undefined && ['TIMEOUT', 'KICK', 'BAN'].includes(b.action)) {
             updates.action = b.action;
         }
+        // Dauer der Hauptaktion in Minuten. 40320 = 28 Tage ist die Grenze,
+        // die Discord fuer Timeouts setzt - alles darueber lehnt die Schnittstelle ab.
+        if (b.action_duration !== undefined) {
+            updates.action_duration = Math.min(40320, Math.max(1, zuZahl(b.action_duration, 1440)));
+        }
         if (b.debug_mode !== undefined) updates.debug_mode = zuBool(b.debug_mode);
         if (b.dm_message !== undefined) updates.dm_message = b.dm_message || null;
 

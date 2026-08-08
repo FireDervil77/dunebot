@@ -11,10 +11,13 @@ try {
     addModAction = ModUtils.addModAction;
 } catch (ex) {
     Logger.warn("[AutoMod] Moderation plugin not found, using fallback actions");
-    addModAction = async (issuer, target, reason, action) => {
+    // Der Ersatz muss dieselbe Unterschrift haben wie das Original - sonst
+    // faellt die Dauer hier wieder auf den Boden, sobald das Moderations-Plugin
+    // einmal fehlt.
+    addModAction = async (issuer, target, reason, action, durationMs) => {
         switch (action) {
             case "TIMEOUT":
-                await target.timeout(24 * 60 * 60 * 1000, reason);
+                await target.timeout(Number(durationMs) > 0 ? Number(durationMs) : 24 * 60 * 60 * 1000, reason);
                 break;
             case "KICK":
                 await target.kick(reason);
@@ -436,11 +439,19 @@ module.exports = async (message) => {
             // Fallback: Kein Escalation Config -> altes System
             dbStrikes = 0;
 
+            // Die Dauer gilt nur fuer TIMEOUT; bei KICK und BAN ist sie
+            // bedeutungslos und wird von `addModAction` ignoriert. Ohne
+            // Einstellung greift dort weiterhin die Vorgabe von 24 Stunden.
+            const dauerMs = Number(settings.action_duration) > 0
+                ? Number(settings.action_duration) * 60 * 1000
+                : undefined;
+
             await addModAction(
                 guild.members.me,
                 member,
                 guild.getT("automod:HANDLER.AUTO_ACTION_REASON"),
                 settings.action,
+                dauerMs,
             ).catch(() => {});
         }
 

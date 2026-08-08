@@ -488,14 +488,22 @@ module.exports = class ModUtils {
      * @param {import('discord.js').GuildMember} target
      * @param {string} reason
      * @param {"TIMEOUT"|"KICK"|"SOFTBAN"|"BAN"} action
+     * @param {number} [durationMs] Timeout-Dauer in Millisekunden. Ohne Angabe
+     *   gilt `DEFAULT_TIMEOUT_HOURS`. Nur fuer TIMEOUT von Bedeutung.
+     *
+     *   Der Parameter fehlte bisher - AutoMod hat ihn aber laengst mitgegeben:
+     *   sowohl die Eskalationsstufen als auch die Kombinationsregeln riefen
+     *   `addModAction(..., action, duration)` mit fuenf Argumenten auf. Das
+     *   fuenfte fiel hier lautlos auf den Boden, und **jeder** Timeout dauerte
+     *   24 Stunden - egal was im Dashboard eingestellt war.
      */
-    static async addModAction(issuer, target, reason, action) {
+    static async addModAction(issuer, target, reason, action, durationMs) {
         switch (action) {
             case "TIMEOUT":
                 return ModUtils.timeoutTarget(
                     issuer,
                     target,
-                    DEFAULT_TIMEOUT_HOURS * 60 * 60 * 1000,
+                    Number(durationMs) > 0 ? Number(durationMs) : DEFAULT_TIMEOUT_HOURS * 60 * 60 * 1000,
                     reason,
                 );
 

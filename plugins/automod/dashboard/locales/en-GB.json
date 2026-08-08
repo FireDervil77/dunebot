@@ -30,6 +30,10 @@
       "BAN": "Ban",
       "HELP": "The action to take when a user reaches the maximum number of strikes"
     },
+    "ACTION_DURATION": {
+      "LABEL": "Timeout duration (minutes)",
+      "HELP": "How long the timeout lasts once the maximum strike count is reached. Only relevant for the “Timeout” action. At most 40320 minutes (28 days) — Discord allows no more. Escalation levels carry their own duration and take precedence."
+    },
     "DEBUG_MODE": {
       "LABEL": "Debug mode",
       "HELP": "Also moderates moderators and admins — they are exempt otherwise. For testing filters with your own account."

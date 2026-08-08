@@ -77,6 +77,32 @@
             <div class="form-hint"><%= tr('automod:SETTINGS.ACTION.HELP') %></div>
           </div>
 
+          <%#
+            Dauer der Hauptaktion. Nur bei TIMEOUT von Bedeutung, deshalb wird
+            das Feld per JavaScript ein- und ausgeblendet - ohne JavaScript
+            bleibt es sichtbar und ist damit immer noch bedienbar.
+          %>
+          <div class="mb-3" id="action-duration-group"
+               style="<%= settings.action === 'TIMEOUT' ? '' : 'display:none' %>">
+            <label for="action_duration" class="form-label">
+              <%= tr('automod:SETTINGS.ACTION_DURATION.LABEL') %>
+            </label>
+            <input type="number" class="form-control" id="action_duration" name="action_duration"
+                   min="1" max="40320" value="<%= settings.action_duration || 1440 %>">
+            <div class="form-hint"><%= tr('automod:SETTINGS.ACTION_DURATION.HELP') %></div>
+          </div>
+
+          <script>
+            (function () {
+              var auswahl = document.getElementById('action');
+              var gruppe  = document.getElementById('action-duration-group');
+              if (!auswahl || !gruppe) return;
+              auswahl.addEventListener('change', function () {
+                gruppe.style.display = auswahl.value === 'TIMEOUT' ? '' : 'none';
+              });
+            })();
+          </script>
+
           <!-- Nachricht an das Mitglied -->
           <div class="mb-3">
             <label for="dm_message" class="form-label"><%= tr('automod:SETTINGS.DM_MESSAGE.LABEL') %></label>
