@@ -1,3 +1,4 @@
+const { ServiceManager } = require('dunebot-core');
 const { aufloesen } = require('../../quellen');
 const { antwort, pruefen, titelZeile, spielzeitText, hinweisText } = require('../../utils');
 const { MusicSettings } = require('../../../shared/models');
@@ -30,8 +31,18 @@ module.exports = async (mitglied, eingabe, zuerst, textKanalId) => {
 
     try {
         await abspieler.beitreten(sprachKanal, textKanalId);
-    } catch {
-        return antwort('Ich komme in den Sprachkanal nicht hinein.', 'fehler');
+    } catch (err) {
+        // Den Grund nennen, nicht verschlucken. Ein blankes "Ich komme nicht
+        // hinein" hat am 2026-08-08 eine Stunde Suche gekostet, weil im
+        // Protokoll nichts stand, woran man haette ansetzen koennen.
+        ServiceManager.get('Logger').error(
+            `[Musik] Beitritt zu ${sprachKanal.id} in Guild ${mitglied.guild.id} fehlgeschlagen: ${err.message}`
+        );
+
+        return antwort(
+            `Ich komme in den Sprachkanal nicht hinein.\n\`${err.message}\``,
+            'fehler'
+        );
     }
 
     const { aufgenommen, abgewiesen } = await abspieler.hinzufuegen(ergebnis.titel, { anfang: zuerst });

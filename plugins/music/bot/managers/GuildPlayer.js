@@ -141,25 +141,52 @@ class GuildPlayer {
 
         this.verbindung.subscribe(this.spieler);
 
+        // Jeden Zustandswechsel mitschreiben.
+        //
+        // Ohne das ist ein fehlgeschlagener Beitritt nicht zu deuten: man sieht
+        // nur, dass der Bot wieder draussen ist, aber nicht, ob er bis
+        // Signalling, bis Connecting oder gar nicht erst losgekommen ist.
+        // Genau daran hing die Suche am 2026-08-08.
+        this.verbindung.on('stateChange', (alt, neu) => {
+            Logger.info(`[Musik] Guild ${this.guildId}: Sprachverbindung ${alt.status} -> ${neu.status}`);
+        });
+
         // Discord verschiebt Sprachverbindungen gelegentlich. Ohne diese
         // Behandlung bricht der Ton dabei einfach ab.
         this.verbindung.on(VoiceConnectionStatus.Disconnected, async () => {
+            Logger.info(`[Musik] Guild ${this.guildId}: getrennt, warte auf Wiederkehr`);
+
+            // `Promise.any` statt `Promise.race`.
+            //
+            // `race` entscheidet beim ersten *Ergebnis*, also auch beim ersten
+            // Fehlschlag. Erreicht die Verbindung Connecting erst nach vier
+            // Sekunden, waehrend die Signalling-Frist schon nach dreien
+            // abgelaufen ist, haette `race` den Umzug faelschlich als Ende
+            // gewertet und die Verbindung abgeraeumt. `any` wartet auf den
+            // ersten *Erfolg* und gibt erst auf, wenn beide scheitern.
             try {
-                await Promise.race([
+                await Promise.any([
                     entersState(this.verbindung, VoiceConnectionStatus.Signalling, 5000),
                     entersState(this.verbindung, VoiceConnectionStatus.Connecting, 5000)
                 ]);
-                // Es war ein Umzug, keine Trennung - nichts weiter zu tun
+                return;   // Es war ein Umzug, keine Trennung
             } catch {
-                Logger.info(`[Musik] Verbindung in Guild ${this.guildId} beendet`);
-                this.aufraeumen();
+                // Beide Fristen abgelaufen - es war wirklich das Ende
             }
+
+            Logger.info(`[Musik] Verbindung in Guild ${this.guildId} beendet`);
+            this.aufraeumen();
         });
 
         try {
             await entersState(this.verbindung, VoiceConnectionStatus.Ready, 20000);
+            Logger.info(`[Musik] Guild ${this.guildId}: Sprachverbindung steht`);
         } catch (err) {
-            Logger.error(`[Musik] Sprachverbindung in Guild ${this.guildId} kam nicht zustande:`, err.message);
+            const zustand = this.verbindung?.state?.status || 'unbekannt';
+            Logger.error(
+                `[Musik] Sprachverbindung in Guild ${this.guildId} kam nicht zustande ` +
+                `(zuletzt ${zustand}): ${err.message}`
+            );
             this.aufraeumen();
             throw err;
         }

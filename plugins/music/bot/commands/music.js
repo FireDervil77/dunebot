@@ -2,22 +2,22 @@ const { ApplicationCommandOptionType } = require('discord.js');
 const klangfilter = require('../klangfilter');
 const { holen: vorschlaegeHolen } = require('../quellen/vorschlaege');
 
-const play = require('./sub/play');
-const skip = require('./sub/skip');
-const stop = require('./sub/stop');
-const pause = require('./sub/pause');
-const resume = require('./sub/resume');
-const disconnect = require('./sub/disconnect');
-const queue = require('./sub/queue');
-const nowplaying = require('./sub/nowplaying');
-const volume = require('./sub/volume');
-const loop = require('./sub/loop');
-const shuffle = require('./sub/shuffle');
-const remove = require('./sub/remove');
-const filter = require('./sub/filter');
-const mode247 = require('./sub/mode247');
-const autoplay = require('./sub/autoplay');
-const voteskip = require('./sub/voteskip');
+const play = require('./sub/_play');
+const skip = require('./sub/_skip');
+const stop = require('./sub/_stop');
+const pause = require('./sub/_pause');
+const resume = require('./sub/_resume');
+const disconnect = require('./sub/_disconnect');
+const queue = require('./sub/_queue');
+const nowplaying = require('./sub/_nowplaying');
+const volume = require('./sub/_volume');
+const loop = require('./sub/_loop');
+const shuffle = require('./sub/_shuffle');
+const remove = require('./sub/_remove');
+const filter = require('./sub/_filter');
+const mode247 = require('./sub/_mode247');
+const autoplay = require('./sub/_autoplay');
+const voteskip = require('./sub/_voteskip');
 
 /**
  * Musik - alle Befehle unter einem Dach.
