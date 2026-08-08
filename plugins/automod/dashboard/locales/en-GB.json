@@ -31,8 +31,8 @@
       "HELP": "The action to take when a user reaches the maximum number of strikes"
     },
     "DEBUG_MODE": {
-      "LABEL": "Debug Mode",
-      "HELP": "Don't moderate messages from moderators (for testing)"
+      "LABEL": "Debug mode",
+      "HELP": "Also moderates moderators and admins — they are exempt otherwise. For testing filters with your own account."
     },
     "ANTI_FEATURES": {
       "TITLE": "Anti Features"

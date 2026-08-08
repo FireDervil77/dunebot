@@ -28,6 +28,10 @@
                               action="/admin/content/news/save"
                               class="guild-ajax-form"
                               data-form-type="news"
+                              <%# TinyMCE schreibt erst beim Absenden ins Textfeld -
+                                  der Änderungswächter würde den Knopf grau lassen,
+                                  während man tippt. %>
+                              data-ohne-aenderungswaechter
                               data-success-url="<%= _backUrl %>">
                             <!-- Verstecktes Feld für ID bei Bearbeitung -->
                             <% if (news && news._id) { %>

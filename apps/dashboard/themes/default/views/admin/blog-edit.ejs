@@ -27,6 +27,10 @@
                               action="/admin/content/blog/save"
                               class="guild-ajax-form"
                               data-form-type="blog"
+                              <%# TinyMCE schreibt erst beim Absenden ins Textfeld -
+                                  der Änderungswächter würde den Knopf grau lassen,
+                                  während man tippt. %>
+                              data-ohne-aenderungswaechter
                               data-success-url="<%= _backUrl %>">
                             <% if (post && post.id) { %>
                                 <input type="hidden" name="postId" value="<%= post.id %>">

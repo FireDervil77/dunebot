@@ -62,8 +62,14 @@
             </div>
             <% } %>
 
+            <%#
+              Der Änderungswächter bleibt hier aus: Monaco und das versteckte
+              `game_data` werden erst kurz vor dem Absenden befüllt - der Knopf
+              bliebe grau, während man im Editor arbeitet.
+            %>
             <form id="addon-editor-form" class="guild-ajax-form"
                   data-form-type="addon-editor"
+                  data-ohne-aenderungswaechter
                   data-method="<%= mode === 'edit' ? 'PUT' : 'POST' %>"
                   action="/guild/<%= guildId %>/plugins/gameserver/addons<%= mode === 'edit' ? '/' + addon.id : '' %>"
                   method="POST">

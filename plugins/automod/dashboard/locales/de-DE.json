@@ -32,7 +32,7 @@
     },
     "DEBUG_MODE": {
       "LABEL": "Debug-Modus",
-      "HELP": "Moderiert keine Nachrichten von Moderatoren (zum Testen)"
+      "HELP": "Moderiert auch Moderatoren und Admins — sonst sind sie ausgenommen. Zum Testen der Filter mit dem eigenen Konto."
     },
     "ANTI_FEATURES": {
       "TITLE": "Anti-Funktionen"
