@@ -1,5 +1,6 @@
 const { ApplicationCommandOptionType } = require('discord.js');
 const klangfilter = require('../klangfilter');
+const { holen: vorschlaegeHolen } = require('../quellen/vorschlaege');
 
 const play = require('./sub/play');
 const skip = require('./sub/skip');
@@ -65,7 +66,7 @@ module.exports = {
                 description: 'music:PLAY.DESCRIPTION',
                 type: ApplicationCommandOptionType.Subcommand,
                 options: [
-                    { name: 'eingabe', description: 'music:PLAY.INPUT_DESC', type: ApplicationCommandOptionType.String, required: true },
+                    { name: 'eingabe', description: 'music:PLAY.INPUT_DESC', type: ApplicationCommandOptionType.String, required: true, autocomplete: true },
                     { name: 'zuerst', description: 'music:PLAY.FIRST_DESC', type: ApplicationCommandOptionType.Boolean, required: false }
                 ]
             },
@@ -187,6 +188,32 @@ module.exports = {
         });
 
         await interaction.followUp(antwort);
+    },
+
+    /**
+     * Trefferliste waehrend des Tippens bei `/music play`.
+     *
+     * Der Wert eines Vorschlags ist die YouTube-Adresse, nicht der Titel. So
+     * spielt genau das, was in der Liste stand - eine zweite Suche beim
+     * Abspielen koennte einen anderen Treffer liefern.
+     *
+     * Nimmt der Nutzer keinen Vorschlag an, sondern tippt einfach weiter und
+     * schickt ab, kommt sein Text unveraendert bei `play` an. Die Liste ist ein
+     * Angebot, keine Pflicht.
+     */
+    async autocomplete({ interaction }) {
+        try {
+            const feld = interaction.options.getFocused(true);
+
+            // Nur das Eingabefeld von `play` bekommt eine Liste
+            if (feld?.name !== 'eingabe') return await interaction.respond([]);
+
+            const vorschlaege = await vorschlaegeHolen(feld.value, interaction.user.id, interaction.guildId);
+            await interaction.respond(vorschlaege);
+        } catch {
+            // Eine leere Liste ist die einzige Antwort, die Discord nie stoert
+            try { await interaction.respond([]); } catch { /* Frist schon abgelaufen */ }
+        }
     }
 };
 
