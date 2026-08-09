@@ -9,7 +9,8 @@
     "ESCALATION": "Escalation",
     "EXEMPTIONS": "Exemptions",
     "RAID": "Raid protection",
-    "LOGS": "Log"
+    "LOGS": "Log",
+    "KEYWORDS": "Keywords"
   },
   "SETTINGS": {
     "PAGE_TITLE": "AutoMod Settings",
@@ -266,9 +267,31 @@
   },
   "KEYWORDS": {
     "TITLE": "Keyword lists",
-    "DESC": "Enable prepared word lists. Messages that match are deleted and earn a strike.",
+    "SUBTITLE": "Words that get deleted — freely composed per server",
     "COUNT": "{{count}} keywords",
-    "NONE": "No keyword lists found. The JSON files are missing from the bot directory."
+    "NONE": "No lists yet. Create one or sync with the templates.",
+    "LIST_EMPTY": "This list is empty.",
+    "NEW_LIST": "New list",
+    "NAME_PLACEHOLDER": "List name",
+    "DESC_PLACEHOLDER": "What is this list for? (optional)",
+    "WORD_PLACEHOLDER": "Add keyword…",
+    "BTN_CREATE_LIST": "Create",
+    "BTN_DELETE_LIST": "Delete list",
+    "REVEAL": "Show words",
+    "FROM_TEMPLATE": "From template",
+    "FROM_TEMPLATE_HELP": "This list was filled from a bundled template. It belongs to this server now — your changes stay.",
+    "MATCH": {
+      "WORD": "whole word",
+      "CONTAINS": "contained",
+      "PREFIX": "word start",
+      "HELP": "\"Whole word\" only matches standalone words — \"contained\" also matches inside other words and easily causes false alarms."
+    },
+    "SYNC": {
+      "TITLE": "Sync with templates",
+      "DESC": "The bundled templates contain words missing from your lists. Applying is optional — deleted words stay deleted if you do nothing here.",
+      "MISSING": "{{count}} missing",
+      "APPLY": "Apply"
+    }
   },
   "REGEX": {
     "TITLE": "Custom patterns",

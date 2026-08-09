@@ -12,6 +12,10 @@
  * `active_keyword_lists` bedingungslos an - auf einer Seite ohne Stichwortlisten
  * waere das ein leeres Array gewesen und haette die Auswahl geloescht.
  *
+ * Am 2026-08-09 ist dieser Sammler entfallen: die Stichwortlisten liegen nicht
+ * mehr als Kaestchenliste in einem Formular, sondern haben eine eigene Seite
+ * mit eigenen Routen.
+ *
  * ── Zwei Fehler in genau diesem Mechanismus (behoben 2026-08-08) ────────────
  *
  * Der Nutzer beschrieb es als "es dauert mehrmals, bis der Schalter ankommt".
@@ -52,7 +56,6 @@
         aufraeumen(form);
         kaestchenNachreichen(form);
         mehrfachauswahlNachreichen(form);
-        stichwortlistenNachreichen(form);
 
         // Nach der Momentaufnahme alles wieder bedienbar machen.
         setTimeout(function () { freigeben(form); }, 0);
@@ -134,24 +137,4 @@
         });
     }
 
-    /**
-     * Angehakte Stichwortlisten als ein JSON-Feld nachreichen.
-     *
-     * Nur wenn die Seite solche Kaestchen ueberhaupt zeigt.
-     *
-     * @param {HTMLFormElement} form Das Formular
-     */
-    function stichwortlistenNachreichen(form) {
-        const kaestchen = form.querySelectorAll('input[data-automod-liste="active_keyword_lists"]');
-        if (kaestchen.length === 0) return;
-
-        const gewaehlt = [];
-        kaestchen.forEach(function (k) {
-            if (k.checked) gewaehlt.push(k.value);
-            k.disabled = true;
-            k.setAttribute('data-automod-stillgelegt', '');
-        });
-
-        nachreichen(form, 'active_keyword_lists', JSON.stringify(gewaehlt));
-    }
 })();

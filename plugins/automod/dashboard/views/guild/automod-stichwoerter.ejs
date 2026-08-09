@@ -1,0 +1,204 @@
+<%- include('partials/automod-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-list-check',
+  titel: tr('automod:KEYWORDS.TITLE'),
+  beschreibung: tr('automod:KEYWORDS.SUBTITLE')
+}) %>
+
+<%#
+  Stichwortlisten, seit dem 2026-08-09 bearbeitbar.
+
+  Vorher gab es hier fuenf Kaestchen auf der Regelseite - an oder aus, ohne
+  jeden Einblick in die Woerter. Wer einen Falschtreffer melden wollte, konnte
+  nicht einmal nachsehen, welches Wort angeschlagen hat.
+
+  Die Woerter stehen bewusst verdeckt (blur), wie der Bot sie im Protokoll mit
+  ||spoiler|| verbirgt. Es sind Beleidigungen und Schimpfwoerter; wer sie
+  braucht, klickt sie auf, aber sie springen niemandem entgegen, der die Seite
+  im Beisein anderer oeffnet.
+%>
+
+<% const darfAendern = hasPermission('AUTOMOD.KEYWORDS.MANAGE'); %>
+
+<%#
+  Die Basis-Adresse steht ausdruecklich im Markup, statt sie im Skript aus
+  location.pathname zu schneiden. Das Schneiden funktioniert, solange die Route
+  genau dort haengt - und bricht still, sobald sie umzieht.
+%>
+<div data-automod-basis="/guild/<%= guildId %>/plugins/automod/stichwoerter" hidden></div>
+
+<!-- ==================== Abgleich mit den Vorlagen ==================== -->
+<% if (offenerAbgleich && offenerAbgleich.length > 0) { %>
+  <div class="card mb-3 border-primary">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fa-solid fa-rotate me-2"></i>
+        <%= tr('automod:KEYWORDS.SYNC.TITLE') %>
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-secondary"><%= tr('automod:KEYWORDS.SYNC.DESC') %></p>
+
+      <% offenerAbgleich.forEach(eintrag => { %>
+        <div class="d-flex align-items-center justify-content-between border rounded p-2 mb-2"
+             id="abgleich-<%= eintrag.template_id %>">
+          <div>
+            <strong><%= eintrag.list_name %></strong>
+            <span class="badge bg-primary-lt ms-2">
+              <%= tr('automod:KEYWORDS.SYNC.MISSING', { count: eintrag.fehlend.length }) %>
+            </span>
+            <div class="text-secondary small mt-1 automod-verdeckt" data-automod-aufdecken>
+              <%= eintrag.fehlend.join(', ') %>
+            </div>
+          </div>
+          <% if (darfAendern) { %>
+            <button type="button" class="btn btn-sm btn-primary"
+                    data-automod-uebernehmen="<%= eintrag.template_id %>">
+              <i class="fa-solid fa-plus me-1"></i>
+              <%= tr('automod:KEYWORDS.SYNC.APPLY') %>
+            </button>
+          <% } %>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+<% } %>
+
+<!-- ==================== Neue Liste ==================== -->
+<% if (darfAendern) { %>
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fa-solid fa-plus me-2"></i>
+        <%= tr('automod:KEYWORDS.NEW_LIST') %>
+      </h3>
+    </div>
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-md-4">
+          <input type="text" class="form-control" id="neueListeName"
+                 maxlength="100" placeholder="<%= tr('automod:KEYWORDS.NAME_PLACEHOLDER') %>">
+        </div>
+        <div class="col-md-6">
+          <input type="text" class="form-control" id="neueListeBeschreibung"
+                 maxlength="255" placeholder="<%= tr('automod:KEYWORDS.DESC_PLACEHOLDER') %>">
+        </div>
+        <div class="col-md-2 d-grid">
+          <button type="button" class="btn btn-success" id="neueListeAnlegen">
+            <%= tr('automod:KEYWORDS.BTN_CREATE_LIST') %>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<!-- ==================== Die Listen ==================== -->
+<% if (!listen || listen.length === 0) { %>
+  <div class="alert alert-info" role="alert">
+    <i class="fa-solid fa-circle-info me-2"></i>
+    <%= tr('automod:KEYWORDS.NONE') %>
+  </div>
+<% } else { %>
+  <% listen.forEach(liste => { %>
+    <div class="card mb-3" id="liste-<%= liste.id %>">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-3">
+          <label class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox"
+                   data-automod-liste-schalter="<%= liste.id %>"
+                   <%= liste.enabled ? 'checked' : '' %>
+                   <%= darfAendern ? '' : 'disabled' %>>
+          </label>
+          <div>
+            <h3 class="card-title mb-0"><%= liste.name %></h3>
+            <% if (liste.description) { %>
+              <div class="text-secondary small"><%= liste.description %></div>
+            <% } %>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <% if (liste.language) { %>
+            <span class="badge bg-secondary">
+              <i class="fa-solid fa-globe me-1"></i><%= liste.language %>
+            </span>
+          <% } %>
+          <span class="badge bg-blue-lt">
+            <%= tr('automod:KEYWORDS.COUNT', { count: liste.keywords.length }) %>
+          </span>
+          <% if (liste.template_id) { %>
+            <span class="badge bg-azure-lt" title="<%= tr('automod:KEYWORDS.FROM_TEMPLATE_HELP') %>">
+              <i class="fa-solid fa-file-lines me-1"></i><%= tr('automod:KEYWORDS.FROM_TEMPLATE') %>
+            </span>
+          <% } %>
+          <% if (darfAendern) { %>
+            <button type="button" class="btn btn-sm btn-ghost-danger"
+                    data-automod-liste-loeschen="<%= liste.id %>"
+                    data-automod-liste-name="<%= liste.name %>"
+                    title="<%= tr('automod:KEYWORDS.BTN_DELETE_LIST') %>">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <% if (liste.keywords.length === 0) { %>
+          <p class="text-secondary mb-3"><%= tr('automod:KEYWORDS.LIST_EMPTY') %></p>
+        <% } else { %>
+          <div class="mb-3">
+            <button type="button" class="btn btn-sm btn-ghost-secondary mb-2" data-automod-aufdecken-schalter>
+              <i class="fa-solid fa-eye me-1"></i><%= tr('automod:KEYWORDS.REVEAL') %>
+            </button>
+            <div class="d-flex flex-wrap gap-2 automod-verdeckt" data-automod-aufdecken>
+              <% liste.keywords.forEach(eintrag => { %>
+                <span class="badge bg-secondary-lt d-inline-flex align-items-center gap-2"
+                      id="eintrag-<%= eintrag.id %>">
+                  <span><%= eintrag.keyword %></span>
+                  <% if (darfAendern) { %>
+                    <select class="form-select form-select-sm automod-trefferart"
+                            data-automod-trefferart="<%= eintrag.id %>">
+                      <% trefferarten.forEach(art => { %>
+                        <option value="<%= art %>" <%= eintrag.match_type === art ? 'selected' : '' %>>
+                          <%= tr('automod:KEYWORDS.MATCH.' + art.toUpperCase()) %>
+                        </option>
+                      <% }); %>
+                    </select>
+                    <a href="#" class="text-danger" data-automod-eintrag-loeschen="<%= eintrag.id %>"
+                       title="<%= tr('automod:RULES.DELETE') %>">
+                      <i class="fa-solid fa-xmark"></i>
+                    </a>
+                  <% } else { %>
+                    <span class="text-secondary small">
+                      <%= tr('automod:KEYWORDS.MATCH.' + String(eintrag.match_type).toUpperCase()) %>
+                    </span>
+                  <% } %>
+                </span>
+              <% }); %>
+            </div>
+          </div>
+        <% } %>
+
+        <% if (darfAendern) { %>
+          <div class="input-group">
+            <input type="text" class="form-control" maxlength="190"
+                   data-automod-neues-wort="<%= liste.id %>"
+                   placeholder="<%= tr('automod:KEYWORDS.WORD_PLACEHOLDER') %>">
+            <select class="form-select" style="max-width: 12rem"
+                    data-automod-neue-trefferart="<%= liste.id %>">
+              <% trefferarten.forEach(art => { %>
+                <option value="<%= art %>" <%= art === 'word' ? 'selected' : '' %>>
+                  <%= tr('automod:KEYWORDS.MATCH.' + art.toUpperCase()) %>
+                </option>
+              <% }); %>
+            </select>
+            <button type="button" class="btn btn-success" data-automod-wort-hinzufuegen="<%= liste.id %>">
+              <i class="fa-solid fa-plus"></i>
+            </button>
+          </div>
+          <div class="form-hint"><%= tr('automod:KEYWORDS.MATCH.HELP') %></div>
+        <% } %>
+      </div>
+    </div>
+  <% }); %>
+<% } %>

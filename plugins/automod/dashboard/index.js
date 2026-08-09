@@ -87,6 +87,14 @@ class AutoModPlugin extends DashboardPlugin {
             inFooter: true
         });
 
+        // Stichwortlisten: Listen, Woerter, Trefferart, Abgleich
+        assetManager.registerScript('automod-stichwoerter', 'js/automod-stichwoerter.js', {
+            plugin: 'automod',
+            deps: [],
+            version: this.version,
+            inFooter: true
+        });
+
         // Protokoll: Zeitraum wechseln, Strikes zuruecksetzen, aufraeumen
         assetManager.registerScript('automod-logs', 'js/automod-logs.js', {
             plugin: 'automod',
@@ -95,7 +103,7 @@ class AutoModPlugin extends DashboardPlugin {
             inFooter: true
         });
 
-        Logger.debug('[AutoMod] Assets angemeldet (1 Stylesheet, 3 Skripte)');
+        Logger.debug('[AutoMod] Assets angemeldet (1 Stylesheet, 4 Skripte)');
     }
 
     /**
@@ -113,12 +121,13 @@ class AutoModPlugin extends DashboardPlugin {
         this.guildRouter.use('/exemptions', require('./routes/exemptions.router'));
         this.guildRouter.use('/escalation', require('./routes/escalation.router'));
         this.guildRouter.use('/protokoll/api', require('./routes/logs.router'));
+        this.guildRouter.use('/stichwoerter', require('./routes/keywords.router'));
         this.guildRouter.use('/', require('./routes/rules.router'));
 
         // Seiten zuletzt: der Seiten-Router faengt mit '/' auch die Startseite
         this.guildRouter.use('/', require('./routes/guild.router'));
 
-        Logger.info('[AutoMod] Routen registriert (6 Router)');
+        Logger.info('[AutoMod] Routen registriert (7 Router)');
     }
 
     /**
@@ -152,6 +161,25 @@ class AutoModPlugin extends DashboardPlugin {
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get('Logger');
         await this._registerNavigation(guildId);
+
+        // Stichwortlisten aus den Vorlagen befuellen - einmalig.
+        //
+        // Die Listen kommen ausgeschaltet an, damit sich am Verhalten einer
+        // Guild nichts aendert, nur weil das Plugin neu eingeschaltet wurde.
+        // `keyword_lists_seeded_at` verhindert, dass eine Guild, die ihre
+        // Listen bewusst geloescht hat, sie beim naechsten Start zurueckbekommt.
+        try {
+            const { AutoModKeywordLists } = require('../shared/models');
+            const angelegt = await AutoModKeywordLists.befuelleAusVorlagen(guildId);
+            if (angelegt > 0) {
+                Logger.info(`[AutoMod] ${angelegt} Stichwortliste(n) fuer Guild ${guildId} aus den Vorlagen befuellt`);
+            }
+        } catch (error) {
+            // Kein Grund, die Aktivierung scheitern zu lassen - die Seite holt
+            // das Befuellen beim ersten Aufruf nach.
+            Logger.warn(`[AutoMod] Stichwortlisten fuer Guild ${guildId} nicht befuellbar: ${error.message}`);
+        }
+
         Logger.info(`[AutoMod] Plugin fuer Guild ${guildId} aktiviert`);
     }
 
@@ -270,6 +298,17 @@ class AutoModPlugin extends DashboardPlugin {
                 url: `${basis}/regeln`,
                 icon: 'fa-solid fa-code',
                 order: 30,
+                type: haupt,
+                capability: 'AUTOMOD.VIEW',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'automod:NAV.KEYWORDS',
+                url: `${basis}/stichwoerter`,
+                icon: 'fa-solid fa-list-check',
+                order: 35,
                 type: haupt,
                 capability: 'AUTOMOD.VIEW',
                 visible: true,

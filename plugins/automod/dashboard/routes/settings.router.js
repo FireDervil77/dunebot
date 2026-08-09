@@ -101,9 +101,6 @@ router.put('/', requirePermission('AUTOMOD.SETTINGS.EDIT'), async (req, res) => 
         // --- Stichwortlisten ---
         // Wird als JSON-Text gespeichert. Das Formular schickt das Feld nur auf
         // der Regel-Seite mit; auf allen anderen Seiten bleibt es unangetastet.
-        if (b.active_keyword_lists !== undefined) {
-            updates.active_keyword_lists = JSON.stringify(zuListe(b.active_keyword_lists));
-        }
 
         // --- Raid-Schutz ---
         if (b.raid_protection_enabled !== undefined) updates.raid_protection_enabled = zuBool(b.raid_protection_enabled);

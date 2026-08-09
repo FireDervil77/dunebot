@@ -80,11 +80,14 @@ class AutoModSettings {
             
             const settings = rows[0];
 
-            // Die drei Listenfelder - siehe `zuListe` oben, warum das nicht
+            // Die beiden Listenfelder - siehe `zuListe` oben, warum das nicht
             // mehr einfach `JSON.parse` mit `[]` als Auffanglösung ist.
+            //
+            // `active_keyword_lists` stand hier bis zum 2026-08-09 mit. Die
+            // Spalte ist entfallen: die Stichwortlisten liegen jetzt je Guild
+            // in eigenen Tabellen, und ob eine gilt, sagt ihr `enabled`.
             settings.whitelisted_channels = zuListe(settings.whitelisted_channels);
             settings.raid_trusted_invites = zuListe(settings.raid_trusted_invites);
-            settings.active_keyword_lists = zuListe(settings.active_keyword_lists);
 
             return settings;
         } catch (error) {
@@ -137,9 +140,6 @@ class AutoModSettings {
             }
             if (updates.raid_trusted_invites !== undefined) {
                 updates.raid_trusted_invites = JSON.stringify(updates.raid_trusted_invites);
-            }
-            if (updates.active_keyword_lists !== undefined && Array.isArray(updates.active_keyword_lists)) {
-                updates.active_keyword_lists = JSON.stringify(updates.active_keyword_lists);
             }
 
             // Dynamisches UPDATE-Statement bauen

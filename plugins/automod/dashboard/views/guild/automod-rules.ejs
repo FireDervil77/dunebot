@@ -6,66 +6,11 @@
   bedingungen: conditionTypes
 }) %>
 
-<!-- ==================== Stichwortlisten ==================== -->
-<form class="guild-ajax-form mb-3"
-      data-automod-form
-      data-form-type="automod-keywords"
-      data-method="PUT"
-      action="/guild/<%= guildId %>/plugins/automod/settings"
-      method="POST">
-
-  <div class="card">
-    <div class="card-header">
-      <h3 class="card-title">
-        <i class="fa-solid fa-list-check me-2"></i>
-        <%= tr('automod:KEYWORDS.TITLE') %>
-      </h3>
-    </div>
-    <div class="card-body">
-      <p class="text-secondary"><%= tr('automod:KEYWORDS.DESC') %></p>
-
-      <% if (keywordLists && keywordLists.length > 0) { %>
-        <div class="row row-cards">
-          <% keywordLists.forEach(liste => {
-               const aktiv = (activeKeywordLists || []).includes(liste.id);
-          %>
-            <div class="col-md-6">
-              <div class="card <%= aktiv ? 'automod-liste-aktiv' : '' %>">
-                <div class="card-body">
-                  <label class="form-check form-switch mb-2">
-                    <input class="form-check-input" type="checkbox"
-                           data-automod-liste="active_keyword_lists"
-                           id="kwl_<%= liste.id %>" value="<%= liste.id %>"
-                           <%= aktiv ? 'checked' : '' %>>
-                    <span class="form-check-label fw-bold"><%= liste.name %></span>
-                  </label>
-                  <p class="text-secondary small mb-2"><%= liste.description %></p>
-                  <span class="badge bg-secondary me-1">
-                    <i class="fa-solid fa-globe me-1"></i><%= liste.language %>
-                  </span>
-                  <span class="badge bg-blue-lt">
-                    <%= tr('automod:KEYWORDS.COUNT', { count: liste.count }) %>
-                  </span>
-                </div>
-              </div>
-            </div>
-          <% }); %>
-        </div>
-      <% } else { %>
-        <div class="alert alert-warning" role="alert">
-          <i class="fa-solid fa-triangle-exclamation me-2"></i>
-          <%= tr('automod:KEYWORDS.NONE') %>
-        </div>
-      <% } %>
-    </div>
-    <div class="card-footer">
-      <button type="submit" class="btn btn-primary">
-        <i class="fa-solid fa-floppy-disk me-2"></i>
-        <%= tr('automod:SETTINGS.SAVE_BUTTON') %>
-      </button>
-    </div>
-  </div>
-</form>
+<%#
+  Die Stichwortlisten standen hier bis zum 2026-08-09 als Kaestchenliste: fuenf
+  Karten, an oder aus, ohne Einblick in die Woerter. Sie haben jetzt eine eigene
+  Seite, auf der sich der Bestand auch bearbeiten laesst.
+%>
 
 <!-- ==================== Regex-Regeln ==================== -->
 <div class="card mb-3">

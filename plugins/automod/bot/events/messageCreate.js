@@ -2,7 +2,8 @@ const { MiscUtils, Logger, EmbedUtils } = require("dunebot-sdk/utils");
 const { parsePlaceholders } = require("dunebot-core");
 const { pruefeSpam, ohneEinladungen, istBefehlsnachricht, merkeEigeneLoeschung, shouldModerate } = require("../utils");
 const { AutoModSettings, AutoModStrikes, AutoModLogs, AutoModEscalation, AutoModExemptions, AutoModRegexRules, AutoModCompoundRules } = require("../../shared/models");
-const { loadKeywordLists } = require("../keywordLoader");
+const { getGuildKeywordLists } = require("../keywordLoader");
+const { findeTreffer } = require("../../shared/stichwortTreffer");
 
 // Moderation Integration - Optional dependency
 let addModAction;
@@ -230,38 +231,30 @@ module.exports = async (message) => {
         }
     }
 
-    // Keyword-Listen Check
-    if (settings.active_keyword_lists) {
-        let activeListIds;
-        try {
-            activeListIds = typeof settings.active_keyword_lists === 'string'
-                ? JSON.parse(settings.active_keyword_lists)
-                : settings.active_keyword_lists;
-        } catch {
-            activeListIds = [];
-        }
+    // ── Stichwortlisten ──────────────────────────────────────────────────
+    //
+    // Ein Bestand je Guild, seit dem 2026-08-09. Die mitgelieferten Listen sind
+    // nur noch Vorlage fuer das erste Befuellen - was hier geprueft wird, gehoert
+    // der Guild und ist ueber das Dashboard bearbeitbar.
+    //
+    // Der Vergleich lief vorher ueber `lowerContent.includes(kw)` - eine reine
+    // Teilzeichenkette, die bei kurzen Eintraegen mitten in harmlosen Woertern
+    // anschlug. Jetzt entscheidet die Trefferart je Eintrag, Vorgabe ist
+    // "ganzes Wort" (siehe shared/stichwortTreffer.js).
+    const stichwortListen = await getGuildKeywordLists(guild.id);
 
-        if (Array.isArray(activeListIds) && activeListIds.length > 0) {
-            const allLists = loadKeywordLists();
-            const lowerContent = content.toLowerCase();
+    for (const liste of stichwortListen) {
+        const treffer = findeTreffer(content, liste.keywords);
+        if (!treffer) continue;
 
-            for (const listId of activeListIds) {
-                const list = allLists.get(listId);
-                if (!list) continue;
-
-                const matched = list.keywords.find(kw => lowerContent.includes(kw.toLowerCase()));
-                if (matched) {
-                    fields.push({
-                        name: guild.getT("automod:HANDLER.FIELD_KEYWORD", { list: list.name }),
-                        value: `||${matched}||`,
-                        inline: true,
-                    });
-                    shouldDelete = true;
-                    strikesTotal += 1;
-                    break;
-                }
-            }
-        }
+        fields.push({
+            name: guild.getT("automod:HANDLER.FIELD_KEYWORD", { list: liste.name }),
+            value: `||${treffer}||`,
+            inline: true,
+        });
+        shouldDelete = true;
+        strikesTotal += 1;
+        break;
     }
 
     // Regex-Regeln Check

@@ -1,79 +1,74 @@
-const fs = require('fs');
-const path = require('path');
 const { Logger } = require('dunebot-sdk/utils');
-
-const KEYWORD_DIR = path.join(__dirname, 'data', 'keyword_lists');
-
-// Cache: Map<string, { id, name, language, description, keywords[] }>
-let keywordListsCache = null;
+const { AutoModKeywordLists } = require('../shared/models');
+const { leereMusterSpeicher } = require('../shared/stichwortTreffer');
 
 /**
- * Lädt alle Keyword-Listen aus dem data/keyword_lists Verzeichnis
- * Ergebnisse werden gecacht (einmaliges Laden beim Start)
- * 
- * @returns {Map<string, Object>} Map von list-id -> list-Objekt
+ * Stichwortlisten für AutoMod.
+ *
+ * Seit dem 2026-08-09 gibt es **einen** Bestand je Guild, in der Datenbank.
+ * Die Dateien unter `data/keyword_lists/` sind nur noch Vorlage für das erste
+ * Befüllen und für den ausdrücklichen Abgleich; sie laufen nicht mehr als
+ * zweite Ebene mit. Deshalb liest diese Datei sie auch nicht mehr — das tut
+ * `AutoModKeywordLists.leseVorlagen()`, dort wo Vorlagen hingehören.
+ *
+ * ## Der Zwischenspeicher, und warum er der wunde Punkt ist
+ *
+ * Vorher stand hier ein Speicher ohne Verfallsdatum: `clearKeywordCache()`
+ * existierte, hatte aber **keinen einzigen Aufrufer**. Eine Änderung wirkte
+ * erst nach einem Neustart des Bots — und weil das Dashboard die Wörter gar
+ * nicht anzeigte, fiel das niemandem auf.
+ *
+ * Jetzt schickt das Dashboard nach jeder Änderung ein
+ * `automod:keywordsChanged`, und der Bot ruft `clearKeywordCache(guildId)`.
+ * Ohne diesen Anstoss wäre die ganze Bearbeitbarkeit eine Anzeige ohne Wirkung.
+ *
+ * @module automod/bot/keywordLoader
  */
-function loadKeywordLists() {
-    if (keywordListsCache) return keywordListsCache;
 
-    keywordListsCache = new Map();
+/** Je Guild die eingeschalteten Listen samt Einträgen. */
+const guildSpeicher = new Map();
 
+/**
+ * Die eingeschalteten Listen einer Guild.
+ *
+ * @param {string} guildId
+ * @returns {Promise<Array<{id, name, keywords: Array}>>}
+ */
+async function getGuildKeywordLists(guildId) {
+    if (guildSpeicher.has(guildId)) return guildSpeicher.get(guildId);
+
+    let listen;
     try {
-        if (!fs.existsSync(KEYWORD_DIR)) {
-            Logger.warn('[AutoMod] Keyword-Listen Verzeichnis nicht gefunden:', KEYWORD_DIR);
-            return keywordListsCache;
-        }
-
-        const files = fs.readdirSync(KEYWORD_DIR).filter(f => f.endsWith('.json'));
-
-        for (const file of files) {
-            try {
-                const filePath = path.join(KEYWORD_DIR, file);
-                const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-
-                if (data.id && Array.isArray(data.keywords)) {
-                    keywordListsCache.set(data.id, data);
-                    Logger.debug(`[AutoMod] Keyword-Liste geladen: ${data.id} (${data.keywords.length} Einträge)`);
-                }
-            } catch (err) {
-                Logger.warn(`[AutoMod] Fehler beim Laden der Keyword-Liste ${file}:`, err.message);
-            }
-        }
-
-        Logger.info(`[AutoMod] ${keywordListsCache.size} Keyword-Listen geladen`);
+        listen = await AutoModKeywordLists.getEnabledWithKeywords(guildId);
     } catch (err) {
-        Logger.error('[AutoMod] Fehler beim Laden der Keyword-Listen:', err);
+        // Eine nicht erreichbare Datenbank darf die Moderation nicht anhalten.
+        // Ohne Listen greifen die übrigen Filter weiter; beim nächsten Aufruf
+        // wird es erneut versucht, deshalb wird hier nichts gespeichert.
+        Logger.warn(`[AutoMod] Stichwortlisten für Guild ${guildId} nicht ladbar: ${err.message}`);
+        return [];
     }
 
-    return keywordListsCache;
+    guildSpeicher.set(guildId, listen || []);
+    return guildSpeicher.get(guildId);
 }
 
 /**
- * Gibt alle verfügbaren Keyword-Listen als Array zurück
- * Für Dashboard-Anzeige (ohne die eigentlichen Keywords)
- * 
- * @returns {Array<{ id, name, language, description, count }>}
+ * Zwischenspeicher leeren.
+ *
+ * @param {string} [guildId] Nur diese Guild. Ohne Angabe: alle.
  */
-function getAvailableKeywordLists() {
-    const lists = loadKeywordLists();
-    return Array.from(lists.values()).map(list => ({
-        id: list.id,
-        name: list.name,
-        language: list.language,
-        description: list.description,
-        count: list.keywords.length
-    }));
-}
+function clearKeywordCache(guildId = null) {
+    if (guildId) {
+        guildSpeicher.delete(guildId);
+    } else {
+        guildSpeicher.clear();
+    }
 
-/**
- * Cache invalidieren (z.B. nach Hot-Reload)
- */
-function clearKeywordCache() {
-    keywordListsCache = null;
+    // Die übersetzten Muster hängen an den Stichwörtern und müssen mit.
+    leereMusterSpeicher();
 }
 
 module.exports = {
-    loadKeywordLists,
-    getAvailableKeywordLists,
+    getGuildKeywordLists,
     clearKeywordCache
 };

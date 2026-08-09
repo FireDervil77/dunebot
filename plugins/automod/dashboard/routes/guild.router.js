@@ -29,28 +29,11 @@ const {
     AutoModCompoundRules,
     AutoModLogs,
     AutoModStrikes,
-    AutoModRaidEvents
+    AutoModRaidEvents,
+    AutoModKeywordLists
 } = require('../../shared/models');
-const { getAvailableKeywordLists } = require('../../bot/keywordLoader');
+const { TREFFERARTEN } = require('../../shared/stichwortTreffer');
 const { makeTranslator, renderView, getGuildChannels, getGuildRoles, renderFehler } = require('./_shared');
-
-/**
- * `active_keyword_lists` liegt je nach Herkunft als JSON-Text oder als Array
- * in der Datenbank. Beides muss die View als Array sehen.
- *
- * @param {*} roh Wert aus den Einstellungen
- * @returns {Array} Liste der aktiven Stichwortlisten-IDs
- */
-function leseAktiveListen(roh) {
-    if (!roh) return [];
-    if (Array.isArray(roh)) return roh;
-    try {
-        const gelesen = JSON.parse(roh);
-        return Array.isArray(gelesen) ? gelesen : [];
-    } catch {
-        return [];
-    }
-}
 
 /**
  * Skripte anmelden, die eine Seite braucht.
@@ -88,7 +71,10 @@ router.get('/dashboard', requirePermission('AUTOMOD.VIEW'), async (req, res) => 
             AutoModCompoundRules.getRules(guildId).catch(() => [])
         ]);
 
-        const aktiveListen = leseAktiveListen(settings.active_keyword_lists);
+        // Zaehler fuer die Uebersicht. Die Stichwortlisten liegen seit dem
+        // 2026-08-09 in eigenen Tabellen, nicht mehr als JSON in den
+        // Einstellungen.
+        const stichwortlisten = await AutoModKeywordLists.getLists(guildId).catch(() => []);
 
         await renderView(res, 'guild/automod-dashboard', {
             tr,
@@ -101,7 +87,7 @@ router.get('/dashboard', requirePermission('AUTOMOD.VIEW'), async (req, res) => 
                 eskalation: eskalation.length,
                 regexRegeln: regexRegeln.filter(r => r.enabled).length,
                 kombiRegeln: kombiRegeln.filter(r => r.enabled).length,
-                stichwortlisten: aktiveListen.length
+                stichwortlisten: stichwortlisten.filter(l => l.enabled).length
             }
         });
     } catch (error) {
@@ -150,8 +136,6 @@ router.get('/regeln', requirePermission('AUTOMOD.VIEW'), async (req, res) => {
             regexRules: regexRegeln,
             compoundRules: kombiRegeln,
             guildRoles,
-            keywordLists: getAvailableKeywordLists(),
-            activeKeywordLists: leseAktiveListen(settings.active_keyword_lists),
             conditionTypes: AutoModCompoundRules.CONDITION_TYPES
         });
     } catch (error) {
@@ -214,6 +198,46 @@ router.get('/ausnahmen', requirePermission('AUTOMOD.VIEW'), async (req, res) => 
         });
     } catch (error) {
         return renderFehler(res, error, 'Die Ausnahmen konnten nicht geladen werden');
+    }
+});
+
+// =====================================================
+// Stichwortlisten
+// =====================================================
+router.get('/stichwoerter', requirePermission('AUTOMOD.VIEW'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+
+    try {
+        // Beim ersten Aufruf aus den Vorlagen befuellen. Danach greift die
+        // Marke `keyword_lists_seeded_at` - eine Guild, die ihre Listen bewusst
+        // geloescht hat, bekommt sie nicht zurueck.
+        await AutoModKeywordLists.befuelleAusVorlagen(guildId).catch(() => 0);
+
+        const [listen, offenerAbgleich] = await Promise.all([
+            AutoModKeywordLists.getLists(guildId),
+            AutoModKeywordLists.vergleicheMitVorlage(guildId).catch(() => [])
+        ]);
+
+        // Die Woerter je Liste dazuholen. Bei fuenf bis zehn Listen ist das
+        // billig genug, um sie in einem Rutsch anzuzeigen statt nachzuladen.
+        const listenMitWoertern = [];
+        for (const liste of listen || []) {
+            const voll = await AutoModKeywordLists.getList(guildId, liste.id);
+            if (voll) listenMitWoertern.push({ ...liste, keywords: voll.keywords });
+        }
+
+        skripteAnmelden(['automod-stichwoerter']);
+
+        await renderView(res, 'guild/automod-stichwoerter', {
+            tr,
+            guildId,
+            listen: listenMitWoertern,
+            offenerAbgleich,
+            trefferarten: TREFFERARTEN
+        });
+    } catch (error) {
+        return renderFehler(res, error, 'Die Stichwortlisten konnten nicht geladen werden');
     }
 });
 

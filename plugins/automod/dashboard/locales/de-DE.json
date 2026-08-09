@@ -9,7 +9,8 @@
     "ESCALATION": "Eskalation",
     "EXEMPTIONS": "Ausnahmen",
     "RAID": "Raid-Schutz",
-    "LOGS": "Protokoll"
+    "LOGS": "Protokoll",
+    "KEYWORDS": "Stichwörter"
   },
   "SETTINGS": {
     "PAGE_TITLE": "AutoMod Einstellungen",
@@ -276,9 +277,31 @@
   },
   "KEYWORDS": {
     "TITLE": "Stichwortlisten",
-    "DESC": "Vorgefertigte Wortlisten aktivieren. Nachrichten mit einem Treffer werden gelöscht und geben einen Strike.",
+    "SUBTITLE": "Wörter, die gelöscht werden — je Server frei zusammenstellbar",
     "COUNT": "{{count}} Stichwörter",
-    "NONE": "Keine Stichwortlisten gefunden. Die JSON-Dateien fehlen im Bot-Verzeichnis."
+    "NONE": "Noch keine Listen vorhanden. Lege eine an oder gleiche mit den Vorlagen ab.",
+    "LIST_EMPTY": "Diese Liste ist leer.",
+    "NEW_LIST": "Neue Liste",
+    "NAME_PLACEHOLDER": "Name der Liste",
+    "DESC_PLACEHOLDER": "Wofür ist die Liste? (optional)",
+    "WORD_PLACEHOLDER": "Stichwort hinzufügen…",
+    "BTN_CREATE_LIST": "Anlegen",
+    "BTN_DELETE_LIST": "Liste löschen",
+    "REVEAL": "Wörter anzeigen",
+    "FROM_TEMPLATE": "Aus Vorlage",
+    "FROM_TEMPLATE_HELP": "Diese Liste wurde aus einer mitgelieferten Vorlage befüllt. Sie gehört jetzt diesem Server — Änderungen bleiben bestehen.",
+    "MATCH": {
+      "WORD": "ganzes Wort",
+      "CONTAINS": "enthalten",
+      "PREFIX": "Wortanfang",
+      "HELP": "„Ganzes Wort\" trifft nur eigenständige Wörter — „enthalten\" schlägt auch mitten in anderen Wörtern an und erzeugt leicht Fehlalarme."
+    },
+    "SYNC": {
+      "TITLE": "Abgleich mit den Vorlagen",
+      "DESC": "In den mitgelieferten Vorlagen stehen Wörter, die in deinen Listen fehlen. Übernehmen ist freiwillig — gelöschte Wörter bleiben gelöscht, wenn du hier nichts tust.",
+      "MISSING": "{{count}} fehlen",
+      "APPLY": "Übernehmen"
+    }
   },
   "REGEX": {
     "TITLE": "Eigene Muster",

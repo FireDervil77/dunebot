@@ -57,6 +57,14 @@
       "category": "automod",
       "is_dangerous": 0,
       "requires": "AUTOMOD.VIEW"
+    },
+    {
+      "key": "AUTOMOD.KEYWORDS.MANAGE",
+      "name": "Stichwortlisten verwalten",
+      "description": "Berechtigung um Stichwortlisten und ihre Wörter zu bearbeiten. Wer das darf, sieht auch den Wortlaut der Listen.",
+      "category": "automod",
+      "is_dangerous": 0,
+      "requires": "AUTOMOD.VIEW"
     }
   ],
   "default_groups": {}

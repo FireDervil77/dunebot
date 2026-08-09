@@ -35,3 +35,30 @@
 .automod-liste-aktiv {
   border-color: var(--tblr-success);
 }
+
+
+/*
+ * Verdeckte Stichwoerter (2026-08-09).
+ *
+ * Die Listen enthalten Beleidigungen und Schimpfwoerter. Der Bot verbirgt sie
+ * im Protokoll mit ||spoiler||; im Dashboard tut das dieselbe Absicht mit einem
+ * Weichzeichner. Wer sie braucht, deckt sie mit einem Klick auf - sie springen
+ * aber niemandem entgegen, der die Seite im Beisein anderer oeffnet.
+ */
+.automod-verdeckt {
+    filter: blur(5px);
+    transition: filter 0.15s ease;
+    user-select: none;
+}
+
+.automod-verdeckt:hover {
+    filter: blur(2px);
+}
+
+/* Die Trefferart-Auswahl sitzt in einer Marke und darf sie nicht sprengen. */
+.automod-trefferart {
+    width: auto;
+    min-width: 8rem;
+    padding-block: 0;
+    font-size: 0.75rem;
+}

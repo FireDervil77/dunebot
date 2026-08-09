@@ -13,5 +13,6 @@ module.exports = {
     AutoModEscalation: require('./AutoModEscalation'),
     AutoModExemptions: require('./AutoModExemptions'),
     AutoModRegexRules: require('./AutoModRegexRules'),
-    AutoModCompoundRules: require('./AutoModCompoundRules')
+    AutoModCompoundRules: require('./AutoModCompoundRules'),
+    AutoModKeywordLists: require('./AutoModKeywordLists')
 };

@@ -137,4 +137,20 @@ function renderFehler(res, error, kontext) {
     });
 }
 
-module.exports = { makeTranslator, renderView, getGuildChannels, getGuildRoles, renderFehler };
+/**
+ * Einheitliche JSON-Fehlerantwort fuer die schreibenden Routen.
+ *
+ * `renderFehler` daneben liefert eine ganze Fehlerseite - das passt fuer
+ * Seitenaufrufe, nicht fuer Aufrufe aus dem Browser-Skript heraus.
+ *
+ * @param {Object} res Express-Antwort
+ * @param {Error} error Der aufgetretene Fehler
+ * @param {string} nachricht Klartext fuer den Nutzer
+ * @param {number} [status=500] HTTP-Status
+ */
+function fehler(res, error, nachricht, status = 500) {
+    ServiceManager.get('Logger').error(`[AutoMod] ${nachricht}:`, error);
+    return res.status(status).json({ success: false, message: nachricht });
+}
+
+module.exports = { makeTranslator, renderView, getGuildChannels, getGuildRoles, renderFehler, fehler };
