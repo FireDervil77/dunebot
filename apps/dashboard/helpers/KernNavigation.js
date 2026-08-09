@@ -202,28 +202,6 @@ async function registerKernNavigation(guildId) {
                 guildId,
                 parent: `/guild/${guildId}/settings`
             },
-            {
-                title: 'NAV.ROLES',
-                url: `/guild/${guildId}/settings/roles`,
-                icon: 'fa-solid fa-shield-halved',
-                order: 40,
-                type: navigationManager.menuTypes.MAIN,
-                capability: 'CORE.SETTINGS.VIEW',
-                visible: true,
-                guildId,
-                parent: `/guild/${guildId}/settings`
-            },
-            {
-                title: 'NAV.CHANNELS',
-                url: `/guild/${guildId}/settings/channels`,
-                icon: 'fa-solid fa-hashtag',
-                order: 45,
-                type: navigationManager.menuTypes.MAIN,
-                capability: 'CORE.SETTINGS.VIEW',
-                visible: true,
-                guildId,
-                parent: `/guild/${guildId}/settings`
-            },
             // Subnav: Berechtigungen
             {
                 title: 'NAV.PERMISSIONS_USERS',

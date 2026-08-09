@@ -316,33 +316,6 @@
       "is_dangerous": 1,
       "sort_order": 1061,
       "requires": "SYSTEM.ADDONS.VIEW"
-    },
-    {
-      "key": "CORE.ROLES.VIEW",
-      "name": "CORE.PERM_ROLES_VIEW",
-      "description": "CORE.PERM_ROLES_VIEW_DESC",
-      "category": "core",
-      "is_dangerous": 0,
-      "sort_order": 59,
-      "requires": null
-    },
-    {
-      "key": "CORE.ROLES.EDIT",
-      "name": "CORE.PERM_ROLES_EDIT",
-      "description": "CORE.PERM_ROLES_EDIT_DESC",
-      "category": "core",
-      "is_dangerous": 1,
-      "sort_order": 60,
-      "requires": "CORE.ROLES.VIEW"
-    },
-    {
-      "key": "CORE.CHANNELS.VIEW",
-      "name": "CORE.PERM_CHANNELS_VIEW",
-      "description": "CORE.PERM_CHANNELS_VIEW_DESC",
-      "category": "core",
-      "is_dangerous": 0,
-      "sort_order": 61,
-      "requires": null
     }
   ],
   "default_groups": {
@@ -353,9 +326,7 @@
       "CORE.PLUGINS.VIEW",
       "CORE.THEMES.VIEW",
       "CORE.MEDIA.VIEW",
-      "CORE.MEDIA.UPLOAD",
-      "CORE.ROLES.VIEW",
-      "CORE.CHANNELS.VIEW"
+      "CORE.MEDIA.UPLOAD"
     ],
     "moderator": [
       "PERMISSIONS.VIEW",

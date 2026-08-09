@@ -1,4 +1,17 @@
-<!-- Kern: Channel-Verwaltung (Discord Channels Mirror) -->
+<!--
+    Discord-Plugin: Kanaluebersicht
+
+    Am 2026-08-09 aus dem Kern hierher gezogen
+    (apps/dashboard/themes/default/views/guild/settings/channels.ejs).
+
+    Die Seite hiess dort "Channel-Verwaltung", hatte aber nie eine
+    Schreibroute. Sie heisst jetzt "Kanaluebersicht", und der Hinweis darauf
+    steht sichtbar auf der Seite statt nur im Code.
+
+    Ausserdem war sie durchgehend hart deutsch - kein einziger
+    Uebersetzungsaufruf. Die sichtbaren Texte kommen jetzt aus
+    discord:CHANNELS.*.
+-->
 <style>
     .channel-badge {
         display: inline-flex;
@@ -143,31 +156,37 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     <i class="fa-solid fa-hashtag me-2"></i>
-                    Discord Channels
+                    <%= tr('discord:CHANNELS.TITLE') %>
                 </h5>
-                <span class="badge bg-secondary"><%= channels.length %> Channels</span>
+                <span class="badge bg-secondary"><%= channels.length %> <%= tr('discord:CHANNELS.COUNT') %></span>
             </div>
             <div class="card-body p-0">
-                <% if (!botHasManageChannels) { %>
+                <!--
+                    Der Hinweis hing bisher an der Bot-Berechtigung. Das war
+                    irreführend: die Seite kann in keinem Fall schreiben, auch
+                    nicht mit ManageChannels. Er steht deshalb jetzt immer.
+                -->
                 <div class="alert alert-info m-3 mb-0">
                     <i class="fa-solid fa-info-circle me-2"></i>
-                    Bot hat keine <strong>Manage Channels</strong> Berechtigung — Nur-Lese-Ansicht.
+                    <%= tr('discord:CHANNELS.READ_ONLY_HINT') %>
+                    <% if (!botHasManageChannels) { %>
+                    <br><small><%= tr('discord:CHANNELS.NO_MANAGE_CHANNELS_PERM') %></small>
+                    <% } %>
                 </div>
-                <% } %>
 
                 <!-- Suchfeld -->
                 <div class="p-3 pb-0">
                     <input type="text" class="form-control form-control-sm" id="channelSearch"
-                           placeholder="Channel suchen...">
+                           placeholder="<%= tr('discord:CHANNELS.SEARCH_PLACEHOLDER') %>">
                 </div>
 
                 <!-- Statistiken -->
                 <div class="px-3 py-2 d-flex flex-wrap gap-3 text-secondary small">
-                    <span><i class="fa-solid fa-hashtag me-1 text-primary"></i> <%= channels.filter(c => c.type === 'text').length %> Text</span>
-                    <span><i class="fa-solid fa-volume-high me-1 text-success"></i> <%= channels.filter(c => c.type === 'voice').length %> Voice</span>
-                    <span><i class="fa-solid fa-bullhorn me-1 text-warning"></i> <%= channels.filter(c => c.type === 'announcement').length %> Announcement</span>
-                    <span><i class="fa-solid fa-comments me-1 text-danger"></i> <%= channels.filter(c => c.type === 'forum').length %> Forum</span>
-                    <span><i class="fa-solid fa-folder me-1"></i> <%= categories.length %> Kategorien</span>
+                    <span><i class="fa-solid fa-hashtag me-1 text-primary"></i> <%= channels.filter(c => c.type === 'text').length %> <%= tr('discord:CHANNELS.TYPE_TEXT') %></span>
+                    <span><i class="fa-solid fa-volume-high me-1 text-success"></i> <%= channels.filter(c => c.type === 'voice').length %> <%= tr('discord:CHANNELS.TYPE_VOICE') %></span>
+                    <span><i class="fa-solid fa-bullhorn me-1 text-warning"></i> <%= channels.filter(c => c.type === 'announcement').length %> <%= tr('discord:CHANNELS.TYPE_ANNOUNCEMENT') %></span>
+                    <span><i class="fa-solid fa-comments me-1 text-danger"></i> <%= channels.filter(c => c.type === 'forum').length %> <%= tr('discord:CHANNELS.TYPE_FORUM') %></span>
+                    <span><i class="fa-solid fa-folder me-1"></i> <%= categories.length %> <%= tr('discord:CHANNELS.CATEGORIES') %></span>
                 </div>
 
                 <!-- Channel-Liste nach Kategorien -->
@@ -185,7 +204,7 @@
                     <% if (uncategorized.length > 0) { %>
                     <div class="channel-category" data-category="uncategorized">
                         <div class="category-header" data-bs-toggle="collapse" data-bs-target="#cat-uncategorized">
-                            <span><i class="fa-solid fa-folder-open me-2"></i> Ohne Kategorie (<%= uncategorized.length %>)</span>
+                            <span><i class="fa-solid fa-folder-open me-2"></i> <%= tr('discord:CHANNELS.UNCATEGORIZED') %> (<%= uncategorized.length %>)</span>
                             <i class="fa-solid fa-chevron-down collapse-icon"></i>
                         </div>
                         <div class="collapse show" id="cat-uncategorized">
@@ -217,7 +236,7 @@
                         <div class="collapse show" id="cat-<%= cat.id %>">
                             <% if (catChannels.length === 0) { %>
                             <div class="channel-item text-secondary small">
-                                <i class="fa-solid fa-circle-info me-2"></i> Keine Channels in dieser Kategorie
+                                <i class="fa-solid fa-circle-info me-2"></i> <%= tr('discord:CHANNELS.NO_CHANNELS') %>
                             </div>
                             <% } else { %>
                                 <% catChannels.forEach(ch => { %>
@@ -241,7 +260,7 @@
                     <% if (channels.length === 0 && categories.length === 0) { %>
                     <div class="text-center text-secondary p-4">
                         <i class="fa-solid fa-circle-info fa-2x mb-2"></i>
-                        <p>Keine Channels gefunden. Ist der Bot online?</p>
+                        <p><%= tr('discord:CHANNELS.NO_CHANNELS') %></p>
                     </div>
                     <% } %>
                 </div>
@@ -255,8 +274,8 @@
         <div id="channelEmptyState" class="card mb-4">
             <div class="card-body text-center text-secondary py-5">
                 <i class="fa-solid fa-hand-pointer fa-3x mb-3"></i>
-                <h5>Channel auswählen</h5>
-                <p>Wähle einen Channel aus der Liste, um seine Details zu sehen.</p>
+                <h5><%= tr('discord:CHANNELS.SELECT_CHANNEL') %></h5>
+                <p><%= tr('discord:CHANNELS.SELECT_CHANNEL_DESC') %></p>
             </div>
         </div>
 
@@ -284,7 +303,7 @@
                             <span class="detail-value" id="infoType">-</span>
                         </div>
                         <div class="detail-row">
-                            <span class="detail-label"><i class="fa-solid fa-folder me-2"></i>Kategorie</span>
+                            <span class="detail-label"><i class="fa-solid fa-folder me-2"></i><%= tr('discord:CHANNELS.CATEGORIES') %></span>
                             <span class="detail-value" id="infoCategory">-</span>
                         </div>
                         <div class="detail-row" id="rowTopic" style="display:none;">
@@ -322,25 +341,25 @@
             <!-- Statistik-Karte -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <h6 class="mb-0"><i class="fa-solid fa-chart-bar me-2"></i>Channel-Übersicht</h6>
+                    <h6 class="mb-0"><i class="fa-solid fa-chart-bar me-2"></i><%= tr('discord:CHANNELS.PAGE_TITLE') %></h6>
                 </div>
                 <div class="card-body">
                     <div class="row text-center" id="channelStats">
                         <div class="col-md-3 mb-3">
                             <div class="stat-number text-primary" id="statText">0</div>
-                            <small class="text-secondary">Text</small>
+                            <small class="text-secondary"><%= tr('discord:CHANNELS.TYPE_TEXT') %></small>
                         </div>
                         <div class="col-md-3 mb-3">
                             <div class="stat-number text-success" id="statVoice">0</div>
-                            <small class="text-secondary">Voice</small>
+                            <small class="text-secondary"><%= tr('discord:CHANNELS.TYPE_VOICE') %></small>
                         </div>
                         <div class="col-md-3 mb-3">
                             <div class="stat-number text-warning" id="statAnnouncement">0</div>
-                            <small class="text-secondary">Announcement</small>
+                            <small class="text-secondary"><%= tr('discord:CHANNELS.TYPE_ANNOUNCEMENT') %></small>
                         </div>
                         <div class="col-md-3 mb-3">
                             <div class="stat-number text-danger" id="statForum">0</div>
-                            <small class="text-secondary">Forum</small>
+                            <small class="text-secondary"><%= tr('discord:CHANNELS.TYPE_FORUM') %></small>
                         </div>
                     </div>
                 </div>

@@ -1,4 +1,15 @@
-<!-- Kern: Rollen-Verwaltung (Discord Roles Mirror) -->
+<!--
+    Discord-Plugin: Rollen (Spiegel der echten Discord-Rollen)
+
+    Am 2026-08-09 aus dem Kern hierher gezogen
+    (apps/dashboard/themes/default/views/guild/settings/roles.ejs).
+    Inhaltlich unverändert übernommen; geändert wurden nur der Übersetzungsraum
+    (core: → discord:) und die Basis-Adresse der Aufrufe.
+
+    Style- und Skriptblock stehen weiterhin inline. Sie herauszulösen wäre
+    richtig, ist aber eine zweite Änderung — sie steht als eigener Punkt in der
+    Bauliste und gehört nicht in einen Umzug.
+-->
 <style>
     .role-badge {
         display: inline-flex;
@@ -86,11 +97,11 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     <i class="fa-solid fa-shield-halved me-2"></i>
-                    <%= tr('core:ROLES.TITLE') %>
+                    <%= tr('discord:ROLES.TITLE') %>
                 </h5>
                 <% if (botHasManageRoles) { %>
                 <button type="button" class="btn btn-sm btn-success" id="btnCreateRole">
-                    <i class="fa-solid fa-plus me-1"></i> <%= tr('core:ROLES.BTN_CREATE') %>
+                    <i class="fa-solid fa-plus me-1"></i> <%= tr('discord:ROLES.BTN_CREATE') %>
                 </button>
                 <% } %>
             </div>
@@ -98,21 +109,21 @@
                 <% if (!botHasManageRoles) { %>
                 <div class="alert alert-warning m-3 mb-0">
                     <i class="fa-solid fa-triangle-exclamation me-2"></i>
-                    <%= tr('core:ROLES.NO_MANAGE_ROLES_PERM') %>
+                    <%= tr('discord:ROLES.NO_MANAGE_ROLES_PERM') %>
                 </div>
                 <% } %>
 
                 <!-- Suchfeld -->
                 <div class="p-3 pb-0">
                     <input type="text" class="form-control form-control-sm" id="roleSearch"
-                           placeholder="<%= tr('core:ROLES.SEARCH_PLACEHOLDER') %>">
+                           placeholder="<%= tr('discord:ROLES.SEARCH_PLACEHOLDER') %>">
                 </div>
 
                 <!-- Statistiken -->
                 <div class="px-3 py-2 d-flex gap-3 text-secondary small">
-                    <span><i class="fa-solid fa-list me-1"></i> <%= roles.length %> <%= tr('core:ROLES.TOTAL') %></span>
-                    <span><i class="fa-solid fa-pen me-1 text-success"></i> <%= roles.filter(r => r.editable).length %> <%= tr('core:ROLES.EDITABLE') %></span>
-                    <span><i class="fa-solid fa-robot me-1 text-info"></i> <%= roles.filter(r => r.managed).length %> <%= tr('core:ROLES.MANAGED') %></span>
+                    <span><i class="fa-solid fa-list me-1"></i> <%= roles.length %> <%= tr('discord:ROLES.TOTAL') %></span>
+                    <span><i class="fa-solid fa-pen me-1 text-success"></i> <%= roles.filter(r => r.editable).length %> <%= tr('discord:ROLES.EDITABLE') %></span>
+                    <span><i class="fa-solid fa-robot me-1 text-info"></i> <%= roles.filter(r => r.managed).length %> <%= tr('discord:ROLES.MANAGED') %></span>
                 </div>
 
                 <!-- Rollenliste -->
@@ -142,7 +153,7 @@
                     <% if (roles.length === 0) { %>
                     <div class="text-center text-secondary p-4">
                         <i class="fa-solid fa-circle-info fa-2x mb-2"></i>
-                        <p><%= tr('core:ROLES.NO_ROLES') %></p>
+                        <p><%= tr('discord:ROLES.NO_ROLES') %></p>
                     </div>
                     <% } %>
                 </div>
@@ -156,8 +167,8 @@
         <div id="roleEmptyState" class="card mb-4">
             <div class="card-body text-center text-secondary py-5">
                 <i class="fa-solid fa-hand-pointer fa-3x mb-3"></i>
-                <h5><%= tr('core:ROLES.SELECT_ROLE') %></h5>
-                <p><%= tr('core:ROLES.SELECT_ROLE_DESC') %></p>
+                <h5><%= tr('discord:ROLES.SELECT_ROLE') %></h5>
+                <p><%= tr('discord:ROLES.SELECT_ROLE_DESC') %></p>
             </div>
         </div>
 
@@ -179,12 +190,12 @@
                     <ul class="nav nav-tabs mb-3" role="tablist">
                         <li class="nav-item">
                             <a class="nav-link active" data-bs-toggle="tab" href="#tabRoleGeneral" role="tab">
-                                <i class="fa-solid fa-sliders me-1"></i> <%= tr('core:ROLES.TAB_GENERAL') %>
+                                <i class="fa-solid fa-sliders me-1"></i> <%= tr('discord:ROLES.TAB_GENERAL') %>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" data-bs-toggle="tab" href="#tabRolePermissions" role="tab">
-                                <i class="fa-solid fa-key me-1"></i> <%= tr('core:ROLES.TAB_PERMISSIONS') %>
+                                <i class="fa-solid fa-key me-1"></i> <%= tr('discord:ROLES.TAB_PERMISSIONS') %>
                             </a>
                         </li>
                     </ul>
@@ -199,14 +210,14 @@
                                     <div class="col-md-8 mb-3">
                                         <label class="form-label fw-bold">
                                             <i class="fa-solid fa-tag me-1 text-primary"></i>
-                                            <%= tr('core:ROLES.NAME') %>
+                                            <%= tr('discord:ROLES.NAME') %>
                                         </label>
                                         <input type="text" class="form-control" id="editRoleName" name="name" maxlength="100" required>
                                     </div>
                                     <div class="col-md-4 mb-3">
                                         <label class="form-label fw-bold">
                                             <i class="fa-solid fa-palette me-1 text-warning"></i>
-                                            <%= tr('core:ROLES.COLOR') %>
+                                            <%= tr('discord:ROLES.COLOR') %>
                                         </label>
                                         <input type="color" class="form-control form-control-color w-100" id="editRoleColor" name="color" value="#99aab5">
                                     </div>
@@ -218,29 +229,29 @@
                                             <input class="form-check-input" type="checkbox" id="editRoleHoist" name="hoist">
                                             <label class="form-check-label" for="editRoleHoist">
                                                 <i class="fa-solid fa-arrow-up me-1"></i>
-                                                <%= tr('core:ROLES.HOIST') %>
+                                                <%= tr('discord:ROLES.HOIST') %>
                                             </label>
                                         </div>
-                                        <div class="form-text"><%= tr('core:ROLES.HOIST_HELP') %></div>
+                                        <div class="form-text"><%= tr('discord:ROLES.HOIST_HELP') %></div>
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <div class="form-check form-switch">
                                             <input class="form-check-input" type="checkbox" id="editRoleMentionable" name="mentionable">
                                             <label class="form-check-label" for="editRoleMentionable">
                                                 <i class="fa-solid fa-at me-1"></i>
-                                                <%= tr('core:ROLES.MENTIONABLE') %>
+                                                <%= tr('discord:ROLES.MENTIONABLE') %>
                                             </label>
                                         </div>
-                                        <div class="form-text"><%= tr('core:ROLES.MENTIONABLE_HELP') %></div>
+                                        <div class="form-text"><%= tr('discord:ROLES.MENTIONABLE_HELP') %></div>
                                     </div>
                                 </div>
 
                                 <!-- Info-Box -->
                                 <div class="alert alert-light border mb-3" id="roleInfoBox">
                                     <div class="row text-center small">
-                                        <div class="col"><strong><%= tr('core:ROLES.POSITION') %>:</strong> <span id="infoPosition">-</span></div>
-                                        <div class="col"><strong><%= tr('core:ROLES.MEMBERS') %>:</strong> <span id="infoMembers">-</span></div>
-                                        <div class="col"><strong><%= tr('core:ROLES.CREATED') %>:</strong> <span id="infoCreated">-</span></div>
+                                        <div class="col"><strong><%= tr('discord:ROLES.POSITION') %>:</strong> <span id="infoPosition">-</span></div>
+                                        <div class="col"><strong><%= tr('discord:ROLES.MEMBERS') %>:</strong> <span id="infoMembers">-</span></div>
+                                        <div class="col"><strong><%= tr('discord:ROLES.CREATED') %>:</strong> <span id="infoCreated">-</span></div>
                                     </div>
                                 </div>
 
@@ -254,7 +265,7 @@
                                         <i class="fa-solid fa-save me-1"></i> <%= tr('BTN_SAVE') %>
                                     </button>
                                     <button type="button" class="btn btn-danger" id="btnDeleteRole">
-                                        <i class="fa-solid fa-trash me-1"></i> <%= tr('core:ROLES.BTN_DELETE') %>
+                                        <i class="fa-solid fa-trash me-1"></i> <%= tr('discord:ROLES.BTN_DELETE') %>
                                     </button>
                                 </div>
                             </form>
@@ -263,7 +274,7 @@
                         <!-- Tab: Permissions -->
                         <div class="tab-pane fade" id="tabRolePermissions" role="tabpanel">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <small class="text-secondary"><%= tr('core:ROLES.PERM_HINT') %></small>
+                                <small class="text-secondary"><%= tr('discord:ROLES.PERM_HINT') %></small>
                                 <div>
                                     <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPermSelectAll">
                                         <i class="fa-solid fa-check-double me-1"></i> Alle
@@ -288,31 +299,31 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fa-solid fa-plus-circle me-2"></i> <%= tr('core:ROLES.CREATE_TITLE') %>
+                    <i class="fa-solid fa-plus-circle me-2"></i> <%= tr('discord:ROLES.CREATE_TITLE') %>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <form id="createRoleForm">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-bold"><%= tr('core:ROLES.NAME') %></label>
+                        <label class="form-label fw-bold"><%= tr('discord:ROLES.NAME') %></label>
                         <input type="text" class="form-control" id="newRoleName" name="name" maxlength="100" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold"><%= tr('core:ROLES.COLOR') %></label>
+                        <label class="form-label fw-bold"><%= tr('discord:ROLES.COLOR') %></label>
                         <input type="color" class="form-control form-control-color" id="newRoleColor" name="color" value="#99aab5">
                     </div>
                     <div class="row">
                         <div class="col-6">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="newRoleHoist">
-                                <label class="form-check-label" for="newRoleHoist"><%= tr('core:ROLES.HOIST') %></label>
+                                <label class="form-check-label" for="newRoleHoist"><%= tr('discord:ROLES.HOIST') %></label>
                             </div>
                         </div>
                         <div class="col-6">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="newRoleMentionable">
-                                <label class="form-check-label" for="newRoleMentionable"><%= tr('core:ROLES.MENTIONABLE') %></label>
+                                <label class="form-check-label" for="newRoleMentionable"><%= tr('discord:ROLES.MENTIONABLE') %></label>
                             </div>
                         </div>
                     </div>
@@ -333,17 +344,17 @@
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="fa-solid fa-trash me-2"></i> <%= tr('core:ROLES.DELETE_TITLE') %></h5>
+                <h5 class="modal-title"><i class="fa-solid fa-trash me-2"></i> <%= tr('discord:ROLES.DELETE_TITLE') %></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
-                <p><%= tr('core:ROLES.DELETE_CONFIRM') %></p>
+                <p><%= tr('discord:ROLES.DELETE_CONFIRM') %></p>
                 <p class="fw-bold text-danger" id="deleteRoleName"></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><%= tr('BTN_CANCEL') %></button>
                 <button type="button" class="btn btn-danger" id="btnConfirmDelete">
-                    <i class="fa-solid fa-trash me-1"></i> <%= tr('core:ROLES.BTN_DELETE') %>
+                    <i class="fa-solid fa-trash me-1"></i> <%= tr('discord:ROLES.BTN_DELETE') %>
                 </button>
             </div>
         </div>
@@ -353,7 +364,7 @@
 <script>
 (function() {
     const guildId = '<%= guildId %>';
-    const baseUrl = `/guild/${guildId}/settings/roles`;
+    const baseUrl = `/guild/${guildId}/plugins/discord/roles`;
 
     /**
      * Ein Fenster ansprechen.
@@ -452,9 +463,9 @@
             actionButtons.style.display = 'none';
 
             let reason = '';
-            if (role.managed) reason = '<%= tr("core:ROLES.REASON_MANAGED") %>';
-            else if (!botHasManageRoles) reason = '<%= tr("core:ROLES.NO_MANAGE_ROLES_PERM") %>';
-            else reason = '<%= tr("core:ROLES.REASON_HIGHER") %>';
+            if (role.managed) reason = '<%= tr("discord:ROLES.REASON_MANAGED") %>';
+            else if (!botHasManageRoles) reason = '<%= tr("discord:ROLES.NO_MANAGE_ROLES_PERM") %>';
+            else reason = '<%= tr("discord:ROLES.REASON_HIGHER") %>';
             document.getElementById('roleNotEditableReason').textContent = reason;
 
             // Felder disabled
@@ -579,13 +590,13 @@
             });
             const data = await res.json();
             if (data.success) {
-                showToast('<%= tr("core:ROLES.TOAST_SAVED") %>', 'success');
+                showToast('<%= tr("discord:ROLES.TOAST_SAVED") %>', 'success');
                 setTimeout(() => location.reload(), 800);
             } else {
-                showToast(data.message || '<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+                showToast(data.message || '<%= tr("discord:ROLES.TOAST_ERROR") %>', 'error');
             }
         } catch (err) {
-            showToast('<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+            showToast('<%= tr("discord:ROLES.TOAST_ERROR") %>', 'error');
         }
     });
 
@@ -607,14 +618,14 @@
             });
             const data = await res.json();
             if (data.success) {
-                showToast('<%= tr("core:ROLES.TOAST_DELETED") %>', 'success');
+                showToast('<%= tr("discord:ROLES.TOAST_DELETED") %>', 'success');
                 fenster('deleteRoleModal')?.hide();
                 setTimeout(() => location.reload(), 800);
             } else {
-                showToast(data.message || '<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+                showToast(data.message || '<%= tr("discord:ROLES.TOAST_ERROR") %>', 'error');
             }
         } catch (err) {
-            showToast('<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+            showToast('<%= tr("discord:ROLES.TOAST_ERROR") %>', 'error');
         }
     });
 
@@ -644,14 +655,14 @@
             });
             const data = await res.json();
             if (data.success) {
-                showToast('<%= tr("core:ROLES.TOAST_CREATED") %>', 'success');
+                showToast('<%= tr("discord:ROLES.TOAST_CREATED") %>', 'success');
                 fenster('createRoleModal')?.hide();
                 setTimeout(() => location.reload(), 800);
             } else {
-                showToast(data.message || '<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+                showToast(data.message || '<%= tr("discord:ROLES.TOAST_ERROR") %>', 'error');
             }
         } catch (err) {
-            showToast('<%= tr("core:ROLES.TOAST_ERROR") %>', 'error');
+            showToast('<%= tr("discord:ROLES.TOAST_ERROR") %>', 'error');
         }
     });
 })();

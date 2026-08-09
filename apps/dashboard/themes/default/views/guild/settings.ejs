@@ -39,13 +39,10 @@ const bereiche = [
         // dorthin. Das Ziel gibt es laengst, es steht auch in der Navigation.
         ziel: `/guild/${guildId}/permissions/users`, knopf: 'BTN_OPEN'
     },
-    {
-        farbe: 'info', symbol: 'fa-hashtag',
-        titel: 'Discord Channels', untertitel: 'Channel-Übersicht',
-        beschreibung: 'Übersicht aller Discord-Channels deines Servers — Text, Voice, Announcement, Forum und mehr.',
-        merkmaleText: ['Alle Channel-Typen', 'Kategorie-Struktur', 'Channel-Details & Metadaten'],
-        ziel: `/guild/${guildId}/settings/channels`, knopfText: 'Channels anzeigen'
-    },
+    // Die Karte "Discord Channels" stand hier bis zum 2026-08-09. Kanaele sind
+    // kein Einstellungsthema: die Seite fasst Discord selbst an, nicht unseren
+    // Bot. Sie liegt jetzt im Plugin `discord` und hat dort einen eigenen
+    // Menuepunkt — eine zweite Tuer von hier waere nur ein Umweg.
     {
         farbe: 'warning', symbol: 'fa-plug', schluessel: 'INTEGRATIONS',
         merkmale: ['WEBHOOKS', 'API_KEYS', 'DISCORD_LOGS', 'EXTERNAL_SERVICES'],

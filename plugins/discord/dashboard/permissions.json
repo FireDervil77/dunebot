@@ -1,0 +1,47 @@
+{
+  "plugin": "discord",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "DISCORD.VIEW",
+      "name": "Discord-Bereich anzeigen",
+      "description": "Berechtigung, den Discord-Bereich im Dashboard zu öffnen",
+      "category": "discord",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "DISCORD.ROLES.VIEW",
+      "name": "Discord-Rollen anzeigen",
+      "description": "Berechtigung, die Rollen des Servers samt Berechtigungen zu sehen",
+      "category": "discord",
+      "is_dangerous": 0,
+      "requires": "DISCORD.VIEW"
+    },
+    {
+      "key": "DISCORD.ROLES.EDIT",
+      "name": "Discord-Rollen anlegen und bearbeiten",
+      "description": "Berechtigung, Rollen anzulegen und zu ändern — wirkt sofort auf dem Discord-Server",
+      "category": "discord",
+      "is_dangerous": 1,
+      "requires": "DISCORD.ROLES.VIEW"
+    },
+    {
+      "key": "DISCORD.ROLES.DELETE",
+      "name": "Discord-Rollen löschen",
+      "description": "Berechtigung, Rollen endgültig zu löschen — nicht rückgängig zu machen",
+      "category": "discord",
+      "is_dangerous": 1,
+      "requires": "DISCORD.ROLES.VIEW"
+    },
+    {
+      "key": "DISCORD.CHANNELS.VIEW",
+      "name": "Discord-Kanäle anzeigen",
+      "description": "Berechtigung, die Kanäle und Kategorien des Servers einzusehen",
+      "category": "discord",
+      "is_dangerous": 0,
+      "requires": "DISCORD.VIEW"
+    }
+  ],
+  "default_groups": {}
+}
