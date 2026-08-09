@@ -163,13 +163,7 @@
       "LOCKDOWN_ACTIVE": "LOCKDOWN AKTIV!",
       "ALERT_CHANNEL": "Raid-Alert Channel",
       "ALERT_MENTION_MODS": "@Mods bei Raid erwähnen",
-      "TRUSTED_INVITES": "Whitelist von Invite-Codes",
-      "PLANNED_FEATURES": "Geplante Features",
-      "FEATURE_1": "Join-Spam Detection (X User in Y Sekunden)",
-      "FEATURE_2": "Account-Age Check (Min. 7 Tage Alt)",
-      "FEATURE_3": "Lockdown-Modus bei Raid-Erkennung",
-      "FEATURE_4": "Automatische Actions (Kick/Ban neue User)",
-      "ETA": "✅ JETZT VERFÜGBAR!"
+      "TRUSTED_INVITES": "Whitelist von Invite-Codes"
     },
     "COMPOUND": {
       "TITLE": "Kombinations-Regeln",

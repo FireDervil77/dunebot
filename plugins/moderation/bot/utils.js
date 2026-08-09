@@ -934,10 +934,72 @@ module.exports = class ModUtils {
     }
 };
 
+/**
+ * Die geltende Warn-Grenze fuer einen Kanal.
+ *
+ * Bis zum 2026-08-09 gab es nur die Guild-weite Grenze aus
+ * `moderation_settings`. Die Seite "Channel-spezifische Regeln" konnte zwar
+ * eine abweichende Grenze je Kanal speichern - **gelesen hat diese Tabelle nie
+ * jemand**. Wer in einem Meme-Kanal lockerere Regeln setzte, bekam nichts.
+ *
+ * Jetzt gilt: gibt es fuer den Kanal eine Regel mit eigener Grenze, sticht sie
+ * die Guild-weite. Grenze und Aktion werden dabei **einzeln** uebernommen -
+ * eine Regel darf nur die Grenze anheben und die Aktion so lassen, wie sie
+ * global gesetzt ist.
+ *
+ * In einem Thread zaehlt der Elternkanal mit: Threads kommen und gehen und
+ * stehen in keiner Auswahlliste, wer den Kanal darunter regelt, meint sie mit.
+ * Nur bei Threads - bei einem gewoehnlichen Kanal waere `parentId` die
+ * Kategorie, und eine ganze Kategorie zu regeln waere etwas anderes.
+ *
+ * @param {string} guildId
+ * @param {Object} settings Guild-weite Einstellungen
+ * @param {import('discord.js').GuildChannel} [channel] Kanal der Verwarnung
+ * @returns {Promise<{limit: number, action: string, kanalRegel: boolean}>}
+ */
+async function getWarnLimit(guildId, settings, channel) {
+    const grundwert = {
+        limit: settings.max_warn_limit,
+        action: settings.max_warn_action,
+        kanalRegel: false
+    };
+
+    if (!channel?.id) return grundwert;
+
+    const kanalIds = [channel.id];
+    if (channel.isThread?.() && channel.parentId) kanalIds.push(channel.parentId);
+
+    try {
+        const dbService = ServiceManager.get('dbService');
+        const platzhalter = kanalIds.map(() => '?').join(', ');
+
+        // Der eigene Kanal zuerst, der Elternkanal nur als Rueckfall.
+        const zeilen = await dbService.query(`
+            SELECT channel_id, max_warn_limit, max_warn_action
+            FROM moderation_channel_rules
+            WHERE guild_id = ? AND channel_id IN (${platzhalter})
+        `, [guildId, ...kanalIds]);
+
+        if (!zeilen || zeilen.length === 0) return grundwert;
+
+        const regel = zeilen.find(z => z.channel_id === channel.id) || zeilen[0];
+
+        return {
+            limit: regel.max_warn_limit ?? grundwert.limit,
+            action: regel.max_warn_action ?? grundwert.action,
+            kanalRegel: regel.max_warn_limit !== null || regel.max_warn_action !== null
+        };
+    } catch (ex) {
+        // Eine nicht lesbare Regel darf die Verwarnung nicht verhindern.
+        Logger.warn(`getWarnLimit: Kanalregel nicht lesbar (${ex.message})`);
+        return grundwert;
+    }
+}
+
 // Export helper functions for commands
-module.exports.warnTarget = async function warnTarget(issuer, target, reason) {
+module.exports.warnTarget = async function warnTarget(issuer, target, reason, channel = null) {
     const settings = await getSettings(issuer.guild.id);
-    
+
     if (!memberInteract(issuer, target)) return "MEMBER_PERM";
     if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
     if (await isProtectedMember(issuer.guild.id, target)) return "PROTECTED_ROLE";
@@ -947,13 +1009,16 @@ module.exports.warnTarget = async function warnTarget(issuer, target, reason) {
         await logModeration(issuer, target, effectiveReason, "Warn");
         const warnings = await countWarnings(issuer.guild.id, target.id);
 
+        const { limit, action, kanalRegel } = await getWarnLimit(issuer.guild.id, settings, channel);
+
         // Check if max warnings reached
-        if (warnings >= settings.max_warn_limit) {
+        if (warnings >= limit) {
+            const herkunft = kanalRegel ? ` [Kanalregel #${channel?.name || channel?.id}]` : '';
             return await module.exports.addModAction(
                 issuer,
                 target,
-                `Max warnings reached (${warnings}/${settings.max_warn_limit})`,
-                settings.max_warn_action
+                `Max warnings reached (${warnings}/${limit})${herkunft}`,
+                action
             );
         }
 
@@ -963,6 +1028,8 @@ module.exports.warnTarget = async function warnTarget(issuer, target, reason) {
         return "ERROR";
     }
 };
+
+module.exports.getWarnLimit = getWarnLimit;
 
 // Export DB helpers
 module.exports.getSettings = getSettings;

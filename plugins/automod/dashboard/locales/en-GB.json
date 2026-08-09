@@ -154,12 +154,16 @@
     "RAID": {
       "TITLE": "Raid Protection",
       "SUBTITLE": "Raid Protection & Join Spam",
-      "PLANNED_FEATURES": "Planned Features",
-      "FEATURE_1": "Join Spam Detection (X users in Y seconds)",
-      "FEATURE_2": "Account Age Check (Min. 7 days old)",
-      "FEATURE_3": "Lockdown Mode on raid detection",
-      "FEATURE_4": "Automatic Actions (Kick/Ban new users)",
-      "ETA": "Available in approx. 1-2 weeks"
+      "ENABLE": "Enable raid protection",
+      "JOIN_THRESHOLD": "Max. joins",
+      "JOIN_TIMESPAN": "Time window (seconds)",
+      "MIN_ACCOUNT_AGE": "Min. account age (days)",
+      "ACTION": "Default action",
+      "LOCKDOWN": "Enable lockdown on raid",
+      "LOCKDOWN_ACTIVE": "LOCKDOWN ACTIVE!",
+      "ALERT_CHANNEL": "Raid alert channel",
+      "ALERT_MENTION_MODS": "Mention @Mods on raid",
+      "TRUSTED_INVITES": "Whitelisted invite codes"
     },
     "COMPOUND": {
       "TITLE": "Compound Rules",

@@ -75,7 +75,7 @@
   },
   "CHANNEL_RULES": {
     "TITLE": "Channel-spezifische Regeln",
-    "DESC": "Definiere abweichende Warn-Grenzen für einzelne Channels, zum Beispiel lockerere Regeln in Meme-Channels.",
+    "DESC": "Setze abweichende Warn-Grenzen für einzelne Channels — zum Beispiel mehr Spielraum in Meme-Channels. Wo keine Regel steht, gilt die serverweite Grenze.",
     "ADD_TITLE": "Channel-Regel hinzufügen",
     "CHANNEL": "Channel",
     "WARN_LIMIT": "Max. Warns",
@@ -90,7 +90,8 @@
     "BADGE_LIMIT": "Ab {{limit}} Verwarnungen → {{aktion}}",
     "DEFAULT_ACTION": "Standardaktion",
     "EMPTY_HINT": "Ohne eigene Regel gelten überall die Grundeinstellungen.",
-    "AUTOMOD_HINT": "Kanäle vom AutoMod auszunehmen geht nicht hier, sondern unter AutoMod → Ausnahmen. Dort steht die einzige Stelle dafür."
+    "AUTOMOD_HINT": "Kanäle vom AutoMod auszunehmen geht nicht hier, sondern unter AutoMod → Ausnahmen. Dort steht die einzige Stelle dafür.",
+    "LIMIT_HELP": "Leer lassen heißt: es gilt die serverweite Einstellung. Threads folgen der Regel ihres Eltern-Channels."
   },
   "NOTES": {
     "TITLE": "Moderator-Notizen",

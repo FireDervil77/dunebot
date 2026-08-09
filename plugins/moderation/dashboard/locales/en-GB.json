@@ -75,7 +75,7 @@
   },
   "CHANNEL_RULES": {
     "TITLE": "Channel-specific Rules",
-    "DESC": "Define different warn limits for individual channels, for example looser rules in meme channels.",
+    "DESC": "Set different warn limits for individual channels — for example more leeway in meme channels. Where no rule exists, the server-wide limit applies.",
     "ADD_TITLE": "Add Channel Rule",
     "CHANNEL": "Channel",
     "WARN_LIMIT": "Max Warns",
@@ -90,7 +90,8 @@
     "BADGE_LIMIT": "From {{limit}} warnings → {{aktion}}",
     "DEFAULT_ACTION": "default action",
     "EMPTY_HINT": "Without a specific rule, the basic settings apply everywhere.",
-    "AUTOMOD_HINT": "Exempting channels from AutoMod is not done here but under AutoMod → Exemptions. That is the single place for it."
+    "AUTOMOD_HINT": "Exempting channels from AutoMod is not done here but under AutoMod → Exemptions. That is the single place for it.",
+    "LIMIT_HELP": "Leave empty to use the server-wide setting. Threads follow their parent channel’s rule."
   },
   "NOTES": {
     "TITLE": "Moderator Notes",

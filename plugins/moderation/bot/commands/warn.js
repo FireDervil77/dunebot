@@ -35,7 +35,7 @@ module.exports = {
         const target = await message.guild.resolveMember(args[0], true);
         if (!target) return message.replyT("moderation:NO_MATCH_USER", { query: args[0] });
         const reason = message.content.split(args[0])[1].trim();
-        const response = await warn(message.member, target, reason);
+        const response = await warn(message.member, target, reason, message.channel);
         await message.reply(response);
     },
 
@@ -44,15 +44,22 @@ module.exports = {
         const reason = interaction.options.getString("reason");
         const target = await interaction.guild.members.fetch(user.id);
 
-        const response = await warn(interaction.member, target, reason);
+        const response = await warn(interaction.member, target, reason, interaction.channel);
         await interaction.followUp(response);
     },
 };
 
-async function warn(issuer, target, reason) {
+/**
+ * @param {import('discord.js').GuildMember} issuer
+ * @param {import('discord.js').GuildMember} target
+ * @param {string} reason
+ * @param {import('discord.js').GuildChannel} [channel] Kanal der Verwarnung -
+ *        entscheidet ueber eine abweichende Warn-Grenze (Kanalregeln)
+ */
+async function warn(issuer, target, reason, channel = null) {
     const guild = issuer.guild;
 
-    const response = await warnTarget(issuer, target, reason);
+    const response = await warnTarget(issuer, target, reason, channel);
     if (typeof response === "boolean")
         return guild.getT("moderation:WARN.SUCCESS", { target: target.user.username });
     if (response === "BOT_PERM")
