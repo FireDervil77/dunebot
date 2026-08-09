@@ -1,3 +1,21 @@
+<%
+  //
+  // Seit dem 2026-08-09 stehen hier nicht mehr nur Textkanaele. Kanalregeln
+  // sind eine Auswahl - sie gelten fuer alles, worin Nachrichten entstehen,
+  // also auch fuer den Chat eines Sprachkanals. Eine Raute vor einem
+  // Sprachkanal waere irrefuehrend, deshalb bekommt jeder Typ sein Symbol.
+  //
+  const kanalSymbol = {
+    text:         'fa-hashtag',
+    voice:        'fa-volume-high',
+    announcement: 'fa-bullhorn',
+    stage:        'fa-microphone',
+    forum:        'fa-comments',
+    media:        'fa-image'
+  };
+  const symbol  = (k) => kanalSymbol[k && k.typeName] || 'fa-hashtag';
+  const zeichen = (k) => ({ text: '#', voice: '\u{1F50A}', announcement: '\u{1F4E2}', stage: '\u{1F3A4}', forum: '\u{1F4AC}', media: '\u{1F5BC}' })[k.typeName] || '#';
+%>
 <%- include('partials/moderation-kopf', {
   guildId, tr,
   icon: 'fa-solid fa-hashtag',
@@ -21,7 +39,7 @@
           <select id="crChannelSelect" class="form-select">
             <option value=""><%= tr('moderation:CHANNEL_SELECT') %></option>
             <% (channels || []).forEach(kanal => { %>
-              <option value="<%= kanal.id %>">#<%= kanal.name %></option>
+              <option value="<%= kanal.id %>"><%= zeichen(kanal) %> <%= kanal.name %></option>
             <% }); %>
           </select>
         </div>
@@ -79,7 +97,7 @@
               <div class="d-flex align-items-start justify-content-between">
                 <div class="flex-grow-1">
                   <div class="mb-1">
-                    <strong><i class="fa-solid fa-hashtag me-1 text-secondary"></i><%= kanal ? kanal.name : regel.channel_id %></strong>
+                    <strong><i class="fa-solid <%= symbol(kanal) %> me-1 text-secondary"></i><%= kanal ? kanal.name : regel.channel_id %></strong>
                     <% if (regel.max_warn_limit !== null && regel.max_warn_limit !== undefined) { %>
                       <span class="badge bg-orange-lt ms-2">
                         <%= tr('moderation:CHANNEL_RULES.BADGE_LIMIT', {

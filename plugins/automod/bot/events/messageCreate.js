@@ -39,15 +39,30 @@ module.exports = async (message) => {
 
     const settings = await AutoModSettings.getSettings(message.guild.id);
 
-    if (settings.whitelisted_channels.includes(message.channelId)) return;
+    // Welche Kanal-IDs zaehlen fuer Whitelist und Ausnahmen?
+    //
+    // In einem Thread ist `message.channelId` die ID des **Threads**, nicht die
+    // des Kanals darunter. Wer einen Kanal ausgenommen hat, meint aber dessen
+    // Threads mit - und Threads stehen in keiner Auswahlliste, sie kommen und
+    // gehen. Deshalb zaehlt bei Threads der Elternkanal zusaetzlich.
+    //
+    // Nur bei Threads. Bei einem gewoehnlichen Kanal ist `parentId` die
+    // Kategorie, und eine ganze Kategorie auszunehmen, weil jemand einen Kanal
+    // darin ausgenommen hat, waere etwas voellig anderes.
+    const kanalIds = [message.channelId];
+    if (message.channel?.isThread?.() && message.channel.parentId) {
+        kanalIds.push(message.channel.parentId);
+    }
+
+    if (kanalIds.some(id => settings.whitelisted_channels.includes(id))) return;
 
     // Exemption-Check: Channels und Rollen
     try {
-        const [channelExempt, memberExempt] = await Promise.all([
-            AutoModExemptions.isExempt(message.guild.id, 'channel', message.channelId),
+        const [kanalAusnahmen, memberExempt] = await Promise.all([
+            Promise.all(kanalIds.map(id => AutoModExemptions.isExempt(message.guild.id, 'channel', id))),
             AutoModExemptions.isMemberExempt(message.guild.id, message.member.roles.cache.map(r => r.id))
         ]);
-        if (channelExempt || memberExempt) return;
+        if (kanalAusnahmen.some(Boolean) || memberExempt) return;
     } catch {
         // Bei DB-Fehler weitermachen mit normalen Checks
     }

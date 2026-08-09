@@ -8,7 +8,7 @@
  * @module automod/routes/_shared
  */
 
-const { ServiceManager } = require('dunebot-core');
+const { ServiceManager, KanalTypen } = require('dunebot-core');
 
 /**
  * Uebersetzungsfunktion fuer eine Anfrage.
@@ -60,16 +60,30 @@ async function renderView(res, viewPath, data) {
  * Liste - die Views zeigen dann das Eingabefeld fuer die Channel-ID statt der
  * Auswahlliste.
  *
+ * **Kanaltypen, seit dem 2026-08-09:** Die Auswahllisten von AutoMod dienen
+ * zwei Zwecken, und die richtige Menge haengt vom Zweck ab.
+ *
+ *   - `MODERIERBARE_TYPEN` fuer Whitelist und Ausnahmen. `messageCreate`
+ *     filtert nicht nach Kanaltyp - der Chat eines Sprachkanals wird also
+ *     moderiert. Bis dahin liess er sich aber nicht ausnehmen, weil die Liste
+ *     nur Textkanaele kannte. Was ueberwacht wird, muss ausnehmbar sein.
+ *   - `BESCHREIBBARE_TYPEN` fuer Zielfelder wie Log- und Alarmkanal. Dort
+ *     schreibt der Bot hin, ein Forum oder eine Buehne waere sinnlos.
+ *
  * @param {string} guildId Discord-Guild-ID
+ * @param {number[]} [typen] Gewuenschte Kanaltypen, Vorgabe: alle moderierbaren
  * @returns {Promise<Array>} Channels oder []
  */
-async function getGuildChannels(guildId) {
+async function getGuildChannels(guildId, typen = KanalTypen.MODERIERBARE_TYPEN) {
     const Logger = ServiceManager.get('Logger');
     const ipcServer = ServiceManager.get('ipcServer');
     if (!ipcServer) return [];
 
     try {
-        const antworten = await ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS', { guildId });
+        const antworten = await ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS', {
+            guildId,
+            types: typen
+        });
         return antworten?.[0]?.channels || [];
     } catch (err) {
         Logger.warn(`[AutoMod] Channels konnten nicht geladen werden: ${err.message}`);

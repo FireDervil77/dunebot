@@ -4,7 +4,7 @@
  * @module moderation/routes/_shared
  */
 
-const { ServiceManager } = require('dunebot-core');
+const { ServiceManager, KanalTypen } = require('dunebot-core');
 
 /**
  * Uebersetzungsfunktion fuer eine Anfrage.
@@ -45,14 +45,23 @@ async function renderView(res, viewPath, data) {
 /**
  * Channels der Guild ueber IPC beim Bot erfragen.
  *
+ * **Kanaltypen, seit dem 2026-08-09:** Die Kanalregeln sind eine *Auswahl* -
+ * sie legen fest, was in welchem Kanal gilt. Dafuer zaehlt alles, worin
+ * Nachrichten entstehen, also auch der Chat eines Sprachkanals. Fuer Zielfelder
+ * (Modlog-Kanal) uebergibt der Aufrufer `BESCHREIBBARE_TYPEN`.
+ *
  * @param {string} guildId Discord-Guild-ID
+ * @param {number[]} [typen] Gewuenschte Kanaltypen, Vorgabe: alle moderierbaren
  * @returns {Promise<Array>} Channels oder []
  */
-async function getGuildChannels(guildId) {
+async function getGuildChannels(guildId, typen = KanalTypen.MODERIERBARE_TYPEN) {
     const ipcServer = ServiceManager.get('ipcServer');
     if (!ipcServer) return [];
     try {
-        const antworten = await ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS', { guildId });
+        const antworten = await ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS', {
+            guildId,
+            types: typen
+        });
         return antworten?.[0]?.channels || [];
     } catch (err) {
         ServiceManager.get('Logger').warn(`[Moderation] Channels nicht ladbar: ${err.message}`);

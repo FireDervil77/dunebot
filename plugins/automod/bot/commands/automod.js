@@ -1,7 +1,8 @@
-const { ApplicationCommandOptionType, ChannelType } = require("discord.js");
+const { ApplicationCommandOptionType } = require("discord.js");
 const { EmbedUtils } = require("dunebot-sdk/utils");
 const { stripIndent } = require("common-tags");
 const { AutoModSettings } = require("../../shared/models");
+const { KanalTypen } = require("dunebot-core");
 
 /**
  * @type {import('dunebot-sdk').CommandType}
@@ -71,7 +72,8 @@ module.exports = {
                         description: "automod:AUTOMOD.CONFIG_LOG_CHANNEL",
                         required: false,
                         type: ApplicationCommandOptionType.Channel,
-                        channelTypes: [ChannelType.GuildText],
+                        // Ziel: dorthin schreibt der Bot.
+                        channelTypes: KanalTypen.BESCHREIBBARE_TYPEN,
                     },
                 ],
             },
@@ -153,7 +155,9 @@ module.exports = {
                         description: "automod:AUTOMOD.CONFIG_WHITELIST_ADD_CH",
                         required: true,
                         type: ApplicationCommandOptionType.Channel,
-                        channelTypes: [ChannelType.GuildText],
+                        // Auswahl: alles, was moderiert wird, muss ausnehmbar
+                        // sein - der Chat eines Sprachkanals eingeschlossen.
+                        channelTypes: KanalTypen.MODERIERBARE_TYPEN,
                     },
                 ],
             },
@@ -167,7 +171,9 @@ module.exports = {
                         description: "automod:AUTOMOD.CONFIG_WHITELIST_REM_CH",
                         required: true,
                         type: ApplicationCommandOptionType.Channel,
-                        channelTypes: [ChannelType.GuildText],
+                        // Auswahl: alles, was moderiert wird, muss ausnehmbar
+                        // sein - der Chat eines Sprachkanals eingeschlossen.
+                        channelTypes: KanalTypen.MODERIERBARE_TYPEN,
                     },
                 ],
             },

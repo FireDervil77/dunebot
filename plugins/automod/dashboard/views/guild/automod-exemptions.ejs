@@ -9,6 +9,22 @@
   const rollenAusnahmen  = (exemptions || []).filter(e => e.type === 'role');
   const channelAusnahmen = (exemptions || []).filter(e => e.type === 'channel');
 
+  //
+  // Seit dem 2026-08-09 stehen hier nicht mehr nur Textkanaele: der Chat eines
+  // Sprachkanals wird von AutoMod ebenso moderiert und muss sich ausnehmen
+  // lassen. Ein Sprachkanal mit Raute davor waere aber irrefuehrend, deshalb
+  // bekommt jeder Typ sein eigenes Zeichen.
+  //
+  const kanalZeichen = {
+    text:         '#',
+    voice:        '🔊',
+    announcement: '📢',
+    stage:        '🎤',
+    forum:        '💬',
+    media:        '🖼'
+  };
+  const zeichen = (kanal) => kanalZeichen[kanal.typeName] || '#';
+
   const whitelistIds = settings.whitelisted_channels
     ? (Array.isArray(settings.whitelisted_channels)
         ? settings.whitelisted_channels.map(String)
@@ -103,7 +119,7 @@
           <select class="form-select" id="add-channel-exemption">
             <option value=""><%= tr('automod:EXEMPTIONS.PICK_CHANNEL') %></option>
             <% (guildChannels || []).forEach(channel => { %>
-              <option value="<%= channel.id %>">#<%= channel.name %></option>
+              <option value="<%= channel.id %>"><%= zeichen(channel) %> <%= channel.name %></option>
             <% }); %>
           </select>
           <button type="button" class="btn btn-success"
@@ -146,7 +162,7 @@
               const gewaehlt = whitelistIds.includes(String(channel.id));
           %>
             <option value="<%= channel.id %>" <%= gewaehlt ? 'selected' : '' %>>
-              <%= channel.parentName ? '   ' : '' %>#<%= channel.name %>
+              <%= channel.parentName ? '   ' : '' %><%= zeichen(channel) %> <%= channel.name %>
             </option>
           <% }); %>
         </select>

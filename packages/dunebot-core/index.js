@@ -7,6 +7,7 @@ const GuildManager = require("./lib/GuildManager");
 const SiteConfig = require("./lib/SiteConfig");
 const MigrationRunner = require("./lib/MigrationRunner");
 const { parsePlaceholders, buildEmbed } = require("./lib/PlaceholderParser");
+const KanalTypen = require("./lib/KanalTypen");
 const languagesMeta = require("./languages-meta.json");
 
 module.exports = {
@@ -21,4 +22,5 @@ module.exports = {
     parsePlaceholders,
     buildEmbed,
     languagesMeta,
+    KanalTypen,
 };

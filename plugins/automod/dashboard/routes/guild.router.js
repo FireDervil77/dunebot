@@ -19,7 +19,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { ServiceManager } = require('dunebot-core');
+const { ServiceManager, KanalTypen } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const {
     AutoModSettings,
@@ -196,6 +196,8 @@ router.get('/ausnahmen', requirePermission('AUTOMOD.VIEW'), async (req, res) => 
         const [settings, exemptions, guildChannels, guildRoles] = await Promise.all([
             AutoModSettings.getSettings(guildId),
             AutoModExemptions.getAll(guildId).catch(() => []),
+            // Auswahl, kein Ziel: alles, was moderiert wird, muss ausnehmbar
+            // sein - Sprachkanaele eingeschlossen. Vorgabe der Funktion.
             getGuildChannels(guildId),
             getGuildRoles(guildId)
         ]);
@@ -225,7 +227,8 @@ router.get('/raid', requirePermission('AUTOMOD.VIEW'), async (req, res) => {
     try {
         const [settings, guildChannels, raidEreignisse] = await Promise.all([
             AutoModSettings.getSettings(guildId),
-            getGuildChannels(guildId),
+            // Alarmkanal ist ein Ziel - dorthin schreibt der Bot.
+            getGuildChannels(guildId, KanalTypen.BESCHREIBBARE_TYPEN),
             AutoModRaidEvents.getRecentEvents(guildId, 10).catch(() => [])
         ]);
 
@@ -297,7 +300,8 @@ router.get('/settings', requirePermission('AUTOMOD.VIEW'), async (req, res) => {
     try {
         const [settings, guildChannels] = await Promise.all([
             AutoModSettings.getSettings(guildId),
-            getGuildChannels(guildId)
+            // Log-Kanal ist ein Ziel - dorthin schreibt der Bot.
+            getGuildChannels(guildId, KanalTypen.BESCHREIBBARE_TYPEN)
         ]);
 
         skripteAnmelden(['automod-forms']);

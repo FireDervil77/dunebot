@@ -17,7 +17,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { ServiceManager } = require('dunebot-core');
+const { ServiceManager, KanalTypen } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { makeTranslator, renderView, getGuildChannels, getGuildRoles, getSettings, renderFehler } = require('./_shared');
 
@@ -200,7 +200,8 @@ router.get('/settings', requirePermission('MODERATION.VIEW'), async (req, res) =
     try {
         const [settings, channels] = await Promise.all([
             getSettings(guildId),
-            getGuildChannels(guildId)
+            // Modlog-Kanal ist ein Ziel - dorthin schreibt der Bot.
+            getGuildChannels(guildId, KanalTypen.BESCHREIBBARE_TYPEN)
         ]);
 
         skripteAnmelden(['moderation-forms']);
