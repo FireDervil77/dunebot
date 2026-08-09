@@ -934,48 +934,64 @@ class PermissionManager {
   }
 
   /**
-   * Entfernt alle Permissions eines Plugins für eine Guild
-   * Wird automatisch beim Plugin-Disable aufgerufen
-   * 
-   * WICHTIG: Entfernt auch Permissions aus allen Gruppen (guild_groups.permissions JSON)
-   * 
+   * Entfernt die Rechte eines Plugins **aus einer Guild**.
+   *
+   * Wird beim Abschalten eines Plugins in einer Guild aufgerufen
+   * (`PluginManager.disableInGuild`, Schritt 5).
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * Am 2026-08-09 repariert. Vorher stand hier:
+   *
+   *     DELETE FROM permission_definitions WHERE plugin_name = ?
+   *
+   * ohne Guild-Filter. `permission_definitions` ist ein **globaler Katalog**
+   * ohne `guild_id` — wer ein Plugin in *einer* Guild abschaltete, löschte
+   * dessen Rechtedefinitionen damit für **alle**.
+   *
+   * Zusammen mit `guild_permission_seeds`, das beim Abschalten nie geleert
+   * wurde, ergab das eine Kette, die das Plugin unbenutzbar zurückliess:
+   * abschalten → Rechte aus den Gruppen entfernt und aus dem Katalog gelöscht
+   * → wieder einschalten → `registerPluginPermissionsForGuild` trägt die
+   * Definitionen zwar neu ein, hält die Schlüssel aber wegen der Seeds für
+   * „schon angeboten" und weist sie **keiner Gruppe** mehr zu. Das Plugin war
+   * zurück, aber niemand durfte es öffnen.
+   *
+   * Jetzt gilt: **Der Katalog bleibt.** Das Abschalten gilt einer Guild, also
+   * wird auch nur in dieser Guild aufgeräumt — Gruppenzuweisungen weg, Seeds
+   * weg. Das Löschen der Definitionen gehörte zu einem Deinstallieren des
+   * Plugins; dafür gibt es im Projekt keinen Aufrufer, und eine Methode
+   * anzulegen, die niemand ruft, wäre genau der Fehler, den wir sonst suchen.
+   * ─────────────────────────────────────────────────────────────────────────
+   *
    * @param {string} pluginName - Plugin-Name
    * @param {string} guildId - Discord Guild ID
-   * @returns {Promise<Object>} { permissionsDeleted, groupsUpdated }
+   * @returns {Promise<Object>} { permissionKeys, groupAssignmentsDeleted, seedsCleared }
    */
   async unregisterPluginPermissions(pluginName, guildId) {
     this._ensureInitialized();
-    
+
     if (!pluginName || !guildId) {
       throw new Error('Invalid arguments: pluginName and guildId required');
     }
-    
-    this.logger.info(`[PermissionManager] Unregistering permissions for plugin "${pluginName}" in guild ${guildId}...`);
-    
+
+    this.logger.info(`[PermissionManager] Rechte von "${pluginName}" in Guild ${guildId} zurücknehmen...`);
+
     try {
-      // 1. Hole alle Permission-Keys dieses Plugins (global)
+      // 1. Schlüssel dieses Plugins aus dem globalen Katalog holen — nur lesen.
       const permissions = await this.dbService.query(
         'SELECT id, permission_key FROM permission_definitions WHERE plugin_name = ?',
         [pluginName]
       );
-      
-      if (!permissions || permissions.length === 0) {
-        this.logger.warn(`[PermissionManager] No permissions found for plugin "${pluginName}"`);
-        return { permissionsDeleted: 0, groupAssignmentsDeleted: 0 };
-      }
-      
-      const permKeys = permissions.map(p => p.permission_key);
-      this.logger.debug(`[PermissionManager] Found ${permKeys.length} permissions to remove: ${permKeys.join(', ')}`);
-      
-      // 2. DELETE aus permission_definitions (UI-Registry-Cleanup, global)
-      const result = await this.dbService.query(
-        'DELETE FROM permission_definitions WHERE plugin_name = ?',
-        [pluginName]
-      );
-      
-      const permissionsDeleted = result.affectedRows || 0;
 
-      // 3. Permissions aus allen Gruppen-JSONs der Guild entfernen
+      if (!permissions || permissions.length === 0) {
+        this.logger.warn(`[PermissionManager] Keine Rechte für Plugin "${pluginName}" im Katalog`);
+        return { permissionKeys: 0, groupAssignmentsDeleted: 0, seedsCleared: 0 };
+      }
+
+      const permKeys = permissions.map(p => p.permission_key);
+      this.logger.debug(`[PermissionManager] ${permKeys.length} Schlüssel betroffen: ${permKeys.join(', ')}`);
+
+      // 2. Rechte aus den Gruppen **dieser** Guild entfernen.
       let groupAssignmentsDeleted = 0;
       if (permKeys.length > 0) {
         const groups = await this.dbService.query(
@@ -1003,16 +1019,34 @@ class PermissionManager {
         }
       }
       
-      // Cache für die Guild invalidieren (Permissions haben sich geändert)
+      // 3. Merkposten dieser Guild für diese Schlüssel löschen.
+      //
+      //    Ohne das bleibt das Plugin nach einem Aus-und-wieder-Ein
+      //    unbenutzbar: `registerPluginPermissionsForGuild` verteilt nur, was
+      //    in `guild_permission_seeds` noch nicht steht. Die Zuweisungen sind
+      //    in Schritt 2 gerade entfernt worden — stünden die Seeds weiter da,
+      //    würde niemand sie je wieder bekommen.
+      let seedsCleared = 0;
+      if (permKeys.length > 0) {
+        const platzhalter = permKeys.map(() => '?').join(', ');
+        const seedErgebnis = await this.dbService.query(
+          `DELETE FROM guild_permission_seeds
+            WHERE guild_id = ? AND permission_key IN (${platzhalter})`,
+          [guildId, ...permKeys]
+        );
+        seedsCleared = seedErgebnis?.affectedRows || 0;
+      }
+
+      // Cache für die Guild invalidieren (Rechte haben sich geändert)
       this.invalidateGuildCache(guildId);
-      
+
       this.logger.success(
-        `[PermissionManager] Unregistered plugin "${pluginName}": ` +
-        `${permissionsDeleted} permissions deleted from registry, ` +
-        `${groupAssignmentsDeleted} group assignments cleaned up`
+        `[PermissionManager] "${pluginName}" in Guild ${guildId} zurückgenommen: ` +
+        `${groupAssignmentsDeleted} Gruppenzuweisung(en) entfernt, ` +
+        `${seedsCleared} Merkposten geleert, Katalog unverändert (${permKeys.length} Schlüssel)`
       );
       
-      return { permissionsDeleted, groupAssignmentsDeleted };
+      return { permissionKeys: permKeys.length, groupAssignmentsDeleted, seedsCleared };
       
     } catch (error) {
       this.logger.error(`[PermissionManager] Failed to unregister plugin "${pluginName}":`, error);

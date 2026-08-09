@@ -324,9 +324,13 @@ class DashboardPlugin {
                 guildId
             );
             
+            // Die Meldung nannte bis zum 2026-08-09 `result.permissionsDeleted`
+            // und `result.groupsUpdated` — beides gibt es nicht, sie stand
+            // also immer mit zweimal `undefined` im Protokoll.
             Logger.success(
-                `[Plugin ${this.name}] Unregistered permissions for guild ${guildId}: ` +
-                `${result.permissionsDeleted} deleted, ${result.groupsUpdated} groups updated`
+                `[Plugin ${this.name}] Rechte in Guild ${guildId} zurückgenommen: ` +
+                `${result.groupAssignmentsDeleted} Gruppenzuweisung(en), ` +
+                `${result.seedsCleared} Merkposten`
             );
         } catch (error) {
             Logger.error(`[Plugin ${this.name}] Failed to unregister permissions for guild ${guildId}:`, error);
