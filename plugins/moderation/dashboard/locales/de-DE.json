@@ -75,13 +75,11 @@
   },
   "CHANNEL_RULES": {
     "TITLE": "Channel-spezifische Regeln",
-    "DESC": "Definiere abweichende Moderations-Einstellungen für einzelne Channels. Hier kannst du z.B. in Meme-Channels lockerere Regeln setzen oder Channels vom AutoMod ausnehmen.",
+    "DESC": "Definiere abweichende Warn-Grenzen für einzelne Channels, zum Beispiel lockerere Regeln in Meme-Channels.",
     "ADD_TITLE": "Channel-Regel hinzufügen",
     "CHANNEL": "Channel",
     "WARN_LIMIT": "Max. Warns",
     "WARN_ACTION": "Aktion",
-    "AUTOMOD_EXEMPT": "AutoMod",
-    "EXEMPT": "Ausgenommen",
     "NOTES": "Notiz",
     "NOTES_PLACEHOLDER": "Optionale Notiz zur Regel...",
     "BTN_ADD": "Hinzufügen",
@@ -91,7 +89,8 @@
     "BTN_DELETE": "Regel löschen",
     "BADGE_LIMIT": "Ab {{limit}} Verwarnungen → {{aktion}}",
     "DEFAULT_ACTION": "Standardaktion",
-    "EMPTY_HINT": "Ohne eigene Regel gelten überall die Grundeinstellungen."
+    "EMPTY_HINT": "Ohne eigene Regel gelten überall die Grundeinstellungen.",
+    "AUTOMOD_HINT": "Kanäle vom AutoMod auszunehmen geht nicht hier, sondern unter AutoMod → Ausnahmen. Dort steht die einzige Stelle dafür."
   },
   "NOTES": {
     "TITLE": "Moderator-Notizen",

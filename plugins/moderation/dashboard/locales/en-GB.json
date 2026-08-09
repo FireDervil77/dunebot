@@ -75,13 +75,11 @@
   },
   "CHANNEL_RULES": {
     "TITLE": "Channel-specific Rules",
-    "DESC": "Define different moderation settings for individual channels. For example, set relaxed rules in meme channels or exempt channels from AutoMod.",
+    "DESC": "Define different warn limits for individual channels, for example looser rules in meme channels.",
     "ADD_TITLE": "Add Channel Rule",
     "CHANNEL": "Channel",
     "WARN_LIMIT": "Max Warns",
     "WARN_ACTION": "Action",
-    "AUTOMOD_EXEMPT": "AutoMod",
-    "EXEMPT": "Exempt",
     "NOTES": "Note",
     "NOTES_PLACEHOLDER": "Optional note about this rule...",
     "BTN_ADD": "Add",
@@ -91,7 +89,8 @@
     "BTN_DELETE": "Delete rule",
     "BADGE_LIMIT": "From {{limit}} warnings → {{aktion}}",
     "DEFAULT_ACTION": "default action",
-    "EMPTY_HINT": "Without a specific rule, the basic settings apply everywhere."
+    "EMPTY_HINT": "Without a specific rule, the basic settings apply everywhere.",
+    "AUTOMOD_HINT": "Exempting channels from AutoMod is not done here but under AutoMod → Exemptions. That is the single place for it."
   },
   "NOTES": {
     "TITLE": "Moderator Notes",

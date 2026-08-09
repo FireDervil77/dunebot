@@ -25,11 +25,6 @@
   };
   const zeichen = (kanal) => kanalZeichen[kanal.typeName] || '#';
 
-  const whitelistIds = settings.whitelisted_channels
-    ? (Array.isArray(settings.whitelisted_channels)
-        ? settings.whitelisted_channels.map(String)
-        : (() => { try { return JSON.parse(settings.whitelisted_channels || '[]').map(String); } catch { return []; } })())
-    : [];
 %>
 
 <div class="row row-cards">
@@ -132,53 +127,12 @@
   </div>
 </div>
 
-<!-- Whitelist der Channels (Teil der Einstellungen) -->
-<form class="guild-ajax-form mt-3"
-      data-automod-form
-      data-form-type="automod-whitelist"
-      data-method="PUT"
-      action="/guild/<%= guildId %>/plugins/automod/settings"
-      method="POST">
+<%#
+  Hier stand bis zum 2026-08-09 eine zweite Karte: die "Whitelist der Channels"
+  aus `automod_settings.whitelisted_channels`. Sie tat fuer Kanaele exakt
+  dasselbe wie die Ausnahmen darueber - zwei Wege auf derselben Seite, ohne
+  einen Hinweis, welcher der richtige ist.
 
-  <div class="card">
-    <div class="card-header">
-      <h3 class="card-title">
-        <i class="fa-solid fa-list-check me-2"></i>
-        <%= tr('automod:SETTINGS.WHITELISTED_CHANNELS.LABEL') %>
-      </h3>
-    </div>
-    <div class="card-body">
-      <% if (guildChannels && guildChannels.length > 0) { %>
-        <select class="form-select automod-kanalauswahl" id="whitelisted_channels"
-                name="whitelisted_channels" multiple size="10">
-          <%
-            let kategorie = null;
-            guildChannels.forEach(channel => {
-              if (channel.parentName && channel.parentName !== kategorie) {
-                kategorie = channel.parentName;
-          %>
-            <option disabled>── <%= kategorie %> ──</option>
-          <%  }
-              const gewaehlt = whitelistIds.includes(String(channel.id));
-          %>
-            <option value="<%= channel.id %>" <%= gewaehlt ? 'selected' : '' %>>
-              <%= channel.parentName ? '   ' : '' %><%= zeichen(channel) %> <%= channel.name %>
-            </option>
-          <% }); %>
-        </select>
-        <div class="form-hint"><%= tr('automod:SETTINGS.WHITELISTED_CHANNELS.HELP') %></div>
-      <% } else { %>
-        <div class="alert alert-warning mb-0" role="alert">
-          <i class="fa-solid fa-triangle-exclamation me-2"></i>
-          <%= tr('automod:SETTINGS.WHITELISTED_CHANNELS.NO_CHANNELS') %>
-        </div>
-      <% } %>
-    </div>
-    <div class="card-footer">
-      <button type="submit" class="btn btn-primary">
-        <i class="fa-solid fa-floppy-disk me-2"></i>
-        <%= tr('automod:SETTINGS.SAVE_BUTTON') %>
-      </button>
-    </div>
-  </div>
-</form>
+  Der Inhalt ist in `automod_exemptions` uebernommen, die Spalte ist weg.
+  Kanalausnahmen stehen jetzt an genau einer Stelle: oben.
+%>

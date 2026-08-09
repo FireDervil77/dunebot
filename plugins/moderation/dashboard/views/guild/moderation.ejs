@@ -1,3 +1,15 @@
+<%#
+  ACHTUNG: Diese Seite hat seit dem Umbau vom 2026-08-07 keine Route mehr - sie
+  ist der Rest der alten Ein-Seiten-Ansicht. Sie wird hier trotzdem
+  mitgepflegt, solange sie im Baum liegt: Ein Feld, das auf entfernte
+  Uebersetzungsschluessel zeigt, wuerde beim Wiederbeleben rohe Schluessel
+  anzeigen.
+
+  Am 2026-08-09 entfernt: der Schalter "AutoMod: ausgenommen". Er hat nie
+  gewirkt, kein Bot-Prozess hat `moderation_channel_rules` je gelesen.
+  Kanalausnahmen stehen jetzt an einer Stelle, auf der Ausnahmeseite von
+  AutoMod.
+%>
 <!-- Moderation Plugin Settings Page - Tab-System -->
 <%# Kein eigener Seitenrahmen: den stellt das Layout des Themes. %>
   <div class="row">
@@ -363,13 +375,6 @@
                         <option value="BAN">BAN</option>
                       </select>
                     </div>
-                    <div class="col-md-2 mb-3">
-                      <label class="form-label"><%= tr('moderation:CHANNEL_RULES.AUTOMOD_EXEMPT') %></label>
-                      <div class="form-check form-switch mt-2">
-                        <input type="checkbox" class="form-check-input" id="crAutomodExempt">
-                        <label class="form-check-label" for="crAutomodExempt"><%= tr('moderation:CHANNEL_RULES.EXEMPT') %></label>
-                      </div>
-                    </div>
                     <div class="col-md-2 mb-3 d-flex align-items-end">
                       <button type="button" class="btn btn-success w-100" onclick="addChannelRule()">
                         <i class="fa-solid fa-plus me-1"></i> <%= tr('moderation:CHANNEL_RULES.BTN_ADD') %>
@@ -396,9 +401,6 @@
                         <strong><i class="fa-solid fa-hashtag text-primary me-1"></i><%= ch ? ch.name : rule.channel_id %></strong>
                         <% if (rule.max_warn_limit !== null) { %>
                           <span class="badge bg-warning ms-2">Max <%= rule.max_warn_limit %> Warns → <%= rule.max_warn_action || 'Standard' %></span>
-                        <% } %>
-                        <% if (rule.automod_exempt) { %>
-                          <span class="badge bg-info ms-1">AutoMod Exempt</span>
                         <% } %>
                         <% if (rule.notes) { %>
                           <br><small class="text-secondary"><%= rule.notes %></small>
@@ -748,7 +750,6 @@
       channel_id: channelId,
       max_warn_limit: document.getElementById('crWarnLimit').value || null,
       max_warn_action: document.getElementById('crWarnAction').value || null,
-      automod_exempt: document.getElementById('crAutomodExempt').checked,
       notes: document.getElementById('crNotes').value || null
     };
     

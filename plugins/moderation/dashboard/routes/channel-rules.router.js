@@ -24,19 +24,30 @@ router.get('/', requirePermission('MODERATION.VIEW'), async (req, res) => {
     }
 });
 
+/**
+ * Kanalregel anlegen oder aendern.
+ *
+ * `automod_exempt` ist am 2026-08-09 entfallen. Das Feld hat nie gewirkt -
+ * kein Bot-Prozess hat diese Tabelle je gelesen -, und Kanalausnahmen stehen
+ * jetzt an einer Stelle, auf der Ausnahmeseite von AutoMod. Vorhandene
+ * Eintraege sind dorthin uebernommen worden.
+ *
+ * `max_warn_limit` und `max_warn_action` bleiben. Auch sie werden bisher von
+ * niemandem ausgewertet - das ist aber keine Ausnahme-Frage, sondern eine
+ * eigene, nie gebaute Funktion der Moderation und als eigener Punkt vermerkt.
+ */
 router.post('/', requirePermission('MODERATION.CHANNEL.RULES.MANAGE'), async (req, res) => {
-    const { channel_id, max_warn_limit, max_warn_action, automod_exempt, notes } = req.body;
+    const { channel_id, max_warn_limit, max_warn_action, notes } = req.body;
     if (!channel_id) return res.status(400).json({ success: false, error: 'channel_id ist erforderlich' });
 
     try {
         await ServiceManager.get('dbService').query(`
             INSERT INTO moderation_channel_rules
-                (guild_id, channel_id, max_warn_limit, max_warn_action, automod_exempt, notes)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (guild_id, channel_id, max_warn_limit, max_warn_action, notes)
+            VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 max_warn_limit  = VALUES(max_warn_limit),
                 max_warn_action = VALUES(max_warn_action),
-                automod_exempt  = VALUES(automod_exempt),
                 notes           = VALUES(notes),
                 updated_at      = NOW()
         `, [
@@ -44,7 +55,6 @@ router.post('/', requirePermission('MODERATION.CHANNEL.RULES.MANAGE'), async (re
             channel_id,
             max_warn_limit ? parseInt(max_warn_limit, 10) : null,
             max_warn_action || null,
-            automod_exempt ? 1 : 0,
             notes ? String(notes).substring(0, 500) : null
         ]);
         res.json({ success: true });

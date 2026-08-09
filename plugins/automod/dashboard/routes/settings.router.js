@@ -94,9 +94,6 @@ router.put('/', requirePermission('AUTOMOD.SETTINGS.EDIT'), async (req, res) => 
         if (b.max_role_mentions !== undefined) updates.max_role_mentions = zuZahl(b.max_role_mentions, 0);
 
         // --- Ausnahmen ---
-        if (b.whitelisted_channels !== undefined) {
-            updates.whitelisted_channels = zuListe(b.whitelisted_channels);
-        }
 
         // --- Stichwortlisten ---
         // Wird als JSON-Text gespeichert. Das Formular schickt das Feld nur auf

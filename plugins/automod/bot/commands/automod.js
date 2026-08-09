@@ -1,7 +1,7 @@
 const { ApplicationCommandOptionType } = require("discord.js");
 const { EmbedUtils } = require("dunebot-sdk/utils");
 const { stripIndent } = require("common-tags");
-const { AutoModSettings } = require("../../shared/models");
+const { AutoModSettings, AutoModExemptions } = require("../../shared/models");
 const { KanalTypen } = require("dunebot-core");
 
 /**
@@ -222,21 +222,21 @@ module.exports = {
 
         // whitelist
         else if (input === "whitelist") {
-            response = getWhitelist(message.guild, settings);
+            response = await getWhitelist(message.guild);
         }
 
         // whitelist add
         else if (input === "whitelistadd") {
             const match = message.guild.findMatchingChannels(args[1]);
             if (!match.length) return message.reply(`No channel found matching ${args[1]}`);
-            response = await whiteListAdd(settings, match[0].id, message.guild);
+            response = await whiteListAdd(match[0].id, message.guild);
         }
 
         // whitelist remove
         else if (input === "whitelistremove") {
             const match = message.guild.findMatchingChannels(args[1]);
             if (!match.length) return message.reply(`No channel found matching ${args[1]}`);
-            response = await whiteListRemove(settings, match[0].id, message.guild);
+            response = await whiteListRemove(match[0].id, message.guild);
         }
 
         //
@@ -274,13 +274,13 @@ module.exports = {
             const channel = interaction.options.getChannel("channel");
             response = await setChannel(channel, settings, interaction.guild);
         } else if (sub === "whitelist") {
-            response = getWhitelist(interaction.guild, settings);
+            response = await getWhitelist(interaction.guild);
         } else if (sub === "whitelistadd") {
             const channelId = interaction.options.getChannel("channel").id;
-            response = await whiteListAdd(settings, channelId, interaction.guild);
+            response = await whiteListAdd(channelId, interaction.guild);
         } else if (sub === "whitelistremove") {
             const channelId = interaction.options.getChannel("channel").id;
-            response = await whiteListRemove(settings, channelId, interaction.guild);
+            response = await whiteListRemove(channelId, interaction.guild);
         } else if (sub === "unlock") {
             response = await unlockServer(settings, interaction.guild);
         } else response = interaction.guild.getT("INVALID_SUBCOMMAND", { sub });
@@ -387,13 +387,22 @@ async function setChannel(targetChannel, settings, guild) {
         : guild.getT("automod:AUTOMOD.LOG_CHANNEL_RESET");
 }
 
-function getWhitelist(guild, settings) {
-    const whitelist = settings.whitelisted_channels;
-    if (!whitelist || !whitelist.length) return guild.getT("automod:AUTOMOD.WHITELIST_NONE");
+/**
+ * Die Whitelist-Befehle schrieben bis zum 2026-08-09 in die JSON-Spalte
+ * `automod_settings.whitelisted_channels`. Die gibt es nicht mehr: Kanal-
+ * ausnahmen stehen jetzt an einer Stelle, in `automod_exemptions`. Vorher
+ * waren es drei Wege, von denen zwei dasselbe taten und einer gar nichts.
+ *
+ * Die Befehle heissen weiter `whitelistadd` und `whitelistremove` — sie stehen
+ * in Anleitungen und in der Gewohnheit der Nutzer.
+ */
+async function getWhitelist(guild) {
+    const ausnahmen = await AutoModExemptions.getByType(guild.id, "channel");
+    if (!ausnahmen || !ausnahmen.length) return guild.getT("automod:AUTOMOD.WHITELIST_NONE");
 
     const channels = [];
-    for (const channelId of whitelist) {
-        const channel = guild.channels.cache.get(channelId);
+    for (const { target_id } of ausnahmen) {
+        const channel = guild.channels.cache.get(target_id);
         if (!channel) continue;
         channels.push(channel.toString());
     }
@@ -401,19 +410,19 @@ function getWhitelist(guild, settings) {
     return guild.getT("automod:AUTOMOD.WHITELIST_LIST", { channels: channels.join(", ") });
 }
 
-async function whiteListAdd(settings, channelId, guild) {
-    if (settings.whitelisted_channels.includes(channelId))
+async function whiteListAdd(channelId, guild) {
+    if (await AutoModExemptions.isExempt(guild.id, "channel", channelId))
         return guild.getT("automod:AUTOMOD.WHITELIST_ALREADY");
-    const updated = [...settings.whitelisted_channels, channelId];
-    await AutoModSettings.updateSettings(guild.id, { whitelisted_channels: updated });
+
+    await AutoModExemptions.add(guild.id, "channel", channelId);
     return guild.getT("automod:AUTOMOD.WHITELIST_ADDED");
 }
 
-async function whiteListRemove(settings, channelId, guild) {
-    if (!settings.whitelisted_channels.includes(channelId))
+async function whiteListRemove(channelId, guild) {
+    if (!await AutoModExemptions.isExempt(guild.id, "channel", channelId))
         return guild.getT("automod:AUTOMOD.WHITELIST_NOT");
-    const updated = settings.whitelisted_channels.filter(id => id !== channelId);
-    await AutoModSettings.updateSettings(guild.id, { whitelisted_channels: updated });
+
+    await AutoModExemptions.removeByTarget(guild.id, "channel", channelId);
     return guild.getT("automod:AUTOMOD.WHITELIST_REMOVED");
 }
 

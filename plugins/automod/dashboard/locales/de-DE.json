@@ -94,11 +94,6 @@
       "LABEL": "Maximale User-Mentions",
       "HELP": "Maximale Anzahl erlaubter User-Mentions (0 = unbegrenzt)"
     },
-    "WHITELISTED_CHANNELS": {
-      "LABEL": "Whitelisted Channels",
-      "HELP": "Channels, in denen AutoMod nicht aktiv ist (Strg+Klick für Mehrfachauswahl)",
-      "NO_CHANNELS": "Keine Channels verfügbar"
-    },
     "SAVE_BUTTON": "Einstellungen speichern",
     "INFO": {
       "TITLE": "Info",
@@ -155,12 +150,6 @@
     "LIMITS": {
       "TITLE": "Limits",
       "SUBTITLE": "Schwellenwerte & Grenzen"
-    },
-    "WHITELIST": {
-      "TITLE": "Whitelisting",
-      "SUBTITLE": "Ausnahmen & Exemptions",
-      "ROLE_WHITELIST_TITLE": "Rollen-Whitelist",
-      "ROLE_WHITELIST_DESC": "Bald verfügbar: Bestimmte Rollen von AutoMod ausschließen (z.B. Moderatoren, Trusted Members)"
     },
     "RAID": {
       "TITLE": "Raid-Schutz",

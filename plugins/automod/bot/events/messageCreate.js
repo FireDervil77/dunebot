@@ -55,9 +55,13 @@ module.exports = async (message) => {
         kanalIds.push(message.channel.parentId);
     }
 
-    if (kanalIds.some(id => settings.whitelisted_channels.includes(id))) return;
-
-    // Exemption-Check: Channels und Rollen
+    // Ausnahmen: Kanaele und Rollen.
+    //
+    // Bis zum 2026-08-09 stand hier zusaetzlich eine Pruefung auf
+    // `settings.whitelisted_channels` - eine JSON-Spalte, die fuer Kanaele
+    // exakt dasselbe tat wie die Ausnahmen darunter. Zwei Wege, kein Hinweis,
+    // welcher der richtige ist. Der Inhalt ist in `automod_exemptions`
+    // uebernommen, die Spalte ist weg.
     try {
         const [kanalAusnahmen, memberExempt] = await Promise.all([
             Promise.all(kanalIds.map(id => AutoModExemptions.isExempt(message.guild.id, 'channel', id))),

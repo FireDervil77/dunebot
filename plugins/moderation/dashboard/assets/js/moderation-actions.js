@@ -97,7 +97,6 @@
             channel_id: kanal,
             max_warn_limit: document.getElementById('crWarnLimit')?.value || null,
             max_warn_action: document.getElementById('crWarnAction')?.value || null,
-            automod_exempt: document.getElementById('crAutomodExempt')?.checked ? 1 : 0,
             notes: document.getElementById('crNotes')?.value || null
         })
             .then(function () { window.location.reload(); })

@@ -98,11 +98,6 @@
       "LABEL": "Maximum Role Mentions",
       "HELP": "Maximum allowed role mentions (0 = unlimited)"
     },
-    "WHITELISTED_CHANNELS": {
-      "LABEL": "Whitelisted Channels",
-      "HELP": "Channels where AutoMod is not active (Ctrl+Click for multi-select)",
-      "NO_CHANNELS": "No channels available"
-    },
     "SAVE_BUTTON": "Save Settings",
     "INFO": {
       "TITLE": "Info",
@@ -155,12 +150,6 @@
     "LIMITS": {
       "TITLE": "Limits",
       "SUBTITLE": "Thresholds & Boundaries"
-    },
-    "WHITELIST": {
-      "TITLE": "Whitelisting",
-      "SUBTITLE": "Exceptions & Exemptions",
-      "ROLE_WHITELIST_TITLE": "Role Whitelist",
-      "ROLE_WHITELIST_DESC": "Coming soon: Exclude specific roles from AutoMod (e.g. Moderators, Trusted Members)"
     },
     "RAID": {
       "TITLE": "Raid Protection",

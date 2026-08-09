@@ -60,10 +60,20 @@
           </div>
         </div>
 
-        <label class="form-check form-switch mb-3">
-          <input type="checkbox" class="form-check-input" id="crAutomodExempt">
-          <span class="form-check-label"><%= tr('moderation:CHANNEL_RULES.AUTOMOD_EXEMPT') %></span>
-        </label>
+        <%#
+          Hier stand bis zum 2026-08-09 ein Schalter "AutoMod: ausgenommen".
+          Er hat nie gewirkt: kein Bot-Prozess hat `moderation_channel_rules`
+          je gelesen. Wer die Ausnahme hier setzte, bekam nichts - ohne jede
+          Rueckmeldung.
+
+          Kanalausnahmen stehen jetzt an genau einer Stelle, auf der
+          Ausnahmeseite von AutoMod. Vorhandene Eintraege sind dorthin
+          uebernommen worden und wirken damit zum ersten Mal.
+        %>
+        <div class="alert alert-info" role="alert">
+          <i class="fa-solid fa-circle-info me-2"></i>
+          <%= tr('moderation:CHANNEL_RULES.AUTOMOD_HINT') %>
+        </div>
 
         <div class="mb-3">
           <label for="crNotes" class="form-label"><%= tr('moderation:CHANNEL_RULES.NOTES') %></label>
@@ -105,9 +115,6 @@
                               aktion: regel.max_warn_action || tr('moderation:CHANNEL_RULES.DEFAULT_ACTION')
                             }) %>
                       </span>
-                    <% } %>
-                    <% if (regel.automod_exempt) { %>
-                      <span class="badge bg-blue-lt ms-1"><%= tr('moderation:CHANNEL_RULES.EXEMPT') %></span>
                     <% } %>
                   </div>
                   <% if (regel.notes) { %>
