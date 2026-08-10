@@ -193,8 +193,17 @@ class DiscordRoleMenus {
 
         // Ans Ende einsortieren. `MAX(position) + 1` statt `COUNT(*)`, damit
         // Löcher nach dem Löschen keine doppelten Positionen erzeugen.
+        //
+        // Die Addition passiert in SQL, nicht in JavaScript — und das ist keine
+        // Geschmacksfrage. MariaDB gibt `COALESCE(MAX(position), -1)` als
+        // **Zeichenkette** zurück ("-1", nicht -1), weil der Ausdruck kein
+        // reiner Spaltenwert mehr ist. In JavaScript ist `"-1" + 1` dann nicht
+        // 0, sondern "-11" — und das ging in eine `smallint unsigned`-Spalte.
+        //
+        // Getroffen hat es jedes leere Menü, also jeden allerersten Eintrag:
+        // "Out of range value for column 'position'".
         const [letzte] = await dbService.query(
-            'SELECT COALESCE(MAX(position), -1) AS p FROM discord_role_menu_options WHERE menu_id = ?',
+            'SELECT COALESCE(MAX(position) + 1, 0) AS p FROM discord_role_menu_options WHERE menu_id = ?',
             [menuId]
         ) || [];
 
@@ -209,7 +218,9 @@ class DiscordRoleMenus {
             felder.label || null,
             felder.description || null,
             felder.stil || 'grau',
-            (letzte?.p ?? -1) + 1
+            // `Number(...)` bleibt als Gürtel zum Hosenträger: die Spalte ist
+            // unsigned, und eine Zeichenkette darf hier nie wieder ankommen.
+            Number(letzte?.p ?? 0)
         ]);
 
         return ergebnis.insertId;
