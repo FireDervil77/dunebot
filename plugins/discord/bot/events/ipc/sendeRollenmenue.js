@@ -62,6 +62,17 @@ module.exports = async (payload, discordClient) => {
         return { ok: false, fehler: `Ich darf in #${channel.name} keine Reaktionen setzen.` };
     }
 
+    // Eine fremde Nachricht lässt sich nicht bearbeiten — Discord erlaubt das
+    // nur beim eigenen Autor. Deshalb gehen dort ausschliesslich Reaktionen,
+    // und das muss gesagt werden, bevor irgendetwas passiert.
+    if (menu.fremde_nachricht && menu.darstellung !== 'reaktion') {
+        return {
+            ok: false,
+            fehler: 'An einer fremden Nachricht sind nur Reaktionen möglich. '
+                  + 'Knöpfe und Auswahllisten gehören zur Nachricht selbst, und die kann ich nicht ändern.'
+        };
+    }
+
     const inhalt = baueNachricht(menu, guild);
 
     try {
@@ -72,8 +83,24 @@ module.exports = async (payload, discordClient) => {
             nachricht = await channel.messages.fetch(menu.message_id).catch(() => null);
         }
 
-        if (nachricht) {
+        if (nachricht && menu.fremde_nachricht) {
+            // Text und Einbettung bleiben, wie ihr Verfasser sie geschrieben
+            // hat. Nur die Reaktionen darunter gehören uns.
+            neu = false;
+        } else if (nachricht) {
             await nachricht.edit(inhalt);
+        } else if (menu.fremde_nachricht) {
+            // Die verknüpfte fremde Nachricht ist weg. Eine eigene an ihrer
+            // Stelle zu senden wäre eine Überraschung — die Verknüpfung wird
+            // gelöst und der Fall gemeldet.
+            await DiscordRoleMenus.updateMenu(guildId, menu.id, {
+                message_id: null,
+                fremde_nachricht: false
+            });
+            return {
+                ok: false,
+                fehler: 'Die verknüpfte Nachricht gibt es nicht mehr. Die Verknüpfung wurde gelöst.'
+            };
         } else {
             nachricht = await channel.send(inhalt);
             neu = true;
@@ -104,9 +131,19 @@ module.exports = async (payload, discordClient) => {
 /**
  * Die Reaktionen unter die Nachricht setzen.
  *
- * Bei einer aktualisierten Nachricht werden vorhandene Reaktionen des Bots
- * zuerst entfernt — sonst bleibt das Emoji eines gelöschten Eintrags für immer
- * unter der Nachricht stehen und sieht aus, als täte es noch etwas.
+ * ## Warum hier nicht `removeAll()` steht
+ *
+ * Die naheliegende Lösung wäre, vor dem Setzen alle Reaktionen abzuräumen.
+ * Das tut aber genau das, was es sagt: es löscht **alle** Reaktionen, auch die
+ * von Mitgliedern. Bei einer eigenen, frisch gesendeten Menü-Nachricht ist das
+ * folgenlos. Bei einer **fremden** Nachricht — dem Regelwerk, unter dem seit
+ * Monaten Daumen und Herzen stehen — ist es ein Eingriff, den niemand
+ * bestellt hat und der sich nicht rückgängig machen lässt.
+ *
+ * Deshalb wird nur entfernt, was der Bot selbst gesetzt hat, und auch das nur
+ * für Emojis, die nicht mehr im Menü stehen. Ein Emoji, das bleibt, bleibt
+ * auch unter der Nachricht — samt der Mitglieder, die schon darauf gedrückt
+ * haben.
  *
  * @param {import('discord.js').Message} nachricht
  * @param {Object} menu
@@ -115,13 +152,20 @@ module.exports = async (payload, discordClient) => {
  */
 async function setzeReaktionen(nachricht, menu, neu) {
     const emojis = reaktionsEmojis(menu);
-    if (emojis.length === 0) {
-        if (!neu) await nachricht.reactions.removeAll().catch(() => {});
-        return [];
-    }
+    const ich = nachricht.client.user.id;
 
     if (!neu) {
-        await nachricht.reactions.removeAll().catch(() => {});
+        // Eigene Reaktionen abräumen, die nicht mehr ins Menü gehören.
+        for (const reaktion of nachricht.reactions.cache.values()) {
+            const kennung = reaktion.emoji.id
+                ? `<${reaktion.emoji.animated ? 'a' : ''}:${reaktion.emoji.name}:${reaktion.emoji.id}>`
+                : reaktion.emoji.name;
+
+            if (emojis.includes(kennung)) continue;
+            if (!reaktion.me) continue;
+
+            await reaktion.users.remove(ich).catch(() => {});
+        }
     }
 
     const uebersprungen = [];

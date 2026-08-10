@@ -196,6 +196,21 @@ router.put('/:menuId', requirePermission('DISCORD.ROLEMENUS.MANAGE'), async (req
     if (req.body?.enabled !== undefined) felder.enabled = Boolean(req.body.enabled);
 
     try {
+        // Hängt das Menü an einer fremden Nachricht, ist die Darstellung nicht
+        // frei: Knöpfe und Auswahllisten gehören zur Nachricht, und die kann
+        // der Bot nicht ändern. Beim Senden käme sonst eine Absage — hier ist
+        // sie am richtigen Ort, nämlich beim Umstellen.
+        if (felder.darstellung && felder.darstellung !== 'reaktion') {
+            const vorher = await DiscordRoleMenus.getMenu(guildId, menuId);
+            if (vorher?.fremde_nachricht) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Dieses Menü hängt an einer fremden Nachricht — dort sind nur Reaktionen möglich. '
+                           + 'Löse erst die Verknüpfung.'
+                });
+            }
+        }
+
         // Der Wechsel auf `reaktion` setzt Emojis voraus — ohne sie gäbe es
         // nichts zum Anklicken, und das Menü wäre eine Nachricht ohne Funktion.
         if (felder.darstellung === 'reaktion') {
@@ -337,6 +352,98 @@ router.put('/:menuId/reihenfolge', requirePermission('DISCORD.ROLEMENUS.MANAGE')
         return res.json({ success: true, geaendert });
     } catch (error) {
         return fehler(res, error, 'Die Reihenfolge konnte nicht gespeichert werden');
+    }
+});
+
+// ── Bestehende Nachricht verknüpfen ──────────────────────────────────────
+
+router.post('/:menuId/nachricht', requirePermission('DISCORD.ROLEMENUS.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const menuId = Number(req.params.menuId);
+    const eingabe = String(req.body?.eingabe || '').trim();
+
+    if (!Number.isInteger(menuId)) {
+        return res.status(400).json({ success: false, message: 'Ungültige Menü-ID' });
+    }
+    if (!eingabe) {
+        return res.status(400).json({ success: false, message: 'Bitte eine Nachrichten-ID oder einen Link angeben' });
+    }
+
+    try {
+        const menu = await DiscordRoleMenus.getMenu(guildId, menuId);
+        if (!menu) {
+            return res.status(404).json({ success: false, message: 'Menü nicht gefunden' });
+        }
+        if (menu.message_id) {
+            return res.status(409).json({
+                success: false,
+                message: 'Dieses Menü hängt bereits an einer Nachricht. Erst die Verknüpfung lösen.'
+            });
+        }
+
+        const antwort = await fragBot('discord:pruefeNachricht', { guildId, eingabe });
+        if (!antwort) {
+            return res.status(503).json({ success: false, message: 'Der Bot antwortet nicht. Läuft er?' });
+        }
+        if (!antwort.ok) {
+            return res.status(400).json({ success: false, message: antwort.fehler });
+        }
+
+        // An einer fremden Nachricht gehen nur Reaktionen. Statt das Verknüpfen
+        // abzulehnen, wird die Darstellung mit umgestellt und gesagt, dass es
+        // geschehen ist — abgelehnt zu werden ohne Ausweg hilft niemandem.
+        const felder = {
+            message_id: antwort.messageId,
+            channel_id: antwort.channelId,
+            fremde_nachricht: !antwort.vomBot
+        };
+
+        let umgestellt = false;
+        if (!antwort.vomBot && menu.darstellung !== 'reaktion') {
+            felder.darstellung = 'reaktion';
+            umgestellt = true;
+        }
+
+        await DiscordRoleMenus.updateMenu(guildId, menuId, felder);
+
+        return res.json({
+            success: true,
+            vomBot: antwort.vomBot,
+            umgestellt,
+            channelName: antwort.channelName,
+            vorschau: antwort.vorschau,
+            url: antwort.url
+        });
+    } catch (error) {
+        return fehler(res, error, 'Die Nachricht konnte nicht verknüpft werden');
+    }
+});
+
+router.delete('/:menuId/nachricht', requirePermission('DISCORD.ROLEMENUS.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const menuId = Number(req.params.menuId);
+
+    if (!Number.isInteger(menuId)) {
+        return res.status(400).json({ success: false, message: 'Ungültige Menü-ID' });
+    }
+
+    try {
+        // Nur die Verknüpfung wird gelöst. Die Nachricht bleibt, wo sie ist —
+        // besonders bei einer fremden wäre alles andere ein Übergriff. Die
+        // Reaktionen des Bots bleiben ebenfalls stehen; sie wirken nicht mehr,
+        // und sie ungefragt abzuräumen hiesse, in einem fremden Kanal
+        // aufzuräumen.
+        const geaendert = await DiscordRoleMenus.updateMenu(guildId, menuId, {
+            message_id: null,
+            fremde_nachricht: false
+        });
+
+        if (!geaendert) {
+            return res.status(404).json({ success: false, message: 'Menü nicht gefunden' });
+        }
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Die Verknüpfung konnte nicht gelöst werden');
     }
 });
 

@@ -125,7 +125,20 @@
     "BUTTON_GREY": "Grey",
     "BUTTON_BLUE": "Blue",
     "BUTTON_GREEN": "Green",
-    "BUTTON_RED": "Red"
+    "BUTTON_RED": "Red",
+    "EXISTING_TITLE": "Existing message",
+    "EXISTING_DESC": "Instead of its own message, the menu can attach to one already in the channel — your rules post, for example.",
+    "EXISTING_PH": "Message link or ID",
+    "EXISTING_HINT": "In Discord: right-click the message → \"Copy Message Link\". With the link it is found reliably.",
+    "EXISTING_REQUIRED": "Please enter a message link or ID.",
+    "EXISTING_OWN": "Own message",
+    "EXISTING_FOREIGN": "Someone else's message",
+    "EXISTING_FOREIGN_HINT": "This message is not from the bot. Its text and embed stay untouched — only reactions are possible, no buttons.",
+    "SWITCHED_TO_REACTION": "The presentation was switched to reactions: buttons are not possible on someone else's message.",
+    "LINK": "Link message",
+    "UNLINK": "Unlink",
+    "UNLINK_HINT": "The message stays in the channel along with its reactions. It simply stops working.",
+    "UNLINK_CONFIRM": "Really unlink? The message stays in the channel but stops working."
   },
   "SAVE": "Save"
 }

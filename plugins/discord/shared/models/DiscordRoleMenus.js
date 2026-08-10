@@ -129,7 +129,8 @@ class DiscordRoleMenus {
         const dbService = ServiceManager.get('dbService');
 
         const erlaubt = ['channel_id', 'message_id', 'title', 'description', 'color',
-                         'darstellung', 'modus', 'min_auswahl', 'max_auswahl', 'enabled'];
+                         'darstellung', 'modus', 'min_auswahl', 'max_auswahl', 'enabled',
+                         'fremde_nachricht'];
         const teile = [];
         const werte = [];
 

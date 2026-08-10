@@ -141,6 +141,42 @@
         </button>
       </div>
     </div>
+
+    <!-- An eine bestehende Nachricht haengen -->
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-link me-2"></i><%= tr('discord:ROLEMENUS.EXISTING_TITLE') %></h3>
+      </div>
+      <div class="card-body">
+
+        <% if (menu.message_id) { %>
+          <div class="mb-3">
+            <% if (menu.fremde_nachricht) { %>
+              <span class="badge bg-azure-lt mb-2"><%= tr('discord:ROLEMENUS.EXISTING_FOREIGN') %></span>
+              <p class="text-secondary small mb-2"><%= tr('discord:ROLEMENUS.EXISTING_FOREIGN_HINT') %></p>
+            <% } else { %>
+              <span class="badge bg-green-lt mb-2"><%= tr('discord:ROLEMENUS.EXISTING_OWN') %></span>
+            <% } %>
+            <div class="text-secondary small font-monospace"><%= menu.message_id %></div>
+          </div>
+          <button class="btn btn-outline-danger w-100" id="knopfLoesen">
+            <i class="fa-solid fa-link-slash me-1"></i><%= tr('discord:ROLEMENUS.UNLINK') %>
+          </button>
+          <small class="form-hint d-block mt-2"><%= tr('discord:ROLEMENUS.UNLINK_HINT') %></small>
+
+        <% } else { %>
+          <p class="text-secondary small"><%= tr('discord:ROLEMENUS.EXISTING_DESC') %></p>
+          <div class="mb-2">
+            <input type="text" id="feldNachricht" class="form-control"
+                   placeholder="<%= tr('discord:ROLEMENUS.EXISTING_PH') %>">
+            <small class="form-hint"><%= tr('discord:ROLEMENUS.EXISTING_HINT') %></small>
+          </div>
+          <button class="btn btn-outline-primary w-100" id="knopfVerknuepfen">
+            <i class="fa-solid fa-link me-1"></i><%= tr('discord:ROLEMENUS.LINK') %>
+          </button>
+        <% } %>
+      </div>
+    </div>
   </div>
 
   <!-- Eintraege -->
@@ -349,6 +385,43 @@
       setTimeout(() => location.reload(), 700);
     }
   });
+
+  // ── Bestehende Nachricht ───────────────────────────────────────────
+
+  const knopfVerknuepfen = document.getElementById('knopfVerknuepfen');
+  if (knopfVerknuepfen) {
+    knopfVerknuepfen.addEventListener('click', async function () {
+      const eingabe = wert('feldNachricht');
+      if (!eingabe) {
+        const t = '<%= tr('discord:ROLEMENUS.EXISTING_REQUIRED') %>';
+        if (window.showToast) showToast(t, 'error'); else alert(t);
+        return;
+      }
+
+      const daten = await anfrage('/' + MENUE + '/nachricht', {
+        method: 'POST',
+        body: JSON.stringify({ eingabe })
+      });
+      if (!daten) return;
+
+      // Die Vorschau ist der eigentliche Nutzen der Rückmeldung: eine
+      // Nachrichten-ID sagt niemandem, ob es die richtige Nachricht war.
+      let text = '#' + daten.channelName + ' — „' + daten.vorschau + '"';
+      if (daten.umgestellt) text += '\n\n<%= tr('discord:ROLEMENUS.SWITCHED_TO_REACTION') %>';
+
+      alert(text);
+      location.reload();
+    });
+  }
+
+  const knopfLoesen = document.getElementById('knopfLoesen');
+  if (knopfLoesen) {
+    knopfLoesen.addEventListener('click', async function () {
+      if (!confirm('<%= tr('discord:ROLEMENUS.UNLINK_CONFIRM') %>')) return;
+      const daten = await anfrage('/' + MENUE + '/nachricht', { method: 'DELETE' });
+      if (daten) location.reload();
+    });
+  }
 
   // ── Einträge ───────────────────────────────────────────────────────
 

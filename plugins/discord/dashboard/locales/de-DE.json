@@ -125,7 +125,20 @@
     "BUTTON_GREY": "Grau",
     "BUTTON_BLUE": "Blau",
     "BUTTON_GREEN": "Grün",
-    "BUTTON_RED": "Rot"
+    "BUTTON_RED": "Rot",
+    "EXISTING_TITLE": "Bestehende Nachricht",
+    "EXISTING_DESC": "Statt einer eigenen Nachricht kann das Menü an einer Nachricht hängen, die schon im Kanal steht — etwa an eurem Regelwerk.",
+    "EXISTING_PH": "Nachrichtenlink oder ID",
+    "EXISTING_HINT": "In Discord: Rechtsklick auf die Nachricht → „Nachrichtenlink kopieren\". Mit dem Link wird sie sicher gefunden.",
+    "EXISTING_REQUIRED": "Bitte einen Nachrichtenlink oder eine ID angeben.",
+    "EXISTING_OWN": "Eigene Nachricht",
+    "EXISTING_FOREIGN": "Fremde Nachricht",
+    "EXISTING_FOREIGN_HINT": "Diese Nachricht stammt nicht vom Bot. Text und Einbettung bleiben unangetastet — nur Reaktionen sind möglich, keine Knöpfe.",
+    "SWITCHED_TO_REACTION": "Die Darstellung wurde auf Reaktionen umgestellt: An einer fremden Nachricht sind Knöpfe nicht möglich.",
+    "LINK": "Nachricht verknüpfen",
+    "UNLINK": "Verknüpfung lösen",
+    "UNLINK_HINT": "Die Nachricht bleibt im Kanal stehen, samt der gesetzten Reaktionen. Sie wirkt nur nicht mehr.",
+    "UNLINK_CONFIRM": "Verknüpfung wirklich lösen? Die Nachricht bleibt im Kanal, wirkt aber nicht mehr."
   },
   "SAVE": "Speichern"
 }
