@@ -62,7 +62,19 @@ async function behandleReaktion(reaction, user, aktion) {
             ? `<${reaction.emoji.animated ? 'a' : ''}:${reaction.emoji.name}:${reaction.emoji.id}>`
             : reaction.emoji.name;
 
-        const eintrag = menu.optionen.find(o => o.emoji === emoji);
+        // Der Vergleich muss den Variationsselektor U+FE0F wegräumen.
+        //
+        // Viele Zeichen gibt es in zwei Schreibweisen: `⚔` (U+2694) und `⚔️`
+        // (U+2694 U+FE0F). Was im Dashboard gespeichert wird, hängt davon ab,
+        // woher der Nutzer es kopiert hat; was Discord in `reaction.emoji.name`
+        // liefert, ist nicht immer dieselbe Form. Ein byte-genauer Vergleich
+        // trifft dann nicht — und weil es auf eine Reaktion keine Rückmeldung
+        // gibt, passiert kommentarlos gar nichts. Genau so gemeldet.
+        //
+        // Eigene Server-Emojis sind davon nicht betroffen, die hängen an der ID.
+        const schluessel = (wert) => String(wert || '').replace(/\uFE0F/g, '');
+
+        const eintrag = menu.optionen.find(o => schluessel(o.emoji) === schluessel(emoji));
         if (!eintrag) return;
 
         const alleRollen = menu.optionen.map(o => String(o.role_id));
