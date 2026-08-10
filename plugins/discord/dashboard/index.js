@@ -31,7 +31,11 @@ class DiscordPlugin extends DashboardPlugin {
             author: 'FireBot Team',
             icon: 'fa-brands fa-discord',
             baseDir: __dirname,
-            publicAssets: false
+            // Muss an sein, sonst reicht der Ausliefer-Handler in app.js den
+            // Pfad einfach durch und `/assets/plugins/discord/...` endet in
+            // einer 404 mit JSON-MIME — der Browser weigert sich dann, das
+            // Skript auszufuehren. Gebraucht seit der Emoji-Auswahl.
+            publicAssets: true
         });
 
         this.app = app;
