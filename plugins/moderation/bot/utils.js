@@ -619,48 +619,22 @@ module.exports = class ModUtils {
         }
     }
 
-    /**
-     * warns the target and logs to the database, channel
-     * @param {import('discord.js').GuildMember} issuer
-     * @param {import('discord.js').GuildMember} target
-     * @param {string} reason
-     */
-    static async warnTarget(issuer, target, reason) {
-        if (!memberInteract(issuer, target)) return "MEMBER_PERM";
-        if (!memberInteract(issuer.guild.members.me, target)) return "BOT_PERM";
-        const settings = await db.getSettings(issuer.guild);
-
-        try {
-            const effectiveReason = await getEffectiveReason(issuer.guild.id, reason);
-            const warnings = await db
-                .getModel("logs")
-                .find({
-                    guild_id: issuer.guild.id,
-                    member_id: target.id,
-                    type: "WARN",
-                    deleted: false,
-                })
-                .lean();
-            logModeration(issuer, target, effectiveReason, "Warn");
-            let warningCount = warnings?.length || 0;
-            warningCount += 1;
-
-            // check if max warnings are reached
-            if (warningCount >= settings.max_warn.limit) {
-                await ModUtils.addModAction(
-                    issuer.guild.members.me,
-                    target,
-                    "Max warnings reached",
-                    settings.max_warn.action,
-                ); // moderate
-            }
-
-            return true;
-        } catch (ex) {
-            Logger.error("warnTarget", ex);
-            return "ERROR";
-        }
-    }
+    //
+    // Hier stand bis zum 2026-08-09 eine zweite `warnTarget`-Fassung als
+    // statische Methode. Sie war nicht nur ungenutzt, sondern **unerreichbar**:
+    // `module.exports` ist diese Klasse, und weiter unten weist
+    // `module.exports.warnTarget = ...` dieselbe statische Eigenschaft neu zu.
+    // Die spaetere Zuweisung gewinnt, die Fassung hier wurde beim Laden
+    // ueberschrieben.
+    //
+    // Aufgefallen ist es niemandem, weil beide gleich hiessen und die richtige
+    // gewann. Inhaltlich war sie ohnehin tot: sie benutzte `db.getModel("logs")`
+    // und `settings.max_warn.limit` - Mongo-Formen aus dem alten FireBot, die
+    // zum heutigen `dbService` nicht passen. Haette die Ueberschreibung gefehlt,
+    // waere jede Verwarnung mit einer Ausnahme gescheitert.
+    //
+    // Geprueft: `warnTarget` war die einzige der 16 statischen Methoden dieser
+    // Klasse, die von einer spaeteren Zuweisung getroffen wurde.
 
     /**
      * Timeouts(aka mutes) the target and logs to the database, channel
