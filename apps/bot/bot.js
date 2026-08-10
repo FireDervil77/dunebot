@@ -160,25 +160,29 @@ ServiceManager.register("bootHooks", bootHooks);
         client.pluginManager.listeningEvents.forEach((event) => {
             if (event !== "ready") {
                 client.on(event, async (...args) => {
-                    // =====================================================
-                    // FIX: Guild-Partials durch vollständige Objekte ersetzen
-                    // Bei interactionCreate/messageCreate ist args[0].guild ein Partial!
-                    // =====================================================
-                    const fixedArgs = args.map(arg => {
-                        // Prüfe ob arg.guild ein Partial ist (hat .id aber kein .name)
-                        if (arg?.guild?.id && !arg.guild.name) {
-                            const fullGuild = client.guilds.cache.get(arg.guild.id);
-                            if (fullGuild) {
-                                // Ersetze das Guild-Partial durch die vollständige Guild
-                                return { ...arg, guild: fullGuild };
-                            } else {
-                                Logger.warn(`[bot.js] Guild ${arg.guild.id} nicht im Cache gefunden!`);
-                            }
-                        }
-                        return arg;
-                    });
-                    
-                    await client.pluginManager.emit(event, ...fixedArgs); 
+                    // Die Argumente gehen unveraendert weiter — bewusst.
+                    //
+                    // Hier stand ein "Fix", der ein Guild-Partial (eine `.id`
+                    // ohne `.name`) durch die Guild aus dem Zwischenspeicher
+                    // ersetzte, per `{ ...arg, guild: fullGuild }`.
+                    //
+                    // Beides war falsch. Erstens gibt es dieses Partial nicht:
+                    // `.guild` ist bei Message und Interaction ein Lesezugriff
+                    // auf den Zwischenspeicher --
+                    //   get guild() { return this.client.guilds.resolve(this.guildId) ?? … ?? null; }
+                    // -- er liefert also die vollstaendige Guild oder `null`,
+                    // nie ein Bruchstueck mit blosser ID. Die Bedingung konnte
+                    // gar nicht zutreffen.
+                    //
+                    // Zweitens waere das Zutreffen der Schaden gewesen: `{...arg}`
+                    // macht aus einer `Message` ein nacktes Objekt. Alles, was
+                    // an der Klasse haengt, ist danach weg -- `reply()`,
+                    // `author`, `member`, jeder Lesezugriff. Die Plugins haetten
+                    // eine Attrappe bekommen.
+                    //
+                    // Ein Blindgaenger also: unerreichbar, und beim ersten
+                    // Treffer verheerend.
+                    await client.pluginManager.emit(event, ...args);
                 });
             }
         });

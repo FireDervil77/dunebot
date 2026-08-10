@@ -38,7 +38,14 @@ const shardOptions = {
 };
 
 // Flag für Graceful Shutdown
-let shuttingDown = process.env.SHUTDOWN_GRACEFUL || 'false';
+//
+// Hier stand `process.env.SHUTDOWN_GRACEFUL || 'false'`. Der Rückfallwert war
+// die Zeichenkette "false" — und die ist wahr. Das Flag stand damit ab dem
+// ersten Moment auf "wir fahren gerade herunter", und jede Meldung unten hing
+// an genau dieser Abfrage: ein wirklich abgestuerzter Shard wurde als
+// "wurde beendet" protokolliert, ein Verbindungsabriss als geordnetes Ende.
+// Ein Absturz sah im Protokoll aus wie ein Neustart auf Ansage.
+let shuttingDown = process.env.SHUTDOWN_GRACEFUL === 'true';
 
 // ShardingManager erstellen
 const manager = new ShardingManager(path.join(__dirname, "bot.js"), shardOptions);

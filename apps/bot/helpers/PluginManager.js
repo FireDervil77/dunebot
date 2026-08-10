@@ -31,14 +31,19 @@ class PluginManager extends BasePluginManager {
         this.#config = new Config("core", path.join(this.pluginsDir, "core"));
 
         // Optional: HookSystem für Bot-Plugins initialisieren
+        //
+        // `Logger` wird ausserhalb des try geholt. Stand er innen, war er im
+        // catch nicht im Geltungsbereich — der Ausweichpfad hätte mit
+        // "Logger is not defined" abgebrochen, statt ohne Hooks weiterzulaufen.
+        // Genau das, was er verhindern sollte.
+        const Logger = ServiceManager.get("Logger");
         try {
             const { HookSystem } = require('dunebot-sdk');
-            const Logger = ServiceManager.get("Logger");
             this.#hooks = new HookSystem();
             this.hooks = this.#hooks;
-            Logger.debug('Hook-System für Bot-Plugins initialisiert');
+            Logger?.debug('Hook-System für Bot-Plugins initialisiert');
         } catch (error) {
-            Logger.debug('Hook-System nicht verfügbar, fahre ohne fort');
+            Logger?.debug(`Hook-System nicht verfügbar, fahre ohne fort: ${error.message}`);
         }
     }
 
@@ -288,10 +293,14 @@ async enablePlugin(pluginName) {
             Logger.debug(`- Befehl: ${cmd.name || 'Unbenannt'} (prefix=${!!cmd.command?.enabled}, slash=${!!cmd.slashCommand?.enabled})`);
         }
 
-        // Commands registrieren
-        if (plugin.commands.size > 0) {
-            this.client.commandManager.registerPlugin(plugin);
-        } else {
+        // Nur die Meldung — registriert wird weiter unten, einmal.
+        //
+        // Hier stand derselbe `registerPlugin`-Aufruf noch einmal, ohne `await`
+        // und nur bei vorhandenen Befehlen. Zwanzig Zeilen tiefer folgt er
+        // erneut, diesmal mit `await` und ohne Bedingung. Jedes Plugin lief
+        // also zweimal durch die Registrierung, die erste Runde nebenher und
+        // unbeobachtet.
+        if (plugin.commands.size === 0) {
             Logger.warn(`Plugin ${plugin.name} hat keine Befehle zum Registrieren`);
         }
 
@@ -673,15 +682,30 @@ async enablePlugin(pluginName) {
             return []; // Bei Fehlern keine Plugins ausführen
         }
 
-        // 4. Implementierung mit Promise.all und Abhängigkeiten
+        // 4. Alle Plugins der Guild, die diesen Handler haben, parallel ausführen.
+        //
+        // Hier stand einmal eine zweite Runde für Plugins mit `dependencies`:
+        // Sie wurden oben herausgefiltert und sollten danach das Ergebnis ihrer
+        // Abhängigkeiten als zusätzliches Argument bekommen. Dieser Code stand
+        // hinter dem `return` und war damit unerreichbar — und wäre er je
+        // gelaufen, hätte er mit `results is not defined` abgebrochen, weil die
+        // Variable oben `pluginResults` heisst.
+        //
+        // Der Filter dagegen war erreichbar. Ein Plugin mit `dependencies`
+        // bekam damit **gar keine** Ereignisse: aus der ersten Runde
+        // ausgeschlossen, in der zweiten nie angekommen. Genutzt hat es bisher
+        // kein Plugin, gemerkt hätte man es erst beim ersten.
+        //
+        // Statt eine nie erprobte Mechanik nachzubauen, ist die Bedingung raus:
+        // jedes Plugin bekommt sein Ereignis. Wer Daten eines anderen Plugins
+        // braucht, holt sie sich selbst — dafür gibt es das Hook-System.
         const pluginResults = await Promise.all(
             this.plugins
                 .filter(
                     (plugin) =>
                         enabled_plugins.includes(plugin.name) &&
-                        plugin.eventHandlers && 
-                        plugin.eventHandlers.has(eventName) &&
-                        (!plugin.dependencies || plugin.dependencies.length === 0)
+                        plugin.eventHandlers &&
+                        plugin.eventHandlers.has(eventName)
                 )
                 .map(async (plugin) => {
                     try {
@@ -696,36 +720,6 @@ async enablePlugin(pluginName) {
         );
 
         return pluginResults;
-
-        // Response-Map erstellen für Plugins mit Abhängigkeiten
-        const responseMap = Object.fromEntries(
-            results.map((result) => [result.name, { success: result.success, data: result.data }])
-        );
-
-        // Plugins mit Abhängigkeiten ausführen
-        for (const plugin of this.plugins.filter(
-            (p) =>
-                enabled_plugins.includes(p.name) &&
-                p.eventHandlers && 
-                p.eventHandlers.has(eventName) &&
-                p.dependencies && 
-                p.dependencies.length > 0
-        )) {
-            const depArgs = Object.fromEntries(
-                plugin.dependencies.map((dep) => [dep, responseMap[dep]])
-            );
-
-            try {
-                const handler = plugin.eventHandlers.get(eventName);
-                const data = await handler(...args, depArgs);
-                responseMap[plugin.name] = { success: true, data };
-            } catch (error) {
-                Logger.error(`Error in plugin ${plugin.name}:`, error);
-                responseMap[plugin.name] = { success: false, data: null };
-            }
-        }
-
-        return responseMap;
     }
     
 }
