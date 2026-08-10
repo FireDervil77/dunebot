@@ -2086,7 +2086,11 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
         const variablen = beurteileVariablen(frozenData, server.env_variables);
 
         return await themeManager.renderView(res, 'guild/gameserver-edit', {
-            title: `Server bearbeiten: ${server.name}`,
+            // "Einstellungen" ueberall gleich: der Knopf auf der Serverseite
+            // heisst so, die Karte auf dieser Seite auch. Vorher stand hier
+            // "Server bearbeiten" — drei Namen fuer dieselbe Sache, und der
+            // User hat den Knopf deshalb nicht gefunden.
+            title: `Einstellungen: ${server.name}`,
             activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
             server,
             guildId,
