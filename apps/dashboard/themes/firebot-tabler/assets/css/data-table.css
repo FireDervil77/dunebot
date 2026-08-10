@@ -1,0 +1,75 @@
+/* ── DuneDataTable Component Styles ────────────────────── */
+
+.dune-dt-toolbar {
+    gap: 0.5rem;
+}
+
+.dune-dt-toolbar .input-group-sm .input-group-text {
+    font-size: .8rem;
+}
+
+/* Bulk-Bar Animation */
+.dune-dt-bulk-bar {
+    animation: dune-dt-slide-in .2s ease;
+}
+
+@keyframes dune-dt-slide-in {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Sort-Header */
+.dune-dt-table th[data-sort-key]:hover {
+    background-color: rgba(0,0,0,.04);
+}
+
+.dune-dt-table th[data-sort-key] .fa-sort-up,
+.dune-dt-table th[data-sort-key] .fa-sort-down {
+    color: #007bff;
+}
+
+/* Checkbox Alignment */
+.dune-dt-table th:first-child,
+.dune-dt-table td:first-child {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.dune-dt-row-check,
+.dune-dt-select-all {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+/* Hover-Highlight bei selektierten Zeilen */
+.dune-dt-table tr[data-row-id] td {
+    transition: background-color .15s ease;
+}
+
+.dune-dt-table tr.dune-dt-selected {
+    background-color: rgba(0, 123, 255, 0.08) !important;
+}
+
+/* Summary Info-Boxes: etwas kompakter */
+.dune-dt-summary .info-box {
+    min-height: auto;
+    padding: .5rem;
+}
+
+.dune-dt-summary .info-box-icon {
+    width: 50px;
+    height: 50px;
+    line-height: 50px;
+    font-size: 1.2rem;
+}
+
+.dune-dt-summary .info-box-content {
+    padding: 5px 10px;
+}
+
+/* Pagination compact */
+.dune-dt-pagination .page-link {
+    padding: .2rem .5rem;
+    font-size: .8rem;
+}

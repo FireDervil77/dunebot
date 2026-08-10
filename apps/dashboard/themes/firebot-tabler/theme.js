@@ -65,6 +65,7 @@ class TablerTheme {
         am.registerVendorScript('sortable', CDN.sortable, { version: '1.15.6' });
 
         // ── Eigene Dateien (über die Theme-Kette auflösbar) ──────────────────
+        am.registerStyle('data-table-css', 'data-table.css', { version: this.version });
         am.registerStyle('tokens', 'tokens.css', { deps: ['tabler-css'], version: this.version });
 
         // ── Übergang: Auth und Frontend laufen noch mit dem alten Gerüst ─────
@@ -91,6 +92,14 @@ class TablerTheme {
         am.registerScript('global-toast', 'global-toast.js', { deps: ['toastr-js'], version: this.version });
         am.registerScript('toast-notification-center', 'toast-notification-center.js', { deps: ['global-toast'], version: this.version });
         am.registerScript('button-loading', 'button-loading.js', { version: this.version });
+        // DuneDataTable. Beim Umstieg von AdminLTE auf Tabler ist es haengen
+        // geblieben: das alte Theme reihte es fuer Guild-Seiten ein, dieses
+        // nicht. `new DuneDataTable(...)` warf seitdem, und weil das im selben
+        // Skriptblock steht wie der Rest, blieb die Port-Verwaltung des
+        // Masterservers vollstaendig leer — kein Fehler, kein Leer-Zustand,
+        // nichts. `firebot-tabler` hat kein Eltern-Theme, erbt die Datei also
+        // nicht; sie liegt hier als eigene Kopie.
+        am.registerScript('data-table', 'data-table.js', { deps: ['jquery'], version: this.version });
         am.registerScript('guild', 'guild.js', { deps: ['jquery'], version: this.version });
     }
 
@@ -156,6 +165,7 @@ class TablerTheme {
         am.enqueueStyle('tabler-themes-css');
         am.enqueueStyle('tokens');
         am.enqueueStyle('toastr-css');
+        am.enqueueStyle('data-table-css');
 
         am.enqueueScript('tabler-js');
         am.enqueueScript('bootstrap-alias');
@@ -165,6 +175,7 @@ class TablerTheme {
         am.enqueueScript('global-toast');
         am.enqueueScript('toast-notification-center');
         am.enqueueScript('button-loading');
+        am.enqueueScript('data-table');
         am.enqueueScript('guild');
     }
 }
