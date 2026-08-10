@@ -2085,7 +2085,37 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
         // Welche Variablen kommen nirgends vor? (Konzept 23.2 – kennzeichnen, nicht verstecken)
         const variablen = beurteileVariablen(frozenData, server.env_variables);
 
+        // ════════════════════════════════════════════════════════════════════
+        // Wie viel darf dieser Server bekommen?
+        //
+        // Bis zum 2026-08-10 standen dort freie Zahlenfelder in MiB und Prozent,
+        // und die Prüfung verlangte alle drei zusammen. Sechs von acht Servern
+        // hatten NULL — wer dann nur den RAM eintrug, bekam beim Speichern
+        // "CPU-Anteil, Speicherplatz fehlen" und kam nicht weiter.
+        //
+        // Jetzt bietet die Oberfläche nur an, was tatsächlich frei ist. Was der
+        // Server heute schon hält, zählt dabei mit: es steckt in der Auslastung
+        // des RootServers und darf ihm nicht ein zweites Mal fehlen.
+        // ════════════════════════════════════════════════════════════════════
+        let kapazitaet = null;
+        try {
+            const RootServerModel = require('../../../masterserver/dashboard/models/RootServer');
+            const frei = await RootServerModel.getAvailableResources(server.rootserver_id);
+            if (frei?.hasQuota) {
+                kapazitaet = {
+                    ramMB:    Math.floor(Number(frei.available_ram_mb    || 0)) + (server.allocated_ram_mb      || 0),
+                    cpuCores: Number(frei.available_cpu_cores || 0) + ((server.allocated_cpu_percent || 0) / 100),
+                    diskGB:   Math.floor(Number(frei.available_disk_gb   || 0)) + (server.allocated_disk_gb     || 0),
+                };
+            }
+        } catch (err) {
+            // Ohne Quota-Angaben bleibt die Oberfläche bei freien Feldern —
+            // besser als eine Auswahl, die auf geratenen Obergrenzen beruht.
+            Logger.warn(`[Gameserver] Kapazität für RootServer ${server.rootserver_id} nicht lesbar: ${err.message}`);
+        }
+
         return await themeManager.renderView(res, 'guild/gameserver-edit', {
+            kapazitaet,
             // "Einstellungen" ueberall gleich: der Knopf auf der Serverseite
             // heisst so, die Karte auf dieser Seite auch. Vorher stand hier
             // "Server bearbeiten" — drei Namen fuer dieselbe Sache, und der

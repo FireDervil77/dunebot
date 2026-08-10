@@ -14,12 +14,51 @@
 
 'use strict';
 
-const { GameDig } = require('gamedig');
+const { GameDig, games: GAMEDIG_KATALOG } = require('gamedig');
 
 /** Timeout für eine einzelne Query in ms */
 const QUERY_TIMEOUT_MS = 5000;
 /** Maximale Verbindungsversuche */
 const QUERY_MAX_ATTEMPTS = 2;
+
+/**
+ * GameDig hat Spielkennungen umbenannt und führt die alten nur noch als
+ * `extra.old_id`. `arkse` heisst dort seit Fassung 5 `ase` — die Abfrage
+ * scheiterte deshalb mit „arkse nicht gefunden", obwohl am Server nichts falsch
+ * war.
+ *
+ * Die Zuordnung wird aus GameDigs eigenem Katalog gelesen, nicht von Hand
+ * gepflegt: sonst steht hier beim nächsten Umbenennen wieder eine veraltete
+ * Liste. Schlägt das Lesen fehl, bleibt der Typ unverändert — dann meldet
+ * GameDig den Fehler wie bisher, statt dass die Abfrage ganz ausfällt.
+ *
+ * Wichtig: die Umschreibung muss hier passieren und nicht nur im Addon-Datensatz.
+ * Laufende Server tragen eine eingefrorene Kopie des Addons (`frozen_game_data`);
+ * ein reparierter Marktplatz-Eintrag erreicht sie nicht.
+ */
+const ALTE_KENNUNGEN = (() => {
+    try {
+        const karte = new Map();
+        for (const [id, spiel] of Object.entries(GAMEDIG_KATALOG || {})) {
+            const alt = spiel?.extra?.old_id;
+            if (!alt) continue;
+            for (const a of (Array.isArray(alt) ? alt : [alt])) karte.set(a, id);
+        }
+        return karte;
+    } catch (_) {
+        return new Map();
+    }
+})();
+
+/**
+ * Übersetzt eine veraltete GameDig-Kennung in die heutige.
+ * @param {string} typ
+ * @returns {{typ: string, umgeschrieben: string|null}}
+ */
+function heutigerTyp(typ) {
+    const heute = ALTE_KENNUNGEN.get(typ);
+    return heute ? { typ: heute, umgeschrieben: typ } : { typ, umgeschrieben: null };
+}
 
 const { resolveStatusConfig } = require('./StatusSchema');
 const { applyQueryRules } = require('./StatusTransforms');
@@ -68,7 +107,13 @@ class QueryService {
             return { success: false, error: `Query-Port (${portVar}) nicht in Server-Konfiguration gefunden` };
         }
 
-        const gameType = queryConfig.gamedig_type;
+        const { typ: gameType, umgeschrieben } = heutigerTyp(queryConfig.gamedig_type);
+        if (umgeschrieben) {
+            // Nur zur Kenntnis, kein Fehler: die Abfrage läuft danach normal.
+            // Der Hinweis zeigt, welches Addon noch die alte Kennung trägt.
+            require('dunebot-core').ServiceManager.get('Logger')
+                ?.debug?.(`[QueryService] GameDig-Kennung "${umgeschrieben}" ist veraltet, benutze "${gameType}"`);
+        }
 
         try {
             const state = await GameDig.query({

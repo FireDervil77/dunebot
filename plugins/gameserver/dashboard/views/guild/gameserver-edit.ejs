@@ -67,25 +67,55 @@
                                         Geprüft wird beim Speichern nur die Erhöhung gegen den freien
                                         Platz des RootServers.
                                     %>
+                                    <%
+                                      // Auswahl statt freier Zahlenfelder. Der User musste vorher
+                                      // in MiB rechnen und Prozent schaetzen — und weil die Pruefung
+                                      // alle drei Werte zusammen verlangt, scheiterte das Speichern,
+                                      // sobald eines leer blieb. Angeboten wird nur, was frei ist.
+                                      const ramStufenGB = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
+                                      const ramMaxMB  = kapazitaet ? kapazitaet.ramMB  : 65536;
+                                      const cpuMaxKerne = kapazitaet ? kapazitaet.cpuCores : 16;
+                                      const ramJetzt  = server.allocated_ram_mb || null;
+                                      const cpuJetzt  = server.allocated_cpu_percent || null;
+                                      // Eine bereits gebuchte Groesse muss waehlbar bleiben, auch wenn
+                                      // sie zwischen den Stufen liegt — sonst kippt sie beim Speichern
+                                      // stillschweigend auf einen Nachbarwert.
+                                      const ramWerte = [...new Set(
+                                        ramStufenGB.map(g => g * 1024)
+                                                   .filter(mb => mb <= ramMaxMB)
+                                                   .concat(ramJetzt ? [ramJetzt] : [])
+                                      )].sort((a, b) => a - b);
+                                      const cpuWerte = [...new Set(
+                                        [10, 25, 50, 100, 150, 200, 300, 400, 600, 800, 1200, 1600]
+                                          .filter(p => p <= Math.round(cpuMaxKerne * 100))
+                                          .concat(cpuJetzt ? [cpuJetzt] : [])
+                                      )].sort((a, b) => a - b);
+                                    %>
                                     <div class="row">
                                         <div class="col-sm-4">
                                             <div class="input-group input-group-sm mb-2">
-                                                <input type="number" class="form-control"
-                                                       id="allocated_ram_mb" name="allocated_ram_mb"
-                                                       min="512" step="512"
-                                                       value="<%= server.allocated_ram_mb || '' %>"
-                                                       placeholder="kein Limit">
-                                                <span class="input-group-text">MiB</span>
+                                                <select class="form-control" id="allocated_ram_mb" name="allocated_ram_mb">
+                                                    <option value="">kein Limit</option>
+                                                    <% ramWerte.forEach(mb => { %>
+                                                        <option value="<%= mb %>" <%= ramJetzt === mb ? 'selected' : '' %>>
+                                                            <%= (mb % 1024 === 0) ? (mb / 1024) + ' GiB' : mb + ' MiB' %>
+                                                        </option>
+                                                    <% }) %>
+                                                </select>
+                                                <span class="input-group-text">RAM</span>
                                             </div>
                                         </div>
                                         <div class="col-sm-4">
                                             <div class="input-group input-group-sm mb-2">
-                                                <input type="number" class="form-control"
-                                                       id="allocated_cpu_percent" name="allocated_cpu_percent"
-                                                       min="10" max="1600" step="10"
-                                                       value="<%= server.allocated_cpu_percent || '' %>"
-                                                       placeholder="kein Limit">
-                                                <span class="input-group-text">% CPU</span>
+                                                <select class="form-control" id="allocated_cpu_percent" name="allocated_cpu_percent">
+                                                    <option value="">kein Limit</option>
+                                                    <% cpuWerte.forEach(p => { %>
+                                                        <option value="<%= p %>" <%= cpuJetzt === p ? 'selected' : '' %>>
+                                                            <%= p %> % <%= p >= 100 ? '(' + (p / 100) + ' Kerne)' : '' %>
+                                                        </option>
+                                                    <% }) %>
+                                                </select>
+                                                <span class="input-group-text">CPU</span>
                                             </div>
                                         </div>
                                         <div class="col-sm-4">
@@ -93,6 +123,7 @@
                                                 <input type="number" class="form-control"
                                                        id="allocated_disk_gb" name="allocated_disk_gb"
                                                        min="1" step="5"
+                                                       max="<%= kapazitaet ? kapazitaet.diskGB : 4096 %>"
                                                        value="<%= server.allocated_disk_gb || '' %>"
                                                        placeholder="kein Limit">
                                                 <span class="input-group-text">GiB</span>
@@ -100,10 +131,32 @@
                                         </div>
                                     </div>
                                     <small class="form-text text-secondary">
-                                        100 % entspricht einem CPU-Kern. Die Werte buchen Platz auf dem
-                                        RootServer und begrenzen den Server im Betrieb — sie greifen beim
-                                        nächsten Start. Alle drei zusammen ausfüllen oder alle leer lassen.
+                                        <strong>Alle drei zusammen ausfüllen oder alle drei leer lassen</strong>
+                                        — dazwischen gibt es nichts, das Speichern bricht sonst ab.
+                                        Die Werte buchen Platz auf dem RootServer und begrenzen den Server
+                                        im Betrieb; sie greifen beim <strong>nächsten Start</strong>.
+                                        <% if (kapazitaet) { %>
+                                            <br>Auf diesem RootServer stehen dir noch
+                                            <strong><%= (kapazitaet.ramMB / 1024).toFixed(0) %> GiB RAM</strong>,
+                                            <strong><%= kapazitaet.cpuCores.toFixed(1) %> Kerne</strong> und
+                                            <strong><%= kapazitaet.diskGB %> GiB Platz</strong> zur Verfügung
+                                            (das mitgezählt, was dieser Server bereits hält).
+                                            Die Auswahl bietet nur an, was hineinpasst.
+                                        <% } else { %>
+                                            <br>Für diesen RootServer sind keine Quota-Angaben hinterlegt —
+                                            die Auswahl ist deshalb nicht begrenzt.
+                                        <% } %>
                                     </small>
+                                    <%#
+                                      Warnung nur dann, wenn tatsaechlich etwas halb ausgefuellt ist.
+                                      Vorher scheiterte das Speichern kommentarlos an genau dieser Regel:
+                                      sechs von acht Servern hatten alle drei Felder auf NULL, und wer nur
+                                      den RAM setzte, kam nicht weiter.
+                                    %>
+                                    <div class="alert alert-warning py-2 mt-2 mb-0" id="ressourcenHinweis" style="display:none;">
+                                        <i class="fas fa-triangle-exclamation me-1"></i>
+                                        <span id="ressourcenHinweisText"></span>
+                                    </div>
 
                                     <%#
                                       Die GiB-Angabe hat bis zum 2026-08-10 nur gebucht, nie begrenzt.
@@ -320,6 +373,39 @@
                                 </a>
                             </div>
                         </form>
+
+<script>
+/**
+ * Die drei Ressourcenfelder gelten nur gemeinsam — halb ausgefuellt lehnt der
+ * Server ab. Vorher merkte man das erst beim Speichern, mit einer Meldung, die
+ * nach einem Fehler aussah. Jetzt sagt es die Seite vorher.
+ */
+(function () {
+    const felder = ['allocated_ram_mb', 'allocated_cpu_percent', 'allocated_disk_gb']
+        .map(id => document.getElementById(id))
+        .filter(Boolean);
+    if (felder.length !== 3) return;
+
+    const hinweis = document.getElementById('ressourcenHinweis');
+    const text    = document.getElementById('ressourcenHinweisText');
+    const namen   = { allocated_ram_mb: 'RAM', allocated_cpu_percent: 'CPU-Anteil', allocated_disk_gb: 'Speicherplatz' };
+
+    function pruefen() {
+        const leer = felder.filter(f => String(f.value).trim() === '');
+        if (leer.length === 0 || leer.length === 3) {
+            hinweis.style.display = 'none';
+            return;
+        }
+        hinweis.style.display = '';
+        text.textContent = leer.length === 1
+            ? `Es fehlt noch ${namen[leer[0].id]} — die drei Werte gelten nur zusammen.`
+            : `Es fehlen noch ${leer.map(f => namen[f.id]).join(' und ')} — die drei Werte gelten nur zusammen.`;
+    }
+
+    felder.forEach(f => { f.addEventListener('change', pruefen); f.addEventListener('input', pruefen); });
+    pruefen();
+})();
+</script>
                     </div>
                 </div>
             </div>
