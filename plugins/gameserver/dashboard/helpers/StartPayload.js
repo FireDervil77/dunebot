@@ -98,6 +98,39 @@ function buildStartPayload(server, guildId, Logger = null) {
         }
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    // Portvariablen aus der Allocation speisen — VOR jeder Substitution.
+    //
+    // Ein Port hat einen Zweck (`game`, `query`, `rcon`), und die Nummer kommt
+    // aus dem Pool. Eine Variable wie `RCON_PORT` ist nur die Art, wie das
+    // Spiel davon erfaehrt — sie darf die belegte Nummer nicht bestimmen.
+    //
+    // Genau das geschah aber: `{{RCON_PORT}}` ist beides, ein Variablenname und
+    // das Muster `{{<KEY>_PORT}}` fuer den belegten Port `rcon`. Die
+    // Variablenschleife lief zuerst, also gewann der Wert aus den
+    // Umgebungsvariablen — eine containerinterne Zahl, die Docker nie
+    // veroeffentlicht. Der Dienst lauschte dort, erreichbar war er nirgends.
+    //
+    // Jetzt gewinnt der belegte Port, und zwar in beiden Richtungen: im
+    // Startbefehl UND in der Umgebung, die der Container bekommt. Sonst stuende
+    // im Befehl die eine und in der Umgebung die andere Zahl.
+    // ════════════════════════════════════════════════════════════════════════
+    for (const [zweck, portData] of Object.entries(ports)) {
+        const belegt = typeof portData === 'object'
+            ? (portData.internal ?? portData.external)
+            : portData;
+        if (belegt === undefined || belegt === null) continue;
+
+        const variablenName = `${zweck.toUpperCase()}_PORT`;
+        if (Object.prototype.hasOwnProperty.call(envVariables, variablenName)
+            && String(envVariables[variablenName]) !== String(belegt)) {
+            debug(`[StartPayload] ${variablenName}: ${envVariables[variablenName]} → ${belegt} (aus der Allocation)`);
+        }
+        if (Object.prototype.hasOwnProperty.call(envVariables, variablenName)) {
+            envVariables[variablenName] = String(belegt);
+        }
+    }
+
     // Variablen-Substitution: {{WORLD}} → "BoomTown" usw.
     let startupCommand = server.launch_params || '';
     if (Array.isArray(frozenData?.variables)) {
