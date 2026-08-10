@@ -911,9 +911,18 @@ async function savePorts() {
                             </button>
                         </div>
                         <div class="form-control form-control-sm bg-transparent text-secondary" id="sftp-pass-hinweis">
-                            <% if (server.sftp_passwort_gesetzt) { %>
+<%#
+                              Drei Zustaende, nicht zwei. Beim Anlegen wird ein Passwort
+                              erzeugt, nur der Hash gespeichert und der Klartext verworfen —
+                              "Gesetzt" sah danach aus wie "du hast es", obwohl es nie jemand
+                              gesehen hat. Der einzige Weg dorthin ist "Zuruecksetzen".
+                            %>
+                            <% if (server.sftp_passwort_gesetzt && server.sftp_passwort_gesehen) { %>
                                 <i class="fas fa-check-circle text-success me-1"></i>
                                 Gesetzt — bei Verlust zurücksetzen
+                            <% } else if (server.sftp_passwort_gesetzt) { %>
+                                <i class="fas fa-eye-slash text-warning me-1"></i>
+                                Vergeben, aber nie angezeigt — zum Verbinden einmal zurücksetzen
                             <% } else { %>
                                 <i class="fas fa-triangle-exclamation text-warning me-1"></i>
                                 Noch keines vergeben

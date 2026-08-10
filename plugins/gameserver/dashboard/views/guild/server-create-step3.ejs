@@ -209,14 +209,22 @@
             </div>
           </div>
 
-          <!-- SFTP Access (Vorbereitet für später) -->
+          <%#
+            SFTP war hier bis zum 2026-08-10 mit "Demnaechst" ausgezeichnet —
+            gebaut ist es laengst: der Zugang entsteht beim Anlegen dieses
+            Servers. Was nicht stimmte, war das Versprechen "du erhaeltst
+            Passwort nach der Installation": der Klartext wird erzeugt und
+            sofort verworfen, nur der Hash bleibt. Zu sehen bekommt man ihn
+            genau einmal, ueber "Zuruecksetzen" auf der Serverseite.
+          %>
+          <!-- SFTP-Zugang -->
           <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h5 class="mb-0">
                 <i class="fa-solid fa-folder-tree me-2"></i>
                 <%= tr('gameserver:SERVER.SFTP_ACCESS') %>
               </h5>
-              <span class="badge bg-warning-lt"><%= tr('gameserver:SERVER.COMING_SOON') %></span>
+              <span class="badge bg-success-lt"><i class="fa-solid fa-check me-1"></i>Automatisch</span>
             </div>
             <div class="card-body">
               <div class="alert alert-info mb-0">
@@ -224,12 +232,6 @@
                 <strong><%= tr('gameserver:SERVER.SFTP_INFO') %></strong><br>
                 <small><%= tr('gameserver:SERVER.SFTP_INFO_DETAIL') %></small>
               </div>
-              <!-- 
-              SPÄTER: 
-              - SFTP Username (auto-generated)
-              - SFTP Password (auto-generated mit option to customize)
-              - SFTP Port (auto-assigned oder manual)
-              -->
             </div>
           </div>
 

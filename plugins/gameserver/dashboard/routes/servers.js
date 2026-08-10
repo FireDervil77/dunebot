@@ -1753,6 +1753,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.updated_at,
                 gs.sftp_username,
                 gs.sftp_password_hash,
+                gs.sftp_password_seen_at,
                 gs.env_variables,
                 am.name as game_name,
                 am.slug as game_slug,
@@ -1930,6 +1931,9 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // in der Antwort nichts verloren — er ist zwar nicht umkehrbar, aber
         // offline angreifbar, und die Seite braucht ihn für nichts.
         server.sftp_passwort_gesetzt = server.sftp_passwort_gesetzt || Boolean(server.sftp_password_hash);
+        // Gesetzt heisst nicht bekannt: beim Anlegen wird der Klartext erzeugt
+        // und sofort verworfen. Erst "Zuruecksetzen" zeigt ihn einmal.
+        server.sftp_passwort_gesehen = Boolean(server.sftp_password_seen_at);
         delete server.sftp_password_hash;
 
         // SFTP-Verbindungsinfo anfügen (IP bevorzugen – Hostname ist oft nicht konfiguriert)
@@ -3885,6 +3889,14 @@ router.post('/:serverId/sftp/reset-password', requirePermission('GAMESERVER.EDIT
         }
 
         Logger.info(`[Gameserver] SFTP-Passwort zurückgesetzt für Server ${serverId}`);
+
+        // Festhalten, dass der Klartext einmal sichtbar war. Ohne das steht auf
+        // der Übersicht "Gesetzt" — auch für Passwörter, die beim Anlegen
+        // erzeugt und sofort verworfen wurden und die nie jemand gesehen hat.
+        await dbService.query(
+            'UPDATE gameservers SET sftp_password_seen_at = NOW() WHERE id = ?',
+            [serverId]
+        );
 
         // Einzige Gelegenheit, den Klartext zu sehen — gespeichert ist nur der Hash.
         return res.json({ success: true, sftp_username, sftp_password: klartext });
