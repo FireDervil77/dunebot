@@ -55,8 +55,8 @@
                     <%= post.title %>
                   </a>
                 </h5>
-                <% if (post.excerpt) { %>
-                  <p class="card-text text-muted flex-grow-1"><%= post.excerpt.replace(/<[^>]+>/g, '').substring(0, 150) %><%= post.excerpt.replace(/<[^>]+>/g, '').length > 150 ? '...' : '' %></p>
+                <% if (post.excerptText) { %>
+                  <p class="card-text text-muted flex-grow-1"><%= post.excerptText %></p>
                 <% } %>
                 <div class="mt-auto pt-3">
                   <div class="d-flex justify-content-between align-items-center">

@@ -4,6 +4,7 @@ const frontendController = require("../controllers/frontend.controller");
 const apiController = require("../controllers/api.controller");
 const { NewsHelper } = require("dunebot-sdk/utils");
 const { ChangelogHelper } = require("dunebot-sdk/utils");
+const { htmlZuVorschautext } = require("../helpers/text");
 
 // Router erstellen
 const router = express.Router();
@@ -271,10 +272,15 @@ router.get('/blog', async (req, res) => {
         const blogPosts = rawPosts.map(p => {
             const titles = typeof p.title_translations === 'string' ? JSON.parse(p.title_translations) : (p.title_translations || {});
             const excerpts = typeof p.excerpt_translations === 'string' ? JSON.parse(p.excerpt_translations) : (p.excerpt_translations || {});
+            const excerpt = excerpts[userLocale] || excerpts['de-DE'] || '';
             return {
                 ...p,
                 title: titles[userLocale] || titles['de-DE'] || '',
-                excerpt: excerpts[userLocale] || excerpts['de-DE'] || '',
+                excerpt,
+                // Der Anriss kommt als HTML aus dem Editor. Die Karte zeigt ihn
+                // als reinen Text, und das heisst: Tags weg UND Entities
+                // aufloesen. Ohne das Zweite stand `&nbsp;` sichtbar auf der Seite.
+                excerptText: htmlZuVorschautext(excerpt, 150),
                 formattedDate: p.published_at
                     ? new Date(p.published_at).toLocaleString(userLocale, { year: 'numeric', month: 'long', day: 'numeric' })
                     : '—'

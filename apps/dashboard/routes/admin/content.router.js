@@ -13,6 +13,7 @@
 const { Router } = require('express');
 const { ServiceManager } = require('dunebot-core');
 const { NewsHelper, ChangelogHelper, NotificationHelper } = require('dunebot-sdk/utils');
+const { entitiesAufloesen } = require('../../helpers/text');
 
 const router = Router();
 
@@ -82,18 +83,10 @@ function htmlZuDiscordMarkdown(html) {
     // Was jetzt noch an Tags uebrig ist, traegt keine Bedeutung mehr
     text = text.replace(/<[^>]+>/g, '');
 
-    // Entities aufloesen (unveraendert aus der frueheren Fassung)
-    text = text
-        .replace(/&auml;/g, 'ä').replace(/&ouml;/g, 'ö').replace(/&uuml;/g, 'ü')
-        .replace(/&Auml;/g, 'Ä').replace(/&Ouml;/g, 'Ö').replace(/&Uuml;/g, 'Ü')
-        .replace(/&szlig;/g, 'ß')
-        .replace(/&mdash;/g, '—').replace(/&ndash;/g, '–').replace(/&hellip;/g, '…')
-        .replace(/&eacute;/g, 'é').replace(/&laquo;/g, '«').replace(/&raquo;/g, '»')
-        .replace(/&bdquo;/g, '„').replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"')
-        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&nbsp;/g, ' ')
-        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-        .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+    // Entities aufloesen — dieselbe Tabelle, die auch die Blogvorschau braucht,
+    // liegt seit dem 2026-08-10 in helpers/text.js. Sie war hier vorher wortgleich
+    // eingebaut; die zweite Stelle hat sie schlicht vergessen und zeigte `&nbsp;`.
+    text = entitiesAufloesen(text);
 
     // Weissraum aus dem Quelltext (auch die dort gesetzten Umbrueche) zu je
     // einem Leerzeichen zusammenziehen — er trug nie Bedeutung.
