@@ -57,6 +57,15 @@ class CronWorker {
             }
         }
 
+        // Taeglicher Aufbewahrungs-Durchlauf, unabhaengig von den Jobs. Ohne
+        // ihn wuerde eine neu gesetzte Grenze erst beim naechsten Backup wirken
+        // — und bei einem geloeschten Backup-Job nie.
+        this._aufbewahrung = cron.schedule('30 3 * * *', () => {
+            this.aufbewahrungDurchlauf().catch(err =>
+                Logger.warn(`[CronWorker] Aufbewahrungs-Durchlauf fehlgeschlagen: ${err.message}`)
+            );
+        });
+
         this._started = true;
         Logger.success('[CronWorker] Cron-Worker gestartet.');
     }
@@ -68,6 +77,10 @@ class CronWorker {
         for (const [id, task] of this._tasks) {
             task.stop();
             this._tasks.delete(id);
+        }
+        if (this._aufbewahrung) {
+            this._aufbewahrung.stop();
+            this._aufbewahrung = null;
         }
         this._jobs.clear();
         this._started = false;
@@ -500,16 +513,34 @@ class CronWorker {
      * Backup zu viel als eine Zeile ohne Datei.
      */
     async _aufbewahrungAnwenden(job, daemonId, ipmServer, dbService, Logger) {
-        const { zuEntfernen } = require('./cronEntscheidung');
-
         // Grenzen frisch lesen: der Job liegt seit dem Einplanen im Speicher,
         // die Einstellung kann seitdem geaendert worden sein.
         const [grenzen] = await dbService.query(
             'SELECT backup_keep, backup_keep_days FROM gameserver_cronjobs WHERE id = ?',
             [job.id]
         );
-        const keep = Number(grenzen?.backup_keep) || 0;
-        const keepDays = Number(grenzen?.backup_keep_days) || 0;
+        return this.aufbewahrungFuerServer(job.server_id, grenzen, daemonId, ipmServer, dbService, Logger);
+    }
+
+    /**
+     * Wendet die Aufbewahrung eines Servers an.
+     *
+     * Getrennt vom Cronjob, weil die Einstellung seit dem 2026-08-10 am Server
+     * haengt: wer den Backup-Job loescht, soll nicht auch die Aufbewahrung
+     * verlieren. Der taegliche Durchlauf ruft dieselbe Methode ohne Job auf.
+     *
+     * @param {number} serverId
+     * @param {object|null} jobGrenzen Abweichung des Cronjobs, oder null
+     */
+    async aufbewahrungFuerServer(serverId, jobGrenzen, daemonId, ipmServer, dbService, Logger) {
+        const { zuEntfernen } = require('./cronEntscheidung');
+        const { loeseAufbewahrung } = require('../assets/js/cronPlan');
+
+        const [server] = await dbService.query(
+            'SELECT backup_keep, backup_keep_days FROM gameservers WHERE id = ?',
+            [serverId]
+        );
+        const { keep, keepDays, quelle } = loeseAufbewahrung(server || {}, jobGrenzen);
         if (!keep && !keepDays) return;
 
         const backups = await dbService.query(
@@ -518,11 +549,13 @@ class CronWorker {
              WHERE server_id = ? AND created_by = 'cron'
                AND status = 'completed' AND pruned_at IS NULL
              ORDER BY created_at DESC`,
-            [job.server_id]
+            [serverId]
         );
 
         const raus = zuEntfernen(backups, { keep, keepDays });
         if (!raus.length) return;
+
+        Logger.debug(`[CronWorker] Aufbewahrung Server ${serverId}: Grenze aus der ${quelle === 'job' ? 'Cronjob-Abweichung' : 'Servereinstellung'}`);
 
         const nachName = new Map(backups.map(b => [b.id, b.name]));
         let entfernt = 0;
@@ -531,7 +564,7 @@ class CronWorker {
             const name = nachName.get(backupId);
             try {
                 const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.backup_delete', {
-                    server_id: String(job.server_id),
+                    server_id: String(serverId),
                     backup_name: name,
                 }, 30000);
 
@@ -552,7 +585,42 @@ class CronWorker {
         }
 
         if (entfernt) {
-            Logger.info(`[CronWorker] Aufbewahrung Job ${job.id}: ${entfernt} von ${raus.length} alten Backup(s) entfernt (behalte ${keep || '∞'}, max. ${keepDays || '∞'} Tage)`);
+            Logger.info(`[CronWorker] Aufbewahrung Server ${serverId}: ${entfernt} von ${raus.length} alten Backup(s) entfernt (behalte ${keep || '∞'}, max. ${keepDays || '∞'} Tage)`);
+        }
+    }
+
+    /**
+     * Taeglicher Durchlauf ueber alle Server mit einer Aufbewahrungsgrenze.
+     *
+     * Warum zusaetzlich zum Aufraeumen nach jedem Backup: die Grenze haengt am
+     * Server, nicht am Cronjob. Wer den Backup-Job loescht oder abschaltet,
+     * soll seine alten Backups trotzdem loswerden — sonst liegt der Bestand von
+     * damals fuer immer da. Ebenso greift eine gerade erst gesetzte Grenze
+     * damit ohne auf das naechste Backup zu warten.
+     *
+     * Server, deren Daemon offline ist, werden uebersprungen und beim naechsten
+     * Durchlauf erneut versucht.
+     */
+    async aufbewahrungDurchlauf() {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+        const ipmServer = ServiceManager.get('ipmServer');
+
+        const server = await dbService.query(
+            `SELECT gs.id, r.daemon_id
+             FROM gameservers gs
+             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+             WHERE gs.backup_keep > 0 OR gs.backup_keep_days > 0`
+        );
+        if (!server?.length) return;
+
+        for (const s of server) {
+            if (!s.daemon_id || !ipmServer?.isDaemonOnline(s.daemon_id)) continue;
+            try {
+                await this.aufbewahrungFuerServer(s.id, null, s.daemon_id, ipmServer, dbService, Logger);
+            } catch (err) {
+                Logger.warn(`[CronWorker] Aufbewahrungs-Durchlauf für Server ${s.id} fehlgeschlagen: ${err.message}`);
+            }
         }
     }
 

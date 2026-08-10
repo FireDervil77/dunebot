@@ -138,6 +138,47 @@
                                     <% } %>
                                 </div>
 
+                                <%#
+                                  Backup-Aufbewahrung. Sie hing zuerst am einzelnen Cronjob —
+                                  wer den loescht, verlor auch die Aufbewahrung, und der alte
+                                  Bestand blieb liegen. Deshalb steht sie hier am Server.
+                                %>
+                                <div class="mb-4">
+                                    <label class="form-label">
+                                        <i class="fas fa-clock-rotate-left me-1"></i>
+                                        Backups aufräumen
+                                    </label>
+                                    <div class="row">
+                                        <div class="col-sm-6">
+                                            <div class="input-group input-group-sm mb-2">
+                                                <span class="input-group-text">behalte</span>
+                                                <input type="number" class="form-control"
+                                                       id="backup_keep" name="backup_keep"
+                                                       min="0" max="65535" step="1"
+                                                       value="<%= server.backup_keep ?? 0 %>">
+                                                <span class="input-group-text">Stück</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <div class="input-group input-group-sm mb-2">
+                                                <span class="input-group-text">höchstens</span>
+                                                <input type="number" class="form-control"
+                                                       id="backup_keep_days" name="backup_keep_days"
+                                                       min="0" max="65535" step="1"
+                                                       value="<%= server.backup_keep_days ?? 0 %>">
+                                                <span class="input-group-text">Tage alt</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <small class="form-text text-secondary">
+                                        Gilt für <strong>automatische</strong> Backups dieses Servers —
+                                        von Hand angelegte bleiben immer stehen, ebenso das jüngste
+                                        Backup. <strong>0 heißt unbegrenzt.</strong> Aufgeräumt wird nach
+                                        jedem neuen Backup und einmal täglich um 3:30 Uhr; ein einzelner
+                                        Cronjob darf davon abweichen.
+                                    </small>
+                                </div>
+
                                 <!-- Auto Restart -->
                                 <div class="mb-3">
                                     <div class="form-check form-switch">

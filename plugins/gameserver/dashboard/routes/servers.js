@@ -2032,6 +2032,8 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
                 gs.allocated_disk_gb,
                 gs.disk_quota_enforced,
                 gs.disk_quota_note,
+                gs.backup_keep,
+                gs.backup_keep_days,
                 am.name as game_name,
                 am.slug as game_slug
             FROM gameservers gs
@@ -2545,7 +2547,8 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
         // sobald die nächste Abfrage durchlief.
         const {
             name, auto_restart, auto_update, env_variables,
-            allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb
+            allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb,
+            backup_keep, backup_keep_days
         } = req.body;
 
         Logger.info(`[Gameserver] Server-Update angefordert (ID: ${serverId})`);
@@ -2659,6 +2662,21 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
             felder.push('allocated_ram_mb = ?', 'allocated_cpu_percent = ?', 'allocated_disk_gb = ?');
             werte.push(neueRessourcen.ramMB, neueRessourcen.cpuPercent, neueRessourcen.diskGB);
         }
+
+        // Backup-Aufbewahrung. Die Grenze haengt seit dem 2026-08-10 am Server,
+        // damit sie auch dann gilt, wenn der Backup-Cronjob geloescht wird.
+        // Ein leeres Feld heisst hier "unveraendert lassen", eine 0 heisst
+        // "unbegrenzt" — deshalb keine Kurzform mit `|| 0`.
+        const aufbewahrung = (wert) => {
+            if (wert === undefined || wert === null || wert === '') return null;
+            const n = Number.parseInt(wert, 10);
+            if (!Number.isFinite(n) || n < 0) return 0;
+            return Math.min(n, 65535);
+        };
+        const keep     = aufbewahrung(backup_keep);
+        const keepDays = aufbewahrung(backup_keep_days);
+        if (keep !== null)     { felder.push('backup_keep = ?');      werte.push(keep); }
+        if (keepDays !== null) { felder.push('backup_keep_days = ?'); werte.push(keepDays); }
 
         werte.push(serverId, guildId);
         await dbService.query(
@@ -4358,13 +4376,17 @@ router.post('/:serverId/cronjobs', requirePermission('GAMESERVER.CRONJOBS.MANAGE
         // Aufbewahrung gilt nur für Backup-Jobs. Eine Zahl an einem
         // Neustart-Job wäre stillschweigend wirkungslos, deshalb wird sie dort
         // gar nicht erst gespeichert.
+        // NULL heisst "erbt die Servereinstellung", 0 heisst "ausdruecklich
+        // unbegrenzt". Ein `|| 0` an dieser Stelle machte aus jedem geerbten
+        // Wert ein "unbegrenzt", und niemand raeumte mehr auf.
         const grenze = (wert) => {
+            if (wert === undefined || wert === null || wert === '') return null;
             const n = Number.parseInt(wert, 10);
             if (!Number.isFinite(n) || n < 0) return 0;
             return Math.min(n, 65535);
         };
-        const keep     = action === 'backup' ? grenze(backup_keep) : 0;
-        const keepDays = action === 'backup' ? grenze(backup_keep_days) : 0;
+        const keep     = action === 'backup' ? grenze(backup_keep) : null;
+        const keepDays = action === 'backup' ? grenze(backup_keep_days) : null;
 
         const result = await dbService.query(
             `INSERT INTO gameserver_cronjobs (server_id, guild_id, name, cron_expr, action, command,

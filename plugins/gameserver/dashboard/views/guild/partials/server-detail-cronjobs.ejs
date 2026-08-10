@@ -20,16 +20,11 @@
     </div>
 </div>
 
-<!-- Info-Box Cron-Syntax -->
-<div class="alert alert-secondary py-2 mb-3">
-    <i class="fas fa-info-circle me-1"></i>
-    <strong>Cron-Syntax:</strong>
-    <code>Minute Stunde Tag Monat Wochentag</code>
-    — Beispiele:
-    <code>0 4 * * *</code> (täglich 4:00 Uhr),
-    <code>*/30 * * * *</code> (alle 30 Min.),
-    <code>0 6 * * 1</code> (Mo 6:00 Uhr)
-</div>
+<%#
+  Die Erklaerung der Cron-Syntax stand hier als Dauer-Infobox. Seit es den
+  Baukasten gibt, muss sie niemand mehr lesen — und wer sie doch braucht,
+  findet sie beim Expertenfeld im Fenster.
+%>
 
 <% if (userPermissions.permissions['GAMESERVER.CRONJOBS.MANAGE']) { %>
 <!-- Cronjob Modal (Erstellen / Bearbeiten) -->
@@ -48,48 +43,101 @@
                     <input type="text" id="cronjobName" class="form-control" placeholder="z.B. Nächtlicher Neustart" maxlength="128" required>
                 </div>
 
+                <%#
+                  Baukasten statt Cron-Syntax. Der Wunsch war ausdruecklich, dass
+                  auch Leute ohne Erfahrung damit einen Job anlegen koennen — ein
+                  Auswahlfeld mit Vorlagen reicht dafuer nicht, sobald jemand
+                  "taeglich um 3:30" will und die Vorlage nur 4:00 kennt.
+                  Der nackte Ausdruck steht weiter zur Verfuegung, aber eingeklappt.
+                %>
                 <div class="mb-3">
-                    <label for="cronjobVorlage">Zeitpunkt</label>
-                    <select id="cronjobVorlage" class="form-control" onchange="vorlageUebernehmen()">
-                        <option value="">— Vorlage wählen —</option>
-                        <option value="*/15 * * * *">Alle 15 Minuten</option>
-                        <option value="*/30 * * * *">Alle 30 Minuten</option>
-                        <option value="0 * * * *">Stündlich (zur vollen Stunde)</option>
-                        <option value="0 */6 * * *">Alle 6 Stunden</option>
-                        <option value="0 4 * * *">Täglich um 4:00 Uhr</option>
-                        <option value="0 5 * * *">Täglich um 5:00 Uhr</option>
-                        <option value="0 4 * * 1">Wöchentlich, Montag 4:00 Uhr</option>
-                        <option value="0 4 1 * *">Monatlich, am 1. um 4:00 Uhr</option>
+                    <label for="cronjobTakt">Wie oft? <span class="text-danger">*</span></label>
+                    <select id="cronjobTakt" class="form-control" onchange="taktGewechselt()">
+                        <option value="taeglich">Täglich</option>
+                        <option value="woechentlich">Wöchentlich</option>
+                        <option value="monatlich">Monatlich</option>
+                        <option value="stuendlich">Stündlich</option>
+                        <option value="minuten">Alle paar Minuten</option>
                     </select>
-                    <small class="form-text text-secondary">
-                        Wähle eine Vorlage oder schreibe den Ausdruck unten selbst.
-                    </small>
+                </div>
+
+                <div class="row">
+                    <div class="col-6 mb-3" id="feldWochentag" style="display:none;">
+                        <label for="cronjobWochentag">Wochentag</label>
+                        <select id="cronjobWochentag" class="form-control" onchange="planGeaendert()">
+                            <option value="1">Montag</option>
+                            <option value="2">Dienstag</option>
+                            <option value="3">Mittwoch</option>
+                            <option value="4">Donnerstag</option>
+                            <option value="5">Freitag</option>
+                            <option value="6">Samstag</option>
+                            <option value="0">Sonntag</option>
+                        </select>
+                    </div>
+
+                    <div class="col-6 mb-3" id="feldTag" style="display:none;">
+                        <label for="cronjobTag">Tag im Monat</label>
+                        <input type="number" id="cronjobTag" class="form-control" min="1" max="28" value="1"
+                               oninput="planGeaendert()">
+                        <small class="form-text text-secondary">Höchstens der 28. — sonst fällt der Lauf in kurzen Monaten aus.</small>
+                    </div>
+
+                    <div class="col-6 mb-3" id="feldUhrzeit">
+                        <label for="cronjobUhrzeit">Uhrzeit</label>
+                        <input type="time" id="cronjobUhrzeit" class="form-control" value="04:00"
+                               oninput="planGeaendert()">
+                    </div>
+
+                    <div class="col-6 mb-3" id="feldMinute" style="display:none;">
+                        <label for="cronjobMinute">Zur Minute</label>
+                        <input type="number" id="cronjobMinute" class="form-control" min="0" max="59" value="0"
+                               oninput="planGeaendert()">
+                    </div>
+
+                    <div class="col-6 mb-3" id="feldIntervall" style="display:none;">
+                        <label for="cronjobIntervall">Alle … Minuten</label>
+                        <input type="number" id="cronjobIntervall" class="form-control" min="5" max="59" value="30"
+                               oninput="planGeaendert()">
+                        <small class="form-text text-secondary">Mindestens 5 — häufiger läuft der Job in sich selbst hinein.</small>
+                    </div>
+                </div>
+
+                <div class="alert alert-info py-2 mb-3" id="cronjobVorschau">
+                    <i class="fas fa-calendar-check me-1"></i>
+                    <span id="cronjobVorschauText">Läuft täglich um 04:00 Uhr.</span>
                 </div>
 
                 <div class="mb-3">
-                    <label for="cronjobExpr">Cron-Expression <span class="text-danger">*</span></label>
-                    <input type="text" id="cronjobExpr" class="form-control" placeholder="0 4 * * *" maxlength="64"
-                           oninput="cronBeschreiben()" required>
-                    <small class="form-text" id="cronjobExprDesc">Gib eine gültige 5-feldige Cron-Expression ein.</small>
+                    <a class="text-secondary small" data-bs-toggle="collapse" href="#cronjobExpertenfeld" role="button">
+                        <i class="fas fa-code me-1"></i> Cron-Ausdruck selbst schreiben
+                    </a>
+                    <div class="collapse mt-2" id="cronjobExpertenfeld">
+                        <input type="text" id="cronjobExpr" class="form-control" placeholder="0 4 * * *" maxlength="64"
+                               oninput="ausdruckGeaendert()">
+                        <small class="form-text" id="cronjobExprDesc">
+                            Reihenfolge: Minute Stunde Tag Monat Wochentag.
+                        </small>
+                    </div>
                 </div>
 
                 <!-- Aufbewahrung: nur für Backup-Jobs sinnvoll (Baustellen 7.1) -->
                 <div id="cronjobAufbewahrungGroup" style="display:none;">
                     <div class="alert alert-secondary py-2 mb-3">
                         <i class="fas fa-hdd me-1"></i>
-                        Ohne Grenze sammeln sich die Backups auf der Platte des Zielservers.
-                        <strong>0 heißt unbegrenzt.</strong> Beide Grenzen dürfen zusammen gelten;
-                        von Hand angelegte Backups bleiben immer stehen.
+                        Die Aufbewahrung steht in den <strong>Servereinstellungen</strong> und gilt
+                        für alle automatischen Backups. Hier nur ausfüllen, wenn dieser eine Job
+                        davon abweichen soll — <strong>leer heißt: Servereinstellung</strong>,
+                        <strong>0 heißt ausdrücklich unbegrenzt</strong>.
                     </div>
                     <div class="row">
                         <div class="col-6 mb-3">
                             <label for="cronjobKeep">Anzahl behalten</label>
-                            <input type="number" id="cronjobKeep" class="form-control" min="0" max="65535" value="7">
+                            <input type="number" id="cronjobKeep" class="form-control" min="0" max="65535" placeholder="Servereinstellung">
                             <small class="form-text text-secondary">Nur die neuesten so vielen bleiben.</small>
                         </div>
                         <div class="col-6 mb-3">
                             <label for="cronjobKeepDays">Höchstalter (Tage)</label>
-                            <input type="number" id="cronjobKeepDays" class="form-control" min="0" max="65535" value="0">
+                            <input type="number" id="cronjobKeepDays" class="form-control" min="0" max="65535" placeholder="Servereinstellung">
                             <small class="form-text text-secondary">Das jüngste Backup bleibt immer.</small>
                         </div>
                     </div>
@@ -172,6 +220,7 @@
     </div>
 </div>
 
+<script src="/assets/plugins/gameserver/js/cronPlan.js"></script>
 <script>
 /**
  * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
@@ -207,70 +256,93 @@ function fenster(id) {
         skipped: '<span class="badge bg-warning-lt"><i class="fas fa-forward me-1"></i>Übersprungen</span>',
     };
 
-    /** Cron-Ausdruck in einen Satz übersetzen — nur die gängigen Formen. */
-    function cronAlsText(ausdruck) {
-        const teile = String(ausdruck || '').trim().split(/\s+/);
-        if (teile.length !== 5) return null;
-        const [min, std, tag, monat, wtag] = teile;
-        const WOCHENTAGE = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-        const zahl = (s) => /^\d+$/.test(s);
-        const uhr = () => `${String(std).padStart(2,'0')}:${String(min).padStart(2,'0')} Uhr`;
+    // Dieselbe Rechnung wie im CronWorker — die Datei liegt bei den Assets und
+    // wird von beiden Seiten benutzt. Zwei Fassungen waeren zwei Wahrheiten.
+    const Plan = window.CronPlan;
 
-        if (/^\*\/(\d+)$/.test(min) && std === '*' && tag === '*' && monat === '*' && wtag === '*') {
-            return `alle ${min.slice(2)} Minuten`;
-        }
-        if (zahl(min) && std === '*' && tag === '*' && monat === '*' && wtag === '*') {
-            return `stündlich, jeweils zur Minute ${min}`;
-        }
-        if (zahl(min) && /^\*\/(\d+)$/.test(std) && tag === '*' && monat === '*' && wtag === '*') {
-            return `alle ${std.slice(2)} Stunden`;
-        }
-        if (zahl(min) && zahl(std) && tag === '*' && monat === '*' && wtag === '*') {
-            return `täglich um ${uhr()}`;
-        }
-        if (zahl(min) && zahl(std) && tag === '*' && monat === '*' && zahl(wtag)) {
-            return `wöchentlich, ${WOCHENTAGE[Number(wtag) % 7]} um ${uhr()}`;
-        }
-        if (zahl(min) && zahl(std) && zahl(tag) && monat === '*' && wtag === '*') {
-            return `monatlich, am ${tag}. um ${uhr()}`;
-        }
-        return null;
+    const cronAlsText = (a) => Plan.beschreibe(a);
+
+    const el = (id) => document.getElementById(id);
+
+    /** Liest den Baukasten aus. */
+    function planAusFeldern() {
+        const takt = el('cronjobTakt').value;
+        const [stunde, minute] = (el('cronjobUhrzeit').value || '04:00').split(':').map(Number);
+        return {
+            takt,
+            stunde,
+            minute: takt === 'stuendlich' ? Number(el('cronjobMinute').value) : minute,
+            wochentag: Number(el('cronjobWochentag').value),
+            tag: Number(el('cronjobTag').value),
+            intervall: Number(el('cronjobIntervall').value),
+        };
     }
 
-    /** Vorlage in das Textfeld übernehmen. */
-    window.vorlageUebernehmen = function() {
-        const wert = document.getElementById('cronjobVorlage').value;
-        if (!wert) return;
-        document.getElementById('cronjobExpr').value = wert;
-        cronBeschreiben();
+    /** Zeigt nur die Felder, die der gewählte Takt braucht. */
+    window.taktGewechselt = function() {
+        const takt = el('cronjobTakt').value;
+        el('feldWochentag').style.display = takt === 'woechentlich' ? '' : 'none';
+        el('feldTag').style.display       = takt === 'monatlich'    ? '' : 'none';
+        el('feldUhrzeit').style.display   = ['taeglich','woechentlich','monatlich'].includes(takt) ? '' : 'none';
+        el('feldMinute').style.display    = takt === 'stuendlich'   ? '' : 'none';
+        el('feldIntervall').style.display = takt === 'minuten'      ? '' : 'none';
+        planGeaendert();
+    };
+
+    /** Baukasten → Ausdruck → Vorschau. */
+    window.planGeaendert = function() {
+        const ausdruck = Plan.baue(planAusFeldern());
+        el('cronjobExpr').value = ausdruck;
+        vorschauZeigen(ausdruck);
     };
 
     /**
-     * Schreibt unter das Feld, was der Ausdruck bedeutet.
-     * Wer die Syntax nicht kennt, sieht sofort, ob er das Richtige getroffen
-     * hat — das war der eigentliche Wunsch hinter Punkt 7.
+     * Ausdruck → Baukasten. Wer selbst schreibt, soll die Felder mitwandern
+     * sehen; passt die Form nicht in den Baukasten, bleibt der Ausdruck
+     * trotzdem gültig und die Vorschau sagt das.
      */
-    window.cronBeschreiben = function() {
-        const feld = document.getElementById('cronjobExpr');
-        const hinweis = document.getElementById('cronjobExprDesc');
-        const wert = feld.value.trim();
-
-        if (!wert) {
-            hinweis.className = 'form-text text-secondary';
-            hinweis.textContent = 'Gib eine gültige 5-feldige Cron-Expression ein.';
-            return;
-        }
-        if (wert.split(/\s+/).length !== 5) {
-            hinweis.className = 'form-text text-danger';
-            hinweis.textContent = `${wert.split(/\s+/).length} Felder statt 5 — Reihenfolge: Minute Stunde Tag Monat Wochentag`;
-            return;
-        }
-        const satz = cronAlsText(wert);
-        hinweis.className = satz ? 'form-text text-success' : 'form-text text-secondary';
-        hinweis.textContent = satz
-            ? `Läuft ${satz}.`
-            : 'Fünf Felder — sieht gültig aus. Diese Form kann ich nicht in Worte fassen.';
+    window.ausdruckGeaendert = function() {
+        const ausdruck = el('cronjobExpr').value.trim();
+        const plan = Plan.lies(ausdruck);
+        if (plan) planInFelder(plan);
+        vorschauZeigen(ausdruck);
     };
+
+    function planInFelder(plan) {
+        el('cronjobTakt').value = plan.takt;
+        if (plan.takt === 'minuten')    el('cronjobIntervall').value = plan.intervall;
+        if (plan.takt === 'stuendlich') el('cronjobMinute').value    = plan.minute;
+        if (plan.stunde !== undefined) {
+            el('cronjobUhrzeit').value =
+                `${String(plan.stunde).padStart(2,'0')}:${String(plan.minute).padStart(2,'0')}`;
+        }
+        if (plan.takt === 'woechentlich') el('cronjobWochentag').value = String(plan.wochentag);
+        if (plan.takt === 'monatlich')    el('cronjobTag').value       = plan.tag;
+
+        const takt = plan.takt;
+        el('feldWochentag').style.display = takt === 'woechentlich' ? '' : 'none';
+        el('feldTag').style.display       = takt === 'monatlich'    ? '' : 'none';
+        el('feldUhrzeit').style.display   = ['taeglich','woechentlich','monatlich'].includes(takt) ? '' : 'none';
+        el('feldMinute').style.display    = takt === 'stuendlich'   ? '' : 'none';
+        el('feldIntervall').style.display = takt === 'minuten'      ? '' : 'none';
+    }
+
+    function vorschauZeigen(ausdruck) {
+        const kasten = el('cronjobVorschau');
+        const text   = el('cronjobVorschauText');
+        const felder = ausdruck.trim().split(/\s+/).length;
+
+        if (!ausdruck.trim() || felder !== 5) {
+            kasten.className = 'alert alert-danger py-2 mb-3';
+            text.textContent = `${felder} Felder statt 5 — Reihenfolge: Minute Stunde Tag Monat Wochentag.`;
+            return;
+        }
+        const satz = Plan.beschreibe(ausdruck);
+        kasten.className = 'alert alert-info py-2 mb-3';
+        text.textContent = satz
+            ? `Läuft ${satz}.`
+            : `Läuft nach dem Ausdruck ${ausdruck} — diese Form kann ich nicht in Worte fassen.`;
+    }
 
     /** Aufbewahrungsfelder nur bei Backup-Jobs zeigen. */
     function aufbewahrungUmschalten() {
@@ -323,7 +395,7 @@ function fenster(id) {
                     <td>
                         <code>${escHtml(j.cron_expr)}</code>
                         ${cronAlsText(j.cron_expr) ? `<br><small class="text-secondary">${escHtml(cronAlsText(j.cron_expr))}</small>` : ''}
-                        ${j.action === 'backup' && (j.backup_keep || j.backup_keep_days) ? `<br><small class="text-secondary"><i class="fas fa-hdd me-1"></i>behält ${j.backup_keep || '∞'}${j.backup_keep_days ? `, max. ${j.backup_keep_days} Tage` : ''}</small>` : ''}
+                        ${j.action === 'backup' ? `<br><small class="text-secondary"><i class="fas fa-hdd me-1"></i>${(j.backup_keep === null && j.backup_keep_days === null) ? 'Aufbewahrung wie im Server' : `abweichend: behält ${j.backup_keep ?? '∞'}${j.backup_keep_days ? `, max. ${j.backup_keep_days} Tage` : ''}`}</small>` : ''}
                     </td>
                     <td>${ACTION_LABELS[j.action] || j.action}</td>
                     <td><small>${fmtDate(j.last_run_at)}</small></td>
@@ -374,13 +446,19 @@ function fenster(id) {
         document.getElementById('cronjobCommand').value = '';
         document.getElementById('cronjobRunOnce').checked = false;
         document.getElementById('cronjobEnabled').checked = true;
-        document.getElementById('cronjobVorlage').value = '';
-        // Vorschlag für neue Backup-Jobs: sieben Stück. Bestehende Jobs behalten
-        // ihre 0 (unbegrenzt) – die Migration ändert nichts an ihnen.
-        document.getElementById('cronjobKeep').value = 7;
-        document.getElementById('cronjobKeepDays').value = 0;
+        // Baukasten auf die haeufigste Wahl stellen: taeglich um 4 Uhr.
+        document.getElementById('cronjobTakt').value = 'taeglich';
+        document.getElementById('cronjobUhrzeit').value = '04:00';
+        document.getElementById('cronjobWochentag').value = '1';
+        document.getElementById('cronjobTag').value = 1;
+        document.getElementById('cronjobMinute').value = 0;
+        document.getElementById('cronjobIntervall').value = 30;
+        // Leer = erbt die Servereinstellung. Das ist die richtige Vorgabe,
+        // seit die Aufbewahrung am Server haengt.
+        document.getElementById('cronjobKeep').value = '';
+        document.getElementById('cronjobKeepDays').value = '';
         toggleCommandField();
-        cronBeschreiben();
+        taktGewechselt();
         fenster('cronjobModal')?.show();
     };
 
@@ -394,11 +472,10 @@ function fenster(id) {
         document.getElementById('cronjobCommand').value = job.command || '';
         document.getElementById('cronjobRunOnce').checked = !!job.run_once;
         document.getElementById('cronjobEnabled').checked = !!job.enabled;
-        document.getElementById('cronjobVorlage').value = '';
-        document.getElementById('cronjobKeep').value = job.backup_keep ?? 0;
-        document.getElementById('cronjobKeepDays').value = job.backup_keep_days ?? 0;
+        document.getElementById('cronjobKeep').value = job.backup_keep ?? '';
+        document.getElementById('cronjobKeepDays').value = job.backup_keep_days ?? '';
         toggleCommandField();
-        cronBeschreiben();
+        ausdruckGeaendert();
         fenster('cronjobModal')?.show();
     };
 
@@ -411,10 +488,15 @@ function fenster(id) {
         const command = document.getElementById('cronjobCommand').value.trim();
         const run_once = document.getElementById('cronjobRunOnce').checked;
         const enabled = document.getElementById('cronjobEnabled').checked;
-        const backup_keep = action === 'backup'
-            ? (parseInt(document.getElementById('cronjobKeep').value, 10) || 0) : 0;
-        const backup_keep_days = action === 'backup'
-            ? (parseInt(document.getElementById('cronjobKeepDays').value, 10) || 0) : 0;
+        // Leeres Feld heisst "erbt vom Server" (null), nicht "unbegrenzt" (0).
+        const grenzeAusFeld = (id) => {
+            const roh = document.getElementById(id).value.trim();
+            if (roh === '') return null;
+            const n = parseInt(roh, 10);
+            return Number.isFinite(n) && n >= 0 ? n : null;
+        };
+        const backup_keep = action === 'backup' ? grenzeAusFeld('cronjobKeep') : null;
+        const backup_keep_days = action === 'backup' ? grenzeAusFeld('cronjobKeepDays') : null;
 
         if (!name || !cron_expr || !action) {
             alert('Bitte Name, Cron-Expression und Aktion ausfüllen.');
