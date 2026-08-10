@@ -37,26 +37,41 @@ const { wendeAn } = require('./anwenden');
  * @param {string} aktion Eine der `AKTION`-Konstanten
  */
 async function behandleReaktion(reaction, user, aktion) {
+    // Jeder Ausstieg sagt, warum. Vorher gab es neun stille `return` und keine
+    // einzige Protokollzeile — bei einem Rollenmenü, das nichts tut, stand man
+    // damit vor einem schwarzen Kasten: keine Rückmeldung an das Mitglied
+    // (dafür fehlt bei Reaktionen der Kanal) UND nichts im Protokoll.
+    //
+    // `debug`, nicht `info`: im Normalbetrieb läuft hier jede Reaktion des
+    // ganzen Servers durch, auch auf Nachrichten, die keine Menüs sind.
+    const raus = (grund) => {
+        Logger.debug(`[Discord] Reaktion nicht verarbeitet: ${grund}`);
+        return undefined;
+    };
+
     if (user.bot) return;
 
     if (reaction.partial) {
-        try { await reaction.fetch(); } catch { return; }
+        try { await reaction.fetch(); } catch { return raus('Reaktion nicht nachladbar'); }
     }
     if (reaction.message.partial) {
-        try { await reaction.message.fetch(); } catch { return; }
+        try { await reaction.message.fetch(); } catch { return raus('Nachricht nicht nachladbar'); }
     }
 
     const guild = reaction.message.guild;
-    if (!guild) return;
+    if (!guild) return raus('keine Guild (DM?)');
 
     try {
         const menu = await DiscordRoleMenus.getMenuByMessage(guild.id, reaction.message.id);
-        if (!menu || menu.darstellung !== 'reaktion') return;
+        if (!menu) return raus(`kein Menü zu Nachricht ${reaction.message.id}`);
+        if (menu.darstellung !== 'reaktion') {
+            return raus(`Menü #${menu.id} ist als "${menu.darstellung}" eingestellt, nicht als Reaktionen`);
+        }
 
         // Erst jetzt das Mitglied holen. Vorher wäre es ein Discord-Aufruf für
         // jede Reaktion auf jede beliebige Nachricht des Servers.
         const member = await guild.members.fetch(user.id).catch(() => null);
-        if (!member) return;
+        if (!member) return raus(`Mitglied ${user.id} nicht abrufbar`);
 
         const emoji = reaction.emoji.id
             ? `<${reaction.emoji.animated ? 'a' : ''}:${reaction.emoji.name}:${reaction.emoji.id}>`
@@ -75,7 +90,11 @@ async function behandleReaktion(reaction, user, aktion) {
         const schluessel = (wert) => String(wert || '').replace(/\uFE0F/g, '');
 
         const eintrag = menu.optionen.find(o => schluessel(o.emoji) === schluessel(emoji));
-        if (!eintrag) return;
+        if (!eintrag) {
+            return raus(`Emoji ${JSON.stringify(emoji)} steht nicht im Menü #${menu.id} `
+                + `(dort: ${menu.optionen.map(o => JSON.stringify(o.emoji)).join(', ') || 'keine Einträge'})`);
+        }
+        Logger.info(`[Discord] Menü #${menu.id}: ${member.user.tag} reagiert mit ${emoji} → ${aktion}`);
 
         const alleRollen = menu.optionen.map(o => String(o.role_id));
         const hatRollen = new Set(member.roles.cache.map(r => r.id));
