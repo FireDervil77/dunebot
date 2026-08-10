@@ -212,12 +212,82 @@ function toteViews(korpus) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pruefung 4: Uebersetzungsschluessel ohne Verwendung
+//
+// Ein Schluessel steht nicht immer als ganze Zeichenkette im Code. Die
+// Filterseite von automod baut ihn zusammen — `tr(schluessel + '.HELP')` —, und
+// eine reine Textsuche meldet dann jeden Schluessel dieser Seite als tot. Von
+// 64 Meldungen in automod waren 20 auf diese Weise falsch.
+//
+// Darum wird zweimal gesucht: erst nach der ganzen Zeichenkette, dann nach den
+// beiden Haelften. Was sich zusammensetzen laesst, wird nicht verschwiegen,
+// sondern getrennt gemeldet — es bleibt ein Verdacht, nur ein schwaecherer.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Sammelt die Bruchstuecke, mit denen der Code Schluessel zusammensetzt. */
+function dynamischeTeile(suchraum) {
+    const enden = new Set();     // `+ '.HELP'`  bzw.  `${…}.HELP`
+    const anfaenge = new Set();  // `'automod:SETTINGS.' + name`
+
+    for (const m of suchraum.matchAll(/\+\s*['"`](\.[A-Za-z0-9_.]+)['"`]/g)) enden.add(m[1]);
+    for (const m of suchraum.matchAll(/\}(\.[A-Za-z0-9_.]+)\s*['"`]/g)) enden.add(m[1]);
+    for (const m of suchraum.matchAll(/['"`]([A-Za-z0-9_:.]*\.)['"`]\s*\+/g)) anfaenge.add(m[1]);
+    for (const m of suchraum.matchAll(/['"`]([A-Za-z0-9_:.]*\.)\$\{/g)) anfaenge.add(m[1]);
+
+    return { enden, anfaenge };
+}
+
+/**
+ * Prueft, ob sich `schluessel` aus einem im Code stehenden Rumpf und einem
+ * angehaengten Ende zusammensetzen laesst. Gibt die Begruendung zurueck oder
+ * null.
+ *
+ * Der Namensraum entscheidet mit. `'music:SETTINGS.' + name` darf einen
+ * automod-Schluessel nicht rechtfertigen — ohne diese Pruefung tut es das,
+ * weil beide Plugins Schluessel unter `SETTINGS.` fuehren.
+ */
+function zusammensetzbar(schluessel, eigenerRaum, suchraum, namensraum, { enden, anfaenge }) {
+    for (const ende of enden) {
+        if (!schluessel.endsWith(ende)) continue;
+        const rumpf = schluessel.slice(0, -ende.length);
+        if (!rumpf) continue;
+        // Entweder der Rumpf steht im eigenen Bereich (dort wird ohne
+        // Namensraum geschrieben), oder anderswo ausdruecklich mit ihm.
+        const eigen = eigenerRaum.includes(rumpf);
+        const fremd = namensraum && suchraum.includes(`${namensraum}:${rumpf}`);
+        if (eigen || fremd) return `'${rumpf}' + '${ende}'`;
+    }
+    for (const anfang of anfaenge) {
+        if (anfang.includes(':')) {
+            // Mit Namensraum: er muss der eigene sein.
+            const [ns, rest] = [anfang.slice(0, anfang.indexOf(':')), anfang.slice(anfang.indexOf(':') + 1)];
+            if (ns !== namensraum) continue;
+            if (rest && schluessel.startsWith(rest)) return `'${anfang}' + Variable`;
+        } else if (schluessel.startsWith(anfang)) {
+            return `'${anfang}' + Variable`;
+        }
+    }
+    return null;
+}
+
+/**
+ * Namensraum und eigener Bereich einer Sprachdatei.
+ * `plugins/automod/dashboard/locales/de-DE.json` → automod, plugins/automod.
+ */
+function bereichDerSprachdatei(relativerPfad) {
+    const teile = relativerPfad.split(/[\\/]/);
+    if (teile[0] === 'plugins' && teile[1]) {
+        return { namensraum: teile[1], wurzel: `${teile[0]}/${teile[1]}` };
+    }
+    return { namensraum: null, wurzel: teile[0] };
+}
+
 function toteUebersetzungen(korpus) {
     const befunde = [];
-    const suchraum = [...korpus.entries()]
-        .filter(([d]) => d.endsWith('.js') || d.endsWith('.ejs'))
-        .map(([, i]) => i).join('\n');
+    const codeDateien = [...korpus.entries()]
+        .filter(([d]) => d.endsWith('.js') || d.endsWith('.ejs'));
+    const suchraum = codeDateien.map(([, i]) => i).join('\n');
+
+    const globaleTeile = dynamischeTeile(suchraum);
 
     const flach = (o, praefix = '') => {
         const raus = [];
@@ -237,8 +307,26 @@ function toteUebersetzungen(korpus) {
         let daten;
         try { daten = JSON.parse(inhalt); } catch (_) { continue; }
 
+        const { namensraum, wurzel } = bereichDerSprachdatei(relativ(datei));
+        const eigenerRaum = codeDateien
+            .filter(([d]) => relativ(d).startsWith(wurzel + path.sep) || relativ(d).startsWith(wurzel + '/'))
+            .map(([, i]) => i).join('\n');
+        // Bruchstuecke aus dem eigenen Bereich zaehlen ohne Namensraum, die aus
+        // dem Rest des Projekts nur mit.
+        const teile = dynamischeTeile(eigenerRaum);
+        for (const e of globaleTeile.enden) teile.enden.add(e);
+        for (const a of globaleTeile.anfaenge) if (a.includes(':')) teile.anfaenge.add(a);
+
         const schluessel = flach(daten);
-        const tot = schluessel.filter(k => !suchraum.includes(k));
+        const tot = [];
+        const dynamisch = [];
+
+        for (const k of schluessel) {
+            if (suchraum.includes(k)) continue;
+            const grund = zusammensetzbar(k, eigenerRaum, suchraum, namensraum, teile);
+            if (grund) dynamisch.push(`${k}  ←  ${grund}`);
+            else tot.push(k);
+        }
 
         if (tot.length) {
             befunde.push({
@@ -246,6 +334,16 @@ function toteUebersetzungen(korpus) {
                 zeile: 1,
                 was: `${tot.length} von ${schluessel.length} Schluesseln`,
                 hinweis: tot.slice(0, 5).join(', ') + (tot.length > 5 ? ' …' : ''),
+                liste: tot,
+            });
+        }
+        if (dynamisch.length) {
+            befunde.push({
+                datei: relativ(datei),
+                zeile: 1,
+                was: `${dynamisch.length} moeglicherweise dynamisch gebildet`,
+                hinweis: 'nicht als ganze Zeichenkette im Code — vor dem Loeschen pruefen',
+                liste: dynamisch,
             });
         }
     }
@@ -341,7 +439,11 @@ function tabellenOhneNutzung(korpus) {
     for (const [datei, inhalt] of korpus) {
         if (!datei.includes(`${path.sep}migrations${path.sep}`)) continue;
 
-        for (const t of inhalt.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?`?([a-z_][a-z0-9_]*)`?/gi)) {
+        // Die oeffnende Klammer der Spaltenliste gehoert zum Muster. Ohne sie
+        // liest das Skript auch Fliesstext in Kommentaren mit: aus dem Satz
+        // "... `CREATE TABLE IF NOT EXISTS`. Die Tabellen gab es schon" wurde
+        // eine Tabelle namens `IF`.
+        for (const t of inhalt.matchAll(/CREATE TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([a-z_][a-z0-9_]*)`?\s*\(/gi)) {
             if (!tabellen.has(t[1])) tabellen.set(t[1], relativ(datei));
         }
         // Eine spaetere Migration kann eine Tabelle der Baseline wieder
@@ -527,6 +629,10 @@ function berichtSchreibenNach(ergebnisse, dateiZahl) {
             zeilen.push('');
             for (const b of liste.slice(0, 60)) {
                 zeilen.push(`- \`${b.datei}:${b.zeile}\` — **${b.was}** · ${b.hinweis}`);
+                // Wo ein Befund viele Einzelposten buendelt (Schluessel einer
+                // Sprachdatei), gehoert die vollstaendige Liste in den Bericht —
+                // sonst muesste man sie von Hand nachbauen, um sie abzuarbeiten.
+                for (const eintrag of b.liste || []) zeilen.push(`  - \`${eintrag}\``);
             }
             if (liste.length > 60) zeilen.push(`- … und ${liste.length - 60} weitere`);
             zeilen.push('');

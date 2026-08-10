@@ -217,6 +217,16 @@ class AutoModPlugin extends DashboardPlugin {
     /**
      * Plugin in einer Guild deaktivieren
      *
+     * Entfernt die Navigation - und sonst nichts. Einstellungen, Strikes und
+     * Protokoll bleiben stehen, damit ein versehentliches Abschalten und
+     * Wiedereinschalten nicht die Arbeit von Monaten kostet.
+     *
+     * In den Modellen standen dafuer `deleteSettings`, `deleteAllStrikes` und
+     * `deleteAllLogs` bereit, mit dem Kommentar "z.B. bei Plugin-Deaktivierung".
+     * Keine davon hatte je einen Aufrufer; am 2026-08-10 wurden sie geloescht.
+     * Wenn Daten wirklich weg sollen, gehoert das in eine eigene, ausdrueckliche
+     * Aktion mit Rueckfrage - nicht stillschweigend an den Abschalter.
+     *
      * @param {string} guildId Discord-Guild-ID
      */
     async onGuildDisable(guildId) {

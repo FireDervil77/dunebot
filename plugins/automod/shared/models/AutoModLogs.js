@@ -96,34 +96,6 @@ class AutoModLogs {
     }
 
     /**
-     * Zählt Logs für einen Member in einem Zeitraum
-     * Nützlich für "Violations in letzten 24h"-Checks
-     * 
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} memberId - Discord Member ID
-     * @param {number} hours - Zeitraum in Stunden (default: 24)
-     * @returns {Promise<number>} Anzahl Logs im Zeitraum
-     */
-    static async countRecentLogs(guildId, memberId, hours = 24) {
-        const dbService = ServiceManager.get('dbService');
-        
-        try {
-            const rows = await dbService.query(
-                `SELECT COUNT(*) as count FROM automod_logs 
-                 WHERE guild_id = ? AND member_id = ? 
-                 AND logged_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)`,
-                [guildId, memberId, hours]
-            );
-            
-            return rows[0]?.count || 0;
-        } catch (error) {
-            const Logger = ServiceManager.get('Logger');
-            Logger.error('[AutoMod] Fehler beim Zählen der Logs:', error);
-            throw error;
-        }
-    }
-
-    /**
      * Lädt Statistiken für eine Guild
      * 
      * @param {string} guildId - Discord Guild ID
@@ -207,28 +179,6 @@ class AutoModLogs {
         }
     }
 
-    /**
-     * Löscht alle Logs für eine Guild (z.B. bei Plugin-Deaktivierung)
-     * 
-     * @param {string} guildId - Discord Guild ID
-     * @returns {Promise<void>}
-     */
-    static async deleteAllLogs(guildId) {
-        const dbService = ServiceManager.get('dbService');
-        const Logger = ServiceManager.get('Logger');
-        
-        try {
-            await dbService.query(
-                'DELETE FROM automod_logs WHERE guild_id = ?',
-                [guildId]
-            );
-            
-            Logger.debug(`[AutoMod] Alle Logs für Guild ${guildId} gelöscht`);
-        } catch (error) {
-            Logger.error('[AutoMod] Fehler beim Löschen der Logs:', error);
-            throw error;
-        }
-    }
 }
 
 module.exports = AutoModLogs;

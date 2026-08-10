@@ -73,21 +73,6 @@ class AutoModStrikes {
     }
 
     /**
-     * Inkrementiert Strikes für einen Member
-     * 
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} memberId - Discord Member ID
-     * @param {number} amount - Anzahl Strikes die hinzugefügt werden (default: 1)
-     * @returns {Promise<number>} Neue Strike-Anzahl
-     */
-    static async addStrikes(guildId, memberId, amount = 1) {
-        const currentStrikes = await this.getStrikes(guildId, memberId);
-        const newStrikes = currentStrikes + amount;
-        await this.updateStrikes(guildId, memberId, newStrikes);
-        return newStrikes;
-    }
-
-    /**
      * Lädt alle Member mit Strikes für eine Guild
      * Sortiert nach Strike-Anzahl (höchste zuerst)
      * 
@@ -116,28 +101,6 @@ class AutoModStrikes {
         }
     }
 
-    /**
-     * Löscht alle Strikes für eine Guild (z.B. bei Plugin-Deaktivierung)
-     * 
-     * @param {string} guildId - Discord Guild ID
-     * @returns {Promise<void>}
-     */
-    static async deleteAllStrikes(guildId) {
-        const dbService = ServiceManager.get('dbService');
-        const Logger = ServiceManager.get('Logger');
-        
-        try {
-            await dbService.query(
-                'DELETE FROM automod_strikes WHERE guild_id = ?',
-                [guildId]
-            );
-            
-            Logger.debug(`[AutoMod] Alle Strikes für Guild ${guildId} gelöscht`);
-        } catch (error) {
-            Logger.error('[AutoMod] Fehler beim Löschen der Strikes:', error);
-            throw error;
-        }
-    }
 }
 
 module.exports = AutoModStrikes;

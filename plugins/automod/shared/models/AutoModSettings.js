@@ -155,28 +155,6 @@ class AutoModSettings {
         }
     }
 
-    /**
-     * Löscht Settings für eine Guild (z.B. bei Plugin-Deaktivierung)
-     * 
-     * @param {string} guildId - Discord Guild ID
-     * @returns {Promise<void>}
-     */
-    static async deleteSettings(guildId) {
-        const dbService = ServiceManager.get('dbService');
-        const Logger = ServiceManager.get('Logger');
-        
-        try {
-            await dbService.query(
-                'DELETE FROM automod_settings WHERE guild_id = ?',
-                [guildId]
-            );
-            
-            Logger.debug(`[AutoMod] Settings für Guild ${guildId} gelöscht`);
-        } catch (error) {
-            Logger.error('[AutoMod] Fehler beim Löschen der Settings:', error);
-            throw error;
-        }
-    }
 }
 
 module.exports = AutoModSettings;

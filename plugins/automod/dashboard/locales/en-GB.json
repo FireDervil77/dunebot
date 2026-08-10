@@ -40,9 +40,6 @@
       "LABEL": "Debug mode",
       "HELP": "Also moderates moderators and admins — they are exempt otherwise. For testing filters with your own account."
     },
-    "ANTI_FEATURES": {
-      "TITLE": "Anti Features"
-    },
     "ANTI_GHOSTPING": {
       "LABEL": "Anti Ghost-Ping",
       "HELP": "Logs deleted messages containing mentions to the log channel. Requires a log channel and only covers messages still in the bot's cache. It only logs, it does not punish."
@@ -82,9 +79,6 @@
     "ANTI_LINKS": {
       "LABEL": "Anti-Links",
       "HELP": "Deletes messages containing links. Discord invites are excluded; Anti-Invites handles those."
-    },
-    "LIMITS": {
-      "TITLE": "Limits & Thresholds"
     },
     "MAX_LINES": {
       "LABEL": "Maximum Lines",
@@ -138,21 +132,16 @@
     }
   },
   "TABS": {
-    "COMING_SOON": "Coming Soon",
     "BASIC": {
-      "TITLE": "Basic Settings",
-      "SUBTITLE": "Core Configuration"
+      "TITLE": "Basic Settings"
     },
     "CONTENT": {
-      "TITLE": "Content Filter",
-      "SUBTITLE": "Anti Features & Filters"
+      "TITLE": "Content Filter"
     },
     "LIMITS": {
-      "TITLE": "Limits",
-      "SUBTITLE": "Thresholds & Boundaries"
+      "TITLE": "Limits"
     },
     "RAID": {
-      "TITLE": "Raid Protection",
       "SUBTITLE": "Raid Protection & Join Spam",
       "ENABLE": "Enable raid protection",
       "JOIN_THRESHOLD": "Max. joins",
@@ -174,40 +163,15 @@
     "SETTINGS_SAVED": "AutoMod settings saved successfully",
     "SETTINGS_ERROR": "Error saving AutoMod settings"
   },
-  "BASIC_TITLE": "Basic Settings",
   "LOGS_TITLE": "Logs Channel",
   "LOGS_DESC": "The channel where the bot has to send automod logs",
   "STRIKES_TITLE": "Max Strikes",
-  "STRIKES_DESC": "The maximum amount of strikes a user can have before being punished",
   "ACTION_TITLE": "Action",
   "ACTION_DESC": "The action to take when a user reaches the max amount of strikes",
   "LOG_EMBED_TITLE": "Log Embed Color",
-  "LOG_EMBED_DESC": "The color of the embeds sent in the logs channel",
-  "DM_EMBED_TITLE": "DM Embed Color",
-  "DM_EMBED_DESC": "The color of the embeds sent in the DMs of the punished user",
-  "WHITELIST_CH_TITLE": "Whitelisted Channels",
-  "WHITELIST_CH_DESC": "The channels where the bot won't moderate",
-  "TOGGLE_TITLE": "Quick Automod Toggles",
   "DEBUG_TITLE": "Debug Mode",
-  "DEBUG_DESC": "Skip moderating messages sent by moderators",
-  "ATTACH_TITLE": "Anti Attachments",
   "ATTACH_DESC": "Automatically delete messages with attachments",
-  "INVITES_TITLE": "Anti Invites",
-  "INVITES_DESC": "Automatically delete messages with discord invites",
-  "LINKS_TITLE": "Anti Links",
-  "LINKS_DESC": "Automatically delete messages with links",
-  "SPAM_TITLE": "Anti Spam",
-  "SPAM_DESC": "Automatically delete messages that are considered spam",
-  "GHOST_TITLE": "Anti Ghost Ping",
-  "GHOST_DESC": "Log and moderate ghost pings",
-  "MASSMENTION_TITLE": "Anti Mass Mention",
-  "MASSMENTION_DESC": "Automatically moderate messages with mass mentions",
-  "MASSMENTION_THRES_TITLE": "Mass Mention Threshold",
-  "MASSMENTION_THRES_DESC": "The amount of mentions a message must have to be considered a mass mention",
-  "MAXLINES_TITLE": "Max Lines",
-  "MAXLINES_DESC": "Automatically delete messages with more than the specified amount of lines",
   "COMPOUND": {
-    "ADD_TITLE": "New Compound Rule",
     "NAME": "Rule Name",
     "NAME_PLACEHOLDER": "e.g. New Account + Link",
     "LOGIC": "Logic",
@@ -224,9 +188,7 @@
     "TIP_TITLE": "Tip",
     "TIP_TEXT": "Compound rules allow you to combine multiple conditions. E.g. 'Account younger than 7 days AND message contains link' → Timeout.",
     "ENABLED": "Enabled",
-    "DISABLED": "Disabled",
-    "CONDITIONS_LABEL": "Conditions",
-    "CONFIRM_DELETE": "Do you really want to delete this compound rule?"
+    "DISABLED": "Disabled"
   },
   "DASHBOARD": {
     "SUBTITLE": "What AutoMod is doing and what it did last",

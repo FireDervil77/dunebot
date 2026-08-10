@@ -40,9 +40,6 @@
       "LABEL": "Debug-Modus",
       "HELP": "Moderiert auch Moderatoren und Admins — sonst sind sie ausgenommen. Zum Testen der Filter mit dem eigenen Konto."
     },
-    "ANTI_FEATURES": {
-      "TITLE": "Anti-Funktionen"
-    },
     "ANTI_GHOSTPING": {
       "LABEL": "Anti Ghost-Ping",
       "HELP": "Protokolliert gelöschte Nachrichten mit Erwähnungen im Log-Kanal. Braucht einen gesetzten Log-Kanal und erfasst nur Nachrichten, die der Bot noch im Zwischenspeicher hat. Es wird nur protokolliert, nicht bestraft."
@@ -82,9 +79,6 @@
     "ANTI_LINKS": {
       "LABEL": "Anti-Links",
       "HELP": "Löscht Nachrichten mit Links. Discord-Einladungen sind davon ausgenommen, die regelt Anti-Einladungen."
-    },
-    "LIMITS": {
-      "TITLE": "Limits & Schwellenwerte"
     },
     "MAX_LINES": {
       "LABEL": "Maximale Zeilen",
@@ -138,21 +132,16 @@
     }
   },
   "TABS": {
-    "COMING_SOON": "Demnächst",
     "BASIC": {
-      "TITLE": "Grundeinstellungen",
-      "SUBTITLE": "Basis-Konfiguration"
+      "TITLE": "Grundeinstellungen"
     },
     "CONTENT": {
-      "TITLE": "Content-Filter",
-      "SUBTITLE": "Anti-Funktionen & Filter"
+      "TITLE": "Content-Filter"
     },
     "LIMITS": {
-      "TITLE": "Limits",
-      "SUBTITLE": "Schwellenwerte & Grenzen"
+      "TITLE": "Limits"
     },
     "RAID": {
-      "TITLE": "Raid-Schutz",
       "SUBTITLE": "Raid-Protection & Join-Spam",
       "ENABLE": "Raid-Schutz aktivieren",
       "JOIN_THRESHOLD": "Max. Joins",
@@ -174,40 +163,15 @@
     "SETTINGS_SAVED": "AutoMod-Einstellungen erfolgreich gespeichert",
     "SETTINGS_ERROR": "Fehler beim Speichern der AutoMod-Einstellungen"
   },
-  "BASIC_TITLE": "Grundeinstellungen",
   "LOGS_TITLE": "Log-Channel",
   "LOGS_DESC": "Der Channel, in dem der Bot AutoMod-Logs senden soll",
   "STRIKES_TITLE": "Max. Strikes",
-  "STRIKES_DESC": "Die maximale Anzahl an Strikes, bevor ein Benutzer bestraft wird",
   "ACTION_TITLE": "Aktion",
   "ACTION_DESC": "Die Aktion, die ausgeführt wird, wenn ein Benutzer die maximale Anzahl an Strikes erreicht",
   "LOG_EMBED_TITLE": "Log-Embed-Farbe",
-  "LOG_EMBED_DESC": "Die Farbe der Embeds, die im Log-Channel gesendet werden",
-  "DM_EMBED_TITLE": "DM-Embed-Farbe",
-  "DM_EMBED_DESC": "Die Farbe der Embeds, die per DM an den bestraften Benutzer gesendet werden",
-  "WHITELIST_CH_TITLE": "Whitelisted Channels",
-  "WHITELIST_CH_DESC": "Die Channels, in denen der Bot nicht moderiert",
-  "TOGGLE_TITLE": "Schnelle AutoMod-Schalter",
   "DEBUG_TITLE": "Debug-Modus",
-  "DEBUG_DESC": "Moderiert keine Nachrichten von Moderatoren",
-  "ATTACH_TITLE": "Anti-Anhänge",
   "ATTACH_DESC": "Löscht automatisch Nachrichten mit Anhängen",
-  "INVITES_TITLE": "Anti-Einladungen",
-  "INVITES_DESC": "Löscht automatisch Nachrichten mit Discord-Einladungen",
-  "LINKS_TITLE": "Anti-Links",
-  "LINKS_DESC": "Löscht automatisch Nachrichten mit Links",
-  "SPAM_TITLE": "Anti-Spam",
-  "SPAM_DESC": "Löscht automatisch Nachrichten, die als Spam gelten",
-  "GHOST_TITLE": "Anti Ghost-Ping",
-  "GHOST_DESC": "Loggt und moderiert Ghost-Pings",
-  "MASSMENTION_TITLE": "Anti Mass-Mention",
-  "MASSMENTION_DESC": "Moderiert automatisch Nachrichten mit Mass-Mentions",
-  "MASSMENTION_THRES_TITLE": "Mass-Mention Schwellenwert",
-  "MASSMENTION_THRES_DESC": "Die Anzahl der Mentions, die eine Nachricht haben muss, um als Mass-Mention zu gelten",
-  "MAXLINES_TITLE": "Max. Zeilen",
-  "MAXLINES_DESC": "Löscht automatisch Nachrichten mit mehr als der angegebenen Anzahl an Zeilen",
   "COMPOUND": {
-    "ADD_TITLE": "Neue Kombinations-Regel",
     "NAME": "Regelname",
     "NAME_PLACEHOLDER": "z.B. Neues Konto + Link",
     "LOGIC": "Verknüpfung",
@@ -224,9 +188,7 @@
     "TIP_TITLE": "Tipp",
     "TIP_TEXT": "Kombinations-Regeln ermöglichen es dir, mehrere Bedingungen zu verknüpfen. Z.B. 'Konto jünger als 7 Tage UND Nachricht enthält Link' → Timeout.",
     "ENABLED": "Aktiv",
-    "DISABLED": "Deaktiviert",
-    "CONDITIONS_LABEL": "Bedingungen",
-    "CONFIRM_DELETE": "Möchtest du diese Kombinations-Regel wirklich löschen?"
+    "DISABLED": "Deaktiviert"
   },
   "DASHBOARD": {
     "SUBTITLE": "Was der AutoMod gerade tut und zuletzt getan hat",
