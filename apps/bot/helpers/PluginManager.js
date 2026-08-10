@@ -586,18 +586,40 @@ async enablePlugin(pluginName) {
         // 3. Guild-Kontext ermitteln und guild-spezifische Plugins laden
         try {
             // WICHTIG: args[0] ist die Interaction/Message, NICHT die Guild!
-            // Die Guild ist unter args[0].guild zu finden
+            //
+            // Die Guild haengt aber nicht bei jedem Ereignis am selben Platz.
+            // `Message`, `Interaction`, `GuildMember` und `VoiceState` tragen
+            // sie direkt unter `.guild` — eine `MessageReaction` hat weder
+            // `.guild` noch `.id`, dort steht sie ausschliesslich an der
+            // Nachricht darunter.
+            //
+            // Wer nur `.guild` liest, findet dann gar nichts, faellt auf das
+            // Argument selbst zurueck, findet auch dort keine `.id`, ueber-
+            // springt diesen ganzen Block — und laesst `enabled_plugins` auf
+            // `["core"]` stehen. Der Filter weiter unten wirft danach jedes
+            // Plugin ausser dem Kern raus, lautlos und ohne Protokolleintrag.
+            // Genau daran kamen die Reaktionen der Rollenmenues nie beim
+            // `discord`-Plugin an: das Ereignis lief, der Handler nie.
             const firstArg = args[0];
-            const guildPartial = firstArg?.guild || firstArg; // Fallback für direkte Guild-Events
-            
-            if (guildPartial?.id && eventName !== "guildCreate") {
+            const guildPartial = firstArg?.guild
+                || firstArg?.message?.guild
+                || firstArg; // Fallback für direkte Guild-Events
+
+            // Die ID getrennt suchen: manche Objekte kennen nur `guildId`,
+            // ohne je ein Guild-Objekt mitzuliefern.
+            const ermittelteGuildId = guildPartial?.id
+                || firstArg?.guildId
+                || firstArg?.message?.guildId
+                || null;
+
+            if (ermittelteGuildId && eventName !== "guildCreate") {
                 // =====================================================
                 // KRITISCH: Guild aus Cache holen statt Partial zu nutzen!
                 // Discord sendet manchmal nur Partial-Objekte ohne .client!
                 // =====================================================
                 
-                const guildId = guildPartial.id;
-                
+                const guildId = ermittelteGuildId;
+
                 // Client vom Partial oder vom PluginManager holen
                 const client = this.client;
                 
@@ -612,7 +634,7 @@ async enablePlugin(pluginName) {
                 // AUSNAHME: Bei guildDelete ist es NORMAL dass Guild nicht im Cache ist!
                 if (!guild && eventName !== "guildDelete") {
                     Logger.error(`[PluginManager] ❌ GHOST-ID BLOCKIERT: Guild ${guildId} NICHT im Discord-Cache!`);
-                    Logger.error(`[PluginManager] Event="${eventName}", Partial=${!guildPartial.name}`);
+                    Logger.error(`[PluginManager] Event="${eventName}", Partial=${!guildPartial?.name}`);
                     Logger.error(`[PluginManager] Bekannte Guilds: ${Array.from(client.guilds.cache.keys()).join(', ')}`);
                     return []; // Strikt blockieren (außer bei guildDelete)
                 }
