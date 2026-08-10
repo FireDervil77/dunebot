@@ -165,10 +165,24 @@ class CronWorker {
         // alten Rootserver, und Backups/Neustarts liefen dort ins Leere.
         const daemonId = await this._resolveDaemonId(job, dbService);
 
-        // Daemon-Status prüfen
-        if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) {
-            Logger.warn(`[CronWorker] Job ${job.id}: Daemon ${daemonId || '?'} ist offline – übersprungen`);
-            await this._updateStatus(dbService, job.id, 'failed');
+        // Soll der Job jetzt überhaupt laufen? Aktion und Serverstatus zusammen
+        // entscheiden das – siehe helpers/cronEntscheidung.js. Wichtig ist der
+        // Sonderfall `start`: der braucht einen gestoppten Server.
+        //
+        // Ein bewusst ausgelassener Job wird als `skipped` verbucht, nicht als
+        // `failed`. Vorher stand nach jeder Nacht mit offline-Daemon ein roter
+        // Fehler in der Liste, obwohl nichts kaputt war.
+        const { entscheide } = require('./cronEntscheidung');
+        const serverStatus = await this._serverStatus(job.server_id, dbService);
+        const lage = entscheide({
+            aktion: job.action,
+            serverStatus,
+            daemonOnline: !!daemonId && !!ipmServer?.isDaemonOnline(daemonId),
+        });
+
+        if (!lage.ausfuehren) {
+            Logger.info(`[CronWorker] Job ${job.id} ("${job.name}") übersprungen: ${lage.grund}`);
+            await this._updateStatus(dbService, job.id, 'skipped', lage.grund);
             return;
         }
 
@@ -456,6 +470,11 @@ class CronWorker {
                 backup_name: backupName,
                 source: 'cron',
             });
+
+            // Aufbewahrung erst NACH dem erfolgreichen Backup anwenden. Wer
+            // vorher aufraeumt, steht ohne Kopie da, wenn das neue Backup
+            // scheitert.
+            await this._aufbewahrungAnwenden(job, daemonId, ipmServer, dbService, Logger);
         } catch (err) {
             await dbService.query(
                 "UPDATE gameserver_backups SET status = 'failed', error_message = ? WHERE id = ?",
@@ -466,13 +485,116 @@ class CronWorker {
     }
 
     /**
-     * Aktualisiert last_run_at und last_status in der DB.
+     * Wendet die Aufbewahrungsgrenzen eines Backup-Cronjobs an (Baustellen 7.1).
+     *
+     * Zwei Grenzen je Job: `backup_keep` (Anzahl) und `backup_keep_days`
+     * (Alter). Beide 0 heisst unbegrenzt – der Zustand von vorher, damit
+     * bestehende Jobs sich durch die Umstellung nicht anders verhalten.
+     *
+     * Beruecksichtigt werden nur Backups **dieses Cronjobs** (`created_by =
+     * 'cron'`), nie die von Hand angelegten. Wer selbst ein Backup zieht, will
+     * es behalten; ein Automatismus darf es nicht wegraeumen.
+     *
+     * Die Datei wird ueber den Daemon geloescht, die DB-Zeile erst danach
+     * markiert. Schlaegt das Loeschen fehl, bleibt beides stehen – lieber ein
+     * Backup zu viel als eine Zeile ohne Datei.
      */
-    async _updateStatus(dbService, jobId, status) {
-        await dbService.query(
-            'UPDATE gameserver_cronjobs SET last_run_at = NOW(), last_status = ? WHERE id = ?',
-            [status, jobId]
+    async _aufbewahrungAnwenden(job, daemonId, ipmServer, dbService, Logger) {
+        const { zuEntfernen } = require('./cronEntscheidung');
+
+        // Grenzen frisch lesen: der Job liegt seit dem Einplanen im Speicher,
+        // die Einstellung kann seitdem geaendert worden sein.
+        const [grenzen] = await dbService.query(
+            'SELECT backup_keep, backup_keep_days FROM gameserver_cronjobs WHERE id = ?',
+            [job.id]
         );
+        const keep = Number(grenzen?.backup_keep) || 0;
+        const keepDays = Number(grenzen?.backup_keep_days) || 0;
+        if (!keep && !keepDays) return;
+
+        const backups = await dbService.query(
+            `SELECT id, name, created_at
+             FROM gameserver_backups
+             WHERE server_id = ? AND created_by = 'cron'
+               AND status = 'completed' AND pruned_at IS NULL
+             ORDER BY created_at DESC`,
+            [job.server_id]
+        );
+
+        const raus = zuEntfernen(backups, { keep, keepDays });
+        if (!raus.length) return;
+
+        const nachName = new Map(backups.map(b => [b.id, b.name]));
+        let entfernt = 0;
+
+        for (const backupId of raus) {
+            const name = nachName.get(backupId);
+            try {
+                const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.backup_delete', {
+                    server_id: String(job.server_id),
+                    backup_name: name,
+                }, 30000);
+
+                if (!antwort?.success) {
+                    throw new Error(antwort?.error || 'Daemon meldete keinen Erfolg');
+                }
+
+                await dbService.query(
+                    'UPDATE gameserver_backups SET pruned_at = NOW() WHERE id = ?',
+                    [backupId]
+                );
+                entfernt++;
+            } catch (err) {
+                // Nicht werfen: das Backup selbst war erfolgreich, und ein
+                // misslungenes Aufraeumen darf den Job nicht auf `failed` setzen.
+                Logger.warn(`[CronWorker] Aufbewahrung: Backup ${backupId} (${name}) konnte nicht entfernt werden: ${err.message}`);
+            }
+        }
+
+        if (entfernt) {
+            Logger.info(`[CronWorker] Aufbewahrung Job ${job.id}: ${entfernt} von ${raus.length} alten Backup(s) entfernt (behalte ${keep || '∞'}, max. ${keepDays || '∞'} Tage)`);
+        }
+    }
+
+    /**
+     * Aktualisiert last_run_at, last_status und den Klartext-Grund in der DB.
+     *
+     * @param {Object} dbService
+     * @param {number} jobId
+     * @param {'success'|'failed'|'skipped'} status
+     * @param {string} [meldung] Grund im Klartext, wird in der Liste angezeigt
+     */
+    async _updateStatus(dbService, jobId, status, meldung = null) {
+        await dbService.query(
+            'UPDATE gameserver_cronjobs SET last_run_at = NOW(), last_status = ?, last_message = ? WHERE id = ?',
+            [status, meldung ? String(meldung).slice(0, 255) : null, jobId]
+        );
+    }
+
+    /**
+     * Liest den aktuellen Status eines Servers.
+     *
+     * Bewusst bei jeder Ausführung frisch aus der DB, nicht aus dem gecachten
+     * Job: der Status ändert sich staendig, der Job wird beim Einplanen einmal
+     * gelesen. Ein unbekannter Server gilt als gestoppt – dann greift die
+     * vorsichtige Seite der Entscheidung.
+     *
+     * @param {number} serverId
+     * @param {Object} dbService
+     * @returns {Promise<string>}
+     */
+    async _serverStatus(serverId, dbService) {
+        try {
+            const [row] = await dbService.query(
+                'SELECT status FROM gameservers WHERE id = ?', [serverId]
+            );
+            return row?.status || 'offline';
+        } catch (err) {
+            ServiceManager.get('Logger')?.warn(
+                `[CronWorker] Status für Server ${serverId} nicht lesbar: ${err.message}`
+            );
+            return 'offline';
+        }
     }
 }
 

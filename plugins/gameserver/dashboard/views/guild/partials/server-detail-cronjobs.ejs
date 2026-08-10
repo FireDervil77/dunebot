@@ -49,9 +49,50 @@
                 </div>
 
                 <div class="mb-3">
+                    <label for="cronjobVorlage">Zeitpunkt</label>
+                    <select id="cronjobVorlage" class="form-control" onchange="vorlageUebernehmen()">
+                        <option value="">— Vorlage wählen —</option>
+                        <option value="*/15 * * * *">Alle 15 Minuten</option>
+                        <option value="*/30 * * * *">Alle 30 Minuten</option>
+                        <option value="0 * * * *">Stündlich (zur vollen Stunde)</option>
+                        <option value="0 */6 * * *">Alle 6 Stunden</option>
+                        <option value="0 4 * * *">Täglich um 4:00 Uhr</option>
+                        <option value="0 5 * * *">Täglich um 5:00 Uhr</option>
+                        <option value="0 4 * * 1">Wöchentlich, Montag 4:00 Uhr</option>
+                        <option value="0 4 1 * *">Monatlich, am 1. um 4:00 Uhr</option>
+                    </select>
+                    <small class="form-text text-secondary">
+                        Wähle eine Vorlage oder schreibe den Ausdruck unten selbst.
+                    </small>
+                </div>
+
+                <div class="mb-3">
                     <label for="cronjobExpr">Cron-Expression <span class="text-danger">*</span></label>
-                    <input type="text" id="cronjobExpr" class="form-control" placeholder="0 4 * * *" maxlength="64" required>
-                    <small class="form-text text-secondary" id="cronjobExprDesc">Gib eine gültige 5-feldige Cron-Expression ein.</small>
+                    <input type="text" id="cronjobExpr" class="form-control" placeholder="0 4 * * *" maxlength="64"
+                           oninput="cronBeschreiben()" required>
+                    <small class="form-text" id="cronjobExprDesc">Gib eine gültige 5-feldige Cron-Expression ein.</small>
+                </div>
+
+                <!-- Aufbewahrung: nur für Backup-Jobs sinnvoll (Baustellen 7.1) -->
+                <div id="cronjobAufbewahrungGroup" style="display:none;">
+                    <div class="alert alert-secondary py-2 mb-3">
+                        <i class="fas fa-hdd me-1"></i>
+                        Ohne Grenze sammeln sich die Backups auf der Platte des Zielservers.
+                        <strong>0 heißt unbegrenzt.</strong> Beide Grenzen dürfen zusammen gelten;
+                        von Hand angelegte Backups bleiben immer stehen.
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label for="cronjobKeep">Anzahl behalten</label>
+                            <input type="number" id="cronjobKeep" class="form-control" min="0" max="65535" value="7">
+                            <small class="form-text text-secondary">Nur die neuesten so vielen bleiben.</small>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label for="cronjobKeepDays">Höchstalter (Tage)</label>
+                            <input type="number" id="cronjobKeepDays" class="form-control" min="0" max="65535" value="0">
+                            <small class="form-text text-secondary">Das jüngste Backup bleibt immer.</small>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="mb-3">
@@ -160,7 +201,83 @@ function fenster(id) {
         pending: '<span class="badge bg-secondary-lt">Ausstehend</span>',
         success: '<span class="badge bg-success-lt"><i class="fas fa-check me-1"></i>Erfolg</span>',
         failed:  '<span class="badge bg-danger-lt"><i class="fas fa-times me-1"></i>Fehler</span>',
+        // "Übersprungen" ist kein Fehler: der Job hat bewusst nichts getan,
+        // weil der Server gestoppt oder der Daemon offline war. Vorher stand
+        // dort ein rotes "Fehler", obwohl nichts kaputt war.
+        skipped: '<span class="badge bg-warning-lt"><i class="fas fa-forward me-1"></i>Übersprungen</span>',
     };
+
+    /** Cron-Ausdruck in einen Satz übersetzen — nur die gängigen Formen. */
+    function cronAlsText(ausdruck) {
+        const teile = String(ausdruck || '').trim().split(/\s+/);
+        if (teile.length !== 5) return null;
+        const [min, std, tag, monat, wtag] = teile;
+        const WOCHENTAGE = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+        const zahl = (s) => /^\d+$/.test(s);
+        const uhr = () => `${String(std).padStart(2,'0')}:${String(min).padStart(2,'0')} Uhr`;
+
+        if (/^\*\/(\d+)$/.test(min) && std === '*' && tag === '*' && monat === '*' && wtag === '*') {
+            return `alle ${min.slice(2)} Minuten`;
+        }
+        if (zahl(min) && std === '*' && tag === '*' && monat === '*' && wtag === '*') {
+            return `stündlich, jeweils zur Minute ${min}`;
+        }
+        if (zahl(min) && /^\*\/(\d+)$/.test(std) && tag === '*' && monat === '*' && wtag === '*') {
+            return `alle ${std.slice(2)} Stunden`;
+        }
+        if (zahl(min) && zahl(std) && tag === '*' && monat === '*' && wtag === '*') {
+            return `täglich um ${uhr()}`;
+        }
+        if (zahl(min) && zahl(std) && tag === '*' && monat === '*' && zahl(wtag)) {
+            return `wöchentlich, ${WOCHENTAGE[Number(wtag) % 7]} um ${uhr()}`;
+        }
+        if (zahl(min) && zahl(std) && zahl(tag) && monat === '*' && wtag === '*') {
+            return `monatlich, am ${tag}. um ${uhr()}`;
+        }
+        return null;
+    }
+
+    /** Vorlage in das Textfeld übernehmen. */
+    window.vorlageUebernehmen = function() {
+        const wert = document.getElementById('cronjobVorlage').value;
+        if (!wert) return;
+        document.getElementById('cronjobExpr').value = wert;
+        cronBeschreiben();
+    };
+
+    /**
+     * Schreibt unter das Feld, was der Ausdruck bedeutet.
+     * Wer die Syntax nicht kennt, sieht sofort, ob er das Richtige getroffen
+     * hat — das war der eigentliche Wunsch hinter Punkt 7.
+     */
+    window.cronBeschreiben = function() {
+        const feld = document.getElementById('cronjobExpr');
+        const hinweis = document.getElementById('cronjobExprDesc');
+        const wert = feld.value.trim();
+
+        if (!wert) {
+            hinweis.className = 'form-text text-secondary';
+            hinweis.textContent = 'Gib eine gültige 5-feldige Cron-Expression ein.';
+            return;
+        }
+        if (wert.split(/\s+/).length !== 5) {
+            hinweis.className = 'form-text text-danger';
+            hinweis.textContent = `${wert.split(/\s+/).length} Felder statt 5 — Reihenfolge: Minute Stunde Tag Monat Wochentag`;
+            return;
+        }
+        const satz = cronAlsText(wert);
+        hinweis.className = satz ? 'form-text text-success' : 'form-text text-secondary';
+        hinweis.textContent = satz
+            ? `Läuft ${satz}.`
+            : 'Fünf Felder — sieht gültig aus. Diese Form kann ich nicht in Worte fassen.';
+    };
+
+    /** Aufbewahrungsfelder nur bei Backup-Jobs zeigen. */
+    function aufbewahrungUmschalten() {
+        const action = document.getElementById('cronjobAction').value;
+        document.getElementById('cronjobAufbewahrungGroup').style.display =
+            action === 'backup' ? '' : 'none';
+    }
 
     function escHtml(s) {
         if (!s) return '';
@@ -175,6 +292,7 @@ function fenster(id) {
     window.toggleCommandField = function() {
         const action = document.getElementById('cronjobAction').value;
         document.getElementById('cronjobCommandGroup').style.display = action === 'command' ? '' : 'none';
+        aufbewahrungUmschalten();
     };
 
     window.loadCronjobs = async function() {
@@ -202,10 +320,17 @@ function fenster(id) {
                         <strong>${escHtml(j.name)}</strong>
                         ${j.action === 'command' ? `<br><small class="text-secondary"><code>${escHtml(j.command)}</code></small>` : ''}
                     </td>
-                    <td><code>${escHtml(j.cron_expr)}</code></td>
+                    <td>
+                        <code>${escHtml(j.cron_expr)}</code>
+                        ${cronAlsText(j.cron_expr) ? `<br><small class="text-secondary">${escHtml(cronAlsText(j.cron_expr))}</small>` : ''}
+                        ${j.action === 'backup' && (j.backup_keep || j.backup_keep_days) ? `<br><small class="text-secondary"><i class="fas fa-hdd me-1"></i>behält ${j.backup_keep || '∞'}${j.backup_keep_days ? `, max. ${j.backup_keep_days} Tage` : ''}</small>` : ''}
+                    </td>
                     <td>${ACTION_LABELS[j.action] || j.action}</td>
                     <td><small>${fmtDate(j.last_run_at)}</small></td>
-                    <td>${STATUS_LABELS[j.last_status] || j.last_status}</td>
+                    <td>
+                        ${STATUS_LABELS[j.last_status] || j.last_status}
+                        ${j.last_message ? `<br><small class="text-secondary">${escHtml(j.last_message)}</small>` : ''}
+                    </td>
                     <td>${j.run_once ? '<span class="badge bg-info-lt" title="Wird nach Ausführung deaktiviert"><i class="fas fa-bolt me-1"></i>Einmalig</span>' : '—'}</td>
                     <td>
                         ${CAN_MANAGE ? `
@@ -249,7 +374,13 @@ function fenster(id) {
         document.getElementById('cronjobCommand').value = '';
         document.getElementById('cronjobRunOnce').checked = false;
         document.getElementById('cronjobEnabled').checked = true;
+        document.getElementById('cronjobVorlage').value = '';
+        // Vorschlag für neue Backup-Jobs: sieben Stück. Bestehende Jobs behalten
+        // ihre 0 (unbegrenzt) – die Migration ändert nichts an ihnen.
+        document.getElementById('cronjobKeep').value = 7;
+        document.getElementById('cronjobKeepDays').value = 0;
         toggleCommandField();
+        cronBeschreiben();
         fenster('cronjobModal')?.show();
     };
 
@@ -263,7 +394,11 @@ function fenster(id) {
         document.getElementById('cronjobCommand').value = job.command || '';
         document.getElementById('cronjobRunOnce').checked = !!job.run_once;
         document.getElementById('cronjobEnabled').checked = !!job.enabled;
+        document.getElementById('cronjobVorlage').value = '';
+        document.getElementById('cronjobKeep').value = job.backup_keep ?? 0;
+        document.getElementById('cronjobKeepDays').value = job.backup_keep_days ?? 0;
         toggleCommandField();
+        cronBeschreiben();
         fenster('cronjobModal')?.show();
     };
 
@@ -276,6 +411,10 @@ function fenster(id) {
         const command = document.getElementById('cronjobCommand').value.trim();
         const run_once = document.getElementById('cronjobRunOnce').checked;
         const enabled = document.getElementById('cronjobEnabled').checked;
+        const backup_keep = action === 'backup'
+            ? (parseInt(document.getElementById('cronjobKeep').value, 10) || 0) : 0;
+        const backup_keep_days = action === 'backup'
+            ? (parseInt(document.getElementById('cronjobKeepDays').value, 10) || 0) : 0;
 
         if (!name || !cron_expr || !action) {
             alert('Bitte Name, Cron-Expression und Aktion ausfüllen.');
@@ -299,7 +438,7 @@ function fenster(id) {
             const resp = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, cron_expr, action, command, run_once, enabled })
+                body: JSON.stringify({ name, cron_expr, action, command, run_once, enabled, backup_keep, backup_keep_days })
             });
             const data = await resp.json();
             fenster('cronjobModal')?.hide();

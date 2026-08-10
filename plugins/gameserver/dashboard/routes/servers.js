@@ -4162,9 +4162,45 @@ router.delete('/:serverId/backups/:backupId', requirePermission('GAMESERVER.BACK
         );
         if (!backup) return res.status(404).json({ success: false, message: 'Backup nicht gefunden' });
 
+        // Erst die Datei, dann die Zeile.
+        //
+        // Bis zum 2026-08-10 entfernte diese Route **nur** die DB-Zeile: das
+        // tar.gz blieb auf dem Zielserver liegen, unsichtbar und für immer.
+        // `DeleteBackupArchive` gab es im Daemon, es fehlte die Aktion dorthin.
+        // Schlägt das Löschen fehl, bleibt auch die Zeile stehen – sonst
+        // entsteht genau die verwaiste Datei wieder, die wir gerade abstellen.
+        const ipmServer = ServiceManager.get('ipmServer');
+        const [ziel] = await dbService.query(
+            `SELECT r.daemon_id FROM gameservers gs
+             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+             WHERE gs.id = ?`,
+            [serverId]
+        );
+        const daemonId = ziel?.daemon_id;
+
+        if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) {
+            return res.status(503).json({
+                success: false,
+                message: 'Der Daemon dieses Servers ist offline – das Backup lässt sich gerade nicht löschen.',
+            });
+        }
+
+        const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.backup_delete', {
+            server_id: String(serverId),
+            backup_name: backup.name,
+        }, 30000);
+
+        if (!antwort?.success) {
+            Logger.warn(`[Gameserver/Backups] Archiv von Backup ${backupId} nicht gelöscht: ${antwort?.error || 'unbekannt'}`);
+            return res.status(500).json({
+                success: false,
+                message: `Das Archiv konnte nicht gelöscht werden: ${antwort?.error || 'Der Daemon meldete keinen Erfolg'}`,
+            });
+        }
+
         await dbService.query('DELETE FROM gameserver_backups WHERE id = ?', [backupId]);
 
-        Logger.info(`[Gameserver/Backups] Backup ${backupId} (${backup.name}) gelöscht`);
+        Logger.info(`[Gameserver/Backups] Backup ${backupId} (${backup.name}) samt Archiv gelöscht`);
         return res.json({ success: true, message: 'Backup gelöscht' });
     } catch (error) {
         Logger.error('[Gameserver/Backups] Fehler beim Löschen des Backups:', error);
@@ -4264,7 +4300,9 @@ router.get('/:serverId/cronjobs', requirePermission('GAMESERVER.CRONJOBS.VIEW'),
         if (!server) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
 
         const cronjobs = await dbService.query(
-            `SELECT id, name, cron_expr, action, command, run_once, enabled, last_run_at, next_run_at, last_status, created_at
+            `SELECT id, name, cron_expr, action, command, run_once, enabled,
+                    backup_keep, backup_keep_days,
+                    last_run_at, next_run_at, last_status, last_message, created_at
              FROM gameserver_cronjobs
              WHERE server_id = ?
              ORDER BY created_at DESC`,
@@ -4297,7 +4335,7 @@ router.post('/:serverId/cronjobs', requirePermission('GAMESERVER.CRONJOBS.MANAGE
         );
         if (!server) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
 
-        const { name, cron_expr, action, command, run_once } = req.body;
+        const { name, cron_expr, action, command, run_once, backup_keep, backup_keep_days } = req.body;
 
         // Validierung
         if (!name || !cron_expr || !action) {
@@ -4315,10 +4353,24 @@ router.post('/:serverId/cronjobs', requirePermission('GAMESERVER.CRONJOBS.MANAGE
             return res.status(400).json({ success: false, message: 'Ungültige Cron-Expression (5 Felder erwartet, z.B. "0 4 * * *")' });
         }
 
+        // Aufbewahrung gilt nur für Backup-Jobs. Eine Zahl an einem
+        // Neustart-Job wäre stillschweigend wirkungslos, deshalb wird sie dort
+        // gar nicht erst gespeichert.
+        const grenze = (wert) => {
+            const n = Number.parseInt(wert, 10);
+            if (!Number.isFinite(n) || n < 0) return 0;
+            return Math.min(n, 65535);
+        };
+        const keep     = action === 'backup' ? grenze(backup_keep) : 0;
+        const keepDays = action === 'backup' ? grenze(backup_keep_days) : 0;
+
         const result = await dbService.query(
-            `INSERT INTO gameserver_cronjobs (server_id, guild_id, name, cron_expr, action, command, run_once, enabled, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-            [serverId, guildId, name.substring(0, 128), cron_expr.trim(), action, action === 'command' ? command.trim() : null, run_once ? 1 : 0, userId]
+            `INSERT INTO gameserver_cronjobs (server_id, guild_id, name, cron_expr, action, command,
+                                              backup_keep, backup_keep_days, run_once, enabled, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+            [serverId, guildId, name.substring(0, 128), cron_expr.trim(), action,
+             action === 'command' ? command.trim() : null,
+             keep, keepDays, run_once ? 1 : 0, userId]
         );
 
         Logger.info(`[Gameserver/Cronjobs] Cronjob ${result.insertId} erstellt für Server ${serverId}`);
@@ -4362,7 +4414,7 @@ router.put('/:serverId/cronjobs/:cronjobId', requirePermission('GAMESERVER.CRONJ
         );
         if (!job) return res.status(404).json({ success: false, message: 'Cronjob nicht gefunden' });
 
-        const { name, cron_expr, action, command, enabled, run_once } = req.body;
+        const { name, cron_expr, action, command, enabled, run_once, backup_keep, backup_keep_days } = req.body;
 
         if (cron_expr && cron_expr.trim().split(/\s+/).length !== 5) {
             return res.status(400).json({ success: false, message: 'Ungültige Cron-Expression' });
@@ -4374,16 +4426,30 @@ router.put('/:serverId/cronjobs/:cronjobId', requirePermission('GAMESERVER.CRONJ
             }
         }
 
+        // `null` heisst hier "unverändert" (COALESCE). Eine 0 ist dagegen ein
+        // gültiger Wert – "unbegrenzt" –, deshalb wird sie ausdrücklich
+        // durchgereicht und nicht mit `|| null` verschluckt.
+        const grenze = (wert) => {
+            if (wert === undefined || wert === null || wert === '') return null;
+            const n = Number.parseInt(wert, 10);
+            if (!Number.isFinite(n) || n < 0) return 0;
+            return Math.min(n, 65535);
+        };
+
         await dbService.query(
             `UPDATE gameserver_cronjobs
              SET name = COALESCE(?, name),
                  cron_expr = COALESCE(?, cron_expr),
                  action = COALESCE(?, action),
                  command = COALESCE(?, command),
+                 backup_keep = COALESCE(?, backup_keep),
+                 backup_keep_days = COALESCE(?, backup_keep_days),
                  run_once = COALESCE(?, run_once),
                  enabled = COALESCE(?, enabled)
              WHERE id = ?`,
-            [name?.substring(0, 128) || null, cron_expr?.trim() || null, action || null, command?.trim() || null, run_once !== undefined ? (run_once ? 1 : 0) : null, enabled !== undefined ? (enabled ? 1 : 0) : null, cronjobId]
+            [name?.substring(0, 128) || null, cron_expr?.trim() || null, action || null, command?.trim() || null,
+             grenze(backup_keep), grenze(backup_keep_days),
+             run_once !== undefined ? (run_once ? 1 : 0) : null, enabled !== undefined ? (enabled ? 1 : 0) : null, cronjobId]
         );
 
         // CronWorker benachrichtigen
