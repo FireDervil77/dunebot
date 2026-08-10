@@ -108,6 +108,13 @@ const GAMESERVER_RESOURCE_USAGE = 'resource_usage';
  */
 const GAMESERVER_CRASHED = 'crashed';
 
+/**
+ * Event: Meldet, ob die gebuchte Platzgrenze (disk_gb) auf diesem Rootserver
+ * wirklich durchgesetzt wird — und wenn nicht, warum.
+ * Payload: { server_id, disk_gb, erzwungen, grund }
+ */
+const GAMESERVER_QUOTA_STATUS = 'quota_status';
+
 // =====================================================
 // CONSOLE ACTIONS
 // =====================================================
@@ -285,6 +292,7 @@ module.exports = {
   GAMESERVER_STATUS_CHANGED,
   GAMESERVER_RESOURCE_USAGE,
   GAMESERVER_CRASHED,
+  GAMESERVER_QUOTA_STATUS,
   
   // Console Actions
   CONSOLE_ATTACH,

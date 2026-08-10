@@ -104,6 +104,38 @@
                                         RootServer und begrenzen den Server im Betrieb — sie greifen beim
                                         nächsten Start. Alle drei zusammen ausfüllen oder alle leer lassen.
                                     </small>
+
+                                    <%#
+                                      Die GiB-Angabe hat bis zum 2026-08-10 nur gebucht, nie begrenzt.
+                                      Seit Daemon 1.0.26 setzt der Daemon eine Projekt-Quota auf das
+                                      Serververzeichnis — das setzt aber voraus, dass das Dateisystem
+                                      mit `prjquota` eingehaengt ist. Ob es geklappt hat, meldet der
+                                      Daemon nach jedem Start zurueck; hier steht die Antwort, damit
+                                      niemand mehr eine Grenze annimmt, die es nicht gibt.
+                                    %>
+                                    <% if (server.disk_quota_enforced === null || server.disk_quota_enforced === undefined) { %>
+                                        <div class="alert alert-secondary py-2 mt-2 mb-0">
+                                            <i class="fas fa-question-circle me-1"></i>
+                                            <strong>Platzgrenze:</strong> noch nicht gemeldet.
+                                            Der Daemon prüft das beim nächsten Start dieses Servers.
+                                        </div>
+                                    <% } else if (server.disk_quota_enforced) { %>
+                                        <div class="alert alert-success py-2 mt-2 mb-0">
+                                            <i class="fas fa-shield-halved me-1"></i>
+                                            <strong>Platzgrenze wird durchgesetzt.</strong>
+                                            Schreibversuche über die Grenze hinaus schlagen fehl.
+                                        </div>
+                                    <% } else { %>
+                                        <div class="alert alert-warning py-2 mt-2 mb-0">
+                                            <i class="fas fa-triangle-exclamation me-1"></i>
+                                            <strong>Die Platzgrenze greift nicht.</strong>
+                                            Die GiB-Angabe bucht Platz in der Rechnung, hindert den Server
+                                            aber nicht daran, die Platte vollzuschreiben.
+                                            <% if (server.disk_quota_note) { %>
+                                                <br><small><%= server.disk_quota_note %></small>
+                                            <% } %>
+                                        </div>
+                                    <% } %>
                                 </div>
 
                                 <!-- Auto Restart -->

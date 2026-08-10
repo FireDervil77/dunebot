@@ -139,6 +139,7 @@ class MessageValidator {
         MessageTypes.GAMESERVER_STATUS_CHANGED,
         MessageTypes.GAMESERVER_RESOURCE_USAGE,
         MessageTypes.GAMESERVER_CRASHED,
+        MessageTypes.GAMESERVER_QUOTA_STATUS,
       ],
       [MessageTypes.NS_CONSOLE]: [
         MessageTypes.CONSOLE_ATTACH,

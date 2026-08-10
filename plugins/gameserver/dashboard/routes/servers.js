@@ -2030,6 +2030,8 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
                 gs.allocated_ram_mb,
                 gs.allocated_cpu_percent,
                 gs.allocated_disk_gb,
+                gs.disk_quota_enforced,
+                gs.disk_quota_note,
                 am.name as game_name,
                 am.slug as game_slug
             FROM gameservers gs

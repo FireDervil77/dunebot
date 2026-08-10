@@ -660,6 +660,16 @@ class GameserverPlugin extends DashboardPlugin {
                 { priority: 1 }
             );
             
+            // ════════════════════════════════════════════════════════════
+            // Platzgrenze: greift sie wirklich? (Baustellen 37)
+            // ════════════════════════════════════════════════════════════
+            eventRouter.register(
+                MessageTypes.NS_GAMESERVER,
+                MessageTypes.GAMESERVER_QUOTA_STATUS,
+                this._handleQuotaStatus.bind(this),
+                { priority: 5 }
+            );
+
             // HINWEIS: KEIN Handler für NS_CONSOLE/CONSOLE_OUTPUT hier!
             // Der ConsoleManager registriert sich selbst auf 'console:output'
             // (ConsoleManager._registerEventHandlers). Eine zweite Registrierung
@@ -670,10 +680,55 @@ class GameserverPlugin extends DashboardPlugin {
             // und broadcasten dort mit dem korrekten SSE-Namespace 'install'.
 
             this._handlersRegistered = true;
-            Logger.success('[Gameserver] Event-Handler registriert (3 Handler)');
+            Logger.success('[Gameserver] Event-Handler registriert (4 Handler)');
         } catch (error) {
             Logger.error('[Gameserver] Fehler beim Registrieren der Event-Handler:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Handler: meldet, ob die gebuchte Platzgrenze wirklich durchgesetzt wird.
+     *
+     * Der Daemon schickt das nach jedem Start. Bis Baustellen 37 stand die
+     * GiB-Angabe im Dashboard und wirkte nirgends — jetzt steht dort, ob sie
+     * greift, und wenn nicht, was der Betreiber am Rootserver tun muss.
+     *
+     * @private
+     */
+    async _handleQuotaStatus(payload, message, context) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+
+        const { server_id, disk_gb, erzwungen, grund } = payload || {};
+        if (!server_id) return;
+
+        try {
+            await dbService.query(
+                'UPDATE gameservers SET disk_quota_enforced = ?, disk_quota_note = ? WHERE id = ?',
+                [erzwungen ? 1 : 0, grund ? String(grund).slice(0, 500) : null, server_id]
+            );
+
+            if (!erzwungen) {
+                Logger.warn(`[Gameserver] Platzgrenze für Server ${server_id} (${disk_gb} GiB) greift nicht: ${grund}`);
+            } else {
+                Logger.debug(`[Gameserver] Platzgrenze für Server ${server_id}: ${disk_gb || 'unbegrenzt'} GiB, durchgesetzt`);
+            }
+
+            const [server] = await dbService.query(
+                'SELECT guild_id FROM gameservers WHERE id = ?', [server_id]
+            );
+            if (server) {
+                ServiceManager.get('sseManager')?.broadcast(String(server.guild_id), 'gameserver', {
+                    action: 'quota_status',
+                    server_id,
+                    disk_gb,
+                    erzwungen: !!erzwungen,
+                    grund: grund || null,
+                });
+            }
+        } catch (error) {
+            Logger.error('[Gameserver] Quota-Meldung konnte nicht gespeichert werden:', error);
         }
     }
 
