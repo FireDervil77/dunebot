@@ -17,6 +17,40 @@ const { AutoModSettings } = require('../../shared/models');
 const { makeTranslator } = require('./_shared');
 
 /** Checkbox-Werte kommen als '1'/'0' aus dem Formular. */
+/**
+ * Farbwert pruefen: `#RRGGBB`, sonst null.
+ *
+ * Grosszuegig beim Lesen, streng beim Schreiben. Angenommen werden die Kurzform
+ * `#RGB`, die Langform `#RRGGBB`, jeweils mit oder ohne Raute und in beliebiger
+ * Schreibweise. Gespeichert wird immer `#RRGGBB` in Grossbuchstaben - die
+ * Spalte ist VARCHAR(7), und ein einheitlicher Wert erspart jedem Leser das
+ * Raten.
+ *
+ * Die Kurzform wird ausdrücklich ausgeschrieben statt abgelehnt: `#FFF` ist
+ * eine gaengige Eingabe, und `setColor` wuerde sie als 0x000FFF lesen - ein
+ * dunkles Blau statt Weiss. Ein stiller Farbfehler ist unangenehmer als eine
+ * abgelehnte Eingabe.
+ *
+ * Alles andere wird zu null. Dann nimmt Discord seine eigene Vorgabe, statt
+ * dass `setColor` beim Senden der Meldung wirft.
+ *
+ * @param {string} wert
+ * @returns {string|null}
+ */
+function zuFarbe(wert) {
+    const text = String(wert ?? '').trim();
+    if (!text) return null;
+
+    const kurz = /^#?([0-9a-f]{3})$/i.exec(text);
+    if (kurz) {
+        const [r, g, b] = kurz[1];
+        return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+    }
+
+    const lang = /^#?([0-9a-f]{6})$/i.exec(text);
+    return lang ? `#${lang[1].toUpperCase()}` : null;
+}
+
 const zuBool = (wert) => wert === '1' || wert === 1 || wert === true || wert === 'true';
 
 /** Ganzzahl mit Rueckfallwert, wenn das Feld leer oder unlesbar ist. */
@@ -66,6 +100,21 @@ router.put('/', requirePermission('AUTOMOD.SETTINGS.EDIT'), async (req, res) => 
         }
         if (b.debug_mode !== undefined) updates.debug_mode = zuBool(b.debug_mode);
         if (b.dm_message !== undefined) updates.dm_message = b.dm_message || null;
+
+        // --- Farben der Embeds ---
+        //
+        // Beide Spalten gab es seit dem Baseline, der Bot wertet sie aus
+        // (`messageCreate.js`: setColor) - einstellbar waren sie nie. Selbst die
+        // Beschriftungen lagen fertig in den Sprachdateien und wurden von keiner
+        // View benutzt.
+        //
+        // Geprueft wird streng: die Spalte ist VARCHAR(7), und `setColor` wirft
+        // bei allem, was kein gueltiger Farbwert ist. Ein Tippfehler wuerde also
+        // nicht nur die Farbe verfehlen, sondern das Senden der Meldung
+        // abbrechen. Ein leeres Feld setzt auf NULL zurueck - dann nimmt Discord
+        // seine Vorgabe.
+        if (b.log_embed_color !== undefined) updates.log_embed_color = zuFarbe(b.log_embed_color);
+        if (b.dm_embed_color !== undefined) updates.dm_embed_color = zuFarbe(b.dm_embed_color);
 
         // --- Inhaltsfilter ---
         if (b.anti_ghostping !== undefined) updates.anti_ghostping = zuBool(b.anti_ghostping);

@@ -137,4 +137,40 @@
         });
     }
 
+    // ── Farbwahl und Textfeld verbinden ─────────────────────────────────
+    //
+    // Je Farbe stehen zwei Felder nebeneinander: die Farbwahl des Browsers
+    // fuer das Auge, daneben ein Textfeld mit dem genauen Wert. Abgeschickt
+    // wird nur das Textfeld - <input type="color"> kennt kein "leer" und
+    // wuerde ein zurueckgesetztes Feld stillschweigend auf Schwarz setzen.
+    //
+    // Die Verbindung geht in beide Richtungen, aber die Farbwahl folgt dem
+    // Text nur, wenn er vollstaendig ist. Sonst spraenge sie waehrend des
+    // Tippens wild umher.
+    farbfelderVerbinden();
+
+    function farbfelderVerbinden() {
+        document.querySelectorAll('[data-farbwahl-fuer]').forEach(function (wahl) {
+            var text = document.getElementById(wahl.getAttribute('data-farbwahl-fuer'));
+            if (!text) return;
+
+            wahl.addEventListener('input', function () {
+                text.value = wahl.value.toUpperCase();
+            });
+
+            text.addEventListener('input', function () {
+                var wert = text.value.trim();
+                if (/^#?[0-9a-f]{3}$/i.test(wert)) {
+                    var k = wert.replace('#', '');
+                    wert = '#' + k[0] + k[0] + k[1] + k[1] + k[2] + k[2];
+                } else if (/^#?[0-9a-f]{6}$/i.test(wert)) {
+                    wert = wert.startsWith('#') ? wert : '#' + wert;
+                } else {
+                    return; // unvollstaendig oder ungueltig - Farbwahl in Ruhe lassen
+                }
+                wahl.value = wert.toLowerCase();
+            });
+        });
+    }
+
 })();

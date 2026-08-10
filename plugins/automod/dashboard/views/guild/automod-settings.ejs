@@ -122,6 +122,39 @@
             </div>
           </div>
 
+          <!-- Farben der Embeds -->
+          <%#
+            Beide Spalten gab es seit jeher, der Bot wertet sie aus - einstellbar
+            waren sie nie. Selbst diese Beschriftungen lagen fertig in den
+            Sprachdateien und wurden von keiner View benutzt.
+
+            Zwei Felder je Farbe: die Farbwahl des Browsers fuer das Auge und ein
+            Textfeld fuer den genauen Wert. Abgeschickt wird das Textfeld -
+            <input type="color"> kann kein "leer" und wuerde ein zurueckgesetztes
+            Feld stillschweigend auf Schwarz setzen.
+          %>
+          <div class="row">
+            <% [
+                 ['log_embed_color', 'LOG_EMBED', '#FF0000'],
+                 ['dm_embed_color',  'DM_EMBED',  '#FFA500']
+               ].forEach(([feld, schluessel, vorgabe]) => {
+                 const wert = settings[feld] || '';
+            %>
+              <div class="col-md-6 mb-3">
+                <label for="<%= feld %>" class="form-label"><%= tr('automod:' + schluessel + '_TITLE') %></label>
+                <div class="input-group">
+                  <input type="color" class="form-control form-control-color"
+                         id="<%= feld %>_wahl" value="<%= wert || vorgabe %>"
+                         data-farbwahl-fuer="<%= feld %>"
+                         aria-label="<%= tr('automod:' + schluessel + '_TITLE') %>">
+                  <input type="text" class="form-control" id="<%= feld %>" name="<%= feld %>"
+                         value="<%= wert %>" placeholder="<%= vorgabe %>" maxlength="7">
+                </div>
+                <div class="form-hint"><%= tr('automod:' + schluessel + '_DESC') %></div>
+              </div>
+            <% }); %>
+          </div>
+
           <!-- Fehlersuche -->
           <label class="form-check form-switch mb-1">
             <input class="form-check-input" type="checkbox" id="debug_mode" name="debug_mode" value="1"
