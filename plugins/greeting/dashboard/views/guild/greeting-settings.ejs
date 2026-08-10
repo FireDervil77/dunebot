@@ -13,7 +13,7 @@
     ['NAV.MESSAGES',      '/nachrichten',   'fa-solid fa-comment-dots',
       settings.welcome.enabled || settings.farewell.enabled || settings.dm_welcome.enabled, 'MESSAGES.SUBTITLE'],
     ['NAV.ROLES',         '/rollen',        'fa-solid fa-user-tag',
-      settings.autorole_ids.length > 0 || (reactionPanels || []).length > 0, 'ROLES.SUBTITLE'],
+      settings.autorole_ids.length > 0, 'ROLES.SUBTITLE'],
     ['NAV.VERIFICATION',  '/verifizierung', 'fa-solid fa-shield-halved',
       settings.verification.enabled, 'VERIFICATION.DESC'],
     ['NAV.BOOST',         '/boost',         'fa-solid fa-rocket',

@@ -1,0 +1,449 @@
+<!--
+    Discord-Plugin: ein Rollenmenue bearbeiten
+
+    Angelegt am 2026-08-10. Zwei Entscheidungen, die auffallen koennten:
+
+      - **Speichern und Senden sind getrennt.** Wer am Menue arbeitet, aendert
+        nicht sofort die Nachricht im Kanal — sonst waere jeder Zwischenstand
+        fuer den ganzen Server sichtbar. Erst „Senden" traegt es hinaus.
+      - **Nicht vergebbare Rollen werden gekennzeichnet, nicht versteckt.**
+        Wer eine Rolle nicht in der Liste findet, sucht den Fehler bei sich.
+        Wer sie mit dem Vermerk „steht ueber der Bot-Rolle" sieht, weiss, was
+        zu tun ist.
+-->
+<%
+  const basis = `/guild/${guildId}/plugins/discord/rollenmenues`;
+
+  const darstellungName = {
+    reaktion: tr('discord:ROLEMENUS.STYLE_REACTION'),
+    knopf:    tr('discord:ROLEMENUS.STYLE_BUTTON'),
+    auswahl:  tr('discord:ROLEMENUS.STYLE_SELECT')
+  };
+
+  const stilName = {
+    grau:  tr('discord:ROLEMENUS.BUTTON_GREY'),
+    blau:  tr('discord:ROLEMENUS.BUTTON_BLUE'),
+    gruen: tr('discord:ROLEMENUS.BUTTON_GREEN'),
+    rot:   tr('discord:ROLEMENUS.BUTTON_RED')
+  };
+%>
+
+<div class="page-header d-print-none mb-3">
+  <div class="row align-items-center">
+    <div class="col">
+      <div class="page-pretitle">
+        <a href="<%= basis %>" class="text-secondary">
+          <i class="fa-solid fa-arrow-left me-1"></i><%= tr('discord:ROLEMENUS.TITLE') %>
+        </a>
+      </div>
+      <h2 class="page-title"><%= menu.title %></h2>
+    </div>
+    <div class="col-auto">
+      <% if (menu.message_id) { %>
+        <span class="badge bg-green-lt me-2"><%= tr('discord:ROLEMENUS.STATUS_SENT') %></span>
+      <% } else { %>
+        <span class="badge bg-orange-lt me-2"><%= tr('discord:ROLEMENUS.STATUS_DRAFT') %></span>
+      <% } %>
+      <button class="btn btn-success" id="knopfSenden">
+        <i class="fa-solid fa-paper-plane me-1"></i>
+        <%= menu.message_id ? tr('discord:ROLEMENUS.UPDATE') : tr('discord:ROLEMENUS.SEND') %>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="row row-cards">
+
+  <!-- Einstellungen des Menues -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-sliders me-2"></i><%= tr('discord:ROLEMENUS.SETTINGS') %></h3>
+      </div>
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label required"><%= tr('discord:ROLEMENUS.FIELD_TITLE') %></label>
+          <input type="text" id="feldTitel" class="form-control" maxlength="255" value="<%= menu.title %>">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label"><%= tr('discord:ROLEMENUS.FIELD_DESC') %></label>
+          <textarea id="feldBeschreibung" class="form-control" rows="3"><%= menu.description || '' %></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label"><%= tr('discord:ROLEMENUS.FIELD_CHANNEL') %></label>
+          <select id="feldKanal" class="form-select">
+            <option value="">— <%= tr('discord:ROLEMENUS.FIELD_CHANNEL') %> —</option>
+            <% (channels || []).forEach(kanal => { %>
+              <option value="<%= kanal.id %>" <%= String(kanal.id) === String(menu.channel_id) ? 'selected' : '' %>>
+                #<%= kanal.name %>
+              </option>
+            <% }); %>
+          </select>
+          <% if (menu.message_id) { %>
+            <small class="form-hint"><%= tr('discord:ROLEMENUS.CHANNEL_CHANGE_HINT') %></small>
+          <% } %>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label"><%= tr('discord:ROLEMENUS.FIELD_COLOR') %></label>
+          <div class="input-group">
+            <input type="color" class="form-control form-control-color"
+                   value="<%= (menu.color || '#5865F2').toLowerCase() %>" data-farbwahl-fuer="feldFarbe">
+            <input type="text" id="feldFarbe" class="form-control" maxlength="7" value="<%= menu.color || '#5865F2' %>">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label"><%= tr('discord:ROLEMENUS.FIELD_STYLE') %></label>
+          <select id="feldDarstellung" class="form-select">
+            <% (darstellungen || []).forEach(d => { %>
+              <option value="<%= d %>" <%= d === menu.darstellung ? 'selected' : '' %>><%= darstellungName[d] %></option>
+            <% }); %>
+          </select>
+          <small class="form-hint"><%= tr('discord:ROLEMENUS.FIELD_STYLE_HINT') %></small>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label"><%= tr('discord:ROLEMENUS.MODE') %></label>
+          <select id="feldModus" class="form-select">
+            <% (modi || []).forEach(m => { %>
+              <option value="<%= m %>" <%= m === menu.modus ? 'selected' : '' %>>
+                <%= tr('discord:ROLEMENUS.MODE_' + m.toUpperCase()) %>
+              </option>
+            <% }); %>
+          </select>
+          <small class="form-hint" id="modusHinweis"></small>
+        </div>
+
+        <!-- Nur bei Auswahllisten sichtbar: wie viele duerfen gewaehlt werden -->
+        <div class="row" id="auswahlGrenzen" style="display: <%= menu.darstellung === 'auswahl' ? 'flex' : 'none' %>">
+          <div class="col-6 mb-3">
+            <label class="form-label"><%= tr('discord:ROLEMENUS.FIELD_MIN') %></label>
+            <input type="number" id="feldMin" class="form-control" min="0" max="25" value="<%= menu.min_auswahl %>">
+          </div>
+          <div class="col-6 mb-3">
+            <label class="form-label"><%= tr('discord:ROLEMENUS.FIELD_MAX') %></label>
+            <input type="number" id="feldMax" class="form-control" min="1" max="25" value="<%= menu.max_auswahl %>">
+          </div>
+        </div>
+
+        <label class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="feldAktiv" <%= menu.enabled ? 'checked' : '' %>>
+          <span class="form-check-label"><%= tr('discord:ROLEMENUS.FIELD_ENABLED') %></span>
+        </label>
+        <small class="form-hint d-block mb-3"><%= tr('discord:ROLEMENUS.FIELD_ENABLED_HINT') %></small>
+
+        <button class="btn btn-primary w-100" id="knopfSpeichern">
+          <i class="fa-solid fa-floppy-disk me-1"></i><%= tr('discord:SAVE') %>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Eintraege -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-list me-2"></i><%= tr('discord:ROLEMENUS.ENTRIES') %></h3>
+        <div class="card-actions text-secondary small">
+          <%= eintraege.length %> / <%= maxEintraege %>
+        </div>
+      </div>
+
+      <% if (eintraege.length === 0) { %>
+        <div class="card-body">
+          <div class="empty">
+            <div class="empty-icon"><i class="fa-solid fa-list fs-1 text-secondary"></i></div>
+            <p class="empty-title"><%= tr('discord:ROLEMENUS.NO_ENTRIES_YET') %></p>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="list-group list-group-flush" id="eintragsListe">
+          <% eintraege.forEach((eintrag, i) => { %>
+            <div class="list-group-item" id="eintrag-<%= eintrag.id %>">
+              <div class="row align-items-center">
+                <div class="col-auto">
+                  <div class="btn-group-vertical btn-group-sm">
+                    <button class="btn btn-sm btn-ghost-secondary py-0" data-hoch="<%= eintrag.id %>"
+                            <%= i === 0 ? 'disabled' : '' %>><i class="fa-solid fa-chevron-up"></i></button>
+                    <button class="btn btn-sm btn-ghost-secondary py-0" data-runter="<%= eintrag.id %>"
+                            <%= i === eintraege.length - 1 ? 'disabled' : '' %>><i class="fa-solid fa-chevron-down"></i></button>
+                  </div>
+                </div>
+
+                <div class="col-auto" style="min-width: 2.5rem; font-size: 1.25rem;">
+                  <%= eintrag.emoji || '' %>
+                </div>
+
+                <div class="col">
+                  <div>
+                    <strong><%= eintrag.label || (eintrag.rolle && eintrag.rolle.name) || eintrag.role_id %></strong>
+                    <% if (menu.darstellung === 'knopf') { %>
+                      <span class="badge bg-secondary-lt ms-1"><%= stilName[eintrag.stil] || eintrag.stil %></span>
+                    <% } %>
+                  </div>
+                  <div class="text-secondary small">
+                    <% if (!eintrag.rolle) { %>
+                      <span class="text-danger">
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i><%= tr('discord:ROLEMENUS.ROLE_GONE') %>
+                      </span>
+                    <% } else { %>
+                      <i class="fa-solid fa-at"></i><%= eintrag.rolle.name %>
+                      <% if (eintrag.rolle.managed) { %>
+                        <span class="text-danger ms-2"><i class="fa-solid fa-lock me-1"></i><%= tr('discord:ROLEMENUS.ROLE_MANAGED') %></span>
+                      <% } else if (eintrag.rolle.editable === false) { %>
+                        <span class="text-warning ms-2"><i class="fa-solid fa-arrow-up me-1"></i><%= tr('discord:ROLEMENUS.ROLE_TOO_HIGH') %></span>
+                      <% } %>
+                    <% } %>
+                    <% if (eintrag.description) { %>
+                      <span class="ms-2">— <%= eintrag.description %></span>
+                    <% } %>
+                  </div>
+                </div>
+
+                <div class="col-auto">
+                  <button class="btn btn-sm btn-ghost-danger" data-eintrag-weg="<%= eintrag.id %>">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+
+      <!-- Neuer Eintrag -->
+      <div class="card-body border-top">
+        <h4 class="mb-3"><%= tr('discord:ROLEMENUS.ADD_ENTRY') %></h4>
+
+        <div class="row g-2 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label required"><%= tr('discord:ROLEMENUS.FIELD_ROLE') %></label>
+            <select id="neuRolle" class="form-select">
+              <option value="">— <%= tr('discord:ROLEMENUS.FIELD_ROLE') %> —</option>
+              <% (roles || []).filter(r => r.name !== '@everyone').forEach(rolle => { %>
+                <option value="<%= rolle.id %>" <%= rolle.managed ? 'disabled' : '' %>>
+                  <%= rolle.name %><%= rolle.managed ? ' (' + tr('discord:ROLEMENUS.ROLE_MANAGED') + ')' : '' %>
+                </option>
+              <% }); %>
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label <%= menu.darstellung === 'reaktion' ? 'required' : '' %>">
+              <%= tr('discord:ROLEMENUS.FIELD_EMOJI') %>
+            </label>
+            <input type="text" id="neuEmoji" class="form-control" maxlength="100" placeholder="🎮">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label"><%= tr('discord:ROLEMENUS.FIELD_LABEL') %></label>
+            <input type="text" id="neuLabel" class="form-control" maxlength="80"
+                   placeholder="<%= tr('discord:ROLEMENUS.FIELD_LABEL_PH') %>">
+          </div>
+
+          <div class="col-md-3" id="stilFeld" style="display: <%= menu.darstellung === 'knopf' ? 'block' : 'none' %>">
+            <label class="form-label"><%= tr('discord:ROLEMENUS.FIELD_BUTTON_STYLE') %></label>
+            <select id="neuStil" class="form-select">
+              <% (stile || []).forEach(s => { %>
+                <option value="<%= s %>"><%= stilName[s] %></option>
+              <% }); %>
+            </select>
+          </div>
+
+          <div class="col-12 mt-2">
+            <label class="form-label"><%= tr('discord:ROLEMENUS.FIELD_ENTRY_DESC') %></label>
+            <input type="text" id="neuBeschreibungEintrag" class="form-control" maxlength="100"
+                   placeholder="<%= tr('discord:ROLEMENUS.FIELD_ENTRY_DESC_PH') %>">
+          </div>
+
+          <div class="col-12 mt-3">
+            <button class="btn btn-outline-primary" id="knopfEintragDazu">
+              <i class="fa-solid fa-plus me-1"></i><%= tr('discord:ROLEMENUS.ADD') %>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const BASIS = '<%= basis %>';
+  const MENUE = <%= menu.id %>;
+
+  const MODUS_TEXT = <%- JSON.stringify({
+    normal:    tr('discord:ROLEMENUS.MODE_NORMAL_DESC'),
+    einmalig:  tr('discord:ROLEMENUS.MODE_ONCE_DESC'),
+    eindeutig: tr('discord:ROLEMENUS.MODE_UNIQUE_DESC'),
+    umgekehrt: tr('discord:ROLEMENUS.MODE_REVERSE_DESC')
+  }).replace(/</g, '\\u003c') %>;
+
+  const wert = (id) => document.getElementById(id).value.trim();
+
+  /** Eine Anfrage an die eigenen Routen, mit einheitlicher Fehlerausgabe. */
+  async function anfrage(pfad, optionen = {}) {
+    const antwort = await fetch(BASIS + pfad, {
+      headers: { 'Content-Type': 'application/json' },
+      ...optionen
+    });
+
+    let daten = {};
+    try { daten = await antwort.json(); } catch { /* kein JSON */ }
+
+    if (!antwort.ok || !daten.success) {
+      const text = daten.message || 'Das hat nicht geklappt (HTTP ' + antwort.status + ')';
+      if (window.showToast) showToast(text, 'error'); else alert(text);
+      return null;
+    }
+    return daten;
+  }
+
+  function melde(text) {
+    if (window.showToast) showToast(text, 'success'); else alert(text);
+  }
+
+  // ── Einstellungen ──────────────────────────────────────────────────
+
+  function zeigeModusHinweis() {
+    document.getElementById('modusHinweis').textContent =
+      MODUS_TEXT[document.getElementById('feldModus').value] || '';
+  }
+
+  document.getElementById('feldModus').addEventListener('change', zeigeModusHinweis);
+  zeigeModusHinweis();
+
+  // Die Grenzen der Auswahlliste und die Knopffarbe gehören nur zu ihrer
+  // jeweiligen Darstellung. Sie einzublenden, sobald sie greifen, erspart die
+  // Frage, warum eine Einstellung nichts bewirkt.
+  document.getElementById('feldDarstellung').addEventListener('change', function () {
+    const d = this.value;
+    document.getElementById('auswahlGrenzen').style.display = d === 'auswahl' ? 'flex' : 'none';
+    document.getElementById('stilFeld').style.display = d === 'knopf' ? 'block' : 'none';
+  });
+
+  document.getElementById('knopfSpeichern').addEventListener('click', async function () {
+    const daten = await anfrage('/' + MENUE, {
+      method: 'PUT',
+      body: JSON.stringify({
+        title: wert('feldTitel'),
+        description: wert('feldBeschreibung'),
+        channel_id: wert('feldKanal'),
+        color: wert('feldFarbe'),
+        darstellung: wert('feldDarstellung'),
+        modus: wert('feldModus'),
+        min_auswahl: Number(wert('feldMin') || 0),
+        max_auswahl: Number(wert('feldMax') || 25),
+        enabled: document.getElementById('feldAktiv').checked
+      })
+    });
+
+    if (daten) {
+      melde('<%= tr('discord:ROLEMENUS.SAVED') %>');
+      setTimeout(() => location.reload(), 700);
+    }
+  });
+
+  // ── Einträge ───────────────────────────────────────────────────────
+
+  document.getElementById('knopfEintragDazu').addEventListener('click', async function () {
+    if (!wert('neuRolle')) {
+      const t = '<%= tr('discord:ROLEMENUS.ROLE_REQUIRED') %>';
+      if (window.showToast) showToast(t, 'error'); else alert(t);
+      return;
+    }
+
+    const daten = await anfrage('/' + MENUE + '/eintraege', {
+      method: 'POST',
+      body: JSON.stringify({
+        role_id: wert('neuRolle'),
+        emoji: wert('neuEmoji'),
+        label: wert('neuLabel'),
+        description: wert('neuBeschreibungEintrag'),
+        stil: wert('neuStil') || 'grau'
+      })
+    });
+
+    if (daten) location.reload();
+  });
+
+  document.addEventListener('click', async function (ereignis) {
+    const weg = ereignis.target.closest('[data-eintrag-weg]');
+    if (weg) {
+      const id = weg.dataset.eintragWeg;
+      if (!confirm('<%= tr('discord:ROLEMENUS.DELETE_ENTRY_CONFIRM') %>')) return;
+      const daten = await anfrage('/eintraege/' + id, { method: 'DELETE' });
+      if (daten) location.reload();
+      return;
+    }
+
+    const hoch = ereignis.target.closest('[data-hoch]');
+    const runter = ereignis.target.closest('[data-runter]');
+    if (hoch || runter) {
+      await verschiebe(Number((hoch || runter).dataset.hoch || (hoch || runter).dataset.runter), hoch ? -1 : 1);
+    }
+
+    const senden = ereignis.target.closest('#knopfSenden');
+    if (senden) {
+      const daten = await anfrage('/' + MENUE + '/senden', { method: 'POST' });
+      if (!daten) return;
+
+      let text = daten.neu
+        ? '<%= tr('discord:ROLEMENUS.SENT') %>'
+        : '<%= tr('discord:ROLEMENUS.UPDATED') %>';
+
+      if (daten.uebersprungen && daten.uebersprungen.length > 0) {
+        text += ' ' + daten.uebersprungen.length + ' Emoji(s) konnten nicht gesetzt werden: '
+             + daten.uebersprungen.join(' ');
+      }
+
+      melde(text);
+      setTimeout(() => location.reload(), 900);
+    }
+  });
+
+  /**
+   * Einen Eintrag um eine Stelle verschieben.
+   *
+   * Die neue Reihenfolge wird aus dem DOM abgelesen und **vollständig**
+   * geschickt, nicht als „tausche diese beiden". So kann die Anzeige nicht von
+   * der Datenbank abweichen, wenn zwei Leute gleichzeitig sortieren.
+   */
+  async function verschiebe(id, richtung) {
+    const liste = document.getElementById('eintragsListe');
+    if (!liste) return;
+
+    const ids = Array.from(liste.children).map(el => Number(el.id.replace('eintrag-', '')));
+    const von = ids.indexOf(id);
+    const nach = von + richtung;
+    if (von < 0 || nach < 0 || nach >= ids.length) return;
+
+    ids.splice(nach, 0, ids.splice(von, 1)[0]);
+
+    const daten = await anfrage('/' + MENUE + '/reihenfolge', {
+      method: 'PUT',
+      body: JSON.stringify({ reihenfolge: ids })
+    });
+
+    if (daten) location.reload();
+  }
+
+  // Farbwahl und Textfeld verbinden — abgeschickt wird das Textfeld.
+  document.querySelectorAll('[data-farbwahl-fuer]').forEach(function (wahl) {
+    const text = document.getElementById(wahl.getAttribute('data-farbwahl-fuer'));
+    if (!text) return;
+
+    wahl.addEventListener('input', () => { text.value = wahl.value.toUpperCase(); });
+    text.addEventListener('input', function () {
+      const v = text.value.trim();
+      if (/^#?[0-9a-f]{6}$/i.test(v)) wahl.value = (v.startsWith('#') ? v : '#' + v).toLowerCase();
+    });
+  });
+})();
+</script>

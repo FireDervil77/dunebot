@@ -23,7 +23,7 @@
 
 <!-- Kennzahlen -->
 <div class="row row-cards mb-3">
-  <div class="col-sm-6 col-lg-3">
+  <div class="col-sm-6 col-lg-4">
     <div class="card">
       <div class="card-body">
         <div class="text-secondary small"><%= tr('greeting:DASHBOARD.ACTIVE_AREAS') %></div>
@@ -31,7 +31,7 @@
       </div>
     </div>
   </div>
-  <div class="col-sm-6 col-lg-3">
+  <div class="col-sm-6 col-lg-4">
     <div class="card">
       <div class="card-body">
         <div class="text-secondary small"><%= tr('greeting:TAB_AUTOROLE') %></div>
@@ -40,16 +40,7 @@
       </div>
     </div>
   </div>
-  <div class="col-sm-6 col-lg-3">
-    <div class="card">
-      <div class="card-body">
-        <div class="text-secondary small"><%= tr('greeting:NAV.REACTION_ROLES') %></div>
-        <div class="h1 mb-0"><%= (reactionPanels || []).length %></div>
-        <div class="text-secondary small"><%= tr('greeting:DASHBOARD.PANELS') %></div>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-6 col-lg-3">
+  <div class="col-sm-6 col-lg-4">
     <div class="card">
       <div class="card-body">
         <div class="text-secondary small"><%= tr('greeting:NAV.INVITES') %></div>
@@ -62,7 +53,7 @@
 
 <div class="row row-cards">
   <!-- Was scharf geschaltet ist -->
-  <div class="col-lg-6">
+  <div class="col-12">
     <div class="card">
       <div class="card-header">
         <h3 class="card-title"><%= tr('greeting:DASHBOARD.STATUS_TITLE') %></h3>
@@ -80,45 +71,4 @@
     </div>
   </div>
 
-  <!-- Reaktionstafeln -->
-  <div class="col-lg-6">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title"><%= tr('greeting:NAV.REACTION_ROLES') %></h3>
-        <div class="card-actions">
-          <a href="<%= basis %>/rollen" class="btn btn-sm btn-outline-primary"><%= tr('greeting:DASHBOARD.MANAGE') %></a>
-        </div>
-      </div>
-
-      <% if (reactionPanels && reactionPanels.length > 0) { %>
-        <div class="list-group list-group-flush">
-          <% reactionPanels.forEach(tafel => { %>
-            <div class="list-group-item">
-              <div class="d-flex justify-content-between align-items-center">
-                <div>
-                  <strong><%= tafel.title || tr('greeting:DASHBOARD.PANEL_UNNAMED') %></strong>
-                  <div class="text-secondary small">
-                    <%= tr('greeting:DASHBOARD.PANEL_ROLES', { count: (tafel.mappings || []).length }) %>
-                  </div>
-                </div>
-                <% if (tafel.message_id) { %>
-                  <span class="badge bg-green-lt"><%= tr('greeting:REACTION_ROLES.STATUS_SENT') %></span>
-                <% } else { %>
-                  <span class="badge bg-orange-lt"><%= tr('greeting:REACTION_ROLES.STATUS_DRAFT') %></span>
-                <% } %>
-              </div>
-            </div>
-          <% }); %>
-        </div>
-      <% } else { %>
-        <div class="card-body">
-          <div class="empty">
-            <div class="empty-icon"><i class="fa-solid fa-face-smile fs-1 text-secondary"></i></div>
-            <p class="empty-title"><%= tr('greeting:DASHBOARD.NO_PANELS') %></p>
-            <p class="empty-subtitle text-secondary"><%= tr('greeting:DASHBOARD.NO_PANELS_HINT') %></p>
-          </div>
-        </div>
-      <% } %>
-    </div>
-  </div>
 </div>

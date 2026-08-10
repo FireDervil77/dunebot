@@ -66,9 +66,10 @@ class DiscordPlugin extends DashboardPlugin {
 
         this.guildRouter.use('/roles', require('./routes/roles.router'));
         this.guildRouter.use('/channels', require('./routes/channels.router'));
+        this.guildRouter.use('/rollenmenues', require('./routes/rollenmenues.router'));
         this.guildRouter.use('/', require('./routes/guild.router'));
 
-        Logger.info('[Discord] Routen registriert (3 Router)');
+        Logger.info('[Discord] Routen registriert (4 Router)');
     }
 
     /**
@@ -163,6 +164,17 @@ class DiscordPlugin extends DashboardPlugin {
                 order: 20,
                 type: haupt,
                 capability: 'DISCORD.CHANNELS.VIEW',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'discord:NAV.ROLEMENUS',
+                url: `${basis}/rollenmenues`,
+                icon: 'fa-solid fa-hand-pointer',
+                order: 30,
+                type: haupt,
+                capability: 'DISCORD.ROLEMENUS.VIEW',
                 visible: true,
                 guildId,
                 parent: basis

@@ -41,6 +41,22 @@
       "category": "discord",
       "is_dangerous": 0,
       "requires": "DISCORD.VIEW"
+    },
+    {
+      "key": "DISCORD.ROLEMENUS.VIEW",
+      "name": "Rollenmenüs anzeigen",
+      "description": "Berechtigung, die Rollenmenüs des Servers einzusehen",
+      "category": "discord",
+      "is_dangerous": 0,
+      "requires": "DISCORD.VIEW"
+    },
+    {
+      "key": "DISCORD.ROLEMENUS.MANAGE",
+      "name": "Rollenmenüs verwalten",
+      "description": "Berechtigung, Rollenmenüs anzulegen, zu ändern und in einen Kanal zu senden. Wer das darf, bestimmt mittelbar, welche Rollen sich Mitglieder selbst geben können",
+      "category": "discord",
+      "is_dangerous": 1,
+      "requires": "DISCORD.ROLEMENUS.VIEW"
     }
   ],
   "default_groups": {}

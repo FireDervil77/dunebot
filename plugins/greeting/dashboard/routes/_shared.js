@@ -80,7 +80,7 @@ function leseEmbed(roh) {
  * Alles laden, was die Greeting-Seiten brauchen.
  *
  * @param {string} guildId Discord-Guild-ID
- * @returns {Promise<Object>} { settings, channels, roles, inviteMappings, reactionPanels }
+ * @returns {Promise<Object>} { settings, channels, roles, inviteMappings }
  */
 async function ladeDaten(guildId) {
     const dbService = ServiceManager.get('dbService');
@@ -163,8 +163,7 @@ async function ladeDaten(guildId) {
         }
     };
 
-    // Einladungszuordnungen und Reaktionstafeln - beide Tabellen koennen in
-    // einer alten Guild noch fehlen.
+    // Die Tabelle kann in einer alten Guild noch fehlen.
     let inviteMappings = [];
     try {
         inviteMappings = await dbService.query(
@@ -173,36 +172,7 @@ async function ladeDaten(guildId) {
         );
     } catch { /* Tabelle noch nicht angelegt */ }
 
-    let reactionPanels = [];
-    try {
-        const tafeln = await dbService.query(
-            'SELECT * FROM greeting_reaction_panels WHERE guild_id = ? ORDER BY created_at DESC',
-            [guildId]
-        );
-
-        if (tafeln.length > 0) {
-            // Eine Abfrage statt einer je Tafel
-            const ids = tafeln.map(t => t.id);
-            const platzhalter = ids.map(() => '?').join(',');
-            const zuordnungen = await dbService.query(
-                `SELECT * FROM greeting_reaction_roles WHERE panel_id IN (${platzhalter})`,
-                ids
-            );
-
-            const nachTafel = {};
-            zuordnungen.forEach(z => {
-                (nachTafel[z.panel_id] = nachTafel[z.panel_id] || []).push({
-                    ...z,
-                    role_name: roles.find(r => String(r.id) === String(z.role_id))?.name || z.role_id
-                });
-            });
-
-            tafeln.forEach(t => { t.mappings = nachTafel[t.id] || []; });
-        }
-        reactionPanels = tafeln;
-    } catch { /* Tabellen noch nicht angelegt */ }
-
-    return { settings, channels, roles, inviteMappings, reactionPanels };
+    return { settings, channels, roles, inviteMappings };
 }
 
 /** Fehlerseite statt eines nackten 500ers. */
