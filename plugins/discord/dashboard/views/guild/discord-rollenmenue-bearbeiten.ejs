@@ -307,12 +307,20 @@
   </div>
 </div>
 
+<script src="/assets/plugins/discord/js/emoji-auswahl.js"></script>
 <script>
 (function () {
   'use strict';
 
   const BASIS = '<%= basis %>';
   const MENUE = <%= menu.id %>;
+
+  // Emoji-Auswahl an das Feld haengen. Ohne sie war es ein blankes Textfeld,
+  // in das man ein Zeichen von anderswo kopieren musste — bei Server-Emojis
+  // praktisch unmoeglich, weil Discord dort `<:name:id>` erwartet.
+  if (window.EmojiAuswahl) {
+    window.EmojiAuswahl.anhaengen(document.getElementById('neuEmoji'), BASIS);
+  }
 
   const MODUS_TEXT = <%- JSON.stringify({
     normal:    tr('discord:ROLEMENUS.MODE_NORMAL_DESC'),

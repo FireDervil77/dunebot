@@ -124,6 +124,33 @@ router.get('/:menuId/bearbeiten', requirePermission('DISCORD.ROLEMENUS.VIEW'), a
 
 // ── Ein Menü ─────────────────────────────────────────────────────────────
 
+/**
+ * GET /guild/:guildId/plugins/discord/rollenmenues/emojis
+ *
+ * Die eigenen Emojis dieses Servers, fuer die Auswahl am Emoji-Feld.
+ *
+ * Standard-Emojis stehen im Dashboard selbst — die sind fuer jede Guild gleich
+ * und muessen nicht ueber die Leitung. Hierher kommt nur, was guild-eigen ist:
+ * dort braucht Discord die Form `<:name:id>`, und die ID kennt niemand
+ * auswendig.
+ *
+ * MUSS vor `/:menuId` stehen: Express nimmt den zuerst passenden Handler, und
+ * `/:menuId` schluckt jeden einzelnen Pfadabschnitt — auch "emojis".
+ */
+router.get('/emojis', requirePermission('DISCORD.ROLEMENUS.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+
+    const antwort = await fragBot('discord:holeEmojis', { guildId });
+    if (!antwort) {
+        return res.status(503).json({ success: false, message: 'Der Bot antwortet nicht. Läuft er?' });
+    }
+    if (!antwort.success) {
+        return res.status(400).json({ success: false, message: antwort.message || 'Emojis nicht abrufbar' });
+    }
+
+    return res.json({ success: true, emojis: antwort.emojis || [] });
+});
+
 router.get('/:menuId', requirePermission('DISCORD.ROLEMENUS.VIEW'), async (req, res) => {
     const guildId = res.locals.guildId;
     const menuId = Number(req.params.menuId);
