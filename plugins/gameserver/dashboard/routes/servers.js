@@ -2601,7 +2601,9 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
 
         // Server existiert prüfen
         const [server] = await dbService.query(
-            `SELECT id, name, status, rootserver_id,
+            // `ports` gehoert dazu: die Portvariablen werden unten dagegen
+            // geprueft. Ohne die Spalte liefe die Pruefung wirkungslos durch.
+            `SELECT id, name, status, rootserver_id, ports, env_variables,
                     allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb
              FROM gameservers WHERE id = ? AND guild_id = ?`,
             [serverId, guildId]
@@ -2683,6 +2685,66 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
                 return res.status(400).json({
                     success: false,
                     message: 'Ungültiges JSON-Format bei Environment Variables'
+                });
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // Portvariablen gegen die Allocation prüfen (Baustellen 39)
+        //
+        // Eine Variable wie `RCON_PORT` trägt eine Portnummer. Wer sie von Hand
+        // ändert, kann einen Port erwischen, den der RootServer gar nicht offen
+        // hat — oder der einem anderen Server gehört. Das fiele erst beim
+        // Verbinden auf, und dann sieht es nach einem kaputten Spiel aus.
+        //
+        // Erlaubt ist nur, was diesem Server als Allocation gehört. Beim Start
+        // speist die Allocation die Variable ohnehin (`StartPayload`); diese
+        // Prüfung sagt es dem Nutzer, statt seine Eingabe stillschweigend zu
+        // überschreiben.
+        // ════════════════════════════════════════════════════════════════════
+        const serverPorts = (() => {
+            try {
+                return typeof server.ports === 'string' ? JSON.parse(server.ports) : (server.ports || {});
+            } catch (_) { return {}; }
+        })();
+        const eigeneAllocations = new Set(
+            Object.values(serverPorts)
+                .map(p => String(p?.external ?? p?.internal ?? p))
+                .filter(Boolean)
+        );
+
+        // Nur beanstanden, was in DIESEM Speichervorgang geaendert wurde.
+        // Bestandsdaten tragen noch Portnummern aus der Zeit vor der Umstellung
+        // (Server 159: RCON_PORT=27020, nie eine Allocation) — wer die pauschal
+        // ablehnt, macht das Speichern genau der Server unmoeglich, die man
+        // gerade reparieren will.
+        const bisher = (() => {
+            try {
+                const roh = typeof server.env_variables === 'string'
+                    ? JSON.parse(server.env_variables) : (server.env_variables || {});
+                return roh || {};
+            } catch (_) { return {}; }
+        })();
+
+        if (eigeneAllocations.size) {
+            const verstoesse = [];
+            for (const [name, wert] of Object.entries(envVarsJson)) {
+                if (!/_PORT$/.test(name)) continue;
+                const nummer = String(wert || '').trim();
+                if (!nummer || !/^\d+$/.test(nummer)) continue;
+                if (eigeneAllocations.has(nummer)) continue;
+                if (String(bisher[name] ?? '').trim() === nummer) continue;  // unveraendert
+                verstoesse.push({ name, nummer });
+            }
+
+            if (verstoesse.length) {
+                const belegte = [...eigeneAllocations].sort((a, b) => Number(a) - Number(b)).join(', ');
+                return res.status(400).json({
+                    success: false,
+                    message: verstoesse.map(v =>
+                        `${v.name} = ${v.nummer} ist keiner der Ports dieses Servers`
+                    ).join('; ') + `. Verfügbar sind: ${belegte}. `
+                      + 'Portnummern kommen aus der Port-Verwaltung des RootServers, nicht aus dieser Variable.'
                 });
             }
         }
