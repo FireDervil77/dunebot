@@ -343,14 +343,28 @@
 
     if (!antwort.ok || !daten.success) {
       const text = daten.message || 'Das hat nicht geklappt (HTTP ' + antwort.status + ')';
-      if (window.showToast) showToast(text, 'error'); else alert(text);
+      if (window.showToast) showToast('error', text); else alert(text);
       return null;
     }
+
+    // Gespeichert ist gespeichert — aber die Nachricht in Discord wird nach
+    // jeder Änderung nachgezogen, und dabei kann etwas schiefgehen (Bot nicht
+    // erreichbar, Nachricht gelöscht, ein Emoji von einem fremden Server).
+    // Das darf die Änderung nicht als Fehlschlag darstellen, aber es muss
+    // gesagt werden. Sonst steht im Dashboard das eine und im Kanal das andere,
+    // und niemand erfährt davon.
+    //
+    // Hier an einer Stelle statt an jeder Aufrufstelle: dieser Helfer ist der
+    // Trichter, durch den alle Änderungen dieser Seite gehen.
+    if (daten.hinweis) {
+      if (window.showToast) showToast('warning', daten.hinweis); else alert(daten.hinweis);
+    }
+
     return daten;
   }
 
   function melde(text) {
-    if (window.showToast) showToast(text, 'success'); else alert(text);
+    if (window.showToast) showToast('success', text); else alert(text);
   }
 
   // ── Einstellungen ──────────────────────────────────────────────────
@@ -402,7 +416,7 @@
       const eingabe = wert('feldNachricht');
       if (!eingabe) {
         const t = '<%= tr('discord:ROLEMENUS.EXISTING_REQUIRED') %>';
-        if (window.showToast) showToast(t, 'error'); else alert(t);
+        if (window.showToast) showToast('error', t); else alert(t);
         return;
       }
 
@@ -436,7 +450,7 @@
   document.getElementById('knopfEintragDazu').addEventListener('click', async function () {
     if (!wert('neuRolle')) {
       const t = '<%= tr('discord:ROLEMENUS.ROLE_REQUIRED') %>';
-      if (window.showToast) showToast(t, 'error'); else alert(t);
+      if (window.showToast) showToast('error', t); else alert(t);
       return;
     }
 

@@ -42,6 +42,51 @@ const MAX_EINTRAEGE = { reaktion: 20, knopf: 25, auswahl: 25 };
  */
 const ausListe = (wert, erlaubt) => erlaubt.includes(wert) ? wert : erlaubt[0];
 
+/**
+ * Eine bereits gesendete Nachricht nach einer Änderung nachziehen.
+ *
+ * ## Warum das sein muss
+ *
+ * Die Routen darunter schrieben ausschliesslich in die Datenbank. Wer einen
+ * Eintrag löschte, sah ihn im Dashboard verschwinden — im Kanal blieb er
+ * stehen, samt seiner Reaktion, und wer darauf drückte, bekam nichts. Die
+ * einzige Stelle, die Discord je anfasste, war der Knopf „Senden", und den
+ * musste man kennen und nach jeder Änderung von Hand drücken.
+ *
+ * Das ist das Muster, an dem dieses Projekt schon mehrfach hängengeblieben ist:
+ * etwas sieht erledigt aus und ist es nicht.
+ *
+ * ## Was hier bewusst NICHT passiert
+ *
+ * Es wird nie eine **neue** Nachricht gesendet. Steht das Menü noch nirgends,
+ * geschieht nichts — sonst erschiene beim Anlegen des ersten Eintrags ungefragt
+ * ein Menü im Kanal. Senden bleibt eine Entscheidung des Nutzers.
+ *
+ * Ein Fehler beim Nachziehen lässt die Route **nicht** scheitern: gespeichert
+ * ist gespeichert. Er wird als `hinweis` zurückgegeben, damit die Oberfläche
+ * ihn zeigen kann, statt eine erfolgreiche Änderung als Fehlschlag darzustellen.
+ *
+ * @param {string} guildId
+ * @param {number} menuId
+ * @returns {Promise<string|null>} Hinweis für den Nutzer, oder null wenn alles glatt lief
+ */
+async function ziehNach(guildId, menuId) {
+    if (!Number.isInteger(menuId)) return null;
+
+    const antwort = await fragBot('discord:sendeRollenmenue', {
+        guildId, menuId, nurAktualisieren: true
+    });
+
+    if (!antwort) return 'Der Bot war nicht erreichbar — die Nachricht in Discord steht noch auf dem alten Stand.';
+    if (antwort.nachrichtWeg) return 'Die Nachricht im Kanal gibt es nicht mehr. Die Verknüpfung wurde gelöst.';
+    if (!antwort.ok) return `Die Nachricht in Discord konnte nicht nachgezogen werden: ${antwort.fehler}`;
+
+    if (Array.isArray(antwort.uebersprungen) && antwort.uebersprungen.length > 0) {
+        return `Diese Reaktionen konnte ich nicht setzen: ${antwort.uebersprungen.join(' ')}`;
+    }
+    return null;
+}
+
 // ── Übersicht ────────────────────────────────────────────────────────────
 
 router.get('/', requirePermission('DISCORD.ROLEMENUS.VIEW'), async (req, res) => {
@@ -255,7 +300,8 @@ router.put('/:menuId', requirePermission('DISCORD.ROLEMENUS.MANAGE'), async (req
         if (!geaendert) {
             return res.status(404).json({ success: false, message: 'Menü nicht gefunden' });
         }
-        return res.json({ success: true });
+        const hinweis = await ziehNach(guildId, menuId);
+        return res.json({ success: true, hinweis });
     } catch (error) {
         return fehler(res, error, 'Das Menü konnte nicht geändert werden');
     }
@@ -270,14 +316,27 @@ router.delete('/:menuId', requirePermission('DISCORD.ROLEMENUS.MANAGE'), async (
     }
 
     try {
+        // ERST abräumen, DANN löschen. Umgekehrt gäbe es weder Nachrichten-ID
+        // noch Emoji-Liste mehr, und es wäre nicht mehr feststellbar, was in
+        // Discord zu diesem Menü gehörte.
+        //
+        // Die Nachricht im Kanal bleibt bewusst stehen: Sie zu löschen wäre ein
+        // Eingriff, den niemand angefordert hat. Was verschwindet, sind nur ihre
+        // Bedienelemente — Knöpfe und die eigenen Reaktionen des Bots. Vorher
+        // blieben auch die stehen: eine Bedienung, die aussieht wie eine und
+        // beim Drücken schweigt.
+        const geraeumt = await fragBot('discord:raeumeRollenmenue', { guildId, menuId });
+
         const geloescht = await DiscordRoleMenus.deleteMenu(guildId, menuId);
         if (!geloescht) {
             return res.status(404).json({ success: false, message: 'Menü nicht gefunden' });
         }
-        // Die Nachricht im Kanal bleibt bewusst stehen: Sie zu löschen wäre ein
-        // Eingriff in einen fremden Kanal, den niemand angefordert hat. Sie tut
-        // ab jetzt nichts mehr — darauf weist die Oberfläche vor dem Löschen hin.
-        return res.json({ success: true });
+
+        const hinweis = geraeumt && geraeumt.ok === false
+            ? `Das Menü ist gelöscht. In Discord blieben die Bedienelemente stehen: ${geraeumt.fehler}`
+            : null;
+
+        return res.json({ success: true, hinweis });
     } catch (error) {
         return fehler(res, error, 'Das Menü konnte nicht gelöscht werden');
     }
@@ -337,7 +396,8 @@ router.post('/:menuId/eintraege', requirePermission('DISCORD.ROLEMENUS.MANAGE'),
             stil: ausListe(req.body?.stil, STILE)
         });
 
-        return res.json({ success: true, id });
+        const hinweis = await ziehNach(guildId, menuId);
+        return res.json({ success: true, id, hinweis });
     } catch (error) {
         if (error?.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({ success: false, message: 'Diese Rolle steht schon in dem Menü' });
@@ -355,11 +415,14 @@ router.delete('/eintraege/:optionId', requirePermission('DISCORD.ROLEMENUS.MANAG
     }
 
     try {
-        const geloescht = await DiscordRoleMenus.removeOption(guildId, optionId);
-        if (!geloescht) {
+        // Gibt die Menü-ID zurück, nicht bloss „hat geklappt" — ohne sie wüssten
+        // wir nach dem Löschen nicht mehr, welche Nachricht nachzuziehen ist.
+        const menuId = await DiscordRoleMenus.removeOption(guildId, optionId);
+        if (!menuId) {
             return res.status(404).json({ success: false, message: 'Eintrag nicht gefunden' });
         }
-        return res.json({ success: true });
+        const hinweis = await ziehNach(guildId, menuId);
+        return res.json({ success: true, hinweis });
     } catch (error) {
         return fehler(res, error, 'Der Eintrag konnte nicht gelöscht werden');
     }
@@ -376,7 +439,8 @@ router.put('/:menuId/reihenfolge', requirePermission('DISCORD.ROLEMENUS.MANAGE')
 
     try {
         const geaendert = await DiscordRoleMenus.setOptionOrder(guildId, menuId, reihenfolge);
-        return res.json({ success: true, geaendert });
+        const hinweis = await ziehNach(guildId, menuId);
+        return res.json({ success: true, geaendert, hinweis });
     } catch (error) {
         return fehler(res, error, 'Die Reihenfolge konnte nicht gespeichert werden');
     }

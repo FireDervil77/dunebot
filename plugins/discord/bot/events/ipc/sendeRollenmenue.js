@@ -23,12 +23,25 @@ const { baueNachricht, reaktionsEmojis } = require('../../rollenmenue/nachricht'
  * noch, wird sie bearbeitet. Ist sie gelöscht, wird eine neue gesendet und die
  * ID überschrieben.
  *
- * @param {{guildId: string, menuId: number}} payload
+ * ## `nurAktualisieren`
+ *
+ * Das Dashboard ruft diesen Handler nach **jeder** Änderung auf, damit ein im
+ * Dashboard gelöschter Eintrag nicht im Kanal stehen bleibt. Dabei gelten zwei
+ * Regeln anders als beim Knopf „Senden":
+ *
+ * - Ohne bestehende Nachricht passiert nichts. Wer einen Eintrag anlegt, will
+ *   nicht, dass dadurch ungefragt ein Menü im Kanal erscheint.
+ * - Ein Menü **ohne** Einträge wird trotzdem nachgezogen. Genau dann ist das
+ *   Nachziehen am wichtigsten: der letzte Eintrag ist weg, und die Reaktionen
+ *   darunter müssen mit. Beim Senden von Hand bleibt der Riegel, dort wäre ein
+ *   leeres Menü nur Verwirrung.
+ *
+ * @param {{guildId: string, menuId: number, nurAktualisieren?: boolean}} payload
  * @param {import('discord.js').Client} discordClient
  * @returns {Promise<Object>}
  */
 module.exports = async (payload, discordClient) => {
-    const { guildId, menuId } = payload || {};
+    const { guildId, menuId, nurAktualisieren = false } = payload || {};
 
     const menu = await DiscordRoleMenus.getMenu(guildId, Number(menuId));
     if (!menu) {
@@ -37,7 +50,11 @@ module.exports = async (payload, discordClient) => {
     if (!menu.channel_id) {
         return { ok: false, fehler: 'Für dieses Menü ist kein Kanal gewählt.' };
     }
-    if (menu.optionen.length === 0) {
+    if (nurAktualisieren && !menu.message_id) {
+        // Nichts zu tun, und das ist kein Fehler: das Menü steht noch nirgends.
+        return { ok: true, uebersprungen: [], nichtsZuTun: true };
+    }
+    if (menu.optionen.length === 0 && !nurAktualisieren) {
         return { ok: false, fehler: 'Das Menü hat noch keine Einträge.' };
     }
 
@@ -101,6 +118,13 @@ module.exports = async (payload, discordClient) => {
                 ok: false,
                 fehler: 'Die verknüpfte Nachricht gibt es nicht mehr. Die Verknüpfung wurde gelöst.'
             };
+        } else if (nurAktualisieren) {
+            // Die eigene Nachricht ist im Kanal gelöscht worden. Beim Nachziehen
+            // ist das kein Anlass, eine neue zu senden — das täte etwas, das
+            // niemand angefordert hat. Die Verknüpfung wird gelöst, damit der
+            // Zustand ehrlich ist.
+            await DiscordRoleMenus.updateMenu(guildId, menu.id, { message_id: null });
+            return { ok: true, uebersprungen: [], nichtsZuTun: true, nachrichtWeg: true };
         } else {
             nachricht = await channel.send(inhalt);
             neu = true;
@@ -154,6 +178,15 @@ async function setzeReaktionen(nachricht, menu, neu) {
     const emojis = reaktionsEmojis(menu);
     const ich = nachricht.client.user.id;
 
+    // Derselbe Vergleich wie in `rollenmenue/reaktion.js`: der
+    // Variationsselektor U+FE0F muss weg. `⚔` und `⚔️` sind dasselbe Zeichen in
+    // zwei Schreibweisen, und welche ankommt, hängt davon ab, woher der Nutzer
+    // es kopiert hat. Byte-genau verglichen hielte der Bot seine eigene, noch
+    // gültige Reaktion für eine überflüssige, nähme sie weg und setzte sie
+    // gleich wieder — bei jedem Nachziehen, für alle sichtbar.
+    const schluessel = (wert) => String(wert || '').replace(/\uFE0F/g, '');
+    const gewollt = new Set(emojis.map(schluessel));
+
     if (!neu) {
         // Eigene Reaktionen abräumen, die nicht mehr ins Menü gehören.
         for (const reaktion of nachricht.reactions.cache.values()) {
@@ -161,7 +194,7 @@ async function setzeReaktionen(nachricht, menu, neu) {
                 ? `<${reaktion.emoji.animated ? 'a' : ''}:${reaktion.emoji.name}:${reaktion.emoji.id}>`
                 : reaktion.emoji.name;
 
-            if (emojis.includes(kennung)) continue;
+            if (gewollt.has(schluessel(kennung))) continue;
             if (!reaktion.me) continue;
 
             await reaktion.users.remove(ich).catch(() => {});

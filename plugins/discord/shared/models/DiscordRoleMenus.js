@@ -227,20 +227,34 @@ class DiscordRoleMenus {
     }
 
     /**
+     * Einen Eintrag löschen.
+     *
+     * Gibt die Menü-ID zurück, nicht bloss „hat geklappt". Nach dem Löschen ist
+     * die Zuordnung weg — der Aufrufer braucht sie aber, um die Nachricht in
+     * Discord nachzuziehen. Sonst verschwindet der Eintrag im Dashboard und
+     * bleibt im Kanal stehen.
+     *
      * @param {string} guildId
      * @param {number} optionId
-     * @returns {Promise<boolean>}
+     * @returns {Promise<number|null>} Menü-ID, oder null wenn nichts gelöscht wurde
      */
     static async removeOption(guildId, optionId) {
         const dbService = ServiceManager.get('dbService');
 
-        const ergebnis = await dbService.query(`
-            DELETE o FROM discord_role_menu_options o
+        const [zeile] = await dbService.query(`
+            SELECT o.menu_id FROM discord_role_menu_options o
             INNER JOIN discord_role_menus m ON m.id = o.menu_id
             WHERE m.guild_id = ? AND o.id = ?
         `, [guildId, optionId]);
 
-        return (ergebnis?.affectedRows || 0) > 0;
+        if (!zeile) return null;
+
+        const ergebnis = await dbService.query(
+            'DELETE FROM discord_role_menu_options WHERE id = ?',
+            [optionId]
+        );
+
+        return (ergebnis?.affectedRows || 0) > 0 ? Number(zeile.menu_id) : null;
     }
 
     /**

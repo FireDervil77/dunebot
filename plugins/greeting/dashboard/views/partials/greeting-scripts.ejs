@@ -355,7 +355,7 @@
       });
       const result = await resp.json();
       if (result.success) {
-        if (window.showToast) showToast('Gespeichert!', 'success');
+        if (window.showToast) showToast('success', 'Gespeichert!');
         else alert('Gespeichert!');
       } else {
         alert(result.message || 'Fehler');
@@ -385,7 +385,7 @@
       });
       const result = await resp.json();
       if (result.success) {
-        if (window.showToast) showToast('Panel gesendet!', 'success');
+        if (window.showToast) showToast('success', 'Panel gesendet!');
         else alert('Verification-Panel wurde gesendet!');
       } else {
         alert(result.message || 'Fehler beim Senden');
