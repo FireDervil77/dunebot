@@ -557,54 +557,65 @@
 }
 
 /* ===========================================================================
-   GLOBAL CHECKBOX STYLES - Maximale Sichtbarkeit auf weißem Hintergrund
-   Wichtig: Ohne sichtbaren Rahmen sind Checkboxen auf weißem Hintergrund
-            praktisch unsichtbar, besonders in Modals!
+   KONTROLLKAESTCHEN UND SCHALTER
+
+   Der Block hiess einmal „GLOBAL CHECKBOX STYLES — Maximale Sichtbarkeit" und
+   griff auf `input[type="checkbox"]` zu, also auf **jedes** Kaestchen im
+   Dashboard. Ein Bootstrap-Schalter ist aber genau das: ein Kaestchen mit
+   `.form-check-input` in einem `.form-switch`. Die Regeln haben ihn deshalb
+   mitgenommen und aus der Pille wieder ein Quadrat gemacht — mit `!important`,
+   gegen das auch die Design-Tokens nicht ankamen.
+
+   Der Grund fuer den Block war berechtigt: Ein Kaestchen ohne Rahmen ist auf
+   weissem Grund kaum zu sehen. Er gilt jetzt nur noch fuer das, was auch
+   wirklich ein Kaestchen ist.
+
+   Zwei Aenderungen ausserdem:
+
+   - **Kein `!important` mehr auf der Farbe.** Ein eingeschaltetes Kaestchen war
+     fest gruen (#28a745) und ueberstimmte damit `--fb-primary` aus
+     `tokens.css`. Wer die Guild-Farbe umgestellt hat, bekam ueberall seine
+     Farbe — nur die Haekchen blieben gruen.
+   - **Farben aus den Tokens** statt fester Werte, damit der Rest des
+     Theme-Umbaus nicht daran vorbeilaeuft.
    ============================================================================ */
 
-/* Alle Checkboxen im Dashboard */
-.form-check-input,
-input[type="checkbox"] {
+/* Nur echte Kaestchen — Schalter regelt das Theme */
+.form-check:not(.form-switch) > .form-check-input[type="checkbox"],
+input[type="checkbox"]:not(.form-check-input) {
   width: 1.25rem;
   height: 1.25rem;
-  border: 2.5px solid #2c3e50 !important;  /* Dicker, dunkler Rahmen für maximale Sichtbarkeit */
+  border: 2px solid var(--fb-border, #2c3e50);
   border-radius: 0.25rem;
   cursor: pointer;
-  background-color: #fff !important;  /* Immer weißer Hintergrund wenn nicht checked */
+  background-color: var(--fb-surface-bg, #fff);
   margin-top: 0.1rem;
   box-sizing: border-box;
 }
 
-/* Hover-Effekt */
-.form-check-input:hover:not(:disabled),
-input[type="checkbox"]:hover:not(:disabled) {
-  border-color: #007bff !important;
-  box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.3);
-  background-color: #f8f9fa !important;  /* Leichter grauer Hintergrund beim Hover */
+.form-check:not(.form-switch) > .form-check-input[type="checkbox"]:hover:not(:disabled),
+input[type="checkbox"]:not(.form-check-input):hover:not(:disabled) {
+  border-color: var(--fb-primary, #007bff);
+  box-shadow: 0 0 0 0.25rem rgba(var(--fb-primary-rgb, 0, 123, 255), 0.25);
 }
 
-/* Checked State */
-.form-check-input:checked,
-input[type="checkbox"]:checked {
-  background-color: #28a745 !important;
-  border-color: #28a745 !important;
-  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+.form-check:not(.form-switch) > .form-check-input[type="checkbox"]:checked,
+input[type="checkbox"]:not(.form-check-input):checked {
+  background-color: var(--fb-primary, #007bff);
+  border-color: var(--fb-primary, #007bff);
 }
 
-/* Focus State (Tastatur-Navigation) */
-.form-check-input:focus,
-input[type="checkbox"]:focus {
-  border-color: #007bff !important;
+.form-check:not(.form-switch) > .form-check-input[type="checkbox"]:focus,
+input[type="checkbox"]:not(.form-check-input):focus {
+  border-color: var(--fb-primary, #007bff);
   outline: 0;
-  box-shadow: 0 0 0 0.3rem rgba(0, 123, 255, 0.3);
+  box-shadow: 0 0 0 0.25rem rgba(var(--fb-primary-rgb, 0, 123, 255), 0.3);
 }
 
-/* Disabled State */
-.form-check-input:disabled,
-input[type="checkbox"]:disabled {
+.form-check:not(.form-switch) > .form-check-input[type="checkbox"]:disabled,
+input[type="checkbox"]:not(.form-check-input):disabled {
   cursor: not-allowed;
   opacity: 0.5;
-  background-color: #e9ecef;
 }
 
 /* Größere Variante für Permission-Matrix */

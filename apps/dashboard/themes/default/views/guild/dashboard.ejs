@@ -62,7 +62,7 @@ const _bekannt = _bereiche.map(b => b.id);
                 <div class="dropdown-menu dropdown-menu-end p-3" id="widget-visibility-menu" style="min-width: 16rem;">
                   <div class="text-secondary small mb-2">Karten auf dem Dashboard</div>
                   <% (locals.alleWidgets || []).slice().sort((a,b) => (a.position||0)-(b.position||0)).forEach(w => { %>
-                    <div class="form-check">
+                    <div class="form-check form-switch">
                       <input class="form-check-input widget-visibility-toggle" type="checkbox"
                              id="sichtbar-<%= w.id %>" data-widget-target="<%= w.id %>"
                              <%= w.visible === false ? '' : 'checked' %>>

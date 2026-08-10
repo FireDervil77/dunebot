@@ -691,14 +691,14 @@ function createVariableRow(varData, index) {
             </div>
             <div class="row">
                 <div class="col-md-6">
-                    <div class="form-check">
+                    <div class="form-check form-switch">
                         <input type="checkbox" class="form-check-input var-user-viewable"
                                ${varData.user_viewable !== false ? 'checked' : ''}>
                         <label class="form-check-label">Sichtbar für Benutzer</label>
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <div class="form-check">
+                    <div class="form-check form-switch">
                         <input type="checkbox" class="form-check-input var-user-editable"
                                ${varData.user_editable !== false ? 'checked' : ''}>
                         <label class="form-check-label">Bearbeitbar für Benutzer</label>
