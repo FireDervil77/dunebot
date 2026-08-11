@@ -1,59 +1,65 @@
-<!-- filepath: /home/firedervil/dunebot_new/apps/dashboard/themes/default/layouts/auth.ejs -->
+<%#
+ * Auth-Layout — Tabler-Gerüst, zentriert
+ *
+ * Tablers Muster fuer Seiten ohne Navigation: `.page.page-center`. Passt genau
+ * zu dem, was dieser Bereich braucht — Anmeldung, Rueckmeldung, Abmeldung und
+ * die Serverauswahl haben noch keine Guild und duerfen deshalb weder
+ * Seitenleiste noch Umschalter zeigen.
+ *
+ * Vorher AdminLTEs `login-page`. Dabei stand am Ende ein `</main>`, das nirgends
+ * geoeffnet wurde — der Browser hat es verschluckt, im Quelltext stand es
+ * trotzdem. Jetzt ausgeglichen.
+%>
 <!DOCTYPE html>
 <html lang="<%= locals.lang || 'de' %>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= locals.title ? `${title} - FireBot` : 'FireBot - Authentifizierung' %></title>
+    <title><%= locals.title ? `${title} - FireBot` : 'FireBot - Anmeldung' %></title>
     <%- locals.csrfMetaTag || '' %>
 
-    <!-- Favicon -->
     <link rel="icon" href="<%= theme.asset('images/favicon.png') %>" type="image/png">
 
-    <!-- Styles: Theme + Plugins (AssetManager) -->
+    <%# Styles: Theme + Plugins (AssetManager) %>
     <% if (locals.assetManager) { %>
       <%- assetManager.renderStyles() %>
     <% } %>
 
-    <%# Design-Tokens aus theme.json — stehen zwischen tokens.css und der Guild-Anpassung %>
-<% if (locals.themeTokensCSS) { %>
-<style id="theme-tokens">
-<%- locals.themeTokensCSS %>
-</style>
-<% } %>
+    <%# Design-Tokens aus theme.json %>
+    <% if (locals.themeTokensCSS) { %>
+    <style id="theme-tokens">
+    <%- locals.themeTokensCSS %>
+    </style>
+    <% } %>
 
-<!-- Head-Skripte: Theme + Plugins (AssetManager) -->
+    <%# Head-Skripte: Theme + Plugins (AssetManager) %>
     <% if (locals.assetManager) { %>
       <%- assetManager.renderScripts(false) %>
     <% } %>
 
-    <!-- Hook: auth_head -->
-<%- hookArea('auth_head') %>
+    <%- hookArea('auth_head') %>
 </head>
-<body class="login-page bg-body-secondary">
-                              
-<!-- Hook: before_auth_content -->
-<%- hookArea('auth_before_content') %>
+<body class="d-flex flex-column">
 
-<!-- Main Content -->
-<%- body %>
+<div class="page page-center">
 
-<!-- Hook: after_auth_content -->
-<%- hookArea('auth_after_content') %>
+    <%- hookArea('auth_before_content') %>
 
-<!-- Footer -->
-<p class="mt-3 mb-3 text-body-secondary">
-    &copy; <%= new Date().getFullYear() %> FireBot
-</p>
+    <%- body %>
 
-</main>
+    <%- hookArea('auth_after_content') %>
 
-<!-- Skripte: Theme + Plugins (AssetManager, Footer) -->
+    <div class="text-center text-secondary mt-4">
+        &copy; <%= new Date().getFullYear() %> FireBot
+    </div>
+
+</div>
+
+<%# Skripte: Theme + Plugins (AssetManager, Footer) %>
 <% if (locals.assetManager) { %>
   <%- assetManager.renderScripts(true) %>
 <% } %>
 
-<!-- Hook: auth_footer_scripts -->
 <%- hookArea('auth_footer_scripts') %>
 </body>
 </html>

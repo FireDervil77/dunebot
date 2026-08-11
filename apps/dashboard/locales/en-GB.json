@@ -552,5 +552,24 @@
   },
   "COMMON": {
     "NO_CHANGES": "No changes"
+  },
+  "AUTH": {
+    "LOGIN_TITLE": "Sign in with Discord",
+    "LOGIN_BUTTON": "Continue with Discord",
+    "LOGIN_HINT": "You will be redirected to Discord to sign in.",
+    "LOGIN_WAIT": "Please wait…",
+    "CALLBACK_TITLE": "Signed in successfully",
+    "CALLBACK_REDIRECT": "Redirecting…",
+    "LOGOUT_TITLE": "Signed out successfully",
+    "LOGOUT_THANKS": "Thanks for stopping by!",
+    "LOGOUT_HOME": "Back to the home page",
+    "LOGOUT_AGAIN": "Sign in again",
+    "ERROR_TITLE": "Sign-in failed",
+    "ERROR_RETRY": "Try again",
+    "ERROR_HOME": "Back to the home page",
+    "ERROR_HELP": "If the problem persists, try:",
+    "ERROR_HELP_CACHE": "Clearing your browser cache",
+    "ERROR_HELP_DISCORD": "Signing out of Discord and signing in again",
+    "ERROR_HELP_ADMIN": "Contacting the bot administrator"
   }
 }

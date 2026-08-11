@@ -1,33 +1,38 @@
-<!-- filepath: /home/firedervil/dunebot_new/apps/dashboard/themes/default/views/auth/error.ejs -->
-<h1 class="h3 mb-4 fw-normal">Anmeldung fehlgeschlagen</h1>
+<%#
+ * Anmeldung fehlgeschlagen — Grund nennen und einen Weg zurueck anbieten.
+%>
+<div class="container container-tight py-4">
+    <div class="card card-md">
+        <div class="card-body">
 
-<div class="alert alert-danger" role="alert">
-    <%= error %>
-</div>
+            <h2 class="h2 text-center mb-4"><%= tr('AUTH.ERROR_TITLE') %></h2>
 
-<div class="mt-4">
-    <% if (locals.retry_url) { %>
-        <a href="<%= retry_url %>" class="btn btn-primary">
-            <i class="fas fa-redo me-2"></i> Erneut versuchen
-        </a>
-    <% } else { %>
-        <a href="/auth/login" class="btn btn-primary">
-            <i class="fas fa-redo me-2"></i> Erneut versuchen
-        </a>
-    <% } %>
-    
-    <a href="/" class="btn btn-outline-secondary ms-2">
-        <i class="fas fa-home me-2"></i> Zurück zur Startseite
-    </a>
-</div>
+            <div class="alert alert-danger" role="alert">
+                <%= error %>
+            </div>
 
-<div class="mt-4 small">
-    <p class="text-muted">
-        Falls das Problem weiterhin besteht, versuche:
-    </p>
-    <ul class="text-muted">
-        <li>Deinen Browser-Cache zu leeren</li>
-        <li>Dich von Discord abzumelden und erneut anzumelden</li>
-        <li>Den Bot-Administrator zu kontaktieren</li>
-    </ul>
+            <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
+                <a href="<%= locals.retry_url || '/auth/login' %>" class="btn btn-primary">
+                    <i class="fas fa-redo me-2"></i>
+                    <%= tr('AUTH.ERROR_RETRY') %>
+                </a>
+                <a href="/" class="btn btn-outline-secondary">
+                    <i class="fas fa-home me-2"></i>
+                    <%= tr('AUTH.ERROR_HOME') %>
+                </a>
+            </div>
+
+            <hr class="my-4">
+
+            <p class="text-secondary small mb-2">
+                <%= tr('AUTH.ERROR_HELP') %>
+            </p>
+            <ul class="text-secondary small mb-0">
+                <li><%= tr('AUTH.ERROR_HELP_CACHE') %></li>
+                <li><%= tr('AUTH.ERROR_HELP_DISCORD') %></li>
+                <li><%= tr('AUTH.ERROR_HELP_ADMIN') %></li>
+            </ul>
+
+        </div>
+    </div>
 </div>

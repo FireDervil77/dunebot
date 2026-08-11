@@ -571,5 +571,24 @@
   },
   "COMMON": {
     "NO_CHANGES": "Keine Änderungen"
+  },
+  "AUTH": {
+    "LOGIN_TITLE": "Mit Discord anmelden",
+    "LOGIN_BUTTON": "Mit Discord fortfahren",
+    "LOGIN_HINT": "Du wirst zu Discord weitergeleitet, um dich anzumelden.",
+    "LOGIN_WAIT": "Bitte warten…",
+    "CALLBACK_TITLE": "Anmeldung erfolgreich",
+    "CALLBACK_REDIRECT": "Du wirst weitergeleitet…",
+    "LOGOUT_TITLE": "Erfolgreich abgemeldet",
+    "LOGOUT_THANKS": "Vielen Dank für deinen Besuch!",
+    "LOGOUT_HOME": "Zurück zur Startseite",
+    "LOGOUT_AGAIN": "Erneut anmelden",
+    "ERROR_TITLE": "Anmeldung fehlgeschlagen",
+    "ERROR_RETRY": "Erneut versuchen",
+    "ERROR_HOME": "Zurück zur Startseite",
+    "ERROR_HELP": "Falls das Problem weiterhin besteht, versuche:",
+    "ERROR_HELP_CACHE": "Deinen Browser-Cache zu leeren",
+    "ERROR_HELP_DISCORD": "Dich von Discord abzumelden und erneut anzumelden",
+    "ERROR_HELP_ADMIN": "Den Bot-Administrator zu kontaktieren"
   }
 }
