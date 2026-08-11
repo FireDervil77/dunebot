@@ -1,17 +1,10 @@
 /**
- * Ein Fenster ansprechen — Bootstrap-5-Schnittstelle.
+ * fenster() kommt aus guild.js — der einzigen Definition im Projekt.
  *
- * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
- * Aufruf wirft, und alles danach im selben Block laeuft nicht mehr.
- *
- * @param {string|Element} ziel - id (mit oder ohne #) oder das Element selbst
+ * Hier stand eine eigene Fassung. Weil Funktionsdeklarationen im globalen
+ * Bereich einander ueberschreiben und guild.js als Theme-Skript spaeter laedt,
+ * wurde sie nie ausgefuehrt — jede Aenderung daran blieb wirkungslos.
  */
-function fenster(ziel) {
-    const el = typeof ziel === 'string'
-        ? document.getElementById(ziel.replace(/^#/, ''))
-        : ziel;
-    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
-}
 
 /**
  * File-Manager Client-Side Logic
@@ -83,33 +76,82 @@ class FileManager {
     }
     
     /**
+     * Dateiinhalt ohne Monaco anzeigen.
+     *
+     * Kein Ersatz fuer den Editor, sondern die Zusicherung, dass ein Klick auf
+     * eine Datei immer etwas zeigt. Bearbeiten und Speichern bleiben moeglich,
+     * es fehlt nur die Syntaxhervorhebung.
+     *
+     * @param {string} inhalt - Dateiinhalt
+     */
+    zeigeRohtext(inhalt) {
+        const behaelter = document.getElementById('monaco-editor');
+        if (!behaelter) return;
+
+        let feld = document.getElementById('editor-rohtext');
+        if (!feld) {
+            behaelter.innerHTML = '';
+            feld = document.createElement('textarea');
+            feld.id = 'editor-rohtext';
+            feld.className = 'form-control font-monospace';
+            feld.style.height = '100%';
+            feld.style.minHeight = '400px';
+            feld.spellcheck = false;
+            feld.readOnly = !this.config?.permissions?.canManage;
+            behaelter.appendChild(feld);
+        }
+        feld.value = inhalt;
+    }
+
+    /**
      * Monaco Editor laden und initialisieren
      */
     async loadMonaco() {
         if (this.monacoEditor) return; // Bereits geladen
-        
+
         return new Promise((resolve, reject) => {
+            // Ein Fehler im require-Rueckruf wurde bisher von niemandem gefangen:
+            // `resolve()` blieb aus, das Promise stand fuer immer offen, und das
+            // `await` in editFile kehrte nie zurueck. Sichtbar war davon nichts —
+            // kein Fenster, keine Meldung, kein Eintrag im Protokoll.
+            // Deshalb faengt hier jetzt alles, und ein Fehlschlag sagt, woran es lag.
+            const abbrechen = setTimeout(() => {
+                reject(new Error('Monaco hat sich nach 20 s nicht gemeldet'));
+            }, 20000);
+
             require(['vs/editor/editor.main'], () => {
+                clearTimeout(abbrechen);
                 console.log('[FileManager] Monaco Editor loaded');
-                
-                // Editor erstellen
-                this.monacoEditor = monaco.editor.create(document.getElementById('monaco-editor'), {
-                    value: '',
-                    language: 'plaintext',
-                    theme: 'vs-dark',
-                    automaticLayout: true,
-                    minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
-                    readOnly: !this.config.permissions.canManage
-                });
-                
-                // Ctrl+S Shortcut zum Speichern
-                this.monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-                    this.saveFile();
-                });
-                
-                resolve();
+
+                try {
+                    const behaelter = document.getElementById('monaco-editor');
+                    if (!behaelter) {
+                        throw new Error('Container #monaco-editor fehlt im Markup');
+                    }
+
+                    this.monacoEditor = monaco.editor.create(behaelter, {
+                        value: '',
+                        language: 'plaintext',
+                        theme: 'vs-dark',
+                        automaticLayout: true,
+                        minimap: { enabled: false },
+                        scrollBeyondLastLine: false,
+                        readOnly: !this.config?.permissions?.canManage
+                    });
+
+                    // Ctrl+S Shortcut zum Speichern
+                    this.monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+                        this.saveFile();
+                    });
+
+                    console.log('[FileManager] Monaco Editor erzeugt');
+                    resolve();
+                } catch (err) {
+                    console.error('[FileManager] Monaco liess sich nicht erzeugen:', err);
+                    reject(err instanceof Error ? err : new Error(String(err)));
+                }
             }, (err) => {
+                clearTimeout(abbrechen);
                 console.error('[FileManager] Monaco Editor Laden fehlgeschlagen:', err);
                 reject(new Error('Monaco Editor konnte nicht geladen werden'));
             });
@@ -365,32 +407,36 @@ class FileManager {
         console.log(`[FileManager] Edit file: ${path}`);
         
         try {
-            // Monaco Editor laden (lazy)
-            await this.loadMonaco();
-            
-            // Datei laden
+            // Datei zuerst holen. Sie ist der Zweck des Klicks — der Editor ist
+            // nur die Darstellung. Scheitert Monaco, soll trotzdem das Fenster
+            // aufgehen und der Inhalt lesbar sein, statt dass gar nichts passiert.
             const response = await fetch(`${this.config.baseUrl}/servers/${this.config.serverId}/files/read?path=${encodeURIComponent(path)}`);
             const data = await response.json();
-            
+
             if (!data.success) {
                 throw new Error(data.error || 'Fehler beim Laden');
             }
-            
-            // Editor befüllen
+
             this.currentEditFile = path;
-            this.monacoEditor.setValue(data.content);
-            
-            // Sprache erkennen
-            const ext = path.split('.').pop().toLowerCase();
-            const language = this.getMonacoLanguage(ext);
-            monaco.editor.setModelLanguage(this.monacoEditor.getModel(), language);
-            
-            // Dateiname in Modal
-            document.getElementById('editor-file-name').textContent = path.split('/').pop();
-            
-            // Modal öffnen
+
+            // Dateiname und Fenster zuerst — beides haengt nicht am Editor.
+            const nameFeld = document.getElementById('editor-file-name');
+            if (nameFeld) nameFeld.textContent = path.split('/').pop();
             fenster('#editor-modal')?.show();
-            
+
+            // Monaco danach. Ein Fehlschlag kostet die Hervorhebung, nicht den Inhalt.
+            try {
+                await this.loadMonaco();
+                this.monacoEditor.setValue(data.content);
+
+                const ext = path.split('.').pop().toLowerCase();
+                monaco.editor.setModelLanguage(this.monacoEditor.getModel(), this.getMonacoLanguage(ext));
+            } catch (editorFehler) {
+                console.error('[FileManager] Editor nicht verfuegbar, Rueckfall auf Textfeld:', editorFehler);
+                this.zeigeRohtext(data.content);
+                this.showToast('warning', 'Editor nicht verfuegbar — Inhalt wird als Text angezeigt');
+            }
+
         } catch (error) {
             console.error('[FileManager] Edit error:', error);
             this.showToast('error', `Fehler: ${error.message}`);
@@ -406,8 +452,18 @@ class FileManager {
         console.log(`[FileManager] Save file: ${this.currentEditFile}`);
         
         try {
-            const content = this.monacoEditor.getValue();
-            
+            // Aus dem Editor, wenn er da ist — sonst aus dem Rueckfall-Textfeld.
+            // Ohne diese Unterscheidung wuerde ein Speichern im Rueckfall den
+            // Inhalt der Datei mit dem leeren Editor ueberschreiben.
+            const rueckfall = document.getElementById('editor-rohtext');
+            const content = this.monacoEditor
+                ? this.monacoEditor.getValue()
+                : (rueckfall ? rueckfall.value : null);
+
+            if (content === null) {
+                throw new Error('Kein Editorinhalt vorhanden — nichts gespeichert');
+            }
+
             const response = await fetch(`${this.config.baseUrl}/servers/${this.config.serverId}/files/write`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

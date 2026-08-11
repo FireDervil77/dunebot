@@ -552,9 +552,16 @@
     </div>
 </div>
 
-<!-- Scripts (aus dashboard/public/js/) -->
-<script src="/assets/plugins/gameserver/js/server-actions.js"></script>
-<!-- Hinweis: servers-overview.js bewusst NICHT laden, um SSE-Kollisionen (Pause bei Tab-Inaktivität) auf der Detailseite zu vermeiden -->
+<!--
+  server-actions.js wird von der Route eingereiht (`enqueueScript('gameserver-actions')`
+  in servers.js). Hier stand zusaetzlich ein fester Skript-Verweis — ohne Bedingung
+  und ohne Versionskennung. Die Datei lief dadurch zweimal: einmal aktuell ueber den
+  AssetManager, einmal in einer beliebig alten Fassung aus dem Browser-Zwischenspeicher.
+  Sichtbar war das nur daran, dass sich der Client zweimal initialisierte.
+
+  Hinweis: servers-overview.js bewusst NICHT laden, um SSE-Kollisionen
+  (Pause bei Tab-Inaktivität) auf der Detailseite zu vermeiden.
+-->
 <script>
 // Guild-ID und Server-ID für Auto-Initialisierung bereitstellen
 window.gameserverGuildId = '<%= guildId %>';

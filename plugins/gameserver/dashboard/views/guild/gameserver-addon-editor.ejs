@@ -463,10 +463,8 @@
  * jQuery ist unter Tabler geladen, dessen Fenster-Methode aber nicht: Der
  * Aufruf warf, und alles danach im selben Block lief nicht mehr.
  */
-function fenster(id) {
-    const el = document.getElementById(id);
-    return (el && window.bootstrap) ? bootstrap.Modal.getOrCreateInstance(el) : null;
-}
+// fenster() kommt aus guild.js — dort ist es die einzige Definition im Projekt.
+// Eine Kopie an dieser Stelle ueberschrieb sie je nach Ladereihenfolge.
 
 // ── Initiale Daten vom Server ──────────────────────────────────────────────────
 const INITIAL_GAME_DATA = <%- JSON.stringify(gameData || {}) %>;
