@@ -1,169 +1,135 @@
-<%# 
-  * Admin-Layout (Guild-Seiten)
-  * @author FireDervil
-  %>
+<%#
+ * Guild-Layout — Tabler-Gerüst
+ *
+ * Struktur nach Tablers kanonischem Aufbau (shared/layouts/DefaultLayout):
+ *
+ *   .page
+ *     aside.navbar.navbar-vertical      ← Seitenleiste
+ *     header.navbar.navbar-expand-md    ← obere Leiste
+ *     .page-wrapper
+ *       .page-header                    ← Titelzeile
+ *       main#content.page-body
+ *         .container-fluid              ← volle Breite statt .container-xl
+ *       footer.footer
+ *
+ * Der <head> kommt über die Theme-Kette aus dem Standard-Theme — er ist
+ * gerüstunabhängig (AssetManager, Tokens, Guild-CSS).
+ *
+ * @author FireDervil
+%>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<%= locals.lang || 'de' %>">
 <head>
     <%- includePartial('guild/header') %>
 </head>
-<body class="layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary">
-    
-    <!--begin::App Wrapper-->
-    <div class="app-wrapper">
+<body>
 
-        <!--begin::Header-->
-          <%- includePartial('guild/header_topbar', { 
-            supportUrl: typeof supportUrl !== 'undefined' ? supportUrl : '#', 
-            supportName: typeof supportName !== 'undefined' ? supportName : 'Discord Support',
-            dashboardVersion: typeof dashboardVersion !== 'undefined' ? dashboardVersion : '1.0.0',
-            botVersion: typeof botVersion !== 'undefined' ? botVersion : '1.0.0'
-          }) %>
-        <!--end::Header-->
+<a href="#content" class="visually-hidden skip-link">Zum Inhalt springen</a>
 
-        <!--begin::Sidebar-->
-          <%- includePartial('guild/sidebar') %>
-        <!--end::Sidebar-->
+<div class="page">
 
-        <!--begin::Breadcrumb-->
-                <!--begin::Breadcrumb-->
-        <%- includePartial('guild/breadcrumb') %>
-        <!--end::Breadcrumb-->
-        <!--
-        <% if (locals.breadcrumb && locals.breadcrumb === true) { %>
-          <%- includePartial('guild/breadcrumb', locals) %>
-        <% } %> 
-        -->
+    <%- includePartial('guild/sidebar') %>
+    <%- includePartial('guild/topbar') %>
 
-        <!-- Begin::Global Notifications -->
-        <% if (locals.globalNotifications && globalNotifications.length > 0) { %>
-            <div class="container-fluid mt-3" id="global-notifications-container">
-                <% globalNotifications.forEach(notification => { %>
-                    <div class="alert alert-<%= notification.type %> alert-dismissible fade show" role="alert" data-notification-id="<%= notification.id %>">
-                        <%#
-                          `class="close"` war Bootstrap 4 (AdminLTE). Unter
-                          Bootstrap 5 heisst der Schliessknopf `btn-close` und
-                          bringt sein × selbst mit — die alte Klasse gibt es dort
-                          nicht mehr, der Knopf stand also unformatiert und an
-                          der falschen Stelle im Kasten.
-                        %>
-                        <button type="button" class="btn-close dismiss-notification-btn" aria-label="Schließen"></button>
-                        <% if (notification.title) { %>
-                            <h5><strong><%- notification.title %></strong></h5>
-                        <% } %>
-                        <p><%- notification.message %></p>
-                        <% if (notification.action_url && notification.action_text) { %>
-                            <hr Class="noshade">
-                            <p class="mb-0">
-                                <a href="<%- notification.action_url %>" class="btn btn-info position-right" target="_blank">
-                                    <%- notification.action_text %>
-                                </a>
-                            </p>
+    <div class="page-wrapper">
+
+        <%# ── Titelzeile ──────────────────────────────────────────────────── %>
+        <% if (locals.title) { %>
+        <div class="page-header d-print-none">
+            <div class="container-fluid">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title"><%= locals.title %></h2>
+                        <% if (locals.subtitle) { %>
+                            <div class="text-secondary mt-1"><%= locals.subtitle %></div>
                         <% } %>
                     </div>
-                <% }); %>
-            </div>
-            <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                document.querySelectorAll('.dismiss-notification-btn').forEach(function(btn) {
-                    btn.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        var alert = this.closest('.alert[data-notification-id]');
-                        var notificationId = alert ? alert.getAttribute('data-notification-id') : null;
-                        if (notificationId) {
-                            fetch('/api/notifications/dismiss/' + notificationId, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                credentials: 'same-origin'
-                            }).catch(function() {});
-                        }
-                        // Hier stand `$(alert).alert('close')` — die
-                        // jQuery-Schnittstelle von Bootstrap 4. jQuery ist unter
-                        // Tabler zwar geladen, dessen Bootstrap-Erweiterung aber
-                        // nicht: Der Aufruf warf `$(...).alert is not a function`,
-                        // und der Kasten blieb stehen. Weggeklickt wurde er
-                        // serverseitig trotzdem — sichtbar wurde das erst beim
-                        // naechsten Seitenaufruf. Dieselbe Leiche wie bei den
-                        // Fenstern in guild.js.
-                        //
-                        // Tabler exportiert Bootstrap unter `window.tabler.bootstrap`,
-                        // das alte Theme unter `window.bootstrap`. Gibt es keins
-                        // von beiden, wird der Kasten einfach entfernt — schliessen
-                        // ist wichtiger als die Ausblendung.
-                        if (alert) {
-                            var bs = window.bootstrap || (window.tabler && window.tabler.bootstrap) || null;
-                            if (bs && bs.Alert) {
-                                bs.Alert.getOrCreateInstance(alert).close();
-                            } else {
-                                alert.remove();
-                            }
-                        }
-                    });
-                });
-            });
-            </script>
-        <% } %>
-        <!-- End::Global Notifications -->
-        
-        <!--end::Breadcrumb-->  
-
-            <%#
-              Seitenrahmen des Themes — die Views bringen nur noch Inhalt.
-              AdminLTE 4 erwartet <main class="app-main"> um den Inhalt; das
-              schliessende Tag stand hier, das oeffnende fehlte seit jeher.
-            %>
-            <main class="app-main">
-
-                <%#
-                  Titelzeile — dasselbe Versprechen wie im Tabler-Layout: Die
-                  View bringt Inhalt, den Titel stellt das Theme aus
-                  `locals.title`. Ohne diese Zeilen verloere jede auf Tabler
-                  gezogene View unter diesem Theme ihre Ueberschrift, weil sie
-                  ihren eigenen `content-header` dabei abgibt.
-                %>
-                <% if (locals.title) { %>
-                <div class="app-content-header">
-                    <div class="container-fluid">
-                        <div class="row align-items-center">
-                            <div class="col-sm-6">
-                                <h3 class="mb-0"><%= locals.title %></h3>
-                                <% if (locals.subtitle) { %>
-                                    <div class="text-muted small"><%= locals.subtitle %></div>
-                                <% } %>
-                            </div>
-                            <div class="col-sm-6 text-sm-end">
-                                <%- locals.pageActions || '' %>
-                                <%- hookArea('content_header_actions') %>
-                            </div>
-                        </div>
+                    <div class="col-auto ms-auto d-print-none">
+                        <%- locals.pageActions || '' %>
+                        <%- hookArea('content_header_actions') %>
                     </div>
                 </div>
+            </div>
+        </div>
+        <% } %>
+
+        <%# ── Inhalt ──────────────────────────────────────────────────────── %>
+        <main id="content" class="page-body">
+            <div class="container-fluid">
+
+                <%# Systemmeldungen %>
+                <% if (locals.globalNotifications && globalNotifications.length > 0) { %>
+                    <div id="global-notifications-container">
+                        <% globalNotifications.forEach(notification => { %>
+                            <div class="alert alert-<%= notification.type || 'info' %> alert-dismissible"
+                                 role="alert" data-notification-id="<%= notification.id %>">
+                                <% if (notification.title) { %>
+                                    <h4 class="alert-title"><%- notification.title %></h4>
+                                <% } %>
+                                <div class="text-secondary"><%- notification.message %></div>
+                                <% if (notification.action_url && notification.action_text) { %>
+                                    <div class="mt-3">
+                                        <a href="<%- notification.action_url %>" class="btn btn-primary btn-sm" target="_blank" rel="noopener">
+                                            <%- notification.action_text %>
+                                        </a>
+                                    </div>
+                                <% } %>
+                                <%#
+                                  `data-bs-dismiss="alert"` fehlte: Der Knopf sah
+                                  richtig aus, aber niemand hat den Kasten
+                                  geschlossen — der Zuhoerer unten meldet das
+                                  Wegklicken nur serverseitig. Sichtbar wurde es
+                                  erst beim naechsten Seitenaufruf.
+                                %>
+                                <button type="button" class="btn-close dismiss-notification-btn"
+                                        data-bs-dismiss="alert" aria-label="Schließen"></button>
+                            </div>
+                        <% }); %>
+                    </div>
                 <% } %>
 
-                <div class="app-content">
-                    <div class="container-fluid">
-                        <%- body %>
+                <%- hookArea('before_guild_content', { guild: locals.guild, guildId: locals.guildId }) %>
+
+                <%- body %>
+
+                <%- hookArea('after_guild_content', { guild: locals.guild, guildId: locals.guildId }) %>
+
+            </div>
+        </main>
+
+        <%# ── Fußzeile ────────────────────────────────────────────────────── %>
+        <footer class="footer footer-transparent d-print-none">
+            <div class="container-fluid">
+                <div class="row text-center align-items-center flex-row-reverse">
+                    <div class="col-lg-auto ms-lg-auto">
+                        <ul class="list-inline list-inline-dots mb-0">
+                            <li class="list-inline-item"><a href="/documentation" class="link-secondary">Dokumentation</a></li>
+                            <li class="list-inline-item"><a href="/privacy" class="link-secondary">Datenschutz</a></li>
+                            <li class="list-inline-item"><a href="/tos" class="link-secondary">Nutzungsbedingungen</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-12 col-lg-auto mt-3 mt-lg-0">
+                        <ul class="list-inline list-inline-dots mb-0">
+                            <li class="list-inline-item">
+                                &copy; <%= new Date().getFullYear() %> FireBot
+                            </li>
+                            <li class="list-inline-item text-secondary">
+                                Dashboard <%= typeof dashboardVersion !== 'undefined' ? dashboardVersion : '1.0.0' %>
+                                &middot; Bot <%= typeof botVersion !== 'undefined' ? botVersion : '1.0.0' %>
+                            </li>
+                        </ul>
                     </div>
                 </div>
-            </main>
-            <!--end::App Main-->
+            </div>
+        </footer>
 
-          <!--begin::Footer-->
-          <%- includePartial('guild/footer', {
-            dashboardVersion: typeof dashboardVersion !== 'undefined' ? dashboardVersion : '1.0.0',
-            botVersion: typeof botVersion !== 'undefined' ? botVersion : '1.0.0',
-            buyMeCoffeeUrl: typeof buyMeCoffeeUrl !== 'undefined' ? buyMeCoffeeUrl : '#'
-          }) %>
-        <!--end::Footer-->
     </div>
-    <!--end::App Wrapper-->
+</div>
 
 <%#
   i18n steht bewusst VOR der Skript-Ausgabe: guild.js und global-toast.js
   greifen auf window.i18n zu, also muss das Objekt vorher gesetzt sein.
 %>
-<!-- i18n Übersetzungen für Client-Side JavaScript -->
 <script>
 window.i18n = {
     TOAST_MESSAGES: {
@@ -176,21 +142,10 @@ window.i18n = {
         LOCALE_ERROR: "<%= tr('TOAST_MESSAGES.LOCALE_ERROR') %>",
         GENERIC_SUCCESS: "<%= tr('TOAST_MESSAGES.GENERIC_SUCCESS') %>",
         GENERIC_ERROR: "<%= tr('TOAST_MESSAGES.GENERIC_ERROR') %>",
-        LOADING_ERROR: "<%= tr('TOAST_MESSAGES.LOADING_ERROR') %>",
-        NEWS_CREATED: "<%= tr('TOAST_MESSAGES.NEWS_CREATED') %>",
-        NEWS_UPDATED: "<%= tr('TOAST_MESSAGES.NEWS_UPDATED') %>",
-        NEWS_DELETED: "<%= tr('TOAST_MESSAGES.NEWS_DELETED') %>",
-        NEWS_ERROR: "<%= tr('TOAST_MESSAGES.NEWS_ERROR') %>",
-        NOTIFICATION_SENT: "<%= tr('TOAST_MESSAGES.NOTIFICATION_SENT') %>",
-        NOTIFICATION_ERROR: "<%= tr('TOAST_MESSAGES.NOTIFICATION_ERROR') %>",
-        CORE_SETTINGS_SAVED: "<%= tr('TOAST_MESSAGES.CORE_SETTINGS_SAVED') %>",
-        CORE_SETTINGS_ERROR: "<%= tr('TOAST_MESSAGES.CORE_SETTINGS_ERROR') %>",
-        DUNEMAP_SETTINGS_SAVED: "<%= tr('TOAST_MESSAGES.DUNEMAP_SETTINGS_SAVED') %>",
-        DUNEMAP_SETTINGS_ERROR: "<%= tr('TOAST_MESSAGES.DUNEMAP_SETTINGS_ERROR') %>"
+        LOADING_ERROR: "<%= tr('TOAST_MESSAGES.LOADING_ERROR') %>"
     },
     COMMON: {
-        NETWORK_ERROR: "Netzwerkfehler oder Serverfehler",
-        NO_CHANGES: "<%= tr('COMMON.NO_CHANGES') %>"
+        NETWORK_ERROR: "Netzwerkfehler oder Serverfehler"
     }
 };
 </script>
@@ -200,74 +155,47 @@ window.i18n = {
   <%- assetManager.renderScripts(true) %>
 <% } %>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-    // OverlayScrollbars sicher initialisieren
-    const SELECTOR_SIDEBAR_WRAPPER = '.sidebar-wrapper';
-    const sidebarWrapper = document.querySelector(SELECTOR_SIDEBAR_WRAPPER);
-    const OS = window.OverlayScrollbarsGlobal?.OverlayScrollbars;
-    if (sidebarWrapper && typeof OS === 'function') {
-        OS(sidebarWrapper, {
-            scrollbars: {
-                theme: 'os-theme-light',
-                autoHide: 'leave',
-                clickScroll: true
-            }
-        });
-    } else {
-        console.warn('[Guild] OverlayScrollbars nicht verfügbar – Sidebar ohne Custom Scrollbars.');
-    }
-
-    // Chart.js (nur wenn vorhanden)
-    if (window.Chart) {
-        // Beispiel: Performance Gauge (falls Element existiert)
-        const ctx = document.getElementById('performanceGauge');
-        if (ctx) {
-            try {
-                new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['CPU', 'RAM', 'Netz'],
-                        datasets: [{
-                            data: [30, 45, 25],
-                            backgroundColor: ['#3498db', '#f39c12', '#2ecc71'],
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        responsive: false,
-                        maintainAspectRatio: false,
-                        cutout: '75%',
-                        plugins: { legend: { display:false } }
-                    }
-                });
-            } catch (e) {
-                console.error('[Guild] Chart Init Fehler:', e);
-            }
-        }
-    } else {
-        console.warn('[Guild] Chart.js nicht geladen – Diagramme werden übersprungen.');
-    }
-});
-</script>
-
-<!-- Plugin Partial Scripts (von includePluginPartial extrahiert) -->
+<!-- Aus Plugin-Partials extrahierte Skripte -->
 <% if (locals._pluginScripts && locals._pluginScripts.length > 0) { %>
-  <!-- Extrahierte Scripts aus Plugin-Partials (Total: <%= locals._pluginScripts.length %>) -->
   <% locals._pluginScripts.forEach(function(script) { %>
     <%- script %>
   <% }); %>
 <% } %>
 
-<!-- View Scripts (express-ejs-layouts) -->
+<!-- View-Skripte (express-ejs-layouts) -->
 <% if (typeof script !== 'undefined') { %>
   <%- script %>
 <% } %>
 
-<!-- Language Switcher Script -->
+<script>
+// Systemmeldung schließen und serverseitig vermerken
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.dismiss-notification-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var box = this.closest('[data-notification-id]');
+            var id  = box ? box.getAttribute('data-notification-id') : null;
+            if (id) {
+                fetch('/api/notifications/dismiss/' + id, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
+                }).catch(function () {});
+            }
+
+            // Rueckfall, falls Bootstrap nicht bereitsteht: dann macht
+            // `data-bs-dismiss` nichts und der Kasten bliebe stehen.
+            var bs = window.bootstrap || (window.tabler && window.tabler.bootstrap) || null;
+            if (box && !(bs && bs.Alert)) box.remove();
+        });
+    });
+});
+</script>
+
+<%# Sprachwahl — das Skript liegt im Standard-Theme und wird ueber die Kette gefunden %>
 <%- includePartial('guild/language_switcher', locals) %>
 
-<!-- Toast Container für guild.js Toasts -->
+<%- hookArea('dashboard_footer_scripts') %>
+
 <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
 
 </body>

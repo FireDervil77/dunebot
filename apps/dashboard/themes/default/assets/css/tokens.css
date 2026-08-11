@@ -1,208 +1,331 @@
 /*!
- * FireBot Design-Tokens
+ * FireBot Design-Tokens — Fassung für Tabler
  *
- * Eine Ebene für alle Farben des Dashboards. Wer etwas umfärben will, ändert
- * hier einen Wert — nicht dutzende Selektoren.
+ * Die Rollen (`--fb-*`) sind dieselben wie im Standard-Theme. Nur die Brücke
+ * zielt woanders hin: Tabler benennt Bootstraps Variablen-Präfix von `--bs-`
+ * auf `--tblr-` um und bringt rund 830 eigene mit.
  *
- * Aufbau:
- *   1. ROLLEN      — die --fb-*-Tokens. Das ist die öffentliche Oberfläche;
- *                    nur sie werden vom Theme-Editor und von theme.json gesetzt.
- *   2. BRÜCKE      — bildet die Rollen auf die Variablen ab, mit denen
- *                    Bootstrap 5 und AdminLTE 4 tatsächlich arbeiten.
- *
- * Warum es eine Brücke braucht und nicht `--bs-primary` allein reicht:
- * Bootstrap 5 schreibt in `.btn-primary` den Wert `--bs-btn-bg` **wörtlich**
- * hinein, nicht als `var(--bs-primary)`. Ein Token wirkt also erst, wenn es
- * auf die jeweilige Komponentenvariable gelegt wird. Das ist der dokumentierte
- * Weg von Bootstrap 5 — und der Grund, warum hier **kein `!important`** steht.
- *
- * RGB-Tripel: Die Utilities von Bootstrap (`.text-primary`, `.bg-primary`)
- * rechnen mit `rgba(var(--bs-primary-rgb), …)`. Deshalb führt jede Rolle, die
- * in Utilities auftaucht, zusätzlich ein `-rgb`-Token. Der Theme-Editor füllt
- * beide.
+ * Genau deshalb ist die Brücke eine eigene Datei pro Theme — die Rollen bleiben
+ * stabil, der Unterbau darf wechseln. Wer Farben ändern will, fasst nur
+ * Abschnitt 1 an oder setzt die Werte über `theme.json` bzw. den Theme-Editor.
  *
  * @author FireDervil
  */
 
 /* ==========================================================================
-   1. ROLLEN
+   1. ROLLEN — Standardwerte. theme.json und der Editor überschreiben sie.
    ========================================================================== */
 
 :root {
-    /* --- Akzente ---------------------------------------------------------- */
     --fb-primary: #3498db;
     --fb-primary-rgb: 52, 152, 219;
     --fb-primary-hover: #2980b9;
 
     --fb-accent: #f39c12;
     --fb-accent-rgb: 243, 156, 18;
-    --fb-accent-hover: #d68910;
 
     --fb-link: #3498db;
     --fb-link-hover: #2980b9;
 
-    /* --- Flächen ---------------------------------------------------------- */
-    --fb-body-bg: #f4f6f9;      /* Seitenhintergrund */
-    --fb-surface-bg: #ffffff;   /* Karten, Tabellen, Panels */
-    --fb-header-bg: #ffffff;    /* obere Leiste */
-    --fb-sidebar-bg: #343a40;   /* Seitenleiste */
+    --fb-body-bg: #f6f8fb;
+    --fb-surface-bg: #ffffff;
+    --fb-header-bg: #ffffff;
+    --fb-sidebar-bg: #1d273b;
 
-    /* --- Text ------------------------------------------------------------- */
-    --fb-text: #212529;
-    --fb-text-muted: #6c757d;
-    --fb-heading: #212529;
+    --fb-text: #1e293b;
+    --fb-text-muted: #667382;
+    --fb-heading: #1e293b;
 
-    /* --- Seitenleiste (eigene Rollen, weil sie ein dunkler Bereich ist) ---- */
-    --fb-sidebar-text: #c2c7d0;
-    --fb-sidebar-hover-bg: #495057;
+    --fb-sidebar-text: #adb5bd;
+    --fb-sidebar-hover-bg: #2b3a55;
     --fb-sidebar-hover-text: #ffffff;
-    --fb-sidebar-active-bg: #495057;
+    --fb-sidebar-active-bg: #2b3a55;
     --fb-sidebar-active-text: #ffffff;
 
-    /* --- Rückmeldungen ---------------------------------------------------- */
-    --fb-success: #28a745;
-    --fb-warning: #f39c12;
-    --fb-danger: #dc3545;
-    --fb-info: #17a2b8;
+    --fb-success: #2fb344;
+    --fb-warning: #f76707;
+    --fb-danger: #d63939;
+    --fb-info: #4299e1;
 
-    /* --- Kanten ----------------------------------------------------------- */
-    --fb-border: #dee2e6;
-    --fb-radius: 0.375rem;
+    --fb-border: #e6e7e9;
+    --fb-radius: 4px;
 }
 
 /* ==========================================================================
-   2. BRÜCKE — Rollen auf Bootstrap 5 / AdminLTE 4 legen
+   2. BRÜCKE — Rollen auf Tabler legen
    ========================================================================== */
 
-/* --- Grundwerte, die vieles automatisch mitnehmen ------------------------- */
 :root,
 [data-bs-theme="light"] {
-    --bs-primary: var(--fb-primary);
-    --bs-primary-rgb: var(--fb-primary-rgb);
+    --tblr-primary: var(--fb-primary);
+    --tblr-primary-rgb: var(--fb-primary-rgb);
 
-    --bs-body-color: var(--fb-text);
-    --bs-emphasis-color: var(--fb-heading);
-    --bs-secondary-color: var(--fb-text-muted);
+    --tblr-body-bg: var(--fb-body-bg);
+    --tblr-body-color: var(--fb-text);
+    --tblr-muted: var(--fb-text-muted);
+    --tblr-secondary: var(--fb-text-muted);
 
-    --bs-link-color: var(--fb-link);
-    --bs-link-hover-color: var(--fb-link-hover);
+    --tblr-link-color: var(--fb-link);
+    --tblr-link-hover-color: var(--fb-link-hover);
 
-    --bs-border-color: var(--fb-border);
-    --bs-border-radius: var(--fb-radius);
+    --tblr-border-color: var(--fb-border);
+    --tblr-border-radius: var(--fb-radius);
 
-    --bs-success: var(--fb-success);
-    --bs-warning: var(--fb-warning);
-    --bs-danger: var(--fb-danger);
-    --bs-info: var(--fb-info);
+    --tblr-bg-surface: var(--fb-surface-bg);
+
+    --tblr-success: var(--fb-success);
+    --tblr-warning: var(--fb-warning);
+    --tblr-danger: var(--fb-danger);
+    --tblr-info: var(--fb-info);
 }
 
-/* --- Seitenhintergrund ---------------------------------------------------- */
-/* Der <body> trägt `bg-body-tertiary`, das ist die Fläche hinter allem. */
-body.bg-body-tertiary,
-.app-main {
-    --bs-tertiary-bg: var(--fb-body-bg);
+/* --- Seitenrand ----------------------------------------------------------- */
+/*
+ * Tabler rechnet mit einem `.container-xl`: Der hat eine Höchstbreite und wird
+ * zentriert, links und rechts bleibt von selbst Luft. Unser Layout nimmt
+ * bewusst `.container-fluid` — volle Breite — und dort ist Tablers
+ * `--tblr-page-padding` von 1rem der einzige Abstand zum Fensterrand. Das ist
+ * auf einem breiten Bildschirm zu knapp: Der Inhalt klebt an der Seitenleiste.
+ *
+ * Aufgefallen ist es im Vergleich Dashboard ↔ Bug Report: Die alten Views
+ * bringen ihren eigenen `.container-fluid` mit, verschachteln also zwei davon
+ * und kommen so auf den doppelten Rand. Der sah richtig aus — nicht weil die
+ * Verschachtelung richtig wäre, sondern weil 1rem zu wenig ist. Beim Entfernen
+ * des alten Seitenrahmens (Stufe 5) verlöre sonst jede Seite der Reihe nach
+ * ihren Rand.
+ *
+ * Die Mobil-Stufe hält Tablers eigenen Wert nach: Ohne sie würde die Regel hier
+ * auch die Medienabfrage in `tabler.min.css` überschreiben, die den Rand auf
+ * schmalen Geräten absichtlich kleiner hält.
+ */
+:root,
+[data-bs-theme="light"] {
+    --tblr-page-padding: var(--tblr-spacer-4);
 }
 
-/* --- Karten und Panels ---------------------------------------------------- */
+@media (max-width: 991.98px) {
+    :root,
+    [data-bs-theme="light"] {
+        --tblr-page-padding: var(--tblr-spacer-2);
+    }
+}
+
+/* --- Karten und Tabellen -------------------------------------------------- */
 .card {
-    --bs-card-bg: var(--fb-surface-bg);
-    --bs-card-border-color: var(--fb-border);
-    --bs-card-cap-bg: var(--fb-surface-bg);
+    --tblr-card-bg: var(--fb-surface-bg);
+    --tblr-card-border-color: var(--fb-border);
+    --tblr-card-cap-bg: var(--fb-surface-bg);
+    --tblr-card-color: var(--fb-text);
 }
 
 .table {
-    --bs-table-bg: var(--fb-surface-bg);
-    --bs-table-color: var(--fb-text);
-    --bs-table-border-color: var(--fb-border);
+    --tblr-table-bg: var(--fb-surface-bg);
+    --tblr-table-color: var(--fb-text);
+    --tblr-table-border-color: var(--fb-border);
+}
+
+/* --- Abzeichen auf farbigem Grund ----------------------------------------- */
+/*
+ * Grauer Text auf grauem Grund — 2026-08-07 gefunden, Verhältnis 1:1.
+ *
+ * Tabler baut ein Abzeichen so:
+ *
+ *     .badge          { --tblr-badge-color: var(--tblr-secondary);
+ *                       color: var(--tblr-badge-color); }
+ *     .bg-secondary   { background-color: var(--tblr-secondary) !important; }
+ *
+ * Wer beides kombiniert — `class="badge bg-secondary"` — setzt Vorder- und
+ * Hintergrund auf denselben Wert. Bei uns ist das `#667382`, also war der Text
+ * schlicht unsichtbar, nicht bloß schwach. Betroffen waren rund 27 Stellen
+ * quer durch alle Plugins ("Aus", "Deaktiviert", Zähler-Abzeichen).
+ *
+ * Die gemeinte Klasse heißt in Bootstrap 5.3 `text-bg-secondary` — die setzt
+ * beides passend. Statt 27 Views nachzuziehen und beim nächsten `bg-secondary`
+ * denselben Fehler zu bekommen, wird die Paarung hier einmal nachgereicht.
+ *
+ * Betroffen ist nicht nur Grau. Gemessen gegen unsere eigenen Markenfarben
+ * (nicht Tablers Standardwerte!) war heute jede solide Variante unlesbar:
+ *
+ *     Variante   Grund      heute   weiß   dunkel   gewählt
+ *     primary    #3498db     1,53   3,15    4,66    dunkel
+ *     secondary  #667382     1,00   4,84    3,03    weiß
+ *     success    #2fb344     1,76   2,74    5,35    dunkel
+ *     danger     #d63939     1,04   4,66    3,15    weiß
+ *     warning    #f76707     1,59   3,04    4,82    dunkel
+ *     info       #4299e1     1,58   3,05    4,81    dunkel
+ *     dark       #1e293b     3,02  14,63    1,00    weiß
+ *     light      #f8fafc     4,63   1,05   14,03    dunkel
+ *
+ * Gewählt ist je Farbe der bessere der beiden Werte; alle acht liegen damit
+ * über 4,5:1 und erfüllen WCAG AA für Fließtextgröße. Bei Grün, Orange und
+ * Blau ist das ausdrücklich NICHT Tablers eigene Wahl — dessen `.text-bg-*`
+ * setzt dort durchgängig fast-weiß und landet bei 2,7 bis 3,1:1.
+ *
+ * Die `-lt`-Varianten (`bg-secondary-lt` und Geschwister) sind nicht betroffen:
+ * die bringen ihre Textfarbe selbst mit und bleiben unangetastet.
+ */
+.badge.bg-secondary,
+.badge.bg-danger,
+.badge.bg-dark {
+    --tblr-badge-color: #ffffff;
+}
+
+.badge.bg-primary,
+.badge.bg-success,
+.badge.bg-warning,
+.badge.bg-info,
+.badge.bg-light {
+    --tblr-badge-color: #1f2937;
+}
+
+/*
+ * Die Seitenleiste ist die einzige dunkle Insel im sonst hellen Dashboard
+ * (`data-bs-theme="dark"` steht projektweit nur dort). Dort dreht Tabler
+ * `--tblr-secondary` auf ein helles Grau — ein Abzeichen in der Seitenleiste
+ * braucht deshalb den umgekehrten Kontrast.
+ */
+[data-bs-theme="dark"] .badge.bg-secondary {
+    --tblr-badge-color: #1f2937;
+}
+
+/*
+ * Weiß auf Weiß — derselbe Fehler in Tablers hellen Tönungen.
+ *
+ * Die `-lt`-Varianten setzen ihre Textfarbe zwar selbst, aber nach dem Muster
+ * „Text = die kräftige Farbe, Grund = deren helle Tönung". Für `light` heißt
+ * das:
+ *
+ *     .bg-light-lt { color:            #f9fafb !important;   ← fast weiß
+ *                    background-color: rgb(254,254,255) !important; }
+ *
+ * Verhältnis 1,04:1, der Text ist unsichtbar. Bei allen anderen Farben geht
+ * das Muster auf (grün auf hellgrün liest sich), nur `light` hat keine
+ * kräftige Variante, gegen die es sich absetzen könnte.
+ *
+ * Im Projekt steckt das an 44 Stellen, meist als Platzhalter-Knopf
+ * (`<code class="badge bg-light-lt border">{member:name}</code>`). An 27 davon
+ * steht bereits ein handgeschriebenes `style="color: #000"` daneben — jemand
+ * ist hier schon einmal gegen dieselbe Wand gelaufen und hat es örtlich
+ * geflickt. Die übrigen 17 waren schlicht leer.
+ *
+ * Das `!important` ist hier nötig, weil Tabler die Farbe selbst mit
+ * `!important` setzt. Die Inline-Notbehelfe in den Views bleiben wirksam
+ * (Inline schlägt Stylesheet) und können nach und nach raus.
+ *
+ * Schließt Punkt 11.2 (Greeting: „Buttons sieht man, den Text darin nicht").
+ */
+.bg-light-lt {
+    color: #1f2937 !important;
 }
 
 /* --- Obere Leiste --------------------------------------------------------- */
-/* `.app-header` trägt `bg-body`, färbt sich also über --bs-body-bg. */
-.app-header {
-    --bs-body-bg: var(--fb-header-bg);
-    --bs-border-color: var(--fb-border);
+.navbar:not(.navbar-vertical) {
+    --tblr-navbar-bg: var(--fb-header-bg);
+    --tblr-navbar-border-color: var(--fb-border);
 }
 
 /* --- Seitenleiste --------------------------------------------------------- */
-/* `.app-sidebar` trägt `bg-body-secondary` und läuft im dunklen Farbschema. */
-.app-sidebar {
-    --bs-secondary-bg: var(--fb-sidebar-bg);
-    --lte-sidebar-color: var(--fb-sidebar-text);
-    --lte-sidebar-hover-color: var(--fb-sidebar-hover-text);
-    --lte-sidebar-hover-bg: var(--fb-sidebar-hover-bg);
-    --lte-sidebar-active-color: var(--fb-sidebar-active-text);
-    --lte-sidebar-menu-active-bg: var(--fb-sidebar-active-bg);
-    --lte-sidebar-menu-active-color: var(--fb-sidebar-active-text);
-    --lte-sidebar-submenu-color: var(--fb-sidebar-text);
-    --lte-sidebar-submenu-hover-color: var(--fb-sidebar-hover-text);
-    --lte-sidebar-submenu-hover-bg: var(--fb-sidebar-hover-bg);
-    --lte-sidebar-submenu-active-color: var(--fb-sidebar-active-text);
-    --lte-sidebar-submenu-active-bg: var(--fb-sidebar-active-bg);
-    --lte-sidebar-header-color: var(--fb-sidebar-text);
+.navbar-vertical {
+    --tblr-navbar-bg: var(--fb-sidebar-bg);
+    --tblr-navbar-color: var(--fb-sidebar-text);
+    --tblr-navbar-hover-color: var(--fb-sidebar-hover-text);
+    --tblr-navbar-active-color: var(--fb-sidebar-active-text);
+    --tblr-navbar-active-bg: var(--fb-sidebar-active-bg);
+    --tblr-navbar-brand-color: var(--fb-sidebar-hover-text);
+    --tblr-navbar-border-color: transparent;
+}
+
+.navbar-vertical .nav-link:hover {
+    background-color: var(--fb-sidebar-hover-bg);
 }
 
 /* --- Schaltflächen -------------------------------------------------------- */
-/* Bootstrap 5 schreibt diese Werte je Variante wörtlich — daher hier einmal
-   sauber überschrieben statt per !important übermalt. */
 .btn-primary {
-    --bs-btn-bg: var(--fb-primary);
-    --bs-btn-border-color: var(--fb-primary);
-    --bs-btn-hover-bg: var(--fb-primary-hover);
-    --bs-btn-hover-border-color: var(--fb-primary-hover);
-    --bs-btn-active-bg: var(--fb-primary-hover);
-    --bs-btn-active-border-color: var(--fb-primary-hover);
-    --bs-btn-disabled-bg: var(--fb-primary);
-    --bs-btn-disabled-border-color: var(--fb-primary);
+    --tblr-btn-bg: var(--fb-primary);
+    --tblr-btn-border-color: var(--fb-primary);
+    --tblr-btn-hover-bg: var(--fb-primary-hover);
+    --tblr-btn-hover-border-color: var(--fb-primary-hover);
+    --tblr-btn-active-bg: var(--fb-primary-hover);
+    --tblr-btn-active-border-color: var(--fb-primary-hover);
+    --tblr-btn-disabled-bg: var(--fb-primary);
+    --tblr-btn-disabled-border-color: var(--fb-primary);
 }
 
 .btn-outline-primary {
-    --bs-btn-color: var(--fb-primary);
-    --bs-btn-border-color: var(--fb-primary);
-    --bs-btn-hover-bg: var(--fb-primary);
-    --bs-btn-hover-border-color: var(--fb-primary);
-    --bs-btn-active-bg: var(--fb-primary);
-    --bs-btn-active-border-color: var(--fb-primary);
-    --bs-btn-disabled-color: var(--fb-primary);
-    --bs-btn-disabled-border-color: var(--fb-primary);
+    --tblr-btn-color: var(--fb-primary);
+    --tblr-btn-border-color: var(--fb-primary);
+    --tblr-btn-hover-bg: var(--fb-primary);
+    --tblr-btn-hover-border-color: var(--fb-primary);
+    --tblr-btn-active-bg: var(--fb-primary);
+    --tblr-btn-active-border-color: var(--fb-primary);
 }
 
-.btn-warning {
-    --bs-btn-bg: var(--fb-accent);
-    --bs-btn-border-color: var(--fb-accent);
-    --bs-btn-hover-bg: var(--fb-accent-hover);
-    --bs-btn-hover-border-color: var(--fb-accent-hover);
-    --bs-btn-active-bg: var(--fb-accent-hover);
-    --bs-btn-active-border-color: var(--fb-accent-hover);
+.btn-warning { --tblr-btn-bg: var(--fb-accent); --tblr-btn-border-color: var(--fb-accent); }
+.btn-success { --tblr-btn-bg: var(--fb-success); --tblr-btn-border-color: var(--fb-success); }
+.btn-danger  { --tblr-btn-bg: var(--fb-danger);  --tblr-btn-border-color: var(--fb-danger); }
+.btn-info    { --tblr-btn-bg: var(--fb-info);    --tblr-btn-border-color: var(--fb-info); }
+
+/* ==========================================================================
+   3. ÜBERGANGSHILFE — AdminLTE-Bauteile, solange sie noch in Views stehen
+   --------------------------------------------------------------------------
+   `info-box`, `small-box` und `callout` kommen an rund 180 Stellen vor. Bis sie
+   auf Tabler-Bauteile gezogen sind, bekommen sie hier ein Minimum an Form,
+   damit die Seiten nicht auseinanderfallen. Dieser Abschnitt ist zum Löschen
+   gedacht, nicht zum Ausbauen.
+   ========================================================================== */
+
+.info-box,
+.small-box {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: var(--fb-surface-bg);
+    border: 1px solid var(--fb-border);
+    border-radius: var(--fb-radius);
 }
 
-.btn-success { --bs-btn-bg: var(--fb-success); --bs-btn-border-color: var(--fb-success); }
-.btn-danger  { --bs-btn-bg: var(--fb-danger);  --bs-btn-border-color: var(--fb-danger); }
-.btn-info    { --bs-btn-bg: var(--fb-info);    --bs-btn-border-color: var(--fb-info); }
-
-/* --- Seitennummerierung --------------------------------------------------- */
-.pagination {
-    --bs-pagination-color: var(--fb-link);
-    --bs-pagination-hover-color: var(--fb-link-hover);
-    --bs-pagination-active-bg: var(--fb-primary);
-    --bs-pagination-active-border-color: var(--fb-primary);
+.info-box .info-box-icon,
+.small-box .icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--fb-radius);
+    background: var(--fb-primary);
+    color: #fff;
+    flex: 0 0 auto;
 }
 
-/* --- Eingabefelder -------------------------------------------------------- */
-.form-control,
-.form-select {
-    --bs-body-bg: var(--fb-surface-bg);
-    --bs-border-color: var(--fb-border);
+.info-box-text,
+.small-box p {
+    color: var(--fb-text-muted);
+    font-size: .875rem;
+    margin: 0;
 }
 
-.form-check-input:checked {
-    background-color: var(--fb-primary);
-    border-color: var(--fb-primary);
+.info-box-number,
+.small-box h3 {
+    color: var(--fb-text);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
 }
 
-/* --- Abzeichen ------------------------------------------------------------ */
-.badge.bg-primary { --bs-badge-bg: var(--fb-primary); }
-.badge.bg-warning { --bs-badge-bg: var(--fb-accent); }
+.callout {
+    padding: .75rem 1rem;
+    margin-bottom: 1rem;
+    background: var(--fb-surface-bg);
+    border: 1px solid var(--fb-border);
+    border-left: 3px solid var(--fb-primary);
+    border-radius: var(--fb-radius);
+}
 
+.content-header {
+    padding: 0 0 1rem;
+}
 /* ==========================================================================
    4. ANORDNEN-MODUS — nur aktiv, solange im Dashboard sortiert wird
    ========================================================================== */
@@ -231,3 +354,26 @@ body.bg-body-tertiary,
 .widget-arrange-griff:active { cursor: grabbing; }
 
 .widget-arrange-ghost { opacity: .35; }
+
+/* ── Hinweiskästen aus der Zeit vor Tabler ───────────────────────────────────
+ *
+ * Tabler legt `.alert` als Flex-Zeile an (display:flex; flex-direction:row;
+ * gap:1rem). Das passt zu SEINEM Aufbau, bei dem der Inhalt in genau einem
+ * Kindelement steckt.
+ *
+ * Unsere 172 Hinweiskästen stammen aus der AdminLTE-Zeit und schreiben Text
+ * direkt in den Kasten, mit <strong>, <a> und <br> dazwischen. Jedes dieser
+ * Stücke — auch die blanken Textabschnitte — wird dadurch zu einer eigenen
+ * Spalte. Aus einem Satz werden acht nebeneinanderstehende Fetzen; auf der
+ * Egg-Import-Seite war der Hinweis dadurch unlesbar.
+ *
+ * Deshalb hier zurück auf Blocksatz. Wer Tablers Zeilenaufbau will, setzt
+ * innen ein `.d-flex` — das ist ohnehin Tablers eigenes Muster und bleibt
+ * davon unberührt.
+ *
+ * Das Schließkreuz braucht dabei nichts: Tabler stellt es ohnehin absolut und
+ * hält mit `.alert-dismissible { padding-right: 3rem }` den Platz frei.
+ */
+.alert {
+    display: block;
+}
