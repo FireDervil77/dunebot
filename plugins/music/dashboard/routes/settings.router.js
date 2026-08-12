@@ -31,6 +31,7 @@ router.put('/', requirePermission('MUSIC.SETTINGS.EDIT'), async (req, res) => {
 
         if (b.dj_role_id !== undefined) updates.dj_role_id = b.dj_role_id || null;
         if (b.default_volume !== undefined) updates.default_volume = zahl(b.default_volume, 50, 0, 200);
+        if (b.normalize_loudness !== undefined) updates.normalize_loudness = zuBool(b.normalize_loudness) ? 1 : 0;
         // 0 heisst unbegrenzt
         if (b.max_queue_size !== undefined) updates.max_queue_size = zahl(b.max_queue_size, 0, 0, 10000);
         if (b.max_track_seconds !== undefined) updates.max_track_seconds = zahl(b.max_track_seconds, 0, 0, 86400);

@@ -143,7 +143,10 @@
       "LABEL": "Retention",
       "UNIT": "days",
       "HELP": "After this many days without being played a file disappears by itself. Counted from the last playback, not from the upload. 0 = never delete."
-    }
+    },
+    "NORMALIZE_LOUDNESS": "Play all tracks at the same loudness",
+    "NORMALIZE_LOUDNESS_HELP": "Brings every track to a common loudness (−14 LUFS, the level Spotify and YouTube use). Quietly mastered tracks become audibly louder without anyone adjusting the volume. With very dynamic material — classical, live recordings — the levelling can become audible; switch it off in that case.",
+    "DEFAULT_VOLUME_HELP": "Values above 100% clip and sound distorted. If playback is too quiet, the switch below helps more."
   },
   "MESSAGES": {
     "SETTINGS_SAVED": "Music settings saved",

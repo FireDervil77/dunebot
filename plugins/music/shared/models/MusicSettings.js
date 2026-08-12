@@ -37,7 +37,8 @@ class MusicSettings {
             'dj_role_id', 'default_volume', 'max_queue_size', 'max_track_seconds',
             'allowed_voice', 'announce_channel', 'announce_now_playing',
             'leave_when_empty', 'leave_after_seconds',
-            'allow_youtube', 'allow_soundcloud', 'allow_spotify', 'allow_direct'
+            'allow_youtube', 'allow_soundcloud', 'allow_spotify', 'allow_direct',
+            'normalize_loudness'
         ];
 
         const felder = [];

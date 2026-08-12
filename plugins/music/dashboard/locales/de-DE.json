@@ -143,7 +143,10 @@
       "LABEL": "Aufbewahrung",
       "UNIT": "Tage",
       "HELP": "Nach so vielen Tagen ohne Abspielen verschwindet eine Datei von selbst. Gezählt wird ab dem letzten Abspielen, nicht ab dem Hochladen. 0 = nie löschen."
-    }
+    },
+    "NORMALIZE_LOUDNESS": "Alle Titel gleich laut abspielen",
+    "NORMALIZE_LOUDNESS_HELP": "Bringt jeden Titel auf eine gemeinsame Lautheit (−14 LUFS, wie Spotify und YouTube). Leise gemasterte Stücke werden dadurch hörbar lauter, ohne dass jemand nachregeln muss. Bei sehr dynamischer Musik — Klassik, Live-Mitschnitte — kann die Regelung hörbar werden; dann abschalten.",
+    "DEFAULT_VOLUME_HELP": "Werte über 100 % übersteuern und klingen verzerrt. Wenn es zu leise ist, hilft der Schalter darunter mehr."
   },
   "MESSAGES": {
     "SETTINGS_SAVED": "Musik-Einstellungen gespeichert",

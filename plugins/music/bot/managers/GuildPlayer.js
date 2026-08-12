@@ -326,6 +326,10 @@ class GuildPlayer {
         this.qualitaet = einstellungen.audio_quality ?? 2;
         this.dauerbetrieb = Boolean(einstellungen.mode_247);
         this.autoplay = Boolean(einstellungen.autoplay);
+        // Standard ist an. `?? 1` und nicht `?? true`, weil die Spalte als
+        // TINYINT kommt — bei einem Server, dessen Zeile aelter ist als die
+        // Migration, faellt der Wert sonst auf undefined und damit auf aus.
+        this.grundlautheit = Boolean(einstellungen.normalize_loudness ?? 1);
     }
 
     /**
@@ -449,7 +453,7 @@ class GuildPlayer {
                     ? tonstromVonAdresse(t.url)
                     : tonstromVonSeite(t.url, this.qualitaet);
 
-            const quelle = this._tonquelle(eingang, klangfilter.ffmpegArgumente(this.filter));
+            const quelle = this._tonquelle(eingang, klangfilter.ffmpegArgumente(this.filter, this.grundlautheit));
 
             if (quelle.volume) quelle.volume.setVolume(this.lautstaerke / 100);
 

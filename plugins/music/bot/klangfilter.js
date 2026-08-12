@@ -141,16 +141,48 @@ function holen(name) {
 }
 
 /**
+ * Grundlautheit, auf die jeder Titel gebracht wird.
+ *
+ * `loudnorm` misst nach EBU R128 und nicht nach Spitzenpegel — es zielt also
+ * auf die *empfundene* Lautheit, nicht auf den lautesten Ausschlag. Genau
+ * darum geht es hier: Ein leise gemasterter Titel und ein lauter sollen gleich
+ * laut ankommen, ohne dass jemand nachregelt.
+ *
+ * Die Werte:
+ *   I=-14    Zielllautheit in LUFS. Derselbe Wert, den Spotify und YouTube
+ *            fahren — Quellen von dort werden dadurch kaum angefasst, und
+ *            alles Leisere kommt auf deren Niveau.
+ *   TP=-1.5  Obergrenze fuer echte Spitzen (dBTP). Etwas Luft, damit die
+ *            spaetere Opus-Kodierung nicht in die Uebersteuerung laeuft.
+ *   LRA=11   Erlaubter Lautheitsumfang. Kleiner hiesse staerkeres
+ *            Zusammendruecken; 11 laesst Dynamik stehen.
+ *
+ * **Einfacher Durchgang, nicht zwei.** Die genaue Variante von `loudnorm`
+ * misst erst die ganze Datei und korrigiert dann — das setzt voraus, dass die
+ * Datei vorliegt. Hier kommt ein Datenstrom, der beim Messen schon gespielt
+ * waere. Der einfache Durchgang regelt dafuer laufend nach; das ist der Preis
+ * und der Grund, warum sich sehr dynamische Musik minimal "atmend" anhoeren
+ * kann. Wem das auffaellt, schaltet es je Server ab.
+ */
+const GRUNDLAUTHEIT = 'loudnorm=I=-14:TP=-1.5:LRA=11';
+
+/**
  * Die ffmpeg-Ausgabeargumente fuer einen Filter.
  *
  * Kommen immer, auch ohne Filter: der Ton geht ohnehin durch ffmpeg, weil
- * die Lautstaerkeregelung rohes PCM braucht. Ohne Filter faellt lediglich
- * die `-af`-Kette weg.
+ * die Lautstaerkeregelung rohes PCM braucht. Ohne Filter und ohne
+ * Normalisierung faellt lediglich die `-af`-Kette weg.
+ *
+ * Reihenfolge in der Kette: **erst der Klangfilter, dann die Normalisierung.**
+ * Bassboost hebt den Pegel an, Nightcore verschiebt ihn — wuerde zuerst
+ * normalisiert, machte der Filter die Arbeit gleich wieder zunichte. So misst
+ * `loudnorm` das, was tatsaechlich herauskommt.
  *
  * @param {string} name Filtername
+ * @param {boolean} [normalisieren=true] Grundlautheit angleichen
  * @returns {Array<string>} Argumente
  */
-function ffmpegArgumente(name) {
+function ffmpegArgumente(name, normalisieren = true) {
     const filter = holen(name);
 
     const argumente = [
@@ -161,7 +193,11 @@ function ffmpegArgumente(name) {
         '-ac', '2'
     ];
 
-    if (filter.ffmpeg) argumente.push('-af', filter.ffmpeg);
+    const kette = [];
+    if (filter.ffmpeg) kette.push(filter.ffmpeg);
+    if (normalisieren) kette.push(GRUNDLAUTHEIT);
+
+    if (kette.length) argumente.push('-af', kette.join(','));
 
     return argumente;
 }
@@ -175,4 +211,4 @@ function auswahl() {
     return Object.entries(FILTER).map(([wert, f]) => ({ wert, name: f.name }));
 }
 
-module.exports = { FILTER, schluessel, bekannt, holen, ffmpegArgumente, auswahl };
+module.exports = { FILTER, GRUNDLAUTHEIT, schluessel, bekannt, holen, ffmpegArgumente, auswahl };
