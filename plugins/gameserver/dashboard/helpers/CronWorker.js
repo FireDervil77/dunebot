@@ -149,7 +149,7 @@ class CronWorker {
 
         const task = cron.schedule(job.cron_expr, () => {
             this._execute(job).catch(err => {
-                Logger.error(`[CronWorker] Fehler bei Ausführung von Job ${job.id} (${job.name}):`, err.message);
+                Logger.error(`[CronWorker] Fehler bei Ausführung von Job ${job.id} (${job.name}):`, err);
             });
         }, {
             timezone: 'Europe/Berlin',
@@ -214,8 +214,11 @@ class CronWorker {
                 Logger.info(`[CronWorker] Job ${job.id} (${job.name}) war run_once – deaktiviert und entfernt`);
             }
         } catch (err) {
-            Logger.error(`[CronWorker] Job ${job.id} (${job.name}) fehlgeschlagen:`, err.message);
-            await this._updateStatus(dbService, job.id, 'failed');
+            Logger.error(`[CronWorker] Job ${job.id} (${job.name}) fehlgeschlagen:`, err);
+            // Der Grund gehoert in die Liste, nicht nur ins Log. Ein rotes
+            // "failed" ohne Text zwingt jeden dazu, im Serverlog zu suchen —
+            // und `skipped` liefert seinen Grund seit dem 2026-08-10 mit.
+            await this._updateStatus(dbService, job.id, 'failed', err.message);
         }
     }
 
@@ -232,6 +235,7 @@ class CronWorker {
                     await this._startPayload(job, dbService, serverId),
                     60000
                 );
+                await this._merkeStart(dbService, job.server_id);
                 break;
 
             case 'stop':
@@ -250,6 +254,7 @@ class CronWorker {
                     await this._startPayload(job, dbService, serverId),
                     60000
                 );
+                await this._merkeStart(dbService, job.server_id);
                 break;
 
             case 'backup':
@@ -263,6 +268,39 @@ class CronWorker {
 
             default:
                 throw new Error(`Unbekannte Aktion: ${job.action}`);
+        }
+    }
+
+    /**
+     * Haelt fest, dass dieser Server gerade gestartet wurde.
+     *
+     * Der Knopf im Dashboard tut das seit jeher (`routes/servers.js`), der
+     * Cronjob nicht. Ein naechtlicher Neustart lief also durch, ohne dass
+     * `last_started_at` mitwanderte: Das Dashboard zeigte als Startzeitpunkt
+     * weiter den letzten Klick von Hand, und die daraus gerechnete Laufzeit war
+     * entsprechend zu hoch. Beim ARK-Server waren es 16 Stunden Unterschied.
+     *
+     * Der **Status** wird hier bewusst nicht mitgesetzt, anders als beim Knopf.
+     * Der Knopf tut es, weil er dem Nutzer sofort etwas anzeigen muss; hier
+     * sitzt niemand davor. Ein hingeschriebenes `online` waere geraten und
+     * koennte einen in Wahrheit gescheiterten Start uebertuenchen — den echten
+     * Status meldet der Daemon ohnehin nach.
+     *
+     * @param {Object} dbService
+     * @param {number} serverId
+     */
+    async _merkeStart(dbService, serverId) {
+        try {
+            await dbService.query(
+                'UPDATE gameservers SET last_started_at = NOW() WHERE id = ?',
+                [serverId]
+            );
+        } catch (err) {
+            // Nicht werfen: der Server laeuft, es fehlt nur die Notiz. Ein
+            // erfolgreicher Neustart darf daran nicht zu `failed` werden.
+            ServiceManager.get('Logger')?.warn(
+                `[CronWorker] last_started_at für Server ${serverId} nicht gesetzt: ${err.message}`
+            );
         }
     }
 
