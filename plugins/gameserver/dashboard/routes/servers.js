@@ -838,6 +838,44 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
             // Sortierte Liste der Extra-Port-Typen (alles außer "game")
             const extraPortTypes = Object.keys(poolPorts).filter(t => t !== 'game');
 
+            // ⚠️ Offset-Ports sind schon vergeben, bevor hier jemand zählt.
+            //
+            // Spiele wie ARK belegen neben dem Spielport zwingend `Spielport + 1`
+            // für den Rohdaten-Socket. Dieser Port wird weiter unten berechnet und
+            // verbraucht bewusst keinen Pool-Eintrag — die sequenzielle Vergabe
+            // hier wusste davon aber nichts und hat dieselbe Nummer ein zweites
+            // Mal ausgegeben. Bei Server 160 lagen `query` und `game_plus_1`
+            // beide auf 7001: ARK bekam denselben Port für Steam-Abfrage und
+            // Spieldaten, und der Beitritt lief in die Zeitüberschreitung.
+            //
+            // Vorher fiel es nicht auf, weil es von der Reihenfolge im Pool
+            // abhing — bei Server 159 landete der Query-Port zufällig *unter*
+            // dem Spielport und kollidierte deshalb nicht.
+            const reservierteVersaetze = new Set(
+                Object.values(offsetPorts)
+                    .filter(o => o.base === 'game')
+                    .map(o => o.offset)
+            );
+
+            // Zählt 1, 2, 3 … hoch und überspringt, was sich das Spiel selbst nimmt.
+            const versatzGeber = () => {
+                let versatz = 0;
+                return () => {
+                    do { versatz++; } while (reservierteVersaetze.has(versatz));
+                    return versatz;
+                };
+            };
+
+            // Dieselben Nummern müssen auch beim Ausweichen auf "irgendein freier
+            // Port" gesperrt sein — sonst greift der Fallback genau danach.
+            const sperrKlausel = (basisPort) => {
+                const nummern = [...reservierteVersaetze].map(v => basisPort + v);
+                return {
+                    sql: nummern.length ? ` AND port NOT IN (${nummern.map(() => '?').join(',')})` : '',
+                    werte: nummern
+                };
+            };
+
             if (userPort && userPort !== 'auto') {
                 // User hat einen spezifischen Game-Port gewählt → validieren gegen Pool
                 const requestedPort = parseInt(userPort);
@@ -863,12 +901,16 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                 }
 
                 // Zusätzliche Ports sequenziell zuweisen: Game+1, Game+2, ...
+                // Versätze, die sich das Spiel selbst nimmt, werden übersprungen.
+                const naechsterVersatz = versatzGeber();
+                const sperre = sperrKlausel(requestedPort);
                 for (let i = 0; i < extraPortTypes.length; i++) {
                     const portType = extraPortTypes[i];
-                    const desiredPort = requestedPort + i + 1; // Game+1, Game+2, ...
+                    const versatz = naechsterVersatz();
+                    const desiredPort = requestedPort + versatz;
                     // Versuche den gewünschten sequenziellen Port zu bekommen
                     const [seqAlloc] = await dbService.query(
-                        `SELECT id, port FROM port_allocations 
+                        `SELECT id, port FROM port_allocations
                          WHERE rootserver_id = ? AND port = ? AND server_id IS NULL LIMIT 1`,
                         [rootserver_id, desiredPort]
                     );
@@ -880,14 +922,15 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                         ports[portType].internal = seqAlloc.port;
                         ports[portType].external = seqAlloc.port;
                         allocatedFromPool[portType] = { allocId: seqAlloc.id, port: seqAlloc.port };
-                        Logger.info(`[Gameserver] Port ${portType} sequential: ${seqAlloc.port} (Game+${i + 1}, Allocation #${seqAlloc.id})`);
+                        Logger.info(`[Gameserver] Port ${portType} sequential: ${seqAlloc.port} (Game+${versatz}, Allocation #${seqAlloc.id})`);
                     } else {
-                        // Fallback: nächsten freien Port aus Pool
+                        // Fallback: nächsten freien Port aus Pool — ohne die,
+                        // die für Offset-Ports des Spiels reserviert sind.
                         const [freeAlloc] = await dbService.query(
-                            `SELECT id, port FROM port_allocations 
-                             WHERE rootserver_id = ? AND server_id IS NULL 
+                            `SELECT id, port FROM port_allocations
+                             WHERE rootserver_id = ? AND server_id IS NULL${sperre.sql}
                              ORDER BY port ASC LIMIT 1`,
-                            [rootserver_id]
+                            [rootserver_id, ...sperre.werte]
                         );
                         if (freeAlloc) {
                             await dbService.query(
@@ -922,11 +965,15 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                     Logger.info(`[Gameserver] Port game auto-assigned: ${gameAlloc.port} (Allocation #${gameAlloc.id})`);
 
                     // Extra-Ports sequenziell: Game+1, Game+2, ...
+                    // Versätze, die sich das Spiel selbst nimmt, werden übersprungen.
+                    const naechsterVersatz = versatzGeber();
+                    const sperre = sperrKlausel(gameAlloc.port);
                     for (let i = 0; i < extraPortTypes.length; i++) {
                         const portType = extraPortTypes[i];
-                        const desiredPort = gameAlloc.port + i + 1;
+                        const versatz = naechsterVersatz();
+                        const desiredPort = gameAlloc.port + versatz;
                         const [seqAlloc] = await dbService.query(
-                            `SELECT id, port FROM port_allocations 
+                            `SELECT id, port FROM port_allocations
                              WHERE rootserver_id = ? AND port = ? AND server_id IS NULL LIMIT 1`,
                             [rootserver_id, desiredPort]
                         );
@@ -938,13 +985,14 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                             ports[portType].internal = seqAlloc.port;
                             ports[portType].external = seqAlloc.port;
                             allocatedFromPool[portType] = { allocId: seqAlloc.id, port: seqAlloc.port };
-                            Logger.info(`[Gameserver] Port ${portType} sequential: ${seqAlloc.port} (Game+${i + 1}, Allocation #${seqAlloc.id})`);
+                            Logger.info(`[Gameserver] Port ${portType} sequential: ${seqAlloc.port} (Game+${versatz}, Allocation #${seqAlloc.id})`);
                         } else {
+                            // Ohne die Nummern, die für Offset-Ports reserviert sind.
                             const [freeAlloc] = await dbService.query(
-                                `SELECT id, port FROM port_allocations 
-                                 WHERE rootserver_id = ? AND server_id IS NULL 
+                                `SELECT id, port FROM port_allocations
+                                 WHERE rootserver_id = ? AND server_id IS NULL${sperre.sql}
                                  ORDER BY port ASC LIMIT 1`,
-                                [rootserver_id]
+                                [rootserver_id, ...sperre.werte]
                             );
                             if (freeAlloc) {
                                 await dbService.query(
