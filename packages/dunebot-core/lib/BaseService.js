@@ -21,7 +21,7 @@
  *     }
  * }
  * 
- * @author DuneBot Team
+ * @author FireBot Team
  * @version 1.0.0
  */
 

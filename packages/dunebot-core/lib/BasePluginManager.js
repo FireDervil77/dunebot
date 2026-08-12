@@ -751,7 +751,7 @@ class BasePluginManager {
 
     async #cloneOrUpdateRepo(repository, branch = "main") {
         const repoHash = this.#createRepoHash(repository);
-        const repoDir = path.join(os.tmpdir(), "dunebot-plugins", repoHash);
+        const repoDir = path.join(os.tmpdir(), "firebot-plugins", repoHash);
         const lockPath = repoDir + ".lock";
 
         // Create an empty file for locking if it doesn't exist

@@ -737,7 +737,7 @@ module.exports = class App {
         // was Assets einreiht
         this.app.use(assetQueueMiddleware);
 
-        // ✅ WICHTIG: baseMiddleware VOR guildMiddleware! 
+        // WICHTIG: baseMiddleware VOR guildMiddleware! 
         // baseMiddleware lädt ungefilterte Navigation, guildMiddleware filtert und überschreibt
         this.app.use(baseMiddleware);
         this.app.use(guildMiddleware);  // NACH base - überschreibt res.locals.guildNav mit gefilterten Items
