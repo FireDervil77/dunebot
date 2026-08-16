@@ -529,11 +529,45 @@ class EggImporter {
      *
      * Unser System nutzt nur {{ENV_VARIABLE}} Format.
      *
-     * @param {object} configFiles — config.files Objekt aus Egg
+     * ── config.files ist meistens eine ZEICHENKETTE, kein Objekt ────────────
+     *
+     * Pterodactyl legt den Abschnitt als JSON-Zeichenkette ab. Gemessen an einer
+     * Stichprobe von 20 Pelican-Eggs (2026-08-16): 12 als Zeichenkette, 0 als
+     * Objekt, 8 leer.
+     *
+     * Bis dahin stand hier `typeof !== 'object' → return {}`. Eine Zeichenkette
+     * ist kein Objekt, also wurde die gesamte Dateizuordnung **stillschweigend
+     * verworfen** — bei rund 60 % der Eggs. Sichtbar wurde es erst beim Zählen
+     * der übersetzten Pakete: 0 von 273 Einstellungen mit `target: file`, bei
+     * Spielen wie Minecraft und ARK, die ohne Konfigurationsdatei gar nicht
+     * einstellbar sind.
+     *
+     * Dieselbe Zeichenkette ist auch die Ursache des "Zeichensalats" auf dem
+     * Datenbankweg: Dort wurde sie zeichenweise zerlegt gespeichert und ergab
+     * Einträge mit den Schlüsseln "0", "1", "2" …
+     *
+     * @param {object|string} configFiles — config.files aus dem Egg
      * @returns {object} — Normalisiertes config.files mit umgemappten Variablen
      */
     _normalizeConfigFiles(configFiles) {
-        if (!configFiles || typeof configFiles !== 'object') return {};
+        if (!configFiles) return {};
+
+        if (typeof configFiles === 'string') {
+            const roh = configFiles.trim();
+            if (!roh || roh === '{}') return {};
+            try {
+                configFiles = JSON.parse(roh);
+            } catch (e) {
+                // Melden statt ausweichen: Ein Egg mit kaputtem Abschnitt ist ein
+                // Egg ohne Dateizuordnung, und das gehört gesagt — sonst sieht es
+                // aus wie ein Spiel, das keine Konfigurationsdatei hat.
+                Logger.warn(`[EggImporter] config.files ist eine Zeichenkette, aber kein gültiges JSON — `
+                    + `die Dateizuordnung fehlt: ${e.message}`);
+                return {};
+            }
+        }
+
+        if (typeof configFiles !== 'object') return {};
 
         const result = {};
 
