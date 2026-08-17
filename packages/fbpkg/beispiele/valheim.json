@@ -170,14 +170,21 @@
     },
     "stop": {
       "sequence": [
-        "sigint",
-        "sigterm",
-        "sigkill"
-      ],
-      "timeouts_sec": [
-        60,
-        30,
-        10
+        {
+          "step": "sigint",
+          "timeout_sec": 60,
+          "terminates": true
+        },
+        {
+          "step": "sigterm",
+          "timeout_sec": 30,
+          "terminates": true
+        },
+        {
+          "step": "sigkill",
+          "timeout_sec": 10,
+          "terminates": true
+        }
       ]
     }
   },

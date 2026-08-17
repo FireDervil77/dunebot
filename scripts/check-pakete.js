@@ -184,6 +184,62 @@ function pruefeInvarianten(paket) {
         }
     }
 
+    // ── I8: Der Stopp-Ablauf muss halten, was er verspricht ─────────────────
+    //
+    // Dieselben Regeln, die `Job.Validate()` im Daemon prüft. Sie stehen hier
+    // ein zweites Mal, weil sie an zwei verschiedenen Stellen zubeissen: Im
+    // Auftrag merkt es fb-init erst beim Stoppen eines laufenden Servers, im
+    // Paket kann man es sehen, bevor überhaupt jemand startet.
+    const SIGNALE = new Set(['sigint', 'sigterm', 'sigkill']);
+    const folge = paket.start?.stop?.sequence || [];
+
+    if (folge.length) {
+        const letzter = folge[folge.length - 1];
+        const letzterName = typeof letzter === 'string' ? letzter : letzter?.step;
+        if (letzterName !== 'sigkill') {
+            verstoesse.push(
+                `I8: Die Stopp-Folge endet mit "${letzterName}" statt sigkill. Ein Ablauf ohne ` +
+                `letztes Mittel ist eine Zusage, die niemand halten kann.`
+            );
+        }
+    }
+
+    for (const [i, eintrag] of folge.entries()) {
+        if (typeof eintrag === 'string') {
+            hinweise.push(
+                `start.stop.sequence[${i}] steht noch in der alten Schreibweise ("${eintrag}") — ` +
+                `ohne eigene Frist und ohne terminates.`
+            );
+            continue;
+        }
+        // Ein Signal beendet, das ist seine ganze Aufgabe. `terminates: false`
+        // daneben wäre eine Aussage, die der Ablauf nicht halten kann — und
+        // fb-init würde danach auf ein Ende warten, das es selbst ausgelöst hat.
+        if (SIGNALE.has(eintrag.step) && eintrag.terminates === false) {
+            verstoesse.push(
+                `I8: Schritt "${eintrag.step}" ist als terminates:false gekennzeichnet — ` +
+                `ein Signal beendet aber, dafür ist es da.`
+            );
+        }
+    }
+
+    // Das parallele Frist-Array ist die Form, an der die drei ARK-Pakete
+    // zerbrochen sind: vier Schritte, drei Fristen, und seither sagt niemand
+    // mehr, welche zu welchem gehört.
+    if (paket.start?.stop?.timeouts_sec) {
+        const n = paket.start.stop.timeouts_sec.length;
+        if (n !== folge.length) {
+            verstoesse.push(
+                `I8: timeouts_sec hat ${n} Fristen für ${folge.length} Schritte — dann ist unklar, ` +
+                `welche zu welchem gehört. Die Frist gehört zum Schritt.`
+            );
+        } else {
+            hinweise.push(
+                `start.stop.timeouts_sec ist die alte parallele Schreibweise. Die Frist gehört zum Schritt.`
+            );
+        }
+    }
+
     // ── Zweisprachigkeit: was fehlt auf Englisch? ────────────────────────────
     let ohneEnglisch = 0;
     (function suche(o) {

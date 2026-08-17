@@ -5,164 +5,368 @@
   "description": "Beschreibt ein Spiel vollständig als Daten. Feldnamen englisch (E-7), Texte für Menschen zweisprachig. Regeln und Begründungen: docs/spielpakete/02-Schichten-und-Vertraege.md",
   "type": "object",
   "additionalProperties": false,
-  "required": ["format", "identity", "image", "ports", "install", "start", "status"],
-
+  "required": [
+    "format",
+    "identity",
+    "image",
+    "ports",
+    "install",
+    "start",
+    "status"
+  ],
   "definitions": {
     "text": {
       "description": "Text, den ein Mensch liest — zweisprachig. Fehlt de, zeigt die Oberfläche en.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "de": { "type": "string" },
-        "en": { "type": "string" }
+        "de": {
+          "type": "string"
+        },
+        "en": {
+          "type": "string"
+        }
       },
-      "anyOf": [{ "required": ["de"] }, { "required": ["en"] }]
+      "anyOf": [
+        {
+          "required": [
+            "de"
+          ]
+        },
+        {
+          "required": [
+            "en"
+          ]
+        }
+      ]
     },
-
     "envKey": {
       "type": "string",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
       "description": "Name einer Umgebungsvariablen. Großbuchstaben sind die Gewohnheit, nicht die Regel: Squad, Post Scriptum, OpenTTD, Grafana und SA-MP lesen klein geschriebene Namen (`servername`, `srv_name`). Der Name kommt vom Spiel — wer ihn großschreibt, benennt eine andere Variable, die niemand liest (E-23)."
     },
-
     "port": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["purpose", "protocol", "assign"],
+      "required": [
+        "purpose",
+        "protocol",
+        "assign"
+      ],
       "properties": {
         "purpose": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "Wofür der Port da ist: game, query, rcon, rawudp, beacon …"
         },
-        "protocol": { "enum": ["tcp", "udp", "both"] },
+        "protocol": {
+          "enum": [
+            "tcp",
+            "udp",
+            "both"
+          ]
+        },
         "assign": {
           "description": "Woher die Nummer kommt. 'pool' = eigene Belegung. '<zweck>+N' = zwingend N über einem anderen Port; scheitert hörbar, wenn nicht erfüllbar (E-5).",
           "type": "string",
           "pattern": "^(pool|[a-z][a-z0-9_]*\\+[0-9]+)$"
         },
-        "required": { "type": "boolean", "default": true },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
         "variable": {
           "$ref": "#/definitions/envKey",
           "description": "Über welche Umgebungsvariable das Spiel die Nummer erfährt. Die Nummer selbst steht NIE im Paket (Invariante I2)."
         },
-        "description": { "$ref": "#/definitions/text" }
+        "description": {
+          "$ref": "#/definitions/text"
+        }
       }
     },
-
     "installStep": {
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "properties": {
-        "type": { "enum": ["steamcmd", "download", "extract", "mkdir", "template", "chown", "script"] },
-        "description": { "$ref": "#/definitions/text" }
+        "type": {
+          "enum": [
+            "steamcmd",
+            "download",
+            "extract",
+            "mkdir",
+            "template",
+            "chown",
+            "script"
+          ]
+        },
+        "description": {
+          "$ref": "#/definitions/text"
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "steamcmd" } } },
-          "then": {
-            "required": ["app"],
+          "if": {
             "properties": {
-              "type": {}, "description": {},
-              "app": { "type": "integer", "minimum": 1 },
-              "login": { "type": "boolean", "default": false, "description": "Vorgabe false (L5a). true ist ein zu genehmigender Sonderfall." },
-              "validate": { "type": "boolean", "default": true },
-              "branch": { "type": "string" },
-              "platform": { "enum": ["linux", "windows"] },
-              "target": { "type": "string" }
+              "type": {
+                "const": "steamcmd"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "app"
+            ],
+            "properties": {
+              "type": {},
+              "description": {},
+              "app": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "login": {
+                "type": "boolean",
+                "default": false,
+                "description": "Vorgabe false (L5a). true ist ein zu genehmigender Sonderfall."
+              },
+              "validate": {
+                "type": "boolean",
+                "default": true
+              },
+              "branch": {
+                "type": "string"
+              },
+              "platform": {
+                "enum": [
+                  "linux",
+                  "windows"
+                ]
+              },
+              "target": {
+                "type": "string"
+              }
             },
             "additionalProperties": false
           }
         },
         {
-          "if": { "properties": { "type": { "const": "download" } } },
-          "then": {
-            "required": ["url", "target"],
+          "if": {
             "properties": {
-              "type": {}, "description": {},
-              "url": { "type": "string", "format": "uri" },
-              "target": { "type": "string" },
-              "checksum": { "type": "string", "description": "sha256:… — Pflicht, sobald die Quelle nicht wir selbst sind." }
+              "type": {
+                "const": "download"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "url",
+              "target"
+            ],
+            "properties": {
+              "type": {},
+              "description": {},
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "target": {
+                "type": "string"
+              },
+              "checksum": {
+                "type": "string",
+                "description": "sha256:… — Pflicht, sobald die Quelle nicht wir selbst sind."
+              }
             },
             "additionalProperties": false
           }
         },
         {
-          "if": { "properties": { "type": { "const": "extract" } } },
-          "then": {
-            "required": ["archive"],
+          "if": {
             "properties": {
-              "type": {}, "description": {},
-              "archive": { "type": "string" },
-              "target": { "type": "string" },
-              "strip_components": { "type": "integer", "minimum": 0 },
-              "delete_archive": { "type": "boolean", "default": true }
+              "type": {
+                "const": "extract"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "archive"
+            ],
+            "properties": {
+              "type": {},
+              "description": {},
+              "archive": {
+                "type": "string"
+              },
+              "target": {
+                "type": "string"
+              },
+              "strip_components": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "delete_archive": {
+                "type": "boolean",
+                "default": true
+              }
             },
             "additionalProperties": false
           }
         },
         {
-          "if": { "properties": { "type": { "const": "mkdir" } } },
+          "if": {
+            "properties": {
+              "type": {
+                "const": "mkdir"
+              }
+            }
+          },
           "then": {
-            "required": ["path"],
-            "properties": { "type": {}, "description": {}, "path": { "type": "string" } },
+            "required": [
+              "path"
+            ],
+            "properties": {
+              "type": {},
+              "description": {},
+              "path": {
+                "type": "string"
+              }
+            },
             "additionalProperties": false
           }
         },
         {
-          "if": { "properties": { "type": { "const": "template" } } },
-          "then": {
-            "required": ["file"],
+          "if": {
             "properties": {
-              "type": {}, "description": {},
-              "file": { "type": "string" },
-              "from": { "type": "string", "description": "Vorlage im Paket." },
-              "content": { "type": "string", "description": "Alternativ: Inhalt direkt." },
-              "only_if_missing": { "type": "boolean", "default": true }
+              "type": {
+                "const": "template"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "file"
+            ],
+            "properties": {
+              "type": {},
+              "description": {},
+              "file": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string",
+                "description": "Vorlage im Paket."
+              },
+              "content": {
+                "type": "string",
+                "description": "Alternativ: Inhalt direkt."
+              },
+              "only_if_missing": {
+                "type": "boolean",
+                "default": true
+              }
             },
             "additionalProperties": false,
-            "anyOf": [{ "required": ["from"] }, { "required": ["content"] }]
+            "anyOf": [
+              {
+                "required": [
+                  "from"
+                ]
+              },
+              {
+                "required": [
+                  "content"
+                ]
+              }
+            ]
           }
         },
         {
-          "if": { "properties": { "type": { "const": "chown" } } },
-          "then": {
-            "required": ["path"],
+          "if": {
             "properties": {
-              "type": {}, "description": {},
-              "path": { "type": "string" },
-              "user": { "enum": ["container", "root"], "default": "container" }
+              "type": {
+                "const": "chown"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "path"
+            ],
+            "properties": {
+              "type": {},
+              "description": {},
+              "path": {
+                "type": "string"
+              },
+              "user": {
+                "enum": [
+                  "container",
+                  "root"
+                ],
+                "default": "container"
+              }
             },
             "additionalProperties": false
           }
         },
         {
-          "if": { "properties": { "type": { "const": "script" } } },
+          "if": {
+            "properties": {
+              "type": {
+                "const": "script"
+              }
+            }
+          },
           "then": {
             "description": "Der Notausgang. Jedes Paket, das ihn benutzt, gehört im Befund vermerkt.",
-            "required": ["script"],
+            "required": [
+              "script"
+            ],
             "properties": {
-              "type": {}, "description": {},
-              "script": { "type": "string" },
-              "image": { "type": "string", "description": "Abweichendes Installations-Image." },
-              "reason": { "$ref": "#/definitions/text" }
+              "type": {},
+              "description": {},
+              "script": {
+                "type": "string"
+              },
+              "image": {
+                "type": "string",
+                "description": "Abweichendes Installations-Image."
+              },
+              "reason": {
+                "$ref": "#/definitions/text"
+              }
             },
             "additionalProperties": false
           }
         }
       ]
     },
-
     "startArg": {
       "description": "Ein Startparameter. Die Befehlszeile wird daraus zusammengesetzt — nie als Zeichenkette geliefert (Invariante I7, B.11). Entweder `form`+`from` (der Regelfall: Schalter, ggf. mit Wert) ODER `parts` (ein einziger argv-Eintrag, aus Stücken gebaut — ARK und die Unreal-Familie verlangen das, weil ihre Binaries alles in einem Argument entgegennehmen).",
       "type": "object",
       "additionalProperties": false,
       "oneOf": [
-        { "required": ["key", "form", "from"] },
-        { "required": ["key", "parts"] }
+        {
+          "required": [
+            "key",
+            "form",
+            "from"
+          ]
+        },
+        {
+          "required": [
+            "key",
+            "parts"
+          ]
+        }
       ],
       "properties": {
-        "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
         "parts": {
           "description": "Stücke EINES argv-Eintrags, der Reihe nach aneinandergehängt. Verweise stehen als {{setting:schluessel}} oder {{port:zweck}} im Text — sie bleiben damit prüfbar. Keine Shell, keine Ersetzung durch die Shell.",
           "type": "array",
@@ -170,18 +374,37 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["text"],
+            "required": [
+              "text"
+            ],
             "properties": {
-              "text": { "type": "string" },
-              "when": { "enum": ["true", "false", "not_empty", "empty"] }
+              "text": {
+                "type": "string"
+              },
+              "when": {
+                "enum": [
+                  "true",
+                  "false",
+                  "not_empty",
+                  "empty"
+                ]
+              }
             }
           }
         },
         "form": {
           "description": "Wie der Parameter aussieht. Zeichenkette = Schalter ohne Wert. Liste = mehrere argv-Einträge, {{value}} wird ersetzt.",
           "oneOf": [
-            { "type": "string" },
-            { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
           ]
         },
         "from": {
@@ -191,35 +414,86 @@
         },
         "when": {
           "description": "Bedingung: 'true'/'false' (Schalterstellung), 'not_empty'/'empty' (Wert gesetzt oder nicht). Fehlt = immer.",
-          "enum": ["true", "false", "not_empty", "empty"]
+          "enum": [
+            "true",
+            "false",
+            "not_empty",
+            "empty"
+          ]
         }
       }
     },
-
     "setting": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["key", "name", "type"],
+      "required": [
+        "key",
+        "name",
+        "type"
+      ],
       "properties": {
-        "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-        "group": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-        "name": { "$ref": "#/definitions/text" },
-        "description": { "$ref": "#/definitions/text" },
-        "type": { "enum": ["text", "number", "boolean", "choice", "password"] },
-        "default": { "type": ["string", "number", "boolean", "null"] },
-        "min": { "type": "number" },
-        "max": { "type": "number" },
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "group": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "name": {
+          "$ref": "#/definitions/text"
+        },
+        "description": {
+          "$ref": "#/definitions/text"
+        },
+        "type": {
+          "enum": [
+            "text",
+            "number",
+            "boolean",
+            "choice",
+            "password"
+          ]
+        },
+        "default": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        },
         "choices": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["value"],
+            "required": [
+              "value"
+            ],
             "properties": {
-              "value": { "type": ["string", "number", "boolean"] },
-              "name": { "$ref": "#/definitions/text" },
-              "hint": { "$ref": "#/definitions/text" },
-              "default": { "type": "boolean" }
+              "value": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              },
+              "name": {
+                "$ref": "#/definitions/text"
+              },
+              "hint": {
+                "$ref": "#/definitions/text"
+              },
+              "default": {
+                "type": "boolean"
+              }
             }
           }
         },
@@ -229,158 +503,377 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["target"],
+            "required": [
+              "target"
+            ],
             "properties": {
-              "target": { "enum": ["file", "env", "arg", "rcon"] },
-              "file": { "type": "string" },
-              "parser": { "enum": ["ini", "json", "yaml", "properties", "xml", "text"] },
-              "path": { "type": "string" },
-              "variable": { "$ref": "#/definitions/envKey" },
-              "command": { "type": "string" },
+              "target": {
+                "enum": [
+                  "file",
+                  "env",
+                  "arg",
+                  "rcon"
+                ]
+              },
+              "file": {
+                "type": "string"
+              },
+              "parser": {
+                "enum": [
+                  "ini",
+                  "json",
+                  "yaml",
+                  "properties",
+                  "xml",
+                  "text"
+                ]
+              },
+              "path": {
+                "type": "string"
+              },
+              "variable": {
+                "$ref": "#/definitions/envKey"
+              },
+              "command": {
+                "type": "string"
+              },
               "as": {
                 "description": "Wie ein Ja/Nein-Wert an DIESER Stelle geschrieben wird. Spiele sind sich uneinig — Valheim will 1/0, server.properties will true/false, ARKs INI will True/False. Ohne Angabe müsste geraten werden; deshalb steht sie am Ziel und nicht an der Einstellung: derselbe Wert kann in der Datei anders aussehen als auf der Kommandozeile.",
-                "enum": ["true_false", "True_False", "TRUE_FALSE", "one_zero", "yes_no", "Yes_No", "on_off", "enabled_disabled"]
+                "enum": [
+                  "true_false",
+                  "True_False",
+                  "TRUE_FALSE",
+                  "one_zero",
+                  "yes_no",
+                  "Yes_No",
+                  "on_off",
+                  "enabled_disabled"
+                ]
               }
             },
             "additionalProperties": false
           }
         },
-        "takes_effect": { "enum": ["instant", "restart", "new_world"], "default": "restart" },
-        "risk": { "enum": ["none", "progress", "world_reset"], "default": "none" },
-        "role": { "enum": ["player", "owner", "expert"], "default": "player" },
-        "visible": { "type": "boolean", "default": true }
+        "takes_effect": {
+          "enum": [
+            "instant",
+            "restart",
+            "new_world"
+          ],
+          "default": "restart"
+        },
+        "risk": {
+          "enum": [
+            "none",
+            "progress",
+            "world_reset"
+          ],
+          "default": "none"
+        },
+        "role": {
+          "enum": [
+            "player",
+            "owner",
+            "expert"
+          ],
+          "default": "player"
+        },
+        "visible": {
+          "type": "boolean",
+          "default": true
+        }
       }
     },
-
     "command": {
       "type": "object",
-      "required": ["via"],
+      "required": [
+        "via"
+      ],
       "properties": {
-        "via": { "enum": ["rcon", "console", "file", "query", "api", "unsupported"] },
-        "command": { "type": "string" },
-        "parse": { "type": "string" },
-        "file": { "type": "string" },
-        "mode": { "enum": ["append_line", "remove_line", "rewrite"] },
-        "value": { "type": "string" },
-        "reason": { "$ref": "#/definitions/text" }
+        "via": {
+          "enum": [
+            "rcon",
+            "console",
+            "file",
+            "query",
+            "api",
+            "unsupported"
+          ]
+        },
+        "command": {
+          "type": "string"
+        },
+        "parse": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "append_line",
+            "remove_line",
+            "rewrite"
+          ]
+        },
+        "value": {
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/definitions/text"
+        }
       },
       "additionalProperties": false,
       "allOf": [
         {
-          "if": { "properties": { "via": { "const": "unsupported" } } },
+          "if": {
+            "properties": {
+              "via": {
+                "const": "unsupported"
+              }
+            }
+          },
           "then": {
-            "required": ["reason"],
+            "required": [
+              "reason"
+            ],
             "description": "Ein grauer Knopf mit Begründung ist besser als ein fehlender (B.9)."
           }
         }
       ]
     }
   },
-
   "properties": {
-    "format": { "const": "FBPKG_v1" },
-
+    "format": {
+      "const": "FBPKG_v1"
+    },
     "identity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["slug", "name", "version"],
+      "required": [
+        "slug",
+        "name",
+        "version"
+      ],
       "properties": {
-        "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-        "name": { "type": "string" },
-        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "description": "Fassung des PAKETS, nicht des Spiels." },
-        "author": { "type": "string" },
-        "description": { "$ref": "#/definitions/text" },
-        "category": { "type": "string" },
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Fassung des PAKETS, nicht des Spiels."
+        },
+        "author": {
+          "type": "string"
+        },
+        "description": {
+          "$ref": "#/definitions/text"
+        },
+        "category": {
+          "type": "string"
+        },
         "origin": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["type"],
+          "required": [
+            "type"
+          ],
           "properties": {
-            "type": { "enum": ["egg-import", "installer", "manual"] },
-            "source": { "type": "string" },
-            "commit": { "type": "string" },
-            "imported_at": { "type": "string", "format": "date" }
+            "type": {
+              "enum": [
+                "egg-import",
+                "installer",
+                "manual"
+              ]
+            },
+            "source": {
+              "type": "string"
+            },
+            "commit": {
+              "type": "string"
+            },
+            "imported_at": {
+              "type": "string",
+              "format": "date"
+            }
           }
         }
       }
     },
-
     "image": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ref", "digest"],
+      "required": [
+        "ref",
+        "digest"
+      ],
       "properties": {
-        "ref": { "type": "string", "description": "Adresse ohne Tag, z.B. registry.firenetworks.de/fb/steamcmd" },
-        "tag": { "type": "string" },
-        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-        "pinned_at": { "type": "string", "format": "date" },
-        "platform": { "enum": ["linux", "windows"], "default": "linux" },
-        "arch": { "type": "array", "items": { "enum": ["amd64", "arm64"] } },
-        "install_image": { "type": "string", "description": "Abweichendes Image für die Installation. Fehlt = dasselbe wie zur Laufzeit." }
+        "ref": {
+          "type": "string",
+          "description": "Adresse ohne Tag, z.B. registry.firenetworks.de/fb/steamcmd"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "pinned_at": {
+          "type": "string",
+          "format": "date"
+        },
+        "platform": {
+          "enum": [
+            "linux",
+            "windows"
+          ],
+          "default": "linux"
+        },
+        "arch": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "amd64",
+              "arm64"
+            ]
+          }
+        },
+        "install_image": {
+          "type": "string",
+          "description": "Abweichendes Image für die Installation. Fehlt = dasselbe wie zur Laufzeit."
+        }
       }
     },
-
     "requirements": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "min_ram_mb": { "type": "integer", "minimum": 0 },
-        "min_disk_gb": { "type": "integer", "minimum": 0 },
-        "min_cpu_cores": { "type": "integer", "minimum": 0 },
-        "glibc": { "type": "string" }
-      }
-    },
-
-    "ports": {
-      "type": "array",
-      "minItems": 1,
-      "items": { "$ref": "#/definitions/port" }
-    },
-
-    "install": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["steps"],
-      "properties": {
-        "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/installStep" } },
-        "cache": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": { "steam_depot": { "type": "boolean", "default": true } }
+        "min_ram_mb": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_disk_gb": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_cpu_cores": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "glibc": {
+          "type": "string"
         }
       }
     },
-
+    "ports": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/port"
+      }
+    },
+    "install": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "steps"
+      ],
+      "properties": {
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/installStep"
+          }
+        },
+        "cache": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "steam_depot": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        }
+      }
+    },
     "start": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["program"],
+      "required": [
+        "program"
+      ],
       "properties": {
-        "program": { "type": "string", "description": "Ausführbare Datei, relativ zum Arbeitsverzeichnis. Keine Shell, keine Argumente darin (I5, I7)." },
-        "args": { "type": "array", "items": { "$ref": "#/definitions/startArg" } },
-        "workdir": { "type": "string", "default": "." },
+        "program": {
+          "type": "string",
+          "description": "Ausführbare Datei, relativ zum Arbeitsverzeichnis. Keine Shell, keine Argumente darin (I5, I7)."
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/startArg"
+          }
+        },
+        "workdir": {
+          "type": "string",
+          "default": "."
+        },
         "extra_args": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "min_role": { "enum": ["owner", "expert"], "default": "expert" },
-            "log": { "type": "boolean", "default": true }
+            "min_role": {
+              "enum": [
+                "owner",
+                "expert"
+              ],
+              "default": "expert"
+            },
+            "log": {
+              "type": "boolean",
+              "default": true
+            }
           }
         },
         "ready_when": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "port": { "type": "string", "description": "Zweck des Ports, der lauschen muss — nicht die Nummer." },
+            "port": {
+              "type": "string",
+              "description": "Zweck des Ports, der lauschen muss — nicht die Nummer."
+            },
             "log_line": {
               "description": "Zeile im Ausgabestrom, die den fertigen Start anzeigt. Als Liste: die erste, die auftaucht, genügt — Spiele melden sich je nach Fassung unterschiedlich (Portal Knights: \"Listening on\" / \"ReadyToServe\" / \"has started\") (E-23).",
               "oneOf": [
-                { "type": "string" },
-                { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
               ]
             },
-            "query": { "type": "boolean", "description": "Erst bereit, wenn die Query antwortet." },
-            "timeout_sec": { "type": "integer", "minimum": 1, "default": 300 }
+            "query": {
+              "type": "boolean",
+              "description": "Erst bereit, wenn die Query antwortet."
+            },
+            "timeout_sec": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 300
+            }
           }
         },
         "stop": {
@@ -389,43 +882,103 @@
           "properties": {
             "sequence": {
               "type": "array",
-              "description": "Der Reihe nach, bis der Prozess weg ist: save | command:<text> | rcon:<text> | sigint | sigterm | sigkill",
-              "items": { "type": "string", "pattern": "^(save|sigint|sigterm|sigkill|command:.+|rcon:.+)$" }
+              "description": "Schritte in der Reihenfolge, in der sie versucht werden. Zeichenkette = alte Schreibweise, weiterhin lesbar; geschrieben wird die Objektform.",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^(save|sigint|sigterm|sigkill|command:.+|rcon:.+)$",
+                    "description": "Alte Schreibweise ohne Frist und ohne terminates."
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "step"
+                    ],
+                    "properties": {
+                      "step": {
+                        "type": "string",
+                        "pattern": "^(save|sigint|sigterm|sigkill|command:.+|rcon:.+)$"
+                      },
+                      "timeout_sec": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Frist für DIESEN Schritt. Fehlt sie, gilt die Vorgabe von 30 s."
+                      },
+                      "terminates": {
+                        "type": "boolean",
+                        "description": "Soll dieser Schritt den Prozess beenden? Fehlt die Angabe, wartet fb-init vorsichtshalber und sagt dazu, dass sie fehlt — geraten wird nicht. Signale beenden immer; bei ihnen ist false ein Fehler."
+                      }
+                    }
+                  }
+                ]
+              }
             },
-            "timeouts_sec": { "type": "array", "items": { "type": "integer", "minimum": 1 } }
-          }
+            "timeouts_sec": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "description": "ALTE Schreibweise: ein paralleles Array neben sequence. Nur noch lesbar, nicht mehr zu schreiben. Es ist bereits schiefgegangen — die drei ARK-Pakete haben vier Schritte und drei Fristen und sagen damit nicht, welche zu welchem gehört. Die Frist gehört zum Schritt."
+            }
+          },
+          "description": "Der Reihe nach, bis der Prozess weg ist. Jeder Schritt trägt seine eigene Frist und die Angabe, ob er beenden SOLL — ein Speicher-Schritt soll das nicht, und wer darauf wartet, verliert bei jedem Stopp Zeit und meldet einen erfolgreichen Schritt als wirkungslos (gemessen am 2026-08-17)."
         }
       }
     },
-
     "env": {
       "description": "Feste Umgebungsvariablen ohne Bedienoberfläche. Alles, was ein Mensch ändern darf, gehört stattdessen nach settings[].",
       "type": "object",
-      "propertyNames": { "$ref": "#/definitions/envKey" },
-      "additionalProperties": { "type": ["string", "number", "boolean"] }
+      "propertyNames": {
+        "$ref": "#/definitions/envKey"
+      },
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
     },
-
-    "settings": { "type": "array", "items": { "$ref": "#/definitions/setting" } },
-
+    "settings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/setting"
+      }
+    },
     "commands": {
       "type": "object",
       "description": "Kern-Befehlsgruppen (B.9). Schlüssel z.B. players.list, players.kick, world.save, broadcast.",
-      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?$" },
-      "additionalProperties": { "$ref": "#/definitions/command" }
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)?$"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/command"
+      }
     },
-
     "content": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["supported"],
+      "required": [
+        "supported"
+      ],
       "properties": {
-        "supported": { "type": "boolean" },
+        "supported": {
+          "type": "boolean"
+        },
         "loader": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "key": { "type": "string" },
-            "installable_as_content": { "type": "boolean", "default": true },
+            "key": {
+              "type": "string"
+            },
+            "installable_as_content": {
+              "type": "boolean",
+              "default": true
+            },
             "adds": {
               "description": "Was der Lader dem Start hinzufügt, wenn er aktiv ist (E-20). Der Daemon setzt es in job.json ein; das Image weiß von Mods nichts.",
               "type": "object",
@@ -433,26 +986,65 @@
               "properties": {
                 "env": {
                   "type": "object",
-                  "propertyNames": { "$ref": "#/definitions/envKey" },
-                  "additionalProperties": { "type": ["string", "number", "boolean"] }
+                  "propertyNames": {
+                    "$ref": "#/definitions/envKey"
+                  },
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ]
+                  }
                 },
-                "args": { "type": "array", "items": { "$ref": "#/definitions/startArg" } }
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/startArg"
+                  }
+                }
               }
             }
           }
         },
-        "sources": { "type": "array", "items": { "enum": ["thunderstore", "modrinth", "curseforge", "steam-workshop", "upload"] } },
-        "path": { "type": "string" },
+        "sources": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "thunderstore",
+              "modrinth",
+              "curseforge",
+              "steam-workshop",
+              "upload"
+            ]
+          }
+        },
+        "path": {
+          "type": "string"
+        },
         "activation": {
-          "enum": ["file_present", "list", "setting", "start"],
+          "enum": [
+            "file_present",
+            "list",
+            "setting",
+            "start"
+          ],
           "description": "Wie ein Inhalt scharf wird. 'start' = der Lader verändert den Start selbst (BepInEx) — siehe loader.adds (E-20)."
         },
-        "order_matters": { "type": "boolean", "default": false },
-        "needs_restart": { "type": "boolean", "default": true },
-        "client_side": { "type": "boolean", "description": "Müssen Mitspieler dasselbe installieren? (B.12)" }
+        "order_matters": {
+          "type": "boolean",
+          "default": false
+        },
+        "needs_restart": {
+          "type": "boolean",
+          "default": true
+        },
+        "client_side": {
+          "type": "boolean",
+          "description": "Müssen Mitspieler dasselbe installieren? (B.12)"
+        }
       }
     },
-
     "management": {
       "type": "object",
       "additionalProperties": false,
@@ -460,57 +1052,121 @@
         "query": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["protocol", "port"],
+          "required": [
+            "protocol",
+            "port"
+          ],
           "properties": {
-            "protocol": { "type": "string", "description": "GameDig-Kennung, z.B. valheim, arkse, palworld." },
-            "port": { "type": "string", "description": "Zweck des Ports, nicht die Nummer." }
+            "protocol": {
+              "type": "string",
+              "description": "GameDig-Kennung, z.B. valheim, arkse, palworld."
+            },
+            "port": {
+              "type": "string",
+              "description": "Zweck des Ports, nicht die Nummer."
+            }
           }
         },
         "rcon": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["protocol", "port"],
+          "required": [
+            "protocol",
+            "port"
+          ],
           "properties": {
-            "protocol": { "enum": ["source", "webrcon", "telnet", "rest"] },
-            "port": { "type": "string" },
-            "password_variable": { "$ref": "#/definitions/envKey" }
+            "protocol": {
+              "enum": [
+                "source",
+                "webrcon",
+                "telnet",
+                "rest"
+              ]
+            },
+            "port": {
+              "type": "string"
+            },
+            "password_variable": {
+              "$ref": "#/definitions/envKey"
+            }
           }
         },
-        "logs": { "type": "array", "items": { "type": "string" } },
-        "saves": { "type": "array", "items": { "type": "string" }, "description": "Was eine Sicherung mitnehmen MUSS." },
-        "mods": { "type": "array", "items": { "type": "string" } },
+        "logs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "saves": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Was eine Sicherung mitnehmen MUSS."
+        },
+        "mods": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "update": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "type": { "enum": ["steamcmd", "download", "none"] },
-            "app": { "type": "integer" }
+            "type": {
+              "enum": [
+                "steamcmd",
+                "download",
+                "none"
+              ]
+            },
+            "app": {
+              "type": "integer"
+            }
           }
         }
       }
     },
-
     "files": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "denylist": { "type": "array", "items": { "type": "string" } },
+        "denylist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "patch": {
           "description": "Dateien, die vor dem Start gesetzt werden — bewährte Parser-Syntax, unverändert übernommen.",
           "type": "object",
           "additionalProperties": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["parser", "find"],
+            "required": [
+              "parser",
+              "find"
+            ],
             "properties": {
-              "parser": { "enum": ["ini", "json", "yaml", "properties", "xml", "text"] },
-              "find": { "type": "object" }
+              "parser": {
+                "enum": [
+                  "ini",
+                  "json",
+                  "yaml",
+                  "properties",
+                  "xml",
+                  "text"
+                ]
+              },
+              "find": {
+                "type": "object"
+              }
             }
           }
         }
       }
     },
-
     "console": {
       "type": "object",
       "additionalProperties": false,
@@ -518,21 +1174,29 @@
         "noise": {
           "description": "Muster, die als uninteressant gelten. Wird AUSGEBLENDET, nicht gelöscht (E-18).",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
-
     "status": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["complete", "open"],
+      "required": [
+        "complete",
+        "open"
+      ],
       "properties": {
-        "complete": { "type": "boolean" },
+        "complete": {
+          "type": "boolean"
+        },
         "open": {
           "description": "Was beim Übersetzen nicht auflösbar war. Ein geratener Wert ist schlimmer als eine gemeldete Lücke.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     }

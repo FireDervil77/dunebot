@@ -226,6 +226,69 @@ function woerter(zeile) {
  * @returns {{program, args, noise, offen}}
  */
 /**
+ * Baut die Stopp-Folge in die Form, die der Auftrag seit dem 2026-08-17 hat:
+ * Schritt, Frist und `terminates` je Eintrag statt zweier paralleler Listen.
+ *
+ * **Warum das parallele Array weg muss** — es ist bereits schiefgegangen, und
+ * zwar hier: Der Übersetzer schrieb `timeouts_sec: [60, 30, 10]` fest, egal wie
+ * lang die Folge war. Bei den drei ARK-Fassungen sind es vier Schritte
+ * (`rcon:saveworld`, `rcon:DoExit`, `sigterm`, `sigkill`) und drei Fristen. Seit
+ * dem Tag ihrer Entstehung sagt dort niemand mehr, welche Frist zu welchem
+ * Schritt gehört.
+ *
+ * **`terminates` wird NICHT geraten.** Nur Signale bekommen `true` — das ist
+ * ihre Definition, keine Ableitung. Bei `command:`- und `rcon:`-Schritten bleibt
+ * die Angabe offen und landet im Befund. fb-init wartet dann vorsichtshalber und
+ * sagt dazu, dass sie fehlt. Ein Namensmuster (»alles mit save«) fiele beim
+ * ersten Spiel um, das seinen Befehl `world.save` oder `persist` nennt.
+ *
+ * **Fristen der Reihe nach**, fehlende bleiben leer statt gefüllt zu werden: Bei
+ * ARK ist objektiv unklar, ob die 10 s zu `sigterm` oder zu `sigkill` gehören.
+ * Wer das auffüllt, erfindet eine Zuordnung und macht sie unumkehrbar.
+ *
+ * @param {string[]} folge    Schritte in ihrer Reihenfolge
+ * @param {number[]} fristen  alte parallele Liste, ggf. zu kurz
+ * @param {string[]} offen    Befundliste des Pakets, wird ergänzt
+ */
+const SIGNALE = new Set(['sigint', 'sigterm', 'sigkill']);
+
+function stoppSchritte(folge, fristen, offen) {
+    const liste = Array.isArray(fristen) ? fristen : [];
+    const ohneAngabe = [];
+
+    const schritte = folge.map((step, i) => {
+        const eintrag = { step };
+        if (liste[i] > 0) eintrag.timeout_sec = liste[i];
+        if (SIGNALE.has(step)) {
+            eintrag.terminates = true;
+        } else {
+            ohneAngabe.push(step);
+        }
+        return eintrag;
+    });
+
+    if (liste.length && liste.length < folge.length) {
+        const fehlend = folge.slice(liste.length);
+        offen.push(
+            `start.stop: Die Quelle nannte ${liste.length} Fristen für ${folge.length} Schritte. ` +
+            `Die vorhandenen wurden der Reihe nach zugeordnet; für ${fehlend.map((s) => `"${s}"`).join(', ')} ` +
+            `bleibt sie offen und es gilt die Vorgabe von 30 s. Nicht aufgefüllt — welche Frist ` +
+            `gemeint war, lässt sich nicht mehr feststellen.`
+        );
+    }
+
+    if (ohneAngabe.length) {
+        offen.push(
+            `start.stop: Für ${ohneAngabe.map((s) => `"${s}"`).join(', ')} ist nicht bekannt, ob der ` +
+            `Schritt den Server beenden soll (terminates). Signale beenden immer, alles andere muss ` +
+            `am laufenden Server geprüft werden — geraten wird es nicht.`
+        );
+    }
+
+    return schritte;
+}
+
+/**
  * Entwirrt Startbefehle, die in Wahrheit ganze Shell-Programme sind.
  *
  * ARK ist der Extremfall: eine Abschaltfunktion mit RCON-Aufrufen, ein `trap`
@@ -255,7 +318,22 @@ function entwirreShell(roh) {
             folge.push(`rcon:${befehlText}`);
         }
         if (folge.length) {
-            stop = { sequence: [...folge, 'sigterm', 'sigkill'], timeouts_sec: [60, 30, 10] };
+            // Die Fristen stehen hier bei ihrem Schritt statt in einer festen
+            // Liste daneben. Vorher war es [60, 30, 10] — unabhängig davon, wie
+            // viele Befehle die Abschaltroutine hergab. Genau daran sind die
+            // ARK-Pakete mit vier Schritten und drei Fristen entstanden.
+            stop = {
+                sequence: [
+                    ...folge.map((step) => ({ step, timeout_sec: 60 })),
+                    { step: 'sigterm', timeout_sec: 30, terminates: true },
+                    { step: 'sigkill', timeout_sec: 10, terminates: true },
+                ],
+            };
+            offen.push(
+                `start.stop: Für ${folge.map((s) => `"${s}"`).join(', ')} ist nicht bekannt, ob der ` +
+                `Schritt den Server beenden soll (terminates) — bei einer geernteten Abschaltroutine ` +
+                `sagt die Quelle darüber nichts.`
+            );
             offen.push(`start.stop: Die Abschaltroutine stand im Startbefehl (Shell-Funktion mit trap). Übernommen als ${folge.join(' → ')} — die Reihenfolge muss am laufenden Server geprüft werden.`);
         } else {
             offen.push('start.stop: Der Startbefehl enthielt eine Abschaltroutine, aus der sich keine Befehle ableiten ließen. Sie ging verloren und muss neu erhoben werden.');
@@ -805,10 +883,13 @@ function uebersetze(gd, kopf) {
                 ...(gd.startup?.done ? { log_line: gd.startup.done } : {}),
             },
             stop: start.stop || {
-                sequence: gd.startup?.stop === '^C' ? ['sigint', 'sigterm', 'sigkill']
-                        : gd.startup?.stop ? [`command:${gd.startup.stop}`, 'sigterm', 'sigkill']
-                        : ['sigterm', 'sigkill'],
-                timeouts_sec: [60, 30, 10],
+                sequence: stoppSchritte(
+                    gd.startup?.stop === '^C' ? ['sigint', 'sigterm', 'sigkill']
+                    : gd.startup?.stop ? [`command:${gd.startup.stop}`, 'sigterm', 'sigkill']
+                    : ['sigterm', 'sigkill'],
+                    [60, 30, 10],
+                    offen,
+                ),
             },
         },
         ...(Object.keys(umgebung).length ? { env: umgebung } : {}),
