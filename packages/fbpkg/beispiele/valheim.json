@@ -1,6 +1,5 @@
 {
   "format": "FBPKG_v1",
-
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
@@ -17,16 +16,16 @@
       "imported_at": "2026-08-15"
     }
   },
-
   "image": {
     "ref": "ghcr.io/parkervcp/games",
     "tag": "valheim",
     "digest": "sha256:483216c5b8f113c0953af96a5ed837c2db63d4b30ecbec8871066b4443cec567",
     "pinned_at": "2026-08-15",
     "platform": "linux",
-    "arch": ["amd64"]
+    "arch": [
+      "amd64"
+    ]
   },
-
   "ports": [
     {
       "purpose": "game",
@@ -34,7 +33,10 @@
       "assign": "pool",
       "required": true,
       "variable": "SERVER_PORT",
-      "description": { "de": "Spielport", "en": "Game port" }
+      "description": {
+        "de": "Spielport",
+        "en": "Game port"
+      }
     },
     {
       "purpose": "query",
@@ -47,7 +49,6 @@
       }
     }
   ],
-
   "install": {
     "steps": [
       {
@@ -56,57 +57,152 @@
         "login": false,
         "validate": true,
         "branch": "{{SRCDS_BETAID}}",
-        "description": { "de": "Serverdateien über SteamCMD laden (anonym)." }
+        "description": {
+          "de": "Serverdateien über SteamCMD laden (anonym)."
+        }
       }
     ],
-    "cache": { "steam_depot": true }
+    "cache": {
+      "steam_depot": true
+    }
   },
-
   "start": {
     "program": "./valheim_server.x86_64",
     "workdir": ".",
     "args": [
-      { "key": "nographics",   "form": "-nographics",                        "from": "fixed" },
-      { "key": "batchmode",    "form": "-batchmode",                         "from": "fixed" },
-      { "key": "name",         "form": ["-name", "{{value}}"],               "from": "setting:name" },
-      { "key": "port",         "form": ["-port", "{{value}}"],               "from": "port:game" },
-      { "key": "world",        "form": ["-world", "{{value}}"],              "from": "setting:world_name" },
-      { "key": "password",     "form": ["-password", "{{value}}"],           "from": "setting:password" },
-      { "key": "public",       "form": ["-public", "{{value}}"],             "from": "setting:public_listing" },
-      { "key": "saveinterval", "form": ["-saveinterval", "{{value}}"],       "from": "setting:autosave_seconds" },
-      { "key": "backups",      "form": ["-backups", "{{value}}"],            "from": "setting:backup_count" },
-      { "key": "backupshort",  "form": ["-backupshort", "{{value}}"],        "from": "setting:backup_short_seconds" },
-      { "key": "backuplong",   "form": ["-backuplong", "{{value}}"],         "from": "setting:backup_long_seconds" },
-      { "key": "crossplay",    "form": "-crossplay",                         "from": "setting:crossplay", "when": "true" }
+      {
+        "key": "nographics",
+        "form": "-nographics",
+        "from": "fixed"
+      },
+      {
+        "key": "batchmode",
+        "form": "-batchmode",
+        "from": "fixed"
+      },
+      {
+        "key": "name",
+        "form": [
+          "-name",
+          "{{value}}"
+        ],
+        "from": "setting:name"
+      },
+      {
+        "key": "port",
+        "form": [
+          "-port",
+          "{{value}}"
+        ],
+        "from": "port:game"
+      },
+      {
+        "key": "world",
+        "form": [
+          "-world",
+          "{{value}}"
+        ],
+        "from": "setting:world_name"
+      },
+      {
+        "key": "password",
+        "form": [
+          "-password",
+          "{{value}}"
+        ],
+        "from": "setting:password"
+      },
+      {
+        "key": "public",
+        "form": [
+          "-public",
+          "{{value}}"
+        ],
+        "from": "setting:public_listing"
+      },
+      {
+        "key": "saveinterval",
+        "form": [
+          "-saveinterval",
+          "{{value}}"
+        ],
+        "from": "setting:autosave_seconds"
+      },
+      {
+        "key": "backups",
+        "form": [
+          "-backups",
+          "{{value}}"
+        ],
+        "from": "setting:backup_count"
+      },
+      {
+        "key": "backupshort",
+        "form": [
+          "-backupshort",
+          "{{value}}"
+        ],
+        "from": "setting:backup_short_seconds"
+      },
+      {
+        "key": "backuplong",
+        "form": [
+          "-backuplong",
+          "{{value}}"
+        ],
+        "from": "setting:backup_long_seconds"
+      },
+      {
+        "key": "crossplay",
+        "form": "-crossplay",
+        "from": "setting:crossplay",
+        "when": "true"
+      }
     ],
-    "extra_args": { "min_role": "expert", "log": true },
+    "extra_args": {
+      "min_role": "expert",
+      "log": true
+    },
     "ready_when": {
-      "port": "game",
+      "port": "query",
       "log_line": "ready",
-      "timeout_sec": 300
+      "timeout_sec": 900
     },
     "stop": {
-      "sequence": ["sigint", "sigterm", "sigkill"],
-      "timeouts_sec": [60, 30, 10]
+      "sequence": [
+        "sigint",
+        "sigterm",
+        "sigkill"
+      ],
+      "timeouts_sec": [
+        60,
+        30,
+        10
+      ]
     }
   },
-
   "env": {
     "LD_LIBRARY_PATH": "./linux64"
   },
-
   "settings": [
     {
       "key": "name",
       "group": "identity",
-      "name": { "de": "Servername", "en": "Server name" },
+      "name": {
+        "de": "Servername",
+        "en": "Server name"
+      },
       "description": {
         "de": "So heißt der Server in der Serverliste.",
         "en": "How the server appears in the server browser."
       },
       "type": "text",
       "default": "My Server",
-      "apply": [{ "target": "arg" }],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
       "takes_effect": "restart",
       "risk": "none",
       "role": "player"
@@ -114,14 +210,21 @@
     {
       "key": "password",
       "group": "access",
-      "name": { "de": "Beitrittskennwort", "en": "Join password" },
+      "name": {
+        "de": "Beitrittskennwort",
+        "en": "Join password"
+      },
       "description": {
         "de": "Ohne dieses Kennwort kommt niemand auf den Server. Mindestens fünf Zeichen, und es darf nicht im Servernamen vorkommen.",
         "en": "Nobody joins without this password. At least five characters, and it must not appear in the server name."
       },
       "type": "password",
       "default": "secret",
-      "apply": [{ "target": "arg" }],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
       "takes_effect": "restart",
       "risk": "none",
       "role": "player"
@@ -129,14 +232,21 @@
     {
       "key": "world_name",
       "group": "world",
-      "name": { "de": "Weltname", "en": "World name" },
+      "name": {
+        "de": "Weltname",
+        "en": "World name"
+      },
       "description": {
         "de": "Welche Welt geladen wird. Ein neuer Name erzeugt eine NEUE, leere Welt — die alte bleibt erhalten und ist über ihren Namen wieder erreichbar.",
         "en": "Which world to load. A new name creates a NEW, empty world — the old one is kept and can be reached again by its name."
       },
       "type": "text",
       "default": "Dedicated",
-      "apply": [{ "target": "arg" }],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
       "takes_effect": "new_world",
       "risk": "progress",
       "role": "owner"
@@ -144,7 +254,10 @@
     {
       "key": "public_listing",
       "group": "identity",
-      "name": { "de": "Öffentlich sichtbar", "en": "Public listing" },
+      "name": {
+        "de": "Öffentlich sichtbar",
+        "en": "Public listing"
+      },
       "description": {
         "de": "Steht der Server in der öffentlichen Liste? Aus heißt: nur über direkte Verbindung erreichbar.",
         "en": "Is the server listed publicly? Off means: reachable only by direct connect."
@@ -152,31 +265,58 @@
       "type": "choice",
       "default": "1",
       "choices": [
-        { "value": "1", "name": { "de": "Sichtbar", "en": "Listed" }, "default": true },
-        { "value": "0", "name": { "de": "Versteckt", "en": "Hidden" } }
+        {
+          "value": "1",
+          "name": {
+            "de": "Sichtbar",
+            "en": "Listed"
+          },
+          "default": true
+        },
+        {
+          "value": "0",
+          "name": {
+            "de": "Versteckt",
+            "en": "Hidden"
+          }
+        }
       ],
-      "apply": [{ "target": "arg" }],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
       "takes_effect": "restart",
       "role": "player"
     },
     {
       "key": "crossplay",
       "group": "access",
-      "name": { "de": "Crossplay", "en": "Crossplay" },
+      "name": {
+        "de": "Crossplay",
+        "en": "Crossplay"
+      },
       "description": {
         "de": "Erlaubt Beitritt von Xbox und Game Pass. Ohne Crossplay verbinden sich Steam-Spieler zuverlässiger.",
         "en": "Allows Xbox and Game Pass players to join. Without crossplay, Steam players connect more reliably."
       },
       "type": "boolean",
       "default": true,
-      "apply": [{ "target": "arg" }],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
       "takes_effect": "restart",
       "role": "player"
     },
     {
       "key": "autosave_seconds",
       "group": "comfort",
-      "name": { "de": "Speicherabstand", "en": "Save interval" },
+      "name": {
+        "de": "Speicherabstand",
+        "en": "Save interval"
+      },
       "description": {
         "de": "Wie oft die Welt gesichert wird. Kürzer heißt weniger Verlust bei einem Absturz, aber häufigere kurze Ruckler.",
         "en": "How often the world is saved. Shorter means less loss on a crash, but more frequent brief stutters."
@@ -184,18 +324,44 @@
       "type": "choice",
       "default": "1800",
       "choices": [
-        { "value": "600",  "name": { "de": "Alle 10 Minuten", "en": "Every 10 minutes" } },
-        { "value": "1800", "name": { "de": "Alle 30 Minuten", "en": "Every 30 minutes" }, "default": true },
-        { "value": "3600", "name": { "de": "Jede Stunde", "en": "Every hour" } }
+        {
+          "value": "600",
+          "name": {
+            "de": "Alle 10 Minuten",
+            "en": "Every 10 minutes"
+          }
+        },
+        {
+          "value": "1800",
+          "name": {
+            "de": "Alle 30 Minuten",
+            "en": "Every 30 minutes"
+          },
+          "default": true
+        },
+        {
+          "value": "3600",
+          "name": {
+            "de": "Jede Stunde",
+            "en": "Every hour"
+          }
+        }
       ],
-      "apply": [{ "target": "arg" }],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
       "takes_effect": "restart",
       "role": "player"
     },
     {
       "key": "backup_count",
       "group": "comfort",
-      "name": { "de": "Anzahl Sicherungen", "en": "Backup count" },
+      "name": {
+        "de": "Anzahl Sicherungen",
+        "en": "Backup count"
+      },
       "description": {
         "de": "Wie viele Weltsicherungen das Spiel selbst aufbewahrt. Unabhängig von unseren Sicherungen.",
         "en": "How many world backups the game itself keeps. Independent of our own backups."
@@ -204,63 +370,96 @@
       "default": 4,
       "min": 0,
       "max": 20,
-      "apply": [{ "target": "arg" }],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
       "takes_effect": "restart",
       "role": "owner"
     },
     {
       "key": "backup_short_seconds",
       "group": "comfort",
-      "name": { "de": "Abstand erste Sicherung", "en": "First backup interval" },
+      "name": {
+        "de": "Abstand erste Sicherung",
+        "en": "First backup interval"
+      },
       "type": "number",
       "default": 7200,
       "min": 60,
-      "apply": [{ "target": "arg" }],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
       "takes_effect": "restart",
       "role": "expert"
     },
     {
       "key": "backup_long_seconds",
       "group": "comfort",
-      "name": { "de": "Abstand weitere Sicherungen", "en": "Later backup interval" },
+      "name": {
+        "de": "Abstand weitere Sicherungen",
+        "en": "Later backup interval"
+      },
       "type": "number",
       "default": 43200,
       "min": 60,
-      "apply": [{ "target": "arg" }],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
       "takes_effect": "restart",
       "role": "expert"
     },
     {
       "key": "auto_update",
       "group": "upkeep",
-      "name": { "de": "Automatisch aktualisieren", "en": "Auto update" },
+      "name": {
+        "de": "Automatisch aktualisieren",
+        "en": "Auto update"
+      },
       "description": {
         "de": "Spieldateien beim Start auf den neuesten Stand bringen.",
         "en": "Update game files on start."
       },
       "type": "boolean",
       "default": true,
-      "apply": [{ "target": "env", "variable": "AUTO_UPDATE" }],
+      "apply": [
+        {
+          "target": "env",
+          "variable": "AUTO_UPDATE"
+        }
+      ],
       "takes_effect": "restart",
       "role": "owner"
     },
     {
       "key": "beta_branch",
       "group": "upkeep",
-      "name": { "de": "Beta-Zweig", "en": "Beta branch" },
+      "name": {
+        "de": "Beta-Zweig",
+        "en": "Beta branch"
+      },
       "description": {
         "de": "Leer lassen, außer man weiß genau, warum nicht.",
         "en": "Leave empty unless you know exactly why not."
       },
       "type": "text",
       "default": "",
-      "apply": [{ "target": "env", "variable": "SRCDS_BETAID" }],
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SRCDS_BETAID"
+        }
+      ],
       "takes_effect": "restart",
       "risk": "progress",
       "role": "expert"
     }
   ],
-
   "commands": {
     "players.list": {
       "via": "query",
@@ -294,25 +493,35 @@
       }
     }
   },
-
   "content": {
     "supported": false
   },
-
   "management": {
-    "query": { "protocol": "valheim", "port": "query" },
-    "saves": [".config/unity3d/IronGate/Valheim/worlds_local"],
-    "update": { "type": "steamcmd", "app": 896660 }
+    "query": {
+      "protocol": "valheim",
+      "port": "query"
+    },
+    "saves": [
+      ".config/unity3d/IronGate/Valheim/worlds_local"
+    ],
+    "update": {
+      "type": "steamcmd",
+      "app": 896660
+    }
   },
-
   "files": {
-    "denylist": [".env", "start.sh", "firebot.lock", "firebot.pid"]
+    "denylist": [
+      ".env",
+      "start.sh",
+      "firebot.lock",
+      "firebot.pid"
+    ]
   },
-
   "console": {
-    "noise": ["^\\(Filename:.*Line:\\s+\\d+\\)$"]
+    "noise": [
+      "^\\(Filename:.*Line:\\s+\\d+\\)$"
+    ]
   },
-
   "status": {
     "complete": false,
     "open": [
