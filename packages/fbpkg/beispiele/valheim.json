@@ -166,6 +166,7 @@
     "ready_when": {
       "port": "query",
       "log_line": "ready",
+      "query": true,
       "timeout_sec": 900
     },
     "stop": {

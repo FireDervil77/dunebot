@@ -1070,10 +1070,6 @@
         "rcon": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "protocol",
-            "port"
-          ],
           "properties": {
             "protocol": {
               "enum": [
@@ -1087,7 +1083,8 @@
               "type": "string"
             },
             "password_variable": {
-              "$ref": "#/definitions/envKey"
+              "$ref": "#/definitions/envKey",
+              "description": "Die Umgebungsvariable, aus der das RCON-Passwort gelesen wird — z.B. RCON_PASSWORD. Das Passwort selbst steht NIE im Paket und NIE im Auftrag; es liegt in der Container-Umgebung. Eine Einstellung muss es dort auch wirklich hinschreiben (apply mit target env und derselben variable), sonst meldet fb-rcon eine leere Variable. Geraten wird nichts: Fehlt die Angabe, kann die Fernsteuerung sich nicht anmelden, und das wird gesagt."
             }
           }
         },
