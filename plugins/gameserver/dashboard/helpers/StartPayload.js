@@ -58,6 +58,31 @@ function ladeUebergang(slug) {
 }
 
 /**
+ * Die Image-Adresse aus dem Paket — gepinnt, wenn möglich.
+ *
+ * Der Daemon nimmt sein Container-Image AUSSCHLIESSLICH aus
+ * `game_data.docker_image` (`websocket/client.go:1411` → `srv.SetImage`). Das
+ * Paket trägt seine Adresse in `image`, und beides auseinanderlaufen zu lassen
+ * ist genau die Falle, in die der erste Startversuch am 2026-08-18 gelaufen ist:
+ * Das Paket zeigte auf `fb/steamcmd`, gestartet wurde `ghcr.io/parkervcp` — ein
+ * Image ohne `fb-init`, also ohne alles.
+ *
+ * Deshalb gewinnt bei angehängtem Paket das Paket. Bevorzugt wird der **Digest**
+ * (`ref@sha256:…`): Ein Tag kann wandern, ein Digest nicht.
+ *
+ * @param {object} paket
+ * @returns {string|null}
+ * @private
+ */
+function imageAusPaket(paket) {
+    const img = paket?.image;
+    if (!img?.ref) return null;
+    if (img.digest) return `${img.ref}@${img.digest}`;
+    if (img.tag)    return `${img.ref}:${img.tag}`;
+    return img.ref;
+}
+
+/**
  * Baut `package` und `settings` für die Start-Payload — oder verweigert.
  *
  * ── Die Sperre, und warum sie existiert ─────────────────────────────────────
@@ -378,6 +403,26 @@ function buildStartPayload(server, guildId, Logger = null) {
     if (spielpaket) {
         payload.package  = spielpaket.paket;
         payload.settings = spielpaket.settings;
+
+        // Das Image kommt jetzt aus dem Paket, nicht aus frozen_game_data.
+        // Ohne diese Zeile startet der Daemon das ALTE Image und findet darin
+        // kein fb-init — der Startversuch vom 2026-08-18 ist genau daran
+        // gescheitert. Das Feld selbst verschwindet mit frozen_game_data (5a);
+        // bis dahin wird es aus dem Paket gefüllt statt daneben gepflegt.
+        const paketImage = imageAusPaket(spielpaket.paket);
+        if (paketImage) {
+            if (paketImage !== dockerImage) {
+                melde(`[StartPayload] Server ${serverId}: Image kommt aus dem Paket — `
+                    + `${paketImage} (statt ${dockerImage})`);
+            }
+            payload.game_data.docker_image = paketImage;
+            dockerImage = paketImage;
+        } else {
+            warn(`[StartPayload] Server ${serverId}: Paket ${server.paket_slug} nennt kein `
+               + `image.ref — es bleibt bei ${dockerImage}. Enthält das Image kein fb-init, `
+               + 'startet der Server nicht.');
+        }
+
         melde(`[StartPayload] Server ${serverId}: Paket ${server.paket_slug} `
             + `${server.paket_version} (${server.paket_channel}) angehängt — `
             + `${Object.keys(spielpaket.settings).length} von `
