@@ -199,6 +199,10 @@ function waehleDockerImage(dockerImages) {
 function buildStartPayload(server, guildId, Logger = null) {
     const warn  = (msg) => Logger?.warn?.(msg);
     const debug = (msg) => Logger?.debug?.(msg);
+    // Absichtlich info und nicht debug: Diese eine Zeile ist der Beleg dafür,
+    // dass der neue Weg wirklich greift. Wer beim ersten Ausrollen zusehen will,
+    // soll dafür nicht erst die Protokollstufe hochdrehen müssen.
+    const melde = (msg) => (Logger?.info ? Logger.info(msg) : Logger?.debug?.(msg));
 
     const serverId = server.id;
     const ports        = parseJson(server.ports, {}, e => warn(`[StartPayload] ports: ${e.message}`)) || {};
@@ -374,9 +378,11 @@ function buildStartPayload(server, guildId, Logger = null) {
     if (spielpaket) {
         payload.package  = spielpaket.paket;
         payload.settings = spielpaket.settings;
-        debug(`[StartPayload] Paket ${server.paket_slug} ${server.paket_version} `
-            + `(${server.paket_channel}) angehängt, `
-            + `${Object.keys(spielpaket.settings).length} Werte zugeordnet`);
+        melde(`[StartPayload] Server ${serverId}: Paket ${server.paket_slug} `
+            + `${server.paket_version} (${server.paket_channel}) angehängt — `
+            + `${Object.keys(spielpaket.settings).length} von `
+            + `${(spielpaket.paket.settings || []).length} Werten zugeordnet. `
+            + `Der Server startet über fb-init.`);
     }
 
     return { payload, error: null, dockerImage, startupCommand, ports, envVariables };
