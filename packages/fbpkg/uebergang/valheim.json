@@ -1,0 +1,35 @@
+{
+  "format": "FBUEB_v1",
+  "slug": "valheim",
+  "gilt_bis": "Stufe 5a — gameservers speichert Werte nach Paketschlüsseln",
+  "warum": [
+    "Ein Paket nennt seine Einstellungen bei den EIGENEN Schlüsseln (name, world_name, …).",
+    "Ein Bestandsserver hat seine Werte unter den EGG-Namen gespeichert (SERVER_NAME, WORLD, …).",
+    "Zwischen beiden gibt es keine Brücke: start.args verweist auf 'setting:world_name',",
+    "aber nirgends steht, dass dieser Wert einmal aus WORLD kam. Der Übersetzer hat die",
+    "Herkunft nicht mitgeschrieben.",
+    "",
+    "Ohne diese Brücke bekäme der Daemon die VORGABEN des Pakets — und die Vorgabe für",
+    "world_name ist 'Dedicated', während der laufende Server 'BoomTown' spielt. Valheim",
+    "erzeugt bei einem unbekannten Weltnamen eine NEUE, LEERE Welt. Genau der Verlust,",
+    "gegen den dieses ganze Vorhaben antritt.",
+    "",
+    "Diese Datei stirbt mit 5a. Sie steht bewusst NEBEN dem Paketformat und nicht darin:",
+    "Ein Paket beschreibt ein Spiel, nicht die Geschichte unserer Datenbank."
+  ],
+  "zuordnung": {
+    "name":                 "SERVER_NAME",
+    "password":             "PASSWORD",
+    "world_name":           "WORLD",
+    "public_listing":       "PUBLIC_SERVER",
+    "crossplay":            "ENABLE_CROSSPLAY",
+    "autosave_seconds":     "BACKUP_INTERVAL",
+    "backup_count":         "BACKUP_COUNT",
+    "backup_short_seconds": "BACKUP_SHORTTIME",
+    "backup_long_seconds":  "BACKUP_LONGTIME",
+    "auto_update":          "AUTO_UPDATE",
+    "beta_branch":          "SRCDS_BETAID"
+  },
+  "geprueft_am": "2026-08-18",
+  "geprueft_gegen": "gameservers #108 (Valheim, rs49) — alle elf Schlüssel haben dort einen Wert"
+}

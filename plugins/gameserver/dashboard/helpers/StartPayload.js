@@ -14,7 +14,123 @@
 
 'use strict';
 
+const fs   = require('fs');
+const path = require('path');
+
 const { resolveUpdateOptions } = require('./UpdateOptions');
+
+/** Wo die Übergangs-Zuordnungen liegen (packages/fbpkg/uebergang/<slug>.json). */
+const UEBERGANG_ORDNER = path.join(__dirname, '../../../../packages/fbpkg/uebergang');
+
+/** Einmal gelesen, dann behalten — die Dateien ändern sich zur Laufzeit nicht. */
+const uebergangCache = new Map();
+
+/**
+ * Lädt die Übergangs-Zuordnung „Paketschlüssel → Egg-Variablenname".
+ *
+ * WARUM ES SIE GIBT: Ein Paket nennt seine Einstellungen bei den eigenen
+ * Schlüsseln (`world_name`), ein Bestandsserver hat den Wert unter dem
+ * Egg-Namen gespeichert (`WORLD`). Zwischen beiden gibt es keine Brücke —
+ * `start.args` verweist auf `setting:world_name`, aber nirgends steht, dass
+ * dieser Wert einmal aus `WORLD` kam. Der Übersetzer hat die Herkunft nicht
+ * mitgeschrieben.
+ *
+ * Diese Zuordnung stirbt mit 5a, sobald `gameservers` die Werte unter den
+ * Paketschlüsseln speichert.
+ *
+ * @param {string} slug
+ * @returns {object|null} Zuordnung oder null, wenn es keine gibt
+ * @private
+ */
+function ladeUebergang(slug) {
+    if (uebergangCache.has(slug)) return uebergangCache.get(slug);
+    let zuordnung = null;
+    try {
+        const datei = path.join(UEBERGANG_ORDNER, `${slug}.json`);
+        if (fs.existsSync(datei)) {
+            zuordnung = JSON.parse(fs.readFileSync(datei, 'utf8')).zuordnung || null;
+        }
+    } catch {
+        zuordnung = null;   // Der Aufrufer meldet es — hier wird nichts verschluckt
+    }
+    uebergangCache.set(slug, zuordnung);
+    return zuordnung;
+}
+
+/**
+ * Baut `package` und `settings` für die Start-Payload — oder verweigert.
+ *
+ * ── Die Sperre, und warum sie existiert ─────────────────────────────────────
+ *
+ * Ohne Werte benutzt der Daemon die VORGABEN des Pakets. Bei Valheim steht dort
+ * `world_name: "Dedicated"`, während der laufende Server `BoomTown` spielt —
+ * und Valheim erzeugt bei einem unbekannten Weltnamen eine NEUE, LEERE Welt.
+ * Ein stiller Rückfall auf Vorgaben kostet also einen Weltstand.
+ *
+ * Deshalb: Fehlt einer Einstellung mit `risk: progress` oder `world_reset` der
+ * Wert, wird das Paket NICHT angehängt. Der Server geht dann den alten Weg
+ * (`startup_command` liegt weiterhin bei) und die Meldung sagt, welcher
+ * Schlüssel fehlte. Melden statt ausweichen.
+ *
+ * @param {object} server        - Zeile aus gameservers samt Paket-JOIN
+ * @param {object} envVariables  - die gespeicherten Werte (Egg-Namen)
+ * @param {function} melde       - Logger-Ausgabe
+ * @returns {{paket: object, settings: object}|null}
+ * @private
+ */
+function baueSpielpaket(server, envVariables, melde) {
+    if (!server.paket_json) return null;
+
+    let paket;
+    try {
+        paket = typeof server.paket_json === 'string'
+              ? JSON.parse(server.paket_json) : server.paket_json;
+    } catch (err) {
+        melde(`[StartPayload] Paket ${server.paket_slug} nicht lesbar: ${err.message} — `
+            + 'der alte Weg bleibt.');
+        return null;
+    }
+
+    const zuordnung = ladeUebergang(server.paket_slug);
+    if (!zuordnung) {
+        melde(`[StartPayload] Für "${server.paket_slug}" gibt es keine Übergangs-Zuordnung `
+            + `(packages/fbpkg/uebergang/${server.paket_slug}.json). Ohne sie liessen sich die `
+            + 'gespeicherten Werte nicht zuordnen — der alte Weg bleibt.');
+        return null;
+    }
+
+    const settings = {};
+    const fehlend  = [];
+    for (const eintrag of paket.settings || []) {
+        const quelle = zuordnung[eintrag.key];
+        const wert   = quelle ? envVariables[quelle] : undefined;
+        // Ein leerer String ist ein WERT (SRCDS_BETAID="" heisst "kein Beta-Zweig").
+        // Nur `undefined` heisst "nicht vorhanden".
+        if (wert === undefined) {
+            fehlend.push({ key: eintrag.key, quelle: quelle || '(nicht zugeordnet)',
+                           risk: eintrag.risk });
+            continue;
+        }
+        settings[eintrag.key] = String(wert);
+    }
+
+    const gefaehrlich = fehlend.filter(f => f.risk === 'progress' || f.risk === 'world_reset');
+    if (gefaehrlich.length) {
+        melde(`[StartPayload] Paket ${server.paket_slug} NICHT angehängt: `
+            + gefaehrlich.map(f => `"${f.key}" (aus ${f.quelle}, Risiko ${f.risk})`).join(', ')
+            + ' hat keinen Wert. Der Daemon würde die Paketvorgabe nehmen, und die kostet '
+            + 'hier einen Weltstand. Der alte Weg bleibt.');
+        return null;
+    }
+    if (fehlend.length) {
+        melde(`[StartPayload] Paket ${server.paket_slug}: ${fehlend.length} Einstellung(en) ohne `
+            + `Wert (${fehlend.map(f => f.key).join(', ')}) — der Daemon nimmt dort die Vorgabe. `
+            + 'Kein Risiko hinterlegt, deshalb kein Abbruch.');
+    }
+
+    return { paket, settings };
+}
+
 
 /** @private */
 function parseJson(value, fallback, onError) {
@@ -245,6 +361,24 @@ function buildStartPayload(server, guildId, Logger = null) {
         },
     };
 
+    // ── Der neue Weg: das Spielpaket mitschicken ────────────────────────────
+    //
+    // Liegt eines bei, baut der Daemon daraus einen Auftrag und startet über
+    // fb-init statt über die Startzeile. `startup_command` bleibt trotzdem in
+    // der Payload: Die INSTALLATION liest es weiterhin (install.go), und ein
+    // Feld zu früh zu entfernen bräche die Neuanlage jedes Servers.
+    //
+    // Fehlt das Paket oder verweigert die Sperre, bleibt es beim alten Weg —
+    // gemeldet, nicht verschwiegen.
+    const spielpaket = baueSpielpaket(server, envVariables, warn);
+    if (spielpaket) {
+        payload.package  = spielpaket.paket;
+        payload.settings = spielpaket.settings;
+        debug(`[StartPayload] Paket ${server.paket_slug} ${server.paket_version} `
+            + `(${server.paket_channel}) angehängt, `
+            + `${Object.keys(spielpaket.settings).length} Werte zugeordnet`);
+    }
+
     return { payload, error: null, dockerImage, startupCommand, ports, envVariables };
 }
 
@@ -263,16 +397,35 @@ async function loadServerForStart(dbService, serverId, guildId = null) {
         where += ' AND gs.guild_id = ?';
         params.push(guildId);
     }
+    // Das Spielpaket kommt über `packages.id = gs.addon_marketplace_id` — die
+    // Einlieferung übernimmt die Kennung des Vorgängers ausdrücklich dafür
+    // (siehe scripts/liefere-pakete.js). Ab 5a trägt `gameservers` stattdessen
+    // `package_slug` und `channel`; bis dahin ist die Kennung die Brücke.
+    //
+    // Welche Fassung: `stable` schlägt `test`, danach die neueste. Solange
+    // `gameservers.channel` nicht existiert, ist das die ehrlichste Regel —
+    // sie bevorzugt das Freigegebene und nimmt sonst, was da ist.
     const [row] = await dbService.query(`
         SELECT gs.*,
                r.daemon_id, r.id AS rootserver_id, r.system_user,
-               am.slug AS addon_slug, am.steam_app_id, am.steam_server_app_id
+               am.slug AS addon_slug, am.steam_app_id, am.steam_server_app_id,
+               pk.slug AS paket_slug,
+               pv.fbpkg AS paket_json, pv.version AS paket_version,
+               pv.channel AS paket_channel, pv.checksum AS paket_checksum
         FROM gameservers gs
         LEFT JOIN rootserver r ON gs.rootserver_id = r.id
         LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
+        LEFT JOIN packages pk ON pk.id = gs.addon_marketplace_id
+        LEFT JOIN package_versions pv ON pv.id = (
+            SELECT v.id FROM package_versions v
+             WHERE v.package_id = pk.id
+             ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
+             LIMIT 1
+        )
         WHERE ${where}
     `, params);
     return row || null;
 }
 
-module.exports = { buildStartPayload, loadServerForStart, waehleDockerImage };
+module.exports = { buildStartPayload, loadServerForStart, waehleDockerImage,
+                   baueSpielpaket, ladeUebergang };

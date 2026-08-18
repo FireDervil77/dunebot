@@ -17,10 +17,10 @@
     }
   },
   "image": {
-    "ref": "ghcr.io/parkervcp/games",
-    "tag": "valheim",
-    "digest": "sha256:483216c5b8f113c0953af96a5ed837c2db63d4b30ecbec8871066b4443cec567",
-    "pinned_at": "2026-08-15",
+    "ref": "registry.firenetworks.de/fb/steamcmd",
+    "tag": "2026.08",
+    "digest": "sha256:f84d7ea2c2e97570cda050d939e4bd4466a63656caa66b130eb008e22c9f3733",
+    "pinned_at": "2026-08-18",
     "platform": "linux",
     "arch": [
       "amd64"
@@ -537,7 +537,6 @@
       "management.saves: Pfad aus der Spieldokumentation übernommen, am laufenden Server noch nicht geprüft.",
       "management.logs: Valheim schreibt keine eigene Logdatei; Ausgabe kommt nur über die Konsole.",
       "content: BepInEx wird heute über ein zweites Addon abgebildet (valheim-bepinex). Nach B.12 gehört der Lader als Inhalt hierher.",
-      "image: zeigt noch auf ghcr.io/parkervcp — Umstellung auf fb/steamcmd erfolgt in Stufe 2.",
       "commands.players.ban: bannedlist.txt und das Eintragsformat [Plattform]_[Kennung] sind durch die offizielle Dokumentation belegt (siehe referenz/valheim.json). Am laufenden Server ist beides weiterhin ungeprüft — Doku ist kein Nachweis.",
       "commands.players.ban: Die Datei liegt im Speicherverzeichnis. Wird -savedir gesetzt, wandert sie mit — dann greift ein fester Pfad ins Leere."
     ]
