@@ -12,7 +12,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
-const { buildStartPayload, loadServerForStart } = require('../helpers/StartPayload');
+const { buildStartPayload, loadServerForStart, paketFuerInstall } = require('../helpers/StartPayload');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
 const PanelService = require('../helpers/PanelService');
 const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');
@@ -747,10 +747,30 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         // Alle variable_* Fields aus req.body sammeln (Key ist der ENV-Variable-Name, z.B. SERVER_NAME)
         // Anschliessend Defaults für fehlende Variablen aus game_data.variables ergänzen
         const envVariables = {};
-        // Zuerst alle Defaults aus game_data.variables als Basis
+        // Zuerst alle Defaults aus game_data.variables als Basis.
+        //
+        // ── Warum hier beide Gestalten geprüft werden ────────────────────────
+        //
+        // Hier stand nur `Array.isArray(gameData.variables)` — und dieser Zweig
+        // war UNERREICHBAR: Oben (Punkt 3 der Normalisierung) wird `variables`
+        // von der Liste in eine Map umgewandelt, bevor diese Zeile läuft.
+        //
+        // Die Folge war nicht harmlos. Das Formular überspringt Variablen mit
+        // `user_editable === false` (server-create-step2.ejs) und schickt sie
+        // deshalb nicht mit. Ihre Vorgabe sollte von hier kommen — kam aber
+        // nirgends her. Bei Valheim betrifft das unter anderem
+        // LD_LIBRARY_PATH und CONSOLE_FILTER.
+        //
+        // Gemessen am 2026-08-19 beim Bau des Schritt-Ausführers, weil dessen
+        // Platzhalter (z.B. {{SRCDS_BETAID}}) aus genau diesen Werten aufgelöst
+        // werden.
         if (Array.isArray(gameData.variables)) {
             for (const v of gameData.variables) {
                 if (v.env_variable) envVariables[v.env_variable] = v.default_value ?? '';
+            }
+        } else if (gameData.variables && typeof gameData.variables === 'object') {
+            for (const [k, v] of Object.entries(gameData.variables)) {
+                envVariables[k] = v ?? '';
             }
         }
         // Dann User-Eingaben aus dem Formular überschreiben (höchste Priorität)
@@ -1170,6 +1190,18 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                     templateName
                 });
 
+                // ── Das Spielpaket, wenn es eines gibt ──────────────────────
+                //
+                // Es entscheidet im Daemon über den ganzen Installationsweg:
+                // Mit Paket läuft das Rezept im Laufzeit-Image nach game/, ohne
+                // Paket das Egg-Skript im Fremd-Image nach /mnt/server.
+                //
+                // Der Umschalter ist die NUTZLAST und keine Einstellung — so
+                // wandert jeder Server genau dann mit, wenn sein Paket steht,
+                // und niemand muss einen Schalter nachziehen.
+                const paket = await paketFuerInstall(
+                    dbService, addon.id, Logger, `Server ${serverId} anlegen`);
+
                 // DEBUG: Payload loggen
                 const installPayload = {
                     server_id: serverId.toString(),
@@ -1184,6 +1216,8 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                     ports,
                     env_variables: envVariables,
                     game_data: gameData,
+                    // Das Paket. Ist es null, gilt im Daemon der alte Weg.
+                    package: paket,
                     // platform als eigenständiges Feld (Belt-and-suspenders neben game_data.platform)
                     platform: gameData.platform || 'linux',
                     run_install: toBool(run_install, true),
@@ -2969,6 +3003,9 @@ router.post('/:serverId/retry-installation', requirePermission('GAMESERVER.CREAT
             addonSlug: server.addon_slug
         });
 
+        const paketErneut = await paketFuerInstall(
+            dbService, server.addon_marketplace_id, Logger, `Server ${serverId} erneut installieren`);
+
         const response = await ipmServer.sendCommand(daemonId, 'gameserver.install', {
             server_id: serverId,
             rootserver_id: server.rootserver_id,
@@ -2980,6 +3017,7 @@ router.post('/:serverId/retry-installation', requirePermission('GAMESERVER.CREAT
             ports,
             env_variables: envVariables,
             game_data: gameData,
+            package: paketErneut,
             platform: gameData.platform || 'linux',
             run_install: true,
             start_after: false
@@ -3511,6 +3549,12 @@ router.post('/:serverId/reinstall', requirePermission('GAMESERVER.CREATE'), asyn
             startup_command: server.launch_params || gameData.startup?.command || '',
             steam_app_id: server.steam_app_id || server.steam_server_app_id || null,
             game_data: gameData,
+            // Auch die Neuinstallation läuft über das Paket, wenn es eines gibt.
+            // Sie wird der Weg sein, über den die vorhandenen Server umziehen —
+            // Datenerhalt ist dabei ausdrücklich NICHT gefordert (Betreiber,
+            // 2026-08-19): Der Altbestand wird nicht gerettet.
+            package: await paketFuerInstall(
+                dbService, server.addon_marketplace_id, Logger, `Server ${serverId} neu installieren`),
             platform: gameData.platform || 'linux',
             run_install: true,
             start_after: false,

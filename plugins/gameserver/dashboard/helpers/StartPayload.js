@@ -579,5 +579,74 @@ async function loadServerForStart(dbService, serverId, guildId = null) {
     return row || null;
 }
 
+/**
+ * Lädt das Spielpaket zu einem Addon — für das ANLEGEN eines Servers.
+ *
+ * loadServerForStart() geht über `gs.addon_marketplace_id`; beim Anlegen gibt es
+ * noch keinen Server, also über die Addon-Kennung direkt. Die Auswahlregel ist
+ * bewusst dieselbe (`stable` vor allem, danach das Neueste): Ein Server soll mit
+ * derselben Fassung installiert werden, mit der er später startet — sonst passt
+ * die Bibliothek nicht zur Datei.
+ *
+ * Kein Paket zu finden ist KEIN Fehler: Dann installiert der Daemon über den
+ * alten Weg weiter. Genau daran hängt die stufenweise Umstellung.
+ *
+ * @param {object} dbService
+ * @param {number} addonId  addon_marketplace.id (= packages.id, die Einlieferung
+ *                          übernimmt die Kennung ausdrücklich dafür)
+ * @returns {Promise<object|null>} { slug, version, channel, checksum, fbpkg }
+ */
+async function ladePaketFuerAddon(dbService, addonId) {
+    if (!addonId) return null;
+    const [row] = await dbService.query(`
+        SELECT pk.slug AS paket_slug,
+               pv.fbpkg AS paket_json, pv.version AS paket_version,
+               pv.channel AS paket_channel, pv.checksum AS paket_checksum
+        FROM packages pk
+        LEFT JOIN package_versions pv ON pv.id = (
+            SELECT v.id FROM package_versions v
+             WHERE v.package_id = pk.id
+             ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
+             LIMIT 1
+        )
+        WHERE pk.id = ?
+    `, [addonId]);
+    if (!row || !row.paket_json) return null;
+    return row;
+}
+
+/**
+ * Das Paket als fertiges Objekt für die Install-Nutzlast — oder null.
+ *
+ * Drei Stellen schicken `gameserver.install`: Anlegen, Erneut versuchen und
+ * Neuinstallieren. Alle drei brauchen dieselbe Entscheidung, und sie an drei
+ * Stellen auszuschreiben hiesse, dass zwei davon beim nächsten Umbau
+ * zurückbleiben — genau das Muster, das im Bestand mehrfach zu finden war.
+ *
+ * Ein unlesbares Paket wird GEMELDET und dann übergangen: Der alte Weg steht
+ * noch, und ein Server, der wegen der neuen Mechanik nicht entsteht, wäre die
+ * schlechtere Wahl. Sobald der alte Weg weg ist (Stufe 4.2), muss das hier zum
+ * Abbruch werden.
+ *
+ * @param {object} dbService
+ * @param {number} addonId  gameservers.addon_marketplace_id bzw. addon_marketplace.id
+ * @param {object} logger
+ * @param {string} wofuer   Für die Protokollzeile: welcher Weg fragt
+ * @returns {Promise<object|null>}
+ */
+async function paketFuerInstall(dbService, addonId, logger, wofuer = 'Installation') {
+    try {
+        const p = await ladePaketFuerAddon(dbService, addonId);
+        if (!p) return null;
+        const paket = typeof p.paket_json === 'string' ? JSON.parse(p.paket_json) : p.paket_json;
+        logger?.info?.(`[Gameserver] ${wofuer} läuft über das Paket ${p.paket_slug} ${p.paket_version} (${p.paket_channel})`);
+        return paket;
+    } catch (err) {
+        logger?.error?.(`[Gameserver] Paket für Addon ${addonId} nicht lesbar — ${wofuer} läuft über den alten Weg`, err);
+        return null;
+    }
+}
+
 module.exports = { buildStartPayload, loadServerForStart, waehleDockerImage,
-                   baueSpielpaket, ladeUebergang, benennePortzwecke, imageAusPaket };
+                   baueSpielpaket, ladeUebergang, benennePortzwecke, imageAusPaket,
+                   ladePaketFuerAddon, paketFuerInstall };
