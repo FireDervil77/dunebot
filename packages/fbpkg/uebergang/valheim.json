@@ -21,7 +21,23 @@
     "hat den Schluessel 'game_plus_1' (aus dem Egg-Import, port_var). Der Daemon",
     "loest den Zweck aus payload.ports auf und wies den Auftrag am 2026-08-18 ab:",
     "'ready.query: Protokoll valheim genannt, aber kein Port.' Zu Recht — er raet",
-    "nicht."
+    "nicht.",
+    "",
+    "UND DRITTENS das ARBEITSVERZEICHNIS. Der Verzeichnisvertrag (E-19) legt die",
+    "Spieldateien nach game/. Der alte Installer schreibt sie aber in die",
+    "Volume-Wurzel — gemessen am 2026-08-19: valheim_server.x86_64 liegt in",
+    "/home/container, und game/ hat fb-init soeben leer angelegt. fb-init wechselte",
+    "korrekt nach game/ und meldete:",
+    "",
+    "  fork/exec ./valheim_server.x86_64: no such file or directory   (ExitCode 126)",
+    "",
+    "Das ist keine Eigenschaft von Valheim, sondern eine dieses Altservers: Sein",
+    "Inhalt stammt aus einer Installation von vor dem Vertrag. Deshalb steht die",
+    "Abweichung hier und nicht im Paket — ein frisch installierter Server hat seine",
+    "Dateien in game/, und sein Paket darf nichts anderes behaupten.",
+    "",
+    "Faellt weg mit Stufe 4.1 (Schritt-Ausfuehrer, Installation nach dem Vertrag)",
+    "bzw. Stufe 6, wo die acht Server neu entstehen."
   ],
   "zuordnung": {
     "name": "SERVER_NAME",
@@ -40,5 +56,6 @@
   "geprueft_gegen": "gameservers #108 (Valheim, rs49) — alle elf Einstellungen und beide Portzwecke haben dort einen Wert",
   "portzwecke": {
     "query": "game_plus_1"
-  }
+  },
+  "arbeitsverzeichnis": "/home/container"
 }

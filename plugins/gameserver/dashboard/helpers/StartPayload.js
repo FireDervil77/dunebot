@@ -50,7 +50,11 @@ function ladeUebergang(slug) {
         if (fs.existsSync(datei)) {
             const roh = JSON.parse(fs.readFileSync(datei, 'utf8'));
             if (roh.zuordnung) {
-                uebergang = { zuordnung: roh.zuordnung, portzwecke: roh.portzwecke || {} };
+                uebergang = {
+                    zuordnung:          roh.zuordnung,
+                    portzwecke:         roh.portzwecke || {},
+                    arbeitsverzeichnis: roh.arbeitsverzeichnis || null,
+                };
             }
         }
     } catch {
@@ -196,6 +200,28 @@ function baueSpielpaket(server, envVariables, melde) {
         melde(`[StartPayload] Paket ${server.paket_slug}: ${fehlend.length} Einstellung(en) ohne `
             + `Wert (${fehlend.map(f => f.key).join(', ')}) — der Daemon nimmt dort die Vorgabe. `
             + 'Kein Risiko hinterlegt, deshalb kein Abbruch.');
+    }
+
+    // ── Arbeitsverzeichnis: Abweichung vom Verzeichnisvertrag ────────────────
+    //
+    // Der Vertrag (E-19) legt die Spieldateien nach `game/`. Ein Bestandsserver
+    // hat sie in der Volume-Wurzel, weil der alte Installer dorthin schreibt.
+    // Am 2026-08-19 gemessen: `fb-init` wechselte korrekt nach `game/`, fand
+    // nichts und beendete sich mit 126 — im Daemon-Log sah das aus wie ein
+    // Absturz des Spiels.
+    //
+    // Gesetzt wird es auf der KOPIE, die mitgeschickt wird — das gespeicherte
+    // Paket bleibt unberührt. Es beschreibt das Spiel, nicht die Geschichte
+    // eines einzelnen Volumes.
+    if (uebergang.arbeitsverzeichnis) {
+        paket.start = paket.start || {};
+        if (paket.start.workdir !== uebergang.arbeitsverzeichnis) {
+            melde(`[StartPayload] Paket ${server.paket_slug}: Arbeitsverzeichnis auf `
+                + `${uebergang.arbeitsverzeichnis} gesetzt — dieser Bestandsserver hat seine `
+                + 'Spieldateien in der Volume-Wurzel, nicht in game/. Übergangsweise, '
+                + 'fällt mit dem Schritt-Ausführer weg.');
+        }
+        paket.start.workdir = uebergang.arbeitsverzeichnis;
     }
 
     return { paket, settings, portzwecke: uebergang.portzwecke };
