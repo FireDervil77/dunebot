@@ -15,21 +15,30 @@
     "gegen den dieses ganze Vorhaben antritt.",
     "",
     "Diese Datei stirbt mit 5a. Sie steht bewusst NEBEN dem Paketformat und nicht darin:",
-    "Ein Paket beschreibt ein Spiel, nicht die Geschichte unserer Datenbank."
+    "Ein Paket beschreibt ein Spiel, nicht die Geschichte unserer Datenbank.",
+    "",
+    "DASSELBE gilt fuer die PORTZWECKE. Das Paket nennt 'query', der Bestandsserver",
+    "hat den Schluessel 'game_plus_1' (aus dem Egg-Import, port_var). Der Daemon",
+    "loest den Zweck aus payload.ports auf und wies den Auftrag am 2026-08-18 ab:",
+    "'ready.query: Protokoll valheim genannt, aber kein Port.' Zu Recht — er raet",
+    "nicht."
   ],
   "zuordnung": {
-    "name":                 "SERVER_NAME",
-    "password":             "PASSWORD",
-    "world_name":           "WORLD",
-    "public_listing":       "PUBLIC_SERVER",
-    "crossplay":            "ENABLE_CROSSPLAY",
-    "autosave_seconds":     "BACKUP_INTERVAL",
-    "backup_count":         "BACKUP_COUNT",
+    "name": "SERVER_NAME",
+    "password": "PASSWORD",
+    "world_name": "WORLD",
+    "public_listing": "PUBLIC_SERVER",
+    "crossplay": "ENABLE_CROSSPLAY",
+    "autosave_seconds": "BACKUP_INTERVAL",
+    "backup_count": "BACKUP_COUNT",
     "backup_short_seconds": "BACKUP_SHORTTIME",
-    "backup_long_seconds":  "BACKUP_LONGTIME",
-    "auto_update":          "AUTO_UPDATE",
-    "beta_branch":          "SRCDS_BETAID"
+    "backup_long_seconds": "BACKUP_LONGTIME",
+    "auto_update": "AUTO_UPDATE",
+    "beta_branch": "SRCDS_BETAID"
   },
   "geprueft_am": "2026-08-18",
-  "geprueft_gegen": "gameservers #108 (Valheim, rs49) — alle elf Schlüssel haben dort einen Wert"
+  "geprueft_gegen": "gameservers #108 (Valheim, rs49) — alle elf Einstellungen und beide Portzwecke haben dort einen Wert",
+  "portzwecke": {
+    "query": "game_plus_1"
+  }
 }

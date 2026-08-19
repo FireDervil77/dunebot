@@ -44,17 +44,62 @@ const uebergangCache = new Map();
  */
 function ladeUebergang(slug) {
     if (uebergangCache.has(slug)) return uebergangCache.get(slug);
-    let zuordnung = null;
+    let uebergang = null;
     try {
         const datei = path.join(UEBERGANG_ORDNER, `${slug}.json`);
         if (fs.existsSync(datei)) {
-            zuordnung = JSON.parse(fs.readFileSync(datei, 'utf8')).zuordnung || null;
+            const roh = JSON.parse(fs.readFileSync(datei, 'utf8'));
+            if (roh.zuordnung) {
+                uebergang = { zuordnung: roh.zuordnung, portzwecke: roh.portzwecke || {} };
+            }
         }
     } catch {
-        zuordnung = null;   // Der Aufrufer meldet es — hier wird nichts verschluckt
+        uebergang = null;   // Der Aufrufer meldet es — hier wird nichts verschluckt
     }
-    uebergangCache.set(slug, zuordnung);
-    return zuordnung;
+    uebergangCache.set(slug, uebergang);
+    return uebergang;
+}
+
+/**
+ * Benennt die Portschlüssel des Servers auf die Zwecke des Pakets um.
+ *
+ * Das Paket nennt nur ZWECKE (Invariante I2) — `game`, `query`. Ein
+ * Bestandsserver trägt die Schlüssel aus dem Egg-Import, bei Valheim
+ * `game_plus_1`. Der Daemon löst den Zweck aus `payload.ports` auf und wies den
+ * Auftrag am 2026-08-18 zu Recht ab: *„ready.query: Protokoll valheim genannt,
+ * aber kein Port."* Er rät nicht.
+ *
+ * **Umbenennen, nicht ergänzen.** Stünden beide Schlüssel mit derselben Nummer
+ * in der Liste, würde Docker denselben Host-Port zweimal binden.
+ *
+ * Schlüssel, die kein Paketzweck beansprucht, bleiben unverändert stehen — sie
+ * gehören zur Portabbildung des Containers und gehen hier niemandem verloren.
+ *
+ * @returns {{ports: object, fehlend: Array<{purpose: string, alias: string}>}}
+ * @private
+ */
+function benennePortzwecke(paket, ports, portzwecke) {
+    const neu      = {};
+    const benutzt  = new Set();
+    const fehlend  = [];
+
+    for (const eintrag of paket.ports || []) {
+        const zweck = eintrag.purpose;
+        const alias = portzwecke[zweck];
+        if (ports[zweck] !== undefined) {
+            neu[zweck] = ports[zweck];
+            benutzt.add(zweck);
+        } else if (alias && ports[alias] !== undefined) {
+            neu[zweck] = ports[alias];
+            benutzt.add(alias);
+        } else if (eintrag.required) {
+            fehlend.push({ purpose: zweck, alias: alias || '(nicht zugeordnet)' });
+        }
+    }
+    for (const [k, v] of Object.entries(ports)) {
+        if (!benutzt.has(k) && neu[k] === undefined) neu[k] = v;
+    }
+    return { ports: neu, fehlend };
 }
 
 /**
@@ -116,8 +161,8 @@ function baueSpielpaket(server, envVariables, melde) {
         return null;
     }
 
-    const zuordnung = ladeUebergang(server.paket_slug);
-    if (!zuordnung) {
+    const uebergang = ladeUebergang(server.paket_slug);
+    if (!uebergang) {
         melde(`[StartPayload] Für "${server.paket_slug}" gibt es keine Übergangs-Zuordnung `
             + `(packages/fbpkg/uebergang/${server.paket_slug}.json). Ohne sie liessen sich die `
             + 'gespeicherten Werte nicht zuordnen — der alte Weg bleibt.');
@@ -127,7 +172,7 @@ function baueSpielpaket(server, envVariables, melde) {
     const settings = {};
     const fehlend  = [];
     for (const eintrag of paket.settings || []) {
-        const quelle = zuordnung[eintrag.key];
+        const quelle = uebergang.zuordnung[eintrag.key];
         const wert   = quelle ? envVariables[quelle] : undefined;
         // Ein leerer String ist ein WERT (SRCDS_BETAID="" heisst "kein Beta-Zweig").
         // Nur `undefined` heisst "nicht vorhanden".
@@ -153,7 +198,7 @@ function baueSpielpaket(server, envVariables, melde) {
             + 'Kein Risiko hinterlegt, deshalb kein Abbruch.');
     }
 
-    return { paket, settings };
+    return { paket, settings, portzwecke: uebergang.portzwecke };
 }
 
 
@@ -400,9 +445,39 @@ function buildStartPayload(server, guildId, Logger = null) {
     // Fehlt das Paket oder verweigert die Sperre, bleibt es beim alten Weg —
     // gemeldet, nicht verschwiegen.
     const spielpaket = baueSpielpaket(server, envVariables, warn);
-    if (spielpaket) {
+
+    // ── Portzwecke, bevor irgendetwas angehängt wird ────────────────────────
+    //
+    // Das Paket nennt nur Zwecke (I2), der Bestandsserver trägt die Schlüssel
+    // aus dem Egg-Import. Fehlt ein PFLICHT-Zweck, wird das Paket gar nicht
+    // erst angehängt: Der Daemon lehnt den Auftrag sonst ohnehin ab — am
+    // 2026-08-18 mit „ready.query: Protokoll valheim genannt, aber kein Port."
+    // Diese Meldung dort zu erzeugen ist eine Umleitung; hier ist der Ort, wo
+    // sie erklärbar ist.
+    const zwecke = spielpaket
+        ? benennePortzwecke(spielpaket.paket, ports, spielpaket.portzwecke)
+        : null;
+
+    if (spielpaket && zwecke.fehlend.length) {
+        warn(`[StartPayload] Server ${serverId}: Paket ${server.paket_slug} NICHT angehängt — `
+           + 'für '
+           + zwecke.fehlend.map(f => `Zweck "${f.purpose}" (Alias ${f.alias})`).join(', ')
+           + ` ist kein Port belegt. Vorhanden sind: ${Object.keys(ports).join(', ') || '(keine)'}. `
+           + 'Der alte Weg bleibt.');
+    } else if (spielpaket) {
         payload.package  = spielpaket.paket;
         payload.settings = spielpaket.settings;
+
+        // Umbenannt, nicht ergänzt: Zwei Schlüssel mit derselben Nummer liessen
+        // Docker denselben Host-Port zweimal binden.
+        const umbenannt = Object.entries(zwecke.ports)
+            .filter(([zweck]) => ports[zweck] === undefined)
+            .map(([zweck]) => zweck);
+        if (umbenannt.length) {
+            melde(`[StartPayload] Server ${serverId}: Portzwecke auf das Paket gehoben — `
+                + umbenannt.map(z => `${spielpaket.portzwecke[z]} → ${z}`).join(', '));
+        }
+        payload.ports = zwecke.ports;
 
         // Das Image kommt jetzt aus dem Paket, nicht aus frozen_game_data.
         // Ohne diese Zeile startet der Daemon das ALTE Image und findet darin
@@ -479,4 +554,4 @@ async function loadServerForStart(dbService, serverId, guildId = null) {
 }
 
 module.exports = { buildStartPayload, loadServerForStart, waehleDockerImage,
-                   baueSpielpaket, ladeUebergang };
+                   baueSpielpaket, ladeUebergang, benennePortzwecke, imageAusPaket };
