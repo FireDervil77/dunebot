@@ -47,6 +47,23 @@ const WIRKUNG = {
     new_world: { text: 'erzeugt eine neue Welt',  ton: 'orange' },
 };
 
+/**
+ * Gruppenüberschriften.
+ *
+ * `group` ist das tragende Feld der Einstellungskarte (Papier 05): Es ordnet,
+ * was sonst eine Liste aus elf gleich aussehenden Zeilen wäre. Ein unbekannter
+ * Schlüssel bekommt KEINE erfundene Überschrift, sondern gar keine — dann steht
+ * die Einstellung eben ohne Abschnitt da, statt unter einem Namen, den sich
+ * niemand ausgedacht hat.
+ */
+const GRUPPE = {
+    identity: 'Name und Auftritt',
+    access:   'Zugang',
+    world:    'Welt',
+    comfort:  'Bequemlichkeit',
+    upkeep:   'Pflege',
+};
+
 /** Was `risk` bedeutet — nur gezeigt, wo es etwas zu verlieren gibt. */
 const RISIKO = {
     progress:    'Bestehender Fortschritt kann verlorengehen.',
@@ -215,21 +232,46 @@ function baueEinstellungen(server, paket, hoehe) {
 
         sichtbar.push({
             schluessel:  e.key,
+            // Der Egg-Name ist das, was gespeichert wird. Ohne ihn lässt sich
+            // die Einstellung ANZEIGEN, aber nicht ändern — und ein Feld, das
+            // sich bedienen lässt und nichts bewirkt, ist schlimmer als keines.
+            variable:    eggName,
+            aenderbar:   Boolean(eggName),
             gruppe:      e.group || 'sonstiges',
+            gruppeName:  GRUPPE[e.group] || null,
             name:        e.name?.de || e.name?.en || e.key,
             beschreibung: e.description?.de || e.description?.en || '',
             typ:         e.type || 'text',
             wirkung:     WIRKUNG[e.takes_effect] || null,
             risiko:      RISIKO[e.risk] || null,
+            wirktBei:    e.takes_effect || null,
             wert:        roh,
             // Kein Wert heisst: der Server hat dazu nichts gespeichert. Die
             // Ansicht sagt das; sie setzt NICHT die Paketvorgabe ein.
             hatWert:     roh !== undefined,
             vorgabe:     e.default,
             geheim:      (e.type === 'password'),
+            auswahl:     Array.isArray(e.choices) ? e.choices.map(c => ({
+                wert: String(c.value),
+                name: c.name?.de || c.name?.en || String(c.value),
+            })) : null,
+            min:         Number.isFinite(e.min) ? e.min : null,
+            max:         Number.isFinite(e.max) ? e.max : null,
         });
     }
-    return { sichtbar, verborgen, ohnePaket: false };
+    // Nach Gruppen bündeln — in der Reihenfolge, in der sie im Paket stehen.
+    // Eine eigene Sortierung wäre eine zweite Meinung darüber, was wichtig ist.
+    const gruppen = [];
+    for (const e of sichtbar) {
+        let g = gruppen.find(x => x.schluessel === e.gruppe);
+        if (!g) {
+            g = { schluessel: e.gruppe, name: e.gruppeName, eintraege: [] };
+            gruppen.push(g);
+        }
+        g.eintraege.push(e);
+    }
+
+    return { sichtbar, gruppen, verborgen, ohnePaket: false };
 }
 
 /** Welt: wann zuletzt gesichert. */
@@ -245,4 +287,4 @@ function baueWelt(letzteSicherung) {
     return { letzte: letzteSicherung, text };
 }
 
-module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO };
+module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE };
