@@ -89,7 +89,22 @@
 
   <%# ── Zustand, Einstellungen, Befehle, Welt ───────────────────────────── %>
   <% if (!locals.bereich) { %>
-    <%- include('partials/server-detail-uebersicht', { uebersicht: locals.uebersicht }) %>
+    <% if (locals.uebersicht) { %>
+      <%- include('partials/server-detail-uebersicht', { uebersicht: locals.uebersicht }) %>
+    <% } else { %>
+      <%# Am 2026-08-19 hat genau dieser Fall die halbe Seite verschwinden
+          lassen: Eine fehlende Spalte liess den Aufbau scheitern, der Fehler
+          ging ins Protokoll, und der Betreiber sah eine Seite ohne Inhalt und
+          ohne Grund. Ein stiller Rueckfall ist kein Rueckfall, sondern ein
+          Raetsel. Also sagt die Seite jetzt, dass etwas fehlt. %>
+      <div class="fb-karte">
+        <div class="fb-kopf"><span>Die Serverkarte konnte nicht aufgebaut werden</span></div>
+        <div class="fb-koerper fb-muted" style="font-size:13px">
+          Der Grund steht im Protokoll des Dashboards. Die Bereiche unten
+          (Dateien, Sicherungen, Konsole …) arbeiten weiter.
+        </div>
+      </div>
+    <% } %>
   <% } %>
 
   <%# ── Bereiche ─────────────────────────────────────────────────────────

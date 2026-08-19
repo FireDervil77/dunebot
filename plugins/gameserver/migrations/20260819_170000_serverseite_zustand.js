@@ -34,7 +34,11 @@
 
 module.exports = {
     async up(db) {
-        const [spalten] = await db.query('SHOW COLUMNS FROM gameservers');
+        // dbService.query() liefert die ZEILEN direkt, nicht [rows, fields].
+        // Hier stand `const [spalten] = …` — das greift die erste Zeile, und
+        // `.some` gibt es darauf nicht. Die Migration scheiterte bei jedem
+        // Dashboard-Start neu, und die zwei Spalten entstanden nie.
+        const spalten = await db.query('SHOW COLUMNS FROM gameservers');
         const hat = (name) => spalten.some(s => s.Field === name);
 
         if (!hat('laeuft_seit')) {
@@ -55,7 +59,11 @@ module.exports = {
     },
 
     async down(db) {
-        const [spalten] = await db.query('SHOW COLUMNS FROM gameservers');
+        // dbService.query() liefert die ZEILEN direkt, nicht [rows, fields].
+        // Hier stand `const [spalten] = …` — das greift die erste Zeile, und
+        // `.some` gibt es darauf nicht. Die Migration scheiterte bei jedem
+        // Dashboard-Start neu, und die zwei Spalten entstanden nie.
+        const spalten = await db.query('SHOW COLUMNS FROM gameservers');
         const hat = (name) => spalten.some(s => s.Field === name);
         if (hat('laeuft_seit')) await db.query('ALTER TABLE gameservers DROP COLUMN laeuft_seit');
         if (hat('ansicht'))     await db.query('ALTER TABLE gameservers DROP COLUMN ansicht');
