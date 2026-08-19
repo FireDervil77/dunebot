@@ -12,7 +12,8 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
-const { buildStartPayload, loadServerForStart, paketFuerInstall } = require('../helpers/StartPayload');
+const { buildStartPayload, loadServerForStart, paketFuerInstall, ladePaketFuerAddon } = require('../helpers/StartPayload');
+const { baueUebersicht } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
 const PanelService = require('../helpers/PanelService');
 const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');
@@ -2057,8 +2058,48 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // gamedig_type für Live-Query-Panel in der View bereitstellen
         server.gamedig_type = gameData?.query?.gamedig_type || null;
 
+        // ── Die neue Serverseite (Entwurf 2026-08-18, Artboard 2) ───────────
+        //
+        // Sie liegt ÜBER der alten Übersicht und ersetzt sie noch nicht: dort
+        // hängt arbeitende Mechanik (Live-Abfrage, Kennzahlen, Ports, SFTP), die
+        // Stück für Stück herüberwandert. Scheitert etwas davon, fehlt die neue
+        // Karte — die Seite bleibt benutzbar. Eine Übersicht ist kein Grund,
+        // einen Server unerreichbar zu machen.
+        let uebersicht = null;
+        try {
+            // Die Höhe hängt am SERVER, nicht am Betrachter (entschieden
+            // 2026-08-18): Sonst sähen zwei Leute mit Rechten auf denselben
+            // Server dieselbe Karte verschieden.
+            const gewuenscht = req.query.ansicht;
+            if (gewuenscht === 'einfach' || gewuenscht === 'fachlich') {
+                if (gewuenscht !== server.ansicht) {
+                    await dbService.query('UPDATE gameservers SET ansicht = ? WHERE id = ?',
+                        [gewuenscht, server.id]);
+                }
+                server.ansicht = gewuenscht;
+            }
+
+            const paketZeile = await ladePaketFuerAddon(dbService, server.addon_marketplace_id);
+            const paket = paketZeile
+                ? (typeof paketZeile.paket_json === 'string'
+                    ? JSON.parse(paketZeile.paket_json) : paketZeile.paket_json)
+                : null;
+
+            const [letzte] = await dbService.query(
+                `SELECT completed_at FROM gameserver_backups
+                  WHERE server_id = ? AND status = 'done' AND completed_at IS NOT NULL
+                  ORDER BY completed_at DESC LIMIT 1`, [server.id]);
+
+            uebersicht = baueUebersicht(server, paket, {
+                letzteSicherung: letzte?.completed_at || null,
+            });
+        } catch (err) {
+            Logger.error('[Gameserver] Übersichtskarte konnte nicht gebaut werden', err);
+        }
+
         await themeManager.renderView(res, 'guild/server-detail', {
             title: `Server: ${server.name}`,
+            uebersicht,
             activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
             server,
             gameData,

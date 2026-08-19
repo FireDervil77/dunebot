@@ -1,0 +1,211 @@
+<%#
+  Die neue Serverseite — Entwurf vom 2026-08-18, Artboard 2 „Serverseite einfach".
+
+  Sie steht ÜBER der alten Übersicht und ersetzt sie noch nicht: Dort hängt
+  arbeitende Mechanik (Live-Abfrage, Kennzahlen, Ports, SFTP), die Stück für
+  Stück herüberwandert. Ein Austausch in einem Zug hätte funktionierende Dinge
+  zerlegt, um Aussehen zu gewinnen.
+
+  Die Regel dieser Datei: Was keine Quelle hat, wird als fehlend GEZEIGT — kein
+  Platzhalter, keine erfundene Zahl, kein Knopf ohne Wirkung.
+-%>
+<% const u = locals.uebersicht; %>
+<% if (u) { %>
+
+<div class="row row-cards mb-3">
+  <div class="col-12">
+
+    <%# ── Kopfzeile: Spiel gross, Herkunft klein, Höhe und Aktionen rechts ── %>
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+      <div>
+        <h2 class="mb-0"><%= u.kopf.spiel %></h2>
+        <div class="text-secondary"><%= u.kopf.herkunft %></div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <%# Die Höhe hängt am SERVER, nicht am Betrachter (entschieden 2026-08-18):
+            Sonst sähen zwei Leute mit Rechten auf denselben Server dieselbe
+            Karte verschieden und redeten aneinander vorbei. %>
+        <div class="btn-group" role="group" aria-label="Höhenstufe">
+          <a class="btn btn-sm <%= u.hoehe === 'einfach' ? 'btn-primary' : 'btn-white' %>"
+             href="?ansicht=einfach">Einfach</a>
+          <a class="btn btn-sm <%= u.hoehe === 'fachlich' ? 'btn-primary' : 'btn-white' %>"
+             href="?ansicht=fachlich">Fachlich</a>
+        </div>
+      </div>
+    </div>
+
+    <%# ── Zustandskarte ────────────────────────────────────────────────────── %>
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row align-items-center">
+
+          <div class="col-md-7">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="status-dot <%= u.zustand.gut ? 'status-dot-animated' : '' %> bg-<%= u.zustand.ton %>"></span>
+              <span class="h3 mb-0"><%= u.zustand.text %></span>
+              <% if (u.zustand.stufe) { %>
+                <span class="badge bg-<%= u.zustand.ton %>-lt"><%= u.zustand.stufe %></span>
+              <% } else if (u.zustand.schluessel === 'online') { %>
+                <%# Ehrlich statt schön: Der Entwurf verspricht hier „Spieler
+                    können rein". Diese Auskunft meldet fb-init über den
+                    Agent-Socket — der Daemon hört ihr aber noch nicht zu
+                    (Baustelle 58). Bis dahin steht hier nichts. %>
+                <span class="badge bg-secondary-lt" title="Die Bereitschaftsstufe des Servers wird noch nicht übertragen (Baustelle 58).">
+                  Bereitschaft unbekannt
+                </span>
+              <% } %>
+            </div>
+
+            <% if (u.adresse) { %>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <code class="fs-4"><%= u.adresse.text %></code>
+                <button type="button" class="btn btn-white btn-sm"
+                        data-fb-kopieren="<%= u.adresse.text %>">Kopieren</button>
+              </div>
+            <% } else { %>
+              <div class="text-secondary mb-1">Adresse unbekannt — es ist kein Port belegt.</div>
+            <% } %>
+
+            <div class="text-secondary">
+              <%= u.laufzeit ? u.laufzeit.text : 'Laufzeit wird erst ab dem nächsten Start gezählt.' %>
+            </div>
+          </div>
+
+          <div class="col-md-5 mt-3 mt-md-0">
+            <div class="d-flex align-items-baseline gap-2 mb-2">
+              <span class="h1 mb-0"><%= u.spieler.jetzt !== null ? u.spieler.jetzt : '—' %></span>
+              <span class="text-secondary">
+                <%= u.spieler.max ? 'von ' + u.spieler.max + ' Spielern' : 'Spieler' %>
+              </span>
+            </div>
+
+            <% if (u.spieler.liste && u.spieler.liste.length) { %>
+              <div class="list-group list-group-flush">
+                <% u.spieler.liste.forEach(function (s) { %>
+                  <div class="list-group-item px-0 py-1 d-flex align-items-center gap-2">
+                    <span class="avatar avatar-xs"
+                          <% if (s.avatar) { %>style="background-image:url('<%= s.avatar %>')"<% } %>>
+                      <% if (!s.avatar) { %><%= s.kuerzel %><% } %>
+                    </span>
+                    <span class="flex-fill text-truncate"><%= s.name %></span>
+                    <% if (s.ping !== null) { %>
+                      <span class="text-secondary font-monospace small"><%= s.ping %> ms</span>
+                    <% } %>
+                  </div>
+                <% }); %>
+              </div>
+            <% } else if (u.spieler.liste) { %>
+              <div class="text-secondary small">Gerade niemand auf dem Server.</div>
+            <% } else { %>
+              <%# Keine Abfrage heisst „wir wissen es nicht" — das ist etwas
+                  anderes als „niemand da", und deshalb steht es auch anders da. %>
+              <div class="text-secondary small">Spielerliste liegt gerade nicht vor.</div>
+            <% } %>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <%# ── Einstellungen der gewählten Höhe ─────────────────────────────────── %>
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">Einstellungen</h3>
+        <span class="text-secondary small">
+          <%= u.hoehe === 'einfach' ? 'Einfache Höhe' : 'Fachliche Höhe' %>
+        </span>
+      </div>
+      <div class="card-body">
+        <% if (u.einstellungen.ohnePaket) { %>
+          <div class="text-secondary">
+            Dieser Server läuft noch über den alten Weg und hat kein Spielpaket.
+            Seine Einstellungen stehen unter „Variablen".
+          </div>
+        <% } else if (!u.einstellungen.sichtbar.length) { %>
+          <div class="text-secondary">In dieser Höhe gibt es nichts einzustellen.</div>
+        <% } else { %>
+          <div class="divide-y">
+            <% u.einstellungen.sichtbar.forEach(function (e) { %>
+              <div class="row align-items-center py-2">
+                <div class="col-md-7">
+                  <div class="fw-bold"><%= e.name %></div>
+                  <% if (e.beschreibung) { %>
+                    <div class="text-secondary small"><%= e.beschreibung %></div>
+                  <% } %>
+                  <div class="mt-1 d-flex flex-wrap gap-1">
+                    <% if (e.wirkung) { %>
+                      <span class="badge bg-<%= e.wirkung.ton %>-lt"><%= e.wirkung.text %></span>
+                    <% } %>
+                    <% if (e.risiko) { %>
+                      <span class="badge bg-red-lt" title="<%= e.risiko %>"><%= e.risiko %></span>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="col-md-5 mt-2 mt-md-0 text-md-end">
+                  <% if (!e.hatWert) { %>
+                    <%# Bewusst NICHT die Paketvorgabe: Sie wäre eine Behauptung
+                        über den laufenden Server. Genau das hätte am 2026-08-19
+                        eine Welt gekostet (Vorgabe „Dedicated", echt „BoomTown"). %>
+                    <span class="text-secondary">kein Wert hinterlegt</span>
+                  <% } else if (e.geheim) { %>
+                    <code>••••••••</code>
+                  <% } else if (e.typ === 'boolean') { %>
+                    <span class="badge bg-<%= String(e.wert) === '1' || e.wert === true ? 'green' : 'secondary' %>-lt">
+                      <%= String(e.wert) === '1' || e.wert === true ? 'An' : 'Aus' %>
+                    </span>
+                  <% } else { %>
+                    <code><%= String(e.wert) %></code>
+                  <% } %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+
+          <% if (u.einstellungen.verborgen > 0 && u.hoehe === 'einfach') { %>
+            <div class="text-secondary small mt-3">
+              <%= u.einstellungen.verborgen %> weitere Einstellungen liegen in der
+              <a href="?ansicht=fachlich">fachlichen Höhe</a>.
+            </div>
+          <% } %>
+
+          <%# Kein Speichern-Knopf, solange er nichts tut. Ein Knopf ohne Wirkung
+              ist dieselbe Krankheit wie eine erfundene Zahl — er sieht nur
+              harmloser aus. Das Bearbeiten kommt im nächsten Schritt. %>
+          <div class="text-secondary small mt-2">
+            Zum Ändern derzeit noch der Reiter „Variablen“.
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <%# ── Welt ─────────────────────────────────────────────────────────────── %>
+    <div class="card mb-3">
+      <div class="card-header"><h3 class="card-title mb-0">Welt</h3></div>
+      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="text-secondary">
+          <% if (u.welt.letzte) { %>
+            Zuletzt gesichert <%= u.welt.text %>
+          <% } else { %>
+            Noch keine Sicherung vorhanden.
+          <% } %>
+        </div>
+        <a class="btn btn-white btn-sm" href="#tabs-backups" data-bs-toggle="tab">Sicherungen…</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// Kopieren — rein im Browser, ohne Umweg über den Server.
+document.querySelectorAll('[data-fb-kopieren]').forEach(function (b) {
+    b.addEventListener('click', function () {
+        var t = b.getAttribute('data-fb-kopieren');
+        navigator.clipboard.writeText(t).then(function () {
+            var alt = b.textContent; b.textContent = 'Kopiert';
+            setTimeout(function () { b.textContent = alt; }, 1500);
+        });
+    });
+});
+</script>
+<% } %>
