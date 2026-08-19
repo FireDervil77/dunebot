@@ -47,26 +47,6 @@
         <a href="?ansicht=fachlich" class="<%= hoehe === 'fachlich' ? 'an' : '' %>">Fachlich</a>
       </div>
 
-      <% const bereiche = [
-           ['dateien',      'Dateien'],
-           ['sicherungen',  'Sicherungen'],
-           ['konsole',      'Konsole'],
-           ['rohmodus',     'Einstellungen — Rohmodus'],
-           ['fernsteuerung','Fernsteuerung'],
-           ['aufgaben',     'Wiederkehrende Aufgaben'],
-           ['panels',       'Discord-Panels'],
-           ['oeffentlich',  'Öffentliche Seite'],
-         ]; %>
-      <div class="dropdown">
-        <button class="btn btn-white btn-sm" data-bs-toggle="dropdown" aria-expanded="false">Bereiche</button>
-        <div class="dropdown-menu">
-          <% bereiche.forEach(function (b) { %>
-            <a class="dropdown-item<%= locals.bereich === b[0] ? ' active' : '' %>"
-               href="?ansicht=<%= hoehe %>&bereich=<%= b[0] %>"><%= b[1] %></a>
-          <% }); %>
-        </div>
-      </div>
-
       <% if (server.status === 'online') { %>
         <button class="btn btn-white btn-sm" onclick="serverAction('<%= server.id %>', 'restart')">Neu starten</button>
         <button class="btn btn-white btn-sm" onclick="serverAction('<%= server.id %>', 'stop')">Stoppen</button>
@@ -86,6 +66,31 @@
       </div>
     </div>
   </div>
+
+  <%# ── Bereiche als Navigation ──────────────────────────────────────────
+      Sie stehen NICHT in der linken Seitenleiste: Es gibt sie nur im
+      Zusammenhang eines Servers, dort staenden sie auch ohne offenen Server.
+      Und nicht in einem Aufklappmenue: Das versteckt, was es gibt — man muss
+      wissen, dass man klicken muss.
+
+      Eine Zeile darunter zeigt beides: was existiert, und wo man ist. %>
+  <% const bereiche = [
+       [null,           'Server'],
+       ['dateien',      'Dateien'],
+       ['sicherungen',  'Sicherungen'],
+       ['konsole',      'Konsole'],
+       ['rohmodus',     'Rohmodus'],
+       ['fernsteuerung','Fernsteuerung'],
+       ['aufgaben',     'Aufgaben'],
+       ['panels',       'Panels'],
+       ['oeffentlich',  'Öffentlich'],
+     ]; %>
+  <nav class="fb-bereiche">
+    <% bereiche.forEach(function (b) { %>
+      <a href="?ansicht=<%= hoehe %><%= b[0] ? '&bereich=' + b[0] : '' %>"
+         class="<%= (locals.bereich || null) === b[0] ? 'an' : '' %>"><%= b[1] %></a>
+    <% }); %>
+  </nav>
 
   <%# ── Zustand, Einstellungen, Befehle, Welt ───────────────────────────── %>
   <% if (!locals.bereich) { %>
@@ -118,11 +123,7 @@
   <% const bereich = locals.bereich || null; %>
   <% if (bereich) { %>
     <div class="fb-karte">
-      <div class="fb-kopf">
-        <span><%= locals.bereichName || bereich %></span>
-        <a class="btn btn-white btn-sm" style="margin-left:auto"
-           href="?ansicht=<%= hoehe %>">Zurück zum Server</a>
-      </div>
+      <div class="fb-kopf"><span><%= locals.bereichName || bereich %></span></div>
       <div class="fb-koerper">
         <% if (bereich === 'dateien') { %>
           <%- include('partials/server-detail-files', { server, guildId, userPermissions }) %>

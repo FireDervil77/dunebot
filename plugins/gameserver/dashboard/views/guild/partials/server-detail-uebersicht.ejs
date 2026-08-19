@@ -20,22 +20,10 @@
 
 <div class="fb-seite">
 
-  <%# ── Kopfzeile ───────────────────────────────────────────────────────── %>
-  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px">
-    <div>
-      <div style="font-size:22px;font-weight:600;letter-spacing:-.01em"><%= u.kopf.spiel %></div>
-      <div class="fb-muted" style="font-size:13px"><%= u.kopf.herkunft %></div>
-    </div>
-    <%# Die Höhe hängt am SERVER, nicht am Betrachter (entschieden 2026-08-18):
-        Sonst sähen zwei Leute mit Rechten auf denselben Server dieselbe Karte
-        verschieden und redeten aneinander vorbei. %>
-    <div style="display:inline-flex;border:1px solid var(--fb-border);border-radius:100rem;padding:2px;background:#fff">
-      <% ['einfach','fachlich'].forEach(function (h) { %>
-        <a href="?ansicht=<%= h %>" style="text-decoration:none;border-radius:100rem;padding:5px 14px;font-size:13px;font-weight:500;<%=
-          u.hoehe === h ? 'background:var(--fb-primary);color:#fff' : 'color:var(--fb-text-muted)' %>"><%= h === 'einfach' ? 'Einfach' : 'Fachlich' %></a>
-      <% }); %>
-    </div>
-  </div>
+  <%# Die Kopfzeile steht im Rahmen (server-detail.ejs), nicht hier.
+      Sie stand am 2026-08-19 an BEIDEN Stellen: Zuerst hier gebaut, dann beim
+      Umbau des Rahmens dorthin gehoben — und hier vergessen. Ergebnis waren
+      zwei Kopfzeilen samt zwei Hoehenumschaltern uebereinander. %>
 
   <%# ── Zustandskarte: zweispaltig, rechte Flanke 268 px ─────────────────── %>
   <div class="fb-karte" style="overflow:hidden">
