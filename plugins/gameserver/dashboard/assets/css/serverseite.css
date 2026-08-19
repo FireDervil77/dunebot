@@ -165,3 +165,9 @@
 .fb-spiel.an { border-color: var(--fb-primary); background: rgba(52,152,219,.04); }
 .fb-spiel .fb-haken { color: transparent; font-weight: 700; flex: 0 0 auto; }
 .fb-spiel.an .fb-haken { color: var(--fb-primary); }
+
+/* ── Maschinenwahl (Artboard 5b) ────────────────────────────────────────── */
+.fb-maschine.an { border-color: var(--fb-primary); background: rgba(52,152,219,.04); }
+.fb-maschine .fb-haken { color: transparent; font-weight: 700; }
+.fb-maschine.an .fb-haken { color: var(--fb-primary); }
+.fb-maschine.aus { opacity: .62; }

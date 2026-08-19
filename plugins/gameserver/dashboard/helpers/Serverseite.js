@@ -600,3 +600,135 @@ function bauePaketAuswahl(paketZeilen, ohnePaket = []) {
 }
 
 module.exports.bauePaketAuswahl = bauePaketAuswahl;
+
+/**
+ * Die Maschinenwahl beim Anlegen — Entwurf vom 2026-08-18, Artboard 5b.
+ *
+ * ── Warum „gebucht" und nicht „benutzt" ─────────────────────────────────────
+ *
+ * Die Vorlage sagt „RAM gebucht 38 / 64 GB", und das ist der richtige Wert. Was
+ * ein Server GERADE braucht, schwankt mit den Spielern; was er BEKOMMEN DARF,
+ * steht fest. Wer nach der Momentanlast bucht, stellt neun Server auf eine
+ * Maschine, weil abends gerade keiner spielt.
+ *
+ * ── Warum die Portprüfung hier steht und nicht erst beim Anlegen ────────────
+ *
+ * Valheim verlangt Spielport+1 — das ist keine Vorliebe, sondern eine
+ * Eigenschaft des Spiels (`assign: game+1`). Ist der Nachbarport belegt, taugt
+ * die Maschine für DIESES Spiel nicht, und das gehört gesagt, bevor jemand
+ * durch zwei weitere Schritte klickt.
+ *
+ * Ausgewichen wird bewusst NICHT auf einen anderen Port: Der Client sucht dann
+ * an einer Stelle, an der nichts lauscht, und der Fehler heisst „Server nicht
+ * gefunden" — weit weg von seiner Ursache.
+ */
+function baueMaschinenAuswahl(maschinen, gebucht, belegtePorts, paket) {
+    // Welche Zwecke braucht das Paket, und wie hängen sie zusammen?
+    const ports = paket?.ports || [];
+    const spielPort = ports.find(p => p.assign === 'pool') || ports[0] || null;
+    const gekoppelt = ports
+        .filter(p => typeof p.assign === 'string' && p.assign.includes('+'))
+        .map(p => ({ zweck: p.purpose, abstand: parseInt(p.assign.split('+')[1], 10) || 0 }));
+
+    const belegt = new Set((belegtePorts || []).map(x => Number(x.port)));
+
+    return (maschinen || []).map((m) => {
+        const g = gebucht[m.id] || { ram_mb: 0, cpu: 0, disk_gb: 0, anzahl: 0 };
+
+        // Ein freies Portpaar suchen — dieselbe Regel, die der Daemon später
+        // anwendet. Gefunden wird das erste, bei dem ALLE Zwecke frei sind.
+        let paar = null, grund = null;
+        const von = m.port_range_start || 0, bis = m.port_range_end || 0;
+        if (!spielPort) {
+            grund = 'Das Paket nennt keine Ports.';
+        } else if (!von || !bis) {
+            grund = 'Für diese Maschine ist kein Portbereich hinterlegt.';
+        } else {
+            for (let n = von; n <= bis; n++) {
+                if (belegt.has(n)) continue;
+                const noetig = gekoppelt.map(k => n + k.abstand);
+                if (noetig.some(x => belegt.has(x) || x > bis)) continue;
+                paar = { spiel: n, weitere: gekoppelt.map(k => ({ zweck: k.zweck, port: n + k.abstand })) };
+                break;
+            }
+            if (!paar) {
+                grund = gekoppelt.length
+                    ? `Kein freies Portpaar. ${paket?.identity?.name || 'Das Spiel'} verlangt ` +
+                      gekoppelt.map(k => 'Spielport+' + k.abstand).join(' und ') +
+                      ' — wir weichen bewusst nicht auf einen anderen Port aus.'
+                    : 'Kein freier Port im hinterlegten Bereich.';
+            }
+        }
+
+        return {
+            id:    m.id,
+            name:  m.name,
+            host:  m.hostname || m.host || null,
+            erreichbar: m.daemon_status === 'online',
+            platte: { gebucht: g.disk_gb, gesamt: m.disk_total_gb ?? null },
+            ram:    { gebucht: Math.round((g.ram_mb || 0) / 1024), gesamt: m.ram_total_gb ?? null },
+            cpu:    { gebucht: g.cpu, gesamt: (m.cpu_cores || 0) * 100 },
+            server: g.anzahl,
+            paar, grund,
+            waehlbar: Boolean(paar) && m.daemon_status === 'online',
+        };
+    });
+}
+
+module.exports.baueMaschinenAuswahl = baueMaschinenAuswahl;
+
+/**
+ * Die Werte beim Anlegen — Entwurf vom 2026-08-18, Artboard 5c.
+ *
+ * Gefragt wird nur, was ein Spieler entscheiden muss (`role: player`). Alles
+ * andere bleibt auf der Vorgabe des Pakets und wird als Satz gesagt: „Fünf
+ * weitere Einstellungen bleiben auf ihrer Vorgabe." Nicht verschwiegen, aber
+ * auch nicht als Formular vorgelegt — die fachliche Höhe gibt es danach.
+ *
+ * Der zweite Teil ist der eigentliche Gewinn: „Was jetzt passiert". Er sagt
+ * VORHER, was die Installation tun wird — welche App, welches Image, ob es
+ * schon auf der Maschine liegt. Das steht alles im Paket und war nie zu sehen;
+ * bisher klickte man „Erstellen" und wartete auf etwas Unbenanntes.
+ */
+function baueWerteSchritt(paket, maschine, imageLiegtDa) {
+    const alle = Array.isArray(paket?.settings) ? paket.settings : [];
+    const gefragt = alle.filter(e => (e.role || 'expert') === 'player');
+
+    return {
+        felder: gefragt.map(e => ({
+            schluessel: e.key,
+            name: e.name?.de || e.name?.en || e.key,
+            beschreibung: e.description?.de || e.description?.en || '',
+            typ: e.type || 'text',
+            vorgabe: e.default,
+            pflicht: e.required === true || e.type === 'password',
+            geheim: e.type === 'password',
+            wirkung: WIRKUNG[e.takes_effect] || null,
+            hinweis: e.takes_effect === 'new_world'
+                ? 'später nur mit neuer Welt änderbar' : null,
+            auswahl: Array.isArray(e.choices) ? e.choices.map(c => ({
+                wert: String(c.value), name: c.name?.de || c.name?.en || String(c.value),
+            })) : null,
+            min: Number.isFinite(e.min) ? e.min : null,
+            max: Number.isFinite(e.max) ? e.max : null,
+        })),
+        aufVorgabe: alle.length - gefragt.length,
+
+        passiert: {
+            quelle: (paket?.install?.steps || []).map(s =>
+                s.type === 'steamcmd' ? 'SteamCMD lädt App ' + s.app : s.type).join(', ') || null,
+            depotCache: paket?.install?.cache?.steam_depot !== false,
+            image: paket?.image?.ref
+                ? (paket.image.tag ? paket.image.ref + ':' + paket.image.tag : paket.image.ref) : null,
+            imageLiegtDa: imageLiegtDa === true,
+            // Keine Dauerangabe: Wir haben keine gemessene. Eine geschätzte
+            // stünde da wie eine Zusage, und die erste Installation, die zwanzig
+            // Minuten braucht, macht sie zur Lüge.
+            maschine: maschine ? maschine.name : null,
+            adresse: maschine && maschine.paar
+                ? (maschine.host || maschine.name) + ':' + maschine.paar.spiel : null,
+        },
+    };
+}
+
+module.exports.baueWerteSchritt = baueWerteSchritt;

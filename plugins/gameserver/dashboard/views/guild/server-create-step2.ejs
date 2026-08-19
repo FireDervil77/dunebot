@@ -1,374 +1,111 @@
-<!-- Gameserver Server-Erstellungs-Wizard - Step 2: Addon Configuration (Variables) -->
-<div class="app-content">
-  <div class="container-fluid">
-    <!-- Breadcrumb -->
-    <nav aria-label="breadcrumb" class="mb-3">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item">
-          <a href="/guild/<%= guildId %>"><i class="fa-solid fa-home"></i> <%= tr('core:NAV.DASHBOARD') %></a>
-        </li>
-        <li class="breadcrumb-item">
-          <a href="/guild/<%= guildId %>/plugins/gameserver"><%= tr('gameserver:NAV.GAMESERVER') %></a>
-        </li>
-        <li class="breadcrumb-item">
-          <a href="/guild/<%= guildId %>/plugins/gameserver/servers"><%= tr('gameserver:NAV.SERVERS') %></a>
-        </li>
-        <li class="breadcrumb-item active" aria-current="page"><%= tr('gameserver:SERVER.CREATE') %></li>
-      </ol>
-    </nav>
+<%#
+  Anlegen, Schritt 2: Maschine — Entwurf vom 2026-08-18, Artboard 5b.
 
-    <!-- Wizard Progress -->
-    <div class="row text-center mb-4">
-      <div class="col-md-4">
-        <div class="progress-step completed">
-          <div class="progress-circle bg-success text-white">
-            <i class="fa-solid fa-check"></i>
-          </div>
-          <div class="text-secondary"><%= tr('gameserver:SERVER.STEP1_LABEL') %></div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="progress-step active">
-          <div class="progress-circle bg-primary text-white">
-            <strong>2</strong>
-          </div>
-          <div><strong><%= tr('gameserver:SERVER.STEP2_LABEL') %></strong></div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="progress-step">
-          <div class="progress-circle bg-secondary text-white">
-            <strong>3</strong>
-          </div>
-          <div class="text-secondary"><%= tr('gameserver:SERVER.STEP3_LABEL') %></div>
-        </div>
+  Die Karte zeigt GEBUCHTES, nicht Benutztes: Was ein Server gerade braucht,
+  schwankt mit den Spielern; was er bekommen darf, steht fest. Wer nach der
+  Momentanlast bucht, stellt neun Server auf eine Maschine, weil abends gerade
+  keiner spielt.
+
+  Und sie lehnt eine Maschine ab, wenn das Portpaar nicht frei ist — mit Grund,
+  bevor jemand durch zwei weitere Schritte klickt.
+-%>
+<div class="fb-seite">
+
+  <div class="fb-seitenkopf">
+    <div>
+      <div class="fb-titel">Server anlegen</div>
+      <div class="fb-muted" style="font-size:13px">
+        Schritt 2 von 3 · Maschine wählen<%= locals.spielName ? ' · ' + spielName : '' %>
       </div>
     </div>
-
-    <!-- Main Content -->
-    <div class="row">
-      <div class="col-lg-8">
-        <!-- Startup Command (Read-Only) -->
-        <div class="card mb-4">
-          <div class="card-header">
-            <h5 class="mb-0">
-              <i class="fa-solid fa-terminal me-2"></i>
-              <%= tr('gameserver:SERVER.STARTUP_COMMAND') %>
-            </h5>
-          </div>
-          <div class="card-body">
-            <div class="mb-3">
-              <textarea class="form-control font-monospace bg-dark text-white" 
-                        id="startupCommandPreview" 
-                        rows="3" 
-                        readonly 
-                        style="resize: none;"><% 
-                const startupCmd = gameData.startup && gameData.startup.command 
-                  ? gameData.startup.command 
-                  : './start.sh';
-              %><%= startupCmd %></textarea>
-              <small class="form-text text-secondary">
-                <%= tr('gameserver:SERVER.STARTUP_COMMAND_HELP_WIZARD') %>
-              </small>
-            </div>
-          </div>
-        </div>
-
-        <!-- Variables Section -->
-        <div class="card mb-4">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
-              <i class="fa-solid fa-sliders me-2"></i>
-              <%= tr('gameserver:SERVER.VARIABLES') %>
-            </h5>
-            <span class="badge bg-info-lt">
-              <% 
-                // ✅ KONVERTIERUNG: Map/Object → Array
-                let variablesArray = [];
-                if (gameData.variables) {
-                  if (Array.isArray(gameData.variables)) {
-                    // Alte Struktur (Array) - direkt nutzen
-                    variablesArray = gameData.variables;
-                  } else if (typeof gameData.variables === 'object') {
-                    // Neue Struktur (Map/Object) - zu Array konvertieren
-                    variablesArray = Object.entries(gameData.variables).map(([key, value]) => ({
-                      name: key,
-                      display_name: key.replace(/_/g, ' '),
-                      default_value: value,
-                      type: 'text',
-                      required: false
-                    }));
-                  }
-                }
-              %>
-              <%= variablesArray.length %> <%= variablesArray.length === 1 ? tr('gameserver:SERVER.VARIABLE_SINGULAR') : tr('gameserver:SERVER.VARIABLES_PLURAL') %>
-            </span>
-          </div>
-          <div class="card-body">
-            <% if (variablesArray && variablesArray.length > 0) { %>
-              <form id="variablesForm">
-                <% variablesArray.forEach((variable, index) => { 
-                  // env_variable = technischer ENV-Key (SERVER_NAME), name = Anzeigename
-                  // Form-Feldname MUSS der ENV-Key sein, damit env_variables korrekt gespeichert werden
-                  const varName = variable.env_variable || variable.key || variable.name || `VAR_${index}`;
-                  const varDisplayName = variable.display_name || variable.name || varName;
-                  const varDescription = variable.description || '';
-                  const varDefaultValue = variable.default_value !== undefined ? variable.default_value : (variable.default !== undefined ? variable.default : '');
-                  const varType = variable.type || 'text';
-                  const varOptions = variable.options || [];
-                  const isRequired = variable.required === true; // NUR wenn explizit true!
-                  // user_editable: false → System-assigned (z.B. Ports) → im Formular ausblenden
-                  if (variable.user_editable === false) return;
-                %>
-                  <div class="mb-3">
-                    <label for="var_<%= varName %>">
-                      <%= varDisplayName %> 
-                      <% if (isRequired) { %><span class="text-danger">*</span><% } %>
-                      <code class="ms-2 text-secondary">{{<%= varName %>}}</code>
-                    </label>
-                    
-                    <% if (varType === 'select' && varOptions.length > 0) { %>
-                      <!-- Select Dropdown -->
-                      <select class="form-control variable-input" 
-                              id="var_<%= varName %>" 
-                              name="variable_<%= varName %>"
-                              data-var-name="<%= varName %>"
-                              <%= isRequired ? 'required' : '' %>>
-                        <% varOptions.forEach(option => { 
-                          const optValue = typeof option === 'object' ? option.value : option;
-                          const optLabel = typeof option === 'object' ? option.label : option;
-                          const isSelected = optValue === varDefaultValue;
-                        %>
-                          <option value="<%= optValue %>" <%= isSelected ? 'selected' : '' %>><%= optLabel %></option>
-                        <% }); %>
-                      </select>
-                    <% } else if (varType === 'number') { %>
-                      <!-- Number Input -->
-                      <input type="number" 
-                             class="form-control variable-input" 
-                             id="var_<%= varName %>" 
-                             name="variable_<%= varName %>"
-                             data-var-name="<%= varName %>"
-                             value="<%= isRequired ? varDefaultValue : '' %>"
-                             placeholder="<%= varDefaultValue || tr('gameserver:SERVER.OPTIONAL') %>"
-                             <%= isRequired ? 'required' : '' %>>
-                    <% } else if (varType === 'boolean') { %>
-                      <!-- Boolean Toggle -->
-                      <select class="form-control variable-input" 
-                              id="var_<%= varName %>" 
-                              name="variable_<%= varName %>"
-                              data-var-name="<%= varName %>"
-                              <%= isRequired ? 'required' : '' %>>
-                        <option value="true" <%= varDefaultValue === 'true' || varDefaultValue === true ? 'selected' : '' %>><%= tr('gameserver:SERVER.YES') %></option>
-                        <option value="false" <%= varDefaultValue === 'false' || varDefaultValue === false ? 'selected' : '' %>><%= tr('gameserver:SERVER.NO') %></option>
-                      </select>
-                    <% } else { %>
-                      <!-- Text Input (Default) -->
-                      <input type="text" 
-                             class="form-control variable-input" 
-                             id="var_<%= varName %>" 
-                             name="variable_<%= varName %>"
-                             data-var-name="<%= varName %>"
-                             value="<%= isRequired ? varDefaultValue : '' %>"
-                             placeholder="<%= varDefaultValue || tr('gameserver:SERVER.OPTIONAL') %>"
-                             <%= isRequired ? 'required' : '' %>>
-                    <% } %>
-                    
-                    <% if (varDescription) { %>
-                      <small class="form-text text-secondary"><%= varDescription %></small>
-                    <% } %>
-                  </div>
-                <% }); %>
-                <% const systemAssigned = variablesArray.filter(v => v.user_editable === false); %>
-                <% if (systemAssigned.length > 0) { %>
-                  <div class="alert alert-secondary mt-3 mb-0">
-                    <i class="fa-solid fa-lock me-2"></i>
-                    <strong><%= tr('gameserver:SERVER.SYSTEM_ASSIGNED') %></strong>
-                    <%= systemAssigned.map(v => `<code>${v.env_variable || v.name}</code>`).join(', ') %>
-                    &mdash; <%= tr('gameserver:SERVER.SYSTEM_ASSIGNED_DESC') %>
-                  </div>
-                <% } %>
-              </form>
-            <% } else { %>
-              <div class="alert alert-info mb-0">
-                <i class="fa-solid fa-info-circle me-2"></i>
-                <%= tr('gameserver:SERVER.NO_VARIABLES') %>
-              </div>
-            <% } %>
-          </div>
-        </div>
-
-        <!-- Navigation -->
-        <div class="card">
-          <div class="card-body">
-            <div class="d-flex justify-content-between">
-              <button type="button" id="btnBack" class="btn btn-secondary">
-                <i class="fa-solid fa-arrow-left me-2"></i>
-                <%= tr('gameserver:SERVER.BACK') %>
-              </button>
-              <button type="button" id="btnNext" class="btn btn-primary">
-                <%= tr('gameserver:SERVER.NEXT') %>
-                <i class="fa-solid fa-arrow-right ms-2"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right Sidebar: Live Preview -->
-      <div class="col-lg-4">
-        <div class="card sticky-top" style="top: 20px;">
-          <div class="card-header bg-info text-white">
-            <h6 class="mb-0">
-              <i class="fa-solid fa-eye me-2"></i>
-              <%= tr('gameserver:SERVER.LIVE_PREVIEW') %>
-            </h6>
-          </div>
-          <div class="card-body">
-            <h6 class="text-secondary mb-2"><%= tr('gameserver:SERVER.RESOLVED_COMMAND') %></h6>
-            <pre class="bg-dark text-white p-3 rounded" style="font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word;"><code id="livePreview"><%= startupCmd %></code></pre>
-            <hr>
-            <h6 class="text-secondary mb-2"><%= tr('gameserver:SERVER.SELECTED_ADDON') %></h6>
-            <div class="d-flex align-items-center">
-              <% if (addon.icon_url) { %>
-                <img src="<%= addon.icon_url %>" alt="<%= addon.name %>" class="me-2" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">
-              <% } %>
-              <div>
-                <strong><%= addon.name %></strong><br>
-                <small class="text-secondary"><%= addon.description || tr('gameserver:SERVER.NO_DESCRIPTION') %></small>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <a class="btn btn-white btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/servers/create">Zurück</a>
   </div>
+
+  <form method="get" action="/guild/<%= guildId %>/plugins/gameserver/servers/create">
+    <input type="hidden" name="step" value="3">
+    <input type="hidden" name="addon_id" value="<%= locals.addonId || '' %>">
+    <input type="hidden" name="rootserver_id" id="fb-maschine" value="">
+
+    <% maschinen.forEach(function (m) { %>
+      <div class="fb-karte fb-maschine<%= m.waehlbar ? '' : ' aus' %>" data-fb-wahl="<%= m.waehlbar ? m.id : '' %>">
+        <div class="fb-koerper">
+          <div style="display:flex;gap:14px;align-items:start;flex-wrap:wrap">
+            <div style="flex:1 1 260px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-weight:600;font-size:15px"><%= m.name %></span>
+                <% if (!m.erreichbar) { %><span class="fb-pille">nicht erreichbar</span><% } %>
+                <% if (m.server) { %><span class="fb-pille"><%= m.server %> Server</span><% } %>
+              </div>
+              <% if (m.host) { %><div class="fb-muted fb-mono" style="font-size:12px"><%= m.host %></div><% } %>
+            </div>
+
+            <div style="flex:2 1 320px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+              <% [['Platte', m.platte, 'GB'], ['RAM gebucht', m.ram, 'GB'], ['CPU gebucht', m.cpu, '%']].forEach(function (z) { %>
+                <div>
+                  <div class="fb-muted" style="font-size:12px"><%= z[0] %></div>
+                  <div class="fb-mono" style="font-size:14px">
+                    <%= z[1].gebucht %> / <%= z[1].gesamt !== null ? z[1].gesamt : '?' %> <%= z[2] %>
+                  </div>
+                  <% if (z[1].gesamt) { %>
+                    <div style="height:4px;border-radius:100rem;background:#eef1f5;margin-top:4px;overflow:hidden">
+                      <div style="height:4px;width:<%= Math.min(100, Math.round(z[1].gebucht / z[1].gesamt * 100)) %>%;background:<%=
+                        z[1].gebucht / z[1].gesamt > .85 ? 'var(--fb-warning)' : 'var(--fb-primary)' %>"></div>
+                    </div>
+                  <% } %>
+                </div>
+              <% }); %>
+            </div>
+
+            <div style="flex:1 1 220px">
+              <% if (m.paar) { %>
+                <div class="fb-muted" style="font-size:12px">Ports frei</div>
+                <div class="fb-mono" style="font-size:14px">
+                  <%= m.paar.spiel %><% m.paar.weitere.forEach(function (w) { %> · <%= w.port %><% }); %>
+                </div>
+                <div class="fb-muted" style="font-size:12px">
+                  Spiel<% m.paar.weitere.forEach(function (w) { %> · <%= w.zweck %><% }); %>
+                </div>
+              <% } else { %>
+                <%# Ausgewichen wird bewusst NICHT auf einen anderen Port: Der
+                    Client sucht dann dort, wo nichts lauscht, und der Fehler
+                    heisst „Server nicht gefunden" — weit weg von der Ursache. %>
+                <span class="fb-pille fb-pille-warn">nicht möglich</span>
+                <div class="fb-muted" style="font-size:12px;margin-top:4px;text-wrap:pretty"><%= m.grund %></div>
+              <% } %>
+            </div>
+
+            <span class="fb-haken" style="align-self:center">✓</span>
+          </div>
+        </div>
+      </div>
+    <% }); %>
+
+    <div class="fb-fuss" style="border:0;margin-top:0">
+      <span class="fb-muted" id="fb-wahl-text">Noch keine Maschine gewählt</span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <a class="btn btn-white btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/servers/create">Zurück</a>
+        <button type="submit" class="btn btn-primary btn-sm" id="fb-weiter" disabled>Weiter zu den Werten</button>
+      </div>
+    </div>
+  </form>
 </div>
 
-<style>
-.progress-step {
-    padding: 20px 0;
-}
-
-.progress-circle {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 10px;
-}
-
-.progress-step.active .progress-circle {
-    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
-}
-
-.progress-step.completed .progress-circle {
-    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
-}
-</style>
-
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const guildId = '<%= guildId %>';
-    const urlParams = new URLSearchParams(window.location.search);
-    
-    // Original Startup Command
-    const originalCommand = `<%= (gameData.startup && gameData.startup.command) ? gameData.startup.command.replace(/`/g, '\\`').replace(/\$/g, '\\$') : './start.sh' %>`;
-    
-    // Variable-Value Map
-    const variableValues = new Map();
-    
-    // Initialize variable values from defaults (env_variable als Key für korrekte Startup-Preview)
-    <% if (variablesArray && variablesArray.length > 0) { %>
-      <% variablesArray.forEach(variable => { 
-        const varName = variable.env_variable || variable.key || variable.name || '';
-        const varDefault = variable.default_value || '';
-      %>
-        variableValues.set('<%= varName %>', '<%= varDefault %>');
-      <% }); %>
-    <% } %>
-    
-    // Helper: Decode HTML Entities
-    function decodeHtmlEntities(text) {
-        const textarea = document.createElement('textarea');
-        textarea.innerHTML = text;
-        return textarea.value;
-    }
-    
-    // Live Preview Update
-    function updateLivePreview() {
-        let resolvedCommand = originalCommand;
-        
-        // Decode HTML entities first (&#34; → ", &amp; → &, etc.)
-        resolvedCommand = decodeHtmlEntities(resolvedCommand);
-        
-        // Replace all {{VARIABLE_NAME}} with actual values
-        variableValues.forEach((value, name) => {
-            const placeholder = new RegExp(`\\{\\{${name}\\}\\}`, 'g');
-            resolvedCommand = resolvedCommand.replace(placeholder, value || `{{${name}}}`);
-        });
-        
-        document.getElementById('livePreview').textContent = resolvedCommand;
-        console.log('[Step2] Live Preview Updated:', resolvedCommand);
-    }
-    
-    // Variable Input Change Listeners
-    document.querySelectorAll('.variable-input').forEach(input => {
-        const varName = input.dataset.varName;
-        
-        input.addEventListener('input', function() {
-            variableValues.set(varName, this.value);
-            updateLivePreview();
-        });
-        
-        input.addEventListener('change', function() {
-            variableValues.set(varName, this.value);
-            updateLivePreview();
-        });
+(function () {
+  var t = document.getElementById('fb-wahl-text'), w = document.getElementById('fb-weiter'),
+      f = document.getElementById('fb-maschine');
+  document.querySelectorAll('.fb-maschine').forEach(function (k) {
+    var id = k.getAttribute('data-fb-wahl');
+    if (!id) return;
+    k.style.cursor = 'pointer';
+    k.addEventListener('click', function () {
+      document.querySelectorAll('.fb-maschine').forEach(function (x) { x.classList.remove('an'); });
+      k.classList.add('an'); f.value = id;
+      var n = k.querySelector('span[style*="font-weight:600"]');
+      var p = k.querySelector('.fb-mono');
+      t.textContent = (n ? n.textContent.trim() : 'Maschine') + ' gewählt';
+      w.disabled = false;
     });
-    
-    // Back Button
-    document.getElementById('btnBack').addEventListener('click', function() {
-        const params = new URLSearchParams(window.location.search);
-        params.set('step', '1');
-        window.location.href = `/guild/${guildId}/plugins/gameserver/servers/create?${params.toString()}`;
-    });
-    
-    // Next Button → Step 3
-    document.getElementById('btnNext').addEventListener('click', function() {
-        const form = document.getElementById('variablesForm');
-        
-        // Validation (falls Form existiert)
-        if (form && !form.checkValidity()) {
-            form.reportValidity();
-            return;
-        }
-        
-        // Build URL with all params from Step 1 + Variables
-        const params = new URLSearchParams(window.location.search);
-        params.set('step', '3');
-        
-        // Add all variable values (NUR NICHT-LEERE!)
-        variableValues.forEach((value, name) => {
-            // Nur übertragen wenn Wert existiert (nicht leer, nicht undefined)
-            if (value && value.trim && value.trim() !== '') {
-                params.set(`variable_${name}`, value);
-            } else if (typeof value === 'number' || (value && !value.trim)) {
-                // Numbers und Non-Strings (booleans) immer übertragen
-                params.set(`variable_${name}`, value);
-            }
-            // Leere Strings werden NICHT übertragen → Backend nutzt dann default_value
-        });
-        
-        console.log('[Step2] Navigiere zu Step 3 mit Variablen:', Object.fromEntries(params));
-        window.location.href = `/guild/${guildId}/plugins/gameserver/servers/create?${params.toString()}`;
-    });
-    
-    // Initial Preview
-    updateLivePreview();
-});
+  });
+})();
 </script>

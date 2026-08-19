@@ -13,7 +13,8 @@ const bcrypt = require('bcrypt');
 const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
 const { buildStartPayload, loadServerForStart, paketFuerInstall, ladePaketFuerAddon } = require('../helpers/StartPayload');
-const { baueUebersicht, baueServerListe, bauePaketAuswahl } = require('../helpers/Serverseite');
+const { baueUebersicht, baueServerListe, bauePaketAuswahl,
+        baueMaschinenAuswahl, baueWerteSchritt } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
 const PanelService = require('../helpers/PanelService');
 const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');
@@ -427,8 +428,57 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
                 ORDER BY r.cpu_usage_percent ASC, r.created_at DESC
             `, [guildId]);
 
+            // ── Maschinen nach dem Entwurf (Artboard 5b) ────────────────────
+            //
+            // Gezeigt wird das GEBUCHTE, nicht das Benutzte, und geprüft wird
+            // das Portpaar. Ist der Nachbarport belegt, taugt die Maschine für
+            // dieses Spiel nicht — das gehört gesagt, bevor jemand durch zwei
+            // weitere Schritte klickt.
+            let maschinen = [];
+            let paketFuerWahl = null;
+            try {
+                const pz = await ladePaketFuerAddon(dbService, addonData.id);
+                paketFuerWahl = pz ? (typeof pz.paket_json === 'string'
+                    ? JSON.parse(pz.paket_json) : pz.paket_json) : null;
+
+                const roh = await dbService.query(`
+                    SELECT r.id, r.name, r.hostname, r.host, r.daemon_status,
+                           r.cpu_cores, r.ram_total_gb, r.disk_total_gb,
+                           r.port_range_start, r.port_range_end
+                      FROM rootserver r
+                     WHERE r.guild_id = ? AND r.install_status = 'completed'`, [guildId]);
+
+                const gebuchtRoh = await dbService.query(`
+                    SELECT rootserver_id,
+                           COALESCE(SUM(allocated_ram_mb),0)    AS ram_mb,
+                           COALESCE(SUM(allocated_cpu_percent),0) AS cpu,
+                           COALESCE(SUM(allocated_disk_gb),0)   AS disk_gb,
+                           COUNT(*) AS anzahl
+                      FROM gameservers WHERE guild_id = ? GROUP BY rootserver_id`, [guildId]);
+                const gebucht = {};
+                for (const g of gebuchtRoh) {
+                    gebucht[g.rootserver_id] = {
+                        ram_mb: Number(g.ram_mb), cpu: Number(g.cpu),
+                        disk_gb: Number(g.disk_gb), anzahl: Number(g.anzahl),
+                    };
+                }
+
+                const belegt = await dbService.query(
+                    'SELECT port FROM port_allocations WHERE guild_id = ?', [guildId]);
+
+                maschinen = baueMaschinenAuswahl(roh, gebucht, belegt, paketFuerWahl);
+            } catch (err) {
+                Logger.error('[Gameserver] Maschinenauswahl konnte nicht aufgebaut werden', err);
+            }
+
+            const am2 = ServiceManager.get('assetManager');
+            if (am2) am2.enqueueStyle('gameserver-serverseite');
+
             return await themeManager.renderView(res, 'guild/server-create-step2', {
-                title: 'Server erstellen - Schritt 2: Template & Server wählen',
+                title: 'Server anlegen — Maschine wählen',
+                maschinen,
+                addonId: addonData.id,
+                spielName: paketFuerWahl?.identity?.name || addonData.name,
                 activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
                 addon: addonData,
                 gameData,
@@ -543,8 +593,43 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
                 }
             }
 
+            // ── Werte nach dem Entwurf (Artboard 5c) ────────────────────────
+            let werte = { felder: [], aufVorgabe: 0, passiert: {} };
+            let paketFuerWerte = null;
+            try {
+                const pz = await ladePaketFuerAddon(dbService, addonData.id);
+                paketFuerWerte = pz ? (typeof pz.paket_json === 'string'
+                    ? JSON.parse(pz.paket_json) : pz.paket_json) : null;
+
+                // Die gewählte Maschine samt vorgemerktem Portpaar — dieselbe
+                // Rechnung wie in Schritt 2, damit die Adresse unten stimmt.
+                let maschine = null;
+                const rsId = req.query.rootserver_id;
+                if (rsId && paketFuerWerte) {
+                    const roh = await dbService.query(`
+                        SELECT r.id, r.name, r.hostname, r.host, r.daemon_status,
+                               r.cpu_cores, r.ram_total_gb, r.disk_total_gb,
+                               r.port_range_start, r.port_range_end
+                          FROM rootserver r WHERE r.id = ? AND r.guild_id = ?`, [rsId, guildId]);
+                    const belegt = await dbService.query(
+                        'SELECT port FROM port_allocations WHERE guild_id = ?', [guildId]);
+                    maschine = baueMaschinenAuswahl(roh, {}, belegt, paketFuerWerte)[0] || null;
+                }
+                werte = baueWerteSchritt(paketFuerWerte, maschine, false);
+            } catch (err) {
+                Logger.error('[Gameserver] Werteschritt konnte nicht aufgebaut werden', err);
+            }
+
+            const am3 = ServiceManager.get('assetManager');
+            if (am3) am3.enqueueStyle('gameserver-serverseite');
+
             return await themeManager.renderView(res, 'guild/server-create-step3', {
-                title: 'Server erstellen - Schritt 3: Konfiguration',
+                title: 'Server anlegen — Werte',
+                werte,
+                addonId: addonData.id,
+                addonSlug: addonData.slug,
+                rootserverId: req.query.rootserver_id || '',
+                spielName: paketFuerWerte?.identity?.name || addonData.name,
                 activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
                 addon: addonData,
                 gameData, // Direkt das komplette gameData übergeben (mit migrierten Variables)
