@@ -69,6 +69,19 @@
             <div class="text-secondary">
               <%= u.laufzeit ? u.laufzeit.text : 'Laufzeit wird erst ab dem nächsten Start gezählt.' %>
             </div>
+
+            <% if (u.kennzahlen) { %>
+              <%# Nur der Augenblick. Der Verlauf liegt in server_metrics und
+                  bekommt einen eigenen Navigationseintrag (entschieden 18.8.). %>
+              <div class="d-flex gap-3 mt-2 text-secondary small">
+                <% if (u.kennzahlen.cpu !== null) { %>
+                  <span>CPU <span class="font-monospace"><%= u.kennzahlen.cpu.toFixed(1) %> %</span></span>
+                <% } %>
+                <% if (u.kennzahlen.ram !== null) { %>
+                  <span>RAM <span class="font-monospace"><%= Math.round(u.kennzahlen.ram) %><%= u.kennzahlen.ramMax ? ' / ' + Math.round(u.kennzahlen.ramMax) : '' %> MB</span></span>
+                <% } %>
+              </div>
+            <% } %>
           </div>
 
           <div class="col-md-5 mt-3 mt-md-0">
@@ -124,8 +137,12 @@
         <% } else if (!u.einstellungen.sichtbar.length) { %>
           <div class="text-secondary">In dieser Höhe gibt es nichts einzustellen.</div>
         <% } else { %>
+          <% u.einstellungen.gruppen.forEach(function (g) { %>
+          <% if (g.name) { %>
+            <div class="text-uppercase text-secondary small fw-bold mt-3 mb-1"><%= g.name %></div>
+          <% } %>
           <div class="divide-y">
-            <% u.einstellungen.sichtbar.forEach(function (e) { %>
+            <% g.eintraege.forEach(function (e) { %>
               <div class="row align-items-center py-2">
                 <div class="col-md-7">
                   <div class="fw-bold"><%= e.name %></div>
@@ -160,6 +177,7 @@
               </div>
             <% }); %>
           </div>
+          <% }); %>
 
           <% if (u.einstellungen.verborgen > 0 && u.hoehe === 'einfach') { %>
             <div class="text-secondary small mt-3">
@@ -177,6 +195,36 @@
         <% } %>
       </div>
     </div>
+
+    <%# ── Befehle (fachliche Höhe) ─────────────────────────────────────────
+        Die ehrlichste Karte der Seite: Sie sagt auch, was NICHT geht, und
+        warum. Valheim hat keine Fernsteuerung — ein Panel, das trotzdem einen
+        „Kicken"-Knopf zeigt, belügt den Betreiber genau einmal, nämlich wenn
+        er ihn braucht. %>
+    <% if (u.hoehe === 'fachlich' && u.befehle.length) { %>
+      <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title mb-0">Befehle</h3></div>
+        <div class="card-body">
+          <div class="divide-y">
+            <% u.befehle.forEach(function (b) { %>
+              <div class="row align-items-center py-2">
+                <div class="col-md-7">
+                  <div class="<%= b.geht ? 'fw-bold' : 'text-secondary' %>"><%= b.name %></div>
+                  <% if (b.grund) { %>
+                    <div class="text-secondary small"><%= b.grund %></div>
+                  <% } else if (b.detail) { %>
+                    <div class="text-secondary small font-monospace"><%= b.detail %></div>
+                  <% } %>
+                </div>
+                <div class="col-md-5 mt-1 mt-md-0 text-md-end">
+                  <span class="badge bg-<%= b.quelle.ton %>-lt"><%= b.quelle.text %></span>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    <% } %>
 
     <%# ── Welt ─────────────────────────────────────────────────────────────── %>
     <div class="card mb-3">

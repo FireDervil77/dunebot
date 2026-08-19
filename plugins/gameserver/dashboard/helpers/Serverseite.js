@@ -64,6 +64,30 @@ const GRUPPE = {
     upkeep:   'Pflege',
 };
 
+/**
+ * Befehle: was das Spiel kann, und worüber.
+ *
+ * Der Entwurf zeigt diese Karte in der fachlichen Höhe — und sie ist die
+ * ehrlichste Karte der ganzen Seite: Sie sagt auch, was NICHT geht, und warum.
+ * Valheim hat keine Fernsteuerung; ein Panel, das trotzdem einen „Kicken"-Knopf
+ * zeigt, belügt den Betreiber genau einmal, nämlich wenn er ihn braucht.
+ */
+const BEFEHL_NAME = {
+    'players.list': 'Spielerliste',
+    'players.kick': 'Spieler entfernen',
+    'players.ban':  'Spieler sperren',
+    'world.save':   'Welt speichern',
+    'broadcast':    'Servernachricht',
+};
+
+const BEFEHL_QUELLE = {
+    query:       { text: 'Abfrage',       ton: 'green'  },
+    file:        { text: 'Datei',         ton: 'blue'   },
+    rcon:        { text: 'Fernsteuerung', ton: 'green'  },
+    console:     { text: 'Konsole',       ton: 'green'  },
+    unsupported: { text: 'nicht möglich', ton: 'secondary' },
+};
+
 /** Was `risk` bedeutet — nur gezeigt, wo es etwas zu verlieren gibt. */
 const RISIKO = {
     progress:    'Bestehender Fortschritt kann verlorengehen.',
@@ -89,6 +113,8 @@ function baueUebersicht(server, paket, zusatz = {}) {
         laufzeit:      baueLaufzeit(server.laeuft_seit),
         spieler:       baueSpieler(server, zusatz.live),
         einstellungen: baueEinstellungen(server, paket, hoehe),
+        befehle:       baueBefehle(paket),
+        kennzahlen:    baueKennzahlen(server),
         welt:          baueWelt(zusatz.letzteSicherung),
     };
 }
@@ -274,6 +300,42 @@ function baueEinstellungen(server, paket, hoehe) {
     return { sichtbar, gruppen, verborgen, ohnePaket: false };
 }
 
+/** Die Befehlsliste des Pakets — samt dem, was nicht geht. */
+function baueBefehle(paket) {
+    const c = paket?.commands;
+    if (!c || typeof c !== 'object') return [];
+    return Object.entries(c).map(([key, v]) => {
+        const via = v?.via || 'unsupported';
+        return {
+            schluessel: key,
+            name:   BEFEHL_NAME[key] || key,
+            quelle: BEFEHL_QUELLE[via] || BEFEHL_QUELLE.unsupported,
+            geht:   via !== 'unsupported',
+            grund:  v?.reason?.de || v?.reason?.en || null,
+            // Woran es hängt, in einem Wort — der Entwurf zeigt das als
+            // Kleingedrucktes neben dem Namen.
+            detail: via === 'file' ? v.file
+                  : via === 'query' ? (v.parse || 'Abfrage')
+                  : null,
+        };
+    });
+}
+
+/**
+ * Kennzahlen — nur was der Heartbeat wirklich mitbringt.
+ *
+ * CPU und RAM kommen alle 30 Sekunden vom Daemon. Der VERLAUF liegt in
+ * `server_metrics` und bekommt einen eigenen Navigationseintrag (entschieden
+ * 2026-08-18); hier steht nur der Augenblick.
+ */
+function baueKennzahlen(server) {
+    const cpu = Number.isFinite(server.cpu_percent) ? server.cpu_percent : null;
+    const ram = Number.isFinite(server.ram_used_mb) ? server.ram_used_mb : null;
+    const ramMax = Number.isFinite(server.ram_total_mb) ? server.ram_total_mb : null;
+    if (cpu === null && ram === null) return null;
+    return { cpu, ram, ramMax };
+}
+
 /** Welt: wann zuletzt gesichert. */
 function baueWelt(letzteSicherung) {
     if (!letzteSicherung) return { letzte: null };
@@ -287,4 +349,4 @@ function baueWelt(letzteSicherung) {
     return { letzte: letzteSicherung, text };
 }
 
-module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE };
+module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE, BEFEHL_NAME, BEFEHL_QUELLE };
