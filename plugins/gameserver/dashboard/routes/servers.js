@@ -2241,7 +2241,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
 
             const [letzte] = await dbService.query(
                 `SELECT completed_at FROM gameserver_backups
-                  WHERE server_id = ? AND status = 'done' AND completed_at IS NOT NULL
+                  WHERE server_id = ? AND status = 'completed' AND completed_at IS NOT NULL
                   ORDER BY completed_at DESC LIMIT 1`, [server.id]);
 
             uebersicht = baueUebersicht(server, paket, {

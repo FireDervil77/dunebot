@@ -1,6 +1,6 @@
 <%#
  * Cronjob-Tab Partial
- * Geplante Aufgaben (Start, Stop, Restart, Backup, Command) mit Cron-Expressions
+ * Geplante Aufgaben (Start, Stop, Restart, Sicherung, Command) mit Cron-Expressions
  * @author FireBot Team
 %>
 
@@ -120,12 +120,12 @@
                     </div>
                 </div>
 
-                <!-- Aufbewahrung: nur für Backup-Jobs sinnvoll (Baustellen 7.1) -->
+                <!-- Aufbewahrung: nur für Sicherung-Jobs sinnvoll (Baustellen 7.1) -->
                 <div id="cronjobAufbewahrungGroup" style="display:none;">
                     <div class="alert alert-secondary py-2 mb-3">
                         <i class="fas fa-hdd me-1"></i>
                         Die Aufbewahrung steht in den <strong>Servereinstellungen</strong> und gilt
-                        für alle automatischen Backups. Hier nur ausfüllen, wenn dieser eine Job
+                        für alle automatischen Sicherungen. Hier nur ausfüllen, wenn dieser eine Job
                         davon abweichen soll — <strong>leer heißt: Servereinstellung</strong>,
                         <strong>0 heißt ausdrücklich unbegrenzt</strong>.
                     </div>
@@ -138,7 +138,7 @@
                         <div class="col-6 mb-3">
                             <label for="cronjobKeepDays">Höchstalter (Tage)</label>
                             <input type="number" id="cronjobKeepDays" class="form-control" min="0" max="65535" placeholder="Servereinstellung">
-                            <small class="form-text text-secondary">Das jüngste Backup bleibt immer.</small>
+                            <small class="form-text text-secondary">Das jüngste Sicherung bleibt immer.</small>
                         </div>
                     </div>
                 </div>
@@ -149,7 +149,7 @@
                         <option value="restart">Server neu starten</option>
                         <option value="start">Server starten</option>
                         <option value="stop">Server stoppen</option>
-                        <option value="backup">Backup erstellen</option>
+                        <option value="backup">Sicherung erstellen</option>
                         <option value="command">Konsolen-Befehl ausführen</option>
                     </select>
                 </div>
@@ -240,7 +240,7 @@
         start:   '<span class="badge bg-success-lt"><i class="fas fa-play me-1"></i>Start</span>',
         stop:    '<span class="badge bg-secondary-lt"><i class="fas fa-stop me-1"></i>Stop</span>',
         restart: '<span class="badge bg-warning-lt"><i class="fas fa-redo me-1"></i>Neustart</span>',
-        backup:  '<span class="badge bg-info-lt"><i class="fas fa-save me-1"></i>Backup</span>',
+        backup:  '<span class="badge bg-info-lt"><i class="fas fa-save me-1"></i>Sicherung</span>',
         command: '<span class="badge bg-dark-lt"><i class="fas fa-terminal me-1"></i>Befehl</span>',
     };
 
@@ -342,7 +342,7 @@
             : `Läuft nach dem Ausdruck ${ausdruck} — diese Form kann ich nicht in Worte fassen.`;
     }
 
-    /** Aufbewahrungsfelder nur bei Backup-Jobs zeigen. */
+    /** Aufbewahrungsfelder nur bei Sicherung-Jobs zeigen. */
     function aufbewahrungUmschalten() {
         const action = document.getElementById('cronjobAction').value;
         document.getElementById('cronjobAufbewahrungGroup').style.display =

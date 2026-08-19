@@ -1,32 +1,32 @@
 <%#
- * Backup-Tab Partial
- * Zeigt Backup-Liste mit Erstellen, Löschen und Restore-Funktionalität
+ * Sicherung-Tab Partial
+ * Zeigt Sicherung-Liste mit Erstellen, Löschen und Restore-Funktionalität
  * @author FireBot Team
 %>
 
 <div class="row mb-3">
     <div class="col-12 d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="fas fa-save me-2"></i>Backups</h5>
+        <h5 class="mb-0"><i class="fas fa-save me-2"></i>Sicherungen</h5>
         <div>
             <button class="btn btn-secondary btn-sm me-2" onclick="loadBackups()">
                 <i class="fas fa-sync-alt me-1"></i> Aktualisieren
             </button>
             <% if (userPermissions.permissions['GAMESERVER.BACKUPS.CREATE']) { %>
                 <button class="btn btn-primary btn-sm" onclick="createBackup()">
-                    <i class="fas fa-plus me-1"></i> Neues Backup
+                    <i class="fas fa-plus me-1"></i> Neues Sicherung
                 </button>
             <% } %>
         </div>
     </div>
 </div>
 
-<!-- Backup-Notiz Modal -->
+<!-- Sicherung-Notiz Modal -->
 <% if (userPermissions.permissions['GAMESERVER.BACKUPS.CREATE']) { %>
 <div class="modal fade" id="backupNoteModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-sm" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-save me-2"></i>Backup erstellen</h5>
+                <h5 class="modal-title"><i class="fas fa-save me-2"></i>Sicherung erstellen</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
@@ -38,7 +38,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
                 <button type="button" class="btn btn-primary" id="confirmBackupBtn" onclick="confirmCreateBackup()">
-                    <i class="fas fa-save me-1"></i> Backup erstellen
+                    <i class="fas fa-save me-1"></i> Sicherung erstellen
                 </button>
             </div>
         </div>
@@ -46,18 +46,18 @@
 </div>
 <% } %>
 
-<!-- Backup-Tabelle -->
+<!-- Sicherung-Tabelle -->
 <div id="backups-container">
     <div id="backups-loading" class="text-center text-secondary py-5">
         <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
-        <p>Backups werden geladen...</p>
+        <p>Sicherungen werden geladen...</p>
     </div>
     <div id="backups-empty" class="text-center text-secondary py-5" style="display:none;">
         <i class="fas fa-archive fa-3x mb-3 text-secondary"></i>
-        <p>Keine Backups vorhanden.</p>
+        <p>Keine Sicherungen vorhanden.</p>
         <% if (userPermissions.permissions['GAMESERVER.BACKUPS.CREATE']) { %>
             <button class="btn btn-primary" onclick="createBackup()">
-                <i class="fas fa-plus me-1"></i> Erstes Backup erstellen
+                <i class="fas fa-plus me-1"></i> Erstes Sicherung erstellen
             </button>
         <% } %>
     </div>
@@ -200,7 +200,7 @@
             fenster('backupNoteModal')?.hide();
 
             if (data.success) {
-                if (typeof showToast === 'function') showToast('success', 'Backup gestartet');
+                if (typeof showToast === 'function') showToast('success', 'Sicherung gestartet');
                 loadBackups();
             } else {
                 if (typeof showToast === 'function') showToast('error', data.message || 'Fehler');
@@ -209,19 +209,19 @@
             if (typeof showToast === 'function') showToast('error', 'Netzwerkfehler');
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-save me-1"></i> Backup erstellen';
+            btn.innerHTML = '<i class="fas fa-save me-1"></i> Sicherung erstellen';
         }
     };
 
     window.deleteBackup = async function(backupId, backupName) {
         if (!CAN_DELETE) return;
-        if (!confirm(`Backup "${backupName}" wirklich löschen?`)) return;
+        if (!confirm(`Sicherung "${backupName}" wirklich löschen?`)) return;
 
         try {
             const resp = await fetch(`${BASE_URL}/${backupId}`, { method: 'DELETE' });
             const data = await resp.json();
             if (data.success) {
-                if (typeof showToast === 'function') showToast('success', 'Backup gelöscht');
+                if (typeof showToast === 'function') showToast('success', 'Sicherung gelöscht');
                 loadBackups();
             } else {
                 if (typeof showToast === 'function') showToast('error', data.message || 'Fehler');
@@ -233,7 +233,7 @@
 
     window.restoreBackup = async function(backupId, backupName) {
         if (!CAN_RESTORE) return;
-        if (!confirm(`Backup "${backupName}" wiederherstellen?\n\nACHTUNG: Aktuelle Serverdaten werden überschrieben! Der Server muss gestoppt sein.`)) return;
+        if (!confirm(`Sicherung "${backupName}" wiederherstellen?\n\nACHTUNG: Aktuelle Serverdaten werden überschrieben! Der Server muss gestoppt sein.`)) return;
 
         try {
             const resp = await fetch(`${BASE_URL}/${backupId}/restore`, { method: 'POST' });
