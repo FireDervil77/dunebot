@@ -13,7 +13,7 @@ const bcrypt = require('bcrypt');
 const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
 const { buildStartPayload, loadServerForStart, paketFuerInstall, ladePaketFuerAddon } = require('../helpers/StartPayload');
-const { baueUebersicht, baueServerListe } = require('../helpers/Serverseite');
+const { baueUebersicht, baueServerListe, bauePaketAuswahl } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
 const PanelService = require('../helpers/PanelService');
 const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');
@@ -332,8 +332,37 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
 
             Logger.debug(`[Gameserver] Step 1 - Public: ${publicAddons.length}, Guild: ${guildAddons.length}, Rootservers: ${rootservers.length}`);
 
+            // ── Die Auswahl nach dem Entwurf (Artboard 5a) ──────────────────
+            //
+            // Sie zeigt PAKETE, nicht Addons — und dazu, was ein Paket über sich
+            // selbst nicht weiss (`status.open`). Spiele ohne Paket bleiben
+            // darunter stehen: Heute hat eines von acht eines, und sie
+            // wegzulassen hiesse sieben Spiele unanlegbar zu machen, damit eine
+            // Liste sauber aussieht.
+            let auswahl = { pakete: [], ohnePaket: [] };
+            try {
+                const paketZeilen = await dbService.query(`
+                    SELECT pk.id, pk.slug, pv.fbpkg, pv.version, pv.channel
+                      FROM packages pk
+                      JOIN package_versions pv ON pv.id = (
+                          SELECT v.id FROM package_versions v
+                           WHERE v.package_id = pk.id
+                           ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
+                           LIMIT 1)
+                     ORDER BY pk.slug`);
+                const mitPaket = new Set(paketZeilen.map(z => z.id));
+                const alle = [...(publicAddons || []), ...(guildAddons || [])];
+                auswahl = bauePaketAuswahl(paketZeilen, alle.filter(a => !mitPaket.has(a.id)));
+            } catch (err) {
+                Logger.error('[Gameserver] Spielauswahl konnte nicht aufgebaut werden', err);
+            }
+
+            const am1 = ServiceManager.get('assetManager');
+            if (am1) am1.enqueueStyle('gameserver-serverseite');
+
             return await themeManager.renderView(res, 'guild/server-create-step1', {
-                title: 'Server erstellen - Schritt 1: Basic Information',
+                title: 'Server anlegen — Spiel wählen',
+                auswahl,
                 activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
                 publicAddons: publicAddons || [],
                 guildAddons: guildAddons || [],

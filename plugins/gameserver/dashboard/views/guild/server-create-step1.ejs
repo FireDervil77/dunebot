@@ -1,403 +1,139 @@
-<!-- Server Creation Wizard - Step 1: Select Addon -->
+<%#
+  Anlegen, Schritt 1: Spiel — Entwurf vom 2026-08-18, Artboard 5a.
 
+  Was diese Auswahl ehrlicher macht als eine Kachel mit Bild: Sie zeigt, was das
+  Paket über sich selbst NICHT weiss. `status.open` ist genau dafür da und stand
+  bisher nirgends.
+-%>
+<div class="fb-seite">
 
-            <!-- Progress Steps -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-4 text-center">
-                                    <div class="progress-step active">
-                                        <div class="progress-circle bg-primary text-white">1</div>
-                                        <strong><%= tr('gameserver:SERVER.STEP1_TITLE') %></strong>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 text-center">
-                                    <div class="progress-step">
-                                        <div class="progress-circle bg-secondary text-white">2</div>
-                                        <%= tr('gameserver:SERVER.STEP2_TITLE') %>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 text-center">
-                                    <div class="progress-step">
-                                        <div class="progress-circle bg-secondary text-white">3</div>
-                                        <%= tr('gameserver:SERVER.STEP3_TITLE') %>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+  <div class="fb-seitenkopf">
+    <div>
+      <div class="fb-titel">Server anlegen</div>
+      <div class="fb-muted" style="font-size:13px">Schritt 1 von 3 · Spiel wählen</div>
+    </div>
+    <a class="btn btn-white btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/servers">Abbrechen</a>
+  </div>
+
+  <form method="get" action="/guild/<%= guildId %>/plugins/gameserver/servers/create" id="fb-schritt1">
+    <input type="hidden" name="step" value="2">
+    <input type="hidden" name="addon_id" id="fb-gewaehlt" value="">
+
+    <div class="fb-karte">
+      <div class="fb-kopf">
+        <span>Spiele mit Paket</span>
+        <span class="fb-muted" style="margin-left:auto;font-size:13px;font-weight:400">
+          <%= auswahl.pakete.length %> <%= auswahl.pakete.length === 1 ? 'Paket' : 'Pakete' %>
+        </span>
+      </div>
+      <div class="fb-koerper">
+        <% if (!auswahl.pakete.length) { %>
+          <div class="fb-muted" style="font-size:13px">Noch kein Paket eingeliefert.</div>
+        <% } %>
+        <% auswahl.pakete.forEach(function (p) { %>
+          <label class="fb-spiel" data-fb-wahl="<%= p.addonId %>">
+            <input type="radio" name="_wahl" value="<%= p.addonId %>" hidden>
+            <div style="display:flex;gap:12px;align-items:start">
+              <div style="flex:1 1 auto">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="font-weight:600;font-size:15px"><%= p.name %></span>
+                  <% if (p.kategorie) { %><span class="fb-pille"><%= p.kategorie %></span><% } %>
+                  <% if (p.version) { %>
+                    <span class="fb-pille fb-mono"><%= p.version %><%= p.kanal ? ' · ' + p.kanal : '' %></span>
+                  <% } %>
                 </div>
-            </div>
+                <% if (p.beschreibung) { %>
+                  <div class="fb-muted" style="font-size:13px;margin-top:3px;text-wrap:pretty"><%= p.beschreibung %></div>
+                <% } %>
 
-            <!-- Step 1: Basic Information -->
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                <i class="fa-solid fa-info-circle"></i>
-                                <%= tr('gameserver:SERVER.BASIC_INFO') %>
-                            </h3>
-                        </div>
-                        <div class="card-body">
-                            <form id="step1Form">
-                                <!-- Server Name -->
-                                <div class="mb-3">
-                                    <label for="server_name">
-                                        <%= tr('gameserver:SERVER.NAME') %> <span class="text-danger">*</span>
-                                    </label>
-                                    <input type="text" 
-                                           class="form-control" 
-                                           id="server_name" 
-                                           name="server_name" 
-                                           placeholder="<%= tr('gameserver:SERVER.NAME_PLACEHOLDER') %>" 
-                                           required 
-                                           maxlength="100">
-                                    <small class="form-text text-secondary">
-                                        <%= tr('gameserver:SERVER.NAME_HELP_TEXT') %>
-                                    </small>
-                                </div>
-
-                                <!-- Addon Selection -->
-                                <div class="mb-3">
-                                    <label for="addon_select">
-                                        <%= tr('gameserver:SERVER.SELECT_ADDON') %> <span class="text-danger">*</span>
-                                    </label>
-                                    <select class="form-control select2" 
-                                            id="addon_select" 
-                                            name="addon_slug" 
-                                            required 
-                                            data-placeholder="<%= tr('gameserver:SERVER.SELECT_ADDON_PLACEHOLDER') %>">
-                                        <option value=""></option>
-                                        
-                                        <!-- Eigene Addons -->
-                                        <% if (guildAddons && guildAddons.length > 0) { %>
-                                            <optgroup label="<%= tr('gameserver:SERVER.MY_ADDONS_LABEL') %>">
-                                                <% guildAddons.forEach(addon => { %>
-                                                    <option value="<%= addon.slug %>" 
-                                                            data-addon='<%= JSON.stringify(addon) %>'>
-                                                        <i class="fa-solid fa-user-shield"></i> <%= addon.name %>
-                                                    </option>
-                                                <% }) %>
-                                            </optgroup>
-                                        <% } %>
-                                        
-                                        <!-- Öffentliche Addons -->
-                                        <% if (publicAddons && publicAddons.length > 0) { %>
-                                            <optgroup label="<%= tr('gameserver:SERVER.PUBLIC_ADDONS') %>">
-                                                <% publicAddons.forEach(addon => { %>
-                                                    <option value="<%= addon.slug %>" 
-                                                            data-addon='<%= JSON.stringify(addon) %>'>
-                                                        <% if (addon.trust_level === 'official') { %>
-                                                            👑 <%= addon.name %>
-                                                        <% } else if (addon.trust_level === 'trusted') { %>
-                                                            🛡️ <%= addon.name %>
-                                                        <% } else if (addon.trust_level === 'verified') { %>
-                                                            ✓ <%= addon.name %>
-                                                        <% } else { %>
-                                                            <%= addon.name %>
-                                                        <% } %>
-                                                    </option>
-                                                <% }) %>
-                                            </optgroup>
-                                        <% } %>
-                                    </select>
-                                    <small class="form-text text-secondary">
-                                        <%= tr('gameserver:SERVER.ADDON_HELP') %>
-                                    </small>
-                                </div>
-
-                                <!-- Addon Info Card (dynamisch) -->
-                                <div id="addonInfoCard" class="alert alert-info" style="display: none;">
-                                    <div class="d-flex align-items-center">
-                                        <i class="fa-solid fa-gamepad fa-2x me-3"></i>
-                                        <div>
-                                            <strong id="addonInfoName">-</strong><br>
-                                            <small id="addonInfoDesc" class="text-secondary">-</small>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Rootserver Selection -->
-                                <div class="mb-3">
-                                    <label for="rootserver_select">
-                                        <%= tr('gameserver:SERVER.SELECT_ROOTSERVER') %> <span class="text-danger">*</span>
-                                    </label>
-                                    <select class="form-control" 
-                                            id="rootserver_select" 
-                                            name="rootserver_id" 
-                                            required>
-                                        <option value=""><%= tr('gameserver:SERVER.SELECT_ROOTSERVER_PLACEHOLDER') %></option>
-                                        <% if (rootservers && rootservers.length > 0) { %>
-                                            <% rootservers.forEach(server => { %>
-                                                <option value="<%= server.id %>" 
-                                                        data-cpu="<%= server.cpu_usage_percent || 0 %>"
-                                                        data-ram="<%= server.ram_usage_gb || 0 %>"
-                                                        data-ram-total="<%= server.ram_total_gb || 0 %>"
-                                                        data-disk="<%= server.disk_usage_gb || 0 %>"
-                                                        data-disk-total="<%= server.disk_total_gb || 0 %>">
-                                                    <%= server.name %> 
-                                                    <% if (server.hostname) { %>(<%= server.hostname %>)<% } %>
-                                                </option>
-                                            <% }) %>
-                                        <% } else { %>
-                                            <option value="" disabled>
-                                                <%= tr('gameserver:SERVER.NO_ROOTSERVERS') %>
-                                            </option>
-                                        <% } %>
-                                    </select>
-                                    <small class="form-text text-secondary">
-                                        <%= tr('gameserver:SERVER.ROOTSERVER_HELP') %>
-                                    </small>
-                                </div>
-
-                                <!-- Rootserver Stats (dynamisch) -->
-                                <div id="rootserverStats" style="display: none;">
-                                    <div class="row text-center mb-3">
-                                        <div class="col-md-4">
-                                            <div class="small text-secondary">CPU</div>
-                                            <div class="progress" style="height: 25px;">
-                                                <div id="statCpu" class="progress-bar" role="progressbar" style="width: 0%">0%</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="small text-secondary">RAM</div>
-                                            <div class="progress" style="height: 25px;">
-                                                <div id="statRam" class="progress-bar bg-info" role="progressbar" style="width: 0%">0 GB</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="small text-secondary">Disk</div>
-                                            <div class="progress" style="height: 25px;">
-                                                <div id="statDisk" class="progress-bar bg-warning" role="progressbar" style="width: 0%">0 GB</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Installation Options -->
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label><%= tr('gameserver:SERVER.RUN_INSTALL_SCRIPT') %> <span class="text-danger">*</span></label>
-                                            <div class="btn-group btn-group-toggle d-flex" data-bs-toggle="buttons">
-                                                <label class="btn btn-outline-success active">
-                                                    <input type="radio" name="run_install_script" value="true" checked> 
-                                                    <i class="fa-solid fa-code"></i> <%= tr('gameserver:SERVER.YES') %>
-                                                </label>
-                                                <label class="btn btn-outline-danger">
-                                                    <input type="radio" name="run_install_script" value="false"> 
-                                                    <i class="fa-solid fa-forward"></i> <%= tr('gameserver:SERVER.SKIP') %>
-                                                </label>
-                                            </div>
-                                            <small class="form-text text-secondary">
-                                                <%= tr('gameserver:SERVER.INSTALL_SCRIPT_HELP_SHORT') %>
-                                            </small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label><%= tr('gameserver:SERVER.START_AFTER_INSTALL') %> <span class="text-danger">*</span></label>
-                                            <div class="btn-group btn-group-toggle d-flex" data-bs-toggle="buttons">
-                                                <label class="btn btn-outline-success active">
-                                                    <input type="radio" name="start_after_install" value="true" checked> 
-                                                    <i class="fa-solid fa-play"></i> <%= tr('gameserver:SERVER.YES') %>
-                                                </label>
-                                                <label class="btn btn-outline-danger">
-                                                    <input type="radio" name="start_after_install" value="false"> 
-                                                    <i class="fa-solid fa-stop"></i> <%= tr('gameserver:SERVER.NO') %>
-                                                </label>
-                                            </div>
-                                            <small class="form-text text-secondary">
-                                                <%= tr('gameserver:SERVER.START_AFTER_HELP') %>
-                                            </small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-                        <div class="card-footer">
-                            <div class="d-flex justify-content-between">
-                                <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="btn btn-secondary">
-                                    <i class="fa-solid fa-times"></i> <%= tr('gameserver:SERVER.CANCEL') %>
-                                </a>
-                                <button type="button" id="btnNextStep1" class="btn btn-primary" disabled>
-                                    <%= tr('gameserver:SERVER.NEXT') %> <i class="fa-solid fa-arrow-right"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                <div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;font-size:13px">
+                  <% if (p.bedarf && (p.bedarf.ram || p.bedarf.platte)) { %>
+                    <span><%= [p.bedarf.ram, p.bedarf.platte].filter(Boolean).join(' · ') %></span>
+                    <% if (p.bedarf.grundlage) { %><span class="fb-muted"><%= p.bedarf.grundlage %></span><% } %>
+                  <% } else { %>
+                    <%# „nicht geraten" ist der wichtigere Teil des Satzes: Eine
+                        geratene Zahl sähe hilfreicher aus und wäre schlechter —
+                        wer 2 GB liest, bucht 2 GB, und der Server stirbt beim
+                        dritten Spieler. %>
+                    <span class="fb-muted">Bedarf nicht gemessen — nicht geraten.</span>
+                  <% } %>
                 </div>
+
+                <% if (p.offen.length) { %>
+                  <details style="margin-top:8px">
+                    <summary style="cursor:pointer;font-size:13px;color:#b35309">
+                      <%= p.offen.length %> <%= p.offen.length === 1 ? 'Punkt' : 'Punkte' %> an diesem Paket ungeprüft
+                    </summary>
+                    <ul class="fb-muted" style="font-size:12.25px;margin:6px 0 0;padding-left:18px">
+                      <% p.offen.forEach(function (o) { %><li style="margin-bottom:3px"><%= o %></li><% }); %>
+                    </ul>
+                  </details>
+                <% } %>
+
+                <% if (p.quelle) { %>
+                  <div class="fb-muted fb-mono" style="font-size:12px;margin-top:6px"><%= p.quelle %></div>
+                <% } %>
+              </div>
+              <span class="fb-haken">✓</span>
             </div>
+          </label>
+        <% }); %>
+      </div>
+    </div>
 
-            <!-- ALTE CARDS KOMPLETT ENTFERNT - Jetzt alles im Dropdown oben! -->
+    <% if (auswahl.ohnePaket.length) { %>
+      <div class="fb-karte">
+        <div class="fb-kopf">
+          <span>Spiele ohne Paket</span>
+          <span class="fb-muted" style="margin-left:auto;font-size:13px;font-weight:400">
+            werden über den alten Weg installiert
+          </span>
+        </div>
+        <div class="fb-koerper">
+          <%# Sie verschwinden NICHT aus der Auswahl. Heute hat eines von acht
+              Spielen ein Paket; die anderen wegzulassen hiesse, sieben Spiele
+              unanlegbar zu machen, damit eine Liste sauber aussieht. %>
+          <% auswahl.ohnePaket.forEach(function (a) { %>
+            <label class="fb-spiel" data-fb-wahl="<%= a.addonId %>">
+              <input type="radio" name="_wahl" value="<%= a.addonId %>" hidden>
+              <div style="display:flex;gap:12px;align-items:center">
+                <div style="flex:1 1 auto">
+                  <div style="font-weight:600;font-size:15px"><%= a.name %></div>
+                  <div class="fb-muted" style="font-size:13px">Kein Paket — Installation über das alte Egg-Skript.</div>
+                </div>
+                <span class="fb-haken">✓</span>
+              </div>
+            </label>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
 
+    <div class="fb-fuss" style="border:0;margin-top:0">
+      <span class="fb-muted" id="fb-wahl-text">Noch nichts gewählt</span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <a class="btn btn-white btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/servers">Abbrechen</a>
+        <button type="submit" class="btn btn-primary btn-sm" id="fb-weiter" disabled>Weiter zur Maschine</button>
+      </div>
+    </div>
+  </form>
 
-
-<style>
-.progress-step {
-    padding: 20px 0;
-}
-
-.progress-circle {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 10px;
-}
-
-.progress-step.active .progress-circle {
-    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
-}
-</style>
+</div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const guildId = '<%= guildId %>';
-    
-    // Form-Validierung & Navigation
-    const form = document.getElementById('step1Form');
-    const btnNext = document.getElementById('btnNextStep1');
-    const addonSelect = document.getElementById('addon_select');
-    const rootserverSelect = document.getElementById('rootserver_select');
-    const serverNameInput = document.getElementById('server_name');
-    
-    // ✅ Query-Parameter auslesen und Addon vorauswählen
-    const urlParams = new URLSearchParams(window.location.search);
-    const preselectedAddon = urlParams.get('addon');
-    const preselectedTemplate = urlParams.get('template');
-    
-    if (preselectedAddon) {
-        console.log('[Step1] Vorausgewähltes Addon:', preselectedAddon);
-        
-        // Addon in Select vorauswählen
-        addonSelect.value = preselectedAddon;
-        
-        // Change-Event triggern für Info-Card & Validation
-        addonSelect.dispatchEvent(new Event('change'));
-        
-        // Optional: Template-Info anzeigen wenn vorhanden
-        if (preselectedTemplate) {
-            console.log('[Step1] Vorausgewähltes Template:', preselectedTemplate);
-            // Template wird in Step 2 verwendet
-        }
-    }
-    
-    // Validation-Check
-    function validateForm() {
-        const serverName = serverNameInput.value.trim();
-        const addonSlug = addonSelect.value;
-        const rootserverId = rootserverSelect.value;
-        
-        const isValid = serverName.length > 0 && addonSlug && rootserverId;
-        
-        btnNext.disabled = !isValid;
-        
-        if (isValid) {
-            btnNext.classList.remove('btn-secondary');
-            btnNext.classList.add('btn-primary');
-        } else {
-            btnNext.classList.remove('btn-primary');
-            btnNext.classList.add('btn-secondary');
-        }
-    }
-    
-    // Event-Listeners
-    serverNameInput.addEventListener('input', validateForm);
-    addonSelect.addEventListener('change', validateForm);
-    rootserverSelect.addEventListener('change', validateForm);
-    
-    // Addon-Auswahl → Info anzeigen
-    addonSelect.addEventListener('change', function() {
-        const selectedOption = this.options[this.selectedIndex];
-        if (!selectedOption.value) {
-            document.getElementById('addonInfoCard').style.display = 'none';
-            return;
-        }
-        
-        try {
-            const addonData = JSON.parse(selectedOption.dataset.addon);
-            document.getElementById('addonInfoName').textContent = addonData.name;
-            document.getElementById('addonInfoDesc').textContent = addonData.description || 'Keine Beschreibung verfügbar';
-            document.getElementById('addonInfoCard').style.display = 'block';
-        } catch (e) {
-            console.error('[Step1] Fehler beim Parsen von Addon-Daten:', e);
-        }
+(function () {
+  var text = document.getElementById('fb-wahl-text');
+  var weiter = document.getElementById('fb-weiter');
+  var feld = document.getElementById('fb-gewaehlt');
+  document.querySelectorAll('.fb-spiel').forEach(function (k) {
+    k.addEventListener('click', function () {
+      document.querySelectorAll('.fb-spiel').forEach(function (x) { x.classList.remove('an'); });
+      k.classList.add('an');
+      var name = k.querySelector('span[style*="font-weight:600"], div[style*="font-weight:600"]');
+      feld.value = k.getAttribute('data-fb-wahl');
+      text.textContent = (name ? name.textContent.trim() : 'Spiel') + ' gewählt';
+      weiter.disabled = false;
     });
-    
-    // Rootserver-Auswahl → Stats anzeigen
-    rootserverSelect.addEventListener('change', function() {
-        const selectedOption = this.options[this.selectedIndex];
-        if (!selectedOption.value) {
-            document.getElementById('rootserverStats').style.display = 'none';
-            return;
-        }
-        
-        const cpu = parseFloat(selectedOption.dataset.cpu) || 0;
-        const ramUsed = parseFloat(selectedOption.dataset.ram) || 0;
-        const ramTotal = parseFloat(selectedOption.dataset.ramTotal) || 1;
-        const diskUsed = parseFloat(selectedOption.dataset.disk) || 0;
-        const diskTotal = parseFloat(selectedOption.dataset.diskTotal) || 1;
-        
-        const ramPercent = ((ramUsed / ramTotal) * 100).toFixed(1);
-        const diskPercent = ((diskUsed / diskTotal) * 100).toFixed(1);
-        
-        // CPU
-        document.getElementById('statCpu').style.width = cpu + '%';
-        document.getElementById('statCpu').textContent = cpu.toFixed(1) + '%';
-        document.getElementById('statCpu').classList.remove('bg-success', 'bg-warning', 'bg-danger');
-        if (cpu < 50) document.getElementById('statCpu').classList.add('bg-success');
-        else if (cpu < 80) document.getElementById('statCpu').classList.add('bg-warning');
-        else document.getElementById('statCpu').classList.add('bg-danger');
-        
-        // RAM
-        document.getElementById('statRam').style.width = ramPercent + '%';
-        document.getElementById('statRam').textContent = ramUsed.toFixed(1) + ' / ' + ramTotal.toFixed(1) + ' GB';
-        
-        // Disk
-        document.getElementById('statDisk').style.width = diskPercent + '%';
-        document.getElementById('statDisk').textContent = diskUsed.toFixed(1) + ' / ' + diskTotal.toFixed(1) + ' GB';
-        
-        document.getElementById('rootserverStats').style.display = 'block';
-    });
-    
-    // Next Button → Step 2
-    btnNext.addEventListener('click', function() {
-        if (!form.checkValidity()) {
-            form.reportValidity();
-            return;
-        }
-        
-        const formData = new FormData(form);
-        const params = new URLSearchParams();
-        
-        params.set('step', '2');
-        params.set('addon', formData.get('addon_slug'));
-        params.set('rootserver', formData.get('rootserver_id'));
-        params.set('server_name', formData.get('server_name'));
-        params.set('run_install', formData.get('run_install_script'));
-        params.set('start_after', formData.get('start_after_install'));
-        
-        console.log('[Step1] Navigiere zu Step 2:', Object.fromEntries(params));
-        window.location.href = `/guild/${guildId}/plugins/gameserver/servers/create?${params.toString()}`;
-    });
-    
-    // Initial Validation
-    validateForm();
-    
-    // Select2 Init (falls verfügbar)
-    if (typeof $.fn.select2 !== 'undefined') {
-        $('#addon_select').select2({
-            theme: 'bootstrap4',
-            width: '100%'
-        });
-    }
-});
+  });
+})();
 </script>

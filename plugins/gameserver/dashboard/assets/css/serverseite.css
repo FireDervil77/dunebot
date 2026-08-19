@@ -154,3 +154,14 @@
   margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--fb-border);
   font-size: 13px;
 }
+
+/* ── Spielauswahl beim Anlegen (Artboard 5a) ────────────────────────────── */
+.fb-spiel {
+  display: block; cursor: pointer;
+  border: 1px solid var(--fb-border); border-radius: var(--fb-radius);
+  padding: 14px 16px; margin-bottom: 10px; background: #fff;
+}
+.fb-spiel:hover { border-color: #cfd6e0; }
+.fb-spiel.an { border-color: var(--fb-primary); background: rgba(52,152,219,.04); }
+.fb-spiel .fb-haken { color: transparent; font-weight: 700; flex: 0 0 auto; }
+.fb-spiel.an .fb-haken { color: var(--fb-primary); }

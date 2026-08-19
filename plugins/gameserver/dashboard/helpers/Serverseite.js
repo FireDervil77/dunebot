@@ -534,3 +534,69 @@ function baueServerListe(zeilen, paketNachAddon = {}) {
 }
 
 module.exports.baueServerListe = baueServerListe;
+
+/**
+ * Die Spielauswahl beim Anlegen — Entwurf vom 2026-08-18, Artboard 5a.
+ *
+ * ── Was diese Karte ehrlicher macht als eine Kachel mit Bild ────────────────
+ *
+ * Sie zeigt, was das Paket über sich selbst NICHT weiss. `status.open` ist
+ * genau dafür da, und es stand bisher nirgends: „7 Punkte an diesem Paket
+ * ungeprüft — Mindest-RAM und Plattenbedarf nicht gemessen, nicht geraten."
+ *
+ * Der Nachsatz ist der Punkt. Eine geratene Zahl sähe hilfreicher aus und wäre
+ * schlechter: Wer 2 GB liest, bucht 2 GB, und der Server stirbt beim dritten
+ * Spieler. „Nicht gemessen" kostet eine Rückfrage, eine falsche Zahl kostet
+ * einen Abend.
+ *
+ * @param {Array} paketZeilen  { id, slug, fbpkg } aus packages/package_versions
+ * @param {Array} ohnePaket    Addons, zu denen es noch kein Paket gibt
+ */
+function bauePaketAuswahl(paketZeilen, ohnePaket = []) {
+    const pakete = [];
+    for (const z of (paketZeilen || [])) {
+        let p;
+        try {
+            p = typeof z.fbpkg === 'string' ? JSON.parse(z.fbpkg) : z.fbpkg;
+        } catch { continue; }
+        if (!p) continue;
+
+        const id = p.identity || {};
+        const r  = p.requirements || null;
+
+        pakete.push({
+            addonId:  z.id,
+            slug:     id.slug || z.slug,
+            name:     id.name || z.slug,
+            kategorie: id.category || null,
+            beschreibung: id.description?.de || id.description?.en || '',
+            version:  id.version || z.version || null,
+            kanal:    z.channel || null,
+            // Bedarf: gemessen oder ausdrücklich nicht.
+            bedarf: r ? {
+                ram:    r.min_ram_mb ? (r.min_ram_mb / 1024).toFixed(1).replace('.', ',') + ' GB RAM' : null,
+                platte: r.min_disk_mb ? (r.min_disk_mb / 1024).toFixed(1).replace('.', ',') + ' GB Platte' : null,
+                grundlage: r.measured_at ? 'gemessen am ' + r.measured_at : null,
+            } : null,
+            offen:    Array.isArray(p.status?.open) ? p.status.open : [],
+            vollstaendig: p.status?.complete === true,
+            // Woher die Dateien kommen — beantwortet „was passiert gleich".
+            quelle:   (p.install?.steps || []).map(s =>
+                        s.type === 'steamcmd' ? 'SteamCMD lädt App ' + s.app : s.type).join(', ') || null,
+            image:    p.image?.ref ? (p.image.tag ? p.image.ref + ':' + p.image.tag : p.image.ref) : null,
+        });
+    }
+
+    return {
+        pakete,
+        // Spiele ohne Paket verschwinden NICHT aus der Auswahl. Heute hat genau
+        // eines von acht ein Paket; sie wegzulassen hiesse, sieben Spiele
+        // unanlegbar zu machen, um eine Liste sauber aussehen zu lassen.
+        ohnePaket: (ohnePaket || []).map(a => ({
+            addonId: a.id, slug: a.slug, name: a.name,
+            beschreibung: a.short_description || a.description || '',
+        })),
+    };
+}
+
+module.exports.bauePaketAuswahl = bauePaketAuswahl;
