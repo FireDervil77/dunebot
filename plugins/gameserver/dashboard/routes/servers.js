@@ -171,6 +171,7 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
         const assetManager = ServiceManager.get('assetManager');
         if (assetManager) {
             assetManager.enqueueScript('gameserver-sse');
+            assetManager.enqueueStyle('gameserver-serverseite');
             assetManager.enqueueScript('gameserver-actions');
             assetManager.enqueueScript('gameserver-overview');
         }
@@ -2049,6 +2050,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         const assetManager = ServiceManager.get('assetManager');
         if (assetManager) {
             assetManager.enqueueScript('gameserver-sse');
+            assetManager.enqueueStyle('gameserver-serverseite');
             assetManager.enqueueScript('gameserver-actions');
         }
 

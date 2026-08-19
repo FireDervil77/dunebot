@@ -1,555 +1,145 @@
-<%# 
-  * Server-Detail-View mit Tabbed-Interface
-  * Zeigt Übersicht, Console, Files, Logs, Backups, Settings
-  * @author FireBot Team
-  %>
+<%#
+  Die Serverseite — Entwurf vom 2026-08-18, Artboards 2 und 3.
 
-<div class="container-fluid">
-    <!-- ========================================
-         SERVER HEADER
-         ======================================== -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <!-- Game Icon & Info -->
-                        <div class="col-md-8">
-                            <div class="d-flex align-items-center">
-                                <!-- Game Icon -->
-                                <% if (server.game_icon) { %>
-                                    <img src="<%= server.game_icon %>" 
-                                         alt="<%= server.game_name %>" 
-                                         class="rounded me-3"
-                                         style="width: 64px; height: 64px; object-fit: cover;">
-                                <% } else { %>
-                                    <div class="bg-secondary text-white rounded d-flex align-items-center justify-content-center me-3" 
-                                         style="width: 64px; height: 64px;">
-                                        <i class="fas fa-gamepad fa-2x"></i>
-                                    </div>
-                                <% } %>
-                                
-                                <!-- Server Info -->
-                                <div>
-                                    <h3 class="mb-1"><%= server.name %></h3>
-                                    <p class="text-secondary mb-1">
-                                        <i class="fas fa-server me-1"></i>
-                                        <%= server.game_name || 'Unbekanntes Spiel' %>
-                                    </p>
-                                    <div>
-                                        <% 
-                                        // Status-Badge-Mapping (running → online, stopped → offline)
-                                        let displayStatus = server.status;
-                                        if (displayStatus === 'running') {
-                                            displayStatus = 'online';
-                                        } else if (displayStatus === 'stopped') {
-                                            displayStatus = 'offline';
-                                        }
-                                        
-                                        const statusColors = {
-                                            online: 'success',
-                                            offline: 'secondary',
-                                            starting: 'warning',
-                                            stopping: 'warning',
-                                            error: 'danger',
-                                            installing: 'info',
-                                            installed: 'success'
-                                        };
-                                        const statusIcons = {
-                                            online: 'fa-check-circle',
-                                            offline: 'fa-circle',
-                                            starting: 'fa-spinner fa-spin',
-                                            stopping: 'fa-spinner fa-spin',
-                                            error: 'fa-exclamation-triangle',
-                                            installing: 'fa-download',
-                                            installed: 'fa-check-circle'
-                                        };
-                                        const color = statusColors[displayStatus] || 'secondary';
-                                        const icon = statusIcons[displayStatus] || 'fa-circle';
-                                        %>
-                                        <span class="badge bg-<%= color %>" data-server-status>
-                                            <i class="fas <%= icon %> me-1"></i>
-                                            <span data-status-text><%= displayStatus %></span>
-                                        </span>
-                                        
-                                        <!-- Connection Info (nur bei online) -->
-                                        <% if (server.status === 'online' && server.ip_address && server.port_game) { %>
-                                            <span class="badge bg-info ms-2">
-                                                <i class="fas fa-plug me-1"></i>
-                                                <%= server.ip_address %>:<%= server.port_game %>
-                                            </span>
-                                        <% } %>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Quick Actions -->
-                        <div class="col-md-4 text-end">
-                            <div class="btn-group" role="group">
-                                <!-- Start Button (immer rendern, Sichtbarkeit via JS) -->
-                                <% if (userPermissions.permissions['GAMESERVER.START']) { %>
-                                    <button class="btn btn-success" 
-                                            onclick="serverAction('<%= server.id %>', 'start')"
-                                            title="Server starten"
-                                            style="display: <%= (displayStatus === 'offline' || displayStatus === 'error' || displayStatus === 'installed') ? '' : 'none' %>;">
-                                        <i class="fas fa-play me-1"></i> Start
-                                    </button>
-                                <% } %>
-                                
-                                <!-- Stop Button (immer rendern, Sichtbarkeit via JS) -->
-                                <% if (userPermissions.permissions['GAMESERVER.STOP']) { %>
-                                    <button class="btn btn-danger" 
-                                            onclick="serverAction('<%= server.id %>', 'stop')"
-                                            title="Server stoppen"
-                                            style="display: <%= (displayStatus === 'online' || displayStatus === 'starting') ? '' : 'none' %>;">
-                                        <i class="fas fa-stop me-1"></i> Stop
-                                    </button>
-                                <% } %>
-                                
-                                <!-- Restart Button (immer rendern, Sichtbarkeit via JS) -->
-                                <% if (userPermissions.permissions['GAMESERVER.RESTART']) { %>
-                                    <button class="btn btn-warning" 
-                                            onclick="serverAction('<%= server.id %>', 'restart')"
-                                            title="Server neu starten"
-                                            style="display: <%= displayStatus === 'online' ? '' : 'none' %>;">
-                                        <i class="fas fa-redo me-1"></i> Restart
-                                    </button>
-                                <% } %>
-                                
-<!-- Reinstall Button -->
-                                <% if (userPermissions.permissions['GAMESERVER.CREATE']) { %>
-                                    <button class="btn btn-primary" 
-                                            onclick="reinstallServer('<%= server.id %>', '<%= server.name %>')" 
-                                            title="Server neu installieren">
-                                        <i class="fas fa-wrench me-1"></i> Reinstall
-                                    </button>
-                                <% } %>
-                                
-<!-- Move Button (Server-Migration) -->
-                                <%# Auch bei 'online' sichtbar: Die Migration stoppt den Server
-                                    selbst als ersten Schritt (siehe MigrationManager) und das Modal
-                                    warnt explizit davor. Nur während laufender Aktionen
-                                    (installing/updating/starting/stopping) ausblenden. %>
-                                <% if (userPermissions.permissions['GAMESERVER.EDIT']) { %>
-                                    <button class="btn btn-info"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#migrationModal"
-                                            title="Server zu anderem RootServer verschieben"
-                                            style="display: <%= ['offline', 'error', 'installed', 'online'].includes(displayStatus) ? '' : 'none' %>;">
-                                        <i class="fas fa-exchange-alt me-1"></i> Move
-                                    </button>
-                                <% } %>
-                                
-                                <!-- Edit Button -->
-                                <% if (userPermissions.permissions['GAMESERVER.EDIT']) { %>
-                                    <a href="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/edit" 
-                                       class="btn btn-secondary"
-                                       title="Server bearbeiten">
-                                        <i class="fas fa-cog me-1"></i> Einstellungen
-                                    </a>
-                                <% } %>
-                                
-                                <!-- Delete/Uninstall Button (nur sichtbar wenn offline/stopped/installed) -->
-                                <% if (userPermissions.permissions['GAMESERVER.DELETE']) { %>
-                                    <button class="btn btn-danger" 
-                                            onclick="deleteServer('<%= server.id %>', '<%= server.name %>')"
-                                            title="Server deinstallieren"
-                                            style="display: <%= (displayStatus === 'offline' || displayStatus === 'error' || displayStatus === 'installed') ? '' : 'none' %>;">
-                                        <i class="fas fa-trash me-1"></i> Löschen
-                                    </button>
-                                <% } %>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  ── Was hier verschwunden ist, und warum ────────────────────────────────────
+
+  Zehn Reiter (Übersicht, Konsole, Dateien, Logs, Sicherungen, Aufgaben,
+  Variablen, RCON, Panels, Öffentlich). Der Entwurf hat KEINE. Er zeigt oben
+  eine Zeile — Höhe, Dateien, Neu starten, Stoppen — und darunter Karten.
+
+  Der Betreiber, nachdem der erste Anlauf die neue Karte nur ÜBER die alte
+  Übersicht gesetzt hatte: „das sieht immer noch nach altem Layout aus… warum
+  sieht es immer noch so aus wie Tabs und alles andere vorher?"
+
+  Die Inhalte sind nicht weg, sie sind einsortiert:
+
+    Übersicht   → die neuen Karten (Zustand, Einstellungen, Befehle, Welt)
+    Variablen   → „Rohmodus" in der fachlichen Höhe; die Einstellungskarte
+                  bedient das Übliche, der Rohmodus alles
+    RCON        → die Befehle-Karte sagt, WAS geht; der Rohmodus ist das Werkzeug
+    Konsole,    → Karten in der fachlichen Höhe
+    Aufgaben,
+    Panels,
+    Öffentlich
+    Dateien     → eigener Abschnitt, aus der Kopfzeile verlinkt
+    Logs        → in der Konsole aufgegangen
+
+  Was ein Betreiber selten braucht, steht in der fachlichen Höhe. Das ist die
+  Höhenstufen-Entscheidung vom 2026-08-18, angewandt auf die ganze Seite statt
+  nur auf die Einstellungsliste.
+-%>
+<div class="fb-seite">
+
+  <%# ── Kopfzeile ───────────────────────────────────────────────────────── %>
+  <% const u = locals.uebersicht; %>
+  <% const hoehe = (u && u.hoehe) || 'einfach'; %>
+  <div class="fb-seitenkopf">
+    <div>
+      <div class="fb-titel"><%= u ? u.kopf.spiel : server.name %></div>
+      <div class="fb-muted" style="font-size:13px">
+        <%= u ? u.kopf.herkunft : (server.game_name || '') %>
+      </div>
     </div>
 
-    <!-- ========================================
-         TABBED INTERFACE
-         ======================================== -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card card-tabs">
-                <div class="card-status-top bg-primary"></div>
-                <!-- Tab Navigation -->
-                <div class="card-header p-0 pt-1 border-bottom-0">
-                    <ul class="nav nav-tabs" id="server-tabs" role="tablist">
-                        <!-- Overview Tab -->
-                        <li class="nav-item">
-                            <a class="nav-link active" 
-                               id="overview-tab" 
-                               data-bs-toggle="tab" 
-                               href="#overview" 
-                               role="tab">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Übersicht
-                            </a>
-                        </li>
-                        
-                        <!-- Console Tab (nur mit Permission) -->
-                        <% if (userPermissions.permissions['GAMESERVER.CONSOLE.VIEW']) { %>
-                            <li class="nav-item">
-                                <a class="nav-link" 
-                                   id="console-tab" 
-                                   data-bs-toggle="tab" 
-                                   href="#console" 
-                                   role="tab">
-                                    <i class="fas fa-terminal me-1"></i>
-                                    Console
-                                </a>
-                            </li>
-                        <% } %>
-                        
-                        <!-- Files Tab (nur mit Permission) -->
-                        <% if (userPermissions.permissions['GAMESERVER.FILES.VIEW']) { %>
-                            <li class="nav-item">
-                                <a class="nav-link" 
-                                   id="files-tab" 
-                                   data-bs-toggle="tab" 
-                                   href="#files" 
-                                   role="tab">
-                                    <i class="fas fa-folder me-1"></i>
-                                    Dateien
-                                </a>
-                            </li>
-                        <% } %>
-                        
-                        <!-- Logs Tab (nur mit Permission) -->
-                        <% if (userPermissions.permissions['GAMESERVER.LOGS.VIEW']) { %>
-                            <li class="nav-item">
-                                <a class="nav-link" 
-                                   id="logs-tab" 
-                                   data-bs-toggle="tab" 
-                                   href="#logs" 
-                                   role="tab">
-                                    <i class="fas fa-file-alt me-1"></i>
-                                    Logs
-                                </a>
-                            </li>
-                        <% } %>
-                        
-                        <!-- Backups Tab (nur mit Permission) -->
-                        <% if (userPermissions.permissions['GAMESERVER.BACKUPS.VIEW']) { %>
-                            <li class="nav-item">
-                                <a class="nav-link" 
-                                   id="backups-tab" 
-                                   data-bs-toggle="tab" 
-                                   href="#backups" 
-                                   role="tab">
-                                    <i class="fas fa-save me-1"></i>
-                                    Backups
-                                </a>
-                            </li>
-                        <% } %>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <div class="fb-hoehe">
+        <a href="?ansicht=einfach"  class="<%= hoehe === 'einfach'  ? 'an' : '' %>">Einfach</a>
+        <a href="?ansicht=fachlich" class="<%= hoehe === 'fachlich' ? 'an' : '' %>">Fachlich</a>
+      </div>
 
-                        <!-- Cronjobs Tab (nur mit Permission) -->
-                        <% if (userPermissions.permissions['GAMESERVER.CRONJOBS.VIEW']) { %>
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   id="cronjobs-tab"
-                                   data-bs-toggle="tab"
-                                   href="#cronjobs"
-                                   role="tab">
-                                    <i class="fas fa-clock me-1"></i>
-                                    Cronjobs
-                                </a>
-                            </li>
-                        <% } %>
+      <a class="btn btn-white btn-sm" href="#dateien">Dateien</a>
 
-                        <!-- Variablen Tab (nur mit EDIT-Permission) -->
-                        <% if (userPermissions.permissions['GAMESERVER.EDIT'] && gameData && gameData.variables && (Array.isArray(gameData.variables) ? gameData.variables.length > 0 : Object.keys(gameData.variables).length > 0)) { %>
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   id="variables-tab"
-                                   data-bs-toggle="tab"
-                                   href="#variables"
-                                   role="tab">
-                                    <i class="fas fa-sliders-h me-1"></i>
-                                    Variablen
-                                </a>
-                            </li>
-                        <% } %>
+      <% if (server.status === 'online') { %>
+        <button class="btn btn-white btn-sm" onclick="serverAction('<%= server.id %>', 'restart')">Neu starten</button>
+        <button class="btn btn-white btn-sm" onclick="serverAction('<%= server.id %>', 'stop')">Stoppen</button>
+      <% } else { %>
+        <button class="btn btn-primary btn-sm" onclick="serverAction('<%= server.id %>', 'start')">Starten</button>
+      <% } %>
 
-                        <!-- RCON Tab (nur wenn Egg RCON unterstützt + RCON-Permission) -->
-                        <% if (server.rcon_configured && userPermissions.permissions['GAMESERVER.RCON']) { %>
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   id="rcon-tab"
-                                   data-bs-toggle="tab"
-                                   href="#rcon"
-                                   role="tab">
-                                    <i class="fas fa-terminal me-1"></i>
-                                    RCON
-                                </a>
-                            </li>
-                        <% } %>
-
-                        <!-- Discord-Panels (Konfiguration ist eine Verwaltungsaufgabe) -->
-                        <% if (userPermissions.permissions['GAMESERVER.EDIT']) { %>
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   id="panels-tab"
-                                   data-bs-toggle="tab"
-                                   href="#panels"
-                                   role="tab">
-                                    <i class="fab fa-discord me-1"></i>
-                                    Discord
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   id="public-tab"
-                                   data-bs-toggle="tab"
-                                   href="#public"
-                                   role="tab">
-                                    <i class="fas fa-globe me-1"></i>
-                                    Öffentlich
-                                </a>
-                            </li>
-                        <% } %>
-                    </ul>
-                </div>
-
-                <!-- Tab Content -->
-                <div class="card-body">
-                    <div class="tab-content" id="server-tabs-content">
-                        <!-- ========================================
-                             TAB: OVERVIEW
-                             ======================================== -->
-                        <div class="tab-pane fade show active" 
-                             id="overview" 
-                             role="tabpanel">
-                            <%- include('partials/server-detail-uebersicht', { uebersicht: locals.uebersicht }) %>
-                        </div>
-
-                        <!-- ========================================
-                             TAB: CONSOLE
-                             ======================================== -->
-                        <% if (userPermissions.permissions['GAMESERVER.CONSOLE.VIEW']) { %>
-                            <div class="tab-pane fade" 
-                                 id="console" 
-                                 role="tabpanel">
-                                <%- include('partials/server-detail-console', { server, guildId, userPermissions, consoleTransport: locals.consoleTransport }) %>
-                            </div>
-                        <% } %>
-
-                        <!-- ========================================
-                             TAB: FILES
-                             ======================================== -->
-                        <% if (userPermissions.permissions['GAMESERVER.FILES.VIEW']) { %>
-                            <div class="tab-pane fade" 
-                                 id="files" 
-                                 role="tabpanel">
-                                <%- include('partials/server-detail-files', { server, guildId, userPermissions }) %>
-                            </div>
-                        <% } %>
-
-                        <!-- ========================================
-                             TAB: LOGS
-                             ======================================== -->
-                        <% if (userPermissions.permissions['GAMESERVER.LOGS.VIEW']) { %>
-                            <div class="tab-pane fade" 
-                                 id="logs" 
-                                 role="tabpanel">
-                                <!-- Log Controls -->
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <div class="input-group">
-                                            <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                            <input type="text" class="form-control" id="log-search" placeholder="Logs durchsuchen...">
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <select class="form-select" id="log-lines">
-                                            <option value="100">Letzte 100 Zeilen</option>
-                                            <option value="500" selected>Letzte 500 Zeilen</option>
-                                            <option value="1000">Letzte 1000 Zeilen</option>
-                                            <option value="2000">Letzte 2000 Zeilen</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-5 text-end">
-                                        <button class="btn btn-primary" id="log-refresh" onclick="loadLogs()">
-                                            <i class="fas fa-sync-alt me-1"></i> Aktualisieren
-                                        </button>
-                                        <button class="btn btn-secondary" id="log-download" onclick="downloadLogs()">
-                                            <i class="fas fa-download me-1"></i> Download
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Log Output -->
-                                <div class="card bg-dark">
-                                    <div class="card-body p-0">
-                                        <div id="log-status" class="text-center text-secondary py-3">
-                                            <i class="fas fa-info-circle me-1"></i> Klicke "Aktualisieren" um Logs zu laden
-                                        </div>
-                                        <pre id="log-output" class="mb-0 p-3" style="max-height: 600px; overflow-y: auto; font-size: 13px; line-height: 1.4; color: #e0e0e0; background: #1e1e1e; display: none; white-space: pre-wrap; word-break: break-all;"></pre>
-                                    </div>
-                                    <div class="card-footer text-secondary d-flex justify-content-between">
-                                        <span id="log-count">0 Zeilen</span>
-                                        <span id="log-filtered" style="display: none;">Gefiltert: <span id="log-filtered-count">0</span> Treffer</span>
-                                    </div>
-                                </div>
-
-                                <script>
-                                let _logLines = [];
-
-                                async function loadLogs() {
-                                    const btn = document.getElementById('log-refresh');
-                                    const output = document.getElementById('log-output');
-                                    const status = document.getElementById('log-status');
-                                    const lines = document.getElementById('log-lines').value;
-
-                                    btn.disabled = true;
-                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Lade...';
-                                    status.style.display = 'block';
-                                    status.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Logs werden geladen...';
-                                    output.style.display = 'none';
-
-                                    try {
-                                        const res = await fetch(`/guild/<%= guildId %>/plugins/gameserver/console/<%= server.id %>/logs?lines=${lines}`);
-                                        const data = await res.json();
-
-                                        if (data.success && data.lines) {
-                                            _logLines = data.lines;
-                                            renderLogs(_logLines);
-                                            document.getElementById('log-count').textContent = `${data.count} Zeilen`;
-                                        } else {
-                                            status.style.display = 'block';
-                                            status.innerHTML = `<i class="fas fa-exclamation-triangle text-warning me-1"></i> ${data.error || 'Keine Logs verfügbar'}`;
-                                            output.style.display = 'none';
-                                        }
-                                    } catch (err) {
-                                        status.style.display = 'block';
-                                        status.innerHTML = '<i class="fas fa-times text-danger me-1"></i> Fehler beim Laden der Logs';
-                                        output.style.display = 'none';
-                                    } finally {
-                                        btn.disabled = false;
-                                        btn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Aktualisieren';
-                                    }
-                                }
-
-                                function renderLogs(lines) {
-                                    const output = document.getElementById('log-output');
-                                    const status = document.getElementById('log-status');
-
-                                    // HTML-Entities escapen
-                                    const escaped = lines.map(l => 
-                                        l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                                    ).join('\n');
-
-                                    output.textContent = '';
-                                    output.innerHTML = escaped;
-                                    output.style.display = 'block';
-                                    status.style.display = 'none';
-
-                                    // Auto-scroll nach unten
-                                    output.scrollTop = output.scrollHeight;
-                                }
-
-                                function downloadLogs() {
-                                    if (!_logLines.length) return;
-                                    const blob = new Blob([_logLines.join('\n')], { type: 'text/plain' });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `server-<%= server.id %>-logs-${new Date().toISOString().slice(0,10)}.log`;
-                                    a.click();
-                                    URL.revokeObjectURL(url);
-                                }
-
-                                // Suchfilter
-                                document.getElementById('log-search').addEventListener('input', function() {
-                                    const query = this.value.toLowerCase().trim();
-                                    const filteredEl = document.getElementById('log-filtered');
-                                    const filteredCountEl = document.getElementById('log-filtered-count');
-
-                                    if (!query) {
-                                        renderLogs(_logLines);
-                                        filteredEl.style.display = 'none';
-                                        return;
-                                    }
-
-                                    const filtered = _logLines.filter(l => l.toLowerCase().includes(query));
-                                    renderLogs(filtered);
-                                    filteredEl.style.display = '';
-                                    filteredCountEl.textContent = filtered.length;
-                                });
-                                </script>
-                            </div>
-                        <% } %>
-
-                        <!-- ========================================
-                             TAB: BACKUPS
-                             ======================================== -->
-                        <% if (userPermissions.permissions['GAMESERVER.BACKUPS.VIEW']) { %>
-                            <div class="tab-pane fade"
-                                 id="backups"
-                                 role="tabpanel">
-                                <%- include('partials/server-detail-backups', { server, guildId, userPermissions }) %>
-                            </div>
-                        <% } %>
-
-                        <!-- ========================================
-                             TAB: CRONJOBS
-                             ======================================== -->
-                        <% if (userPermissions.permissions['GAMESERVER.CRONJOBS.VIEW']) { %>
-                            <div class="tab-pane fade"
-                                 id="cronjobs"
-                                 role="tabpanel">
-                                <%- include('partials/server-detail-cronjobs', { server, guildId, userPermissions }) %>
-                            </div>
-                        <% } %>
-
-                        <!-- ========================================
-                             TAB: VARIABLEN
-                             ======================================== -->
-                        <% if (userPermissions.permissions['GAMESERVER.EDIT'] && gameData && gameData.variables) { %>
-                            <div class="tab-pane fade"
-                                 id="variables"
-                                 role="tabpanel">
-                                <%- include('partials/server-detail-variables', { server, gameData, guildId, userPermissions }) %>
-                            </div>
-                        <% } %>
-
-                        <!-- ========================================
-                             TAB: RCON
-                             ======================================== -->
-                        <% if (server.rcon_configured && userPermissions.permissions['GAMESERVER.RCON']) { %>
-                            <div class="tab-pane fade"
-                                 id="rcon"
-                                 role="tabpanel">
-                                <%- include('partials/server-detail-rcon', { server, guildId, userPermissions }) %>
-                            </div>
-                        <% } %>
-
-                        <!-- ========================================
-                             TAB: DISCORD-PANELS
-                             ======================================== -->
-                        <% if (userPermissions.permissions['GAMESERVER.EDIT']) { %>
-                            <div class="tab-pane fade"
-                                 id="panels"
-                                 role="tabpanel">
-                                <%- include('partials/server-detail-panels', { server, guildId, userPermissions }) %>
-                            </div>
-
-                            <!-- ========================================
-                                 TAB: ÖFFENTLICHER STATUS
-                                 ======================================== -->
-                            <div class="tab-pane fade"
-                                 id="public"
-                                 role="tabpanel">
-                                <%- include('partials/server-detail-public', { server, guildId, userPermissions }) %>
-                            </div>
-                        <% } %>
-                    </div>
-                </div>
-            </div>
+      <div class="dropdown">
+        <button class="btn btn-white btn-sm" data-bs-toggle="dropdown" aria-expanded="false">Mehr</button>
+        <div class="dropdown-menu dropdown-menu-end">
+          <a class="dropdown-item" href="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/edit">Bearbeiten</a>
+          <a class="dropdown-item" href="#" onclick="reinstallServer('<%= server.id %>', '<%= server.name %>'); return false;">Neu installieren</a>
+          <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#migrationModal">Auf andere Maschine</a>
+          <div class="dropdown-divider"></div>
+          <a class="dropdown-item text-danger" href="#" onclick="deleteServer('<%= server.id %>', '<%= server.name %>'); return false;">Löschen</a>
         </div>
+      </div>
     </div>
+  </div>
+
+  <%# ── Zustand, Einstellungen, Befehle, Welt ───────────────────────────── %>
+  <%- include('partials/server-detail-uebersicht', { uebersicht: locals.uebersicht }) %>
+
+  <%# ── Fachliche Höhe: Werkzeuge ───────────────────────────────────────── %>
+  <% if (hoehe === 'fachlich') { %>
+
+    <div class="fb-karte">
+      <div class="fb-kopf"><span>Konsole</span></div>
+      <div class="fb-koerper">
+        <%- include('partials/server-detail-console', { server, guildId, userPermissions, consoleTransport: locals.consoleTransport }) %>
+      </div>
+    </div>
+
+    <div class="fb-karte">
+      <div class="fb-kopf">
+        <span>Einstellungen — Rohmodus</span>
+        <span class="fb-muted" style="margin-left:auto;font-size:13px;font-weight:400">
+          alle Variablen, ohne Deutung durch das Paket
+        </span>
+      </div>
+      <div class="fb-koerper">
+        <%- include('partials/server-detail-variables', { server, gameData, guildId, userPermissions }) %>
+      </div>
+    </div>
+
+    <div class="fb-karte">
+      <div class="fb-kopf"><span>Fernsteuerung</span></div>
+      <div class="fb-koerper">
+        <%- include('partials/server-detail-rcon', { server, guildId, userPermissions }) %>
+      </div>
+    </div>
+
+    <div class="fb-karte">
+      <div class="fb-kopf"><span>Wiederkehrende Aufgaben</span></div>
+      <div class="fb-koerper">
+        <%- include('partials/server-detail-cronjobs', { server, guildId, userPermissions }) %>
+      </div>
+    </div>
+
+    <div class="fb-karte">
+      <div class="fb-kopf"><span>Discord-Panels</span></div>
+      <div class="fb-koerper">
+        <%- include('partials/server-detail-panels', { server, guildId, userPermissions }) %>
+      </div>
+    </div>
+
+    <div class="fb-karte">
+      <div class="fb-kopf"><span>Öffentliche Seite</span></div>
+      <div class="fb-koerper">
+        <%- include('partials/server-detail-public', { server, guildId, userPermissions }) %>
+      </div>
+    </div>
+
+  <% } %>
+
+  <%# ── Sicherungen — in beiden Höhen, die Welt-Karte verweist hierher ──── %>
+  <div class="fb-karte" id="sicherungen">
+    <div class="fb-kopf"><span>Sicherungen</span></div>
+    <div class="fb-koerper">
+      <%- include('partials/server-detail-backups', { server, guildId, userPermissions }) %>
+    </div>
+  </div>
+
+  <%# ── Dateien ─────────────────────────────────────────────────────────── %>
+  <div class="fb-karte" id="dateien">
+    <div class="fb-kopf"><span>Dateien</span></div>
+    <div class="fb-koerper">
+      <%- include('partials/server-detail-files', { server, guildId, userPermissions }) %>
+    </div>
+  </div>
+
 </div>
 
 <!--

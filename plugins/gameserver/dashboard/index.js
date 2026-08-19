@@ -70,6 +70,18 @@ class GameserverPlugin extends DashboardPlugin {
             defer: false
         });
         
+        // Das Aussehen der neuen Serverseite (Entwurf 2026-08-18).
+        //
+        // Bewusst als Stylesheet des PLUGINS und nicht auf eine Seite begrenzt:
+        // Der ganze Gameserver-Bereich soll so aussehen wie abgenommen, nicht
+        // eine Karte darin.
+        assetManager.registerStyle('gameserver-serverseite', 'css/serverseite.css', {
+            plugin: 'gameserver',
+            deps: [],
+            version: '1.0.0',
+            media: 'all'
+        });
+
         // xterm.js CSS
         assetManager.registerStyle('xterm-style', 'vendor/xterm/xterm.min.css', {
             plugin: 'gameserver',
