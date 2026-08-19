@@ -37,7 +37,22 @@
     "Dateien in game/, und sein Paket darf nichts anderes behaupten.",
     "",
     "Faellt weg mit Stufe 4.1 (Schritt-Ausfuehrer, Installation nach dem Vertrag)",
-    "bzw. Stufe 6, wo die acht Server neu entstehen."
+    "bzw. Stufe 6, wo die acht Server neu entstehen.",
+    "",
+    "ARBEITSVERZEICHNIS ENTFALLEN am 2026-08-19, gleichzeitig mit der Neuinstallation",
+    "aus dem Paket (Stufe 4.1). Ab dann liegen die Spieldateien dort, wo der Vertrag",
+    "sie hinlegt: in game/. Die Brücke wäre danach nicht bloss überflüssig, sondern",
+    "SCHÄDLICH — sie zeigt auf /home/container, und dort liegt die ALTE",
+    "valheim_server.x86_64 noch. Der Server wäre gestartet, hätte normal ausgesehen",
+    "und hätte nichts bewiesen: installiert nach game/, gestartet aus der Wurzel.",
+    "",
+    "Der Wert steht als 'arbeitsverzeichnis_entfallen' weiter hier, nicht gelöscht.",
+    "Er wird nicht mehr gelesen (StartPayload liest nur 'arbeitsverzeichnis'), aber",
+    "wer diese Datei später liest, soll sehen, dass es ihn gab und warum er ging.",
+    "",
+    "workdir: '.' im Paket löst der Daemon von selbst richtig auf:",
+    "Job.EffectiveWorkdir() gibt bei leer ODER '.' das game/-Verzeichnis zurück.",
+    "Es braucht also keinen Ersatz, nur das Weglassen."
   ],
   "zuordnung": {
     "name": "SERVER_NAME",
@@ -57,5 +72,9 @@
   "portzwecke": {
     "query": "game_plus_1"
   },
-  "arbeitsverzeichnis": "/home/container"
+  "arbeitsverzeichnis_entfallen": {
+    "wert": "/home/container",
+    "entfallen_am": "2026-08-19",
+    "grund": "Neuinstallation aus dem Paket legt die Spieldateien nach game/ (E-19)"
+  }
 }
