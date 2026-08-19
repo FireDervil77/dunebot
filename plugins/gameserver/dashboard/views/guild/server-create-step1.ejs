@@ -89,24 +89,32 @@
         <div class="fb-kopf">
           <span>Spiele ohne Paket</span>
           <span class="fb-muted" style="margin-left:auto;font-size:13px;font-weight:400">
-            werden über den alten Weg installiert
+            noch nicht anlegbar
           </span>
         </div>
         <div class="fb-koerper">
           <%# Sie verschwinden NICHT aus der Auswahl. Heute hat eines von acht
               Spielen ein Paket; die anderen wegzulassen hiesse, sieben Spiele
               unanlegbar zu machen, damit eine Liste sauber aussieht. %>
+          <%# Nicht waehlbar, und zwar mit Absicht.
+              Betreiber am 2026-08-19: „nein wir wollen nix altes mehr."
+              Sie ueber den alten Egg-Weg anzulegen hiesse, weiter Server zu
+              erzeugen, die genau das mitbringen, was dieser ganze Umbau
+              abschafft — Fremd-Image, Skript in die Volume-Wurzel, kein
+              fb-init. Sie stehen hier trotzdem, damit sichtbar bleibt, was
+              noch fehlt. %>
           <% auswahl.ohnePaket.forEach(function (a) { %>
-            <label class="fb-spiel" data-fb-wahl="<%= a.slug %>">
-              <input type="radio" name="_wahl" value="<%= a.slug %>" hidden>
+            <div class="fb-spiel aus">
               <div style="display:flex;gap:12px;align-items:center">
                 <div style="flex:1 1 auto">
                   <div style="font-weight:600;font-size:15px"><%= a.name %></div>
-                  <div class="fb-muted" style="font-size:13px">Kein Paket — Installation über das alte Egg-Skript.</div>
+                  <div class="fb-muted" style="font-size:13px">
+                    Für dieses Spiel gibt es noch kein Paket. Sobald eines eingeliefert ist,
+                    lässt es sich hier anlegen.
+                  </div>
                 </div>
-                <span class="fb-haken">✓</span>
               </div>
-            </label>
+            </div>
           <% }); %>
         </div>
       </div>

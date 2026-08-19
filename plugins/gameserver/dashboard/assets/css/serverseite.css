@@ -171,3 +171,5 @@
 .fb-maschine .fb-haken { color: transparent; font-weight: 700; }
 .fb-maschine.an .fb-haken { color: var(--fb-primary); }
 .fb-maschine.aus { opacity: .62; }
+.fb-spiel.aus { opacity: .55; cursor: default; }
+.fb-spiel.aus:hover { border-color: var(--fb-border); }
