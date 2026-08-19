@@ -129,25 +129,56 @@
                 </div>
               </div>
               <div>
-                <% if (!e.hatWert) { %>
-                  <%# Bewusst NICHT die Paketvorgabe: Sie wäre eine Behauptung
-                      über den laufenden Server. Genau das hätte am 2026-08-19
-                      eine Welt gekostet („Dedicated" statt „BoomTown"). %>
-                  <div class="fb-feld fb-muted" style="border-style:dashed">kein Wert hinterlegt</div>
-                <% } else if (e.geheim) { %>
-                  <div class="fb-feld"><span class="fb-mono">••••••••</span></div>
+                <% if (!e.aenderbar) { %>
+                  <%# Ohne Egg-Namen laesst sich der Wert anzeigen, aber nicht
+                      speichern. Ein Feld, das sich bedienen laesst und nichts
+                      bewirkt, waere schlimmer als ein festes. %>
+                  <div class="fb-feld fb-feld-leer"><%= e.hatWert ? String(e.wert) : 'kein Wert hinterlegt' %></div>
+                  <div class="fb-muted" style="font-size:12px;margin-top:4px">nur lesbar — das Paket kennt hier keine Zuordnung</div>
+                <% } else if (e.typ === 'choice' && e.auswahl) { %>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap">
+                    <% e.auswahl.forEach(function (c) { %>
+                      <button type="button" class="fb-wahl<%= String(e.wert) === c.wert ? ' an' : '' %>"
+                              data-fb-feld="<%= e.variable %>" data-fb-wert="<%= c.wert %>"><%= c.name %></button>
+                    <% }); %>
+                  </div>
                 <% } else if (e.typ === 'boolean') { %>
-                  <div class="fb-feld"><%= (String(e.wert) === '1' || e.wert === true) ? 'An' : 'Aus' %></div>
-                <% } else if (e.auswahl) { %>
-                  <% const t = e.auswahl.find(function (c) { return c.wert === String(e.wert); }); %>
-                  <div class="fb-feld"><%= t ? t.name : String(e.wert) %></div>
+                  <% const an = String(e.wert) === '1' || e.wert === true; %>
+                  <div style="display:flex;gap:6px">
+                    <button type="button" class="fb-wahl<%= an ? ' an' : '' %>"
+                            data-fb-feld="<%= e.variable %>" data-fb-wert="1">An</button>
+                    <button type="button" class="fb-wahl<%= an ? '' : ' an' %>"
+                            data-fb-feld="<%= e.variable %>" data-fb-wert="0">Aus</button>
+                  </div>
                 <% } else { %>
-                  <div class="fb-feld"><%= String(e.wert) %></div>
+                  <input class="fb-feld" style="width:100%"
+                         type="<%= e.geheim ? 'password' : (e.typ === 'number' ? 'number' : 'text') %>"
+                         <% if (e.min !== null) { %>min="<%= e.min %>"<% } %>
+                         <% if (e.max !== null) { %>max="<%= e.max %>"<% } %>
+                         value="<%= e.hatWert ? String(e.wert) : '' %>"
+                         placeholder="<%= e.hatWert ? '' : 'kein Wert hinterlegt' %>"
+                         data-fb-feld="<%= e.variable %>"
+                         data-fb-alt="<%= e.hatWert ? String(e.wert) : '' %>">
+                <% } %>
+                <% if (e.risiko) { %>
+                  <div class="fb-muted" style="font-size:12px;margin-top:4px;color:#b35309"><%= e.risiko %></div>
                 <% } %>
               </div>
             </div>
           <% }); %>
         <% }); %>
+
+        <%# ── Fussleiste: erst zaehlen, dann speichern ────────────────────
+            Der Zaehler nennt nicht nur die Zahl, sondern die FOLGE: „braucht
+            einen Neustart" oder „erzeugt eine neue Welt". Wer speichert, soll
+            vorher wissen, was danach passiert — nicht erst hinterher. %>
+        <div class="fb-fuss" id="fb-fuss" hidden>
+          <span class="fb-muted" id="fb-fuss-text"></span>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button type="button" class="btn btn-white btn-sm" id="fb-verwerfen">Verwerfen</button>
+            <button type="button" class="btn btn-primary btn-sm" id="fb-speichern">Speichern</button>
+          </div>
+        </div>
 
         <% if (u.einstellungen.verborgen > 0 && u.hoehe === 'einfach') { %>
           <div class="fb-muted" style="font-size:13px;margin-top:16px">
@@ -155,8 +186,6 @@
             <a href="?ansicht=fachlich">fachlichen Höhe</a>.
           </div>
         <% } %>
-        <%# Kein Speichern-Knopf, solange er nichts tut — ein Knopf ohne Wirkung
-            ist dieselbe Krankheit wie eine erfundene Zahl. %>
       <% } %>
     </div>
   </div>
@@ -281,6 +310,104 @@
 </div>
 
 <script>
+/*
+ * Die Einstellungskarte — Entwurf vom 2026-08-18, Artboard 4.
+ *
+ * Gespeichert wird ueber PUT /servers/:id/variables, den es laengst gibt. Kein
+ * zweiter Weg: Zwei Wege, die dasselbe Feld schreiben, driften auseinander, und
+ * der zweite faellt beim ersten Umbau hinten runter.
+ *
+ * Die Karte kennt die FOLGE jeder Aenderung, weil das Paket sie nennt
+ * (`takes_effect`). Der Zaehler sagt sie an, bevor gespeichert wird — nicht
+ * danach. Und bei `risk` wird nachgefragt: Ein Weltname ist ein Wort wie jedes
+ * andere, bis man versteht, dass ein neues Wort eine neue, leere Welt erzeugt.
+ */
+(function () {
+  var karte = document.getElementById('fb-fuss');
+  if (!karte) return;
+
+  var wirkung = <%- JSON.stringify(
+      (u.einstellungen.sichtbar || []).reduce(function (a, e) {
+        if (e.variable) a[e.variable] = { name: e.name, wirkt: e.wirktBei, risiko: e.risiko };
+        return a; }, {})) %>;
+
+  var geaendert = {};
+
+  function folge() {
+    var n = Object.keys(geaendert).length;
+    if (n === 0) return null;
+    var welt = false, neustart = false;
+    Object.keys(geaendert).forEach(function (k) {
+      var w = wirkung[k] || {};
+      if (w.wirkt === 'new_world') welt = true;
+      else if (w.wirkt === 'restart') neustart = true;
+    });
+    return (n === 1 ? '1 Änderung' : n + ' Änderungen') +
+      (welt ? ' — erzeugt eine neue Welt' : neustart ? ' — braucht einen Neustart' : ' — wirkt sofort');
+  }
+
+  function zeigen() {
+    var t = folge();
+    karte.hidden = !t;
+    if (t) document.getElementById('fb-fuss-text').textContent = t;
+  }
+
+  function merken(feld, wert, alt) {
+    if (String(wert) === String(alt)) delete geaendert[feld];
+    else geaendert[feld] = String(wert);
+    zeigen();
+  }
+
+  document.querySelectorAll('.fb-wahl').forEach(function (b) {
+    var gruppe = b.getAttribute('data-fb-feld');
+    if (!b.hasAttribute('data-fb-alt')) {
+      b.setAttribute('data-fb-alt', b.classList.contains('an') ? b.getAttribute('data-fb-wert') : '');
+    }
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.fb-wahl[data-fb-feld="' + gruppe + '"]').forEach(function (x) {
+        x.classList.remove('an');
+      });
+      b.classList.add('an');
+      var ursprung = '';
+      document.querySelectorAll('.fb-wahl[data-fb-feld="' + gruppe + '"]').forEach(function (x) {
+        if (x.getAttribute('data-fb-alt')) ursprung = x.getAttribute('data-fb-alt');
+      });
+      merken(gruppe, b.getAttribute('data-fb-wert'), ursprung);
+    });
+  });
+
+  document.querySelectorAll('input[data-fb-feld]').forEach(function (i) {
+    i.addEventListener('input', function () {
+      merken(i.getAttribute('data-fb-feld'), i.value, i.getAttribute('data-fb-alt'));
+    });
+  });
+
+  document.getElementById('fb-verwerfen').addEventListener('click', function () {
+    location.reload();
+  });
+
+  document.getElementById('fb-speichern').addEventListener('click', function () {
+    var riskant = Object.keys(geaendert).filter(function (k) { return (wirkung[k] || {}).risiko; });
+    if (riskant.length) {
+      var t = riskant.map(function (k) { return '• ' + wirkung[k].name + ': ' + wirkung[k].risiko; }).join('\n');
+      if (!confirm('Das hat Folgen:\n\n' + t + '\n\nWirklich speichern?')) return;
+    }
+    var knopf = this; knopf.disabled = true; knopf.textContent = 'Speichert…';
+    fetch(location.pathname.replace(/\/$/, '') + '/variables', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(geaendert),
+    }).then(function (r) { return r.json(); }).then(function (a) {
+      if (a && a.success) { location.reload(); }
+      else { knopf.disabled = false; knopf.textContent = 'Speichern';
+             alert('Nicht gespeichert: ' + ((a && a.message) || 'unbekannter Grund')); }
+    }).catch(function (e) {
+      knopf.disabled = false; knopf.textContent = 'Speichern';
+      alert('Nicht gespeichert: ' + e.message);
+    });
+  });
+})();
+
 document.querySelectorAll('[data-fb-kopieren]').forEach(function (b) {
     b.addEventListener('click', function () {
         navigator.clipboard.writeText(b.getAttribute('data-fb-kopieren')).then(function () {

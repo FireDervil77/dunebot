@@ -136,3 +136,21 @@
 }
 .fb-bereiche a:hover { color: var(--fb-text); }
 .fb-bereiche a.an { color: var(--fb-primary); border-bottom-color: var(--fb-primary); }
+
+/* ── Auswahl als Pillenreihe (Entwurf, Artboard 4) ──────────────────────── */
+.fb-wahl {
+  padding: 5px 11px; border: 1px solid var(--fb-border); border-radius: 100rem;
+  font-size: 12.25px; color: var(--fb-text-muted); background: #fff; cursor: pointer;
+}
+.fb-wahl:hover { color: var(--fb-text); }
+.fb-wahl.an {
+  border-color: var(--fb-primary); background: rgba(52,152,219,.08);
+  color: var(--fb-primary); font-weight: 500;
+}
+
+/* ── Fussleiste der Einstellungskarte ───────────────────────────────────── */
+.fb-fuss {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--fb-border);
+  font-size: 13px;
+}
