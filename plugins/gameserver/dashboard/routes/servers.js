@@ -13,7 +13,7 @@ const bcrypt = require('bcrypt');
 const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
 const { buildStartPayload, loadServerForStart, paketFuerInstall, ladePaketFuerAddon } = require('../helpers/StartPayload');
-const { baueUebersicht } = require('../helpers/Serverseite');
+const { baueUebersicht, baueServerListe } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
 const PanelService = require('../helpers/PanelService');
 const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');
@@ -90,6 +90,8 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
                 gs.created_at,
                 gs.last_started_at,
                 gs.rootserver_id,
+                gs.ports,
+                gs.bind_ip,
                 am.name as game_name,
                 am.slug as game_slug,
                 am.icon_url as game_icon,
@@ -176,8 +178,44 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
             assetManager.enqueueScript('gameserver-overview');
         }
         
+        // ── Die Übersicht nach dem Entwurf (Artboard 1) ─────────────────────
+        //
+        // Sie zeigt eine Spalte, die es vorher nicht gab: BEREITSCHAFT.
+        // „Läuft" beantwortet nicht die Frage, die ein Betreiber wirklich hat —
+        // ob jemand rein kann.
+        let liste = { liste: [], zahlen: { alle: 0, bereit: 0, aus: 0, maschinen: 0 } };
+        try {
+            // Die Pakete zu allen vorkommenden Addons in EINEM Zug — nicht je
+            // Zeile eine Abfrage. Bei acht Servern fiele das nicht auf, bei
+            // achtzig schon.
+            const ids = [...new Set((servers || []).map(x => x.addon_marketplace_id).filter(Boolean))];
+            const paketNachAddon = {};
+            if (ids.length) {
+                const zeilen = await dbService.query(`
+                    SELECT pk.id, pv.fbpkg
+                      FROM packages pk
+                      LEFT JOIN package_versions pv ON pv.id = (
+                          SELECT v.id FROM package_versions v
+                           WHERE v.package_id = pk.id
+                           ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
+                           LIMIT 1)
+                     WHERE pk.id IN (${ids.map(() => '?').join(',')})`, ids);
+                for (const z of zeilen) {
+                    if (!z.fbpkg) continue;
+                    try {
+                        paketNachAddon[z.id] = typeof z.fbpkg === 'string' ? JSON.parse(z.fbpkg) : z.fbpkg;
+                    } catch { /* ein unlesbares Paket kostet eine Zeile, nicht die Seite */ }
+                }
+            }
+            liste = baueServerListe(servers, paketNachAddon);
+        } catch (err) {
+            Logger.error('[Gameserver] Serverliste konnte nicht aufbereitet werden', err);
+        }
+
         await themeManager.renderView(res, 'guild/servers-overview', {
             title: 'Gameserver Übersicht',
+            liste,
+            filter: ['alle', 'bereit', 'aus'].includes(req.query.f) ? req.query.f : 'alle',
             activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
             servers: servers || [],
             games: gameTypes || [], // ← Template erwartet 'games'

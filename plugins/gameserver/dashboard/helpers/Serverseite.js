@@ -460,3 +460,77 @@ function baueWelt(letzteSicherung) {
 }
 
 module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE, BEFEHL_NAME, BEFEHL_QUELLE };
+
+/**
+ * Die Serverliste — Entwurf vom 2026-08-18, Artboard 1.
+ *
+ * ── Woher die Bereitschaftsbalken kommen, ohne dass jemand sie meldet ───────
+ *
+ * Die volle Leiter (Prozess → Port → Abfrage) meldet `fb-init` über den
+ * Agent-Socket, und sie kommt nicht an (Baustelle 58). Was wir trotzdem WISSEN,
+ * ohne etwas zu erfinden:
+ *
+ *   Prozess   der Zustand ist `online` — der Container läuft, das hat der
+ *             Daemon gemeldet
+ *   Abfrage   eine Spielerzahl liegt vor. Sie entsteht NUR, wenn das Spiel auf
+ *             eine Abfrage geantwortet hat. Wer antwortet, lauscht auch —
+ *             also ist Port damit ebenfalls belegt.
+ *
+ * Alles andere bleibt „nicht gemessen". Das ist keine Verlegenheitslösung,
+ * sondern die Aussage: Wir wissen es nicht. Der Entwurf sagt es in der Legende
+ * selbst — „nicht gemessen heisst: wir wissen es nicht. 0 heisst: gemessen,
+ * niemand da."
+ */
+function baueServerListe(zeilen, paketNachAddon = {}) {
+    const liste = (zeilen || []).map((s) => {
+        const paket = paketNachAddon[s.addon_marketplace_id] || null;
+        const zustand = baueZustand(s);
+
+        const laeuft  = s.status === 'online';
+        const gefragt = s.current_players !== null && s.current_players !== undefined;
+
+        const stufen = [
+            { name: 'Prozess', erfuellt: laeuft },
+            { name: 'Port',    erfuellt: gefragt },
+            { name: 'Abfrage', erfuellt: gefragt },
+        ];
+        const erfuellt = stufen.filter(x => x.erfuellt).length;
+
+        return {
+            id:      s.id,
+            name:    s.name,
+            spiel:   paket?.identity?.name || s.game_name || s.template_name || '—',
+            zustand,
+            stufen,
+            bereit:  erfuellt === 3,
+            bereitschaftText:
+                erfuellt === 3 ? 'bereit'
+              : laeuft         ? 'Abfrage antwortet nicht'
+              : s.status === 'starting' ? 'startet'
+              : 'aus',
+            spieler: {
+                jetzt: gefragt ? s.current_players : null,
+                max:   s.max_players ?? null,
+            },
+            adresse: baueAdresse({
+                bind_ip: s.bind_ip, rootserver_hostname: s.server_ip,
+                ports: s.ports,
+            }),
+            maschine: s.rootserver_name || null,
+            paket:    paket ? `${paket.identity.slug} ${paket.identity.version || ''}`.trim() : null,
+        };
+    });
+
+    const maschinen = new Set(liste.map(x => x.maschine).filter(Boolean));
+    return {
+        liste,
+        zahlen: {
+            alle:   liste.length,
+            bereit: liste.filter(x => x.bereit).length,
+            aus:    liste.filter(x => x.zustand.schluessel === 'offline').length,
+            maschinen: maschinen.size,
+        },
+    };
+}
+
+module.exports.baueServerListe = baueServerListe;

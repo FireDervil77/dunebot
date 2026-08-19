@@ -111,3 +111,14 @@
 /* ── Zweispaltig: links das Tun, rechts das Nachsehen ───────────────────── */
 .fb-raster { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr); gap: 16px; }
 @media (max-width: 992px) { .fb-raster { grid-template-columns: 1fr; } }
+
+/* ── Tabelle der Serverübersicht ────────────────────────────────────────── */
+.fb-tabelle { width: 100%; border-collapse: collapse; }
+.fb-tabelle th {
+  text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--fb-text-muted); font-weight: 700;
+  padding: 10px 20px; border-bottom: 1px solid var(--fb-border);
+}
+.fb-tabelle td { padding: 12px 20px; border-bottom: 1px solid var(--fb-border); vertical-align: middle; }
+.fb-tabelle tbody tr:last-child td { border-bottom: 0; }
+.fb-tabelle tbody tr:hover { background: #f9fafb; }

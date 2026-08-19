@@ -1,133 +1,93 @@
-<%
-/**
- * Gameserver Overview - Card-Grid mit Live-Status
- * 
- * Zeigt alle Server der Guild als Cards an mit:
- * - Filter-Bar (Status, Game, Search)
- * - Status-Badges mit Live-Updates (SSE)
- * - Resource-Display (CPU, RAM, Players)
- * - Quick-Actions (Start, Stop, Restart, Details)
- * 
- * @requires userPermissions (aus loadUserPermissions Middleware)
- * @requires servers, gameTypes, statusCounts, filters (aus Route)
- */
-%>
+<%#
+  Die Serverübersicht — Entwurf vom 2026-08-18, Artboard 1.
 
-<!-- Gameserver Plugin Styles -->
-<link rel="stylesheet" href="/assets/plugins/gameserver/css/gameserver.css">
+  Der Betreiber über die Vorlage: „das ist doch eine viel bessere Server-
+  übersicht wie sie bisher existiert."
 
-    <!-- Header -->
+  Sie ersetzt die Kachelansicht. Was sie besser macht, ist nicht das Aussehen,
+  sondern die Spalte, die es vorher nicht gab: BEREITSCHAFT. „Läuft" beantwortet
+  nicht die Frage, die ein Betreiber wirklich hat — nämlich ob jemand rein kann.
+-%>
+<div class="fb-seite">
 
-    <!-- Content -->
-    <div class="content">
-        <div class="container-fluid">
-            
-            <!-- Filter-Bar -->
-            <div class="card mb-3">
-                <div class="card-body">
-                    <form method="GET" class="row g-3">
-                        
-                        <!-- Status-Filter -->
-                        <div class="col-md-3">
-                            <label class="form-label">Status</label>
-                            <select name="status" class="form-select" onchange="this.form.submit()">
-                                <option value="all" <%= filters.status === 'all' ? 'selected' : '' %>>
-                                    Alle (<%= statusCounts.all %>)
-                                </option>
-                                <option value="online" <%= filters.status === 'online' ? 'selected' : '' %>>
-                                    🟢 Online (<%= statusCounts.online %>)
-                                </option>
-                                <option value="offline" <%= filters.status === 'offline' ? 'selected' : '' %>>
-                                    ⚫ Offline (<%= statusCounts.offline %>)
-                                </option>
-                                <option value="starting" <%= filters.status === 'starting' ? 'selected' : '' %>>
-                                    🟡 Startet (<%= statusCounts.starting %>)
-                                </option>
-                                <option value="stopping" <%= filters.status === 'stopping' ? 'selected' : '' %>>
-                                    🟠 Stoppt (<%= statusCounts.stopping %>)
-                                </option>
-                                <option value="installing" <%= filters.status === 'installing' ? 'selected' : '' %>>
-                                    🔵 Installiert (<%= statusCounts.installing %>)
-                                </option>
-                                <option value="error" <%= filters.status === 'error' ? 'selected' : '' %>>
-                                    🔴 Fehler (<%= statusCounts.error %>)
-                                </option>
-                            </select>
-                        </div>
+  <div class="fb-seitenkopf">
+    <div>
+      <div class="fb-titel">Server</div>
+      <div class="fb-muted" style="font-size:13px">
+        <%= liste.zahlen.alle %> Server auf
+        <%= liste.zahlen.maschinen === 1 ? 'einer Maschine' : liste.zahlen.maschinen + ' Maschinen' %>
+        · <%= liste.zahlen.bereit %> bereit
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn btn-white btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/metrics">Kennzahlen</a>
+      <a class="btn btn-primary btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/servers/create">Server anlegen</a>
+    </div>
+  </div>
 
-                        <!-- Game-Filter -->
-                        <div class="col-md-3">
-                            <label class="form-label">Spiel</label>
-                            <select name="game" class="form-select" onchange="this.form.submit()">
-                                <option value="all" <%= filters.game === 'all' ? 'selected' : '' %>>
-                                    Alle Spiele
-                                </option>
-                                <% gameTypes.forEach(game => { %>
-                                    <option value="<%= game.game_slug %>" 
-                                            <%= filters.game === game.game_slug ? 'selected' : '' %>>
-                                        <%= game.display_name %> (<%= game.count %>)
-                                    </option>
-                                <% }); %>
-                            </select>
-                        </div>
+  <div class="fb-karte">
+    <div class="fb-kopf">
+      <span>Deine Server</span>
+      <div style="margin-left:auto;display:flex;gap:6px">
+        <% [['alle','Alle',liste.zahlen.alle],['bereit','Bereit',liste.zahlen.bereit],['aus','Aus',liste.zahlen.aus]].forEach(function (f) { %>
+          <a href="?f=<%= f[0] %>" class="fb-pille<%= (locals.filter || 'alle') === f[0] ? ' fb-pille-gut' : '' %>"
+             style="text-decoration:none"><%= f[1] %> <%= f[2] %></a>
+        <% }); %>
+      </div>
+    </div>
 
-                        <!-- Suche -->
-                        <div class="col-md-6">
-                            <label class="form-label">Suche</label>
-                            <div class="input-group">
-                                <input type="text" name="search" class="form-control" 
-                                       placeholder="Server-Name..." 
-                                       value="<%= filters.search %>">
-                                <button type="submit" class="btn btn-secondary">
-                                    <i class="bi bi-search"></i>
-                                </button>
-                                <% if (filters.search) { %>
-                                    <a href="?" class="btn btn-outline-secondary">
-                                        <i class="bi bi-x"></i>
-                                    </a>
-                                <% } %>
-                            </div>
-                        </div>
-                        
-                    </form>
+    <div style="overflow-x:auto">
+      <table class="fb-tabelle">
+        <thead>
+          <tr>
+            <th>Server</th><th>Bereitschaft</th><th>Zustand</th>
+            <th>Spieler</th><th>Adresse</th><th>Maschine</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% liste.liste.forEach(function (s) {
+               const f = locals.filter || 'alle';
+               if (f === 'bereit' && !s.bereit) return;
+               if (f === 'aus' && s.zustand.schluessel !== 'offline') return; %>
+            <tr onclick="location.href='/guild/<%= guildId %>/plugins/gameserver/servers/<%= s.id %>'" style="cursor:pointer">
+              <td>
+                <div style="font-weight:600"><%= s.name %></div>
+                <div class="fb-muted fb-mono" style="font-size:12px">#<%= s.id %> · <%= s.spiel %></div>
+              </td>
+              <td>
+                <div style="display:flex;gap:3px;margin-bottom:3px">
+                  <% s.stufen.forEach(function (st) { %>
+                    <span style="width:22px;height:5px;border-radius:100rem;background:<%=
+                      st.erfuellt ? 'var(--fb-success)' : '#e6e7e9' %>"></span>
+                  <% }); %>
                 </div>
-            </div>
+                <div class="fb-muted" style="font-size:12px"><%= s.bereitschaftText %></div>
+              </td>
+              <td><span class="fb-pille<%= s.zustand.gut ? ' fb-pille-gut' : '' %>"><%= s.zustand.text %></span></td>
+              <td class="fb-mono">
+                <% if (s.spieler.jetzt !== null) { %>
+                  <%= s.spieler.jetzt %> / <%= s.spieler.max !== null ? s.spieler.max : '?' %>
+                <% } else { %>
+                  <%# „nicht gemessen" ist etwas anderes als „0" — die Legende
+                      unten sagt es ausdrücklich. %>
+                  <span class="fb-muted" style="font-family:inherit">nicht gemessen</span>
+                <% } %>
+              </td>
+              <td class="fb-mono" style="font-size:13px"><%= s.adresse ? s.adresse.text : '—' %></td>
+              <td><span class="fb-pille"><%= s.maschine || '—' %></span></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
 
-            <!-- Server-Cards Grid -->
-            <% if (servers.length === 0) { %>
-                <!-- Empty-State -->
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> 
-                    <% if (filters.status !== 'all' || filters.game !== 'all' || filters.search) { %>
-                        Keine Server gefunden, die deinen Filterkriterien entsprechen.
-                        <a href="?">Filter zurücksetzen</a>
-                    <% } else { %>
-                        Noch keine Server erstellt. 
-                        <% if (userPermissions.permissions['GAMESERVER.CREATE']) { %>
-                            <a href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=1">
-                                Erstelle deinen ersten Server!
-                            </a>
-                        <% } else { %>
-                            Du benötigst die <code>GAMESERVER.CREATE</code> Permission, um Server zu erstellen.
-                        <% } %>
-                    <% } %>
-                </div>
-            <% } else { %>
-                <!-- Cards Grid -->
-                <div class="row" id="server-cards-grid">
-                    <% servers.forEach(server => { %>
-                        <div class="col-lg-4 col-md-6 mb-4">
-                            <%- include('./partials/server-card', { server, userPermissions, guildId }) %>
-                        </div>
-                    <% }); %>
-                </div>
-            <% } %>
+    <div class="fb-koerper fb-muted" style="font-size:12px;border-top:1px solid var(--fb-border);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span style="display:flex;gap:3px">
+        <% for (let i=0;i<3;i++) { %><span style="width:22px;height:5px;border-radius:100rem;background:var(--fb-success)"></span><% } %>
+      </span>
+      <span>Prozess · Port · Abfrage</span>
+      <span><strong>nicht gemessen</strong> heisst: wir wissen es nicht. <strong>0</strong> heisst: gemessen, niemand da.</span>
+    </div>
+  </div>
 
-        </div>
-        </div>
-
-<!-- ✅ Scripts werden über AssetManager geladen (gameserver-sse, gameserver-actions, gameserver-overview) -->
-<script>
-// Guild-ID für Auto-Initialisierung bereitstellen
-window.gameserverGuildId = '<%= guildId %>';
-</script>
+</div>
