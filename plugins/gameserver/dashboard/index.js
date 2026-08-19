@@ -1127,38 +1127,33 @@ class GameserverPlugin extends DashboardPlugin {
                 guildId,
                 parent: null
             },
-            // Submenü: Dashboard
-            {
-                title: 'gameserver:NAV.DASHBOARD',
-                url: `/guild/${guildId}/plugins/gameserver/dashboard`,
-                icon: 'fa-solid fa-gauge-high',
-                order: 10,
-                type: navigationManager.menuTypes.MAIN,
-                capability: 'GAMESERVER.VIEW', // Gameserver-Zugriff
-                visible: true,
-                guildId,
-                parent: `/guild/${guildId}/plugins/gameserver`
-            },
+            // ── Dashboard und „Meine Addons" sind entfallen ──────────────────
+            //
+            // Entschieden am 2026-08-18: „Heute führen DREI Einträge zu
+            // Spielarten von ‚Server ansehen': die Plugin-Wurzel,
+            // NAV.DASHBOARD und NAV.SERVERS. Daraus wird einer." Die neue
+            // Serverübersicht IST das Dashboard — eine zweite Seite daneben
+            // wäre dieselbe Auskunft in schlechter.
+            //
+            // „Meine Addons" entfällt mit der Entscheidung gegen private Pakete
+            // (E4, 2026-08-18): Es gibt nur EINEN Katalog.
+            //
+            // ACHTUNG: registerNavigation() LÖSCHT NICHT (nachgelesen in
+            // NavigationManager.js, Zeile 181/188 — es fügt nur hinzu, was noch
+            // fehlt). Die alten Zeilen räumt deshalb die Migration
+            // 20260819_190000_navigation_zusammenlegen.js weg. Wer hier einen
+            // Eintrag entfernt und die Migration vergisst, sieht ihn weiter.
             // Submenü: Daemon-Setup
             {
+                // Heisst jetzt „Spiele": Niemand sucht ein Addon, alle suchen
+                // ein Spiel. „Marktplatz" verdient sich den Namen erst, wenn es
+                // mehr als einen Beisteuernden gibt (Papier 05).
                 title: 'gameserver:NAV.ADDONS',
                 url: `/guild/${guildId}/plugins/gameserver/addons`,
-                icon: 'fa-solid fa-cog',
+                icon: 'fa-solid fa-dice-d20',
                 order: 20,
                 type: navigationManager.menuTypes.MAIN,
                 capability: 'GAMESERVER.EDIT', // Addons verwalten erfordert Edit-Rechte
-                visible: true,
-                guildId,
-                parent: `/guild/${guildId}/plugins/gameserver`
-            },
-            // Submenü: Meine Addons (NEU!)
-            {
-                title: 'gameserver:NAV.MY_ADDONS',
-                url: `/guild/${guildId}/plugins/gameserver/addons/my-addons`,
-                icon: 'fa-solid fa-puzzle-piece',
-                order: 30,
-                type: navigationManager.menuTypes.MAIN,
-                capability: 'GAMESERVER.EDIT', // Eigene Addons verwalten
                 visible: true,
                 guildId,
                 parent: `/guild/${guildId}/plugins/gameserver`
@@ -1167,8 +1162,8 @@ class GameserverPlugin extends DashboardPlugin {
             {
                 title: 'gameserver:NAV.SERVERS',
                 url: `/guild/${guildId}/plugins/gameserver/servers`,
-                icon: 'fa-solid fa-list',
-                order: 40,
+                icon: 'fa-solid fa-server',
+                order: 10,
                 type: navigationManager.menuTypes.MAIN,
                 capability: 'GAMESERVER.VIEW', // Server-Liste ansehen
                 visible: true,
