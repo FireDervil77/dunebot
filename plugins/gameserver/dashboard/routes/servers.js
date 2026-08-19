@@ -2099,9 +2099,21 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             Logger.error('[Gameserver] Übersichtskarte konnte nicht gebaut werden', err);
         }
 
+        // Welcher Bereich gezeigt wird — was frueher ein Reiter war.
+        // Kein Bereich heisst: die Serverseite selbst.
+        const BEREICHE = {
+            dateien: 'Dateien', sicherungen: 'Sicherungen', konsole: 'Konsole',
+            rohmodus: 'Einstellungen — Rohmodus', fernsteuerung: 'Fernsteuerung',
+            aufgaben: 'Wiederkehrende Aufgaben', panels: 'Discord-Panels',
+            oeffentlich: 'Öffentliche Seite',
+        };
+        const bereich = BEREICHE[req.query.bereich] ? req.query.bereich : null;
+
         await themeManager.renderView(res, 'guild/server-detail', {
             title: `Server: ${server.name}`,
             uebersicht,
+            bereich,
+            bereichName: bereich ? BEREICHE[bereich] : null,
             activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
             server,
             gameData,

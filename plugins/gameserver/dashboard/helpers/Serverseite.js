@@ -114,6 +114,9 @@ function baueUebersicht(server, paket, zusatz = {}) {
         spieler:       baueSpieler(server, zusatz.live),
         einstellungen: baueEinstellungen(server, paket, hoehe),
         befehle:       baueBefehle(paket),
+        ports:         bauePorts(server, paket),
+        paket:         bauePaketkarte(server, paket, zusatz.paketZeile),
+        bereitschaft:  baueBereitschaft(paket),
         kennzahlen:    baueKennzahlen(server),
         welt:          baueWelt(zusatz.letzteSicherung),
     };
@@ -334,6 +337,113 @@ function baueKennzahlen(server) {
     const ramMax = Number.isFinite(server.ram_total_mb) ? server.ram_total_mb : null;
     if (cpu === null && ram === null) return null;
     return { cpu, ram, ramMax };
+}
+
+/**
+ * Ports mit ihrem ZWECK und ihrer Belegungsregel.
+ *
+ * Der Entwurf zeigt hier mehr als eine Zahl: „Abfrage 2457 — assign: game+1,
+ * bei Valheim zwingend Spielport+1, keine freie Wahl." Genau diese Auskunft
+ * steckt im Paket (Invariante I2: das Paket nennt Zwecke, nie Nummern) und war
+ * bisher nirgends zu sehen — die alte Ansicht zeigte nackte Zahlen.
+ */
+function bauePorts(server, paket) {
+    let belegt = {};
+    try {
+        belegt = typeof server.ports === 'string' ? JSON.parse(server.ports) : (server.ports || {});
+    } catch { belegt = {}; }
+
+    // Der Bestandsserver führt seine Ports unter den EGG-Schlüsseln
+    // (`game_plus_1`), das Paket nennt Zwecke (`query`). Dieselbe Brücke wie im
+    // Startweg — ohne sie stünde hier „Abfrage —", obwohl der Port belegt ist.
+    // Genau diese Verwechslung wies der Daemon am 2026-08-18 zu Recht ab.
+    const uebergang = ladeUebergang(paket?.identity?.slug || '');
+    const zweckKey = (zweck) => uebergang?.portzwecke?.[zweck] || zweck;
+
+    const ZWECK = { game: 'Spiel', query: 'Abfrage', rcon: 'Fernsteuerung' };
+    const liste = [];
+
+    for (const p of (paket?.ports || [])) {
+        const eintrag = belegt[p.purpose] || belegt[zweckKey(p.purpose)] || belegt[p.variable] || null;
+        const nummer = eintrag?.external ?? eintrag?.internal
+                    ?? (typeof eintrag === 'number' ? eintrag : null);
+        liste.push({
+            zweck:    ZWECK[p.purpose] || p.purpose,
+            nummer,
+            protokoll: p.protocol || null,
+            regel:    p.assign || null,
+            variable: p.variable || null,
+            pflicht:  p.required !== false,
+        });
+    }
+
+    // Belegte Ports, die das Paket nicht kennt, gehören trotzdem gezeigt: Sie
+    // sind belegt, und wer sie sucht, soll sie finden.
+    const schonGezeigt = new Set((paket?.ports || []).flatMap(p =>
+        [p.purpose, zweckKey(p.purpose), p.variable].filter(Boolean)));
+    for (const [schluessel, eintrag] of Object.entries(belegt)) {
+        if (schonGezeigt.has(schluessel)) continue;
+        const nummer = eintrag?.external ?? eintrag?.internal
+                    ?? (typeof eintrag === 'number' ? eintrag : null);
+        if (nummer) liste.push({ zweck: schluessel, nummer, protokoll: null, regel: null, ausserhalb: true });
+    }
+    return liste;
+}
+
+/**
+ * Paket und Image — die technische Identität.
+ *
+ * Sie gehört in die fachliche Höhe und nirgends anders hin: Ein Digest ist für
+ * niemanden eine Auskunft, der einen Server bloss betreibt. Für den, der einen
+ * Fehler sucht, ist er die wichtigste Zeile der Seite.
+ */
+function bauePaketkarte(server, paket, zeile) {
+    if (!paket) return null;
+    const img = paket.image || {};
+    return {
+        slug:    paket.identity?.slug || null,
+        version: paket.identity?.version || null,
+        kanal:   zeile?.paket_channel || null,
+        image:   img.ref ? (img.tag ? img.ref + ':' + img.tag : img.ref) : null,
+        digest:  img.digest || null,
+        // Woher die Dateien kommen — der erste Installationsschritt.
+        quelle:  (paket.install?.steps || []).map(s =>
+                    s.type === 'steamcmd' ? 'steamcmd · App ' + s.app : s.type).join(', ') || null,
+        welten:  paket.management?.saves || null,
+    };
+}
+
+/**
+ * Die Bereitschaftsleiter — drei Stufen, wie fb-init sie meldet.
+ *
+ * ── Warum hier „nicht gemessen" steht und keine Häkchen ─────────────────────
+ *
+ * Der Entwurf zeigt drei erfüllte Stufen mit Zeiten: Prozess 0,3 s · Port 31 s ·
+ * Abfrage 31 s. Diese Angaben entstehen wirklich — `fb-init` meldet sie über den
+ * Agent-Socket. Nur ruft `agent.Neu(...)` im Daemon ausschliesslich das
+ * Prüfwerkzeug `fb-agentprobe`, nie der Startweg (Baustelle 58).
+ *
+ * Die Karte zeigt deshalb, WAS das Paket zu prüfen verlangt, und dass die
+ * Messung fehlt. Drei grüne Häkchen zu malen wäre die eine Zeile auf dieser
+ * Seite, die einen Betreiber wirklich in die Irre führen würde: Er würde
+ * glauben, ein Spieler kommt rein.
+ */
+function baueBereitschaft(paket) {
+    const r = paket?.start?.ready_when;
+    if (!r) return null;
+    const stufen = [
+        { name: 'Prozess', verlangt: true,
+          erklaerung: 'Das Programm läuft — PID 1 ist fb-init, exec ohne Shell.' },
+        { name: 'Port', verlangt: Boolean(r.port),
+          erklaerung: r.port ? 'Der Port „' + r.port + '" lauscht.' : 'Kein Port im Paket genannt.' },
+        { name: 'Abfrage', verlangt: r.query === true,
+          erklaerung: r.query === true ? 'Das Spiel antwortet auf eine Abfrage.' : 'Keine Abfrage verlangt.' },
+    ];
+    return {
+        stufen,
+        frist: r.timeout_sec || null,
+        gemessen: false,   // siehe Baustelle 58
+    };
 }
 
 /** Welt: wann zuletzt gesichert. */

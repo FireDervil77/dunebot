@@ -103,6 +103,10 @@
     </div>
   </div>
 
+  <%# ── Zweispaltig, wie im Entwurf: links das Tun, rechts das Nachsehen ── %>
+  <div class="fb-raster">
+  <div>
+
   <%# ── Einstellungen ────────────────────────────────────────────────────── %>
   <div class="fb-karte">
     <div class="fb-kopf">
@@ -193,15 +197,97 @@
     </div>
   <% } %>
 
+  </div>
+  <div>
+
+  <%# ── Bereitschaft (fachlich) ─────────────────────────────────────────── %>
+  <% if (u.hoehe === 'fachlich' && u.bereitschaft) { %>
+    <div class="fb-karte">
+      <div class="fb-kopf">
+        <span>Bereitschaft</span>
+        <% if (!u.bereitschaft.gemessen) { %>
+          <span class="fb-pille" style="margin-left:auto">nicht gemessen</span>
+        <% } %>
+      </div>
+      <div class="fb-koerper">
+        <% u.bereitschaft.stufen.forEach(function (st) { %>
+          <div style="display:flex;gap:10px;padding:8px 0;align-items:start">
+            <span class="fb-punkt" style="margin-top:6px;background:<%= st.verlangt ? 'var(--fb-border)' : '#f1f3f5' %>"></span>
+            <div>
+              <div style="font-weight:500;<%= st.verlangt ? '' : 'color:var(--fb-text-muted)' %>"><%= st.name %></div>
+              <div class="fb-muted" style="font-size:13px"><%= st.erklaerung %></div>
+            </div>
+          </div>
+        <% }); %>
+        <%# Drei gruene Haekchen zu malen waere die eine Zeile auf dieser Seite,
+            die wirklich in die Irre fuehrt: Der Betreiber wuerde glauben, ein
+            Spieler kommt rein. %>
+        <div class="fb-muted" style="font-size:13px;margin-top:8px">
+          Was das Paket prüfen lässt. Die Messung selbst kommt noch nicht beim
+          Dashboard an<%= u.bereitschaft.frist ? ' (Frist ' + u.bereitschaft.frist + ' s)' : '' %>.
+        </div>
+      </div>
+    </div>
+  <% } %>
+
   <%# ── Welt ─────────────────────────────────────────────────────────────── %>
   <div class="fb-karte">
     <div class="fb-kopf"><span>Welt</span></div>
-    <div style="padding:16px 20px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px">
-      <div class="fb-muted" style="font-size:13px">
+    <div class="fb-koerper">
+      <div class="fb-muted" style="font-size:13px;margin-bottom:10px">
         <%= u.welt.letzte ? 'Zuletzt gesichert ' + u.welt.text : 'Noch keine Sicherung vorhanden.' %>
       </div>
-      <a class="btn btn-white btn-sm" href="#sicherungen">Sicherungen…</a>
+      <a class="btn btn-white btn-sm" href="?ansicht=<%= u.hoehe %>&bereich=sicherungen">Sicherungen…</a>
     </div>
+  </div>
+
+  <%# ── Ports (fachlich) ─────────────────────────────────────────────────── %>
+  <% if (u.hoehe === 'fachlich' && u.ports.length) { %>
+    <div class="fb-karte">
+      <div class="fb-kopf"><span>Ports</span></div>
+      <div class="fb-koerper">
+        <% u.ports.forEach(function (p) { %>
+          <div style="display:flex;gap:10px;padding:8px 0;align-items:baseline">
+            <div style="flex:1 1 auto"><%= p.zweck %></div>
+            <div class="fb-mono"><%= p.nummer !== null ? p.nummer : '—' %></div>
+            <% if (p.protokoll) { %><span class="fb-muted" style="font-size:12px"><%= p.protokoll %></span><% } %>
+          </div>
+          <% if (p.regel) { %>
+            <div class="fb-muted fb-mono" style="font-size:12px;margin:-4px 0 4px">assign: <%= p.regel %></div>
+          <% } %>
+        <% }); %>
+      </div>
+    </div>
+  <% } %>
+
+  <%# ── Paket und Image (fachlich) ───────────────────────────────────────── %>
+  <% if (u.hoehe === 'fachlich' && u.paket) { %>
+    <div class="fb-karte">
+      <div class="fb-kopf"><span>Paket und Image</span></div>
+      <div class="fb-koerper" style="font-size:13px">
+        <% [['Paket', (u.paket.slug || '') + ' ' + (u.paket.version || '')],
+            ['Kanal', u.paket.kanal],
+            ['Image', u.paket.image],
+            ['Digest', u.paket.digest],
+            ['Quelle', u.paket.quelle]].forEach(function (z) { %>
+          <% if (z[1]) { %>
+            <div style="display:flex;gap:10px;padding:5px 0">
+              <div class="fb-muted" style="flex:0 0 74px"><%= z[0] %></div>
+              <div class="fb-mono" style="word-break:break-all"><%= z[1] %></div>
+            </div>
+          <% } %>
+        <% }); %>
+        <% if (u.paket.welten) { %>
+          <div style="display:flex;gap:10px;padding:5px 0">
+            <div class="fb-muted" style="flex:0 0 74px">Welten</div>
+            <div class="fb-mono" style="word-break:break-all"><%= u.paket.welten.join(', ') %></div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
+
+  </div>
   </div>
 
 </div>

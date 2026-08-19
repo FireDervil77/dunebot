@@ -47,7 +47,25 @@
         <a href="?ansicht=fachlich" class="<%= hoehe === 'fachlich' ? 'an' : '' %>">Fachlich</a>
       </div>
 
-      <a class="btn btn-white btn-sm" href="#dateien">Dateien</a>
+      <% const bereiche = [
+           ['dateien',      'Dateien'],
+           ['sicherungen',  'Sicherungen'],
+           ['konsole',      'Konsole'],
+           ['rohmodus',     'Einstellungen — Rohmodus'],
+           ['fernsteuerung','Fernsteuerung'],
+           ['aufgaben',     'Wiederkehrende Aufgaben'],
+           ['panels',       'Discord-Panels'],
+           ['oeffentlich',  'Öffentliche Seite'],
+         ]; %>
+      <div class="dropdown">
+        <button class="btn btn-white btn-sm" data-bs-toggle="dropdown" aria-expanded="false">Bereiche</button>
+        <div class="dropdown-menu">
+          <% bereiche.forEach(function (b) { %>
+            <a class="dropdown-item<%= locals.bereich === b[0] ? ' active' : '' %>"
+               href="?ansicht=<%= hoehe %>&bereich=<%= b[0] %>"><%= b[1] %></a>
+          <% }); %>
+        </div>
+      </div>
 
       <% if (server.status === 'online') { %>
         <button class="btn btn-white btn-sm" onclick="serverAction('<%= server.id %>', 'restart')">Neu starten</button>
@@ -70,75 +88,47 @@
   </div>
 
   <%# ── Zustand, Einstellungen, Befehle, Welt ───────────────────────────── %>
-  <%- include('partials/server-detail-uebersicht', { uebersicht: locals.uebersicht }) %>
-
-  <%# ── Fachliche Höhe: Werkzeuge ───────────────────────────────────────── %>
-  <% if (hoehe === 'fachlich') { %>
-
-    <div class="fb-karte">
-      <div class="fb-kopf"><span>Konsole</span></div>
-      <div class="fb-koerper">
-        <%- include('partials/server-detail-console', { server, guildId, userPermissions, consoleTransport: locals.consoleTransport }) %>
-      </div>
-    </div>
-
-    <div class="fb-karte">
-      <div class="fb-kopf">
-        <span>Einstellungen — Rohmodus</span>
-        <span class="fb-muted" style="margin-left:auto;font-size:13px;font-weight:400">
-          alle Variablen, ohne Deutung durch das Paket
-        </span>
-      </div>
-      <div class="fb-koerper">
-        <%- include('partials/server-detail-variables', { server, gameData, guildId, userPermissions }) %>
-      </div>
-    </div>
-
-    <div class="fb-karte">
-      <div class="fb-kopf"><span>Fernsteuerung</span></div>
-      <div class="fb-koerper">
-        <%- include('partials/server-detail-rcon', { server, guildId, userPermissions }) %>
-      </div>
-    </div>
-
-    <div class="fb-karte">
-      <div class="fb-kopf"><span>Wiederkehrende Aufgaben</span></div>
-      <div class="fb-koerper">
-        <%- include('partials/server-detail-cronjobs', { server, guildId, userPermissions }) %>
-      </div>
-    </div>
-
-    <div class="fb-karte">
-      <div class="fb-kopf"><span>Discord-Panels</span></div>
-      <div class="fb-koerper">
-        <%- include('partials/server-detail-panels', { server, guildId, userPermissions }) %>
-      </div>
-    </div>
-
-    <div class="fb-karte">
-      <div class="fb-kopf"><span>Öffentliche Seite</span></div>
-      <div class="fb-koerper">
-        <%- include('partials/server-detail-public', { server, guildId, userPermissions }) %>
-      </div>
-    </div>
-
+  <% if (!locals.bereich) { %>
+    <%- include('partials/server-detail-uebersicht', { uebersicht: locals.uebersicht }) %>
   <% } %>
 
-  <%# ── Sicherungen — in beiden Höhen, die Welt-Karte verweist hierher ──── %>
-  <div class="fb-karte" id="sicherungen">
-    <div class="fb-kopf"><span>Sicherungen</span></div>
-    <div class="fb-koerper">
-      <%- include('partials/server-detail-backups', { server, guildId, userPermissions }) %>
-    </div>
-  </div>
+  <%# ── Bereiche ─────────────────────────────────────────────────────────
+      Was frueher Reiter waren, sind jetzt eigene Punkte — der Betreiber:
+      „die punkte die vorher tab waren als einzelne menues machen."
 
-  <%# ── Dateien ─────────────────────────────────────────────────────────── %>
-  <div class="fb-karte" id="dateien">
-    <div class="fb-kopf"><span>Dateien</span></div>
-    <div class="fb-koerper">
-      <%- include('partials/server-detail-files', { server, guildId, userPermissions }) %>
+      Sie stapeln sich NICHT unter der Serverseite. Ein Bereich wird gezeigt,
+      wenn er gewaehlt ist, sonst keiner. Der erste Anlauf hatte sie als Karten
+      untereinander gehaengt — dieselbe Vermischung wie die Reiter, nur
+      senkrecht. %>
+  <% const bereich = locals.bereich || null; %>
+  <% if (bereich) { %>
+    <div class="fb-karte">
+      <div class="fb-kopf">
+        <span><%= locals.bereichName || bereich %></span>
+        <a class="btn btn-white btn-sm" style="margin-left:auto"
+           href="?ansicht=<%= hoehe %>">Zurück zum Server</a>
+      </div>
+      <div class="fb-koerper">
+        <% if (bereich === 'dateien') { %>
+          <%- include('partials/server-detail-files', { server, guildId, userPermissions }) %>
+        <% } else if (bereich === 'sicherungen') { %>
+          <%- include('partials/server-detail-backups', { server, guildId, userPermissions }) %>
+        <% } else if (bereich === 'konsole') { %>
+          <%- include('partials/server-detail-console', { server, guildId, userPermissions, consoleTransport: locals.consoleTransport }) %>
+        <% } else if (bereich === 'rohmodus') { %>
+          <%- include('partials/server-detail-variables', { server, gameData, guildId, userPermissions }) %>
+        <% } else if (bereich === 'fernsteuerung') { %>
+          <%- include('partials/server-detail-rcon', { server, guildId, userPermissions }) %>
+        <% } else if (bereich === 'aufgaben') { %>
+          <%- include('partials/server-detail-cronjobs', { server, guildId, userPermissions }) %>
+        <% } else if (bereich === 'panels') { %>
+          <%- include('partials/server-detail-panels', { server, guildId, userPermissions }) %>
+        <% } else if (bereich === 'oeffentlich') { %>
+          <%- include('partials/server-detail-public', { server, guildId, userPermissions }) %>
+        <% } %>
+      </div>
     </div>
-  </div>
+  <% } %>
 
 </div>
 

@@ -107,3 +107,7 @@
   justify-content: space-between; gap: 12px; margin-bottom: 16px;
 }
 .fb-titel { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+
+/* ── Zweispaltig: links das Tun, rechts das Nachsehen ───────────────────── */
+.fb-raster { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr); gap: 16px; }
+@media (max-width: 992px) { .fb-raster { grid-template-columns: 1fr; } }
