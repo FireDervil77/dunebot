@@ -17,7 +17,10 @@
 
   <form method="get" action="/guild/<%= guildId %>/plugins/gameserver/servers/create" id="fb-schritt1">
     <input type="hidden" name="step" value="2">
-    <input type="hidden" name="addon_id" id="fb-gewaehlt" value="">
+    <%# Die Route liest `addon` als SLUG (req.query.addon → WHERE slug = ?).
+        Hier stand `addon_id` mit der Zahl — der Weiter-Knopf fuehrte damit auf
+        Schritt 1 zurueck, weil `addon` leer war und der Zweig nie griff. %>
+    <input type="hidden" name="addon" id="fb-gewaehlt" value="">
 
     <div class="fb-karte">
       <div class="fb-kopf">
@@ -31,8 +34,8 @@
           <div class="fb-muted" style="font-size:13px">Noch kein Paket eingeliefert.</div>
         <% } %>
         <% auswahl.pakete.forEach(function (p) { %>
-          <label class="fb-spiel" data-fb-wahl="<%= p.addonId %>">
-            <input type="radio" name="_wahl" value="<%= p.addonId %>" hidden>
+          <label class="fb-spiel" data-fb-wahl="<%= p.slug %>">
+            <input type="radio" name="_wahl" value="<%= p.slug %>" hidden>
             <div style="display:flex;gap:12px;align-items:start">
               <div style="flex:1 1 auto">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -94,8 +97,8 @@
               Spielen ein Paket; die anderen wegzulassen hiesse, sieben Spiele
               unanlegbar zu machen, damit eine Liste sauber aussieht. %>
           <% auswahl.ohnePaket.forEach(function (a) { %>
-            <label class="fb-spiel" data-fb-wahl="<%= a.addonId %>">
-              <input type="radio" name="_wahl" value="<%= a.addonId %>" hidden>
+            <label class="fb-spiel" data-fb-wahl="<%= a.slug %>">
+              <input type="radio" name="_wahl" value="<%= a.slug %>" hidden>
               <div style="display:flex;gap:12px;align-items:center">
                 <div style="flex:1 1 auto">
                   <div style="font-weight:600;font-size:15px"><%= a.name %></div>

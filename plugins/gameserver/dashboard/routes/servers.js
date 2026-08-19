@@ -477,7 +477,7 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
             return await themeManager.renderView(res, 'guild/server-create-step2', {
                 title: 'Server anlegen — Maschine wählen',
                 maschinen,
-                addonId: addonData.id,
+                addonSlug: addonData.slug,
                 spielName: paketFuerWahl?.identity?.name || addonData.name,
                 activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
                 addon: addonData,

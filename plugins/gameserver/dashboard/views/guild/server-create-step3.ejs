@@ -44,25 +44,49 @@
                 </div>
                 <div>
                   <% if (f.auswahl) { %>
-                    <select class="fb-feld" style="width:100%" name="variable_<%= f.schluessel %>">
+                    <select class="fb-feld" style="width:100%" name="<%= f.istServerName ? 'server_name' : (f.variable ? 'variable_' + f.variable : 'variable_' + f.schluessel) %>">
                       <% f.auswahl.forEach(function (c) { %>
                         <option value="<%= c.wert %>" <%= String(f.vorgabe) === c.wert ? 'selected' : '' %>><%= c.name %></option>
                       <% }); %>
                     </select>
                   <% } else if (f.typ === 'boolean') { %>
-                    <select class="fb-feld" style="width:100%" name="variable_<%= f.schluessel %>">
+                    <select class="fb-feld" style="width:100%" name="<%= f.istServerName ? 'server_name' : (f.variable ? 'variable_' + f.variable : 'variable_' + f.schluessel) %>">
                       <option value="1" <%= String(f.vorgabe) === '1' || f.vorgabe === true ? 'selected' : '' %>>An</option>
                       <option value="0" <%= String(f.vorgabe) === '1' || f.vorgabe === true ? '' : 'selected' %>>Aus</option>
                     </select>
                   <% } else { %>
                     <input class="fb-feld" style="width:100%"
                            type="<%= f.geheim ? 'password' : (f.typ === 'number' ? 'number' : 'text') %>"
-                           name="variable_<%= f.schluessel %>"
+                           name="<%= f.istServerName ? 'server_name' : (f.variable ? 'variable_' + f.variable : 'variable_' + f.schluessel) %>"
                            <% if (f.min !== null) { %>min="<%= f.min %>"<% } %>
                            <% if (f.max !== null) { %>max="<%= f.max %>"<% } %>
                            <%= f.pflicht ? 'required' : '' %>
                            value="<%= f.geheim ? '' : (f.vorgabe !== undefined ? f.vorgabe : '') %>">
                   <% } %>
+                </div>
+              </div>
+            <% }); %>
+
+            <%# ── Was der Server bekommen darf ─────────────────────────────
+                Die Anlegeroute verlangt diese drei und rechnet sie gegen die
+                Kapazitaet der Maschine. Sie sind ein Wert, den der Betreiber
+                setzt — nicht das Paket: Der Bedarf steht dort ausdruecklich als
+                „nicht gemessen — nicht geraten". %>
+            <div class="fb-abschnitt">Was der Server bekommen darf</div>
+            <% [['allocated_ram_mb','Arbeitsspeicher','MB',4096],
+                ['allocated_cpu_percent','CPU','%',200],
+                ['allocated_disk_gb','Platte','GB',20]].forEach(function (r) { %>
+              <div class="fb-zeile">
+                <div>
+                  <div style="font-weight:500"><%= r[1] %></div>
+                  <div class="fb-muted" style="font-size:13px;margin-top:2px">
+                    Wird auf der Maschine gebucht, auch wenn der Server gerade weniger braucht.
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input class="fb-feld" style="width:100%" type="number" min="1" required
+                         name="<%= r[0] %>" value="<%= r[3] %>">
+                  <span class="fb-muted" style="font-size:13px"><%= r[2] %></span>
                 </div>
               </div>
             <% }); %>
@@ -121,7 +145,7 @@
         <%= werte.felder.filter(function (f) { return f.pflicht; }).length %> Pflichtangaben
       </span>
       <div style="margin-left:auto;display:flex;gap:8px">
-        <a class="btn btn-white btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=2&addon_id=<%= locals.addonId || '' %>">Zurück</a>
+        <a class="btn btn-white btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=2&addon=<%= locals.addonSlug || '' %>">Zurück</a>
         <button type="submit" class="btn btn-primary btn-sm">Anlegen und installieren</button>
       </div>
     </div>

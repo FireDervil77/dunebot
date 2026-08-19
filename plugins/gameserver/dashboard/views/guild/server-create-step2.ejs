@@ -23,7 +23,7 @@
 
   <form method="get" action="/guild/<%= guildId %>/plugins/gameserver/servers/create">
     <input type="hidden" name="step" value="3">
-    <input type="hidden" name="addon_id" value="<%= locals.addonId || '' %>">
+    <input type="hidden" name="addon" value="<%= locals.addonSlug || '' %>">
     <input type="hidden" name="rootserver_id" id="fb-maschine" value="">
 
     <% maschinen.forEach(function (m) { %>

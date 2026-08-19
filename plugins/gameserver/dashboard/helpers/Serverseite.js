@@ -694,9 +694,20 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
     const alle = Array.isArray(paket?.settings) ? paket.settings : [];
     const gefragt = alle.filter(e => (e.role || 'expert') === 'player');
 
+    // Gespeichert wird unter dem EGG-Namen, nicht unter dem Paketschlüssel: Die
+    // Anlegeroute schreibt `variable_<ENV>` nach `env_variables`, und von dort
+    // liest der Startweg. Dieselbe Brücke wie überall — ohne sie landete der
+    // Servername unter „name" statt unter „SERVER_NAME" und käme nie an.
+    const uebergang = ladeUebergang(paket?.identity?.slug || '');
+
     return {
         felder: gefragt.map(e => ({
             schluessel: e.key,
+            variable: uebergang?.zuordnung?.[e.key] || null,
+            // Der Servername ist zugleich der Name des Servers in der Datenbank.
+            // Die Anlegeroute verlangt ihn als `server_name`; ihn zweimal
+            // abzufragen wäre die Sorte Formular, die niemand ausfüllen will.
+            istServerName: e.key === 'name',
             name: e.name?.de || e.name?.en || e.key,
             beschreibung: e.description?.de || e.description?.en || '',
             typ: e.type || 'text',
