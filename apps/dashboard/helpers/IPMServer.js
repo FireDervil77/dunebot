@@ -324,6 +324,17 @@ class IPMServer {
                                 this.Logger.error(`[IPMServer] SFTP-Abgleich fehlgeschlagen für Daemon ${daemonId}:`, err);
                             });
                         });
+                    } else if (result.istVorlauf) {
+                        // Der Einrichtungs-Vorlauf ist KEIN Fehlversuch.
+                        //
+                        // Ohne diesen Zweig liefe er in die Brute-Force-Bremse:
+                        // Der Token war richtig, die Antwort ist schon raus —
+                        // und der Zähler hätte trotzdem hochgezählt, bis sich
+                        // ein Betreiber nach ein paar Einrichtungen selbst
+                        // aussperrt. Dazu käme eine zweite, widersprüchliche
+                        // Nachricht ("error") hinter dem "probe_ok".
+                        this.registerFailures.delete(rateKey);
+                        ws.close(1000, 'Vorlauf beendet');
                     } else {
                         // ✅ SECURITY: Fehlversuch zählen (Brute-Force-Bremse)
                         this._recordRegisterFailure(rateKey, clientIp);
@@ -398,6 +409,32 @@ class IPMServer {
      * @param {string} clientIp - Client IP-Adresse
      * @private
      */
+    /**
+     * Was der Betreiber für diese Maschine WOLLTE — auf dem Weg zur Maschine.
+     *
+     * ── Warum das mit der Anmeldeantwort geht und nicht in einem eigenen Kanal ──
+     *
+     * Die Reihenfolge beim Einrichten ist: Formular ausfüllen → Daemon-ID und
+     * API-Key aus dem Modal → `install.sh` auf der Maschine. Die Absicht steht
+     * also fest, bevor die Maschine überhaupt angefasst wird, und sie hängt am
+     * selben Schlüssel, den der Betreiber ohnehin einträgt.
+     *
+     * Ein zweiter Weg dafür wäre eine zweite Wahrheit: Man müsste erklären, was
+     * gilt, wenn beide etwas anderes sagen.
+     *
+     * Wichtig: Das ist die ABSICHT, nicht die Erlaubnis. Ob FastDL geht,
+     * entscheidet weiterhin der Befund der Maschine.
+     * @private
+     */
+    _absichtFuer(zeile) {
+        return {
+            fqdn:          zeile.fqdn || null,
+            fastdl:        !!zeile.fastdl_enabled,
+            datenbanken:   !!zeile.db_gewuenscht,
+            db_je_server:  Number(zeile.db_je_server) || 0,
+        };
+    }
+
     async _handleRegister(ws, payload, clientIp) {
         const { token, daemon_id, version, hardware, sftp_fingerprint, sftp_port } = payload;
 
@@ -467,7 +504,8 @@ class IPMServer {
                             id: daemon.id,
                             name: daemon.name,
                             base_directory: daemon.base_directory,
-                            system_user: daemon.system_user
+                            system_user: daemon.system_user,
+                            absicht: this._absichtFuer(daemon)
                         },
                         serverRegistry: reconnectServers || []
                     }));
@@ -509,6 +547,37 @@ class IPMServer {
                 return { success: false, error: 'Invalid or expired token' };
             }
 
+            // ── Der Einrichtungs-Vorlauf (probe) ─────────────────────────────
+            //
+            // Der Setup-Wizard fragt hier einmal an, WÄHREND der Betreiber noch
+            // am Terminal sitzt: Stimmt der Token, und was wurde für diese
+            // Maschine angefordert? Erst mit dieser Antwort kann er die
+            // richtigen Rückfragen stellen — „FastDL angefordert, hier ist kein
+            // Webserver, soll ich nginx installieren?".
+            //
+            // Er ändert bewusst NICHTS am Zustand: kein `markOnline`, kein
+            // Sitzungsschlüssel, kein `install_status = completed`. Eine
+            // Maschine, auf der der Wizard gerade läuft, IST nicht online — und
+            // wer den Wizard abbricht, soll keine Zeile hinterlassen, die
+            // behauptet, die Installation sei fertig.
+            //
+            // Der Token wird trotzdem echt geprüft: Ein Vertipper fällt damit
+            // sofort auf, statt später als Dienst, der nicht hochkommt.
+            if (payload.probe === true) {
+                this.Logger.info(`[IPMServer] Einrichtungs-Vorlauf für Daemon ${daemon_id} (IP: ${clientIp})`);
+                ws.send(JSON.stringify({
+                    type: 'probe_ok',
+                    rootserver: {
+                        id:             rootserverByToken.id,
+                        name:           rootserverByToken.name,
+                        base_directory: rootserverByToken.base_directory,
+                        system_user:    rootserverByToken.system_user,
+                        absicht:        this._absichtFuer(rootserverByToken),
+                    },
+                }));
+                return { success: false, error: 'probe', istVorlauf: true };
+            }
+
             // JWT Session-Token generieren
             const sessionToken = jwt.sign({
                 daemon_id,
@@ -546,7 +615,8 @@ class IPMServer {
                     id: rootserverByToken.id,
                     name: rootserverByToken.name,
                     base_directory: rootserverByToken.base_directory,
-                    system_user: rootserverByToken.system_user
+                    system_user: rootserverByToken.system_user,
+                    absicht: this._absichtFuer(rootserverByToken)
                 },
                 serverRegistry: firstRegServers || []
             }));
