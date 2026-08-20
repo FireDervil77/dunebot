@@ -58,28 +58,20 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="hostname">Hostname (optional)</label>
-                                <input type="text"
-                                       class="form-control"
-                                       id="hostname"
-                                       name="hostname"
-                                       placeholder="z.B. node1.example.com">
-                                <small class="form-text text-secondary">Öffentlicher Hostname (nur zur Anzeige)</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="fqdn">FQDN (optional)</label>
+                                <label for="fqdn">Domainname (optional)</label>
                                 <input type="text"
                                        class="form-control"
                                        id="fqdn"
                                        name="fqdn"
                                        placeholder="z.B. node1.firenetworks.de">
-                                <small class="form-text text-secondary">Vollqualifizierter Domainname (DNS muss auf die IP zeigen)</small>
+                                <small class="form-text text-secondary">
+                                    Wird beim Verbinden des Daemons geprüft: Zeigt er auf DIESE Maschine,
+                                    erscheint er als Adresse — sonst bleibt es bei der IP.
+                                </small>
                             </div>
                         </div>
+                    </div>
+                    <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="fastdlEnabled">FastDL</label>
@@ -87,20 +79,34 @@
                                     <input type="checkbox" class="form-check-input" id="fastdlEnabled" name="fastdlEnabled" value="true">
                                     <label class="form-check-label" for="fastdlEnabled">FastDL aktivieren</label>
                                 </div>
-                                <small class="form-text text-secondary">Stellt Downloads über HTTP bereit (benötigt Nginx)</small>
+                                <small class="form-text text-secondary">
+                                    Schnellere Kartendownloads für Source-Spiele. Ob es geht, meldet die
+                                    Maschine — sie braucht dafür nginx oder apache. Eine Domain ist nicht nötig.
+                                </small>
                             </div>
                         </div>
                     </div>
-                    <div class="row" id="fastdlUrlRow" style="display: none;">
-                        <div class="col-md-12">
+                    <div class="row">
+                        <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="fastdlUrl">FastDL Base-URL</label>
-                                <input type="url"
-                                       class="form-control"
-                                       id="fastdlUrl"
-                                       name="fastdlUrl"
-                                       placeholder="z.B. https://fastdl.firenetworks.de">
-                                <small class="form-text text-secondary">Base-URL für FastDL-Downloads (ohne abschließenden /)</small>
+                                <label for="dbGewuenscht">Datenbanken</label>
+                                <div class="form-check form-switch mt-2">
+                                    <input type="checkbox" class="form-check-input" id="dbGewuenscht" name="dbGewuenscht" value="true">
+                                    <label class="form-check-label" for="dbGewuenscht">Spieldatenbanken anbieten</label>
+                                </div>
+                                <small class="form-text text-secondary">
+                                    Ohne Häkchen rührt der Daemon MySQL auf dieser Maschine nicht an.
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="dbJeServer">Datenbanken je Gameserver</label>
+                                <input type="number" class="form-control" id="dbJeServer" name="dbJeServer"
+                                       min="0" max="20" step="1" value="0">
+                                <small class="form-text text-secondary">
+                                    Eine Grenze wie RAM oder Platte. 0 = keine.
+                                </small>
                             </div>
                         </div>
                     </div>
@@ -213,41 +219,25 @@
                 </div>
             </div>
 
-            <!-- Hardware -->
+            <!-- Hardware — nicht mehr gefragt, sondern gemessen (M-6, 2026-08-20) -->
             <div class="card mt-3">
-                <div class="card-status-top bg-primary"></div>
+                <div class="card-status-top bg-secondary"></div>
                 <div class="card-header">
                     <h3 class="card-title">
-                        <i class="fa-solid fa-microchip me-2"></i>Hardware-Limits
+                        <i class="fa-solid fa-microchip me-2"></i>Hardware
                     </h3>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="cpuCores">CPU-Kerne</label>
-                                <input type="number" class="form-control" id="cpuCores" name="cpuCores"
-                                       min="0" step="1" value="4" placeholder="z.B. 8">
-                                <small class="form-text text-secondary">0 = automatisch ermitteln</small>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="ramTotal">RAM-Limit (GB) <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="ramTotal" name="ramTotal"
-                                       min="1" step="1" value="16" placeholder="z.B. 32" required>
-                                <small class="form-text text-secondary">Maximaler RAM für Gameserver</small>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="diskTotal">Disk-Limit (GB) <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="diskTotal" name="diskTotal"
-                                       min="1" step="1" value="100" placeholder="z.B. 500" required>
-                                <small class="form-text text-secondary">Maximaler Speicherplatz</small>
-                            </div>
-                        </div>
-                    </div>
+                    <p class="mb-1">
+                        CPU-Kerne, RAM und Plattenplatz werden hier nicht mehr eingetragen.
+                        Der Daemon misst sie beim ersten Verbinden — an der richtigen Stelle:
+                        die Platte am Datenverzeichnis, nicht an der Wurzel.
+                    </p>
+                    <p class="text-secondary mb-0">
+                        Die gemessenen Werte sind die Kapazität dieser Maschine. Eine niedrigere
+                        Grenze lässt sich danach unter <strong>Ressourcen</strong> setzen — dann ist
+                        das eine bewusste Entscheidung und keine Zahl, die jemand getippt hat.
+                    </p>
                 </div>
             </div>
 
@@ -431,10 +421,23 @@ function copyFieldValue(id) {
     setTimeout(() => { el.style.borderColor = orig; }, 800);
 }
 
-// FastDL Toggle: URL-Feld ein-/ausblenden
-document.getElementById('fastdlEnabled').addEventListener('change', function() {
-    document.getElementById('fastdlUrlRow').style.display = this.checked ? '' : 'none';
-});
+// Datenbanken-Schalter: die Anzahl je Gameserver ist nur sinnvoll, wenn
+// Datenbanken überhaupt angeboten werden.
+//
+// (Das FastDL-URL-Feld stand hier bis zum 2026-08-20. Es ist entfallen: Die
+// Adresse ergibt sich aus der Maschine — geprüfter Name oder IP —, sie ist
+// nichts, was jemand tippt und niemand nachprüft.)
+const dbSchalter = document.getElementById('dbGewuenscht');
+const dbAnzahl   = document.getElementById('dbJeServer');
+if (dbSchalter && dbAnzahl) {
+    const nachfuehren = () => {
+        dbAnzahl.disabled = !dbSchalter.checked;
+        if (!dbSchalter.checked) dbAnzahl.value = 0;
+        else if (Number(dbAnzahl.value) === 0) dbAnzahl.value = 1;
+    };
+    dbSchalter.addEventListener('change', nachfuehren);
+    nachfuehren();
+}
 
 // ==========================================
 // Server-Typ Toggle: Dropdown vs. Textfeld

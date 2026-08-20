@@ -271,6 +271,39 @@ class IPMServer {
                         this.connectionCounts.set(daemonId, currentConnections + 1);
                         
                         this.Logger.info(`[IPMServer] Daemon ${daemonId} registriert (Guild: ${result.metadata.guild_id}, Connections: ${currentConnections + 1}/${this.maxConnectionsPerDaemon})`);
+
+                        // ── Maschinenbefund übernehmen (M-1 bis M-6) ────────
+                        //
+                        // Hier und nicht im Heartbeat: Virtualisierung,
+                        // Webserver und Datenbank ändern sich nicht im
+                        // Minutentakt, und die Namensprüfung ist eine
+                        // DNS-Auflösung — die gehört nicht in einen Takt, der
+                        // alle paar Sekunden schlägt.
+                        //
+                        // `clientIp` ist die einzige Adresse dieser Maschine,
+                        // die niemand getippt hat. Genau daran wird der
+                        // gewünschte Name gemessen.
+                        if (message.payload && message.payload.maschine) {
+                            try {
+                                const befund = await RootServer.uebernimmMaschinenbefund(
+                                    daemonId, message.payload.maschine, clientIp);
+                                if (befund) {
+                                    this.Logger.info(
+                                        `[IPMServer] Maschine ${daemonId}: Name ${befund.name.gilt ? 'gilt' : 'gilt nicht'} — ${befund.name.grund}`);
+                                    if (!befund.hardwareBelastbar) {
+                                        this.Logger.warn(
+                                            `[IPMServer] Maschine ${daemonId} ist containervirtualisiert ` +
+                                            `(${message.payload.maschine.virtualisierung}) — die gemeldeten ` +
+                                            'CPU-, RAM- und Plattenwerte zeigen den WIRT, nicht den Mietanteil.');
+                                    }
+                                }
+                            } catch (error) {
+                                // Ein misslungener Befund darf die Anmeldung nicht kippen:
+                                // Der Daemon ist verbunden, die Gameserver laufen. Was fehlt,
+                                // sind Fähigkeiten — und die stehen dann eben auf "unbekannt".
+                                this.Logger.error('[IPMServer] Maschinenbefund konnte nicht übernommen werden', error);
+                            }
+                        }
                         
                         // ✅ RE-TRIGGER: Gameserver mit Status 'installing' erneut senden (NACH Connection-Registrierung!)
                         if (result.isReconnect) {

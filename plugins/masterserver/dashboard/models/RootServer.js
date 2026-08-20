@@ -36,9 +36,10 @@ class RootServer {
               daemon_status, install_status,
               cpu_cores, ram_total_gb, disk_total_gb,
               datacenter, country_code,
-              fqdn, fastdl_enabled, fastdl_url,
+              fqdn, fastdl_enabled,
+              db_gewuenscht, db_je_server,
               created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
             [
                 daemonId,
                 data.guildId,
@@ -57,7 +58,10 @@ class RootServer {
                 data.countryCode   || null,
                 data.fqdn          || null,
                 data.fastdlEnabled ? 1 : 0,
-                data.fastdlUrl     || null
+                // Absicht, nicht Fähigkeit: `db_moeglich` setzt ausschliesslich
+                // der Maschinenbefund beim Verbinden des Daemons.
+                data.dbGewuenscht  ? 1 : 0,
+                Number.isFinite(data.dbJeServer) ? data.dbJeServer : 0
             ]
         );
 
@@ -302,6 +306,74 @@ class RootServer {
                 daemonId
             ]
         );
+    }
+
+    /**
+     * Übernimmt den Maschinenbefund, den der Daemon beim Verbinden meldet.
+     *
+     * ── Warum das eine eigene Methode ist ───────────────────────────────────
+     *
+     * `updateHardwareStats()` schreibt Zahlen, die sich im Minutentakt ändern.
+     * Hier geht es um Eigenschaften der Maschine, die sich fast nie ändern —
+     * und um die daraus abgeleiteten Fähigkeiten, an denen Funktionen hängen.
+     * Beides in einem UPDATE würde bedeuten, bei jedem Herzschlag eine
+     * DNS-Auflösung zu fahren.
+     *
+     * Die Reihenfolge ist wichtig: Erst wird geprüft (Name, Webserver,
+     * Datenbank), dann geschrieben. Ein `fqdn_gilt = 1` entsteht ausschliesslich
+     * aus einer Messung — nie aus einer Eingabe.
+     *
+     * @param {string} daemonId
+     * @param {object} befund     was der Daemon gemessen hat
+     * @param {string} gesehenIp  die IP, von der er verbindet
+     */
+    static async uebernimmMaschinenbefund(daemonId, befund, gesehenIp) {
+        const dbService = ServiceManager.get('dbService');
+        const M = require('../helpers/Maschinenbefund');
+
+        // Die Absicht steht schon in der Zeile — sie kommt aus dem Formular.
+        const [zeile] = await dbService.query(
+            'SELECT id, host, fqdn, fastdl_enabled, db_gewuenscht FROM rootserver WHERE daemon_id = ?',
+            [daemonId]
+        );
+        if (!zeile) return null;
+
+        const name   = await M.pruefeNamen(zeile.fqdn, gesehenIp, zeile.host);
+        const fastdl = M.leiteFastdlAb(!!zeile.fastdl_enabled, befund && befund.webserver);
+        const db     = M.leiteDatenbankAb(!!zeile.db_gewuenscht, befund && befund.datenbank);
+
+        await dbService.query(
+            `UPDATE rootserver SET
+                gesehene_ip      = ?,
+                virtualisierung  = ?,
+                webserver        = ?,
+                webserver_grund  = ?,
+                fqdn_zeigt_auf   = ?,
+                fqdn_geprueft_am = NOW(),
+                fqdn_gilt        = ?,
+                fqdn_grund       = ?,
+                fastdl_moeglich  = ?,
+                fastdl_grund     = ?,
+                db_moeglich      = ?,
+                db_grund         = ?
+             WHERE daemon_id = ?`,
+            [
+                M.nackteIp(gesehenIp),
+                befund?.virtualisierung   || null,
+                befund?.webserver?.art    || null,
+                befund?.webserver?.grund  || null,
+                name.zeigtAuf,
+                name.gilt,
+                name.grund,
+                fastdl.moeglich,
+                fastdl.grund,
+                db.moeglich,
+                db.grund,
+                daemonId,
+            ]
+        );
+
+        return { name, fastdl, db, hardwareBelastbar: M.hardwareIstBelastbar(befund?.virtualisierung) };
     }
 
     /**

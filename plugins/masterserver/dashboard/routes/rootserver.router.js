@@ -177,20 +177,37 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
     const guildId = res.locals.guildId;
 
     try {
-        const { 
-            name, host, daemonPort, description, hostname,
-            cpuCores, ramTotal, diskTotal,
+        // ── Was das Formular seit M-6 noch fragt ─────────────────────────────
+        //
+        // Nur noch ABSICHT. `cpuCores`, `ramTotal` und `diskTotal` sind
+        // entfallen: Die Maschine misst sie beim ersten Verbinden genauer, als
+        // sie jemand tippen kann — und die gemessenen Werte sind seit der
+        // Migration „Quota folgt erkannter Hardware" ohnehin die, mit denen
+        // gerechnet wird.
+        //
+        // `hostname` ist ebenfalls entfallen. Es gab zwei Felder für einen
+        // Namen, und ausgerechnet das mit der Beschriftung „nur zur Anzeige"
+        // entschied die Adresse, die ein Spieler bekam. Geblieben ist `fqdn` —
+        // als Wunsch, den eine Messung bestätigt oder eben nicht.
+        //
+        // `mysqlEnabled`, `mysqlDbLimit`, `webDomain` und `fastdlUrl` standen
+        // hier schon, wurden an das Modell durchgereicht und dort still
+        // fallengelassen: Das INSERT kannte diese Spalten nie. Sie sind durch
+        // `dbGewuenscht`/`dbJeServer` ersetzt, die wirklich ankommen.
+        const {
+            name, host, daemonPort, description,
             quotaProfileId,
-            backupLimit, mysqlEnabled, mysqlDbLimit, webDomain,
+            backupLimit,
             datacenter, countryCode,
-            fqdn, fastdlEnabled, fastdlUrl
+            fqdn, fastdlEnabled,
+            dbGewuenscht, dbJeServer
         } = req.body;
 
         // Validierung
-        if (!name || !ramTotal || !diskTotal) {
+        if (!name || !host) {
             return res.status(400).json({
                 success: false,
-                message: 'Pflichtfelder fehlen: Name, RAM, Disk'
+                message: 'Pflichtfelder fehlen: Name und IP-Adresse'
             });
         }
 
@@ -211,21 +228,19 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
             systemUser,
             baseDirectory,
             description: description || null,
-            hostname: hostname || null,
             fqdn: fqdn || null,
             fastdlEnabled: fastdlEnabled === 'true' || fastdlEnabled === true,
-            fastdlUrl: fastdlUrl || null,
-            // Hardware-Specs (CPU optional, wird vom Daemon auto-detected)
-            cpuCores: cpuCores ? parseFloat(cpuCores) : null,
-            cpuThreads: null, // Auto-detected
-            cpuModel: null,   // Auto-detected
-            ramTotalGb: parseFloat(ramTotal),
-            diskTotalGb: parseFloat(diskTotal),
-            // Neue Features
-            backupLimit: parseInt(backupLimit) || 3,
-            mysqlEnabled: mysqlEnabled === 'true' || mysqlEnabled === true,
-            mysqlDbLimit: parseInt(mysqlDbLimit) || 0,
-            webDomain: webDomain || null
+            // Datenbanken: Wunsch und Grenze. Ob es geht, entscheidet der Befund
+            // der Maschine — nicht dieses Häkchen.
+            dbGewuenscht: dbGewuenscht === 'true' || dbGewuenscht === true,
+            dbJeServer: Math.max(0, parseInt(dbJeServer, 10) || 0),
+            // Hardware bleibt leer: Der Daemon meldet sie beim ersten Verbinden.
+            cpuCores: null,
+            cpuThreads: null,
+            cpuModel: null,
+            ramTotalGb: null,
+            diskTotalGb: null,
+            backupLimit: parseInt(backupLimit) || 3
         });
 
         Logger.info(`[Masterserver] RootServer created: ${result.id} (${result.daemonId}) by ${systemUser}`);
@@ -247,12 +262,23 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
                     guild_id: guildId,               // Guild-ID für SQLite-Cache
                     server_name: name,               // Display-Name
                     username: systemUser,            // gs-guild_XXXXX
-                    ram_limit_gb: parseFloat(ramTotal),
-                    disk_limit_gb: parseFloat(diskTotal),
-                    custom_path: null,
-                    // Neue Features an Daemon übergeben
-                    mysql_enabled: mysqlEnabled === 'true' || mysqlEnabled === true,
-                    web_domain: webDomain || null
+                    custom_path: null
+                    //
+                    // Hier standen bis zum 2026-08-20 vier weitere Felder:
+                    // ram_limit_gb, disk_limit_gb, mysql_enabled, web_domain.
+                    //
+                    // Gemessen: `handleVirtualCreate` im Daemon liest genau
+                    // fünf Schlüssel — daemon_id/server_id, server_name,
+                    // username, rootserver_id, guild_id. Die vier anderen sind
+                    // nie irgendwo angekommen.
+                    //
+                    // Zwei davon waren nach dem Umbau des Formulars (M-6) sogar
+                    // nicht mehr definiert: `ramTotal` und `diskTotal` gibt es
+                    // nicht mehr, `parseFloat(ramTotal)` hätte hier einen
+                    // ReferenceError geworfen. Er wäre im umgebenden catch
+                    // gelandet, das mit „Nicht kritisch" protokolliert — der
+                    // RootServer wäre also angelegt worden und die
+                    // Verzeichnisstruktur stillschweigend nicht.
                 }, 180000);  // 3 Minuten Timeout (SteamCMD Installation!)
 
                 if (vServerResponse.success) {

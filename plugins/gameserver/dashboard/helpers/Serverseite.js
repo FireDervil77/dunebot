@@ -169,9 +169,42 @@ function baueZustand(server) {
     return { schluessel: s, text: e.text, ton: e.ton, gut: e.gut, stufe: null };
 }
 
-/** Die Adresse zum Weitergeben — eine Zeile, kopierbar. */
+/**
+ * Die Adresse zum Weitergeben — eine Zeile, kopierbar.
+ *
+ * ── M-1: eine Adresse, an einer Stelle gebaut (2026-08-20) ──────────────────
+ *
+ * Hier stand bis heute `bind_ip || rootserver_hostname || rootserver_ip`. Drei
+ * Felder rieten mit, und zwei Seiten kamen zu verschiedenen Ergebnissen: Die
+ * Übersicht schob die IP in denselben Platz, die Serverseite den Hostnamen.
+ * Derselbe Server hatte damit zwei Adressen, je nachdem, wo man hinsah.
+ *
+ * Schlimmer war, was gewann: `hostname` — ein Feld, das im Formular mit „nur
+ * zur Anzeige" beschriftet ist. Am 2026-08-19 stand dort
+ * `node1.firenetworks.de`, ein Name, der wegen eines Platzhalter-Eintrags
+ * `*.firenetworks.de` auf den WEBHOST zeigte. Wer diese Adresse in Valheim
+ * eingab, landete auf dem Dashboard.
+ *
+ * Die Reihenfolge jetzt, und warum sie so ist:
+ *
+ *   1. `bind_ip`        — bindet der Server an eine bestimmte Adresse, ist er
+ *                         NUR dort erreichbar. Ein noch so schöner Name, der
+ *                         auf eine andere Adresse derselben Maschine zeigt,
+ *                         hilft dann niemandem.
+ *   2. geprüfter Name   — nur wenn `fqdn_gilt` gesetzt ist, und das setzt
+ *                         ausschliesslich eine Messung (M-3), nie eine Eingabe.
+ *   3. die IP           — die Antwort, die immer stimmt.
+ *
+ * **Ein ungeprüfter Name erscheint nie.** Lieber eine nüchterne IP als ein
+ * Name, der ins Leere führt: Der Fehler heisst dann „Server nicht gefunden",
+ * und niemand sucht ihn in einem DNS-Eintrag.
+ */
 function baueAdresse(server) {
-    const host = server.bind_ip || server.rootserver_hostname || server.rootserver_ip || null;
+    const nameGilt = Boolean(server.fqdn_gilt) && Boolean(server.fqdn);
+    const host = server.bind_ip
+        || (nameGilt ? server.fqdn : null)
+        || server.rootserver_ip
+        || null;
     let port = null;
     try {
         const p = typeof server.ports === 'string' ? JSON.parse(server.ports) : server.ports;
@@ -512,9 +545,14 @@ function baueServerListe(zeilen, paketNachAddon = {}) {
                 jetzt: gefragt ? s.current_players : null,
                 max:   s.max_players ?? null,
             },
+            // Dieselben Felder wie auf der Serverseite — sonst entstehen wieder
+            // zwei Adressen für denselben Server.
             adresse: baueAdresse({
-                bind_ip: s.bind_ip, rootserver_hostname: s.server_ip,
-                ports: s.ports,
+                bind_ip:       s.bind_ip,
+                fqdn:          s.fqdn,
+                fqdn_gilt:     s.fqdn_gilt,
+                rootserver_ip: s.server_ip,
+                ports:         s.ports,
             }),
             maschine: s.rootserver_name || null,
             paket:    paket ? `${paket.identity.slug} ${paket.identity.version || ''}`.trim() : null,

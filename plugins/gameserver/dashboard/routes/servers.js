@@ -98,6 +98,8 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
                 am.icon_url as game_icon,
                 JSON_EXTRACT(gs.ports, '$.game.internal') as game_port,
                 r.host as server_ip,
+                r.fqdn,
+                r.fqdn_gilt,
                 r.name as rootserver_name,
                 r.daemon_id
             FROM gameservers gs
@@ -1998,6 +2000,10 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 r.name as rootserver_name,
                 r.hostname as rootserver_hostname,
                 r.host as rootserver_ip,
+                -- Der geprüfte Name (M-1/M-3): fqdn_gilt setzt ausschliesslich
+                -- eine Messung beim Verbinden des Daemons, nie eine Eingabe.
+                r.fqdn,
+                r.fqdn_gilt,
                 r.daemon_id,
                 r.sftp_fingerprint,
                 r.sftp_port AS rootserver_sftp_port,
