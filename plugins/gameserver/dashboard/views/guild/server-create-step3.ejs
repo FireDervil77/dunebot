@@ -146,8 +146,78 @@
       </span>
       <div style="margin-left:auto;display:flex;gap:8px">
         <a class="btn btn-white btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/servers/create?step=2&addon=<%= locals.addonSlug || '' %>">Zurück</a>
-        <button type="submit" class="btn btn-primary btn-sm">Anlegen und installieren</button>
+        <button type="submit" class="btn btn-primary btn-sm" id="fb-absenden">Anlegen und installieren</button>
+      </div>
+    </div>
+
+    <%# Platz für die Antwort — bis 2026-08-22 gab es keinen. -%>
+    <div id="fb-fehler" class="fb-karte" style="display:none;border-color:var(--fb-danger);margin-top:12px">
+      <div class="fb-koerper">
+        <strong>Anlegen fehlgeschlagen</strong>
+        <div class="fb-muted" id="fb-fehler-text" style="margin-top:4px;text-wrap:pretty"></div>
       </div>
     </div>
   </form>
 </div>
+
+<script>
+/*
+ * Das Formular schickte bis zum 2026-08-22 ganz normal ab — und die Route
+ * antwortet JSON. Der Browser hat also getan, was er tun muss: Er hat den
+ * JSON-Text als Seite angezeigt.
+ *
+ *   {"success":true,"message":"Server \"FireDervil\" wird installiert...",
+ *    "serverId":161,"redirectUrl":"/guild/…/servers"}
+ *
+ * Die Route liefert `redirectUrl` sogar mit — es gab nur niemanden, der ihr
+ * folgt. In der ganzen Datei stand keine Zeile JavaScript.
+ *
+ * Bewusst hier und nicht als Weiterleitung in der Route: Der FEHLERFALL braucht
+ * denselben Weg. Eine Route, die bei Erfolg weiterleitet und bei einem Fehler
+ * JSON zeigt, hätte die Hälfte des Problems gelassen — und zwar die Hälfte, in
+ * der der Betreiber eine Erklärung braucht.
+ */
+(function () {
+  var form  = document.getElementById('fb-anlegen');
+  var knopf = document.getElementById('fb-absenden');
+  var kasten= document.getElementById('fb-fehler');
+  var text  = document.getElementById('fb-fehler-text');
+  if (!form || !knopf) return;
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    kasten.style.display = 'none';
+    knopf.disabled = true;
+    knopf.textContent = 'Wird angelegt…';
+
+    fetch(form.action, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      body: new URLSearchParams(new FormData(form)),
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (a) {
+        if (a.ok && a.d && a.d.success) {
+          window.location.href = a.d.redirectUrl ||
+            form.action.replace(/\/create.*$/, '');
+          return;
+        }
+        zeige((a.d && a.d.message) || 'Die Antwort des Servers war nicht lesbar.');
+      })
+      .catch(function (err) {
+        // Ein Netzfehler ist etwas anderes als eine Ablehnung, und das gehört
+        // gesagt: Der Server kann trotzdem angelegt worden sein.
+        zeige('Die Anfrage kam nicht durch (' + err.message + '). ' +
+              'Sieh in der Serverliste nach, bevor du es erneut versuchst.');
+      });
+  });
+
+  function zeige(nachricht) {
+    text.textContent = nachricht;
+    kasten.style.display = '';
+    knopf.disabled = false;
+    knopf.textContent = 'Anlegen und installieren';
+    kasten.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+})();
+</script>
