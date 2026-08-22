@@ -652,15 +652,44 @@ module.exports.bauePaketAuswahl = bauePaketAuswahl;
  * ── Warum die Portprüfung hier steht und nicht erst beim Anlegen ────────────
  *
  * Valheim verlangt Spielport+1 — das ist keine Vorliebe, sondern eine
- * Eigenschaft des Spiels (`assign: game+1`). Ist der Nachbarport belegt, taugt
- * die Maschine für DIESES Spiel nicht, und das gehört gesagt, bevor jemand
- * durch zwei weitere Schritte klickt.
+ * Eigenschaft des Spiels (`assign: game+1`). Ist der Nachbarport nicht frei,
+ * taugt die Maschine für DIESES Spiel nicht, und das gehört gesagt, bevor
+ * jemand durch zwei weitere Schritte klickt.
  *
  * Ausgewichen wird bewusst NICHT auf einen anderen Port: Der Client sucht dann
  * an einer Stelle, an der nichts lauscht, und der Fehler heisst „Server nicht
  * gefunden" — weit weg von seiner Ursache.
+ *
+ * ── Baustelle 62a: die Rechnung stand auf zwei falschen Beinen ──────────────
+ *
+ * Gemessen am 2026-08-20 und am 2026-08-22 bestätigt. Diese Funktion lieferte
+ * IMMER eine leere oder ablehnende Liste, aus zwei voneinander unabhängigen
+ * Gründen:
+ *
+ *   1. Die Abfrage dazu lautete `... FROM port_allocations WHERE guild_id = ?`.
+ *      Diese Spalte gibt es nicht — die Tabelle hängt an `rootserver_id`. Der
+ *      Fehler lief in ein `try/catch`, die Liste blieb leer, und die Seite sagte
+ *      dazu nichts.
+ *
+ *   2. Gerechnet wurde über `port_range_start` … `port_range_end` der Maschine.
+ *      Diese beiden Spalten werden im ganzen Baum **nur gelesen, nie
+ *      geschrieben** — bei beiden Maschinen steht dort NULL. Selbst mit
+ *      korrigierter Abfrage hätte hier gestanden: „Für diese Maschine ist kein
+ *      Portbereich hinterlegt."
+ *
+ * ── Wie es wirklich funktioniert ────────────────────────────────────────────
+ *
+ * `port_allocations` ist ein **vorgehaltener Vorrat** je Maschine, angelegt
+ * über Masterserver → RootServer → Ports. Eine Zeile IST ein Port, der vergeben
+ * werden darf; `server_id IS NULL` heisst frei.
+ *
+ * Daraus folgt die Regel, die hier gilt: Ein gekoppelter Port muss **im Vorrat
+ * stehen UND frei sein**. Nicht nur „nicht belegt": Ein Port, den niemand
+ * eingetragen hat, ist keine Erlaubnis. Ihn trotzdem zu vergeben hiesse, am
+ * Buch vorbei zu binden — und beim nächsten Server würde derselbe Port ein
+ * zweites Mal vergeben.
  */
-function baueMaschinenAuswahl(maschinen, gebucht, belegtePorts, paket) {
+function baueMaschinenAuswahl(maschinen, gebucht, vorrat, paket) {
     // Welche Zwecke braucht das Paket, und wie hängen sie zusammen?
     const ports = paket?.ports || [];
     const spielPort = ports.find(p => p.assign === 'pool') || ports[0] || null;
@@ -668,24 +697,37 @@ function baueMaschinenAuswahl(maschinen, gebucht, belegtePorts, paket) {
         .filter(p => typeof p.assign === 'string' && p.assign.includes('+'))
         .map(p => ({ zweck: p.purpose, abstand: parseInt(p.assign.split('+')[1], 10) || 0 }));
 
-    const belegt = new Set((belegtePorts || []).map(x => Number(x.port)));
+    // Vorrat je Maschine aufschlüsseln: was steht drin, und was davon ist frei?
+    const jeMaschine = new Map();
+    for (const z of (vorrat || [])) {
+        const id = Number(z.rootserver_id);
+        if (!jeMaschine.has(id)) jeMaschine.set(id, { alle: new Set(), frei: new Set() });
+        const e = jeMaschine.get(id);
+        const p = Number(z.port);
+        e.alle.add(p);
+        if (z.server_id === null || z.server_id === undefined) e.frei.add(p);
+    }
 
     return (maschinen || []).map((m) => {
         const g = gebucht[m.id] || { ram_mb: 0, cpu: 0, disk_gb: 0, anzahl: 0 };
+        const v = jeMaschine.get(Number(m.id));
 
-        // Ein freies Portpaar suchen — dieselbe Regel, die der Daemon später
-        // anwendet. Gefunden wird das erste, bei dem ALLE Zwecke frei sind.
         let paar = null, grund = null;
-        const von = m.port_range_start || 0, bis = m.port_range_end || 0;
         if (!spielPort) {
             grund = 'Das Paket nennt keine Ports.';
-        } else if (!von || !bis) {
-            grund = 'Für diese Maschine ist kein Portbereich hinterlegt.';
+        } else if (!v || v.alle.size === 0) {
+            // Kein Vorrat ist etwas anderes als ein voller Vorrat. Der eine ist
+            // eine fehlende Eingabe, der andere eine volle Maschine — und der
+            // Betreiber tut in beiden Fällen etwas anderes.
+            grund = 'Für diese Maschine ist noch kein Portvorrat angelegt. ' +
+                    'Masterserver → RootServer → Ports.';
         } else {
-            for (let n = von; n <= bis; n++) {
-                if (belegt.has(n)) continue;
+            // Aufsteigend, damit die Vergabe vorhersagbar bleibt: Wer zweimal
+            // dasselbe Spiel anlegt, bekommt benachbarte Ports und keine
+            // Streuung über den ganzen Vorrat.
+            for (const n of [...v.frei].sort((a, b) => a - b)) {
                 const noetig = gekoppelt.map(k => n + k.abstand);
-                if (noetig.some(x => belegt.has(x) || x > bis)) continue;
+                if (noetig.some(x => !v.frei.has(x))) continue;
                 paar = { spiel: n, weitere: gekoppelt.map(k => ({ zweck: k.zweck, port: n + k.abstand })) };
                 break;
             }
@@ -693,20 +735,29 @@ function baueMaschinenAuswahl(maschinen, gebucht, belegtePorts, paket) {
                 grund = gekoppelt.length
                     ? `Kein freies Portpaar. ${paket?.identity?.name || 'Das Spiel'} verlangt ` +
                       gekoppelt.map(k => 'Spielport+' + k.abstand).join(' und ') +
-                      ' — wir weichen bewusst nicht auf einen anderen Port aus.'
-                    : 'Kein freier Port im hinterlegten Bereich.';
+                      ' — und beide müssen im Vorrat stehen und frei sein. ' +
+                      'Wir weichen bewusst nicht auf einen anderen Port aus.'
+                    : 'Kein freier Port im Vorrat dieser Maschine.';
             }
         }
 
         return {
             id:    m.id,
             name:  m.name,
-            host:  m.hostname || m.host || null,
+            // Dieselbe Regel wie bei der Serveradresse (M-1): ein Name nur,
+            // wenn eine Messung ihn bestätigt hat. Sonst die IP.
+            host:  (m.fqdn_gilt && m.fqdn) ? m.fqdn : (m.host || null),
             erreichbar: m.daemon_status === 'online',
             platte: { gebucht: g.disk_gb, gesamt: m.disk_total_gb ?? null },
             ram:    { gebucht: Math.round((g.ram_mb || 0) / 1024), gesamt: m.ram_total_gb ?? null },
             cpu:    { gebucht: g.cpu, gesamt: (m.cpu_cores || 0) * 100 },
             server: g.anzahl,
+            // Damit die Karte den Unterschied zeigen kann zwischen „kein
+            // Vorrat" und „Vorrat voll".
+            vorrat: jeMaschine.has(Number(m.id))
+                ? { frei: jeMaschine.get(Number(m.id)).frei.size,
+                    alle: jeMaschine.get(Number(m.id)).alle.size }
+                : { frei: 0, alle: 0 },
             paar, grund,
             waehlbar: Boolean(paar) && m.daemon_status === 'online',
         };

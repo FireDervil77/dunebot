@@ -58,7 +58,11 @@
 
             <div style="flex:1 1 220px">
               <% if (m.paar) { %>
-                <div class="fb-muted" style="font-size:12px">Ports frei</div>
+                <div class="fb-muted" style="font-size:12px">
+                  Ports frei<% if (m.vorrat && m.vorrat.alle) { %>
+                    <span class="fb-mono">(<%= m.vorrat.frei %> von <%= m.vorrat.alle %> im Vorrat)</span>
+                  <% } %>
+                </div>
                 <div class="fb-mono" style="font-size:14px">
                   <%= m.paar.spiel %><% m.paar.weitere.forEach(function (w) { %> · <%= w.port %><% }); %>
                 </div>

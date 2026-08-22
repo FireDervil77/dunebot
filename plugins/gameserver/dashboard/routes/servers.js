@@ -446,7 +446,7 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
                 const roh = await dbService.query(`
                     SELECT r.id, r.name, r.hostname, r.host, r.daemon_status,
                            r.cpu_cores, r.ram_total_gb, r.disk_total_gb,
-                           r.port_range_start, r.port_range_end
+                           r.fqdn, r.fqdn_gilt
                       FROM rootserver r
                      WHERE r.guild_id = ? AND r.install_status = 'completed'`, [guildId]);
 
@@ -465,10 +465,22 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
                     };
                 }
 
-                const belegt = await dbService.query(
-                    'SELECT port FROM port_allocations WHERE guild_id = ?', [guildId]);
+                // Der Portvorrat der Maschinen dieser Guild.
+                //
+                // `port_allocations` hat KEIN guild_id — die Tabelle hängt an
+                // `rootserver_id`. Genau dieser geratene Spaltenname liess die
+                // Maschinenwahl monatelang leer bleiben (Baustelle 62a): Der
+                // Fehler lief ins catch, die Liste blieb leer, die Seite sagte
+                // nichts.
+                const vorrat = roh.length
+                    ? await dbService.query(
+                        `SELECT rootserver_id, port, server_id
+                           FROM port_allocations
+                          WHERE rootserver_id IN (${roh.map(() => '?').join(',')})`,
+                        roh.map(r => r.id))
+                    : [];
 
-                maschinen = baueMaschinenAuswahl(roh, gebucht, belegt, paketFuerWahl);
+                maschinen = baueMaschinenAuswahl(roh, gebucht, vorrat, paketFuerWahl);
             } catch (err) {
                 Logger.error('[Gameserver] Maschinenauswahl konnte nicht aufgebaut werden', err);
             }
@@ -611,11 +623,15 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
                     const roh = await dbService.query(`
                         SELECT r.id, r.name, r.hostname, r.host, r.daemon_status,
                                r.cpu_cores, r.ram_total_gb, r.disk_total_gb,
-                               r.port_range_start, r.port_range_end
+                               r.fqdn, r.fqdn_gilt
                           FROM rootserver r WHERE r.id = ? AND r.guild_id = ?`, [rsId, guildId]);
-                    const belegt = await dbService.query(
-                        'SELECT port FROM port_allocations WHERE guild_id = ?', [guildId]);
-                    maschine = baueMaschinenAuswahl(roh, {}, belegt, paketFuerWerte)[0] || null;
+                    // Dieselbe Rechnung wie in Schritt 2 — also auch derselbe
+                    // Vorrat, nach rootserver_id statt nach einer Spalte, die
+                    // es nicht gibt.
+                    const vorrat = await dbService.query(
+                        'SELECT rootserver_id, port, server_id FROM port_allocations WHERE rootserver_id = ?',
+                        [rsId]);
+                    maschine = baueMaschinenAuswahl(roh, {}, vorrat, paketFuerWerte)[0] || null;
                 }
                 werte = baueWerteSchritt(paketFuerWerte, maschine, false);
             } catch (err) {

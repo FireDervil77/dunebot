@@ -553,19 +553,40 @@ create_data_directories() {
 }
 
 
+# ── Der Einrichtungsdialog ───────────────────────────────────────────────────
+#
+# Diese Funktion stand hier schon, hatte aber KEINEN Aufrufer — und haette auch
+# nicht funktionieren koennen: Sie schob einen INTERAKTIVEN Wizard in eine Pipe
+# zu grep. Die Fragen waeren im Rohr gelandet, der Betreiber haette nichts
+# gesehen und nichts beantworten koennen.
+#
+# Jetzt laeuft er richtig, und zwar hier statt in einem zweiten Befehl, den man
+# hinterher von Hand tippt. Der Grund ist nicht Bequemlichkeit: Der Wizard holt
+# beim Dashboard ab, was fuer diese Maschine angefordert wurde, misst was hier
+# ist, und fragt die Luecke ab. Das geht nur, solange jemand am Terminal sitzt.
 run_setup_wizard() {
-    log_info "Starte Setup-Wizard..."
-    
-    # In Installations-Verzeichnis wechseln
-    cd "$INSTALL_DIR"
-    
-    # Setup-Wizard ausführen (Binary macht das interaktiv)
-    if ./${BINARY_NAME} 2>&1 | grep -q "Setup-Wizard"; then
-        log_success "Setup-Wizard abgeschlossen"
-    else
-        log_error "Setup-Wizard fehlgeschlagen!"
-        exit 1
+    # Bei `curl ... | sudo bash` ist stdin das Skript selbst — ein interaktiver
+    # Dialog kann dort nichts lesen. Dann bleibt es beim zweiten Befehl, und das
+    # wird gesagt statt stillschweigend uebersprungen.
+    if [[ ! -r /dev/tty ]]; then
+        log_warn "Kein Terminal verfuegbar (Installation ueber eine Pipe)."
+        log_info  "Der Einrichtungsdialog muss darum von Hand gestartet werden:"
+        log_info  "   sudo ${INSTALL_DIR}/${BINARY_NAME}"
+        return 1
     fi
+
+    log_info "Starte Einrichtungsdialog..."
+    cd "$INSTALL_DIR"
+
+    # Ohne Pipe, mit dem Terminal als Eingabe.
+    if ./${BINARY_NAME} < /dev/tty; then
+        log_success "Einrichtung abgeschlossen"
+        return 0
+    fi
+
+    log_error "Einrichtungsdialog abgebrochen oder fehlgeschlagen."
+    log_info  "Erneut versuchen mit: sudo ${INSTALL_DIR}/${BINARY_NAME} --setup"
+    return 1
 }
 
 validate_config() {
@@ -1021,6 +1042,19 @@ main() {
     # Systemd Service
     create_systemd_service
     enable_service
+
+    # ── Einrichtung, solange jemand da ist ───────────────────────────────────
+    #
+    # Erst hier, weil der Dialog das fertige Binaer und die Verzeichnisse
+    # braucht. Und vor dem Start des Dienstes, weil der Dienst ohne
+    # daemon.yaml nur wieder in denselben Dialog laufen wuerde — dann aber
+    # unter systemd, ohne Terminal.
+    EINRICHTUNG_FERTIG=0
+    if run_setup_wizard; then
+        if validate_config && start_service; then
+            EINRICHTUNG_FERTIG=1
+        fi
+    fi
     
     # Post-Install Info
     show_post_install_info
@@ -1028,17 +1062,28 @@ main() {
     echo ""
     echo -e "${GREEN}✅ Installation erfolgreich abgeschlossen!${NC}"
     echo ""
-    echo -e "${CYAN}╔═══════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║${NC}     ${YELLOW}📋 Nächster Schritt: Setup-Wizard${NC}          ${CYAN}║${NC}"
-    echo -e "${CYAN}╚═══════════════════════════════════════════════════╝${NC}"
-    echo ""
-    echo -e "${CYAN}Starte den Setup-Wizard mit:${NC}"
-    echo ""
-    echo -e "   ${GREEN}sudo /opt/firebot-daemon/firebot-daemon${NC}"
-    echo ""
-    echo -e "${CYAN}Der Wizard führt dich durch die Konfiguration.${NC}"
-    echo -e "${CYAN}Nach dem Setup läuft der Daemon automatisch als Service.${NC}"
-    echo ""
+    if [[ "${EINRICHTUNG_FERTIG:-0}" == "1" ]]; then
+        echo -e "${CYAN}╔═══════════════════════════════════════════════════╗${NC}"
+        echo -e "${CYAN}║${NC}     ${GREEN}✅ Eingerichtet und gestartet${NC}              ${CYAN}║${NC}"
+        echo -e "${CYAN}╚═══════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${CYAN}Im Dashboard sollte die Maschine jetzt auf 'Online' stehen.${NC}"
+        echo -e "${CYAN}Was sie kann — Webserver, Domainname, Datenbanken — steht dort${NC}"
+        echo -e "${CYAN}auf der Seite der Maschine unter 'Was diese Maschine kann'.${NC}"
+        echo ""
+    else
+        echo -e "${CYAN}╔═══════════════════════════════════════════════════╗${NC}"
+        echo -e "${CYAN}║${NC}     ${YELLOW}📋 Nächster Schritt: Einrichtung${NC}           ${CYAN}║${NC}"
+        echo -e "${CYAN}╚═══════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${CYAN}Starte den Einrichtungsdialog mit:${NC}"
+        echo ""
+        echo -e "   ${GREEN}sudo /opt/firebot-daemon/firebot-daemon${NC}"
+        echo ""
+        echo -e "${CYAN}Er fragt Daemon-ID und Token ab, prüft sie beim Dashboard und${NC}"
+        echo -e "${CYAN}sagt dir, was auf dieser Maschine für das Angeforderte fehlt.${NC}"
+        echo ""
+    fi
     echo -e "   ${YELLOW}ℹ️  Hinweis:${NC} Der Daemon läuft als root für Docker-Operationen"
     echo -e "   Gameserver laufen als isolierte Docker-Container (kein gs-User mehr)"
     echo -e "   Docker-Network: firebot | Volumes: /var/lib/firebot-daemon/volumes/"
