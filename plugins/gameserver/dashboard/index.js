@@ -139,6 +139,14 @@ class GameserverPlugin extends DashboardPlugin {
         });
         
         // Servers Overview Script (für Server-Listen)
+        // Die Live-Anzeige (Baustelle 62b). Braucht den SSE-Client.
+        assetManager.registerScript('gameserver-live', 'js/gameserver-live.js', {
+            plugin: 'gameserver',
+            deps: ['gameserver-sse'],
+            version: '1.0.0',
+            defer: false
+        });
+
         assetManager.registerScript('gameserver-overview', 'js/servers-overview.js', {
             plugin: 'gameserver',
             deps: [], 

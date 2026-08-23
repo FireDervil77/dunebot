@@ -188,6 +188,7 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
             assetManager.enqueueStyle('gameserver-serverseite');
             assetManager.enqueueScript('gameserver-actions');
             assetManager.enqueueScript('gameserver-overview');
+            assetManager.enqueueScript('gameserver-live');
         }
         
         // ── Die Übersicht nach dem Entwurf (Artboard 1) ─────────────────────
@@ -1352,7 +1353,7 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                 addon_version,
                 status,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installing', NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installing', NOW())
         `, [
             guildId,
             userId,
@@ -1575,6 +1576,41 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         });
     } catch (error) {
         Logger.error('[Gameserver] Fehler beim Erstellen des Servers:', error);
+
+        // ── Vorgemerkte Ports wieder freigeben ───────────────────────────────
+        //
+        // Die Portvergabe bucht mit `server_id = 0`, BEVOR die Zeile existiert —
+        // sonst könnten zwei gleichzeitige Anlegevorgänge denselben Port
+        // bekommen. Scheitert danach irgendetwas, blieb die Vormerkung stehen.
+        //
+        // Gemessen am 2026-08-23: Zwei fehlgeschlagene Versuche hinterliessen
+        // vier gebuchte Ports (25000–25003), die kein Server je benutzte. Beim
+        // dritten Versuch wäre der Vorrat um vier Nummern ärmer gewesen — und
+        // niemand hätte gewusst warum, denn `server_id = 0` sieht aus wie eine
+        // gültige Buchung.
+        //
+        // Aufgefallen ist es nur, weil scripts/check-portvergabe.js danach
+        // sucht. Ohne diese eine Zeile im Prüfskript wäre der Vorrat still
+        // leergelaufen.
+        try {
+            if (typeof allocatedFromPool === 'object' && allocatedFromPool
+                && Object.keys(allocatedFromPool).length) {
+                const ids = Object.values(allocatedFromPool).map(a => a.allocId).filter(Boolean);
+                if (ids.length) {
+                    await dbService.query(
+                        `UPDATE port_allocations SET server_id = NULL, assigned_at = NULL
+                          WHERE id IN (${ids.map(() => '?').join(',')}) AND server_id = 0`, ids);
+                    Logger.info(`[Gameserver] ${ids.length} vorgemerkte Port(s) nach dem `
+                        + 'Fehlschlag wieder freigegeben');
+                }
+            }
+        } catch (aufraeumFehler) {
+            // Nicht verschlucken: Ein Vorrat, der still schrumpft, ist genau die
+            // Sorte Fehler, die Wochen später als "keine Ports mehr" auftaucht.
+            Logger.error('[Gameserver] Vorgemerkte Ports konnten nicht freigegeben werden',
+                aufraeumFehler);
+        }
+
         res.status(500).json({
             success: false,
             message: 'Serverfehler beim Erstellen des Gameservers'
@@ -1676,9 +1712,16 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
     try {
         const guildId = res.locals.guildId;
 
-        // Hole alle Server-IDs und Status für diese Guild
+        // Der Zustand, aus dem die Live-Anzeige zeichnet.
+        //
+        // Erweitert statt verdoppelt (2026-08-23): Diese Route gab bisher nur
+        // id und status. Die Live-Anzeige braucht nach einem Verbindungsabriss
+        // aber den GANZEN Zustand — ein verpasstes Ereignis lässt sich nicht
+        // nachträglich empfangen, nur nachholen.
         const servers = await dbService.query(
-            'SELECT id, status FROM gameservers WHERE guild_id = ?',
+            `SELECT id, status, current_players, max_players,
+                    bereitschaft_stufe, bereitschaft_grund
+               FROM gameservers WHERE guild_id = ?`,
             [guildId]
         );
 
@@ -2314,6 +2357,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             assetManager.enqueueScript('gameserver-sse');
             assetManager.enqueueStyle('gameserver-serverseite');
             assetManager.enqueueScript('gameserver-actions');
+            assetManager.enqueueScript('gameserver-live');
         }
 
         Logger.info(`[Gameserver] Assets eingereiht, rendere View...`);

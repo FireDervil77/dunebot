@@ -33,7 +33,8 @@
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <span class="fb-punkt" style="background:var(--fb-<%= u.zustand.ton === 'green' ? 'success' : u.zustand.ton === 'red' ? 'danger' : u.zustand.ton === 'yellow' ? 'warning' : 'text-muted' %>);<%=
             u.zustand.gut ? 'box-shadow:0 0 0 4px rgba(47,179,68,.16)' : '' %>"></span>
-          <div style="font-size:20px;font-weight:600;letter-spacing:-.01em"><%= u.zustand.text %></div>
+          <div style="font-size:20px;font-weight:600;letter-spacing:-.01em"
+               data-fb-live="status-text" data-fb-server="<%= server.id %>"><%= u.zustand.text %></div>
           <% if (u.zustand.stufe) { %>
             <span class="fb-pille"><%= u.zustand.stufe %></span>
           <% } else if (u.zustand.schluessel === 'online' || u.zustand.schluessel === 'starting') { %>
@@ -42,15 +43,21 @@
                 fb-init meldet die Stufe über den Agent-Socket, der Daemon reicht
                 sie hoch, das Dashboard nimmt sie an. Was hier steht, ist also
                 eine Messung — oder ehrlich gesagt, dass noch keine vorliegt. %>
+            <%# Ein Element, drei Zustände — das Live-Modul schreibt Text, Klasse
+                und Titel. Drei getrennte Elemente hiessen, dass die Ansicht und
+                das Skript sich einig sein müssten, welches gerade sichtbar ist. %>
             <% if (u.bereitschaft && u.bereitschaft.bereit) { %>
-              <span class="fb-pille fb-pille-gut" title="fb-init hat die letzte Stufe erreicht.">Spieler können rein</span>
+              <span class="fb-pille fb-pille-gut" data-fb-live="bereitschaft-pille"
+                    data-fb-server="<%= server.id %>"
+                    title="fb-init hat die letzte Stufe erreicht.">Spieler können rein</span>
             <% } else if (u.bereitschaft && u.bereitschaft.gemessen) { %>
-              <span class="fb-pille fb-pille-warn"
-                    title="<%= u.bereitschaft.grund || 'Der Server ist noch nicht auf der letzten Stufe.' %>">
-                startet — Stufe <%= u.bereitschaft.stufe %>
-              </span>
+              <span class="fb-pille fb-pille-warn" data-fb-live="bereitschaft-pille"
+                    data-fb-server="<%= server.id %>"
+                    title="<%= u.bereitschaft.grund || 'Der Server ist noch nicht auf der letzten Stufe.' %>">startet — Stufe <%= u.bereitschaft.stufe %></span>
             <% } else { %>
-              <span class="fb-pille" title="Der Server hat noch keine Bereitschaftsstufe gemeldet.">Bereitschaft noch nicht gemeldet</span>
+              <span class="fb-pille" data-fb-live="bereitschaft-pille"
+                    data-fb-server="<%= server.id %>"
+                    title="Der Server hat noch keine Bereitschaftsstufe gemeldet.">Bereitschaft noch nicht gemeldet</span>
             <% } %>
           <% } %>
         </div>
@@ -275,7 +282,10 @@
             <% const farbe = st.erreicht ? 'var(--fb-success)'
                  : (!st.verlangt ? '#f1f3f5'
                  : (u.bereitschaft.gemessen && st.wartet ? 'var(--fb-warning)' : 'var(--fb-border)')); %>
-            <span class="fb-punkt" style="margin-top:6px;background:<%= farbe %>"></span>
+            <span class="fb-punkt" style="margin-top:6px;background:<%= farbe %>"
+                  data-fb-live="stufe-punkt" data-fb-server="<%= server.id %>"
+                  data-fb-stufe="<%= st.schluessel %>"
+                  data-fb-verlangt="<%= st.verlangt ? 'ja' : 'nein' %>"></span>
             <div>
               <div style="font-weight:500;<%= st.verlangt ? '' : 'color:var(--fb-text-muted)' %>">
                 <%= st.name %><% if (st.erreicht) { %> ✓<% } %>
@@ -287,9 +297,8 @@
         <%# Der Erklärsatz von fb-init — der Teil, für den die Messung gebaut
             wurde: „Port 2457 lauscht nach 60 s noch nicht, der Prozess läuft
             aber. Bei einer neuen Welt ist das normal." %>
-        <% if (u.bereitschaft.grund) { %>
-          <div style="font-size:13px;margin-top:8px;text-wrap:pretty"><%= u.bereitschaft.grund %></div>
-        <% } %>
+        <div style="font-size:13px;margin-top:8px;text-wrap:pretty<%= u.bereitschaft.grund ? '' : ';display:none' %>"
+             data-fb-live="bereitschaft-grund" data-fb-server="<%= server.id %>"><%= u.bereitschaft.grund || '' %></div>
         <div class="fb-muted" style="font-size:13px;margin-top:8px">
           <% if (u.bereitschaft.veraltet) { %>
             Der Server ist aus — die letzte gemeldete Stufe sagt nichts über jetzt.
