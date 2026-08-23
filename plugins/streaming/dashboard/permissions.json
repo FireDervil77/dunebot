@@ -5,7 +5,7 @@
     {
       "key": "STREAMING.VIEW",
       "name": "Streaming ansehen",
-      "description": "Berechtigung um den Streaming-Bereich zu oeffnen, beobachtete Kanaele und den Betriebszustand zu sehen",
+      "description": "Berechtigung um den Streaming-Bereich zu oeffnen und den Betriebszustand zu sehen",
       "category": "streaming",
       "is_dangerous": 0,
       "requires": null
@@ -45,7 +45,7 @@
     {
       "key": "STREAMING.TEST",
       "name": "Testankuendigung ausloesen",
-      "description": "Berechtigung um eine Probe-Ankuendigung zu senden. Bewusst ein eigenes Recht: sie erscheint sichtbar im Kanal und erwaehnt gegebenenfalls eine Rolle.",
+      "description": "Berechtigung um eine Probe-Ankuendigung zu senden. Sie erscheint sichtbar im Kanal.",
       "category": "streaming",
       "is_dangerous": 1,
       "requires": "STREAMING.VIEW"
