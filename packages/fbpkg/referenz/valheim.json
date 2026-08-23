@@ -2,23 +2,23 @@
   "format": "FBREF_v1",
   "slug": "valheim",
   "checked_at": "2026-08-16",
-
   "sources": [
     "https://www.valheimgame.com/support/a-guide-to-dedicated-servers/",
     "https://docs.unity3d.com/Manual/PlayerCommandLineArguments.html",
     "https://nodecraft.com/support/games/valheim/adding-world-modifiers-to-your-valheim-server"
   ],
-
   "note": {
     "de": "Valheim hat KEINE Konfigurationsdatei für den Server — alles läuft über die Kommandozeile. Zugriffsrechte stehen in drei Textdateien im Speicherverzeichnis (`adminlist.txt`, `bannedlist.txt`, `permittedlist.txt`), je Zeile eine Plattform-Spielerkennung im Format `[Plattform]_[Kennung]`. Eine Fernsteuerung (RCON) gibt es nicht: Die Konsolenbefehle unten wirken nur im Spiel selbst (F5) und nur für Spieler, die in `adminlist.txt` stehen. Weltmodifikatoren aus `-preset`/`-modifier`/`-setkey` greifen laut Nodecraft nur beim ERSTEN Erzeugen einer Welt; danach nur noch über die Spielkonsole. Das ist die entscheidende Angabe für `wirkt_ab: neue_welt` in der Einstellungskarte und am laufenden Server noch nicht nachgeprüft.",
     "en": "Valheim has NO server config file — everything goes through the command line. Access control lives in three text files in the save directory (`adminlist.txt`, `bannedlist.txt`, `permittedlist.txt`), one platform user ID per line as `[Platform]_[UserID]`. There is no remote console: the console commands below only work in-game (F5) and only for players listed in `adminlist.txt`. World modifiers from `-preset`/`-modifier`/`-setkey` reportedly apply only when a world is first created; after that only via the in-game console. Not yet verified on a running server."
   },
-
   "start_args": [
     {
       "name": "-name",
       "takes": "text",
-      "note": { "de": "Name in der Serverliste.", "en": "Name shown in the server browser." }
+      "note": {
+        "de": "Name in der Serverliste.",
+        "en": "Name shown in the server browser."
+      }
     },
     {
       "name": "-port",
@@ -42,9 +42,11 @@
       "name": "-password",
       "takes": "text",
       "note": {
-        "de": "Mindestens fünf Zeichen und darf nicht im Servernamen vorkommen — sonst startet der Server nicht.",
+        "de": "Mindestens fuenf Zeichen und darf nicht im Servernamen vorkommen — sonst startet der Server nicht. GEMESSEN am 2026-08-23 an einem laufenden Server: Ohne Kennwort meldet Valheim „Error bad password: The password is too short“, danach ist die WorldGenerator-Instanz null und der Prozess endet mit Code 0. Der Parameter ist also nicht optional. Doku war hier kein Nachweis — die Messung ist es.",
         "en": "At least five characters and must not appear in the server name — otherwise the server refuses to start."
-      }
+      },
+      "required": true,
+      "gemessen_am": "2026-08-23"
     },
     {
       "name": "-savedir",
@@ -57,9 +59,15 @@
     {
       "name": "-public",
       "takes": "enum",
-      "values": ["0", "1"],
+      "values": [
+        "0",
+        "1"
+      ],
       "default": "1",
-      "note": { "de": "1 = in der Serverliste sichtbar, 0 = nur über direkte Verbindung.", "en": "1 = listed in the browser, 0 = direct connect only." }
+      "note": {
+        "de": "1 = in der Serverliste sichtbar, 0 = nur über direkte Verbindung.",
+        "en": "1 = listed in the browser, 0 = direct connect only."
+      }
     },
     {
       "name": "-logFile",
@@ -69,10 +77,42 @@
         "en": "Without it Valheim writes no log file of its own — output comes via the console only. Answers the package's open point `management.logs`."
       }
     },
-    { "name": "-saveinterval", "takes": "number", "default": 1800, "note": { "de": "Sekunden zwischen zwei Weltsicherungen.", "en": "Seconds between world saves." } },
-    { "name": "-backups",      "takes": "number", "default": 4,     "note": { "de": "Wie viele automatische Sicherungen aufbewahrt werden.", "en": "How many automatic backups are retained." } },
-    { "name": "-backupshort",  "takes": "number", "default": 7200,  "note": { "de": "Abstand der ersten automatischen Sicherungen.", "en": "Interval for the first automatic backups." } },
-    { "name": "-backuplong",   "takes": "number", "default": 43200, "note": { "de": "Abstand der weiteren Sicherungen.", "en": "Interval for subsequent backups." } },
+    {
+      "name": "-saveinterval",
+      "takes": "number",
+      "default": 1800,
+      "note": {
+        "de": "Sekunden zwischen zwei Weltsicherungen.",
+        "en": "Seconds between world saves."
+      }
+    },
+    {
+      "name": "-backups",
+      "takes": "number",
+      "default": 4,
+      "note": {
+        "de": "Wie viele automatische Sicherungen aufbewahrt werden.",
+        "en": "How many automatic backups are retained."
+      }
+    },
+    {
+      "name": "-backupshort",
+      "takes": "number",
+      "default": 7200,
+      "note": {
+        "de": "Abstand der ersten automatischen Sicherungen.",
+        "en": "Interval for the first automatic backups."
+      }
+    },
+    {
+      "name": "-backuplong",
+      "takes": "number",
+      "default": 43200,
+      "note": {
+        "de": "Abstand der weiteren Sicherungen.",
+        "en": "Interval for subsequent backups."
+      }
+    },
     {
       "name": "-crossplay",
       "takes": "none",
@@ -92,7 +132,15 @@
     {
       "name": "-preset",
       "takes": "enum",
-      "values": ["Normal", "Casual", "Easy", "Hard", "Hardcore", "Immersive", "Hammer"],
+      "values": [
+        "Normal",
+        "Casual",
+        "Easy",
+        "Hard",
+        "Hardcore",
+        "Immersive",
+        "Hammer"
+      ],
       "note": {
         "de": "Setzt alle Weltmodifikatoren auf einmal und ÜBERSCHREIBT vorher gesetzte. Muss deshalb vor `-modifier` stehen.",
         "en": "Sets all world modifiers at once and OVERWRITES earlier ones. Must therefore come before `-modifier`."
@@ -116,8 +164,16 @@
     {
       "name": "-setkey",
       "takes": "enum",
-      "values": ["nobuildcost", "playerevents", "passivemobs", "nomap"],
-      "note": { "de": "Reine Einschalter ohne Wert, mehrfach angebbar.", "en": "Pure on-switches without a value, repeatable." }
+      "values": [
+        "nobuildcost",
+        "playerevents",
+        "passivemobs",
+        "nomap"
+      ],
+      "note": {
+        "de": "Reine Einschalter ohne Wert, mehrfach angebbar.",
+        "en": "Pure on-switches without a value, repeatable."
+      }
     },
     {
       "name": "-nographics",
@@ -138,29 +194,39 @@
       }
     }
   ],
-
   "config_keys": [],
-
   "console_commands": [
     {
       "name": "kick",
       "takes": "text",
-      "note": { "de": "`kick SPIELERNAME` — wirft einen Spieler heraus. Nur in der Spielkonsole (F5) durch einen Admin.", "en": "`kick PLAYERNAME` — removes a player. In-game console (F5) by an admin only." }
+      "note": {
+        "de": "`kick SPIELERNAME` — wirft einen Spieler heraus. Nur in der Spielkonsole (F5) durch einen Admin.",
+        "en": "`kick PLAYERNAME` — removes a player. In-game console (F5) by an admin only."
+      }
     },
     {
       "name": "ban",
       "takes": "text",
-      "note": { "de": "`ban SPIELERNAME` — trägt in `bannedlist.txt` ein.", "en": "`ban PLAYERNAME` — adds to `bannedlist.txt`." }
+      "note": {
+        "de": "`ban SPIELERNAME` — trägt in `bannedlist.txt` ein.",
+        "en": "`ban PLAYERNAME` — adds to `bannedlist.txt`."
+      }
     },
     {
       "name": "unban",
       "takes": "text",
-      "note": { "de": "`unban SPIELERNAME` — nimmt den Eintrag zurück.", "en": "`unban PLAYERNAME` — removes the entry." }
+      "note": {
+        "de": "`unban SPIELERNAME` — nimmt den Eintrag zurück.",
+        "en": "`unban PLAYERNAME` — removes the entry."
+      }
     },
     {
       "name": "banned",
       "takes": "none",
-      "note": { "de": "Listet alle Gesperrten auf.", "en": "Lists all banned players." }
+      "note": {
+        "de": "Listet alle Gesperrten auf.",
+        "en": "Lists all banned players."
+      }
     }
   ]
 }

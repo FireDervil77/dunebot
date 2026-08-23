@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -224,8 +224,8 @@
         "en": "Join password"
       },
       "description": {
-        "de": "Ohne dieses Kennwort kommt niemand auf den Server. Mindestens fünf Zeichen, und es darf nicht im Servernamen vorkommen.",
-        "en": "Nobody joins without this password. At least five characters, and it must not appear in the server name."
+        "de": "Ohne dieses Kennwort kommt niemand auf den Server. Mindestens fuenf Zeichen, und es darf nicht im Servernamen vorkommen. Valheim startet OHNE Kennwort nicht — gemessen am 2026-08-23: „Error bad password: The password is too short“, danach bricht die Welterzeugung ab.",
+        "en": "Nobody joins without this password. At least five characters, and it must not appear in the server name. Valheim refuses to start WITHOUT one — measured 2026-08-23: \"Error bad password: The password is too short\", world generation then aborts."
       },
       "type": "password",
       "default": "secret",
@@ -236,7 +236,9 @@
       ],
       "takes_effect": "restart",
       "risk": "none",
-      "role": "player"
+      "role": "player",
+      "required": true,
+      "min_length": 5
     },
     {
       "key": "world_name",

@@ -581,6 +581,15 @@
         "visible": {
           "type": "boolean",
           "default": true
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Muss einen Wert haben. Gemeint ist NICHT 'wichtig', sondern: Das Spiel startet ohne diesen Wert nicht. Fehlt das Feld, ist die Einstellung freiwillig.\n\nWarum es das gibt (2026-08-23): Die Oberflaeche erzwang bis dahin JEDES Feld vom Typ password — eine Regel, die sie sich selbst ausgedacht hatte. Nach dem Entfernen liess sich ein Valheim-Server ohne Kennwort anlegen, und der startete dann nicht: 'Error bad password: The password is too short'. Beide Male lag die Wahrheit an der falschen Stelle. Sie gehoert hierher, ins Paket, mit Nachweis in status.open oder der Referenz."
+        },
+        "min_length": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Mindestlaenge fuer Text- und Passwortwerte. `min`/`max` gelten fuer Zahlen und beantworten diese Frage nicht."
         }
       }
     },
