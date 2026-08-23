@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -224,7 +224,7 @@
         "en": "Join password"
       },
       "description": {
-        "de": "Ohne dieses Kennwort kommt niemand auf den Server. Mindestens fuenf Zeichen, und es darf nicht im Servernamen vorkommen. Valheim startet OHNE Kennwort nicht — gemessen am 2026-08-23: „Error bad password: The password is too short“, danach bricht die Welterzeugung ab.",
+        "de": "Ohne dieses Kennwort kommt niemand auf den Server. Mindestens fuenf Zeichen, und es darf nicht im Servernamen vorkommen. Fuer einen OEFFENTLICH sichtbaren Server ist es Pflicht — gemessen am 2026-08-23: ohne Kennwort meldet Valheim „Error bad password: The password is too short“ und startet nicht. Ein versteckter Server (Oeffentlich = Versteckt) darf ohne auskommen.",
         "en": "Nobody joins without this password. At least five characters, and it must not appear in the server name. Valheim refuses to start WITHOUT one — measured 2026-08-23: \"Error bad password: The password is too short\", world generation then aborts."
       },
       "type": "password",
@@ -237,8 +237,8 @@
       "takes_effect": "restart",
       "risk": "none",
       "role": "player",
-      "required": true,
-      "min_length": 5
+      "min_length": 5,
+      "required_when": "public_listing=1"
     },
     {
       "key": "world_name",
@@ -541,7 +541,15 @@
       "management.logs: Valheim schreibt keine eigene Logdatei; Ausgabe kommt nur über die Konsole.",
       "content: BepInEx wird heute über ein zweites Addon abgebildet (valheim-bepinex). Nach B.12 gehört der Lader als Inhalt hierher.",
       "commands.players.ban: bannedlist.txt und das Eintragsformat [Plattform]_[Kennung] sind durch die offizielle Dokumentation belegt (siehe referenz/valheim.json). Am laufenden Server ist beides weiterhin ungeprüft — Doku ist kein Nachweis.",
-      "commands.players.ban: Die Datei liegt im Speicherverzeichnis. Wird -savedir gesetzt, wandert sie mit — dann greift ein fester Pfad ins Leere."
+      "commands.players.ban: Die Datei liegt im Speicherverzeichnis. Wird -savedir gesetzt, wandert sie mit — dann greift ein fester Pfad ins Leere.",
+      "requirements.os_packages: aus dem offiziellen Wiki uebernommen (valheim.fandom.com/wiki/Dedicated_servers). Ob sie im Laufzeit-Image schon stecken, ist nicht gemessen — Doku ist kein Nachweis."
+    ]
+  },
+  "requirements": {
+    "os_packages": [
+      "libpulse-dev",
+      "libatomic1",
+      "libc6"
     ]
   }
 }

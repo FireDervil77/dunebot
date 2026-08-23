@@ -878,7 +878,15 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
             // Betreiber am 2026-08-23: "wenn ich nun das Oeffentlich auf
             // sichtbar setze, sollte der Server dennoch auch ohne Passwort
             // installierbar sein."
-            pflicht: e.required === true,
+            // `required` gilt immer, `required_when` nur bei einer bestimmten
+            // Stellung einer anderen Einstellung.
+            //
+            // Valheim verlangt ein Kennwort NUR fuer einen oeffentlich
+            // sichtbaren Server (gemessen 2026-08-23). Eine harte Pflicht waere
+            // zu streng und verboete einen versteckten Server ohne Kennwort,
+            // den es geben darf. Eine gar nicht vorhandene Pflicht liesse den
+            // oeffentlichen Fall scheitern — genau das ist heute passiert.
+            pflicht: e.required === true || istBedingtPflicht(e, alle, server, uebergang, paketWerte),
             geheim: e.type === 'password',
             wirkung: WIRKUNG[e.takes_effect] || null,
             hinweis: e.takes_effect === 'new_world'
@@ -909,3 +917,42 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
 }
 
 module.exports.baueWerteSchritt = baueWerteSchritt;
+
+
+/**
+ * Wertet `required_when: "schluessel=wert"` aus.
+ *
+ * Nur die Form "ein Schlüssel gleich ein Wert" — mehr braucht bisher niemand,
+ * und eine Ausdruckssprache zu erfinden, bevor es einen zweiten Fall gibt, wäre
+ * genau die Sorte Vorratsbau, die dieses Vorhaben abräumt.
+ */
+function istBedingtPflicht(eintrag, alle, server, uebergang, paketWerte) {
+    const bedingung = eintrag.required_when;
+    if (typeof bedingung !== 'string' || !bedingung.includes('=')) return false;
+
+    const [schluessel, erwartet] = bedingung.split('=');
+
+    // Den aktuellen Wert der ANDEREN Einstellung holen — auf demselben Weg wie
+    // oben, damit beide dieselbe Wahrheit sehen.
+    let wert;
+    if (paketWerte && Object.prototype.hasOwnProperty.call(paketWerte, schluessel)) {
+        wert = paketWerte[schluessel];
+    } else {
+        const eggName = uebergang?.zuordnung?.[schluessel];
+        let env = {};
+        try {
+            env = typeof server.env_variables === 'string'
+                ? JSON.parse(server.env_variables) : (server.env_variables || {});
+        } catch { env = {}; }
+        wert = eggName ? env[eggName] : undefined;
+    }
+
+    // Kein Wert gespeichert? Dann gilt die Vorgabe des Pakets — sonst hinge die
+    // Pflicht davon ab, ob jemand die andere Einstellung schon einmal angefasst
+    // hat.
+    if (wert === undefined) {
+        const anderer = (alle || []).find(x => x.key === schluessel);
+        wert = anderer ? anderer.default : undefined;
+    }
+    return String(wert) === String(erwartet);
+}

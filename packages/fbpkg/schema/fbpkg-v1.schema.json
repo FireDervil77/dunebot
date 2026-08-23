@@ -590,6 +590,10 @@
           "type": "integer",
           "minimum": 1,
           "description": "Mindestlaenge fuer Text- und Passwortwerte. `min`/`max` gelten fuer Zahlen und beantworten diese Frage nicht."
+        },
+        "required_when": {
+          "type": "string",
+          "description": "Bedingte Pflicht: Die Einstellung muss einen Wert haben, WENN eine andere einen bestimmten hat — Form 'schluessel=wert', z.B. 'public_listing=1'.\n\nWarum (gemessen 2026-08-23): Valheim verlangt ein Kennwort nur fuer einen OEFFENTLICH sichtbaren Server. Ohne Kennwort und mit -public 1 kommt 'Error bad password: The password is too short'; mit -public 0 bleibt diese Meldung aus. `required: true` waere hier zu streng und wuerde einen versteckten Server ohne Kennwort verbieten, den es geben darf."
         }
       }
     },
@@ -777,6 +781,13 @@
         },
         "glibc": {
           "type": "string"
+        },
+        "os_packages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Systempakete, die das Spiel zum Laufen braucht — z.B. libatomic1, libpulse-dev. Gehoert ins Paket, weil es eine Eigenschaft des SPIELS ist, keine des Images: Wer das Laufzeit-Image wechselt, muss wissen, was fehlen darf und was nicht.\n\nFuer Valheim aus dem offiziellen Wiki: libpulse-dev, libatomic1, libc6 (https://valheim.fandom.com/wiki/Dedicated_servers). Doku ist kein Nachweis — ob sie im aktuellen Image schon stecken, gehoert gemessen."
         }
       }
     },
