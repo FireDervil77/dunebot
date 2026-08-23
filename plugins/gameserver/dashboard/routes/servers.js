@@ -14,6 +14,7 @@ const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
 const { buildStartPayload, loadServerForStart, paketFuerInstall, ladePaketFuerAddon } = require('../helpers/StartPayload');
 const { vergibPortsAusPaket } = require('../helpers/Portvergabe');
+const { ladeUebergang: ladeUebergangFuer } = require('../helpers/StartPayload');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
         baueMaschinenAuswahl, baueWerteSchritt } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
@@ -1046,6 +1047,7 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         //
         // Liegt ein Paket vor, entscheidet ab hier ausschliesslich das Paket.
         let paketPortsAktiv = false;
+        let paketWerteAnlegen = null;   // Stufe 5a
         if (rootserver_id) {
             try {
                 const pz = await ladePaketFuerAddon(dbService, addon.id);
@@ -1062,6 +1064,24 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                     paketPortsAktiv = true;
                     Logger.info(`[Gameserver] Ports aus dem Paket vergeben: `
                         + Object.entries(ports).map(([z, d]) => `${z} ${d.internal}`).join(', '));
+
+                    // ── Stufe 5a: Werte unter Paketschlüsseln festhalten ─────
+                    //
+                    // Das Formular schickt sie unter den Egg-Namen
+                    // (`variable_SERVER_NAME`). Die Zuordnung dorthin gibt es
+                    // heute nur in der Übergangsdatei — die wird damit beim
+                    // ANLEGEN ein letztes Mal gebraucht und danach nie wieder.
+                    const ueb = ladeUebergangFuer(paketFuerPorts?.identity?.slug);
+                    paketWerteAnlegen = {};
+                    for (const eintrag of (paketFuerPorts.settings || [])) {
+                        const eggName = ueb?.zuordnung?.[eintrag.key];
+                        const wert = eggName !== undefined ? envVariables[eggName] : undefined;
+                        // Leerer String ist ein Wert, `undefined` ist keiner.
+                        if (wert !== undefined) paketWerteAnlegen[eintrag.key] = String(wert);
+                    }
+                    Logger.info(`[Gameserver] Paketwerte festgehalten: `
+                        + `${Object.keys(paketWerteAnlegen).length} von `
+                        + `${(paketFuerPorts.settings || []).length} Einstellungen`);
                 }
             } catch (err) {
                 // Hier NICHT weiterlaufen: Ein Server mit falschen Ports startet
@@ -1314,6 +1334,7 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                 install_path,
                 ports,
                 env_variables,
+                paket_werte,
                 frozen_game_data,
                 launch_params,
                 auto_restart,
@@ -1335,6 +1356,15 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
             'temp',  // ← Temporärer Pfad, wird gleich aktualisiert
             JSON.stringify(ports),
             JSON.stringify(envVariables),
+            // ── Stufe 5a: die Werte unter den Schlüsseln des PAKETS ──────────
+            //
+            // Ohne Paket bleibt die Spalte leer, und der alte Weg über die
+            // Übergangsdatei gilt weiter. Mit Paket ist sie ab sofort die
+            // Wahrheit — `env_variables` steht daneben, bis der letzte Leser
+            // umgestellt ist. Zwei Quellen zugleich sind unschön; eine davon im
+            // selben Zug wegzunehmen macht jeden Fehler unumkehrbar, und der
+            // teuerste heisst hier „leere Welt".
+            paketWerteAnlegen ? JSON.stringify(paketWerteAnlegen) : null,
             typeof addon.game_data === 'string' ? addon.game_data : JSON.stringify(addon.game_data),
             startup_command,
             // Das Formular schickt die Strings "0"/"1" – und "0" ist in JS truthy.

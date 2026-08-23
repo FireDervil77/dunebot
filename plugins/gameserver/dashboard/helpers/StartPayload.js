@@ -165,19 +165,47 @@ function baueSpielpaket(server, envVariables, melde) {
         return null;
     }
 
+    // ── Stufe 5a: Werte unter Paketschlüsseln, falls vorhanden ──────────────
+    //
+    // Seit dem 2026-08-23 speichert ein Server seine Werte direkt unter den
+    // Schlüsseln des Pakets (`gameservers.paket_werte`). Dann braucht es keine
+    // Übersetzung mehr — und damit auch keine Übergangsdatei.
+    //
+    // Die Brücke bleibt als RÜCKFALL für Zeilen, die noch nichts davon haben.
+    // Sie ersatzlos zu streichen hiesse, einen Bestandsserver beim nächsten
+    // Start mit den Paketvorgaben zu füttern — und die Vorgabe für `world_name`
+    // ist „Dedicated", während der laufende Server „BoomTown" spielt. Valheim
+    // erzeugt bei unbekanntem Weltnamen eine neue, LEERE Welt.
+    let paketWerte = null;
+    try {
+        paketWerte = typeof server.paket_werte === 'string'
+            ? JSON.parse(server.paket_werte) : (server.paket_werte || null);
+    } catch { paketWerte = null; }
+    const direkt = paketWerte && Object.keys(paketWerte).length > 0;
+
+    // Die Brücke wird WEITERHIN geladen — sie trägt mehr als die Werte:
+    // `arbeitsverzeichnis` (wo ein Bestandsserver seine Dateien wirklich hat)
+    // und `portzwecke`. Nur die WERTQUELLE wechselt.
     const uebergang = ladeUebergang(server.paket_slug);
-    if (!uebergang) {
-        melde(`[StartPayload] Für "${server.paket_slug}" gibt es keine Übergangs-Zuordnung `
-            + `(packages/fbpkg/uebergang/${server.paket_slug}.json). Ohne sie liessen sich die `
-            + 'gespeicherten Werte nicht zuordnen — der alte Weg bleibt.');
+    if (!direkt && !uebergang) {
+        melde(`[StartPayload] Für "${server.paket_slug}" gibt es weder gespeicherte `
+            + 'Paketwerte noch eine Übergangs-Zuordnung '
+            + `(packages/fbpkg/uebergang/${server.paket_slug}.json). Ohne beides liessen sich `
+            + 'die Werte nicht zuordnen — der alte Weg bleibt.');
         return null;
     }
 
     const settings = {};
     const fehlend  = [];
     for (const eintrag of paket.settings || []) {
-        const quelle = uebergang.zuordnung[eintrag.key];
-        const wert   = quelle ? envVariables[quelle] : undefined;
+        let quelle, wert;
+        if (direkt) {
+            quelle = 'paket_werte';
+            wert   = paketWerte[eintrag.key];
+        } else {
+            quelle = uebergang.zuordnung[eintrag.key];   // nur im Rückfall erreichbar
+            wert   = quelle ? envVariables[quelle] : undefined;
+        }
         // Ein leerer String ist ein WERT (SRCDS_BETAID="" heisst "kein Beta-Zweig").
         // Nur `undefined` heisst "nicht vorhanden".
         if (wert === undefined) {
@@ -213,7 +241,7 @@ function baueSpielpaket(server, envVariables, melde) {
     // Gesetzt wird es auf der KOPIE, die mitgeschickt wird — das gespeicherte
     // Paket bleibt unberührt. Es beschreibt das Spiel, nicht die Geschichte
     // eines einzelnen Volumes.
-    if (uebergang.arbeitsverzeichnis) {
+    if (uebergang && uebergang.arbeitsverzeichnis) {
         paket.start = paket.start || {};
         if (paket.start.workdir !== uebergang.arbeitsverzeichnis) {
             melde(`[StartPayload] Paket ${server.paket_slug}: Arbeitsverzeichnis auf `
@@ -224,7 +252,7 @@ function baueSpielpaket(server, envVariables, melde) {
         paket.start.workdir = uebergang.arbeitsverzeichnis;
     }
 
-    return { paket, settings, portzwecke: uebergang.portzwecke };
+    return { paket, settings, portzwecke: uebergang ? uebergang.portzwecke : null };
 }
 
 

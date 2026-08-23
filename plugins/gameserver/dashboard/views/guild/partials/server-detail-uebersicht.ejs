@@ -36,11 +36,22 @@
           <div style="font-size:20px;font-weight:600;letter-spacing:-.01em"><%= u.zustand.text %></div>
           <% if (u.zustand.stufe) { %>
             <span class="fb-pille"><%= u.zustand.stufe %></span>
-          <% } else if (u.zustand.schluessel === 'online') { %>
-            <%# Der Entwurf verspricht hier „Spieler können rein". fb-init meldet
-                das über den Agent-Socket — der Daemon hört noch nicht zu
-                (Baustelle 58). Das zu behaupten wäre gelogen. %>
-            <span class="fb-pille" title="Die Bereitschaftsstufe wird noch nicht übertragen (Baustelle 58).">Bereitschaft unbekannt</span>
+          <% } else if (u.zustand.schluessel === 'online' || u.zustand.schluessel === 'starting') { %>
+            <%# Der Entwurf verspricht hier „Spieler können rein".
+                Seit Baustelle 62f (2026-08-23) wird das gemessen statt behauptet:
+                fb-init meldet die Stufe über den Agent-Socket, der Daemon reicht
+                sie hoch, das Dashboard nimmt sie an. Was hier steht, ist also
+                eine Messung — oder ehrlich gesagt, dass noch keine vorliegt. %>
+            <% if (u.bereitschaft && u.bereitschaft.bereit) { %>
+              <span class="fb-pille fb-pille-gut" title="fb-init hat die letzte Stufe erreicht.">Spieler können rein</span>
+            <% } else if (u.bereitschaft && u.bereitschaft.gemessen) { %>
+              <span class="fb-pille fb-pille-warn"
+                    title="<%= u.bereitschaft.grund || 'Der Server ist noch nicht auf der letzten Stufe.' %>">
+                startet — Stufe <%= u.bereitschaft.stufe %>
+              </span>
+            <% } else { %>
+              <span class="fb-pille" title="Der Server hat noch keine Bereitschaftsstufe gemeldet.">Bereitschaft noch nicht gemeldet</span>
+            <% } %>
           <% } %>
         </div>
 
@@ -248,8 +259,18 @@
             <%# Gefüllt nur, was der Daemon wirklich gemeldet hat. Drei geratene
                 Haken wären die eine Zeile auf dieser Seite, die in die Irre
                 führt — der Betreiber glaubte dann, ein Spieler kommt rein. %>
-            <span class="fb-punkt" style="margin-top:6px;background:<%=
-              st.erreicht ? 'var(--fb-success)' : (st.verlangt ? 'var(--fb-border)' : '#f1f3f5') %>"></span>
+            <%# Drei Farben, drei Bedeutungen — keine Verzierung:
+                  grün  = gemessen erreicht
+                  gelb  = die Stufe, auf die gerade gewartet wird
+                  grau  = verlangt, aber noch nicht dran
+                  blass = das Paket verlangt sie gar nicht
+                Gelb gibt es nur, WENN gemessen wird. Ohne Meldung ist alles
+                grau — eine wartende Stufe zu zeigen, wo niemand misst, wäre
+                dieselbe Behauptung wie ein grüner Haken. %>
+            <% const farbe = st.erreicht ? 'var(--fb-success)'
+                 : (!st.verlangt ? '#f1f3f5'
+                 : (u.bereitschaft.gemessen && st.wartet ? 'var(--fb-warning)' : 'var(--fb-border)')); %>
+            <span class="fb-punkt" style="margin-top:6px;background:<%= farbe %>"></span>
             <div>
               <div style="font-weight:500;<%= st.verlangt ? '' : 'color:var(--fb-text-muted)' %>">
                 <%= st.name %><% if (st.erreicht) { %> ✓<% } %>

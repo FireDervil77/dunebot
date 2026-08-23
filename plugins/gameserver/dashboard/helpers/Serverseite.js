@@ -282,23 +282,45 @@ function baueEinstellungen(server, paket, hoehe) {
             ? JSON.parse(server.env_variables) : (server.env_variables || {});
     } catch { env = {}; }
 
+    // Werte unter Paketschlüsseln (Stufe 5a). Leer heisst: diese Zeile ist noch
+    // nicht übersetzt — dann gilt der alte Weg über die Übergangsdatei.
+    let paketWerte = null;
+    try {
+        const p = typeof server.paket_werte === 'string'
+            ? JSON.parse(server.paket_werte) : server.paket_werte;
+        if (p && Object.keys(p).length) paketWerte = p;
+    } catch { paketWerte = null; }
+
     const sichtbar = [];
     let verborgen = 0;
 
     for (const e of alle) {
         if (!erlaubt.has(e.role || 'expert')) { verborgen++; continue; }
 
+        // ── Stufe 5a: Der Wert steht unter dem PAKETSCHLÜSSEL ───────────────
+        //
+        // Seit dem 2026-08-23 speichert ein Server seine Werte direkt so, wie
+        // das Paket sie nennt. Der Umweg über den Egg-Namen bleibt nur für
+        // Zeilen, die noch nichts davon haben.
+        //
+        // `aenderbar` haengt damit nicht mehr am Egg-Namen: Wer seine Werte
+        // unter Paketschluesseln hat, kann JEDE Einstellung des Pakets aendern
+        // — auch die, fuer die es nie eine Egg-Variable gab.
         const eggName = uebergang?.zuordnung?.[e.key] || null;
-        const roh = eggName && Object.prototype.hasOwnProperty.call(env, eggName)
-            ? env[eggName] : undefined;
+        const direkt = paketWerte
+            && Object.prototype.hasOwnProperty.call(paketWerte, e.key);
+        const roh = direkt
+            ? paketWerte[e.key]
+            : (eggName && Object.prototype.hasOwnProperty.call(env, eggName)
+                ? env[eggName] : undefined);
 
         sichtbar.push({
             schluessel:  e.key,
             // Der Egg-Name ist das, was gespeichert wird. Ohne ihn lässt sich
             // die Einstellung ANZEIGEN, aber nicht ändern — und ein Feld, das
             // sich bedienen lässt und nichts bewirkt, ist schlimmer als keines.
-            variable:    eggName,
-            aenderbar:   Boolean(eggName),
+            variable:    direkt ? e.key : eggName,
+            aenderbar:   Boolean(paketWerte) || Boolean(eggName),
             gruppe:      e.group || 'sonstiges',
             gruppeName:  GRUPPE[e.group] || null,
             name:        e.name?.de || e.name?.en || e.key,
@@ -491,6 +513,14 @@ function baueBereitschaft(paket, server = {}) {
         // Ohne Meldung wird nichts als erreicht behauptet. Drei graue Punkte
         // sind ehrlicher als drei geratene Haken.
         stufen[i].erreicht = Boolean(gemeldet) && laeuft && wieWeit >= 0 && i <= wieWeit;
+    }
+
+    // Auf welche Stufe wartet der Server gerade? Die erste verlangte, die noch
+    // nicht erreicht ist. Ohne Messung wartet er auf nichts — dann steht diese
+    // Angabe auf false, und die Ansicht faerbt nichts gelb.
+    const wartend = stufen.findIndex(st => st.verlangt && !st.erreicht);
+    for (let i = 0; i < stufen.length; i++) {
+        stufen[i].wartet = Boolean(gemeldet) && laeuft && i === wartend;
     }
 
     return {
