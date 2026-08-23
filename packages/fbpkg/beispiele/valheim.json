@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -110,7 +110,8 @@
           "-password",
           "{{value}}"
         ],
-        "from": "setting:password"
+        "from": "setting:password",
+        "when": "not_empty"
       },
       {
         "key": "public",

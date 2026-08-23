@@ -835,7 +835,20 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
             beschreibung: e.description?.de || e.description?.en || '',
             typ: e.type || 'text',
             vorgabe: e.default,
-            pflicht: e.required === true || e.type === 'password',
+            // ── Was das PAKET verlangt, nicht was die Ansicht sich denkt ────
+            //
+            // Hier stand `|| e.type === 'password'`: Jede Einstellung vom Typ
+            // Passwort war zwingend, unabhaengig davon, was das Paket sagt.
+            //
+            // Das Valheim-Paket markiert `password` NICHT als erforderlich —
+            // ein Server ohne Beitrittskennwort ist eine legitime Wahl, gerade
+            // bei einem oeffentlich sichtbaren. Die Regel war in der Ansicht
+            // erfunden, und sie machte eine Betriebsentscheidung unmoeglich.
+            //
+            // Betreiber am 2026-08-23: "wenn ich nun das Oeffentlich auf
+            // sichtbar setze, sollte der Server dennoch auch ohne Passwort
+            // installierbar sein."
+            pflicht: e.required === true,
             geheim: e.type === 'password',
             wirkung: WIRKUNG[e.takes_effect] || null,
             hinweis: e.takes_effect === 'new_world'
