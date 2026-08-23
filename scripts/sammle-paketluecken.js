@@ -76,8 +76,46 @@ function pfade(objekt, prefix = '', tiefe = 0) {
         database: process.env.MYSQL_DATABASE,
     });
 
-    // ── 1. Egg-Felder, die niemand liest ────────────────────────────────────
-    const [spiele] = await c.query('SELECT id, slug, name, game_data FROM addon_marketplace ORDER BY name');
+    // ── 1. Egg-Felder, die der Uebersetzer nicht uebernimmt ─────────────────
+    //
+    // Standardquelle sind die eingespielten Spiele. Der Betreiber am
+    // 2026-08-23: "ich wuerde das nicht an allen 23 messen, sondern an allen
+    // eggs" — zu Recht. 23 eingespielte Eggs sind eine Stichprobe, und ein
+    // Format an einer Stichprobe zu entwerfen heisst, die Ueberraschungen auf
+    // spaeter zu verschieben.
+    //
+    // Mit --eggs <ordner> liest das Werkzeug stattdessen rohe Egg-Dateien aus
+    // einem Verzeichnis. Damit laesst sich gegen eine beliebig grosse Sammlung
+    // messen, sobald eine vorliegt.
+    const eggOrdnerFlag = process.argv.indexOf('--eggs');
+    const eggOrdner = eggOrdnerFlag >= 0 ? process.argv[eggOrdnerFlag + 1] : null;
+
+    let spiele;
+    if (eggOrdner) {
+        if (!fs.existsSync(eggOrdner)) {
+            console.error(`Ordner nicht gefunden: ${eggOrdner}`);
+            process.exit(1);
+        }
+        const dateien = [];
+        const gehe = (d) => {
+            for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+                const voll = path.join(d, e.name);
+                if (e.isDirectory()) gehe(voll);
+                else if (e.name.endsWith('.json')) dateien.push(voll);
+            }
+        };
+        gehe(eggOrdner);
+        spiele = dateien.map(f => {
+            try {
+                return { slug: path.basename(f, '.json'), name: path.basename(f), game_data: fs.readFileSync(f, 'utf8') };
+            } catch { return null; }
+        }).filter(Boolean);
+        console.log(`\nQuelle: ${dateien.length} Egg-Dateien aus ${eggOrdner}`);
+    } else {
+        [spiele] = await c.query('SELECT id, slug, name, game_data FROM addon_marketplace ORDER BY name');
+        console.log(`\nQuelle: ${spiele.length} eingespielte Spiele aus addon_marketplace`);
+        console.log('        (mit --eggs <ordner> gegen eine groessere Sammlung messen)');
+    }
     const ungelesen = new Map();   // Pfad → [slugs]
     const gelesenZaehler = new Map();
 
@@ -99,17 +137,56 @@ function pfade(objekt, prefix = '', tiefe = 0) {
     }
 
     console.log(`\n═══ Paketlücken, gemessen am ${new Date().toISOString().slice(0, 10)} ═══`);
-    console.log(`\n▸ 1. Egg-Felder ohne Leser  (${spiele.length} Spiele untersucht)\n`);
+    console.log(`\n▸ 1. Egg-Felder, die der ÜBERSETZER nicht ins Paket übernimmt`
+        + `  (${spiele.length} Spiele untersucht)\n`);
+    // Wer liest das Feld SONST? Das ist der Unterschied zwischen „darf weg"
+    // und „hängt eine Funktion dran".
+    //
+    // Beim ersten Lauf am 2026-08-23 hätte die Überschrift „ohne Leser" fast
+    // dazu geführt, `templates` zu streichen — dabei liest StartPayload.js es
+    // und die Addon-Detailseite zeigt es an. Ein Werkzeug, das zum Löschen
+    // verleitet, ist schlimmer als keines.
+    const sucheLeser = (feld) => {
+        const wurzel = feld.split('.')[0];
+        try {
+            const treffer = require('child_process')
+                .execSync(
+                    `grep -rIl --exclude-dir=node_modules --exclude-dir=.git ` +
+                    `-e '\\.${wurzel}\\b' -e "\\['${wurzel}'\\]" ` +
+                    `plugins apps scripts packages 2>/dev/null || true`,
+                    { cwd: path.join(__dirname, '..'), encoding: 'utf8' })
+                .split('\n').filter(Boolean)
+                .filter(f => !f.includes('sammle-paketluecken'));
+            return treffer;
+        } catch { return []; }
+    };
+
+    const leserJe = {};
     if (!ungelesen.size) {
-        console.log('   Keine. Jedes Feld, das in einem Egg steht, wird vom Übersetzer gelesen.');
+        console.log('   Keine. Jedes Feld, das in einem Egg steht, übernimmt der Übersetzer.');
     } else {
         const sortiert = [...ungelesen.entries()].sort((a, b) => b[1].length - a[1].length);
+        const gesehen = new Set();
         for (const [pfad, slugs] of sortiert) {
-            console.log(`   ${String(slugs.length).padStart(3)}× ${pfad}`);
+            const wurzel = pfad.split('.')[0];
+            let hinweis = '';
+            if (!gesehen.has(wurzel)) {
+                gesehen.add(wurzel);
+                const leser = sucheLeser(wurzel);
+                leserJe[wurzel] = leser;
+                hinweis = leser.length
+                    ? `   ← liest sonst wer: ${leser.length} Datei(en)`
+                    : '   ← liest sonst NIEMAND';
+            }
+            console.log(`   ${String(slugs.length).padStart(3)}× ${pfad}${hinweis}`);
+            if (hinweis && leserJe[wurzel] && leserJe[wurzel].length && leserJe[wurzel].length <= 4) {
+                for (const f of leserJe[wurzel]) console.log(`        ${f}`);
+            }
             if (slugs.length <= 3) console.log(`        ${slugs.join(', ')}`);
         }
         console.log('\n   Jede Zeile ist eine Entscheidung: gehört das ins Paketformat,');
         console.log('   oder darf es mit den Eggs verschwinden?');
+        console.log('   „liest sonst wer" sagt, ob der Rest des Systems daran hängt.');
     }
 
     // ── 2. Was der Übersetzer selbst offen liess ────────────────────────────
@@ -173,7 +250,7 @@ function pfade(objekt, prefix = '', tiefe = 0) {
     }
 
     console.log('\n═══ Zusammenfassung ═══');
-    console.log(`   Egg-Felder ohne Leser : ${ungelesen.size}`);
+    console.log(`   vom Übersetzer ignoriert: ${ungelesen.size} Feldpfade`);
     console.log(`   offene Punkte in Paketen: ${offenGesamt}`);
     console.log(`   Brücken               : ${Object.keys(bruecken).length}`);
     console.log(`   Server an Egg-Daten   : ${haengend.length}`);
@@ -186,7 +263,8 @@ function pfade(objekt, prefix = '', tiefe = 0) {
         fs.writeFileSync(ziel, JSON.stringify({
             gemessen_am: new Date().toISOString(),
             spiele: spiele.length,
-            egg_felder_ohne_leser: Object.fromEntries(ungelesen),
+            egg_felder_ohne_uebersetzer: Object.fromEntries(ungelesen),
+            wer_liest_sie_sonst: leserJe,
             egg_felder_mit_leser: Object.fromEntries(
                 [...gelesenZaehler].map(([k, n]) => [k, { treffer: n, ziel: ZIEL[k] || '?' }])),
             offene_punkte: offenJe,
