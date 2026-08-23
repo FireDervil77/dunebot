@@ -68,7 +68,7 @@
     "CLIENT_ID": "Client-ID",
     "CLIENT_SECRET": "Client-Secret",
     "SECRET_SET": "gesetzt - aus Sicherheitsgruenden nicht mehr lesbar",
-    "CREDENTIALS_HELP": "Eine Anwendung fuer die ganze Anlage. Anzulegen unter dev.twitch.tv/console/apps. Einzelne Guilds tragen keine Schluessel ein.",
+    "CREDENTIALS_HELP": "Eine Anwendung fuer die ganze Anlage — die Entwicklerdaten des Betreibers, ueblicherweise in der .env. Anzulegen unter dev.twitch.tv/console/apps. Einzelne Guilds tragen keine Schluessel ein.",
     "QUOTA": "Kontingent",
     "NOT_MEASURED": "noch nicht gemessen"
   },

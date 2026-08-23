@@ -19,6 +19,11 @@
         <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
         <div class="card-body">
           <p class="text-secondary small"><%= tr('streaming:OPERATIONS.CREDENTIALS_HELP') %></p>
+          <p class="text-secondary small">
+            Nicht zu verwechseln mit der spaeteren Anmeldung einzelner Streamer:
+            Die laeuft ueber dieselbe Anwendung, und niemand traegt dabei
+            Schluessel ein — er meldet sich bei Twitch an.
+          </p>
 
           <div class="mb-3">
             <label for="client_id" class="form-label"><%= tr('streaming:OPERATIONS.CLIENT_ID') %></label>
@@ -56,10 +61,11 @@
             Gesetzt und verschluesselt in der Datenbank. Ein Wechsel braucht keinen Neustart.
           </p>
         <% } else if (secretQuelle === 'env') { %>
-          <span class="badge bg-yellow-lt">aus der .env</span>
+          <span class="badge bg-green-lt">aus der .env</span>
           <p class="text-secondary small mt-2 mb-0">
-            Rueckfall fuer bestehende Einrichtungen. Wer die Werte hier speichert,
-            braucht die Datei nicht mehr.
+            Der vorgesehene Weg: Client-ID und Secret sind die Entwicklerdaten
+            der Anlage — eine Anwendung fuer alle Guilds, wie der Bot-Token.
+            Wer sie hier speichert, ueberschreibt die Datei; noetig ist das nicht.
           </p>
         <% } else if (secretQuelle === 'defekt') { %>
           <span class="badge bg-red-lt">nicht entschluesselbar</span>
@@ -71,7 +77,10 @@
           <span class="badge bg-secondary-lt">nicht hinterlegt</span>
           <p class="text-secondary small mt-2 mb-0">
             Ohne Zugangsdaten laesst sich kein Abonnement anlegen — es kommen
-            keine Meldungen an.
+            keine Meldungen an. Vorgesehen sind
+            <code>TWITCH_CLIENT_ID</code> und <code>TWITCH_CLIENT_SECRET</code>
+            in der <code>.env</code> des Dashboards; das Formular hier ist nur
+            die Abkuerzung ohne Dateizugriff.
           </p>
         <% } %>
       </div>

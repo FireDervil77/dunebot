@@ -68,7 +68,7 @@
     "CLIENT_ID": "Client ID",
     "CLIENT_SECRET": "Client secret",
     "SECRET_SET": "set - not readable again for security reasons",
-    "CREDENTIALS_HELP": "One application for the whole installation. Create it at dev.twitch.tv/console/apps. Individual guilds do not enter keys.",
+    "CREDENTIALS_HELP": "One application for the whole installation — the operator’s developer credentials, normally in the .env. Create it at dev.twitch.tv/console/apps. Individual guilds do not enter keys.",
     "QUOTA": "Quota",
     "NOT_MEASURED": "not measured yet"
   },
