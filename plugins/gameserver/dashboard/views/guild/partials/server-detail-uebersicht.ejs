@@ -217,8 +217,18 @@
   </div>
   <div>
 
-  <%# ── Bereitschaft (fachlich) ─────────────────────────────────────────── %>
-  <% if (u.hoehe === 'fachlich' && u.bereitschaft) { %>
+  <%# ── Bereitschaft ──────────────────────────────────────────────────────
+       In BEIDEN Höhen, seit 2026-08-23 auf Ansage des Betreibers.
+
+       Sie stand bis dahin nur in der fachlichen, nach der Regel „was ein
+       Betreiber selten braucht, steht in der fachlichen Höhe". Die Regel passt
+       hier nicht: Bereitschaft beantwortet die Frage, die ein Betreiber am
+       HÄUFIGSTEN hat — kann jemand rein? „Läuft" beantwortet sie nicht.
+
+       Damit ist sie eher das Gegenteil von fachlich: Wer die einfache Höhe
+       wählt, will genau diese eine Auskunft und nicht die Portliste dahinter.
+  -%>
+  <% if (u.bereitschaft) { %>
     <div class="fb-karte">
       <div class="fb-kopf">
         <span>Bereitschaft</span>
