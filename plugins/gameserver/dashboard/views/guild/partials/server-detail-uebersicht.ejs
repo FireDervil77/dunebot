@@ -163,6 +163,11 @@
                   </div>
                 <% } else { %>
                   <input class="fb-feld" style="width:100%"
+                         <%# Siehe server-create-step3.ejs: Ohne das fuellt der
+                             Browser hier den angemeldeten Nutzer und ein
+                             gespeichertes Passwort ein. %>
+                         autocomplete="<%= e.geheim ? 'new-password' : 'off' %>"
+                         data-1p-ignore data-lpignore="true" data-bwignore
                          type="<%= e.geheim ? 'password' : (e.typ === 'number' ? 'number' : 'text') %>"
                          <% if (e.min !== null) { %>min="<%= e.min %>"<% } %>
                          <% if (e.max !== null) { %>max="<%= e.max %>"<% } %>

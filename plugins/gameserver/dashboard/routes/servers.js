@@ -89,6 +89,13 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
                 gs.addon_marketplace_id,
                 gs.template_name,
                 gs.addon_version,
+                -- Ohne diese drei zeigte die Bereitschaftskarte "noch nicht
+                -- gemeldet", obwohl die Stufe in der Zeile stand. Der Handler
+                -- schrieb sie, die Ansicht las sie nur nie (2026-08-23).
+                gs.bereitschaft_stufe,
+                gs.bereitschaft_grund,
+                gs.bereitschaft_am,
+                gs.paket_werte,
                 gs.update_available,
                 gs.created_at,
                 gs.last_started_at,

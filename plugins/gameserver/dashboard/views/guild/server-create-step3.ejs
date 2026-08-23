@@ -19,7 +19,7 @@
     </div>
   </div>
 
-  <form method="post" action="/guild/<%= guildId %>/plugins/gameserver/servers" id="fb-anlegen">
+  <form method="post" autocomplete="off" action="/guild/<%= guildId %>/plugins/gameserver/servers" id="fb-anlegen">
     <input type="hidden" name="addon_slug" value="<%= locals.addonSlug || '' %>">
     <input type="hidden" name="rootserver_id" value="<%= locals.rootserverId || '' %>">
 
@@ -56,6 +56,16 @@
                     </select>
                   <% } else { %>
                     <input class="fb-feld" style="width:100%"
+                           <%# Der Browser hielt "Servername" und "Beitrittskennwort"
+                               fuer ein Anmeldeformular und fuellte den Namen des
+                               angemeldeten Nutzers samt gespeichertem Passwort ein
+                               (gemeldet 2026-08-23). Das ueberschrieb still zwei
+                               Werte, die ueber Erreichbarkeit und Zugang entscheiden.
+                               `new-password` ist der einzige Wert, den Chrome und
+                               Firefox wirklich respektieren; `off` allein reicht bei
+                               Passwortfeldern nicht. %>
+                           autocomplete="<%= f.geheim ? 'new-password' : 'off' %>"
+                           data-1p-ignore data-lpignore="true" data-bwignore
                            type="<%= f.geheim ? 'password' : (f.typ === 'number' ? 'number' : 'text') %>"
                            name="<%= f.istServerName ? 'server_name' : (f.variable ? 'variable_' + f.variable : 'variable_' + f.schluessel) %>"
                            <% if (f.min !== null) { %>min="<%= f.min %>"<% } %>
