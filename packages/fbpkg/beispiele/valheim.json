@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.3",
+    "version": "1.0.5",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -224,7 +224,7 @@
         "en": "Join password"
       },
       "description": {
-        "de": "Ohne dieses Kennwort kommt niemand auf den Server. Mindestens fuenf Zeichen, und es darf nicht im Servernamen vorkommen. Fuer einen OEFFENTLICH sichtbaren Server ist es Pflicht — gemessen am 2026-08-23: ohne Kennwort meldet Valheim „Error bad password: The password is too short“ und startet nicht. Ein versteckter Server (Oeffentlich = Versteckt) darf ohne auskommen.",
+        "de": "Ohne dieses Kennwort kommt niemand auf den Server. Mindestens fuenf Zeichen, und es darf nicht im Servernamen vorkommen. Fuer einen OEFFENTLICH sichtbaren Server verlangt Valheim eines — gemessen am 2026-08-23 und vom Betreiber in der Spieldokumentation bestaetigt: ohne Kennwort meldet der Server „Error bad password: The password is too short“ und startet nicht. Ein versteckter Server darf ohne auskommen.",
         "en": "Nobody joins without this password. At least five characters, and it must not appear in the server name. Valheim refuses to start WITHOUT one — measured 2026-08-23: \"Error bad password: The password is too short\", world generation then aborts."
       },
       "type": "password",

@@ -886,7 +886,17 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
             // zu streng und verboete einen versteckten Server ohne Kennwort,
             // den es geben darf. Eine gar nicht vorhandene Pflicht liesse den
             // oeffentlichen Fall scheitern — genau das ist heute passiert.
-            pflicht: e.required === true || istBedingtPflicht(e, alle, server, uebergang, paketWerte),
+            // Pflicht ist NUR, was das Paket ausdrücklich so nennt.
+            //
+            // `required_when` gibt es weiterhin im Format, Valheim benutzt es
+            // aber nicht mehr: Der Betreiber am 2026-08-23 — „ein Passwort darf
+            // keine Pflicht sein bei einem public server, das darf höchstens
+            // optional sein." Wo eine Messung sagt, dass etwas scheitern WIRD,
+            // sagt die Karte das jetzt — und lässt es zu.
+            pflicht: e.required === true || bedingungTrifftZu(e.required_when, alle, server, uebergang, paketWerte),
+            // Der Hinweis, der nicht sperrt.
+            warnung: bedingungTrifftZu(e.warn_when, alle, server, uebergang, paketWerte)
+                ? (e.warn_text?.de || e.warn_text?.en || null) : null,
             geheim: e.type === 'password',
             wirkung: WIRKUNG[e.takes_effect] || null,
             hinweis: e.takes_effect === 'new_world'
@@ -920,14 +930,14 @@ module.exports.baueWerteSchritt = baueWerteSchritt;
 
 
 /**
- * Wertet `required_when: "schluessel=wert"` aus.
+ * Wertet eine Bedingung der Form "schluessel=wert" aus — für `required_when`
+ * ebenso wie für `warn_when`.
  *
  * Nur die Form "ein Schlüssel gleich ein Wert" — mehr braucht bisher niemand,
  * und eine Ausdruckssprache zu erfinden, bevor es einen zweiten Fall gibt, wäre
  * genau die Sorte Vorratsbau, die dieses Vorhaben abräumt.
  */
-function istBedingtPflicht(eintrag, alle, server, uebergang, paketWerte) {
-    const bedingung = eintrag.required_when;
+function bedingungTrifftZu(bedingung, alle, server, uebergang, paketWerte) {
     if (typeof bedingung !== 'string' || !bedingung.includes('=')) return false;
 
     const [schluessel, erwartet] = bedingung.split('=');

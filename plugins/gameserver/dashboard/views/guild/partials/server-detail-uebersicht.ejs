@@ -135,6 +135,14 @@
                 <div style="font-weight:500"><%= e.name %></div>
                 <% if (e.beschreibung) { %>
                   <div class="fb-muted" style="font-size:13px;margin-top:2px;text-wrap:pretty"><%= e.beschreibung %></div>
+                  <%# Ein Hinweis, keine Sperre. Er erscheint nur, wenn die
+                      Bedingung des Pakets zutrifft — und sagt, was passieren
+                      WIRD, nicht was verboten ist. %>
+                  <% if (e.warnung) { %>
+                    <div style="font-size:12px;margin-top:4px;color:var(--fb-warning);text-wrap:pretty">
+                      ⚠ <%= e.warnung %>
+                    </div>
+                  <% } %>
                 <% } %>
                 <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">
                   <% if (e.wirkung) { %><span class="fb-pille"><%= e.wirkung.text %></span><% } %>

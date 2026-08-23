@@ -594,6 +594,14 @@
         "required_when": {
           "type": "string",
           "description": "Bedingte Pflicht: Die Einstellung muss einen Wert haben, WENN eine andere einen bestimmten hat — Form 'schluessel=wert', z.B. 'public_listing=1'.\n\nWarum (gemessen 2026-08-23): Valheim verlangt ein Kennwort nur fuer einen OEFFENTLICH sichtbaren Server. Ohne Kennwort und mit -public 1 kommt 'Error bad password: The password is too short'; mit -public 0 bleibt diese Meldung aus. `required: true` waere hier zu streng und wuerde einen versteckten Server ohne Kennwort verbieten, den es geben darf."
+        },
+        "warn_when": {
+          "type": "string",
+          "description": "Warnt, statt zu sperren — Form 'schluessel=wert'.\n\nDer Unterschied zu `required_when` ist eine Haltungsfrage, und der Betreiber hat sie am 2026-08-23 entschieden: 'ein Passwort darf keine Pflicht sein bei einem public server, das darf hoechstens optional sein.' Wo eine Messung sagt, dass etwas scheitern WIRD, sagt das Paket das — es verbietet es aber nicht. Wer es trotzdem so einstellt, soll wissen warum es danach steht, und nicht daran gehindert werden."
+        },
+        "warn_text": {
+          "$ref": "#/definitions/text",
+          "description": "Der Satz, der bei zutreffendem `warn_when` erscheint. Sagt, was passieren wird."
         }
       }
     },
