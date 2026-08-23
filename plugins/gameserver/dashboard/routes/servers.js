@@ -1080,6 +1080,29 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                     // heute nur in der Übergangsdatei — die wird damit beim
                     // ANLEGEN ein letztes Mal gebraucht und danach nie wieder.
                     const ueb = ladeUebergangFuer(paketFuerPorts?.identity?.slug);
+
+                    // ── Der Servername wird nur EINMAL abgefragt ─────────────
+                    //
+                    // Das Formular nennt das Feld `server_name`, weil es
+                    // zugleich der Name der Zeile in `gameservers` ist — ihn
+                    // zweimal einzutippen wäre die Sorte Formular, die niemand
+                    // ausfüllen will (Kommentar in baueWerteSchritt).
+                    //
+                    // Genau dadurch kam er aber nie bei der PAKETEINSTELLUNG
+                    // `name` an: Die behielt ihre Vorgabe „My Server", während
+                    // die Zeile richtig hiess. In der Serverliste von Valheim
+                    // stand danach der falsche Name, und auf der Detailseite
+                    // die Vorgabe statt der Eingabe.
+                    //
+                    // Gemeldet am 2026-08-23: „wenn ich den Server mit den Daten
+                    // aus der Werte-Karte installiere, wird beim ersten Wechsel
+                    // in die Detailseite nur der Standard angezeigt."
+                    const nameAlias = ueb?.zuordnung?.name;
+                    if (nameAlias && server_name) {
+                        envVariables[nameAlias] = String(server_name);
+                        Logger.debug(`[Gameserver] Servername in ${nameAlias} gespiegelt: ${server_name}`);
+                    }
+
                     paketWerteAnlegen = {};
                     for (const eintrag of (paketFuerPorts.settings || [])) {
                         const eggName = ueb?.zuordnung?.[eintrag.key];
