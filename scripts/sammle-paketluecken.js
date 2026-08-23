@@ -38,6 +38,11 @@ const path = require('path');
  * — sonst meldet das Werkzeug Lücken, die keine sind.
  */
 const GELESEN = new Set([
+    // Rohe Eggs tragen diese oben, unser `game_data` schachtelt sie unter `meta`.
+    // Beide Formen gehoeren hierher, sonst meldet das Werkzeug die halbe
+    // Kopfzeile jedes Eggs als Luecke.
+    'name', 'author', 'description', 'meta.name', 'meta.author',
+    'meta.description', 'meta.version', 'exported_at', '_comment',
     'meta', 'startup', 'startup.command', 'startup.done', 'startup.stop',
     'variables', 'ports', 'config', 'scripts', 'scripts.installation',
     'query', 'query.port_var', 'query.gamedig_type',
@@ -53,17 +58,53 @@ const ZIEL = {
     'query': 'ports (Zweck query)', 'query.port_var': 'ports[].assign',
     'query.gamedig_type': 'ports[].protocol', 'platform': 'requirements',
     'image': 'image', 'file_denylist': 'files.deny',
+    'name': 'identity.name', 'author': 'identity.origin',
+    'description': 'identity.description',
+    'exported_at': '— (Zeitstempel des Exports, ohne Entsprechung)',
+    '_comment': '— (Hinweis fuer Menschen)',
 };
+
+/**
+ * Ist dieser Schlüssel ein FELDNAME oder ein DATENWERT?
+ *
+ * `docker_images` ist eine Zuordnung Etikett → Image; die Schlüssel darin sind
+ * `ghcr.io/parkervcp/yolks:debian` oder `Java 17`. Beim ersten Lauf über 272
+ * Eggs füllten genau die den halben Bericht — 30 Zeilen „Feld" für Dinge, die
+ * gar keine Felder sind.
+ *
+ * Ein Feldname enthält keinen Punkt, keinen Schrägstrich, keinen Doppelpunkt und
+ * kein Leerzeichen. Das ist eine Faustregel und keine Wahrheit, aber sie trennt
+ * hier sauber — und wo sie danebenliegt, taucht das Feld eben auf der obersten
+ * Ebene trotzdem auf.
+ */
+function istFeldname(k) {
+    return !/[./: ]/.test(k);
+}
+
+/**
+ * Felder, deren SCHLUESSEL Daten sind statt Feldnamen.
+ *
+ * `docker_images` ordnet Etikett → Image zu: mal `ghcr.io/parkervcp/yolks:debian`,
+ * mal schlicht `Debian` oder `Proton`. Die Faustregel oben faengt die erste Form,
+ * nicht die zweite — und dann steht `docker_images.Proton` im Bericht, als waere
+ * es ein Feld.
+ *
+ * Hier hilft nur Wissen, nicht Mustererkennung: Wir kennen dieses eine Feld.
+ */
+const WERTSCHLUESSEL = new Set(['docker_images']);
 
 function pfade(objekt, prefix = '', tiefe = 0) {
     const aus = [];
     if (!objekt || typeof objekt !== 'object' || Array.isArray(objekt)) return aus;
     for (const [k, v] of Object.entries(objekt)) {
+        // Unterhalb der obersten Ebene zaehlen nur Feldnamen. Ein Bildname als
+        // Schluessel ist ein WERT und gehoert nicht in eine Feldliste.
+        if (tiefe > 0 && !istFeldname(k)) continue;
         const p = prefix ? `${prefix}.${k}` : k;
         aus.push(p);
         // Zwei Ebenen genügen: Tiefer wird es je Spiel verschieden, und dann
         // meldet das Werkzeug Rauschen statt Lücken.
-        if (tiefe < 1) aus.push(...pfade(v, p, tiefe + 1));
+        if (tiefe < 1 && !WERTSCHLUESSEL.has(k)) aus.push(...pfade(v, p, tiefe + 1));
     }
     return aus;
 }
