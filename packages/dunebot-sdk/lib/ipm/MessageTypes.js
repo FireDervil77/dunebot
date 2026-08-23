@@ -115,6 +115,17 @@ const GAMESERVER_CRASHED = 'crashed';
  */
 const GAMESERVER_QUOTA_STATUS = 'quota_status';
 
+/**
+ * Die Bereitschaftsleiter von fb-init: process → port → query.
+ *
+ * Bewusst getrennt von `status_changed`. Das sagt, ob der Container laeuft —
+ * eine andere Frage als die, die ein Betreiber wirklich hat: Kann jemand rein?
+ * Beides in ein Feld zu pressen hiesse, zwei Wahrheiten uebereinanderzulegen,
+ * und die groebere wuerde die feinere ueberschreiben, sobald der naechste
+ * Herzschlag kommt.
+ */
+const GAMESERVER_READINESS = 'readiness';
+
 // =====================================================
 // CONSOLE ACTIONS
 // =====================================================
@@ -293,6 +304,7 @@ module.exports = {
   GAMESERVER_RESOURCE_USAGE,
   GAMESERVER_CRASHED,
   GAMESERVER_QUOTA_STATUS,
+  GAMESERVER_READINESS,
   
   // Console Actions
   CONSOLE_ATTACH,

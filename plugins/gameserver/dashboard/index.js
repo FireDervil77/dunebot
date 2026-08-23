@@ -682,6 +682,21 @@ class GameserverPlugin extends DashboardPlugin {
                 { priority: 5 }
             );
 
+            // ════════════════════════════════════════════════════════════
+            // Bereitschaft: kann jemand rein? (Baustellen 58 und 62f)
+            // ════════════════════════════════════════════════════════════
+            //
+            // Der Daemon meldet das seit dem 2026-08-20 nachweislich — hier gab
+            // es dafür bis heute keinen Empfänger. Die Meldung lief ins Leere,
+            // und die Karte auf der Serverseite sagte „nicht gemessen", obwohl
+            // die Messung unten längst vorlag.
+            eventRouter.register(
+                MessageTypes.NS_GAMESERVER,
+                MessageTypes.GAMESERVER_READINESS,
+                this._handleReadiness.bind(this),
+                { priority: 1 }
+            );
+
             // HINWEIS: KEIN Handler für NS_CONSOLE/CONSOLE_OUTPUT hier!
             // Der ConsoleManager registriert sich selbst auf 'console:output'
             // (ConsoleManager._registerEventHandlers). Eine zweite Registrierung
@@ -692,7 +707,7 @@ class GameserverPlugin extends DashboardPlugin {
             // und broadcasten dort mit dem korrekten SSE-Namespace 'install'.
 
             this._handlersRegistered = true;
-            Logger.success('[Gameserver] Event-Handler registriert (4 Handler)');
+            Logger.success('[Gameserver] Event-Handler registriert (5 Handler)');
         } catch (error) {
             Logger.error('[Gameserver] Fehler beim Registrieren der Event-Handler:', error);
             throw error;
@@ -741,6 +756,58 @@ class GameserverPlugin extends DashboardPlugin {
             }
         } catch (error) {
             Logger.error('[Gameserver] Quota-Meldung konnte nicht gespeichert werden:', error);
+        }
+    }
+
+    /**
+     * Handler: die Bereitschaftsstufe von fb-init.
+     *
+     * ── Warum das nicht in `status` gehört ──────────────────────────────────
+     *
+     * `status` sagt, ob der Container läuft. Die Bereitschaft sagt, ob jemand
+     * rein kann. Zwischen „läuft" und „bereit" liegen bei Valheim rund dreissig
+     * Sekunden, bei einer neuen Welt Minuten — und genau in dieser Spanne schaut
+     * ein Betreiber hin.
+     *
+     * Der Erklärsatz ist der Teil, für den fb-init überhaupt gebaut wurde:
+     * „Port 2457 lauscht nach 60 s noch nicht, der Prozess läuft aber. Bei einer
+     * neuen Welt ist das normal." Ohne ihn bliebe von einer dreistufigen Messung
+     * ein Ampelmännchen.
+     *
+     * @private
+     */
+    async _handleReadiness(payload, message, context) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+
+        const { server_id, stage, hinweis } = payload || {};
+        if (!server_id) return;
+
+        try {
+            await dbService.query(
+                `UPDATE gameservers
+                    SET bereitschaft_stufe = ?, bereitschaft_grund = ?, bereitschaft_am = NOW()
+                  WHERE id = ?`,
+                [stage || null, hinweis ? String(hinweis).slice(0, 500) : null, server_id]
+            );
+
+            const [server] = await dbService.query(
+                'SELECT guild_id, name FROM gameservers WHERE id = ?', [server_id]);
+            if (!server) return;
+
+            Logger.info(`[Gameserver] Bereitschaft ${server.name} (${server_id}): `
+                + `${stage || 'unbekannt'}${hinweis ? ' — ' + hinweis : ''}`);
+
+            ServiceManager.get('sseManager')?.broadcast(String(server.guild_id), 'gameserver', {
+                action: 'readiness',
+                server_id,
+                stufe: stage || null,
+                grund: hinweis || null,
+            });
+        } catch (error) {
+            // Eine verlorene Bereitschaftsmeldung darf nichts kippen: Der Server
+            // läuft, nur die Anzeige bleibt auf dem vorigen Stand.
+            Logger.error('[Gameserver] Bereitschaft konnte nicht übernommen werden', error);
         }
     }
 

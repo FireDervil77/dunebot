@@ -116,7 +116,7 @@ function baueUebersicht(server, paket, zusatz = {}) {
         befehle:       baueBefehle(paket),
         ports:         bauePorts(server, paket),
         paket:         bauePaketkarte(server, paket, zusatz.paketZeile),
-        bereitschaft:  baueBereitschaft(paket),
+        bereitschaft:  baueBereitschaft(paket, server),
         kennzahlen:    baueKennzahlen(server),
         welt:          baueWelt(zusatz.letzteSicherung),
     };
@@ -461,21 +461,49 @@ function bauePaketkarte(server, paket, zeile) {
  * Seite, die einen Betreiber wirklich in die Irre führen würde: Er würde
  * glauben, ein Spieler kommt rein.
  */
-function baueBereitschaft(paket) {
+function baueBereitschaft(paket, server = {}) {
     const r = paket?.start?.ready_when;
     if (!r) return null;
+
+    // Die Leiter, wie das Paket sie verlangt.
     const stufen = [
-        { name: 'Prozess', verlangt: true,
+        { schluessel: 'process', name: 'Prozess', verlangt: true,
           erklaerung: 'Das Programm läuft — PID 1 ist fb-init, exec ohne Shell.' },
-        { name: 'Port', verlangt: Boolean(r.port),
+        { schluessel: 'port', name: 'Port', verlangt: Boolean(r.port),
           erklaerung: r.port ? 'Der Port „' + r.port + '" lauscht.' : 'Kein Port im Paket genannt.' },
-        { name: 'Abfrage', verlangt: r.query === true,
+        { schluessel: 'query', name: 'Abfrage', verlangt: r.query === true,
           erklaerung: r.query === true ? 'Das Spiel antwortet auf eine Abfrage.' : 'Keine Abfrage verlangt.' },
     ];
+
+    // ── Was davon ist ERREICHT? (Baustelle 62f, 2026-08-23) ──────────────────
+    //
+    // Bis heute stand hier `gemessen: false` — der Daemon meldete die Stufe seit
+    // dem 2026-08-20 nachweislich, nur nahm sie im Dashboard niemand an.
+    //
+    // Eine Stufe gilt als erreicht, wenn sie VOR der gemeldeten liegt oder die
+    // gemeldete IST. Die Reihenfolge steckt in der Leiter selbst, nicht in einer
+    // zweiten Tabelle daneben — sonst geraten beide auseinander.
+    const gemeldet = server.bereitschaft_stufe || null;
+    const laeuft = ['online', 'starting'].includes(server.status);
+    const wieWeit = stufen.findIndex(st => st.schluessel === gemeldet);
+
+    for (let i = 0; i < stufen.length; i++) {
+        // Ohne Meldung wird nichts als erreicht behauptet. Drei graue Punkte
+        // sind ehrlicher als drei geratene Haken.
+        stufen[i].erreicht = Boolean(gemeldet) && laeuft && wieWeit >= 0 && i <= wieWeit;
+    }
+
     return {
         stufen,
         frist: r.timeout_sec || null,
-        gemessen: false,   // siehe Baustelle 58
+        gemessen: Boolean(gemeldet) && laeuft,
+        stufe: laeuft ? gemeldet : null,
+        // Der Erklärsatz von fb-init — der Teil, für den die Messung gebaut wurde.
+        grund: laeuft ? (server.bereitschaft_grund || null) : null,
+        // Ein Stand von gestern ist keine Auskunft über heute.
+        veraltet: Boolean(gemeldet) && !laeuft,
+        bereit: laeuft && wieWeit >= 0
+            && stufen.every((st, i) => !st.verlangt || i <= wieWeit),
     };
 }
 
@@ -572,6 +600,9 @@ function baueServerListe(zeilen, paketNachAddon = {}) {
 }
 
 module.exports.baueServerListe = baueServerListe;
+// Ausdruecklich exportiert, damit scripts/check-bereitschaft.js die Leiter
+// pruefen kann, ohne eine ganze Seite zu bauen.
+module.exports.baueBereitschaft = baueBereitschaft;
 
 /**
  * Die Spielauswahl beim Anlegen — Entwurf vom 2026-08-18, Artboard 5a.

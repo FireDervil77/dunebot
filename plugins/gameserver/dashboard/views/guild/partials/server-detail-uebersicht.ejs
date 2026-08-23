@@ -232,26 +232,46 @@
     <div class="fb-karte">
       <div class="fb-kopf">
         <span>Bereitschaft</span>
-        <% if (!u.bereitschaft.gemessen) { %>
-          <span class="fb-pille" style="margin-left:auto">nicht gemessen</span>
+        <% if (u.bereitschaft.bereit) { %>
+          <span class="fb-pille fb-pille-gut" style="margin-left:auto">bereit</span>
+        <% } else if (u.bereitschaft.gemessen) { %>
+          <span class="fb-pille" style="margin-left:auto">Stufe <%= u.bereitschaft.stufe %></span>
+        <% } else if (u.bereitschaft.veraltet) { %>
+          <span class="fb-pille" style="margin-left:auto">Server ist aus</span>
+        <% } else { %>
+          <span class="fb-pille" style="margin-left:auto">noch nicht gemeldet</span>
         <% } %>
       </div>
       <div class="fb-koerper">
         <% u.bereitschaft.stufen.forEach(function (st) { %>
           <div style="display:flex;gap:10px;padding:8px 0;align-items:start">
-            <span class="fb-punkt" style="margin-top:6px;background:<%= st.verlangt ? 'var(--fb-border)' : '#f1f3f5' %>"></span>
+            <%# Gefüllt nur, was der Daemon wirklich gemeldet hat. Drei geratene
+                Haken wären die eine Zeile auf dieser Seite, die in die Irre
+                führt — der Betreiber glaubte dann, ein Spieler kommt rein. %>
+            <span class="fb-punkt" style="margin-top:6px;background:<%=
+              st.erreicht ? 'var(--fb-success)' : (st.verlangt ? 'var(--fb-border)' : '#f1f3f5') %>"></span>
             <div>
-              <div style="font-weight:500;<%= st.verlangt ? '' : 'color:var(--fb-text-muted)' %>"><%= st.name %></div>
+              <div style="font-weight:500;<%= st.verlangt ? '' : 'color:var(--fb-text-muted)' %>">
+                <%= st.name %><% if (st.erreicht) { %> ✓<% } %>
+              </div>
               <div class="fb-muted" style="font-size:13px"><%= st.erklaerung %></div>
             </div>
           </div>
         <% }); %>
-        <%# Drei gruene Haekchen zu malen waere die eine Zeile auf dieser Seite,
-            die wirklich in die Irre fuehrt: Der Betreiber wuerde glauben, ein
-            Spieler kommt rein. %>
+        <%# Der Erklärsatz von fb-init — der Teil, für den die Messung gebaut
+            wurde: „Port 2457 lauscht nach 60 s noch nicht, der Prozess läuft
+            aber. Bei einer neuen Welt ist das normal." %>
+        <% if (u.bereitschaft.grund) { %>
+          <div style="font-size:13px;margin-top:8px;text-wrap:pretty"><%= u.bereitschaft.grund %></div>
+        <% } %>
         <div class="fb-muted" style="font-size:13px;margin-top:8px">
-          Was das Paket prüfen lässt. Die Messung selbst kommt noch nicht beim
-          Dashboard an<%= u.bereitschaft.frist ? ' (Frist ' + u.bereitschaft.frist + ' s)' : '' %>.
+          <% if (u.bereitschaft.veraltet) { %>
+            Der Server ist aus — die letzte gemeldete Stufe sagt nichts über jetzt.
+          <% } else if (!u.bereitschaft.gemessen) { %>
+            Der Server hat noch keine Stufe gemeldet<%= u.bereitschaft.frist ? ' (Frist ' + u.bereitschaft.frist + ' s)' : '' %>.
+          <% } else { %>
+            Gemeldet von fb-init auf der Maschine<%= u.bereitschaft.frist ? ', Frist ' + u.bereitschaft.frist + ' s' : '' %>.
+          <% } %>
         </div>
       </div>
     </div>
