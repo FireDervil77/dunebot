@@ -13,6 +13,7 @@ const bcrypt = require('bcrypt');
 const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
 const { buildStartPayload, loadServerForStart, paketFuerInstall, ladePaketFuerAddon } = require('../helpers/StartPayload');
+const { vergibPortsAusPaket } = require('../helpers/Portvergabe');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
         baueMaschinenAuswahl, baueWerteSchritt } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
@@ -954,7 +955,11 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         });
 
         // ✅ Ports aus game_data extrahieren (alle Port-Definitionen aus dem Egg)
-        const ports = {};
+        //
+        // Bleibt nur für Bestandsserver ohne Paket. Liegt ein Paket vor, wird
+        // `ports` weiter unten vollständig ersetzt — siehe „Portvergabe nach dem
+        // Paket".
+        let ports = {};
         if (gameData.ports && typeof gameData.ports === 'object') {
             for (const [portType, portDef] of Object.entries(gameData.ports)) {
                 ports[portType] = {
@@ -1025,8 +1030,49 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         // Strategie: Game-Port → ausgewählt oder auto. Extra-Ports → sequenziell (Game+1, Game+2, ...)
         const userPort = req.body.game_port; // "auto" oder eine Port-Nummer
         const allocatedFromPool = {};
-        
+
+        // ── Portvergabe nach dem Paket (2026-08-23) ──────────────────────────
+        //
+        // Das Egg-Modell kennt `game_plus_1` als eigenen Eintrag und `query`
+        // als weiteren Zweck daneben. Das Paket kennt diese Trennung nicht — es
+        // sagt: `query` liegt bei `game+1`.
+        //
+        // Gemessen an Server 161 und 162: Gebucht wurden game 25000 UND query
+        // 25002, berechnet wurde game_plus_1 25001. Valheim lauscht auf 25001;
+        // gebucht war eine Nummer, auf der nie etwas läuft. Der Start ging
+        // trotzdem gut, weil die Übergangsdatei `query` auf `game_plus_1`
+        // abbildet — das Buch stimmte also nicht mit der Wirklichkeit überein,
+        // und niemandem fiel es auf.
+        //
+        // Liegt ein Paket vor, entscheidet ab hier ausschliesslich das Paket.
+        let paketPortsAktiv = false;
         if (rootserver_id) {
+            try {
+                const pz = await ladePaketFuerAddon(dbService, addon.id);
+                const paketFuerPorts = pz
+                    ? (typeof pz.paket_json === 'string' ? JSON.parse(pz.paket_json) : pz.paket_json)
+                    : null;
+                if (paketFuerPorts) {
+                    const wunsch = (req.body.game_port && req.body.game_port !== 'auto')
+                        ? parseInt(req.body.game_port, 10) : null;
+                    const { ports: p, belegt } = await vergibPortsAusPaket(
+                        dbService, rootserver_id, paketFuerPorts, wunsch);
+                    ports = p;
+                    Object.assign(allocatedFromPool, belegt);
+                    paketPortsAktiv = true;
+                    Logger.info(`[Gameserver] Ports aus dem Paket vergeben: `
+                        + Object.entries(ports).map(([z, d]) => `${z} ${d.internal}`).join(', '));
+                }
+            } catch (err) {
+                // Hier NICHT weiterlaufen: Ein Server mit falschen Ports startet
+                // und ist trotzdem unerreichbar — der teuerste Ausgang. Lieber
+                // gar nicht anlegen und sagen, warum.
+                Logger.error('[Gameserver] Portvergabe nach dem Paket fehlgeschlagen', err);
+                return res.status(400).json({ success: false, message: err.message });
+            }
+        }
+
+        if (rootserver_id && !paketPortsAktiv) {
             // Sortierte Liste der Extra-Port-Typen (alles außer "game")
             const extraPortTypes = Object.keys(poolPorts).filter(t => t !== 'game');
 
@@ -1207,7 +1253,12 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         }
 
         // ✅ Offset-Ports berechnen: game_plus_N = game_port + N (kein Pool-Verbrauch)
-        for (const [portType, offsetData] of Object.entries(offsetPorts)) {
+        //
+        // Nur noch für den alten Weg. Beim Paket sind die gekoppelten Ports
+        // bereits vergeben UND gebucht — genau das ist der Unterschied: Ein
+        // nicht gebuchter Port ist beim nächsten Server wieder frei, und so
+        // entstand die ARK-Kollision mit zwei Zwecken auf derselben Nummer.
+        for (const [portType, offsetData] of (paketPortsAktiv ? [] : Object.entries(offsetPorts))) {
             const basePort = ports[offsetData.base]?.internal || ports[offsetData.base]?.external;
             if (basePort) {
                 const computedPort = basePort + offsetData.offset;
