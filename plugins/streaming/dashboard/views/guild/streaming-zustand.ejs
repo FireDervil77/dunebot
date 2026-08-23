@@ -1,0 +1,106 @@
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-heart-pulse',
+  titel: tr('streaming:STATE.TITLE'),
+  beschreibung: tr('streaming:STATE.SUBTITLE')
+}) %>
+
+<%
+  const farbe = ampel === 'rot' ? 'red' : (ampel === 'gelb' ? 'yellow' : 'green');
+  const text  = ampel === 'rot' ? tr('streaming:STATE.BROKEN')
+              : (ampel === 'gelb' ? tr('streaming:STATE.DELAYED') : tr('streaming:STATE.OK'));
+  const gehoert = vorWieLange(zustand.letzteMeldungAm);
+%>
+
+<div class="row row-cards">
+  <!-- Ampel in einem Satz -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body d-flex align-items-center">
+        <span class="status-dot status-dot-animated bg-<%= farbe %> me-3"></span>
+        <div>
+          <div class="fw-bold"><%= text %></div>
+          <div class="text-secondary">
+            <%= zustand.ueberwacht %> <%= tr('streaming:STATE.WATCHED') %> ·
+            <%= zustand.live %> live ·
+            <%= tr('streaming:STATE.LAST_EVENT') %>:
+            <%= gehoert || tr('streaming:STATE.NEVER') %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Je Streamer eine Zeile -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('streaming:STREAMERS.TITLE') %></h3>
+      </div>
+      <% if (!streamer || streamer.length === 0) { %>
+        <div class="card-body text-secondary"><%= tr('streaming:STREAMERS.EMPTY') %></div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th><%= tr('streaming:STREAMERS.CHANNEL') %></th>
+                <th><%= tr('streaming:STREAMERS.STATE') %></th>
+                <th><%= tr('streaming:STREAMERS.LAST_HEARD') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% streamer.forEach(s => { %>
+                <tr>
+                  <td><%= s.anzeigename || s.login %></td>
+                  <td>
+                    <% if (s.abo_zustand === 'widerrufen' || s.abo_zustand === 'fehler') { %>
+                      <span class="badge bg-red-lt">⚠ Abo <%= s.abo_zustand %></span>
+                    <% } else if (s.ist_live) { %>
+                      <span class="badge bg-red">● <%= tr('streaming:STREAMERS.LIVE') %></span>
+                    <% } else { %>
+                      <span class="text-secondary">○ <%= tr('streaming:STREAMERS.OFFLINE') %></span>
+                    <% } %>
+                  </td>
+                  <td class="text-secondary">
+                    <%= vorWieLange(s.letzte_meldung_am) || tr('streaming:STATE.NEVER') %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Was klemmt: nur sichtbar, wenn es etwas gibt -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('streaming:STATE.PROBLEMS') %></h3>
+      </div>
+      <div class="card-body">
+        <% if (zustand.kaputteAbos.length === 0 && zustand.gescheitert === 0) { %>
+          <span class="text-secondary"><%= tr('streaming:STATE.NO_PROBLEMS') %></span>
+        <% } else { %>
+          <ul class="mb-0">
+            <% zustand.kaputteAbos.forEach(a => { %>
+              <li>
+                <strong><%= a.login %></strong>: Abo <%= a.zustand %>
+                <% if (a.fehlertext) { %> — <%= a.fehlertext %><% } %>
+                <div class="text-secondary small">Abhilfe: Kanal einmal entfernen und neu eintragen.</div>
+              </li>
+            <% }); %>
+            <% if (zustand.gescheitert > 0) { %>
+              <li>
+                <%= zustand.gescheitert %> Auftrag/Auftraege aufgegeben
+                <div class="text-secondary small">Abhilfe: Rechte des Bots im Zielkanal pruefen.</div>
+              </li>
+            <% } %>
+          </ul>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>

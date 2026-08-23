@@ -1,0 +1,81 @@
+{
+  "TITLE": "Streaming",
+  "DESCRIPTION": "Announces in Discord when a watched channel goes live",
+  "NAV": {
+    "STREAMING": "Streaming",
+    "STREAMERS": "Streamers",
+    "TARGETS": "Targets",
+    "TEMPLATES": "Templates",
+    "STATE": "Status",
+    "OPERATIONS": "Operations"
+  },
+  "STREAMERS": {
+    "TITLE": "Watched channels",
+    "SUBTITLE": "Whoever goes live gets announced here",
+    "EMPTY": "No channel added yet.",
+    "EMPTY_HINT": "Add a Twitch channel name. The streamer is not notified - being live is public information.",
+    "ADD": "Add channel",
+    "PLATFORM": "Platform",
+    "CHANNEL": "Channel",
+    "STATE": "Status",
+    "TARGETS": "Targets",
+    "LAST_HEARD": "Last heard",
+    "LIVE": "live",
+    "OFFLINE": "offline",
+    "UNKNOWN": "unknown"
+  },
+  "TARGETS": {
+    "TITLE": "Targets",
+    "SUBTITLE": "Where the announcement goes and how it looks",
+    "EMPTY": "No target configured yet.",
+    "CHANNEL": "Announcement channel",
+    "ROLE": "Mentioned role",
+    "ONAIR": "On-air voice channel",
+    "ONAIR_HELP": "The streamer's voice channel. The announcement links to it - it is not monitored.",
+    "FILTER_GAME": "Only for this game",
+    "FILTER_TITLE": "Only if the title contains this word",
+    "CLEANUP": "After the stream",
+    "CLEANUP_EDIT": "Turn the message into a recap",
+    "CLEANUP_DELETE": "Delete the message",
+    "CLEANUP_KEEP": "Leave it",
+    "OWN_IMAGE": "Custom preview image",
+    "PUBLISH": "Publish in announcement channels",
+    "ACTIVE": "Active"
+  },
+  "TEMPLATES": {
+    "TITLE": "Templates",
+    "SUBTITLE": "The text above the announcement",
+    "DEFAULT": "Default text for this guild",
+    "PLACEHOLDERS": "Available placeholders",
+    "HINT": "Plain text with placeholders. The card below has a fixed layout."
+  },
+  "STATE": {
+    "TITLE": "Status",
+    "SUBTITLE": "What is watched, when we last heard something, and what is stuck",
+    "OK": "All good",
+    "DELAYED": "Delayed",
+    "BROKEN": "Broken",
+    "WATCHED": "watched channels",
+    "LAST_EVENT": "last heard",
+    "NEVER": "never",
+    "PROBLEMS": "What is stuck",
+    "NO_PROBLEMS": "Nothing. All subscriptions active, no pending jobs."
+  },
+  "OPERATIONS": {
+    "TITLE": "Operations",
+    "SUBTITLE": "Subscriptions, quota and credentials - across all guilds",
+    "CREDENTIALS": "Twitch credentials",
+    "CLIENT_ID": "Client ID",
+    "CLIENT_SECRET": "Client secret",
+    "SECRET_SET": "set - not readable again for security reasons",
+    "CREDENTIALS_HELP": "One application for the whole installation. Create it at dev.twitch.tv/console/apps. Individual guilds do not enter keys.",
+    "QUOTA": "Quota",
+    "NOT_MEASURED": "not measured yet"
+  },
+  "COMMON": {
+    "SAVE": "Save",
+    "CANCEL": "Cancel",
+    "DELETE": "Remove",
+    "NOT_YET": "Coming with the next stage"
+  }
+}

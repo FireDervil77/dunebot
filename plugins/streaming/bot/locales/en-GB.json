@@ -1,0 +1,10 @@
+{
+  "TITLE": "Streaming",
+  "DESCRIPTION": "Who is live right now and what is being watched",
+  "CMD": {
+    "LIVE": "Who from the list is streaming right now",
+    "LIST": "Which channels this server watches",
+    "STATUS": "Watched channels, last event, pending jobs",
+    "HELP": "Where to set things up"
+  }
+}

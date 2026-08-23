@@ -1,0 +1,77 @@
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-bullseye',
+  titel: tr('streaming:TARGETS.TITLE'),
+  beschreibung: tr('streaming:TARGETS.SUBTITLE')
+}) %>
+
+<%- include('partials/streaming-stufe', {
+  text: 'Stufe 1: Diese Seite zeigt die eingerichteten Ziele. Bearbeiten kommt mit Stufe 5.'
+}) %>
+
+<%
+  const kanalName = (id, liste) => {
+    const k = (liste || []).find(x => String(x.id) === String(id));
+    return k ? k.name : id;
+  };
+  const rollenName = (id) => {
+    const r = (rollen || []).find(x => String(x.id) === String(id));
+    return r ? r.name : id;
+  };
+%>
+
+<div class="row row-cards">
+  <div class="col-12">
+    <div class="card">
+      <% if (!ziele || ziele.length === 0) { %>
+        <div class="card-body">
+          <p class="text-secondary mb-0"><%= tr('streaming:TARGETS.EMPTY') %></p>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th><%= tr('streaming:STREAMERS.CHANNEL') %></th>
+                <th><%= tr('streaming:TARGETS.CHANNEL') %></th>
+                <th><%= tr('streaming:TARGETS.ROLE') %></th>
+                <th><%= tr('streaming:TARGETS.ONAIR') %></th>
+                <th><%= tr('streaming:TARGETS.CLEANUP') %></th>
+                <th><%= tr('streaming:TARGETS.ACTIVE') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% ziele.forEach(z => { %>
+                <tr>
+                  <td class="fw-bold"><%= z.anzeigename || z.login %></td>
+                  <td># <%= kanalName(z.channel_id, textkanaele) %></td>
+                  <td>
+                    <% if (z.rolle_id) { %>@<%= rollenName(z.rolle_id) %><% } else { %>
+                      <span class="text-secondary">—</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <% if (z.onair_channel) { %>
+                      🔊 <%= kanalName(z.onair_channel, sprachkanaele) %>
+                    <% } else { %>
+                      <span class="text-secondary">—</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <% if (z.aufraeumen === 'loeschen') { %><%= tr('streaming:TARGETS.CLEANUP_DELETE') %>
+                    <% } else if (z.aufraeumen === 'stehenlassen') { %><%= tr('streaming:TARGETS.CLEANUP_KEEP') %>
+                    <% } else { %><%= tr('streaming:TARGETS.CLEANUP_EDIT') %><% } %>
+                  </td>
+                  <td>
+                    <% if (z.aktiv) { %><span class="badge bg-green-lt">✓</span>
+                    <% } else { %><span class="badge bg-secondary-lt">—</span><% } %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>

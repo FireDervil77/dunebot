@@ -1,0 +1,10 @@
+{
+  "TITLE": "Streaming",
+  "DESCRIPTION": "Wer gerade live ist und was ueberwacht wird",
+  "CMD": {
+    "LIVE": "Wer aus der Liste gerade sendet",
+    "LIST": "Welche Kanaele dieser Server beobachtet",
+    "STATUS": "Ueberwachte Kanaele, zuletzt Gehoertes, offene Auftraege",
+    "HELP": "Wo eingerichtet wird"
+  }
+}

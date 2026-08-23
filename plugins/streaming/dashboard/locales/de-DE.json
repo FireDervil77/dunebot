@@ -1,0 +1,81 @@
+{
+  "TITLE": "Streaming",
+  "DESCRIPTION": "Meldet im Discord, wenn ein beobachteter Kanal live geht",
+  "NAV": {
+    "STREAMING": "Streaming",
+    "STREAMERS": "Streamer",
+    "TARGETS": "Ziele",
+    "TEMPLATES": "Vorlagen",
+    "STATE": "Zustand",
+    "OPERATIONS": "Betrieb"
+  },
+  "STREAMERS": {
+    "TITLE": "Beobachtete Kanaele",
+    "SUBTITLE": "Wer live geht, wird hier gemeldet",
+    "EMPTY": "Noch kein Kanal eingetragen.",
+    "EMPTY_HINT": "Trage einen Twitch-Kanalnamen ein. Der Streamer erfaehrt davon nichts - dass jemand live ist, ist oeffentlich.",
+    "ADD": "Kanal eintragen",
+    "PLATFORM": "Plattform",
+    "CHANNEL": "Kanal",
+    "STATE": "Zustand",
+    "TARGETS": "Ziele",
+    "LAST_HEARD": "Zuletzt gehoert",
+    "LIVE": "live",
+    "OFFLINE": "offline",
+    "UNKNOWN": "unbekannt"
+  },
+  "TARGETS": {
+    "TITLE": "Ziele",
+    "SUBTITLE": "Wohin die Ankuendigung geht und wie sie aussieht",
+    "EMPTY": "Noch kein Ziel eingerichtet.",
+    "CHANNEL": "Ankuendigungskanal",
+    "ROLE": "Erwaehnte Rolle",
+    "ONAIR": "On-Air-Sprachkanal",
+    "ONAIR_HELP": "Der Sprachkanal des Streamers. Die Ankuendigung verweist darauf - ueberwacht wird er nicht.",
+    "FILTER_GAME": "Nur bei diesem Spiel",
+    "FILTER_TITLE": "Nur wenn der Titel dieses Wort enthaelt",
+    "CLEANUP": "Nach dem Stream",
+    "CLEANUP_EDIT": "Nachricht zur Rueckschau umbauen",
+    "CLEANUP_DELETE": "Nachricht loeschen",
+    "CLEANUP_KEEP": "stehen lassen",
+    "OWN_IMAGE": "Eigenes Vorschaubild",
+    "PUBLISH": "In Ankuendigungskanaelen veroeffentlichen",
+    "ACTIVE": "Aktiv"
+  },
+  "TEMPLATES": {
+    "TITLE": "Vorlagen",
+    "SUBTITLE": "Der Text ueber der Ankuendigung",
+    "DEFAULT": "Standardtext dieser Guild",
+    "PLACEHOLDERS": "Verfuegbare Platzhalter",
+    "HINT": "Reintext mit Platzhaltern. Das Aussehen der Karte darunter ist festgelegt."
+  },
+  "STATE": {
+    "TITLE": "Zustand",
+    "SUBTITLE": "Was ueberwacht wird, wann zuletzt etwas ankam und wo es klemmt",
+    "OK": "Alles in Ordnung",
+    "DELAYED": "Verzoegert",
+    "BROKEN": "Gestoert",
+    "WATCHED": "ueberwachte Kanaele",
+    "LAST_EVENT": "zuletzt gehoert",
+    "NEVER": "noch nie",
+    "PROBLEMS": "Was klemmt",
+    "NO_PROBLEMS": "Nichts. Alle Abos stehen, keine offenen Auftraege."
+  },
+  "OPERATIONS": {
+    "TITLE": "Betrieb",
+    "SUBTITLE": "Abos, Kontingent und Zugangsdaten - ueber alle Guilds",
+    "CREDENTIALS": "Twitch-Zugangsdaten",
+    "CLIENT_ID": "Client-ID",
+    "CLIENT_SECRET": "Client-Secret",
+    "SECRET_SET": "gesetzt - aus Sicherheitsgruenden nicht mehr lesbar",
+    "CREDENTIALS_HELP": "Eine Anwendung fuer die ganze Anlage. Anzulegen unter dev.twitch.tv/console/apps. Einzelne Guilds tragen keine Schluessel ein.",
+    "QUOTA": "Kontingent",
+    "NOT_MEASURED": "noch nicht gemessen"
+  },
+  "COMMON": {
+    "SAVE": "Speichern",
+    "CANCEL": "Abbrechen",
+    "DELETE": "Entfernen",
+    "NOT_YET": "Kommt mit der naechsten Stufe"
+  }
+}

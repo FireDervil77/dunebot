@@ -1,0 +1,64 @@
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-comment-dots',
+  titel: tr('streaming:TEMPLATES.TITLE'),
+  beschreibung: tr('streaming:TEMPLATES.SUBTITLE')
+}) %>
+
+<%- include('partials/streaming-stufe', {
+  text: 'Stufe 1: Die Platzhalter stehen fest, das Bearbeiten kommt mit Stufe 5.'
+}) %>
+
+<div class="row row-cards">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('streaming:TEMPLATES.DEFAULT') %></h3>
+      </div>
+      <div class="card-body">
+        <pre class="mb-2 p-3 bg-secondary-lt rounded">{rolle} {streamer} ist jetzt live!</pre>
+        <p class="text-secondary small mb-0"><%= tr('streaming:TEMPLATES.HINT') %></p>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title">So sieht die Ankuendigung aus</h3>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Der Text oben erscheint als Klartext, darunter die Karte. Die Erwaehnung
+          gehoert bewusst in den Klartext: Discord loest Erwaehnungen innerhalb
+          einer Karte <strong>nicht</strong> als Benachrichtigung aus.
+        </p>
+        <ul class="text-secondary small mb-0">
+          <li>Kopf: Kanalname und Bild des Kanals</li>
+          <li>Titel der Sendung, verlinkt auf den Stream</li>
+          <li>Kategorie und Zuschauerzahl nebeneinander</li>
+          <li>Vorschaubild des Streams</li>
+          <li>Knopf „Zum Stream" — dazu „Beitreten", wenn ein On-Air-Kanal gesetzt ist</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('streaming:TEMPLATES.PLACEHOLDERS') %></h3>
+      </div>
+      <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+          <tbody>
+            <% platzhalter.forEach(p => { %>
+              <tr>
+                <td class="w-1"><code><%= p.name %></code></td>
+                <td class="text-secondary"><%= p.bedeutung %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,93 @@
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-sliders',
+  titel: tr('streaming:OPERATIONS.TITLE'),
+  beschreibung: tr('streaming:OPERATIONS.SUBTITLE')
+}) %>
+
+<% if (gespeichert) { %>
+  <div class="alert alert-success">Zugangsdaten gespeichert.</div>
+<% } %>
+
+<div class="row row-cards">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('streaming:OPERATIONS.CREDENTIALS') %></h3>
+      </div>
+      <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/betrieb/zugangsdaten">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <div class="card-body">
+          <p class="text-secondary small"><%= tr('streaming:OPERATIONS.CREDENTIALS_HELP') %></p>
+
+          <div class="mb-3">
+            <label for="client_id" class="form-label"><%= tr('streaming:OPERATIONS.CLIENT_ID') %></label>
+            <input type="text" class="form-control" id="client_id" name="client_id"
+                   value="<%= clientId %>" autocomplete="off" required>
+          </div>
+
+          <div class="mb-1">
+            <label for="client_secret" class="form-label"><%= tr('streaming:OPERATIONS.CLIENT_SECRET') %></label>
+            <input type="password" class="form-control" id="client_secret" name="client_secret"
+                   autocomplete="new-password"
+                   placeholder="<%= secretQuelle === 'dashboard' ? tr('streaming:OPERATIONS.SECRET_SET') : '' %>">
+            <div class="form-hint">
+              Leer lassen aendert das gespeicherte Geheimnis nicht. Es wird
+              verschluesselt abgelegt und ist danach nicht mehr lesbar.
+            </div>
+          </div>
+        </div>
+        <div class="card-footer text-end">
+          <button type="submit" class="btn btn-primary"><%= tr('streaming:COMMON.SAVE') %></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Herkunft</h3>
+      </div>
+      <div class="card-body">
+        <% if (secretQuelle === 'dashboard') { %>
+          <span class="badge bg-green-lt">aus dem Dashboard</span>
+          <p class="text-secondary small mt-2 mb-0">
+            Gesetzt und verschluesselt in der Datenbank. Ein Wechsel braucht keinen Neustart.
+          </p>
+        <% } else if (secretQuelle === 'env') { %>
+          <span class="badge bg-yellow-lt">aus der .env</span>
+          <p class="text-secondary small mt-2 mb-0">
+            Rueckfall fuer bestehende Einrichtungen. Wer die Werte hier speichert,
+            braucht die Datei nicht mehr.
+          </p>
+        <% } else if (secretQuelle === 'defekt') { %>
+          <span class="badge bg-red-lt">nicht entschluesselbar</span>
+          <p class="text-secondary small mt-2 mb-0">
+            Das gespeicherte Geheimnis passt nicht zum Schluessel der Anlage
+            (TOKEN_ENCRYPTION_KEY). Bitte neu eintragen.
+          </p>
+        <% } else { %>
+          <span class="badge bg-secondary-lt">nicht hinterlegt</span>
+          <p class="text-secondary small mt-2 mb-0">
+            Ohne Zugangsdaten laesst sich kein Abonnement anlegen — es kommen
+            keine Meldungen an.
+          </p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('streaming:OPERATIONS.QUOTA') %></h3>
+      </div>
+      <div class="card-body text-secondary">
+        <%= tr('streaming:OPERATIONS.NOT_MEASURED') %>
+        <div class="small mt-1">
+          Kommt mit Stufe 2 — gemessen bei der Plattform, nicht aus unserer
+          Tabelle gerechnet.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

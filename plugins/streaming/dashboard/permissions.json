@@ -1,0 +1,55 @@
+{
+  "plugin": "streaming",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "STREAMING.VIEW",
+      "name": "Streaming ansehen",
+      "description": "Berechtigung um den Streaming-Bereich zu oeffnen, beobachtete Kanaele und den Betriebszustand zu sehen",
+      "category": "streaming",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "STREAMING.STREAMERS.MANAGE",
+      "name": "Streamer verwalten",
+      "description": "Berechtigung um Kanaele zur Beobachtung einzutragen und wieder zu entfernen",
+      "category": "streaming",
+      "is_dangerous": 0,
+      "requires": "STREAMING.VIEW"
+    },
+    {
+      "key": "STREAMING.TARGETS.MANAGE",
+      "name": "Ziele verwalten",
+      "description": "Berechtigung um Ankuendigungskanal, Erwaehnungsrolle, Filter und Aufraeumart zu setzen",
+      "category": "streaming",
+      "is_dangerous": 0,
+      "requires": "STREAMING.VIEW"
+    },
+    {
+      "key": "STREAMING.TEMPLATES.EDIT",
+      "name": "Nachrichtenvorlagen bearbeiten",
+      "description": "Berechtigung um den Text der Ankuendigungen zu aendern",
+      "category": "streaming",
+      "is_dangerous": 0,
+      "requires": "STREAMING.VIEW"
+    },
+    {
+      "key": "STREAMING.SETTINGS.EDIT",
+      "name": "Streaming-Einstellungen bearbeiten",
+      "description": "Berechtigung um Vorgaben der Guild zu setzen: Standardkanal, Abklingzeit, Aufraeumart",
+      "category": "streaming",
+      "is_dangerous": 0,
+      "requires": "STREAMING.VIEW"
+    },
+    {
+      "key": "STREAMING.TEST",
+      "name": "Testankuendigung ausloesen",
+      "description": "Berechtigung um eine Probe-Ankuendigung zu senden. Bewusst ein eigenes Recht: sie erscheint sichtbar im Kanal und erwaehnt gegebenenfalls eine Rolle.",
+      "category": "streaming",
+      "is_dangerous": 1,
+      "requires": "STREAMING.VIEW"
+    }
+  ],
+  "default_groups": {}
+}

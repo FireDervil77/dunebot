@@ -1,0 +1,15 @@
+{
+    "name": "streaming",
+    "displayName": "Streaming",
+    "description": "Live-Benachrichtigungen fuer Twitch, spaeter Kick und YouTube",
+    "version": "0.1.0",
+    "author": "FireBot Team",
+    "license": "none",
+    "type": "commonjs",
+    "peerDependencies": {
+        "discord.js": "^14.19.0",
+        "express": "^5.1.0",
+        "dunebot-core": "*",
+        "dunebot-sdk": "*"
+    }
+}

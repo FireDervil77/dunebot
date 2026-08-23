@@ -1,0 +1,72 @@
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-video',
+  titel: tr('streaming:STREAMERS.TITLE'),
+  beschreibung: tr('streaming:STREAMERS.SUBTITLE')
+}) %>
+
+<%- include('partials/streaming-stufe', {
+  text: 'Stufe 1: Diese Seite zeigt den Bestand. Eintragen und Entfernen kommt mit Stufe 5.'
+}) %>
+
+<div class="row row-cards">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('streaming:STREAMERS.TITLE') %></h3>
+        <div class="card-actions text-secondary">
+          <%= anzahl %> / <%= grenze %>
+        </div>
+      </div>
+
+      <% if (!streamer || streamer.length === 0) { %>
+        <div class="card-body">
+          <p class="text-secondary mb-1"><%= tr('streaming:STREAMERS.EMPTY') %></p>
+          <p class="text-secondary small mb-0"><%= tr('streaming:STREAMERS.EMPTY_HINT') %></p>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th><%= tr('streaming:STREAMERS.CHANNEL') %></th>
+                <th><%= tr('streaming:STREAMERS.PLATFORM') %></th>
+                <th><%= tr('streaming:STREAMERS.STATE') %></th>
+                <th><%= tr('streaming:STREAMERS.TARGETS') %></th>
+                <th><%= tr('streaming:STREAMERS.LAST_HEARD') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% streamer.forEach(s => { %>
+                <tr>
+                  <td>
+                    <span class="fw-bold"><%= s.anzeigename || s.login %></span>
+                    <% if (s.titel) { %>
+                      <div class="text-secondary small"><%= s.titel %></div>
+                    <% } %>
+                  </td>
+                  <td><%= s.plattform %></td>
+                  <td>
+                    <% if (s.abo_zustand === 'widerrufen' || s.abo_zustand === 'fehler') { %>
+                      <span class="badge bg-red-lt">Abo <%= s.abo_zustand %></span>
+                    <% } else if (s.ist_live) { %>
+                      <span class="badge bg-red">● <%= tr('streaming:STREAMERS.LIVE') %></span>
+                    <% } else if (s.ist_live === 0) { %>
+                      <span class="badge bg-secondary-lt"><%= tr('streaming:STREAMERS.OFFLINE') %></span>
+                    <% } else { %>
+                      <span class="text-secondary">—</span>
+                    <% } %>
+                  </td>
+                  <td><%= s.ziele %></td>
+                  <td class="text-secondary">
+                    <%= vorWieLange(s.letzte_meldung_am) || tr('streaming:STATE.NEVER') %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
