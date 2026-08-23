@@ -893,9 +893,22 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
             // keine Pflicht sein bei einem public server, das darf höchstens
             // optional sein." Wo eine Messung sagt, dass etwas scheitern WIRD,
             // sagt die Karte das jetzt — und lässt es zu.
-            pflicht: e.required === true || bedingungTrifftZu(e.required_when, alle, server, uebergang, paketWerte),
-            // Der Hinweis, der nicht sperrt.
-            warnung: bedingungTrifftZu(e.warn_when, alle, server, uebergang, paketWerte)
+            // Beim ANLEGEN gibt es noch keinen gespeicherten Wert — die
+            // Bedingung wird gegen die Vorgaben des Pakets geprüft. Deshalb
+            // hier kein `server`, kein `paketWerte`: Beides existiert an dieser
+            // Stelle nicht, und sie zu übergeben hat die ganze Karte gekostet
+            // (ReferenceError im try/catch der Route, Formular blieb leer).
+            // Der Servername ist immer Pflicht — nicht weil das Paket es sagt,
+            // sondern weil die Anlegeroute ohne ihn nicht kann: Er ist zugleich
+            // der Name der Zeile in `gameservers`.
+            //
+            // Ohne diese Zeile stand er als „optional" im Formular und die Route
+            // antwortete danach „Pflichtfelder fehlen: server_name" — eine
+            // Sperre, die das Formular selbst nicht angekündigt hatte.
+            pflicht: e.key === 'name'
+                || e.required === true
+                || bedingungTrifftZu(e.required_when, alle),
+            warnung: bedingungTrifftZu(e.warn_when, alle)
                 ? (e.warn_text?.de || e.warn_text?.en || null) : null,
             geheim: e.type === 'password',
             wirkung: WIRKUNG[e.takes_effect] || null,
@@ -937,7 +950,7 @@ module.exports.baueWerteSchritt = baueWerteSchritt;
  * und eine Ausdruckssprache zu erfinden, bevor es einen zweiten Fall gibt, wäre
  * genau die Sorte Vorratsbau, die dieses Vorhaben abräumt.
  */
-function bedingungTrifftZu(bedingung, alle, server, uebergang, paketWerte) {
+function bedingungTrifftZu(bedingung, alle, server = null, uebergang = null, paketWerte = null) {
     if (typeof bedingung !== 'string' || !bedingung.includes('=')) return false;
 
     const [schluessel, erwartet] = bedingung.split('=');
@@ -951,8 +964,8 @@ function bedingungTrifftZu(bedingung, alle, server, uebergang, paketWerte) {
         const eggName = uebergang?.zuordnung?.[schluessel];
         let env = {};
         try {
-            env = typeof server.env_variables === 'string'
-                ? JSON.parse(server.env_variables) : (server.env_variables || {});
+            env = typeof server?.env_variables === 'string'
+                ? JSON.parse(server.env_variables) : (server?.env_variables || {});
         } catch { env = {}; }
         wert = eggName ? env[eggName] : undefined;
     }
