@@ -84,39 +84,25 @@
       </div>
     </div>
 
+    <%#
+      Spiele ohne Paket stehen hier nicht mehr einzeln.
+
+      Bis zum 2026-08-23 waren es 22 von 23 Eintraegen — eine Wand aus grauen
+      Zeilen, die alle dasselbe sagten. Der Betreiber: "das alles muss weg. wir
+      bauen alles nur noch in Pakete. die Altlasten sind genau das, was uns
+      immer wieder auf die Fuesse faellt."
+
+      Ganz weglassen waere trotzdem falsch: Wer Palworld sucht und nicht findet,
+      soll erfahren WARUM — sonst haelt er es fuer einen Fehler. Geblieben ist
+      deshalb eine Zeile mit der Zahl und dem Weg dorthin. Streichen heisst
+      umetikettieren, nicht verschweigen.
+    -%>
     <% if (auswahl.ohnePaket.length) { %>
-      <div class="fb-karte">
-        <div class="fb-kopf">
-          <span>Spiele ohne Paket</span>
-          <span class="fb-muted" style="margin-left:auto;font-size:13px;font-weight:400">
-            noch nicht anlegbar
-          </span>
-        </div>
-        <div class="fb-koerper">
-          <%# Sie verschwinden NICHT aus der Auswahl. Heute hat eines von acht
-              Spielen ein Paket; die anderen wegzulassen hiesse, sieben Spiele
-              unanlegbar zu machen, damit eine Liste sauber aussieht. %>
-          <%# Nicht waehlbar, und zwar mit Absicht.
-              Betreiber am 2026-08-19: „nein wir wollen nix altes mehr."
-              Sie ueber den alten Egg-Weg anzulegen hiesse, weiter Server zu
-              erzeugen, die genau das mitbringen, was dieser ganze Umbau
-              abschafft — Fremd-Image, Skript in die Volume-Wurzel, kein
-              fb-init. Sie stehen hier trotzdem, damit sichtbar bleibt, was
-              noch fehlt. %>
-          <% auswahl.ohnePaket.forEach(function (a) { %>
-            <div class="fb-spiel aus">
-              <div style="display:flex;gap:12px;align-items:center">
-                <div style="flex:1 1 auto">
-                  <div style="font-weight:600;font-size:15px"><%= a.name %></div>
-                  <div class="fb-muted" style="font-size:13px">
-                    Für dieses Spiel gibt es noch kein Paket. Sobald eines eingeliefert ist,
-                    lässt es sich hier anlegen.
-                  </div>
-                </div>
-              </div>
-            </div>
-          <% }); %>
-        </div>
+      <div class="fb-muted" style="font-size:13px;margin-top:12px;text-wrap:pretty">
+        <%= auswahl.ohnePaket.length %>
+        <%= auswahl.ohnePaket.length === 1 ? 'weiteres Spiel wartet' : 'weitere Spiele warten' %>
+        noch auf ein Paket und lassen sich deshalb nicht anlegen.
+        <a href="/guild/<%= guildId %>/plugins/gameserver/addons">Alle Spiele ansehen</a>
       </div>
     <% } %>
 

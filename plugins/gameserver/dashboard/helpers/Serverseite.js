@@ -627,9 +627,12 @@ function bauePaketAuswahl(paketZeilen, ohnePaket = []) {
 
     return {
         pakete,
-        // Spiele ohne Paket verschwinden NICHT aus der Auswahl. Heute hat genau
-        // eines von acht ein Paket; sie wegzulassen hiesse, sieben Spiele
-        // unanlegbar zu machen, um eine Liste sauber aussehen zu lassen.
+        // Spiele ohne Paket werden seit dem 2026-08-23 nicht mehr einzeln
+        // aufgezaehlt — die Ansicht zeigt nur noch ihre ANZAHL.
+        //
+        // Sie bleiben hier trotzdem in den Daten: Die Zahl muss echt sein, und
+        // wer sucht, soll erfahren WARUM sein Spiel fehlt. Eine Liste aus 22
+        // grauen Zeilen, die alle dasselbe sagen, ist keine Auskunft.
         ohnePaket: (ohnePaket || []).map(a => ({
             addonId: a.id, slug: a.slug, name: a.name,
             beschreibung: a.short_description || a.description || '',
