@@ -104,18 +104,40 @@ const generalLimiter = rateLimit({
 });
 
 /**
- * Webhook-Limiter (sehr restriktiv)
- * Externe Webhooks sollten sehr limitiert sein
+ * Webhook-Limiter — fuer eingehende Rueckrufe fremder Dienste.
+ *
+ * Bis zum 2026-08-23 stand hier `max: 10` und der Limiter wurde **nirgends
+ * verwendet** (Baustelle 63b). Beides ist jetzt behoben: Er haengt am
+ * dynamischen Webhook-Mount in `app.js` — und 10 waeren dort toedlich gewesen.
+ *
+ * Warum 600: Ein einzelner Twitch-Kanal erzeugt beim Livegehen eine Zustellung,
+ * aber ein Anbieter stellt aus **wenigen** Adressen fuer **alle** beobachteten
+ * Kanaele zu. Alle Zustellungen teilen sich also dasselbe IP-Budget. Wird es
+ * gerissen, antworten wir 429, der Anbieter wertet das als Fehlzustellung — und
+ * nach genug davon widerruft Twitch die Abos **aller** Guilds. Der Zaehler ist
+ * deshalb bewusst weit; die eigentliche Schranke ist die Signaturpruefung, die
+ * jeder Handler durchfuehren muss.
+ *
+ * 600/Minute sind 10 je Sekunde und damit weit ueber jedem realistischen
+ * Schwall, aber immer noch eine Grenze gegen einen Fluter.
  */
 const webhookLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 Minute
-    max: 10, // Max 10 Webhook-Calls pro Minute
+    max: 600,                // 10 je Sekunde
     message: {
         success: false,
         message: 'Webhook rate limit exceeded'
     },
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    handler: (req, res) => {
+        // Muss auffallen: Wenn das greift, verliert ein Anbieter Zustellungen.
+        const { ServiceManager } = require('dunebot-core');
+        ServiceManager.get('Logger').warn(
+            `[Security] Webhook-Ratengrenze gerissen: ${req.ip} -> ${req.originalUrl}`
+        );
+        res.status(429).json({ success: false, message: 'Webhook rate limit exceeded' });
+    }
 });
 
 module.exports = {

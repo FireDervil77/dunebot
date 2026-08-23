@@ -615,7 +615,61 @@ module.exports = class App {
         const blockSensitiveFiles = require('./middlewares/blockSensitiveFiles');
         this.app.use(blockSensitiveFiles);
         
-        // 4. Rate Limiting - Allgemeines Limit
+        // 4. Eingehende Webhooks von Plugins (und kuenftig vom Kern)
+        //
+        // Steht bewusst GENAU hier:
+        //
+        //   - **nach** helmet, Exploit-Blocker und blockSensitiveFiles: Der
+        //     Exploit-Blocker prueft nur `req.path`, kostet also nichts und
+        //     bleibt wirksam.
+        //   - **vor** `generalLimiter`: Der laesst in Produktion 60 Anfragen
+        //     je Minute und IP zu. Twitch stellt aus wenigen Adressen zu; ein
+        //     grosser Streamer reicht, um das zu reissen. Die Antwort waere
+        //     429, Twitch wertet das als Fehlzustellung — und nach genug davon
+        //     widerruft es die Abos ALLER Guilds. Deshalb ein eigener,
+        //     grosszuegiger Zaehler statt des allgemeinen.
+        //   - **vor** `express.json()`: Die Signaturpruefung rechnet auf dem
+        //     unveraenderten Koerper. Nach dem Parser ist er weg.
+        //
+        // Der Mount authentifiziert NICHTS. Er macht einen Pfad erreichbar und
+        // reicht den rohen Koerper durch; die Signatur prueft der eingetragene
+        // Handler. Wer das verwechselt, baut ein offenes Tor.
+        const { WebhookRegistry } = require('dunebot-sdk');
+        const { webhookLimiter } = require('./middlewares/security/rate-limiter.middleware');
+
+        this.app.use(
+            '/api/:name/webhook',
+            webhookLimiter,
+            express.raw({ type: '*/*', limit: '1mb' }),
+            (req, res, next) => {
+                const Logger = ServiceManager.get('Logger');
+                const name = String(req.params.name || '');
+
+                // Kein Pfad-Durchgriff ueber den Parameter
+                if (!WebhookRegistry.NAME_MUSTER.test(name)) return res.status(404).end();
+
+                const handler = WebhookRegistry.get(name);
+                if (!handler) {
+                    // Kein Fehler, sondern der Normalfall bei Scannern.
+                    Logger.debug(`[Webhook] Kein Handler fuer "${name}" eingetragen`);
+                    return res.status(404).end();
+                }
+
+                req.rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+                try {
+                    req.body = req.rawBody.length ? JSON.parse(req.rawBody.toString('utf8')) : null;
+                } catch {
+                    // Nicht hier abweisen: Manche Anbieter schicken kein JSON,
+                    // und die Signaturpruefung des Handlers hat ohnehin das
+                    // letzte Wort. Sie bekommt den rohen Koerper.
+                    req.body = null;
+                }
+
+                return handler(req, res, next);
+            }
+        );
+
+        // 5. Rate Limiting - Allgemeines Limit
         const { generalLimiter } = require('./middlewares/security/rate-limiter.middleware');
         this.app.use(generalLimiter);
         

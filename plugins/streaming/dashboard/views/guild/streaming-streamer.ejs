@@ -5,11 +5,84 @@
   beschreibung: tr('streaming:STREAMERS.SUBTITLE')
 }) %>
 
-<%- include('partials/streaming-stufe', {
-  text: 'Stufe 1: Diese Seite zeigt den Bestand. Eintragen und Entfernen kommt mit Stufe 5.'
-}) %>
+<%
+  const meldungen = {
+    neu:      'Kanal eingetragen. Sobald er live geht, kommt die Ankuendigung.',
+    geteilt:  'Kanal eingetragen. Er wird bereits ueberwacht — dein Ziel kam dazu, ein zweites Abonnement war nicht noetig.',
+    entfernt: 'Kanal entfernt.'
+  };
+  const fehlerTexte = {
+    kanal_fehlt: 'Bitte einen Kanalnamen eingeben.',
+    ziel_fehlt:  'Bitte einen Kanal fuer die Ankuendigung waehlen.',
+    unbekannt:   'Diesen Kanal gibt es bei Twitch nicht.',
+    grenze:      'Die Obergrenze dieses Servers ist erreicht.',
+    abo:         'Eingetragen, aber das Abonnement bei Twitch wurde abgelehnt — Einzelheiten unter Zustand.',
+    technisch:   'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+  };
+%>
+
+<% if (meldung && meldungen[meldung]) { %>
+  <div class="alert alert-success"><%= meldungen[meldung] %></div>
+<% } %>
+<% if (fehler && fehlerTexte[fehler]) { %>
+  <div class="alert alert-danger"><%= fehlerTexte[fehler] %></div>
+<% } %>
 
 <div class="row row-cards">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('streaming:STREAMERS.ADD') %></h3>
+      </div>
+      <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/streamer">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label for="kanal" class="form-label">Twitch-Kanal</label>
+              <input type="text" class="form-control" id="kanal" name="kanal"
+                     placeholder="z. B. ninja" autocomplete="off" required
+                     <%= anzahl >= grenze ? 'disabled' : '' %>>
+              <div class="form-hint">Name oder Adresse. Der Streamer erfaehrt davon nichts.</div>
+            </div>
+            <div class="col-md-4">
+              <label for="channel_id" class="form-label"><%= tr('streaming:TARGETS.CHANNEL') %></label>
+              <select class="form-select" id="channel_id" name="channel_id" required
+                      <%= anzahl >= grenze ? 'disabled' : '' %>>
+                <option value="">—</option>
+                <% (textkanaele || []).forEach(k => { %>
+                  <option value="<%= k.id %>"># <%= k.name %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label for="rolle_id" class="form-label"><%= tr('streaming:TARGETS.ROLE') %></label>
+              <select class="form-select" id="rolle_id" name="rolle_id"
+                      <%= anzahl >= grenze ? 'disabled' : '' %>>
+                <option value="">— keine —</option>
+                <% (rollen || []).forEach(r => { %>
+                  <option value="<%= r.id %>">@<%= r.name %></option>
+                <% }); %>
+              </select>
+            </div>
+          </div>
+          <% if (anzahl >= grenze) { %>
+            <div class="text-secondary small mt-3">
+              Obergrenze erreicht (<%= grenze %>). Gezaehlt werden eigene Kanaele —
+              ein Kanal, den andere Server schon beobachten, zaehlt trotzdem einmal
+              fuer diesen Server.
+            </div>
+          <% } %>
+        </div>
+        <div class="card-footer text-end">
+          <button type="submit" class="btn btn-primary" <%= anzahl >= grenze ? 'disabled' : '' %>>
+            <%= tr('streaming:STREAMERS.ADD') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="col-12">
     <div class="card">
       <div class="card-header">
@@ -34,6 +107,7 @@
                 <th><%= tr('streaming:STREAMERS.STATE') %></th>
                 <th><%= tr('streaming:STREAMERS.TARGETS') %></th>
                 <th><%= tr('streaming:STREAMERS.LAST_HEARD') %></th>
+                <th class="w-1"></th>
               </tr>
             </thead>
             <tbody>
@@ -60,6 +134,16 @@
                   <td><%= s.ziele %></td>
                   <td class="text-secondary">
                     <%= vorWieLange(s.letzte_meldung_am) || tr('streaming:STATE.NEVER') %>
+                  </td>
+                  <td>
+                    <form method="POST"
+                          action="/guild/<%= guildId %>/plugins/streaming/streamer/<%= s.id %>/entfernen"
+                          onsubmit="return confirm('<%= (s.anzeigename || s.login) %> nicht mehr beobachten?');">
+                      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                      <button type="submit" class="btn btn-sm btn-ghost-danger">
+                        <%= tr('streaming:COMMON.DELETE') %>
+                      </button>
+                    </form>
                   </td>
                 </tr>
               <% }); %>

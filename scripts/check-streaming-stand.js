@@ -88,6 +88,13 @@ function pruefe(gut, text, zusatz = '') {
             if (!erwartet.includes(key)) pruefe(false, `${key} steht im Katalog, aber nicht in der Datei`);
         }
 
+        // --- Voraussetzungen des Eingangs ---
+        console.log('\nEingang');
+        const basis = (process.env.DASHBOARD_BASE_URL || '').replace(/\/+$/, '');
+        pruefe(basis.startsWith('https://'), 'DASHBOARD_BASE_URL ist HTTPS',
+            basis || 'nicht gesetzt');
+        if (basis) console.log(`      Rueckrufadresse: ${basis}/api/streaming/webhook`);
+
         // --- Aktivierung und Navigation ---
         console.log('\nAktivierung');
         const [g] = await c.query(

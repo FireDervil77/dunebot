@@ -17,7 +17,7 @@
  * @author FireBot Team
  */
 
-const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper, WebhookRegistry } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class StreamingDashboardPlugin extends DashboardPlugin {
@@ -49,10 +49,36 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         Logger.info('Aktiviere [Streaming] Dashboard-Plugin...');
 
         this._setupRoutes();
+        this._eingangAnmelden();
         await this._zugangsdatenPruefen();
 
         Logger.success('[Streaming] Dashboard-Plugin aktiviert');
         return true;
+    }
+
+    /**
+     * Den Eingang anmelden.
+     *
+     * Der Kern haengt einen Mount `/api/:name/webhook` ein und reicht an den
+     * hier eingetragenen Handler durch - mit dem **unveraenderten** Koerper als
+     * `req.rawBody`, weil die Signaturpruefung genau darauf rechnet.
+     *
+     * Bewusst eine Handlung und kein Feld auf der Plugin-Klasse: Ein Feld, das
+     * geprueft und nirgends gemountet wird, ist genau die Falle, in der
+     * `adminRouter` steckt.
+     *
+     * @private
+     */
+    _eingangAnmelden() {
+        const Logger = ServiceManager.get('Logger');
+        try {
+            WebhookRegistry.register('streaming', require('./routes/webhook.router'));
+            Logger.info('[Streaming] Eingang angemeldet: /api/streaming/webhook');
+        } catch (error) {
+            // Ohne Eingang kommt nie eine Meldung an. Das darf nicht still
+            // bleiben - aber es darf auch nicht das Dashboard mitreissen.
+            Logger.error('[Streaming] Eingang konnte NICHT angemeldet werden:', error);
+        }
     }
 
     /**
@@ -101,7 +127,8 @@ class StreamingDashboardPlugin extends DashboardPlugin {
      * @returns {Promise<boolean>} true bei Erfolg
      */
     async onDisable() {
-        ServiceManager.get('Logger').info('[Streaming] Dashboard-Plugin deaktiviert');
+        WebhookRegistry.unregister('streaming');
+        ServiceManager.get('Logger').info('[Streaming] Dashboard-Plugin deaktiviert, Eingang abgemeldet');
         return true;
     }
 

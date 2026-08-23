@@ -18,6 +18,7 @@ const MessageBuilder = require("./lib/ipm/MessageBuilder");
 const MessageValidator = require("./lib/ipm/MessageValidator");
 const permissionManager = require("./lib/PermissionManager");
 const WidgetManager = require("./lib/WidgetManager");
+const WebhookRegistry = require("./lib/WebhookRegistry");
 
 module.exports = {
     BotPlugin,
@@ -35,6 +36,7 @@ module.exports = {
     PluginHooks, // Auch unter dem alten Namen exportieren für Abwärtskompatibilität
     permissionManager,
     WidgetManager,
+    WebhookRegistry,
     // IPM (Inter-Process Messaging) - Event-Bus Architecture
     MessageTypes,
     MessageBuilder,
