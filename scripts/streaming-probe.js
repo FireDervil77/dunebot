@@ -22,6 +22,14 @@
  * `--frisch` setzt vorher den Zustand des Streamers zurueck (nicht live, keine
  * letzte Meldung). Ohne das greift beim zweiten Versuch die Abklingzeit - im
  * Betrieb genau richtig, beim Proben hinderlich.
+ *
+ * `--kette` spielt den ganzen Ablauf durch: live gehen, Titel wechseln,
+ * beenden. Das ist noetig, weil der Anreicherungslauf alle 30 Sekunden bei der
+ * Plattform nachfragt - und dort ist der Kanal natuerlich NICHT live. Er setzt
+ * den Zustand dann zurueck (richtig so, das ist die Selbstheilung gegen
+ * verlorene offline-Meldungen), womit ein einzeln geschicktes `update` oder
+ * `offline` ins Leere laeuft. Die Kette haelt den Zustand zwischen den
+ * Schritten aufrecht.
  */
 'use strict';
 
@@ -33,6 +41,7 @@ const mysql = require('mysql2/promise');
 const [, , kanalArg, artArg = 'online', ...rest] = process.argv;
 const ernst = rest.includes('--ja') || artArg === '--ja';
 const frisch = rest.includes('--frisch') || artArg === '--frisch';
+const kette = rest.includes('--kette') || artArg === '--kette';
 const art = ['online', 'offline', 'update'].includes(artArg) ? artArg : 'online';
 
 const EREIGNIS = { online: 'stream.online', offline: 'stream.offline', update: 'channel.update' }[art];
@@ -41,6 +50,119 @@ const ADRESSE = (process.env.DASHBOARD_BASE_URL || 'http://127.0.0.1:3000').repl
 if (!kanalArg) {
     console.log('\n  node scripts/streaming-probe.js <kanalname> [online|offline|update] [--ja]\n');
     process.exit(1);
+}
+
+/**
+ * Eine einzelne Zustellung schicken.
+ *
+ * @param {Object} c Datenbankverbindung
+ * @param {Object} s Streamer-Zeile
+ * @param {string} ereignis Ereignisname
+ * @param {string} sendungId Kennung der Sendung
+ * @returns {Promise<{status: number, msgId: string, ms: number}>} Ergebnis
+ */
+async function schicken(c, s, ereignis, sendungId) {
+    const [abo] = await c.query(
+        'SELECT * FROM streaming_subscriptions WHERE streamer_id = ? AND ereignis = ? LIMIT 1',
+        [s.id, ereignis]);
+    if (!abo.length) throw new Error(`Kein Abo "${ereignis}"`);
+
+    const koerper = {
+        subscription: {
+            id: abo[0].anbieter_abo_id, type: ereignis, version: '1', status: 'enabled',
+            condition: { broadcaster_user_id: String(s.kanal_id) }
+        },
+        event: ereignis === 'channel.update'
+            ? {
+                broadcaster_user_id: String(s.kanal_id), broadcaster_user_login: s.login,
+                broadcaster_user_name: s.anzeigename, title: `Titel gewechselt um ${new Date().toLocaleTimeString('de-DE')}`,
+                category_name: 'Software and Game Development'
+            }
+            : {
+                id: sendungId, broadcaster_user_id: String(s.kanal_id),
+                broadcaster_user_login: s.login, broadcaster_user_name: s.anzeigename,
+                type: 'live', started_at: new Date(Date.now() - 45 * 60000).toISOString()
+            }
+    };
+
+    const roh = Buffer.from(JSON.stringify(koerper), 'utf8');
+    const msgId = `probe-${crypto.randomUUID()}`;
+    const zeit = new Date().toISOString();
+    const signatur = 'sha256=' + crypto.createHmac('sha256', abo[0].geheimnis)
+        .update(Buffer.concat([Buffer.from(msgId), Buffer.from(zeit), roh])).digest('hex');
+
+    const beginn = Date.now();
+    const antwort = await fetch(`${ADRESSE}/api/streaming/webhook`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Twitch-Eventsub-Message-Id': msgId,
+            'Twitch-Eventsub-Message-Timestamp': zeit,
+            'Twitch-Eventsub-Message-Signature': signatur,
+            'Twitch-Eventsub-Message-Type': 'notification',
+            'Twitch-Eventsub-Subscription-Type': ereignis,
+            'Twitch-Eventsub-Subscription-Version': '1'
+        },
+        body: roh
+    });
+
+    return { status: antwort.status, msgId, ms: Date.now() - beginn };
+}
+
+/**
+ * Den ganzen Ablauf durchspielen.
+ *
+ * @param {Object} c Datenbankverbindung
+ * @param {Object} s Streamer-Zeile
+ * @returns {Promise<void>}
+ */
+async function ketteFahren(c, s) {
+    const sendungId = `probe-${Date.now()}`;
+
+    /** Zeigt, was in der Datenbank steht. */
+    const stand = async (was) => {
+        const [n] = await c.query(`
+            SELECT m.message_id, m.zustand FROM streaming_messages m
+              JOIN streaming_targets t ON t.id = m.target_id
+             WHERE t.streamer_id = ? ORDER BY m.id DESC LIMIT 1`, [s.id]);
+        const [z] = await c.query('SELECT ist_live, titel FROM streaming_state WHERE streamer_id = ?', [s.id]);
+        console.log(`     ${was}: Nachricht ${n[0]?.zustand || '—'}${n[0]?.message_id ? ` (${n[0].message_id})` : ''}` +
+            ` · live=${z[0]?.ist_live ?? '—'} · Titel "${z[0]?.titel || '—'}"`);
+    };
+
+    console.log('\n  1) live gehen');
+    await c.query("UPDATE streaming_state SET ist_live = 0, sendung_id = NULL, zuletzt_gemeldet_am = NULL, beendet_am = NULL WHERE streamer_id = ?", [s.id]);
+    let r = await schicken(c, s, 'stream.online', sendungId);
+    console.log(`     Antwort ${r.status} nach ${r.ms} ms`);
+    await new Promise(x => setTimeout(x, 9000));
+    await stand('danach');
+
+    console.log('\n  2) Titel wechseln (darf KEINE neue Nachricht erzeugen)');
+    // Die Anreicherung koennte inzwischen zurueckgesetzt haben - der Kanal ist
+    // bei Twitch ja wirklich nicht live. Fuer die Probe halten wir ihn live.
+    await c.query('UPDATE streaming_state SET ist_live = 1, angereichert_am = NOW() WHERE streamer_id = ?', [s.id]);
+    r = await schicken(c, s, 'channel.update', sendungId);
+    console.log(`     Antwort ${r.status} nach ${r.ms} ms`);
+    await new Promise(x => setTimeout(x, 9000));
+    await stand('danach');
+
+    console.log('\n  3) beenden (Nachricht wird zur Rueckschau)');
+    await c.query('UPDATE streaming_state SET ist_live = 1 WHERE streamer_id = ?', [s.id]);
+    r = await schicken(c, s, 'stream.offline', sendungId);
+    console.log(`     Antwort ${r.status} nach ${r.ms} ms`);
+    console.log('     (Karenz: 2 Minuten, dann wird aufgeraeumt)');
+    await new Promise(x => setTimeout(x, 9000));
+    await stand('danach');
+
+    const [auftraege] = await c.query(`
+        SELECT aktion, zustand, faellig_ab, fehlertext FROM streaming_outbox
+         WHERE target_id IN (SELECT id FROM streaming_targets WHERE streamer_id = ?)
+         ORDER BY id DESC LIMIT 4`, [s.id]);
+    console.log('\n  Auftraege:');
+    auftraege.forEach(a => console.log(`     ${a.aktion} = ${a.zustand}` +
+        (a.zustand === 'offen' ? `  (faellig ${new Date(a.faellig_ab).toLocaleTimeString('de-DE')})` : '') +
+        (a.fehlertext ? `  — ${a.fehlertext}` : '')));
+    console.log('');
 }
 
 (async () => {
@@ -81,6 +203,11 @@ if (!kanalArg) {
         if (!ernst) {
             console.log('\n  Das war die Vorschau. Mit --ja wird es wirklich geschickt —');
             console.log('  und dann entsteht eine ECHTE Nachricht in deinem Discord.\n');
+            process.exit(0);
+        }
+
+        if (kette) {
+            await ketteFahren(c, s);
             process.exit(0);
         }
 
