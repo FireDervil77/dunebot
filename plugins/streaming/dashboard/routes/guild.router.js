@@ -239,20 +239,22 @@ router.post('/ziele/live-rolle', requirePermission('STREAMING.SETTINGS.EDIT'), a
  */
 async function altRolleAbraeumen(guildId, rolleId) {
     const db = ServiceManager.get('dbService');
-    const ziele = await db.query(
-        'SELECT id, mitglied_id FROM streaming_targets WHERE guild_id = ? AND mitglied_id IS NOT NULL', [guildId]);
 
-    const gesehen = new Set();
+    // **Nur, wem WIR sie gegeben haben.** Vorher stand hier "alle Mitglieder,
+    // die einem Ziel zugeordnet sind" — und das nahm die Rolle auch denen weg,
+    // die sie aus einem ganz anderen Grund tragen. Ist die eingetragene Rolle
+    // zugleich ein Zugangsrecht, ist das ein Zugangsverlust (2026-08-25).
+    const vergeben = await db.query(
+        'SELECT mitglied_id FROM streaming_role_grants WHERE guild_id = ? AND rolle_id = ?',
+        [guildId, rolleId]);
+
     let anzahl = 0;
 
-    for (const ziel of ziele) {
-        if (gesehen.has(ziel.mitglied_id)) continue;
-        gesehen.add(ziel.mitglied_id);
-
+    for (const v of vergeben) {
         await db.query(`
-            INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast)
-            VALUES (?, ?, 'rolle_nehmen', ?)
-        `, [ziel.id, guildId, JSON.stringify({ mitglied_id: ziel.mitglied_id, rolle_id: rolleId })]);
+            INSERT INTO streaming_outbox (guild_id, aktion, nutzlast)
+            VALUES (?, 'rolle_nehmen', ?)
+        `, [guildId, JSON.stringify({ mitglied_id: v.mitglied_id, rolle_id: rolleId })]);
         anzahl++;
     }
 

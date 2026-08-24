@@ -37,21 +37,52 @@ function log() {
 /**
  * **Die Entscheidung, getrennt von der Ausfuehrung.**
  *
+ * Drei Mengen, nicht zwei — und die dritte ist die wichtigste:
+ *
+ *   traeger   wer die Rolle jetzt hat        (von Discord)
+ *   sollen    wer sie haben sollte           (wer gerade sendet)
+ *   vergeben  wem WIR sie gegeben haben      (unser Gedaechtnis)
+ *
+ * Genommen wird nur, wer sie von uns hat und nicht mehr sendet. Ohne die
+ * dritte Menge nimmt der Abgleich sie **jedem** weg, der sie traegt — und das
+ * ist am 2026-08-25 passiert: Die eingetragene Rolle war zugleich das
+ * Zugangsrecht zum privaten Streaming-Bereich, vier Mitglieder verloren
+ * dadurch ihren Zugang.
+ *
+ * **Ein Bot nimmt nur zurueck, was er selbst gegeben hat.**
+ *
  * @param {Array<string>} traeger Wer die Rolle jetzt hat
  * @param {Array<string>} sollen Wer sie haben sollte
+ * @param {Array<string>} vergeben Wem das Plugin sie gegeben hat
  * @returns {{geben: Array<string>, nehmen: Array<string>}} was zu tun ist
  */
-function vergleichen(traeger, sollen) {
+function vergleichen(traeger, sollen, vergeben) {
     // Ueber Mengen, nicht ueber Schleifen: Discord liefert Zeichenketten,
     // unsere Spalte auch - aber ein `Number` an einer Stelle wuerde den
     // Vergleich lautlos immer falsch machen. Deshalb ueberall `String`.
-    const hat  = new Set((traeger || []).map(String));
-    const soll = new Set((sollen  || []).map(String));
+    const hat   = new Set((traeger  || []).map(String));
+    const soll  = new Set((sollen   || []).map(String));
+    const unser = new Set((vergeben || []).map(String));
 
     return {
         geben:  [...soll].filter(id => !hat.has(id)),
-        nehmen: [...hat].filter(id => !soll.has(id))
+        // Traegt sie, sendet nicht mehr, UND hat sie von uns.
+        nehmen: [...hat].filter(id => !soll.has(id) && unser.has(id))
     };
+}
+
+/**
+ * Wem hat das Plugin diese Rolle gegeben?
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {string} rolleId Rolle
+ * @returns {Promise<Array<string>>} Mitglieder-IDs
+ */
+async function vergebene(guildId, rolleId) {
+    const zeilen = await db().query(
+        'SELECT mitglied_id FROM streaming_role_grants WHERE guild_id = ? AND rolle_id = ?',
+        [guildId, rolleId]);
+    return zeilen.map(z => String(z.mitglied_id));
 }
 
 /**
@@ -92,4 +123,4 @@ async function sollTraeger(guildId) {
     return zeilen.map(z => String(z.mitglied_id));
 }
 
-module.exports = { vergleichen, guildsMitRolle, sollTraeger };
+module.exports = { vergleichen, guildsMitRolle, sollTraeger, vergebene };

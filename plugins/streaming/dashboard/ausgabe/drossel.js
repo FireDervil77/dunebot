@@ -131,6 +131,28 @@ async function rolleSetzen(auftrag) {
 
     if (!antwort.ok) return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
 
+    // **Buch fuehren, sonst nimmt der Abgleich spaeter Fremdes weg.**
+    // Ohne diese beiden Zeilen weiss das Plugin nicht, welche Rolle es selbst
+    // vergeben hat — und der taegliche Lauf raeumt dann bei jedem ab, der sie
+    // aus einem anderen Grund traegt. Genau das ist am 2026-08-25 passiert.
+    try {
+        if (richtung === 'geben') {
+            await db().query(`
+                INSERT INTO streaming_role_grants (guild_id, mitglied_id, rolle_id)
+                VALUES (?, ?, ?)
+                ON DUPLICATE KEY UPDATE vergeben_am = vergeben_am
+            `, [auftrag.guild_id, mitgliedId, rolleId]);
+        } else {
+            await db().query(
+                'DELETE FROM streaming_role_grants WHERE guild_id = ? AND mitglied_id = ? AND rolle_id = ?',
+                [auftrag.guild_id, mitgliedId, rolleId]);
+        }
+    } catch (err) {
+        // Die Rolle ist gesetzt - das Buch ist zweitrangig. Aber es gehoert
+        // gemeldet, denn ohne Eintrag holt der Abgleich sie nie zurueck.
+        log().warn(`[Streaming] Rollenvergabe nicht notiert (${richtung}): ${err.message}`);
+    }
+
     return {
         ok: true, fehler: null, endgueltig: false,
         hinweis: antwort.daten?.hinweis || (antwort.daten?.geaendert ? undefined : 'unveraendert')

@@ -58,7 +58,10 @@ async function lauf({ trocken = false } = {}) {
             continue;
         }
 
-        const entscheidung = urteil.vergleichen(nutzlast.traeger, await urteil.sollTraeger(g.guild_id));
+        const entscheidung = urteil.vergleichen(
+            nutzlast.traeger,
+            await urteil.sollTraeger(g.guild_id),
+            await urteil.vergebene(g.guild_id, g.rolle_id));
         bericht.geben += entscheidung.geben.length;
         bericht.nehmen += entscheidung.nehmen.length;
 
