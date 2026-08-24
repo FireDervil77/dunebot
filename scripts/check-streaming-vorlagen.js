@@ -118,6 +118,20 @@ pruefe('ohne Rolle kein Rest', nachricht.live({
     streamer, zustand, ziel: { vorlage: '{rolle} {streamer} ist live!' } }).content,
     'Beispiel ist live!');
 
+// Der On-Air-Kanal darf NICHT als Knopf in der oeffentlichen Ankuendigung
+// stehen: Er ist privat und gehoert der Stream-Crew. Ein Knopf dorthin fuehrt
+// fuer fast jeden ins Leere und laedt zum Mitreden ein, wo niemand mitreden
+// soll. Am 2026-08-24 vom Betreiber richtiggestellt - hier festgehalten, damit
+// es nicht unbemerkt zurueckkommt.
+const mitOnair = nachricht.live({
+    streamer, zustand,
+    ziel: { vorlage: 'live', guild_id: '111', onair_channel: '222' }
+});
+const knoepfe = mitOnair.components[0].components;
+pruefe('genau ein Knopf, auch mit On-Air-Kanal', knoepfe.length, 1);
+pruefe('kein Knopf zeigt auf einen Discord-Kanal',
+    knoepfe.some(k => String(k.url).includes('discord.com/channels')), false);
+
 // Die Vorgaben selbst muessen die eigenen Regeln bestehen
 pruefe('Vorgabe live ist gueltig',       pruefeVorlage(VORGABE_LIVE),       null);
 pruefe('Vorgabe rueckschau ist gueltig', pruefeVorlage(VORGABE_RUECKSCHAU), null);

@@ -31,7 +31,7 @@
     "CHANNEL": "Announcement channel",
     "ROLE": "Mentioned role",
     "ONAIR": "On-air voice channel",
-    "ONAIR_HELP": "The streamer's voice channel. The announcement links to it - it is not monitored.",
+    "ONAIR_HELP": "Private voice channel of the stream crew. Stored, but not yet in effect: needed for the live role (stage 9). Deliberately NOT shown in the announcement.",
     "FILTER_GAME": "Only for this game",
     "FILTER_TITLE": "Only if the title contains this word",
     "CLEANUP": "After the stream",

@@ -31,7 +31,7 @@
     "CHANNEL": "Ankuendigungskanal",
     "ROLE": "Erwaehnte Rolle",
     "ONAIR": "On-Air-Sprachkanal",
-    "ONAIR_HELP": "Der Sprachkanal des Streamers. Die Ankuendigung verweist darauf - ueberwacht wird er nicht.",
+    "ONAIR_HELP": "Privater Sprachkanal der Stream-Crew. Wird gespeichert, wirkt aber noch nicht: Er wird fuer die Live-Rolle gebraucht (Stufe 9). In der Ankuendigung erscheint er bewusst NICHT.",
     "FILTER_GAME": "Nur bei diesem Spiel",
     "FILTER_TITLE": "Nur wenn der Titel dieses Wort enthaelt",
     "CLEANUP": "Nach dem Stream",

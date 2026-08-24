@@ -117,7 +117,10 @@
               </div>
 
               <div class="col-md-4">
-                <label class="form-label" for="onair_<%= z.id %>"><%= tr('streaming:TARGETS.ONAIR') %></label>
+                <label class="form-label" for="onair_<%= z.id %>">
+                  <%= tr('streaming:TARGETS.ONAIR') %>
+                  <span class="badge bg-secondary-lt ms-1">wirkt noch nicht</span>
+                </label>
                 <select class="form-select" id="onair_<%= z.id %>" name="onair_channel" <%= darfAendern ? '' : 'disabled' %>>
                   <option value="">— keiner —</option>
                   <% if (z.onair_channel && !oName) { %>

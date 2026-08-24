@@ -127,15 +127,20 @@ function live({ streamer, zustand = {}, ziel = {} }) {
         timestamp: zustand.begonnen_am ? new Date(zustand.begonnen_am).toISOString() : undefined
     };
 
+    // **Nur ein Knopf, und zwar bewusst.**
+    //
+    // Hier stand bis zum 2026-08-24 ein zweiter Knopf "Beitreten" auf den
+    // On-Air-Sprachkanal (K-1). Das war falsch verstanden: Der On-Air-Kanal ist
+    // in einem echten Streaming-Discord **privat** - er gehoert der Rolle, die
+    // nur wer mitstreamt bekommt. Ein Knopf dorthin steht in einer
+    // oeffentlichen Ankuendigung und fuehrt fuer fast jeden ins Leere; er laedt
+    // zum Mitreden ein, wo niemand mitreden soll.
+    //
+    // `ziel.onair_channel` wird weiter gespeichert - es wird fuer die
+    // Live-Rolle gebraucht (Stufe 9). Es wirkt nur nicht mehr in der
+    // Ankuendigung. `scripts/check-streaming-vorlagen.js` haelt das fest, damit
+    // der Knopf nicht unbemerkt zurueckkommt.
     const knoepfe = [{ type: 2, style: 5, label: 'Zum Stream', url }];
-    if (ziel.onair_channel) {
-        // Der Sprachkanal, den der Streamer selbst angelegt hat (K-1). Der Bot
-        // ueberwacht ihn nicht, er verweist nur darauf.
-        knoepfe.push({
-            type: 2, style: 5, label: 'Beitreten',
-            url: `https://discord.com/channels/${ziel.guild_id}/${ziel.onair_channel}`
-        });
-    }
 
     return { content, embeds: [embed], components: [{ type: 1, components: knoepfe }] };
 }
