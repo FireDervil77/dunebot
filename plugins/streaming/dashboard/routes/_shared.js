@@ -196,7 +196,16 @@ async function getMitglieder(guildId) {
         const alle = antwort?.members || [];
         return alle
             .filter(m => !m.user?.bot)
-            .map(m => ({ id: m.user.id, name: m.displayName || m.user.username, tag: m.user.tag }));
+            // Die Rollen kommen mit und werden behalten: Damit laesst sich ohne
+            // eine zweite Abfrage feststellen, wer eine bestimmte Rolle traegt -
+            // und darauf beruht die Warnung vor einer Live-Rolle, die schon
+            // etwas anderes bedeutet (Vorfall 2026-08-25).
+            .map(m => ({
+                id: m.user.id,
+                name: m.displayName || m.user.username,
+                tag: m.user.tag,
+                rollen: (m.roles || []).map(r => String(r.id))
+            }));
     } catch (err) {
         ServiceManager.get('Logger').warn(`[Streaming] Mitglieder nicht ladbar: ${err.message}`);
         return [];

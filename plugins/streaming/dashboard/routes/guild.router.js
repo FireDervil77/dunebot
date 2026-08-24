@@ -35,6 +35,37 @@ const modelle = require('../../shared/models');
 const abos = require('../kern/abos');
 const { PLATZHALTER, pruefeVorlage, VORGABE_LIVE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
 
+/**
+ * Auswaehlbare Zeitzonen.
+ *
+ * Bewusst eine kurze Liste statt eines Freitextfelds: Ein vertippter
+ * Zonenname faellt sonst nirgends auf - `Intl` wirft, wir weichen auf die
+ * Serverzeit aus, und die Ruhezeit gilt still zur falschen Stunde.
+ */
+const ZEITZONEN = [
+    'Europe/Berlin', 'Europe/Vienna', 'Europe/Zurich', 'Europe/London',
+    'Europe/Lisbon', 'Europe/Helsinki', 'Europe/Moscow', 'UTC',
+    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+    'America/Sao_Paulo', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Singapore',
+    'Australia/Sydney', 'Pacific/Auckland'
+];
+
+/**
+ * Eine Uhrzeit aus dem Formular pruefen.
+ *
+ * Leer heisst "keine Ruhezeit", nicht "Mitternacht". Ein `<input type="time">`
+ * liefert "HH:MM"; alles andere wird abgelehnt, statt als 00:00 zu gelten.
+ *
+ * @param {*} wert Eingabe
+ * @returns {string|null} "HH:MM:00" oder null
+ */
+function uhrzeit(wert) {
+    const t = String(wert || '').trim();
+    if (!t) return null;
+    const m = t.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+    return m ? `${m[1]}:${m[2]}:00` : null;
+}
+
 // =====================================================
 // Einstieg
 // =====================================================
@@ -173,9 +204,23 @@ router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
             getMitglieder(guildId),
             modelle.liveRolle(guildId)
         ]);
+        const zeitzone = await modelle.zeitzone(guildId);
+
+        // **Trägt die gewählte Rolle Mitglieder, die nicht von uns kommen?**
+        // Dann bedeutet sie auf diesem Server noch etwas anderes - ein
+        // Zugangsrecht zum Beispiel. Das gehoert gesagt, BEVOR ein Abgleich
+        // sie einsammelt (Vorfall 2026-08-25, Baustelle 69).
+        let fremdeTraeger = 0;
+        if (liveRolleId) {
+            const unsere = new Set(await modelle.vergebeneRolle(guildId, liveRolleId));
+            fremdeTraeger = (mitglieder || [])
+                .filter(m => (m.rollen || []).includes(String(liveRolleId)) && !unsere.has(String(m.id)))
+                .length;
+        }
 
         await renderView(res, 'guild/streaming-ziele', {
             tr, guildId, ziele, zielkanaele, sprachkanaele, rollen, mitglieder, liveRolleId,
+            fremdeTraeger, zeitzone, zonen: ZEITZONEN,
             meldung: req.query.ok || null,
             fehler: req.query.fehler || null
         });
@@ -204,6 +249,13 @@ router.post('/ziele/live-rolle', requirePermission('STREAMING.SETTINGS.EDIT'), a
         if (rolleId && !/^\d{5,32}$/.test(rolleId)) {
             return res.redirect(`${zurueck}?fehler=rolle`);
         }
+
+        // Die Zeitzone haengt am selben Formular: Beides sind Vorgaben der
+        // Guild, und zwei Knoepfe nebeneinander waeren nur Gelegenheit, einen
+        // davon zu vergessen.
+        const zone = String(req.body.zeitzone || '').trim();
+        if (zone && !ZEITZONEN.includes(zone)) return res.redirect(`${zurueck}?fehler=zone`);
+        if (zone) await modelle.zeitzoneSetzen(guildId, zone);
 
         const vorher = await modelle.liveRolle(guildId);
         await modelle.liveRolleSetzen(guildId, rolleId);
@@ -290,6 +342,10 @@ router.post('/ziele/:id', requirePermission('STREAMING.TARGETS.MANAGE'), async (
             onair_channel:    String(req.body.onair_channel || '').trim() || null,
             filter_spiel:     String(req.body.filter_spiel || '').trim() || null,
             filter_titel:     String(req.body.filter_titel || '').trim() || null,
+            filter_spiel_aus: String(req.body.filter_spiel_aus || '').trim() || null,
+            filter_titel_aus: String(req.body.filter_titel_aus || '').trim() || null,
+            ruhe_von:         uhrzeit(req.body.ruhe_von),
+            ruhe_bis:         uhrzeit(req.body.ruhe_bis),
             aufraeumen,
             eigenes_bild:     bild || null,
             veroeffentlichen: req.body.veroeffentlichen ? 1 : 0,

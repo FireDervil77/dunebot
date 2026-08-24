@@ -44,6 +44,14 @@ const ANREICHERN_MS = 30_000;
  */
 const SCHONFRIST_MS = 10 * 60 * 1000;
 
+/**
+ * Zeitzone, in der Ruhezeiten gelten, solange die Guild nichts anderes sagt.
+ *
+ * Ohne Vorgabe waere es die Zeitzone des Servers - und die kennt niemand, der
+ * "23:00 bis 08:00" in ein Formular tippt. `dunemap` macht es genauso.
+ */
+const VORGABE_ZEITZONE = 'Europe/Berlin';
+
 /** Abgleich und Aufraeumen: einmal am Tag reicht - beide reden mit der Plattform. */
 const TAG_MS = 24 * 60 * 60 * 1000;
 
@@ -273,12 +281,25 @@ async function auffaechern(streamerId, aktion, verzoegerungMs = 0) {
 
     let geschrieben = 0;
 
+    // Die Ruhezeit gilt in der Zeitzone der Guild. Einmal je Guild ermitteln,
+    // nicht je Ziel - und nur, wenn ueberhaupt gepostet wird.
+    const zonen = new Map();
+    if (aktion === 'posten') {
+        for (const guildId of new Set(ziele.map(z => z.guild_id))) {
+            const zone = await db().getConfig('streaming', 'ZEITZONE', 'shared', guildId);
+            zonen.set(guildId, entscheidung.minutenIn(
+                typeof zone === 'string' && zone.trim() ? zone.trim() : VORGABE_ZEITZONE));
+        }
+    }
+
     for (const ziel of ziele) {
         // Beim Aufraeumen und Bearbeiten zaehlt der Filter nicht mehr: Was
         // gepostet wurde, muss auch aufgeraeumt werden - selbst wenn sich die
-        // Kategorie zwischendurch geaendert hat.
+        // Kategorie zwischendurch geaendert hat. Dasselbe gilt fuer die
+        // Ruhezeit: Eine Nachricht, die schon steht, wird auch nachts
+        // aufgeraeumt - sonst bliebe sie bis zum Morgen falsch stehen.
         if (aktion === 'posten') {
-            const passt = entscheidung.zielPasst(ziel, zustand);
+            const passt = entscheidung.zielPasst(ziel, { ...zustand, minutenJetzt: zonen.get(ziel.guild_id) });
             if (!passt.passt) {
                 if (passt.wartetAufAnreicherung) {
                     // Nicht verwerfen: Der Anreicherungslauf entscheidet gleich
@@ -562,6 +583,15 @@ async function nachtragen(streamerId) {
         'SELECT * FROM streaming_targets WHERE streamer_id = ? AND aktiv = 1', [streamerId]);
     const zustandZeilen = await db().query('SELECT * FROM streaming_state WHERE streamer_id = ?', [streamerId]);
     const zustand = zustandZeilen[0] || {};
+
+    // Auch beim Nachtragen gilt die Ruhezeit - sonst kaeme die Meldung, die
+    // um 3 Uhr unterdrueckt wurde, dreissig Sekunden spaeter doch.
+    const zonen = new Map();
+    for (const guildId of new Set(ziele.map(z => z.guild_id))) {
+        const zone = await db().getConfig('streaming', 'ZEITZONE', 'shared', guildId);
+        zonen.set(guildId, entscheidung.minutenIn(
+            typeof zone === 'string' && zone.trim() ? zone.trim() : VORGABE_ZEITZONE));
+    }
     if (!zustand.ist_live || !zustand.sendung_id) return;
 
     for (const ziel of ziele) {
@@ -569,7 +599,7 @@ async function nachtragen(streamerId) {
             'SELECT id FROM streaming_messages WHERE target_id = ? AND sendung_id = ? LIMIT 1',
             [ziel.id, zustand.sendung_id]);
 
-        const passt = entscheidung.zielPasst(ziel, zustand);
+        const passt = entscheidung.zielPasst(ziel, { ...zustand, minutenJetzt: zonen.get(ziel.guild_id) });
 
         if (schonGesendet.length) {
             // Steht schon: Titel oder Kategorie koennten sich geaendert haben.

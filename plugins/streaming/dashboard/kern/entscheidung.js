@@ -105,15 +105,51 @@ function beiBeendet(ereignis, zustand) {
 function zielPasst(ziel, angaben = {}) {
     if (!ziel.aktiv) return { passt: false, grund: 'Ziel ist abgeschaltet', wartetAufAnreicherung: false };
 
-    const hatFilter = Boolean(ziel.filter_spiel || ziel.filter_titel);
+    // **Die Ruhezeit zuerst.** Sie hat mit dem Inhalt nichts zu tun, und wer
+    // nachts keinen Ping will, will ihn auch dann nicht, wenn das Spiel passt.
+    // `minutenJetzt` kommt von aussen: Die Umrechnung in die Zeitzone der Guild
+    // ist unrein, die Entscheidung darueber soll es nicht sein.
+    if (typeof angaben.minutenJetzt === 'number' && inRuhezeit(ziel.ruhe_von, ziel.ruhe_bis, angaben.minutenJetzt)) {
+        return { passt: false, grund: 'Ruhezeit', wartetAufAnreicherung: false };
+    }
+
+    const hatFilter = Boolean(ziel.filter_spiel || ziel.filter_titel
+                           || ziel.filter_spiel_aus || ziel.filter_titel_aus);
     if (!hatFilter) return { passt: true, grund: 'kein Filter', wartetAufAnreicherung: false };
 
     // Kategorie und Titel kommen erst mit der Anreicherung. Ein Ziel mit
     // Filter kann im Augenblick des Ereignisses noch nicht entschieden werden
-    // - es wartet, statt zu raten.
-    const fehlt = (ziel.filter_spiel && !angaben.kategorie) || (ziel.filter_titel && !angaben.titel);
+    // - es wartet, statt zu raten. Das gilt fuer Ausschluesse genauso: Wer
+    // "alles ausser Just Chatting" eingestellt hat und die Kategorie noch nicht
+    // kennt, wuerde sonst genau das melden, was er ausschliessen wollte.
+    const fehlt = ((ziel.filter_spiel || ziel.filter_spiel_aus) && !angaben.kategorie)
+               || ((ziel.filter_titel || ziel.filter_titel_aus) && !angaben.titel);
     if (fehlt) {
         return { passt: false, grund: 'Angaben fehlen noch', wartetAufAnreicherung: true };
+    }
+
+    // **Ausschluss zuerst - aber nicht, weil er sonst verloere.** Beide
+    // Pruefungen muessen bestehen; ein doppelt eingetragenes Spiel faellt so
+    // oder so durch. Die Reihenfolge entscheidet nur, welche BEGRUENDUNG im
+    // Log und auf der Seite steht, und "ist ausgeschlossen" hilft dort mehr als
+    // "steht nicht im Filter".
+    //
+    // (Das stand hier zuerst falsch herum begruendet. Aufgefallen ist es, weil
+    // die Gegenprobe zum Vertauschen der Reihenfolge NICHT ansprang - ein
+    // Pruefskript, das gruen bleibt, wenn man den Code umbaut, prueft an dieser
+    // Stelle nichts.)
+    if (ziel.filter_spiel_aus) {
+        const verboten = String(ziel.filter_spiel_aus).split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+        if (verboten.includes(String(angaben.kategorie).toLowerCase())) {
+            return { passt: false, grund: `Kategorie "${angaben.kategorie}" ist ausgeschlossen`, wartetAufAnreicherung: false };
+        }
+    }
+
+    if (ziel.filter_titel_aus) {
+        const wort = String(ziel.filter_titel_aus).trim().toLowerCase();
+        if (wort && String(angaben.titel).toLowerCase().includes(wort)) {
+            return { passt: false, grund: `Titel enthaelt das ausgeschlossene Wort "${ziel.filter_titel_aus}"`, wartetAufAnreicherung: false };
+        }
     }
 
     if (ziel.filter_spiel) {
@@ -150,6 +186,68 @@ function zielPasst(ziel, angaben = {}) {
  * @param {number} schonfristMs Dauer der Schonfrist
  * @returns {boolean} true, wenn noch nicht angefasst werden darf
  */
+/**
+ * Liegt ein Zeitpunkt in der Ruhezeit?
+ *
+ * Alles in Minuten seit Mitternacht, damit hier weder Datum noch Zeitzone
+ * vorkommen - die Umrechnung passiert draussen.
+ *
+ * **Der Fall, den man vergisst:** `von > bis` ist der Normalfall, nicht die
+ * Ausnahme. 23:00 bis 08:00 laeuft ueber Mitternacht, und ein schlichtes
+ * `jetzt >= von && jetzt < bis` waere dort immer falsch.
+ *
+ * Sind beide gleich, ist die Ruhezeit leer (nicht ganztaegig): Ein
+ * Eingabefehler soll Ankuendigungen nicht fuer immer abschalten.
+ *
+ * @param {string|null} von Beginn als "HH:MM" oder "HH:MM:SS"
+ * @param {string|null} bis Ende
+ * @param {number} minutenJetzt Minuten seit Mitternacht
+ * @returns {boolean} true, wenn geschwiegen wird
+ */
+function inRuhezeit(von, bis, minutenJetzt) {
+    const alsMinuten = (wert) => {
+        if (!wert) return null;
+        const teile = String(wert).split(':');
+        const h = Number(teile[0]), m = Number(teile[1] || 0);
+        if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+        if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+        return h * 60 + m;
+    };
+
+    const a = alsMinuten(von);
+    const b = alsMinuten(bis);
+    if (a === null || b === null) return false;
+    if (a === b) return false;
+
+    return a < b
+        ? (minutenJetzt >= a && minutenJetzt < b)      // 09:00 - 17:00
+        : (minutenJetzt >= a || minutenJetzt < b);     // 23:00 - 08:00, ueber Mitternacht
+}
+
+/**
+ * Minuten seit Mitternacht in einer Zeitzone.
+ *
+ * Der unreine Teil, bewusst klein und getrennt von der Entscheidung.
+ *
+ * @param {string} zone Zeitzone, z.B. 'Europe/Berlin'
+ * @param {Date} [zeitpunkt] Zeitpunkt
+ * @returns {number} Minuten seit Mitternacht
+ */
+function minutenIn(zone, zeitpunkt = new Date()) {
+    try {
+        const teile = new Intl.DateTimeFormat('de-DE', {
+            timeZone: zone, hour: '2-digit', minute: '2-digit', hour12: false
+        }).formatToParts(zeitpunkt);
+        const h = Number(teile.find(t => t.type === 'hour')?.value ?? 0);
+        const m = Number(teile.find(t => t.type === 'minute')?.value ?? 0);
+        return h * 60 + m;
+    } catch {
+        // Unbekannte Zeitzone: lieber die Serverzeit als gar keine Entscheidung.
+        const d = zeitpunkt;
+        return d.getHours() * 60 + d.getMinutes();
+    }
+}
+
 function inSchonfrist(begonnenAm, jetzt, schonfristMs) {
     if (!begonnenAm) return false;
     const start = new Date(begonnenAm).getTime();
@@ -160,4 +258,6 @@ function inSchonfrist(begonnenAm, jetzt, schonfristMs) {
 }
 
 module.exports = {
-    inSchonfrist, VORGABE, beiGingLive, beiBeendet, zielPasst };
+    inSchonfrist,
+    inRuhezeit,
+    minutenIn, VORGABE, beiGingLive, beiBeendet, zielPasst };

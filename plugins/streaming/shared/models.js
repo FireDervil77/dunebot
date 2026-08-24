@@ -275,6 +275,10 @@ async function zielSpeichern(guildId, zielId, f) {
                onair_channel    = ?,
                filter_spiel     = ?,
                filter_titel     = ?,
+               filter_spiel_aus = ?,
+               filter_titel_aus = ?,
+               ruhe_von         = ?,
+               ruhe_bis         = ?,
                aufraeumen       = ?,
                eigenes_bild     = ?,
                veroeffentlichen = ?,
@@ -282,6 +286,7 @@ async function zielSpeichern(guildId, zielId, f) {
                mitglied_id      = ?
          WHERE id = ? AND guild_id = ?
     `, [f.channel_id, f.rolle_id, f.onair_channel, f.filter_spiel, f.filter_titel,
+        f.filter_spiel_aus, f.filter_titel_aus, f.ruhe_von, f.ruhe_bis,
         f.aufraeumen, f.eigenes_bild, f.veroeffentlichen, f.aktiv, f.mitglied_id, zielId, guildId]);
     return Number(ergebnis?.affectedRows || 0);
 }
@@ -362,6 +367,50 @@ async function liveRolleSetzen(guildId, rolleId) {
     await db().setConfig(PLUGIN, 'LIVE_ROLLE_ID', String(rolleId || '').trim(), 'shared', guildId, false);
 }
 
+/** Zeitzone, in der Ruhezeiten gelten, solange die Guild nichts anderes sagt. */
+const VORGABE_ZEITZONE = 'Europe/Berlin';
+
+/**
+ * Die Zeitzone dieser Guild.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @returns {Promise<string>} Zeitzone
+ */
+async function zeitzone(guildId) {
+    const wert = await db().getConfig(PLUGIN, 'ZEITZONE', 'shared', guildId);
+    return typeof wert === 'string' && wert.trim() ? wert.trim() : VORGABE_ZEITZONE;
+}
+
+/**
+ * Die Zeitzone setzen.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {string} zone Zeitzone
+ * @returns {Promise<void>}
+ */
+async function zeitzoneSetzen(guildId, zone) {
+    await db().setConfig(PLUGIN, 'ZEITZONE', String(zone || VORGABE_ZEITZONE).trim(), 'shared', guildId, false);
+}
+
+/**
+ * Wem hat das Plugin diese Rolle gegeben?
+ *
+ * Grundlage der Warnung auf der Ziele-Seite: Traegt eine Rolle mehr Mitglieder,
+ * als das Plugin vergeben hat, bedeutet sie auf diesem Server noch etwas
+ * anderes - und dann ist sie die falsche Wahl.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {string} rolleId Rolle
+ * @returns {Promise<Array<string>>} Mitglieder-IDs
+ */
+async function vergebeneRolle(guildId, rolleId) {
+    if (!rolleId) return [];
+    const zeilen = await db().query(
+        'SELECT mitglied_id FROM streaming_role_grants WHERE guild_id = ? AND rolle_id = ?',
+        [guildId, rolleId]);
+    return zeilen.map(z => String(z.mitglied_id));
+}
+
 // =====================================================
 // Vorlagen der Guild
 // =====================================================
@@ -423,6 +472,10 @@ module.exports = {
     zielVorlageSetzen,
     liveRolle,
     liveRolleSetzen,
+    vergebeneRolle,
+    zeitzone,
+    zeitzoneSetzen,
+    VORGABE_ZEITZONE,
     vorlagenLesen,
     vorlagenSetzen,
     zugangsdaten,

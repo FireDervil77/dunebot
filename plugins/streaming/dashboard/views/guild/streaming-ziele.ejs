@@ -61,7 +61,7 @@
 
 <div class="card mb-3">
   <div class="card-header">
-    <h3 class="card-title">Live-Rolle</h3>
+    <h3 class="card-title">Vorgaben dieses Servers</h3>
     <div class="card-actions">
       <% if (liveRolleId) { %>
         <span class="badge bg-green-lt">an</span>
@@ -73,6 +73,24 @@
   <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/live-rolle">
     <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
     <div class="card-body">
+      <% if (typeof fremdeTraeger !== 'undefined' && fremdeTraeger > 0) { %>
+        <div class="alert alert-warning">
+          <strong>Diese Rolle bedeutet auf diesem Server schon etwas anderes.</strong>
+          <p class="mb-1">
+            <%= fremdeTraeger %> Mitglied<%= fremdeTraeger === 1 ? '' : 'er' %>
+            trägt sie, ohne dass der Bot sie vergeben hat — sie wurde also von Hand
+            oder von woanders gesetzt. Typischer Fall: Die Rolle schaltet einen
+            Bereich frei.
+          </p>
+          <p class="mb-0">
+            <strong>Nimm dafür eine eigene, leere Rolle</strong>, die nichts
+            freischaltet und nur anzeigt, wer gerade sendet. Der Bot rührt fremde
+            Träger nicht an — er nimmt nur zurück, was er selbst vergeben hat —
+            aber eine Rolle mit zwei Bedeutungen verwirrt jeden, der sie sieht.
+          </p>
+        </div>
+      <% } %>
+
       <p class="text-secondary small">
         Wer gerade sendet, bekommt diese Rolle — und verliert sie, wenn der Stream
         endet. Sie ist dafür gedacht, Streamende in der Mitgliederliste nach oben
@@ -95,6 +113,10 @@
             <strong>Wichtig:</strong> Die Rolle muss in der Rangliste <em>unter</em>
             der Rolle des Bots stehen — sonst darf er sie nicht vergeben, und es
             passiert nichts.
+            <br>
+            Umbenennen reicht nicht, um hier etwas zu ändern: Discord behält beim
+            Umbenennen dieselbe Rolle. Wer eine <em>andere</em> Rolle will, wählt
+            sie hier aus.
           </div>
         </div>
         <div class="col-md-6">
@@ -111,6 +133,29 @@
         </div>
       </div>
     </div>
+      <hr class="my-3">
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="zeitzone">Zeitzone für Ruhezeiten</label>
+          <select class="form-select" id="zeitzone" name="zeitzone" <%= darfEinstellen ? '' : 'disabled' %>>
+            <% (zonen || []).forEach(z => { %>
+              <option value="<%= z %>" <%= z === zeitzone ? 'selected' : '' %>><%= z %></option>
+            <% }); %>
+          </select>
+          <div class="form-hint">
+            Gilt für die Ruhezeiten weiter unten. Ohne diese Angabe wäre es die
+            Zeitzone des Servers — und die kennt niemand, der „23:00 bis 08:00"
+            in ein Feld tippt.
+          </div>
+        </div>
+        <div class="col-md-6 d-flex align-items-end">
+          <div class="text-secondary small">
+            Es ist dort gerade
+            <strong><%= new Date().toLocaleTimeString('de-DE', { timeZone: zeitzone, hour: '2-digit', minute: '2-digit' }) %> Uhr</strong>.
+          </div>
+        </div>
+      </div>
     <% if (darfEinstellen) { %>
       <div class="card-footer text-end">
         <button type="submit" class="btn btn-primary"><%= tr('streaming:COMMON.SAVE') %></button>
@@ -241,6 +286,42 @@
                 <input type="text" class="form-control" id="filter_titel_<%= z.id %>" name="filter_titel"
                        value="<%= z.filter_titel || '' %>" placeholder="leer = jeder Titel" <%= darfAendern ? '' : 'disabled' %>>
                 <div class="form-hint">Ein Wort. Gross- und Kleinschreibung ist egal.</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="filter_spiel_aus_<%= z.id %>">Nicht bei diesen Spielen</label>
+                <input type="text" class="form-control" id="filter_spiel_aus_<%= z.id %>" name="filter_spiel_aus"
+                       value="<%= z.filter_spiel_aus || '' %>" placeholder="z. B. Just Chatting" <%= darfAendern ? '' : 'disabled' %>>
+                <div class="form-hint">
+                  Mehrere durch Komma. <strong>Schlägt die Erlaubnis oben:</strong>
+                  Steht dasselbe Spiel in beiden Feldern, wird nicht gemeldet.
+                </div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="filter_titel_aus_<%= z.id %>">Nicht, wenn der Titel dieses Wort enthält</label>
+                <input type="text" class="form-control" id="filter_titel_aus_<%= z.id %>" name="filter_titel_aus"
+                       value="<%= z.filter_titel_aus || '' %>" placeholder="z. B. test" <%= darfAendern ? '' : 'disabled' %>>
+                <div class="form-hint">Ein Wort. Groß- und Kleinschreibung ist egal.</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Ruhezeit — keine Ankündigung</label>
+                <div class="input-group">
+                  <input type="time" class="form-control" name="ruhe_von"
+                         value="<%= z.ruhe_von ? String(z.ruhe_von).slice(0, 5) : '' %>" <%= darfAendern ? '' : 'disabled' %>>
+                  <span class="input-group-text">bis</span>
+                  <input type="time" class="form-control" name="ruhe_bis"
+                         value="<%= z.ruhe_bis ? String(z.ruhe_bis).slice(0, 5) : '' %>" <%= darfAendern ? '' : 'disabled' %>>
+                </div>
+                <div class="form-hint">
+                  Beide leer = immer melden. Über Mitternacht geht (23:00 bis 08:00).
+                  Zeitzone: <strong><%= zeitzone %></strong>.
+                  <br>
+                  In der Ruhezeit wird <strong>nicht nachgeholt</strong> — wer dann
+                  live geht, wird für diesen Stream nicht angekündigt. Das Aufräumen
+                  danach läuft trotzdem.
+                </div>
               </div>
 
               <div class="col-md-4">

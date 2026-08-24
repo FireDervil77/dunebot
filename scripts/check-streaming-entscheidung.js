@@ -147,6 +147,80 @@ pruefe('unlesbare Startzeit -> keine Schonfrist',
 pruefe('Start in der Zukunft -> keine Schonfrist',
     e.inSchonfrist(new Date(JETZT + 5 * MIN), JETZT, 10 * MIN), false);
 
+// ---------------------------------------------------------------
+console.log('\nRuhezeiten');
+// ---------------------------------------------------------------
+const U = (h, m = 0) => h * 60 + m;
+
+pruefe('ohne Zeiten keine Ruhe',            e.inRuhezeit(null, null, U(3)), false);
+pruefe('nur Beginn gesetzt -> keine Ruhe',  e.inRuhezeit('23:00', null, U(3)), false);
+pruefe('Fenster am Tag, mittendrin',        e.inRuhezeit('09:00', '17:00', U(12)), true);
+pruefe('Fenster am Tag, davor',             e.inRuhezeit('09:00', '17:00', U(8)), false);
+pruefe('Fenster am Tag, genau Beginn',      e.inRuhezeit('09:00', '17:00', U(9)), true);
+pruefe('Fenster am Tag, genau Ende',        e.inRuhezeit('09:00', '17:00', U(17)), false);
+
+// Der Fall, den man vergisst: ueber Mitternacht. Ein schlichtes
+// "jetzt >= von && jetzt < bis" waere hier IMMER falsch.
+pruefe('ueber Mitternacht, nachts um 3',    e.inRuhezeit('23:00', '08:00', U(3)), true);
+pruefe('ueber Mitternacht, abends um 23',   e.inRuhezeit('23:00', '08:00', U(23)), true);
+pruefe('ueber Mitternacht, 22:59 noch nicht', e.inRuhezeit('23:00', '08:00', U(22, 59)), false);
+pruefe('ueber Mitternacht, mittags frei',   e.inRuhezeit('23:00', '08:00', U(12)), false);
+pruefe('ueber Mitternacht, 08:00 vorbei',   e.inRuhezeit('23:00', '08:00', U(8)), false);
+
+// Gegenproben: Ein Eingabefehler darf Ankuendigungen nicht fuer immer abschalten.
+pruefe('gleiche Zeiten -> KEINE Ruhe (nicht ganztaegig)', e.inRuhezeit('10:00', '10:00', U(10)), false);
+pruefe('Unsinn statt Uhrzeit -> keine Ruhe', e.inRuhezeit('abends', '08:00', U(3)), false);
+pruefe('Stunde 25 -> keine Ruhe',            e.inRuhezeit('25:00', '08:00', U(3)), false);
+pruefe('mit Sekunden geht auch',             e.inRuhezeit('23:00:00', '08:00:00', U(3)), true);
+
+// ---------------------------------------------------------------
+console.log('\nAusschlussfilter');
+// ---------------------------------------------------------------
+const zielAus = (t) => ({ aktiv: 1, ...t });
+
+pruefe('ausgeschlossenes Spiel -> nicht melden',
+    e.zielPasst(zielAus({ filter_spiel_aus: 'Just Chatting' }), { kategorie: 'Just Chatting', titel: 'x' }).passt, false);
+pruefe('anderes Spiel -> melden',
+    e.zielPasst(zielAus({ filter_spiel_aus: 'Just Chatting' }), { kategorie: 'Minecraft', titel: 'x' }).passt, true);
+pruefe('Gross- und Kleinschreibung egal',
+    e.zielPasst(zielAus({ filter_spiel_aus: 'just chatting' }), { kategorie: 'Just Chatting', titel: 'x' }).passt, false);
+pruefe('mehrere ausgeschlossen, zweites trifft',
+    e.zielPasst(zielAus({ filter_spiel_aus: 'Minecraft, Just Chatting' }), { kategorie: 'Just Chatting', titel: 'x' }).passt, false);
+pruefe('ausgeschlossenes Titelwort -> nicht melden',
+    e.zielPasst(zielAus({ filter_titel_aus: 'test' }), { kategorie: 'x', titel: 'Nur ein TEST heute' }).passt, false);
+pruefe('Titel ohne das Wort -> melden',
+    e.zielPasst(zielAus({ filter_titel_aus: 'test' }), { kategorie: 'x', titel: 'Ernsthafter Stream' }).passt, true);
+
+// Der wichtigste Fall: Ausschluss schlaegt Erlaubnis. Ein doppelt eingetragenes
+// Spiel fuehrt zu einer Meldung ZU WENIG, nicht zu einer zu viel.
+pruefe('in beiden Listen -> nicht melden',
+    e.zielPasst(zielAus({ filter_spiel: 'Minecraft', filter_spiel_aus: 'Minecraft' }), { kategorie: 'Minecraft', titel: 'x' }).passt, false);
+// Die Reihenfolge entscheidet nicht ueber das Urteil (beide Pruefungen muessen
+// bestehen), sondern ueber die BEGRUENDUNG - und die liest ein Mensch.
+//
+// Der Fall muss so gebaut sein, dass BEIDE Pruefungen ablehnen, aber mit
+// verschiedenem Grund: Kategorie steht nicht auf der Erlaubnisliste UND steht
+// auf der Ausschlussliste. Nur dann zeigt sich, welche zuerst lief. Zwei
+// Anlaeufe davor waren so gebaut, dass die Reihenfolge gar nichts aenderte -
+// und blieben deshalb gruen, egal wie der Code aussah.
+pruefe('    Begruendung nennt den Ausschluss, nicht die Erlaubnisliste',
+    /ausgeschlossen/.test(e.zielPasst(
+        zielAus({ filter_spiel: 'Fortnite', filter_spiel_aus: 'Minecraft' }),
+        { kategorie: 'Minecraft', titel: 'x' }).grund), true);
+
+// Auch ein reiner Ausschlussfilter muss auf die Anreicherung warten - sonst
+// meldet er genau das, was er ausschliessen sollte.
+pruefe('Ausschluss ohne Kategorie -> wartet',
+    e.zielPasst(zielAus({ filter_spiel_aus: 'Just Chatting' }), { titel: 'x' }).wartetAufAnreicherung, true);
+
+// Ruhezeit im Zusammenspiel
+pruefe('Ruhezeit schlaegt alles',
+    e.zielPasst(zielAus({ ruhe_von: '23:00', ruhe_bis: '08:00' }), { kategorie: 'x', titel: 'x', minutenJetzt: U(3) }).passt, false);
+pruefe('ausserhalb der Ruhezeit normal',
+    e.zielPasst(zielAus({ ruhe_von: '23:00', ruhe_bis: '08:00' }), { kategorie: 'x', titel: 'x', minutenJetzt: U(12) }).passt, true);
+pruefe('ohne minutenJetzt greift die Ruhezeit nicht',
+    e.zielPasst(zielAus({ ruhe_von: '23:00', ruhe_bis: '08:00' }), { kategorie: 'x', titel: 'x' }).passt, true);
+
 console.log(gescheitert === 0
     ? `\nErgebnis: ${geprueft} Faelle, 0 Abweichungen.\n`
     : `\nErgebnis: ${geprueft} Faelle, ${gescheitert} Abweichung(en).\n`);
