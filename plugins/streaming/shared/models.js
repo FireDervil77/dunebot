@@ -25,6 +25,8 @@
 
 const { ServiceManager } = require('dunebot-core');
 
+const { VORGABE_LIVE, VORGABE_RUECKSCHAU, vorlageWaehlen } = require('./vorlagen');
+
 const PLUGIN = 'streaming';
 
 /** @returns {Object} Datenbankdienst */
@@ -47,6 +49,7 @@ async function streamerDerGuild(guildId) {
         SELECT  s.id, s.plattform, s.login, s.anzeigename, s.avatar_url,
                 z.ist_live, z.titel, z.kategorie, z.begonnen_am,
                 COUNT(t.id)            AS ziele,
+                MIN(t.id)              AS erstes_ziel,
                 MAX(a.letzte_meldung_am) AS letzte_meldung_am,
                 MIN(a.zustand)         AS abo_zustand
         FROM streaming_targets  t
@@ -199,12 +202,174 @@ async function zugangsdatenSetzen(plattform, clientId, clientSecret) {
     }
 }
 
+
+// =====================================================
+// Ein einzelnes Ziel bearbeiten
+// =====================================================
+
+/**
+ * Ein Ziel dieser Guild laden.
+ *
+ * Die Guild steht **in der Bedingung**, nicht nur im Aufruf: Sonst koennte
+ * eine fremde Guild mit einer geratenen Zahl in der Adresse ein Ziel
+ * bearbeiten, das ihr nicht gehoert. Die Rechtepruefung der Route sagt nur,
+ * ob jemand Ziele aendern darf - nicht, welche.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {number} zielId Ziel-ID
+ * @returns {Promise<Object|null>} Zeile oder null
+ */
+async function zielLesen(guildId, zielId) {
+    const zeilen = await db().query(`
+        SELECT  t.*, s.plattform, s.login, s.anzeigename
+        FROM streaming_targets t
+        JOIN streaming_streamers s ON s.id = t.streamer_id
+        WHERE t.id = ? AND t.guild_id = ?
+    `, [zielId, guildId]);
+    return zeilen[0] || null;
+}
+
+/**
+ * Ein Ziel aendern.
+ *
+ * Nur die Felder, die die Oberflaeche wirklich anbietet - eine Schleife ueber
+ * `req.body` waere kuerzer und wuerde `guild_id` oder `streamer_id`
+ * mitschreiben lassen.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {number} zielId Ziel-ID
+ * @param {Object} f Felder
+ * @returns {Promise<number>} Anzahl geaenderter Zeilen
+ */
+async function zielSpeichern(guildId, zielId, f) {
+    const ergebnis = await db().query(`
+        UPDATE streaming_targets
+           SET channel_id       = ?,
+               rolle_id         = ?,
+               onair_channel    = ?,
+               filter_spiel     = ?,
+               filter_titel     = ?,
+               aufraeumen       = ?,
+               eigenes_bild     = ?,
+               veroeffentlichen = ?,
+               aktiv            = ?
+         WHERE id = ? AND guild_id = ?
+    `, [f.channel_id, f.rolle_id, f.onair_channel, f.filter_spiel, f.filter_titel,
+        f.aufraeumen, f.eigenes_bild, f.veroeffentlichen, f.aktiv, zielId, guildId]);
+    return Number(ergebnis?.affectedRows || 0);
+}
+
+/**
+ * Ein einzelnes Ziel entfernen.
+ *
+ * Abzugrenzen vom Entfernen auf der Streamer-Seite: Dort verschwindet der
+ * Kanal ganz aus der Beobachtung dieser Guild (alle ihre Ziele). Hier faellt
+ * nur **eine** Ankuendigung weg - ein Streamer kann in mehrere Kanaele melden.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {number} zielId Ziel-ID
+ * @returns {Promise<{entfernt: boolean, streamerId: number|null, letztes: boolean}>} Ergebnis
+ */
+async function zielEntfernen(guildId, zielId) {
+    const ziel = await zielLesen(guildId, zielId);
+    if (!ziel) return { entfernt: false, streamerId: null, letztes: false };
+
+    await db().query('DELETE FROM streaming_targets WHERE id = ? AND guild_id = ?', [zielId, guildId]);
+
+    // War es das letzte Ziel dieser Guild fuer den Kanal, ist der Kanal aus
+    // ihrer Sicht nicht mehr beobachtet. Ob das Abo weg muss, entscheidet die
+    // Referenzzaehlung ueber ALLE Guilds - nicht diese Abfrage.
+    const rest = await db().query(
+        'SELECT COUNT(*) AS anzahl FROM streaming_targets WHERE guild_id = ? AND streamer_id = ?',
+        [guildId, ziel.streamer_id]);
+
+    return {
+        entfernt: true,
+        streamerId: ziel.streamer_id,
+        letztes: Number(rest[0]?.anzahl || 0) === 0
+    };
+}
+
+/**
+ * Die eigene Vorlage eines Ziels setzen.
+ *
+ * Leerer Text heisst **"wieder den Standard nehmen"**, nicht "leere
+ * Ankuendigung". Deshalb `null` statt `''` - `null` faellt in der Ausgabe auf
+ * den Guild-Standard zurueck, `''` waere eine Vorlage, die nichts sagt.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {number} zielId Ziel-ID
+ * @param {string} vorlage Text; leer setzt zurueck
+ * @returns {Promise<number>} Anzahl geaenderter Zeilen
+ */
+async function zielVorlageSetzen(guildId, zielId, vorlage) {
+    const wert = String(vorlage || '').trim() || null;
+    const ergebnis = await db().query(
+        'UPDATE streaming_targets SET vorlage = ? WHERE id = ? AND guild_id = ?',
+        [wert, zielId, guildId]);
+    return Number(ergebnis?.affectedRows || 0);
+}
+
+// =====================================================
+// Vorlagen der Guild
+// =====================================================
+
+/**
+ * Die beiden Standardtexte einer Guild.
+ *
+ * Achtung, eine Falle in `getConfig`: Faengt ein Wert mit `{` an, versucht die
+ * Datenbankschicht ihn als JSON zu lesen. Bei `{rolle} {streamer} ist live!`
+ * scheitert das und der Rohtext kommt zurueck - richtig. Bei einem Text, der
+ * zufaellig gueltiges JSON ist (`{}`), kaeme ein **Objekt** heraus. Deshalb
+ * wird hier auf Text geprueft und sonst die Vorgabe genommen, statt einem
+ * Objekt in den Nachrichtenbau zu folgen.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @returns {Promise<{live: string, rueckschau: string, eigeneLive: boolean, eigeneRueckschau: boolean}>} Texte
+ */
+async function vorlagenLesen(guildId) {
+    const [live, rueck] = await Promise.all([
+        db().getConfig(PLUGIN, 'VORLAGE_LIVE', 'shared', guildId),
+        db().getConfig(PLUGIN, 'VORLAGE_RUECKSCHAU', 'shared', guildId)
+    ]);
+
+    return {
+        live:             vorlageWaehlen(null, live,  VORGABE_LIVE),
+        rueckschau:       vorlageWaehlen(null, rueck, VORGABE_RUECKSCHAU),
+        eigeneLive:       typeof live === 'string' && Boolean(live.trim()),
+        eigeneRueckschau: typeof rueck === 'string' && Boolean(rueck.trim())
+    };
+}
+
+/**
+ * Die Standardtexte einer Guild setzen.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {string} live Text der Live-Ankuendigung
+ * @param {string} rueckschau Text nach dem Stream
+ * @returns {Promise<void>}
+ */
+async function vorlagenSetzen(guildId, live, rueckschau) {
+    // isGlobal ausdruecklich false: Ohne das Argument raet setConfig anhand
+    // der guildId - und eine Guild-Vorlage waere ploetzlich die aller.
+    await db().setConfig(PLUGIN, 'VORLAGE_LIVE', String(live || '').trim(), 'shared', guildId, false);
+    await db().setConfig(PLUGIN, 'VORLAGE_RUECKSCHAU', String(rueckschau || '').trim(), 'shared', guildId, false);
+}
+
 module.exports = {
     PLUGIN,
+    VORGABE_LIVE,
+    VORGABE_RUECKSCHAU,
     streamerDerGuild,
     zieleDerGuild,
     anzahlStreamer,
     zustandDerGuild,
+    zielLesen,
+    zielSpeichern,
+    zielEntfernen,
+    zielVorlageSetzen,
+    vorlagenLesen,
+    vorlagenSetzen,
     zugangsdaten,
     zugangsdatenSetzen
 };

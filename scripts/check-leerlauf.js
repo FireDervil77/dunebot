@@ -139,7 +139,12 @@ function routenOhneRecht(korpus) {
         if (!datei.includes(`${path.sep}plugins${path.sep}`)) continue;
 
         const zeilen = inhalt.split('\n');
-        const WAECHTER = /requirePermission|requireAnyPermission|requireAllPermissions|requireGuildOwner/;
+        // `CheckAdmin` gehoert dazu: Es ist die Betreiber-Sperre und damit
+        // enger als jedes Recht — nicht loser. Ohne diesen Eintrag meldete der
+        // Scanner die Betriebsseiten als ungeschuetzt, obwohl sie es nicht
+        // sind. `CheckAuth` steht bewusst NICHT hier: Angemeldet zu sein ist
+        // noch keine Berechtigung.
+        const WAECHTER = /requirePermission|requireAnyPermission|requireAllPermissions|requireGuildOwner|CheckAdmin/;
 
         zeilen.forEach((zeile, i) => {
             const treffer = zeile.match(/^\s*router\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`]*)['"`]/);

@@ -26,6 +26,8 @@
 
 const { ServiceManager } = require('dunebot-core');
 const nachricht = require('./nachricht');
+const modelle = require('../../shared/models');
+const { vorlageWaehlen, VORGABE_LIVE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
 
 const TAKT_MS = 500;
 const JE_LAUF = 20;
@@ -102,11 +104,19 @@ async function umfeldLaden(auftrag) {
     if (!zeilen.length) return null;
     const r = zeilen[0];
 
+    // Welche Vorlage gilt, wird HIER entschieden und nicht im Nachrichtenbau:
+    // eigener Text des Ziels, sonst der Standard der Guild, sonst die Vorgabe.
+    // `nachricht.js` bleibt dadurch eine reine Funktion - sie bekommt einen
+    // fertigen Text und fragt nichts nach.
+    const guildVorlagen = await modelle.vorlagenLesen(r.guild_id);
+
     return {
         ziel: {
             id: r.id, guild_id: r.guild_id, channel_id: r.channel_id, rolle_id: r.rolle_id,
-            onair_channel: r.onair_channel, vorlage: r.vorlage, eigenes_bild: r.eigenes_bild,
-            aufraeumen: r.aufraeumen, veroeffentlichen: r.veroeffentlichen
+            onair_channel: r.onair_channel, eigenes_bild: r.eigenes_bild,
+            aufraeumen: r.aufraeumen, veroeffentlichen: r.veroeffentlichen,
+            vorlage: vorlageWaehlen(r.vorlage, guildVorlagen.live, VORGABE_LIVE),
+            vorlage_rueckschau: vorlageWaehlen(null, guildVorlagen.rueckschau, VORGABE_RUECKSCHAU)
         },
         streamer: {
             id: r.streamer_id, plattform: r.plattform, login: r.login,

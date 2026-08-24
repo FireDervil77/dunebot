@@ -28,7 +28,9 @@ const FARBEN = { twitch: 0x9146FF, kick: 0x53FC18, youtube: 0xFF0000 };
 /** Die Rueckschau ist bewusst stumpf - sie soll nicht mehr nach "jetzt" aussehen. */
 const FARBE_VORBEI = 0x6C757D;
 
-const VORGABE_VORLAGE = '{rolle} {streamer} ist jetzt live!';
+// Die Vorgabetexte stehen bei den uebrigen Vorlagenregeln, damit Router,
+// Ausgabe und Pruefskript dieselben lesen.
+const { VORGABE_LIVE: VORGABE_VORLAGE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
 
 /**
  * Adresse des Kanals bei der Plattform.
@@ -85,6 +87,8 @@ function textFuellen(vorlage, werte) {
  * @param {Object} daten.streamer { plattform, login, anzeigename, avatar_url }
  * @param {Object} daten.zustand { titel, kategorie, zuschauer, vorschaubild, begonnen_am }
  * @param {Object} daten.ziel { rolle_id, vorlage, onair_channel, eigenes_bild }
+ *   `vorlage` ist bereits aufgeloest - der Aufrufer entscheidet, ob die eigene
+ *   Vorlage des Ziels oder der Standard der Guild gilt.
  * @returns {{content: string, embeds: Array, components: Array}} Discord-Nutzlast
  */
 function live({ streamer, zustand = {}, ziel = {} }) {
@@ -166,13 +170,26 @@ function rueckschau({ streamer, zustand = {}, ziel = {}, vodUrl = null }) {
 
     const knoepfe = [{ type: 2, style: 5, label: vodUrl ? 'Aufzeichnung' : 'Zum Kanal', url: vodUrl || url }];
 
+    // Die Erwaehnung faellt weg: Eine bearbeitete Nachricht pingt zwar nicht
+    // erneut, aber der Text soll auch nicht mehr danach aussehen. `{rolle}`
+    // wird deshalb mit Leer gefuellt, nicht stehengelassen.
+    const content = textFuellen(ziel.vorlage_rueckschau || VORGABE_RUECKSCHAU, {
+        streamer: name,
+        titel: zustand.titel || '',
+        kategorie: zustand.kategorie || '',
+        url,
+        zuschauer: '',
+        rolle: '',
+        plattform: streamer.plattform === 'twitch' ? 'Twitch'
+                 : streamer.plattform === 'kick' ? 'Kick' : 'YouTube',
+        dauer: dauer || 'unbekannt lange'
+    });
+
     return {
-        // Die Erwaehnung faellt weg: Eine bearbeitete Nachricht pingt zwar
-        // nicht erneut, aber der Text soll auch nicht mehr danach aussehen.
-        content: `${name} war live.`,
+        content,
         embeds: [embed],
         components: [{ type: 1, components: knoepfe }]
     };
 }
 
-module.exports = { FARBEN, FARBE_VORBEI, VORGABE_VORLAGE, kanalAdresse, dauerText, textFuellen, live, rueckschau };
+module.exports = { FARBEN, FARBE_VORBEI, VORGABE_VORLAGE, VORGABE_RUECKSCHAU, kanalAdresse, dauerText, textFuellen, live, rueckschau };

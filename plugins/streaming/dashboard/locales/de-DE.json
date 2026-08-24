@@ -75,7 +75,6 @@
   "COMMON": {
     "SAVE": "Speichern",
     "CANCEL": "Abbrechen",
-    "DELETE": "Entfernen",
-    "NOT_YET": "Kommt mit der naechsten Stufe"
+    "DELETE": "Entfernen"
   }
 }

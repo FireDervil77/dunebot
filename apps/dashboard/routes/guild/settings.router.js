@@ -159,10 +159,24 @@ router.get('/integrations', requirePermission('CORE.SETTINGS.EDIT'), async (req,
     const themeManager = ServiceManager.get('themeManager');
     const guildId = res.locals.guildId;
 
+    // Die Twitch-Karte zeigte seit jeher einen abgeschalteten Schalter und
+    // einen toten Knopf (Befund B-7 des Streaming-Vorhabens). Statt Erwartung
+    // zu wecken und nichts zu tun, verweist sie jetzt dorthin, wo die Sache
+    // wirklich eingerichtet wird - und sagt es ehrlich, wenn das Plugin in
+    // dieser Guild gar nicht laeuft.
+    let streamingAktiv = false;
+    try {
+        const pluginManager = ServiceManager.get('pluginManager');
+        streamingAktiv = Boolean(await pluginManager?.isPluginEnabledForGuild('streaming', guildId));
+    } catch (err) {
+        ServiceManager.get('Logger').warn(`[Settings] Streaming-Status nicht ermittelbar: ${err.message}`);
+    }
+
     await themeManager.renderView(res, 'guild/settings/integrations', {
         title: 'Integrationen',
         activeMenu: `/guild/${guildId}/settings/integrations`,
-        guildId
+        guildId,
+        streamingAktiv
     });
 });
 

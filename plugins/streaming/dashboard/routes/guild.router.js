@@ -10,12 +10,14 @@
  *   /zustand     Was laeuft, was klemmt
  *   /betrieb     Abos, Kontingent, Zugangsdaten (nur Betreiber)
  *
- * **Stand Stufe 1:** Die Seiten lesen echte Daten und zeigen sie an. Eintragen
- * und Aendern kommt mit Stufe 5 - bis dahin sagen die Seiten das ausdruecklich,
- * statt Knoepfe anzubieten, die nichts tun.
+ * **Rechte:** Lesen verlangt `STREAMING.VIEW`, Schreiben jeweils das engere
+ * Recht - und zwar **in der Route**. Dass die Ansicht einen Knopf ausblendet,
+ * ist Hoeflichkeit, keine Sperre; `scripts/check-streaming-rechte.js` prueft
+ * deshalb jede schreibende Route einzeln.
  *
- * Ausnahme sind die Zugangsdaten unter /betrieb: Sie sind die Voraussetzung
- * fuer alles Weitere und lassen sich deshalb schon jetzt setzen.
+ * Ob jemand aendern darf, entscheidet in den Ansichten der vorhandene
+ * Theme-Helfer `hasPermission('KEY')` (siehe `ThemeRenderer`) - kein eigener
+ * Nachbau im Router.
  *
  * @module streaming/dashboard/routes/guild
  */
@@ -31,6 +33,7 @@ const {
 } = require('./_shared');
 const modelle = require('../../shared/models');
 const abos = require('../kern/abos');
+const { PLATZHALTER, pruefeVorlage, VORGABE_LIVE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
 
 // =====================================================
 // Einstieg
@@ -170,10 +173,88 @@ router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
         ]);
 
         await renderView(res, 'guild/streaming-ziele', {
-            tr, guildId, ziele, zielkanaele, sprachkanaele, rollen
+            tr, guildId, ziele, zielkanaele, sprachkanaele, rollen,
+            meldung: req.query.ok || null,
+            fehler: req.query.fehler || null
         });
     } catch (error) {
         return renderFehler(res, error, 'Die Ziele konnten nicht geladen werden');
+    }
+});
+
+// Ein Ziel aendern
+router.post('/ziele/:id', requirePermission('STREAMING.TARGETS.MANAGE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/ziele`;
+
+    try {
+        const zielId = Number(req.params.id);
+        if (!Number.isInteger(zielId)) return res.redirect(`${zurueck}?fehler=technisch`);
+
+        const channelId = String(req.body.channel_id || '').trim();
+        if (!channelId) return res.redirect(`${zurueck}?fehler=ziel_fehlt`);
+
+        // 'bearbeiten' ist die Vorgabe. Ein unbekannter Wert kaeme aus einem
+        // veraenderten Formular - dann gilt die Vorgabe, nicht der Wunsch.
+        const erlaubteArten = ['bearbeiten', 'loeschen', 'stehenlassen'];
+        const aufraeumen = erlaubteArten.includes(req.body.aufraeumen) ? req.body.aufraeumen : 'bearbeiten';
+
+        const bild = String(req.body.eigenes_bild || '').trim();
+        if (bild && !/^https:\/\//i.test(bild)) {
+            return res.redirect(`${zurueck}?fehler=bild`);
+        }
+
+        const geaendert = await modelle.zielSpeichern(guildId, zielId, {
+            channel_id:       channelId,
+            rolle_id:         String(req.body.rolle_id || '').trim() || null,
+            onair_channel:    String(req.body.onair_channel || '').trim() || null,
+            filter_spiel:     String(req.body.filter_spiel || '').trim() || null,
+            filter_titel:     String(req.body.filter_titel || '').trim() || null,
+            aufraeumen,
+            eigenes_bild:     bild || null,
+            veroeffentlichen: req.body.veroeffentlichen ? 1 : 0,
+            aktiv:            req.body.aktiv ? 1 : 0
+        });
+
+        // Null geaenderte Zeilen heisst hier: das Ziel gehoert dieser Guild
+        // nicht (oder gibt es nicht mehr). Das ist kein Erfolg.
+        if (!geaendert) {
+            const vorhanden = await modelle.zielLesen(guildId, zielId);
+            if (!vorhanden) return res.redirect(`${zurueck}?fehler=weg`);
+        }
+
+        Logger.info(`[Streaming] Ziel ${zielId} in Guild ${guildId} geaendert`);
+        return res.redirect(`${zurueck}?ok=gespeichert`);
+    } catch (error) {
+        Logger.error('[Streaming] Ziel speichern fehlgeschlagen:', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+// Ein einzelnes Ziel entfernen
+router.post('/ziele/:id/entfernen', requirePermission('STREAMING.TARGETS.MANAGE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/ziele`;
+
+    try {
+        const zielId = Number(req.params.id);
+        if (!Number.isInteger(zielId)) return res.redirect(`${zurueck}?fehler=technisch`);
+
+        const ergebnis = await modelle.zielEntfernen(guildId, zielId);
+        if (!ergebnis.entfernt) return res.redirect(`${zurueck}?fehler=weg`);
+
+        // War es das letzte Ziel dieser Guild fuer den Kanal, muss das Abo
+        // geprueft werden - sonst bleibt ein Abo stehen, das niemand mehr
+        // liest, und das gemeinsame Kontingent laeuft voll.
+        if (ergebnis.letztes) await abos.abosAufraeumen(ergebnis.streamerId);
+
+        Logger.info(`[Streaming] Ziel ${zielId} aus Guild ${guildId} entfernt`);
+        return res.redirect(`${zurueck}?ok=entfernt`);
+    } catch (error) {
+        Logger.error('[Streaming] Ziel entfernen fehlgeschlagen:', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
     }
 });
 
@@ -185,24 +266,70 @@ router.get('/vorlagen', requirePermission('STREAMING.VIEW'), async (req, res) =>
     const tr = makeTranslator(req, res);
 
     try {
-        const ziele = await modelle.zieleDerGuild(guildId);
+        const [ziele, vorlagen] = await Promise.all([
+            modelle.zieleDerGuild(guildId),
+            modelle.vorlagenLesen(guildId)
+        ]);
 
-        // Die Platzhalter stehen hier und nicht in der Ansicht: Sie sind
-        // Vertrag zwischen Vorlage und Ausgabe, nicht Beiwerk der Seite.
-        const platzhalter = [
-            { name: '{streamer}',  bedeutung: 'Anzeigename des Kanals' },
-            { name: '{titel}',     bedeutung: 'Titel der Sendung' },
-            { name: '{kategorie}', bedeutung: 'Spiel oder Kategorie' },
-            { name: '{url}',       bedeutung: 'Adresse des Streams' },
-            { name: '{zuschauer}', bedeutung: 'Zuschauerzahl' },
-            { name: '{rolle}',     bedeutung: 'Erwaehnung der eingestellten Rolle' },
-            { name: '{plattform}', bedeutung: 'Twitch, Kick oder YouTube' },
-            { name: '{dauer}',     bedeutung: 'nur in der Rueckschau nach dem Stream' }
-        ];
-
-        await renderView(res, 'guild/streaming-vorlagen', { tr, guildId, ziele, platzhalter });
+        await renderView(res, 'guild/streaming-vorlagen', {
+            tr, guildId, ziele, vorlagen,
+            platzhalter: PLATZHALTER,
+            vorgabeLive: VORGABE_LIVE,
+            vorgabeRueckschau: VORGABE_RUECKSCHAU,
+            meldung: req.query.ok || null,
+            fehler: req.query.fehler || null
+        });
     } catch (error) {
         return renderFehler(res, error, 'Die Vorlagen konnten nicht geladen werden');
+    }
+});
+
+// Die Standardtexte der Guild
+router.post('/vorlagen', requirePermission('STREAMING.TEMPLATES.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/vorlagen`;
+
+    try {
+        const live  = String(req.body.vorlage_live || '').trim();
+        const rueck = String(req.body.vorlage_rueckschau || '').trim();
+
+        const zuLang = pruefeVorlage(live) || pruefeVorlage(rueck);
+        if (zuLang) return res.redirect(`${zurueck}?fehler=${zuLang}`);
+
+        await modelle.vorlagenSetzen(guildId, live, rueck);
+        Logger.info(`[Streaming] Standardvorlagen der Guild ${guildId} gesetzt`);
+        return res.redirect(`${zurueck}?ok=gespeichert`);
+    } catch (error) {
+        Logger.error('[Streaming] Vorlagen speichern fehlgeschlagen:', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+// Die Abweichung eines einzelnen Ziels
+router.post('/vorlagen/:id', requirePermission('STREAMING.TEMPLATES.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/vorlagen`;
+
+    try {
+        const zielId = Number(req.params.id);
+        if (!Number.isInteger(zielId)) return res.redirect(`${zurueck}?fehler=technisch`);
+
+        const vorlage = String(req.body.vorlage || '').trim();
+        const zuLang = pruefeVorlage(vorlage);
+        if (zuLang) return res.redirect(`${zurueck}?fehler=${zuLang}`);
+
+        const geaendert = await modelle.zielVorlageSetzen(guildId, zielId, vorlage);
+        if (!geaendert && !(await modelle.zielLesen(guildId, zielId))) {
+            return res.redirect(`${zurueck}?fehler=weg`);
+        }
+
+        Logger.info(`[Streaming] Vorlage von Ziel ${zielId} ${vorlage ? 'gesetzt' : 'zurueckgesetzt'}`);
+        return res.redirect(`${zurueck}?ok=${vorlage ? 'gespeichert' : 'zurueckgesetzt'}`);
+    } catch (error) {
+        Logger.error('[Streaming] Zielvorlage speichern fehlgeschlagen:', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
     }
 });
 

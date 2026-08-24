@@ -75,7 +75,6 @@
   "COMMON": {
     "SAVE": "Save",
     "CANCEL": "Cancel",
-    "DELETE": "Remove",
-    "NOT_YET": "Coming with the next stage"
+    "DELETE": "Remove"
   }
 }

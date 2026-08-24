@@ -5,20 +5,115 @@
   beschreibung: tr('streaming:TEMPLATES.SUBTITLE')
 }) %>
 
-<%- include('partials/streaming-stufe', {
-  text: 'Stufe 1: Die Platzhalter stehen fest, das Bearbeiten kommt mit Stufe 5.'
-}) %>
+<%
+  const darfAendern = typeof hasPermission === 'function' && hasPermission('STREAMING.TEMPLATES.EDIT');
+
+  const meldungen = {
+    gespeichert:    'Gespeichert.',
+    zurueckgesetzt: 'Eigener Text entfernt — fuer dieses Ziel gilt wieder der Standard.'
+  };
+  const fehlerTexte = {
+    zu_lang:     'Der Text ist zu lang. Discord nimmt 2000 Zeichen; wir lassen 1000 zu, weil Platzhalter beim Fuellen wachsen.',
+    platzhalter: 'Da steht ein Platzhalter, den es nicht gibt. Er wuerde woertlich in der Ankuendigung landen — die Liste rechts zeigt alle gueltigen.',
+    weg:         'Dieses Ziel gibt es nicht mehr.',
+    technisch:   'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+  };
+%>
+
+<% if (meldung && meldungen[meldung]) { %>
+  <div class="alert alert-success"><%= meldungen[meldung] %></div>
+<% } %>
+<% if (fehler && fehlerTexte[fehler]) { %>
+  <div class="alert alert-danger"><%= fehlerTexte[fehler] %></div>
+<% } %>
 
 <div class="row row-cards">
   <div class="col-lg-7">
+
     <div class="card">
       <div class="card-header">
         <h3 class="card-title"><%= tr('streaming:TEMPLATES.DEFAULT') %></h3>
       </div>
-      <div class="card-body">
-        <pre class="mb-2 p-3 bg-secondary-lt rounded">{rolle} {streamer} ist jetzt live!</pre>
-        <p class="text-secondary small mb-0"><%= tr('streaming:TEMPLATES.HINT') %></p>
+      <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/vorlagen">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <div class="card-body">
+
+          <div class="mb-3">
+            <label class="form-label" for="vorlage_live">Wenn jemand live geht</label>
+            <textarea class="form-control vorlage-feld" id="vorlage_live" name="vorlage_live" rows="2"
+                      data-vorschau="vorschau_live" <%= darfAendern ? '' : 'disabled' %>><%= vorlagen.live %></textarea>
+            <div class="form-hint">
+              <%= tr('streaming:TEMPLATES.HINT') %>
+              <% if (!vorlagen.eigeneLive) { %>
+                <br>Zurzeit gilt die Vorgabe: <code><%= vorgabeLive %></code>
+              <% } %>
+            </div>
+            <div class="mt-2 p-2 rounded bg-secondary-lt small">
+              <span class="text-secondary">Vorschau:</span> <span id="vorschau_live"></span>
+            </div>
+          </div>
+
+          <div class="mb-1">
+            <label class="form-label" for="vorlage_rueckschau">Wenn der Stream vorbei ist</label>
+            <textarea class="form-control vorlage-feld" id="vorlage_rueckschau" name="vorlage_rueckschau" rows="2"
+                      data-vorschau="vorschau_rueck" <%= darfAendern ? '' : 'disabled' %>><%= vorlagen.rueckschau %></textarea>
+            <div class="form-hint">
+              Gilt fuer Ziele mit „<%= tr('streaming:TARGETS.CLEANUP_EDIT') %>“. Hier ist
+              <code>{dauer}</code> gefuellt — waehrend des Streams ist er leer, weil
+              noch niemand weiss, wie lange es dauert.
+              <% if (!vorlagen.eigeneRueckschau) { %>
+                <br>Zurzeit gilt die Vorgabe: <code><%= vorgabeRueckschau %></code>
+              <% } %>
+            </div>
+            <div class="mt-2 p-2 rounded bg-secondary-lt small">
+              <span class="text-secondary">Vorschau:</span> <span id="vorschau_rueck"></span>
+            </div>
+          </div>
+
+        </div>
+        <% if (darfAendern) { %>
+          <div class="card-footer text-end">
+            <button type="submit" class="btn btn-primary"><%= tr('streaming:COMMON.SAVE') %></button>
+          </div>
+        <% } %>
+      </form>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title">Abweichungen je Ziel</h3>
       </div>
+      <% if (!ziele || ziele.length === 0) { %>
+        <div class="card-body">
+          <p class="text-secondary mb-0"><%= tr('streaming:TARGETS.EMPTY') %></p>
+        </div>
+      <% } else { %>
+        <div class="card-body">
+          <p class="text-secondary small">
+            Leer lassen heisst: Es gilt der Standard oben. Das ist der Regelfall —
+            eine Abweichung lohnt sich, wenn ein Kanal einen anderen Ton hat.
+          </p>
+          <% ziele.forEach(z => { %>
+            <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/vorlagen/<%= z.id %>"
+                  class="mb-3 pb-3 border-bottom" id="vorlage-<%= z.id %>">
+              <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+              <label class="form-label" for="vorlage_<%= z.id %>">
+                <%= z.anzeigename || z.login %>
+                <% if (!z.vorlage) { %><span class="badge bg-secondary-lt ms-1">Standard</span><% } %>
+              </label>
+              <div class="input-group">
+                <textarea class="form-control vorlage-feld" id="vorlage_<%= z.id %>" name="vorlage" rows="1"
+                          data-vorschau="vorschau_<%= z.id %>" data-streamer="<%= z.anzeigename || z.login %>"
+                          placeholder="leer = Standard" <%= darfAendern ? '' : 'disabled' %>><%= z.vorlage || '' %></textarea>
+                <% if (darfAendern) { %>
+                  <button type="submit" class="btn btn-outline-primary"><%= tr('streaming:COMMON.SAVE') %></button>
+                <% } %>
+              </div>
+              <div class="mt-1 small text-secondary">Vorschau: <span id="vorschau_<%= z.id %>"></span></div>
+            </form>
+          <% }); %>
+        </div>
+      <% } %>
     </div>
 
     <div class="card mt-3">
@@ -38,8 +133,13 @@
           <li>Vorschaubild des Streams</li>
           <li>Knopf „Zum Stream" — dazu „Beitreten", wenn ein On-Air-Kanal gesetzt ist</li>
         </ul>
+        <p class="text-secondary small mb-0 mt-2">
+          Die Karte selbst ist festgelegt und nicht frei formatierbar — die
+          Vorlage steuert nur den Text darueber.
+        </p>
       </div>
     </div>
+
   </div>
 
   <div class="col-lg-5">
@@ -59,6 +159,61 @@
           </tbody>
         </table>
       </div>
+      <div class="card-footer text-secondary small">
+        Andere Platzhalter werden beim Speichern abgelehnt. Sie wuerden sonst
+        woertlich in der Ankuendigung stehen — ein Fehler, den man erst im
+        Discord sieht.
+      </div>
     </div>
   </div>
 </div>
+
+<script>
+// Vorschau im Browser, mit Beispielwerten. Bewusst kein Testversand: Wer eine
+// Vorschau sehen will, soll dafuer niemandem eine Nachricht schicken.
+//
+// Die Werte sind erkennbar Beispiele. Erfundene Zahlen, die wie gemessene
+// aussehen, waeren schlimmer als keine.
+(function () {
+  var BEISPIEL = {
+    '{streamer}':  'BeispielKanal',
+    '{titel}':     'Erster Versuch, zweiter Anlauf',
+    '{kategorie}': 'Just Chatting',
+    '{url}':       'https://twitch.tv/beispielkanal',
+    '{zuschauer}': '42',
+    '{rolle}':     '@Stream-Ping',
+    '{plattform}': 'Twitch',
+    '{dauer}':     '2 h 14 min'
+  };
+
+  function fuellen(text, streamerName) {
+    var werte = Object.assign({}, BEISPIEL);
+    if (streamerName) werte['{streamer}'] = streamerName;
+
+    return String(text || '').replace(/\{[a-z_]+\}/gi, function (treffer) {
+      var schluessel = treffer.toLowerCase();
+      // Unbekannter Platzhalter: stehen lassen und markieren. Genau so
+      // erschiene er auch im Discord.
+      return Object.prototype.hasOwnProperty.call(werte, schluessel)
+        ? werte[schluessel]
+        : treffer;
+    }).trim();
+  }
+
+  function zeichnen(feld) {
+    var ziel = document.getElementById(feld.dataset.vorschau);
+    if (!ziel) return;
+    var text = feld.value.trim();
+    if (!text) {
+      ziel.innerHTML = '<em class="text-secondary">— es gilt der Standard —</em>';
+      return;
+    }
+    ziel.textContent = fuellen(text, feld.dataset.streamer);
+  }
+
+  document.querySelectorAll('.vorlage-feld').forEach(function (feld) {
+    zeichnen(feld);
+    feld.addEventListener('input', function () { zeichnen(feld); });
+  });
+})();
+</script>
