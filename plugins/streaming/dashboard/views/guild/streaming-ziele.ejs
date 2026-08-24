@@ -10,9 +10,13 @@
 }) %>
 
 <%
+  // Die Kanalnamen kommen frisch vom Bot - wir speichern nur IDs. Findet sich
+  // eine ID nicht mehr, ist der Kanal geloescht worden. Das soll dastehen und
+  // nicht als nackte Zahl erscheinen, mit der niemand etwas anfangen kann.
   const kanalName = (id, liste) => {
+    if (!id) return null;
     const k = (liste || []).find(x => String(x.id) === String(id));
-    return k ? k.name : id;
+    return k ? k.name : null;
   };
   const rollenName = (id) => {
     const r = (rollen || []).find(x => String(x.id) === String(id));
@@ -44,15 +48,24 @@
               <% ziele.forEach(z => { %>
                 <tr>
                   <td class="fw-bold"><%= z.anzeigename || z.login %></td>
-                  <td># <%= kanalName(z.channel_id, zielkanaele) %></td>
+                  <td>
+                    <% const kName = kanalName(z.channel_id, zielkanaele); %>
+                    <% if (kName) { %># <%= kName %><% } else { %>
+                      <span class="text-danger" title="ID <%= z.channel_id %>">
+                        ⚠ Kanal geloescht
+                      </span>
+                    <% } %>
+                  </td>
                   <td>
                     <% if (z.rolle_id) { %>@<%= rollenName(z.rolle_id) %><% } else { %>
                       <span class="text-secondary">—</span>
                     <% } %>
                   </td>
                   <td>
-                    <% if (z.onair_channel) { %>
-                      🔊 <%= kanalName(z.onair_channel, sprachkanaele) %>
+                    <% const oName = kanalName(z.onair_channel, sprachkanaele); %>
+                    <% if (oName) { %>🔊 <%= oName %>
+                    <% } else if (z.onair_channel) { %>
+                      <span class="text-danger" title="ID <%= z.onair_channel %>">⚠ geloescht</span>
                     <% } else { %>
                       <span class="text-secondary">—</span>
                     <% } %>
