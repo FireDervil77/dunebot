@@ -34,6 +34,16 @@ const abos = require('./abos');
 const TAKT_MS = 5_000;
 const ANREICHERN_MS = 30_000;
 
+/**
+ * Wie lange eine frisch begonnene Sendung vor der Selbstheilung geschuetzt ist.
+ *
+ * Twitch meldet `stream.online` frueher, als der Stream in `/helix/streams`
+ * auftaucht. Ohne diese Frist erklaerte der Anreicherungslauf eine gerade
+ * begonnene Sendung fuer beendet - und zwar genau die, die man gerade
+ * ankuendigen wollte.
+ */
+const SCHONFRIST_MS = 10 * 60 * 1000;
+
 /** Abgleich und Aufraeumen: einmal am Tag reicht - beide reden mit der Plattform. */
 const TAG_MS = 24 * 60 * 60 * 1000;
 
@@ -356,6 +366,24 @@ async function rollenAuffaechern(streamerId, aktion, verzoegerungMs = 0) {
     return geschrieben;
 }
 
+/**
+ * Was nach einem Streamende zu tun ist - egal, woher wir davon wissen.
+ *
+ * Zwei Wege fuehren hierher: die Meldung `stream.offline` und die
+ * Selbstheilung, die bei der Plattform nachfragt. Beide muessen dasselbe tun,
+ * sonst raeumt der eine auf und der andere laesst eine Ankuendigung stehen,
+ * die behauptet, jemand sende noch.
+ *
+ * @param {number} streamerId Streamer
+ * @returns {Promise<number>} Anzahl vorgemerkter Auftraege
+ */
+async function nachStreamende(streamerId) {
+    const karenzMs = einstellungen().karenzMinuten * 60_000;
+    const auftraege = await auffaechern(streamerId, 'aufraeumen', karenzMs);
+    const rollen = await rollenAuffaechern(streamerId, 'nehmen', karenzMs);
+    return auftraege + rollen;
+}
+
 // =====================================================
 // Die Laeufe
 // =====================================================
@@ -426,7 +454,7 @@ async function anreicherungsLauf() {
 
     try {
         const offen = await db().query(`
-            SELECT s.id, s.plattform, s.kanal_id, s.login
+            SELECT s.id, s.plattform, s.kanal_id, s.login, z.begonnen_am
               FROM streaming_state z
               JOIN streaming_streamers s ON s.id = z.streamer_id
              WHERE z.ist_live = 1
@@ -467,10 +495,30 @@ async function anreicherungsLauf() {
                     // `stream.offline` ist verlorengegangen. Sonst stuende der
                     // Kanal fuer immer als live in der Liste - und beim
                     // naechsten echten Start kaeme keine Ankuendigung.
+                    //
+                    // **Aber nicht sofort.** Twitch schickt `stream.online`
+                    // frueher, als `/helix/streams` den Stream kennt. Ein Lauf
+                    // 30 Sekunden nach dem Start faende dort nichts und wuerde
+                    // eine gerade begonnene Sendung fuer beendet erklaeren -
+                    // Ankuendigung weg, Rolle weg, und beim naechsten Ereignis
+                    // keine neue Meldung, weil der Zustand schon "offline" ist.
+                    if (entscheidung.inSchonfrist(zeile.begonnen_am, Date.now(), SCHONFRIST_MS)) {
+                        log().debug(`[Streaming] ${zeile.login} nicht in der Streamliste, aber gerade erst begonnen - Schonfrist`);
+                        continue;
+                    }
+
                     await db().query(
                         'UPDATE streaming_state SET ist_live = 0, beendet_am = COALESCE(beendet_am, NOW()), angereichert_am = NOW() WHERE streamer_id = ?',
                         [zeile.id]);
-                    log().warn(`[Streaming] Kanal ${zeile.kanal_id} ist laut Plattform nicht live - Zustand zurueckgesetzt`);
+
+                    // **Und die Nachricht muss mit.** Bis zum 2026-08-25 heilte
+                    // sich hier nur der Zustand: Die Ankuendigung im Discord
+                    // blieb auf "ist jetzt live" stehen - fuer immer, weil das
+                    // Aufraeumen nur am `stream.offline`-Ereignis hing, und das
+                    // war ja gerade verlorengegangen. Aufgefallen ist es dem
+                    // Betreiber beim Proben.
+                    const nachbereitet = await nachStreamende(zeile.id);
+                    log().warn(`[Streaming] ${zeile.login} ist laut Plattform nicht live - Zustand zurueckgesetzt, ${nachbereitet} Nachbereitung(en) vorgemerkt`);
                     continue;
                 }
 

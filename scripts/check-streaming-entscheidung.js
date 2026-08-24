@@ -127,6 +127,26 @@ console.log('\nZiele und Filter');
     pruefe('ohne Filter wartet nichts', r.wartetAufAnreicherung, false, r.grund);
 }
 
+// ---------------------------------------------------------------
+console.log('\nSchonfrist fuer frische Sendungen');
+// ---------------------------------------------------------------
+pruefe('gerade begonnen -> in Ruhe lassen',
+    e.inSchonfrist(new Date(JETZT - 1 * MIN), JETZT, 10 * MIN), true);
+pruefe('kurz vor Ablauf -> immer noch',
+    e.inSchonfrist(new Date(JETZT - 9 * MIN), JETZT, 10 * MIN), true);
+pruefe('genau abgelaufen -> anfassen',
+    e.inSchonfrist(new Date(JETZT - 10 * MIN), JETZT, 10 * MIN), false);
+pruefe('lange her -> anfassen',
+    e.inSchonfrist(new Date(JETZT - 3 * 60 * MIN), JETZT, 10 * MIN), false);
+// Gegenprobe: Ohne Startzeit gibt es keinen Schutz - sonst bliebe ein Zustand
+// ohne `begonnen_am` fuer immer auf "live" stehen.
+pruefe('ohne Startzeit -> keine Schonfrist',
+    e.inSchonfrist(null, JETZT, 10 * MIN), false);
+pruefe('unlesbare Startzeit -> keine Schonfrist',
+    e.inSchonfrist('kein Datum', JETZT, 10 * MIN), false);
+pruefe('Start in der Zukunft -> keine Schonfrist',
+    e.inSchonfrist(new Date(JETZT + 5 * MIN), JETZT, 10 * MIN), false);
+
 console.log(gescheitert === 0
     ? `\nErgebnis: ${geprueft} Faelle, 0 Abweichungen.\n`
     : `\nErgebnis: ${geprueft} Faelle, ${gescheitert} Abweichung(en).\n`);

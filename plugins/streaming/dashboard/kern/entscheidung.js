@@ -133,4 +133,31 @@ function zielPasst(ziel, angaben = {}) {
     return { passt: true, grund: 'Filter trifft zu', wartetAufAnreicherung: false };
 }
 
-module.exports = { VORGABE, beiGingLive, beiBeendet, zielPasst };
+/**
+ * Ist eine Sendung so frisch, dass die Selbstheilung sie in Ruhe lassen muss?
+ *
+ * Twitch meldet `stream.online` frueher, als der Stream in der Streamliste
+ * auftaucht. Fragt der Anreicherungslauf 30 Sekunden nach dem Start nach,
+ * findet er nichts - und wuerde eine gerade begonnene Sendung fuer beendet
+ * erklaeren. Genau die, die man ankuendigen wollte.
+ *
+ * Ohne Startzeitpunkt gibt es keine Schonfrist: Dann wissen wir nicht, wie alt
+ * die Sendung ist, und die Selbstheilung ist das kleinere Uebel gegenueber
+ * einem Zustand, der ewig auf "live" steht.
+ *
+ * @param {Date|string|null} begonnenAm Beginn der Sendung
+ * @param {number} jetzt Zeitpunkt in Millisekunden
+ * @param {number} schonfristMs Dauer der Schonfrist
+ * @returns {boolean} true, wenn noch nicht angefasst werden darf
+ */
+function inSchonfrist(begonnenAm, jetzt, schonfristMs) {
+    if (!begonnenAm) return false;
+    const start = new Date(begonnenAm).getTime();
+    if (Number.isNaN(start)) return false;
+    // Ein Beginn in der Zukunft ist eine kaputte Angabe, kein Schutzgrund.
+    if (start > jetzt) return false;
+    return (jetzt - start) < schonfristMs;
+}
+
+module.exports = {
+    inSchonfrist, VORGABE, beiGingLive, beiBeendet, zielPasst };
