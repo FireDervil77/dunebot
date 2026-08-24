@@ -46,4 +46,12 @@ class StreamingBotPlugin extends BotPlugin {
     }
 }
 
-module.exports = StreamingBotPlugin;
+// **Eine Instanz, keine Klasse.** `PluginManager.js:241` prueft
+// `plugin instanceof BotPlugin` und weist die Klasse selbst ab:
+// "Kein gueltiges Plugin (Exportiert es eine Instanz der BotPlugin-Klasse?)".
+//
+// Auf der Dashboard-Seite ist es genau andersherum - dort wird die Klasse
+// erwartet und mit `new Plugin(app)` erzeugt. Diese Asymmetrie kostete am
+// 2026-08-24 eine Fehlersuche: Der Bot lud das Plugin nicht, kannte damit
+// `streaming:post` nicht, und die Ankuendigung blieb aus.
+module.exports = new StreamingBotPlugin();

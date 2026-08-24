@@ -146,9 +146,23 @@ async function ausfuehren(auftrag) {
                 [ziel.id, sendungId, ziel.channel_id]);
         } catch (e) {
             if (e.code === 'ER_DUP_ENTRY') {
-                return { ok: true, fehler: null, endgueltig: true, hinweis: 'stand schon' };
+                // Es gibt schon eine Zeile - aber das heisst NICHT, dass die
+                // Nachricht steht. Scheiterte ein frueherer Versuch, blockierte
+                // die reservierte Zeile jeden weiteren, und der Auftrag galt als
+                // erledigt, obwohl nie etwas gesendet wurde. Stilles
+                // Fallenlassen, genau das, was hier nie passieren soll.
+                const vorhanden = await db().query(
+                    'SELECT zustand FROM streaming_messages WHERE target_id = ? AND sendung_id = ?',
+                    [ziel.id, sendungId]);
+
+                if (vorhanden[0]?.zustand === 'steht') {
+                    return { ok: true, fehler: null, endgueltig: true, hinweis: 'stand schon' };
+                }
+                // 'offen' oder 'fehler' -> erneut versuchen
+                log().info(`[Streaming] Ziel ${ziel.id}: vorheriger Versuch offen (${vorhanden[0]?.zustand}) - neuer Anlauf`);
+            } else {
+                throw e;
             }
-            throw e;
         }
 
         const antwort = await anDenBot('streaming:post', {
@@ -286,8 +300,13 @@ async function lauf() {
                 `, [versuche, String(ergebnis.fehler).slice(0, 512),
                     aufgeben ? 'aufgegeben' : 'offen', Math.min(60, 2 ** versuche), auftrag.id]);
 
+                // Jeder Fehlversuch gehoert ins Log, nicht nur das Aufgeben:
+                // Sonst steht am Ende "aufgegeben" da, und warum es fuenfmal
+                // scheiterte, weiss niemand mehr.
                 if (aufgeben) {
-                    log().error(`[Streaming] Auftrag ${auftrag.id} (${auftrag.aktion}) aufgegeben: ${ergebnis.fehler}`);
+                    log().error(`[Streaming] Auftrag ${auftrag.id} (${auftrag.aktion}) aufgegeben nach ${versuche} Versuch(en): ${ergebnis.fehler}`);
+                } else {
+                    log().warn(`[Streaming] Auftrag ${auftrag.id} (${auftrag.aktion}) Versuch ${versuche} fehlgeschlagen: ${ergebnis.fehler}`);
                 }
             } catch (err) {
                 await db().query(

@@ -129,6 +129,22 @@ melde('Kein `const [x] = await …query(INSERT|UPDATE|DELETE)` (Baustelle 63a)',
         return treffer;
     })());
 
+// Die Asymmetrie, die am 2026-08-24 eine Fehlersuche gekostet hat: Der Bot
+// braucht eine INSTANZ, das Dashboard die KLASSE. Beides sieht im Quelltext
+// fast gleich aus und faellt erst im Log des Bots auf.
+console.log('\nExportform');
+{
+    const botIndex = fs.readFileSync(path.join(WURZEL, 'bot/index.js'), 'utf8');
+    melde('bot/index.js exportiert eine Instanz (`new …()`)',
+        /module\.exports\s*=\s*new\s+\w+\(\)/.test(botIndex) ? []
+            : [{ datei: 'bot/index.js', zeile: 0, text: 'exportiert keine Instanz' }]);
+
+    const dashIndex = fs.readFileSync(path.join(WURZEL, 'dashboard/index.js'), 'utf8');
+    melde('dashboard/index.js exportiert die Klasse (kein `new`)',
+        /module\.exports\s*=\s*new\s/.test(dashIndex)
+            ? [{ datei: 'dashboard/index.js', zeile: 0, text: 'exportiert eine Instanz statt der Klasse' }] : []);
+}
+
 console.log(verstoesse === 0
     ? '\nErgebnis: 0 Verstoesse.\n'
     : `\nErgebnis: ${verstoesse} Verstoss/Verstoesse.\n`);
