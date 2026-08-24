@@ -85,6 +85,59 @@ async function anDenBot(ereignis, nutzlast) {
 }
 
 /**
+ * Die Live-Rolle geben oder nehmen.
+ *
+ * @param {Object} auftrag Outbox-Zeile
+ * @returns {Promise<{ok: boolean, fehler: string|null, endgueltig: boolean, hinweis?: string}>} Ergebnis
+ */
+async function rolleSetzen(auftrag) {
+    const nutzlast = typeof auftrag.nutzlast === 'string'
+        ? JSON.parse(auftrag.nutzlast) : (auftrag.nutzlast || {});
+
+    const { mitglied_id: mitgliedId, rolle_id: rolleId } = nutzlast;
+    const richtung = auftrag.aktion === 'rolle_geben' ? 'geben' : 'nehmen';
+
+    // Ohne Mitglied oder Rolle ist der Auftrag nicht ausfuehrbar und wird es
+    // auch nie - also endgueltig, statt fuenfmal zu wiederholen.
+    if (!mitgliedId || !rolleId) {
+        return { ok: false, fehler: 'Auftrag ohne Mitglied oder Rolle', endgueltig: true };
+    }
+
+    // Beim Geben wird noch einmal nachgesehen, ob die Person ueberhaupt (noch)
+    // live ist. Zwischen Vormerken und Ausfuehren koennen Minuten liegen, und
+    // eine Rolle "ist live" an jemandem, der nicht mehr sendet, ist genau die
+    // Art Fehler, die niemand meldet.
+    if (richtung === 'geben' && nutzlast.streamer_id) {
+        const zeilen = await db().query(
+            'SELECT ist_live FROM streaming_state WHERE streamer_id = ?', [nutzlast.streamer_id]);
+        if (zeilen.length && !zeilen[0].ist_live) {
+            return { ok: true, fehler: null, endgueltig: true, hinweis: 'nicht mehr live' };
+        }
+    }
+
+    // Beim Nehmen umgekehrt: Kam die Person innerhalb der Karenz zurueck, darf
+    // die Rolle bleiben.
+    if (richtung === 'nehmen' && nutzlast.streamer_id) {
+        const zeilen = await db().query(
+            'SELECT ist_live FROM streaming_state WHERE streamer_id = ?', [nutzlast.streamer_id]);
+        if (zeilen.length && zeilen[0].ist_live) {
+            return { ok: true, fehler: null, endgueltig: true, hinweis: 'wieder live' };
+        }
+    }
+
+    const antwort = await anDenBot('streaming:role', {
+        guildId: auftrag.guild_id, userId: mitgliedId, roleId: rolleId, aktion: richtung
+    });
+
+    if (!antwort.ok) return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
+
+    return {
+        ok: true, fehler: null, endgueltig: false,
+        hinweis: antwort.daten?.hinweis || (antwort.daten?.geaendert ? undefined : 'unveraendert')
+    };
+}
+
+/**
  * Alles laden, was fuer eine Nachricht gebraucht wird.
  *
  * @param {Object} auftrag Outbox-Zeile
@@ -137,6 +190,16 @@ async function umfeldLaden(auftrag) {
  * @returns {Promise<{ok: boolean, fehler: string|null, endgueltig: boolean}>} Ergebnis
  */
 async function ausfuehren(auftrag) {
+    // **Rollen zuerst, und bewusst OHNE `umfeldLaden`.** Die Nutzlast traegt
+    // Mitglied und Rolle schon; sie braucht das Ziel nicht mehr. Das ist kein
+    // Umweg, sondern der Punkt: Wird ein Ziel geloescht, waehrend jemand live
+    // ist, muss die Rolle trotzdem noch abgenommen werden koennen. Liefe der
+    // Auftrag ueber `umfeldLaden`, endete er mit "Ziel existiert nicht mehr" —
+    // und die Rolle bliebe fuer immer haengen.
+    if (auftrag.aktion === 'rolle_geben' || auftrag.aktion === 'rolle_nehmen') {
+        return await rolleSetzen(auftrag);
+    }
+
     const umfeld = await umfeldLaden(auftrag);
     if (!umfeld) return { ok: false, fehler: 'Ziel existiert nicht mehr', endgueltig: true };
 

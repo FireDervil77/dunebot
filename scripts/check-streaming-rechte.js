@@ -130,6 +130,36 @@ for (const datei of routerDateien()) {
     });
 
     if (!gefunden) melde(`${kurz}: keine einzige Route gefunden — stimmt das Muster noch?`);
+
+    // Regel 5: Eine Route mit festem Wort darf nicht HINTER einer Route mit
+    // Platzhalter stehen, die auf denselben Abschnitt passt. Express nimmt die
+    // erste, die passt — `/ziele/:id` schluckt dann `/ziele/live-rolle`, und
+    // die Seite meldet einen technischen Fehler, ohne dass irgendwo stuende,
+    // warum. Genau das ist am 2026-08-25 beim Bau der Live-Rolle passiert.
+    const pfade = [];
+    zeilen.forEach((zeile, i) => {
+        const t = zeile.match(/router\.(get|post|put|patch|delete)\('([^']*)'/);
+        if (t) pfade.push({ nr: i + 1, art: t[1], pfad: t[2] });
+    });
+
+    for (let i = 0; i < pfade.length; i++) {
+        const spaeter = pfade[i];
+        const teileS = spaeter.pfad.split('/');
+        for (let j = 0; j < i; j++) {
+            const frueher = pfade[j];
+            if (frueher.art !== spaeter.art) continue;
+            const teileF = frueher.pfad.split('/');
+            if (teileF.length !== teileS.length) continue;
+
+            const verdeckt = teileF.every((teil, k) =>
+                teil === teileS[k] || (teil.startsWith(':') && !teileS[k].startsWith(':')));
+            const hatPlatzhalter = teileF.some(t => t.startsWith(':'));
+
+            if (verdeckt && hatPlatzhalter) {
+                melde(`${kurz}:${spaeter.nr} "${spaeter.pfad}" wird von "${frueher.pfad}" (Zeile ${frueher.nr}) verdeckt — feste Pfade gehoeren nach oben`);
+            }
+        }
+    }
 }
 
 console.log(abweichungen === 0

@@ -278,10 +278,11 @@ async function zielSpeichern(guildId, zielId, f) {
                aufraeumen       = ?,
                eigenes_bild     = ?,
                veroeffentlichen = ?,
-               aktiv            = ?
+               aktiv            = ?,
+               mitglied_id      = ?
          WHERE id = ? AND guild_id = ?
     `, [f.channel_id, f.rolle_id, f.onair_channel, f.filter_spiel, f.filter_titel,
-        f.aufraeumen, f.eigenes_bild, f.veroeffentlichen, f.aktiv, zielId, guildId]);
+        f.aufraeumen, f.eigenes_bild, f.veroeffentlichen, f.aktiv, f.mitglied_id, zielId, guildId]);
     return Number(ergebnis?.affectedRows || 0);
 }
 
@@ -334,6 +335,31 @@ async function zielVorlageSetzen(guildId, zielId, vorlage) {
         'UPDATE streaming_targets SET vorlage = ? WHERE id = ? AND guild_id = ?',
         [wert, zielId, guildId]);
     return Number(ergebnis?.affectedRows || 0);
+}
+
+/**
+ * Die Live-Rolle dieser Guild.
+ *
+ * Eine je Guild, nicht eine je Ziel: Wer zwanzig Kanaele beobachtet, soll
+ * nicht zwanzigmal dieselbe Rolle einstellen muessen.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @returns {Promise<string|null>} Rollen-ID oder null
+ */
+async function liveRolle(guildId) {
+    const wert = await db().getConfig(PLUGIN, 'LIVE_ROLLE_ID', 'shared', guildId);
+    return typeof wert === 'string' && wert.trim() ? wert.trim() : null;
+}
+
+/**
+ * Die Live-Rolle setzen. Leer schaltet sie ab.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {string} rolleId Rollen-ID; leer = aus
+ * @returns {Promise<void>}
+ */
+async function liveRolleSetzen(guildId, rolleId) {
+    await db().setConfig(PLUGIN, 'LIVE_ROLLE_ID', String(rolleId || '').trim(), 'shared', guildId, false);
 }
 
 // =====================================================
@@ -395,6 +421,8 @@ module.exports = {
     zielSpeichern,
     zielEntfernen,
     zielVorlageSetzen,
+    liveRolle,
+    liveRolleSetzen,
     vorlagenLesen,
     vorlagenSetzen,
     zugangsdaten,

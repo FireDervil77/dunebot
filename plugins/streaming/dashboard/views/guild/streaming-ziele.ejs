@@ -12,12 +12,15 @@
 
   const meldungen = {
     gespeichert: 'Gespeichert. Ab der naechsten Ankuendigung gilt die neue Einstellung.',
-    entfernt:    'Ziel entfernt. Der Kanal wird weiter beobachtet, wenn noch ein anderes Ziel darauf zeigt.'
+    entfernt:         'Ziel entfernt. Der Kanal wird weiter beobachtet, wenn noch ein anderes Ziel darauf zeigt.',
+    rolle_gewechselt: 'Live-Rolle gewechselt. Die alte Rolle wird allen entzogen, denen sie das Plugin gegeben haben könnte.',
+    rolle_aus:        'Live-Rolle abgeschaltet und allen entzogen.'
   };
   const fehlerTexte = {
     ziel_fehlt: 'Bitte einen Kanal fuer die Ankuendigung waehlen.',
     bild:       'Das eigene Vorschaubild muss eine vollstaendige Adresse mit https:// sein.',
     weg:        'Dieses Ziel gibt es nicht mehr.',
+    rolle:      'Das war keine gültige Rollen-Auswahl.',
     technisch:  'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
   };
 
@@ -50,6 +53,71 @@
     </div>
   </div>
 <% } %>
+
+<%
+  const darfEinstellen = typeof hasPermission === 'function' && hasPermission('STREAMING.SETTINGS.EDIT');
+  const liveRolleName = (rollen || []).find(r => String(r.id) === String(liveRolleId));
+%>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h3 class="card-title">Live-Rolle</h3>
+    <div class="card-actions">
+      <% if (liveRolleId) { %>
+        <span class="badge bg-green-lt">an</span>
+      <% } else { %>
+        <span class="badge bg-secondary-lt">aus</span>
+      <% } %>
+    </div>
+  </div>
+  <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/live-rolle">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+    <div class="card-body">
+      <p class="text-secondary small">
+        Wer gerade sendet, bekommt diese Rolle — und verliert sie, wenn der Stream
+        endet. Sie ist dafür gedacht, Streamende in der Mitgliederliste nach oben
+        zu holen oder ihnen währenddessen einen eigenen Kanal zu öffnen.
+      </p>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="live_rolle_id">Rolle</label>
+          <select class="form-select" id="live_rolle_id" name="live_rolle_id" <%= darfEinstellen ? '' : 'disabled' %>>
+            <option value="">— keine, Live-Rolle aus —</option>
+            <% if (liveRolleId && !liveRolleName) { %>
+              <option value="<%= liveRolleId %>" selected>⚠ gelöschte Rolle (<%= liveRolleId %>)</option>
+            <% } %>
+            <% (rollen || []).forEach(r => { %>
+              <option value="<%= r.id %>" <%= String(r.id) === String(liveRolleId) ? 'selected' : '' %>>@<%= r.name %></option>
+            <% }); %>
+          </select>
+          <div class="form-hint">
+            <strong>Wichtig:</strong> Die Rolle muss in der Rangliste <em>unter</em>
+            der Rolle des Bots stehen — sonst darf er sie nicht vergeben, und es
+            passiert nichts.
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="text-secondary small">
+            Die Rolle bekommt nur, wem unten ein Discord-Mitglied zugeordnet ist.
+            Ohne Zuordnung wissen wir nicht, wem der Kanal gehört — ein Kanalname
+            ist kein Discord-Konto.
+            <br><br>
+            Sie hängt am Live-Zustand, <strong>nicht</strong> am Filter: Wer
+            sendet, bekommt sie auch dann, wenn wegen eines Spielfilters keine
+            Ankündigung erscheint. Andernfalls ginge sie mitten im Stream an und
+            aus, sobald jemand die Kategorie wechselt.
+          </div>
+        </div>
+      </div>
+    </div>
+    <% if (darfEinstellen) { %>
+      <div class="card-footer text-end">
+        <button type="submit" class="btn btn-primary"><%= tr('streaming:COMMON.SAVE') %></button>
+      </div>
+    <% } %>
+  </form>
+</div>
 
 <div class="row row-cards">
   <% (ziele || []).forEach(z => { %>
@@ -131,6 +199,31 @@
                   <% }); %>
                 </select>
                 <div class="form-hint"><%= tr('streaming:TARGETS.ONAIR_HELP') %></div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="mitglied_<%= z.id %>">
+                  Wem gehört dieser Kanal?
+                  <% if (!liveRolleId) { %>
+                    <span class="badge bg-secondary-lt ms-1">Live-Rolle ist aus</span>
+                  <% } %>
+                </label>
+                <select class="form-select" id="mitglied_<%= z.id %>" name="mitglied_id" <%= darfAendern ? '' : 'disabled' %>>
+                  <option value="">— niemand zugeordnet —</option>
+                  <%
+                    const mDa = (mitglieder || []).some(m => String(m.id) === String(z.mitglied_id));
+                  %>
+                  <% if (z.mitglied_id && !mDa) { %>
+                    <option value="<%= z.mitglied_id %>" selected>⚠ nicht mehr auf dem Server (<%= z.mitglied_id %>)</option>
+                  <% } %>
+                  <% (mitglieder || []).forEach(m => { %>
+                    <option value="<%= m.id %>" <%= String(m.id) === String(z.mitglied_id) ? 'selected' : '' %>><%= m.name %></option>
+                  <% }); %>
+                </select>
+                <div class="form-hint">
+                  Nur für die Live-Rolle. Für die Ankündigung wird das nicht
+                  gebraucht — ohne Zuordnung funktioniert alles andere weiter.
+                </div>
               </div>
 
               <div class="col-md-4">

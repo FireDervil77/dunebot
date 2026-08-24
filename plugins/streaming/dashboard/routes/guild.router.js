@@ -29,7 +29,7 @@ const { requirePermission } = require('../../../../apps/dashboard/middlewares/pe
 const { CheckAdmin } = require('../../../../apps/dashboard/middlewares/admin.middleware');
 const {
     makeTranslator, renderView, renderFehler,
-    getZielkanaele, getSprachkanaele, getRollen, vorWieLange
+    getZielkanaele, getSprachkanaele, getRollen, getMitglieder, vorWieLange
 } = require('./_shared');
 const modelle = require('../../shared/models');
 const abos = require('../kern/abos');
@@ -165,15 +165,17 @@ router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
     const tr = makeTranslator(req, res);
 
     try {
-        const [ziele, zielkanaele, sprachkanaele, rollen] = await Promise.all([
+        const [ziele, zielkanaele, sprachkanaele, rollen, mitglieder, liveRolleId] = await Promise.all([
             modelle.zieleDerGuild(guildId),
             getZielkanaele(guildId),
             getSprachkanaele(guildId),
-            getRollen(guildId)
+            getRollen(guildId),
+            getMitglieder(guildId),
+            modelle.liveRolle(guildId)
         ]);
 
         await renderView(res, 'guild/streaming-ziele', {
-            tr, guildId, ziele, zielkanaele, sprachkanaele, rollen,
+            tr, guildId, ziele, zielkanaele, sprachkanaele, rollen, mitglieder, liveRolleId,
             meldung: req.query.ok || null,
             fehler: req.query.fehler || null
         });
@@ -181,6 +183,81 @@ router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
         return renderFehler(res, error, 'Die Ziele konnten nicht geladen werden');
     }
 });
+
+// **Reihenfolge zaehlt.** Diese Route muss VOR `/ziele/:id` stehen: Express
+// nimmt die erste Route, die passt, und `:id` passt auch auf "live-rolle".
+// Andersherum landete jedes Speichern der Live-Rolle in der Ziel-Route, wo
+// `Number("live-rolle")` NaN ergibt - und die Seite meldete einen technischen
+// Fehler, ohne dass irgendwo stuende, warum.
+// Die Live-Rolle der Guild
+//
+// Eigenes Recht (SETTINGS.EDIT statt TARGETS.MANAGE): Das ist eine Vorgabe der
+// Guild, kein einzelnes Ziel. Wer Ziele pflegen darf, soll nicht nebenbei eine
+// Rolle vergeben duerfen, die der ganze Server sieht.
+router.post('/ziele/live-rolle', requirePermission('STREAMING.SETTINGS.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/ziele`;
+
+    try {
+        const rolleId = String(req.body.live_rolle_id || '').trim();
+        if (rolleId && !/^\d{5,32}$/.test(rolleId)) {
+            return res.redirect(`${zurueck}?fehler=rolle`);
+        }
+
+        const vorher = await modelle.liveRolle(guildId);
+        await modelle.liveRolleSetzen(guildId, rolleId);
+
+        // **Wird die Rolle gewechselt oder abgeschaltet, bleibt die alte an
+        // allen haengen, die gerade live sind.** Sie abzuraeumen ist kein
+        // Zusatz, sondern gehoert zum Umstellen dazu - sonst traegt jemand
+        // wochenlang eine Rolle, die es im Plugin nicht mehr gibt.
+        if (vorher && vorher !== rolleId) {
+            const anzahl = await altRolleAbraeumen(guildId, vorher);
+            Logger.info(`[Streaming] Live-Rolle gewechselt, ${anzahl} Auftrag/Auftraege zum Entziehen der alten Rolle`);
+            return res.redirect(`${zurueck}?ok=${rolleId ? 'rolle_gewechselt' : 'rolle_aus'}`);
+        }
+
+        Logger.info(`[Streaming] Live-Rolle der Guild ${guildId} ${rolleId ? 'gesetzt' : 'abgeschaltet'}`);
+        return res.redirect(`${zurueck}?ok=gespeichert`);
+    } catch (error) {
+        Logger.error('[Streaming] Live-Rolle speichern fehlgeschlagen:', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+/**
+ * Eine abgeloeste Live-Rolle bei allen einsammeln, die sie tragen koennten.
+ *
+ * Gemeint sind die Ziele dieser Guild mit zugeordnetem Mitglied - mehr wissen
+ * wir nicht. Wer die Rolle von Hand bekommen hat, behaelt sie: Das Plugin
+ * raeumt nur weg, was es selbst vergeben haben koennte.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {string} rolleId Die alte Rolle
+ * @returns {Promise<number>} Anzahl Auftraege
+ */
+async function altRolleAbraeumen(guildId, rolleId) {
+    const db = ServiceManager.get('dbService');
+    const ziele = await db.query(
+        'SELECT id, mitglied_id FROM streaming_targets WHERE guild_id = ? AND mitglied_id IS NOT NULL', [guildId]);
+
+    const gesehen = new Set();
+    let anzahl = 0;
+
+    for (const ziel of ziele) {
+        if (gesehen.has(ziel.mitglied_id)) continue;
+        gesehen.add(ziel.mitglied_id);
+
+        await db.query(`
+            INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast)
+            VALUES (?, ?, 'rolle_nehmen', ?)
+        `, [ziel.id, guildId, JSON.stringify({ mitglied_id: ziel.mitglied_id, rolle_id: rolleId })]);
+        anzahl++;
+    }
+
+    return anzahl;
+}
 
 // Ein Ziel aendern
 router.post('/ziele/:id', requirePermission('STREAMING.TARGETS.MANAGE'), async (req, res) => {
@@ -214,7 +291,11 @@ router.post('/ziele/:id', requirePermission('STREAMING.TARGETS.MANAGE'), async (
             aufraeumen,
             eigenes_bild:     bild || null,
             veroeffentlichen: req.body.veroeffentlichen ? 1 : 0,
-            aktiv:            req.body.aktiv ? 1 : 0
+            aktiv:            req.body.aktiv ? 1 : 0,
+            // Nur Ziffern: Eine Discord-ID ist eine Zahl. Ein eingetippter
+            // Name kaeme sonst als Mitglied durch und die Rolle ginge ins Leere.
+            mitglied_id:      /^\d{5,32}$/.test(String(req.body.mitglied_id || '').trim())
+                                ? String(req.body.mitglied_id).trim() : null
         });
 
         // Null geaenderte Zeilen heisst hier: das Ziel gehoert dieser Guild

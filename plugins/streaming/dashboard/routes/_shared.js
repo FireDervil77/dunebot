@@ -178,6 +178,32 @@ async function getRollen(guildId) {
 }
 
 /**
+ * Mitglieder der Guild - fuer die Zuordnung Kanal -> Person (Live-Rolle).
+ *
+ * `dashboard:GET_ALL_GUILD_MEMBERS` steht im Switch von `IPCClient.js` und
+ * wird vom Rechte-Router bereits benutzt - nicht neu gebaut, nachgesehen. Er
+ * holt die Liste mit `force: true`, also **auch die abgemeldeten**; ohne das
+ * fehlten genau die, die gerade nicht im Discord sind.
+ *
+ * Boter werden aussortiert: Ein Bot betreibt keinen Twitch-Kanal.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @returns {Promise<Array>} Mitglieder, nach Anzeigename sortiert
+ */
+async function getMitglieder(guildId) {
+    try {
+        const antwort = await fragBot('dashboard:GET_ALL_GUILD_MEMBERS', { guildId });
+        const alle = antwort?.members || [];
+        return alle
+            .filter(m => !m.user?.bot)
+            .map(m => ({ id: m.user.id, name: m.displayName || m.user.username, tag: m.user.tag }));
+    } catch (err) {
+        ServiceManager.get('Logger').warn(`[Streaming] Mitglieder nicht ladbar: ${err.message}`);
+        return [];
+    }
+}
+
+/**
  * "vor 40 Sekunden" statt eines Zeitstempels.
  *
  * Das ist die Zahl, die den Unterschied macht: Sie beantwortet die Frage, die
@@ -207,5 +233,6 @@ module.exports = {
     getZielkanaele,
     getSprachkanaele,
     getRollen,
+    getMitglieder,
     vorWieLange
 };

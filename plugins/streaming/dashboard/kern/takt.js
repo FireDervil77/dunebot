@@ -165,7 +165,12 @@ async function gingLive(streamer, zustand, ereignis) {
             beendet_am = NULL
     `, [streamer.id, ereignis.sendung_id || null, alsDatum(ereignis.begonnen_am, new Date())]);
 
-    if (wahl.handlung === 'nichts') return `keine Meldung: ${wahl.grund}`;
+    // Die Rolle haengt am Livezustand, nicht an der Ankuendigung: Auch wenn
+    // wegen Abklingzeit oder Filter nichts gemeldet wird, sendet die Person.
+    // Deshalb steht das VOR den beiden Abbruechen darunter.
+    const rollen = await rollenAuffaechern(streamer.id, 'geben');
+
+    if (wahl.handlung === 'nichts') return `keine Meldung: ${wahl.grund}` + (rollen ? `, ${rollen} Rolle(n) vorgemerkt` : '');
     if (wahl.handlung === 'aktualisieren') return `keine zweite Ankuendigung: ${wahl.grund}`;
 
     const anzahl = await auffaechern(streamer.id, 'posten');
@@ -194,15 +199,27 @@ async function beendet(streamer, zustand, ereignis) {
         ON DUPLICATE KEY UPDATE ist_live = 0, beendet_am = VALUES(beendet_am)
     `, [streamer.id, alsDatum(ereignis.beendet_am, new Date())]);
 
-    if (wahl.handlung === 'nichts') return wahl.grund;
-
     // Karenz: erst nach Ablauf aufraeumen. Kommt der Streamer vorher zurueck,
     // hebt `gingLive` den Zustand wieder auf, und der Auftrag findet beim
     // Ausfuehren eine laufende Sendung vor.
     const karenzMs = einstellungen().karenzMinuten * 60_000;
+
+    // **Die Rolle bekommt dieselbe Karenz.** Twitch meldet nach kurzen
+    // Verbindungsabrissen erneut `stream.online`; ohne Karenz waere die Rolle
+    // in der Zwischenzeit weg und kaeme sofort wieder - mit allem, was daran
+    // haengt (Sortierung der Mitgliederliste, Benachrichtigungen). Sie wird
+    // auch dann genommen, wenn gar nichts angekuendigt wurde: Die Rolle haengt
+    // am Livezustand, nicht an der Nachricht.
+    const rollen = await rollenAuffaechern(streamer.id, 'nehmen', karenzMs);
+
+    if (wahl.handlung === 'nichts') {
+        return wahl.grund + (rollen ? `, ${rollen} Rolle(n) zum Entziehen vorgemerkt` : '');
+    }
+
     const anzahl = await auffaechern(streamer.id, 'aufraeumen', karenzMs);
 
-    return `Aufraeumen fuer ${anzahl} Ziel(e) in ${Math.round(karenzMs / 1000)} s vorgemerkt`;
+    return `Aufraeumen fuer ${anzahl} Ziel(e) in ${Math.round(karenzMs / 1000)} s vorgemerkt` +
+           (rollen ? `, dazu ${rollen} Rolle(n)` : '');
 }
 
 /**
@@ -266,6 +283,72 @@ async function auffaechern(streamerId, aktion, verzoegerungMs = 0) {
             INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast, faellig_ab)
             VALUES (?, ?, ?, ?, DATE_ADD(NOW(3), INTERVAL ? MICROSECOND))
         `, [ziel.id, ziel.guild_id, aktion, JSON.stringify({ streamer_id: streamerId }), verzoegerungMs * 1000]);
+
+        geschrieben++;
+    }
+
+    return geschrieben;
+}
+
+/**
+ * Live-Rolle auffaechern.
+ *
+ * Getrennt von `auffaechern()`, weil hier andere Regeln gelten:
+ *
+ * **1. Der Ankuendigungsfilter zaehlt NICHT.** Wer sendet, sendet — auch wenn
+ * die Guild nur bei einem bestimmten Spiel meldet. Haengte man die Rolle an
+ * den Filter, ginge sie mitten im Stream an und aus, sobald jemand die
+ * Kategorie wechselt. Ein Mitglied, dem der Bot im Minutentakt eine Rolle gibt
+ * und nimmt, ist ein Aergernis mit Benachrichtigung.
+ *
+ * **2. Ohne Zuordnung passiert nichts.** `mitglied_id` leer heisst: Wir wissen
+ * nicht, wem der Kanal gehoert. Das ist der Normalfall, kein Fehler.
+ *
+ * **3. Die Rolle wird in die Nutzlast geschrieben, nicht spaeter gelesen.**
+ * Sonst nimmt ein „nehmen" nach einer Umstellung die falsche Rolle weg — und
+ * die alte bleibt fuer immer haengen.
+ *
+ * @param {number} streamerId Streamer
+ * @param {string} aktion 'geben' | 'nehmen'
+ * @param {number} [verzoegerungMs=0] Verzoegerung
+ * @returns {Promise<number>} Anzahl geschriebener Auftraege
+ */
+async function rollenAuffaechern(streamerId, aktion, verzoegerungMs = 0) {
+    const ziele = await db().query(
+        'SELECT id, guild_id, mitglied_id FROM streaming_targets WHERE streamer_id = ? AND aktiv = 1 AND mitglied_id IS NOT NULL',
+        [streamerId]);
+    if (!ziele.length) return 0;
+
+    // Die Rollen aller betroffenen Guilds in EINEM Zug - nicht je Ziel eine
+    // Abfrage. Bei 200 Guilds waere das sonst der teuerste Teil des Laufs.
+    const guilds = [...new Set(ziele.map(z => z.guild_id))];
+    const rollen = new Map();
+    for (const guildId of guilds) {
+        const wert = await db().getConfig('streaming', 'LIVE_ROLLE_ID', 'shared', guildId);
+        if (typeof wert === 'string' && wert.trim()) rollen.set(guildId, wert.trim());
+    }
+
+    let geschrieben = 0;
+
+    // Ein Mitglied kann in derselben Guild mehrere Ziele haben (zwei Kanaele).
+    // Die Rolle ist trotzdem eine - sonst schreiben wir zwei Auftraege, die
+    // dasselbe tun, und der zweite meldet "hatte die Rolle schon".
+    const gesehen = new Set();
+
+    for (const ziel of ziele) {
+        const rolleId = rollen.get(ziel.guild_id);
+        if (!rolleId) continue;
+
+        const schluessel = `${ziel.guild_id}/${ziel.mitglied_id}/${rolleId}`;
+        if (gesehen.has(schluessel)) continue;
+        gesehen.add(schluessel);
+
+        await db().query(`
+            INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast, faellig_ab)
+            VALUES (?, ?, ?, ?, DATE_ADD(NOW(3), INTERVAL ? MICROSECOND))
+        `, [ziel.id, ziel.guild_id, `rolle_${aktion}`,
+            JSON.stringify({ streamer_id: streamerId, mitglied_id: ziel.mitglied_id, rolle_id: rolleId }),
+            verzoegerungMs * 1000]);
 
         geschrieben++;
     }
@@ -509,6 +592,14 @@ async function tagesLauf() {
         await require('./aufraeumen').lauf();
     } catch (err) {
         log().error('[Streaming] Aufraeumen fehlgeschlagen:', err);
+    }
+
+    try {
+        // Der Rollenabgleich zum Schluss: Er stuetzt sich auf `streaming_state`,
+        // und das ist nach Abgleich und Aufraeumen am ehesten richtig.
+        await require('../ausgabe/liverolle').lauf();
+    } catch (err) {
+        log().error('[Streaming] Rollenabgleich fehlgeschlagen:', err);
     } finally {
         tagLaeuft = false;
     }
@@ -524,4 +615,4 @@ function anhalten() {
     uhren = [];
 }
 
-module.exports = { TAKT_MS, ANREICHERN_MS, TAG_MS, alsDatum, starten, anhalten, posteingangLauf, anreicherungsLauf, tagesLauf, verarbeiten };
+module.exports = { TAKT_MS, ANREICHERN_MS, TAG_MS, alsDatum, starten, anhalten, posteingangLauf, anreicherungsLauf, tagesLauf, rollenAuffaechern, verarbeiten };

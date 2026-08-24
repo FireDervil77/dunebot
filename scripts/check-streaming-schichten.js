@@ -97,7 +97,11 @@ melde('Twitch-Vokabular nur in plattformen/',
         rel => !rel.startsWith(path.join('dashboard', 'plattformen'))));
 
 melde('IPC nur in ausgabe/',
-    suche(/ipcServer|broadcastOne\(|\.broadcast\(/,
+    // `fragBot` gehoert dazu. Am 2026-08-25 rutschte der Rollenabgleich durch
+    // diese Regel, weil er nicht `ipcServer` schrieb, sondern den Helfer aus
+    // `routes/_shared.js` - dieselbe Sache, anderer Name. Ein Waechter, der nur
+    // ein Wort kennt, bewacht nur dieses Wort.
+    suche(/ipcServer|broadcastOne\(|\.broadcast\(|\bfragBot\b/,
         rel => !rel.startsWith(path.join('dashboard', 'ausgabe'))
             && !rel.startsWith(path.join('dashboard', 'routes', '_shared'))));
 
