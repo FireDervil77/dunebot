@@ -276,12 +276,32 @@ async function ketteFahren(c, s) {
             (ereignisse[0]?.fehlertext ? `  — ${ereignisse[0].fehlertext}` : ''));
 
         const [auftraege] = await c.query(`
-            SELECT aktion, zustand, fehlertext FROM streaming_outbox
+            SELECT aktion, zustand, faellig_ab, fehlertext FROM streaming_outbox
              WHERE target_id IN (SELECT id FROM streaming_targets WHERE streamer_id = ?)
              ORDER BY id DESC LIMIT 5`, [s.id]);
         console.log('  Auftraege:  ' + (auftraege.length
             ? auftraege.map(a => `${a.aktion}=${a.zustand}${a.fehlertext ? ` (${a.fehlertext})` : ''}`).join(', ')
             : 'keine'));
+
+        // **Der wichtigste Satz dieser Ausgabe.** Ein Auftrag auf "offen" mit
+        // einer Faelligkeit in der Zukunft sieht aus wie ein Fehlschlag und ist
+        // keiner - er wartet die Karenz ab. Ohne diese Zeile schaut man nach
+        // zehn Sekunden ins Discord, sieht die unveraenderte Ankuendigung und
+        // haelt das Aufraeumen fuer kaputt. Genau das ist am 2026-08-25 zweimal
+        // passiert, bevor diese Zeile hier stand.
+        const offen = auftraege.filter(a => a.zustand === 'offen' && new Date(a.faellig_ab) > new Date());
+        if (offen.length) {
+            console.log('');
+            for (const a of offen) {
+                const sekunden = Math.max(0, Math.round((new Date(a.faellig_ab) - Date.now()) / 1000));
+                console.log(`  ⏳ "${a.aktion}" ist vorgemerkt, aber noch NICHT faellig:`);
+                console.log(`     faellig um ${new Date(a.faellig_ab).toLocaleTimeString('de-DE')}, also in ${sekunden} s.`);
+            }
+            console.log('     Bis dahin bleibt die Nachricht im Discord unveraendert stehen —');
+            console.log('     das ist die Karenz und richtig so: Kommt der Streamer innerhalb');
+            console.log('     dieser Zeit zurueck, waere das Aufraeumen ein Fehler gewesen.');
+            console.log('     Also warten und DANN nachsehen.');
+        }
 
         const [nachrichten] = await c.query(`
             SELECT message_id, zustand FROM streaming_messages
