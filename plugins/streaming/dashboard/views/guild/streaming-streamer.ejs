@@ -41,9 +41,14 @@
             <div class="col-md-4">
               <label for="kanal" class="form-label">Twitch-Kanal</label>
               <input type="text" class="form-control" id="kanal" name="kanal"
-                     placeholder="z. B. ninja" autocomplete="off" required
+                     placeholder="ninja  oder  twitch.tv/ninja" autocomplete="off" required
                      <%= anzahl >= grenze ? 'disabled' : '' %>>
-              <div class="form-hint">Name oder Adresse. Der Streamer erfaehrt davon nichts.</div>
+              <div class="form-hint">
+                Der Name aus der <strong>Adresszeile</strong> (twitch.tv/<em>name</em>) —
+                nicht der Anzeigename aus dem Profil. Gross- und Kleinschreibung ist egal,
+                eine vollstaendige Adresse geht auch. Der Kanal wird vor dem Speichern
+                bei Twitch nachgeschlagen; den Streamer selbst benachrichtigt das nicht.
+              </div>
             </div>
             <div class="col-md-4">
               <label for="channel_id" class="form-label"><%= tr('streaming:TARGETS.CHANNEL') %></label>
@@ -77,6 +82,11 @@
                   <option value="<%= r.id %>">@<%= r.name %></option>
                 <% }); %>
               </select>
+              <div class="form-hint">
+                Wird in der Ankuendigung erwaehnt — alle mit dieser Rolle bekommen
+                eine Benachrichtigung. Ueblich ist eine Rolle, die sich Mitglieder
+                selbst geben koennen. Ohne Auswahl kommt die Ankuendigung ohne Ping.
+              </div>
             </div>
           </div>
           <div class="mt-3">
