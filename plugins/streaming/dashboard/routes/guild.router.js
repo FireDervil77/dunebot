@@ -380,16 +380,91 @@ router.get('/betrieb', CheckAdmin, async (req, res) => {
     const guildId = res.locals.guildId;
 
     try {
-        const daten = await modelle.zugangsdaten('TWITCH');
+        const abgleich = require('../kern/abgleich');
+        const aufraeumen = require('../kern/aufraeumen');
+
+        const [daten, abgleichBericht, aufraeumBericht, alleStreamer] = await Promise.all([
+            modelle.zugangsdaten('TWITCH'),
+            abgleich.letzterBericht(),
+            aufraeumen.letzterBericht(),
+            modelle.alleStreamer()
+        ]);
 
         await renderView(res, 'guild/streaming-betrieb', {
             tr, guildId,
             clientId: daten.clientId || '',
             secretQuelle: daten.quelle,
-            gespeichert: req.query.ok === '1'
+            abgleichBericht, aufraeumBericht, alleStreamer,
+            vorWieLange,
+            gespeichert: req.query.ok === '1',
+            meldung: req.query.ok || null,
+            fehler: req.query.fehler || null
         });
     } catch (error) {
         return renderFehler(res, error, 'Die Betriebsseite konnte nicht geladen werden');
+    }
+});
+
+// Abgleich von Hand ausloesen
+//
+// Der Lauf laeuft ohnehin taeglich. Von Hand braucht man ihn nach einem
+// Ausfall - und genau dann will man nicht bis morgen warten.
+router.post('/betrieb/abgleich', CheckAdmin, async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/betrieb`;
+
+    try {
+        // `trocken` zeigt nur, was geschehen wuerde. Beim ersten Mal nach
+        // einem Ausfall ist das die richtige Reihenfolge: erst sehen, dann
+        // handeln.
+        const trocken = Boolean(req.body.trocken);
+        const bericht = await require('../kern/abgleich').lauf({ trocken });
+
+        Logger.info(`[Streaming] Abgleich von Hand ausgeloest (${trocken ? 'Probelauf' : 'scharf'})`);
+        return res.redirect(`${zurueck}?ok=${bericht.abgebrochen ? 'abgleich_abbruch' : (trocken ? 'abgleich_probe' : 'abgleich')}`);
+    } catch (error) {
+        Logger.error('[Streaming] Abgleich fehlgeschlagen:', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+// Einen Kanal ueberall entfernen
+//
+// Das ist NICHT dasselbe wie das Entfernen in einer Guild: Hier verschwindet
+// der Kanal aus **allen** Guilds, die Abos werden abbestellt und die
+// Nachrichten-Verweise fallen mit. Grundlage ist die Loeschpflicht aus dem
+// Twitch-Developer-Agreement (FRAGEN.md, F-11).
+//
+// **Was hier bewusst NOCH fehlt:** eine Sperre, die ein erneutes Eintragen
+// verhindert. Die gehoert in den Admin-Bereich und nicht in dieses Plugin
+// (Entscheidung des Betreibers am 2026-08-24, ab Stufe 8). Bis dahin kann eine
+// Guild denselben Kanal morgen wieder eintragen - das sagt die Seite auch.
+router.post('/betrieb/streamer/:id/ueberall-entfernen', CheckAdmin, async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/betrieb`;
+
+    try {
+        const streamerId = Number(req.params.id);
+        if (!Number.isInteger(streamerId)) return res.redirect(`${zurueck}?fehler=technisch`);
+
+        const zeilen = await ServiceManager.get('dbService').query(
+            'SELECT login FROM streaming_streamers WHERE id = ?', [streamerId]);
+        if (!zeilen.length) return res.redirect(`${zurueck}?fehler=weg`);
+
+        // Reihenfolge: erst die Ziele weg, DANN aufraeumen. `abosAufraeumen`
+        // zaehlt die verbliebenen Ziele - solange noch eines steht, behaelt es
+        // das Abo und die Loeschung waere unvollstaendig.
+        await ServiceManager.get('dbService').query(
+            'DELETE FROM streaming_targets WHERE streamer_id = ?', [streamerId]);
+        const ergebnis = await abos.abosAufraeumen(streamerId);
+
+        Logger.warn(`[Streaming] "${zeilen[0].login}" ueberall entfernt (${ergebnis.abbestellt} Abo(s) abbestellt)`);
+        return res.redirect(`${zurueck}?ok=ueberall`);
+    } catch (error) {
+        Logger.error('[Streaming] Ueberall entfernen fehlgeschlagen:', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
     }
 });
 

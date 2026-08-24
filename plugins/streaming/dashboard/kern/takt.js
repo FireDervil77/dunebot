@@ -34,8 +34,21 @@ const abos = require('./abos');
 const TAKT_MS = 5_000;
 const ANREICHERN_MS = 30_000;
 
+/** Abgleich und Aufraeumen: einmal am Tag reicht - beide reden mit der Plattform. */
+const TAG_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Warten, bevor der erste Abgleich laeuft.
+ *
+ * Ein Abgleich in der ersten Sekunde nach dem Start traefe auf ein Dashboard,
+ * das seine Verbindungen noch aufbaut. Scheitert er, sieht das aus wie "alle
+ * Abos sind weg" - und der Lauf handelt danach.
+ */
+const START_VERZOEGERUNG_MS = 60_000;
+
 let laeuftGerade = false;
 let anreicherungLaeuft = false;
+let tagLaeuft = false;
 let uhren = [];
 
 /**
@@ -351,10 +364,20 @@ async function anreicherungsLauf() {
             const adapter = abos.ADAPTER[plattform];
             if (!adapter) continue;
 
-            const angaben = await adapter.anreichern(zeilen.map(z => z.kanal_id));
+            const { angaben, vollstaendig } = await adapter.anreichern(zeilen.map(z => z.kanal_id));
 
             for (const zeile of zeilen) {
                 const a = angaben.get(String(zeile.kanal_id));
+
+                // **Fehlt die Angabe, weil der Stream vorbei ist - oder weil
+                // die Abfrage scheiterte?** Der Unterschied entscheidet alles:
+                // Beim Fehlschlag wuerden hier ALLE laufenden Streams auf
+                // offline gesetzt und mitten in der Sendung zur Rueckschau
+                // umgebaut. Im Zweifel nichts tun.
+                if (!a && !vollstaendig) {
+                    log().warn(`[Streaming] Anreicherung unvollstaendig - Zustand von ${zeile.login} bleibt unberuehrt`);
+                    continue;
+                }
 
                 if (!a) {
                     // Nicht in `/streams` gefunden: Der Stream ist vorbei, und
@@ -446,9 +469,49 @@ function starten() {
     // Ueberlappungsschutz, wie es der Aufraeumer im Musik-Plugin vormacht.
     uhren.push(setInterval(() => posteingangLauf().catch(() => {}), TAKT_MS));
     uhren.push(setInterval(() => anreicherungsLauf().catch(() => {}), ANREICHERN_MS));
+    uhren.push(setInterval(() => tagesLauf().catch(() => {}), TAG_MS));
     uhren.forEach(u => u.unref?.());
 
-    log().info(`[Streaming] Takt gestartet (Posteingang ${TAKT_MS / 1000} s, Anreicherung ${ANREICHERN_MS / 1000} s)`);
+    // **Einmal beim Start, aber nicht sofort.** Ein Abgleich in der ersten
+    // Sekunde traefe auf ein Dashboard, das seine Verbindungen noch aufbaut -
+    // und ein gescheiterter Abgleich sieht aus wie "alle Abos weg". Die
+    // Verzoegerung ist kein Schoenheitsfehler, sie ist der Punkt.
+    const ersterLauf = setTimeout(() => tagesLauf().catch(() => {}), START_VERZOEGERUNG_MS);
+    ersterLauf.unref?.();
+    uhren.push(ersterLauf);
+
+    log().info(`[Streaming] Takt gestartet (Posteingang ${TAKT_MS / 1000} s, ` +
+        `Anreicherung ${ANREICHERN_MS / 1000} s, Abgleich alle ${TAG_MS / 3600000} h)`);
+}
+
+/**
+ * Der taegliche Lauf: erst abgleichen, dann aufraeumen.
+ *
+ * **Die Reihenfolge zaehlt.** Der Abgleich bestellt Abos ab, die niemand mehr
+ * liest; erst danach darf der Aufraeumer Streamer loeschen, die weder Ziel noch
+ * Abo haben. Andersherum verschwaende der Streamer mitsamt seiner Abo-Zeile -
+ * und das Abo bei der Plattform lebte weiter, ohne dass noch jemand davon
+ * weiss. Genau dieser Fall ist im Aufraeumer als zweite Bedingung vermerkt.
+ *
+ * @returns {Promise<void>}
+ */
+async function tagesLauf() {
+    if (tagLaeuft) return;
+    tagLaeuft = true;
+
+    try {
+        await require('./abgleich').lauf();
+    } catch (err) {
+        log().error('[Streaming] Abgleich fehlgeschlagen:', err);
+    }
+
+    try {
+        await require('./aufraeumen').lauf();
+    } catch (err) {
+        log().error('[Streaming] Aufraeumen fehlgeschlagen:', err);
+    } finally {
+        tagLaeuft = false;
+    }
 }
 
 /**
@@ -461,4 +524,4 @@ function anhalten() {
     uhren = [];
 }
 
-module.exports = { TAKT_MS, ANREICHERN_MS, alsDatum, starten, anhalten, posteingangLauf, anreicherungsLauf, verarbeiten };
+module.exports = { TAKT_MS, ANREICHERN_MS, TAG_MS, alsDatum, starten, anhalten, posteingangLauf, anreicherungsLauf, tagesLauf, verarbeiten };

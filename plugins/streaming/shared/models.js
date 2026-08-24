@@ -95,6 +95,32 @@ async function anzahlStreamer(guildId) {
     return Number(zeilen[0]?.anzahl || 0);
 }
 
+/**
+ * Alle beobachteten Kanaele ueber ALLE Guilds - fuer die Betriebsseite.
+ *
+ * Bewusst getrennt von `streamerDerGuild`: Die eine Abfrage beantwortet „was
+ * beobachtet dieser Server", die andere „was haelt diese Anlage". Wer beides
+ * in eine Funktion mit Schalter presst, verwechselt sie irgendwann - und dann
+ * sieht eine Guild die Kanaele aller anderen.
+ *
+ * @returns {Promise<Array>} Zeilen mit Anzahl Guilds und Abos
+ */
+async function alleStreamer() {
+    return await db().query(`
+        SELECT  s.id, s.plattform, s.login, s.anzeigename, s.angelegt_am,
+                z.ist_live,
+                COUNT(DISTINCT t.guild_id) AS guilds,
+                COUNT(DISTINCT a.id)       AS abos,
+                MAX(a.letzte_meldung_am)   AS letzte_meldung_am
+        FROM streaming_streamers s
+        LEFT JOIN streaming_targets       t ON t.streamer_id = s.id
+        LEFT JOIN streaming_subscriptions a ON a.streamer_id = s.id
+        LEFT JOIN streaming_state         z ON z.streamer_id = s.id
+        GROUP BY s.id, z.ist_live
+        ORDER BY s.login ASC
+    `);
+}
+
 // =====================================================
 // Betriebszustand
 // =====================================================
@@ -362,6 +388,7 @@ module.exports = {
     VORGABE_RUECKSCHAU,
     streamerDerGuild,
     zieleDerGuild,
+    alleStreamer,
     anzahlStreamer,
     zustandDerGuild,
     zielLesen,

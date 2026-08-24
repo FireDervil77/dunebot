@@ -188,28 +188,85 @@ async function abbestellen(aboId) {
 }
 
 /**
+ * Zustand eines Abos ins Hausvokabular.
+ *
+ * Die Uebersetzung gehoert hierher und nirgendwo sonst: `enabled` und
+ * `authorization_revoked` sind Twitch-Woerter. Wer sie im Kern vergleicht, hat
+ * Twitch im Kern - und Kick bringt andere mit.
+ *
+ * Unbekanntes wird **nicht** stillschweigend auf "fehler" gelegt: Ein neuer
+ * Zustand bei Twitch waere sonst ein Fehler, den es nicht gibt. Er kommt als
+ * `null` zurueck, und der Aufrufer laesst die Zeile in Ruhe und protokolliert.
+ *
+ * @param {string} status Zustand bei Twitch
+ * @returns {string|null} 'bestaetigt' | 'angefragt' | 'fehler' | 'widerrufen' | null
+ */
+function zustandUebersetzen(status) {
+    switch (status) {
+        case 'enabled':
+            return 'bestaetigt';
+        case 'webhook_callback_verification_pending':
+            return 'angefragt';
+        case 'webhook_callback_verification_failed':
+        case 'notification_failures_exceeded':
+            return 'fehler';
+        case 'authorization_revoked':
+        case 'moderator_removed':
+        case 'user_removed':
+        case 'version_removed':
+        case 'chat_user_banned':
+            return 'widerrufen';
+        default:
+            return null;
+    }
+}
+
+/**
  * Alle Abos dieser Anwendung - Grundlage des Abgleichs.
  *
- * @returns {Promise<{abos: Array, kosten: number, grenze: number}>} Bestand
+ * Gibt **uebersetzte** Zeilen zurueck, keine Rohdaten: Sonst muesste der Kern
+ * `condition.broadcaster_user_id` lesen und haette damit Twitch-Vokabular.
+ *
+ * `unbekannt` traegt den Rohzustand, falls die Uebersetzung ihn nicht kennt -
+ * damit im Protokoll steht, was Twitch wirklich gesagt hat.
+ *
+ * @returns {Promise<{abos: Array, kosten: number, grenze: number, vollstaendig: boolean}>} Bestand
  */
 async function abosAuflisten() {
     const abos = [];
     let cursor = null;
     let kosten = 0;
     let grenze = 0;
+    let vollstaendig = true;
 
     do {
         const pfad = '/eventsub/subscriptions' + (cursor ? `?after=${encodeURIComponent(cursor)}` : '');
         const { ok, json } = await helix(pfad);
-        if (!ok) break;
 
-        abos.push(...(json.data || []));
+        // Ein Abbruch mitten in der Blaetterung ist gefaehrlich: Die halbe
+        // Liste sieht aus wie "die Haelfte der Abos ist weg" - und ein
+        // Abgleich, der darauf handelt, bestellt sie ab. Deshalb ein Merker,
+        // und der Aufrufer bricht ab, statt aufzuraeumen.
+        if (!ok) { vollstaendig = false; break; }
+
+        for (const a of json.data || []) {
+            abos.push({
+                anbieter_abo_id: a.id,
+                ereignis:        a.type,
+                kanal_id:        a.condition?.broadcaster_user_id || null,
+                zustand:         zustandUebersetzen(a.status),
+                unbekannt:       zustandUebersetzen(a.status) === null ? a.status : null,
+                kosten:          a.cost ?? 0,
+                rueckruf:        a.transport?.callback || null
+            });
+        }
+
         kosten = json.total_cost ?? kosten;
         grenze = json.max_total_cost ?? grenze;
         cursor = json.pagination?.cursor || null;
     } while (cursor);
 
-    return { abos, kosten, grenze };
+    return { abos, kosten, grenze, vollstaendig };
 }
 
 /**
@@ -221,17 +278,25 @@ async function abosAuflisten() {
  * fuer alles).
  *
  * @param {Array<string>} kanalIds Numerische IDs
- * @returns {Promise<Map<string, Object>>} kanalId -> Angaben
+ * @returns {Promise<{angaben: Map<string, Object>, vollstaendig: boolean}>} Angaben je kanalId, und ob alle Stapel durchkamen
  */
 async function anreichern(kanalIds) {
     const ergebnis = new Map();
+    let vollstaendig = true;
     const ids = [...new Set(kanalIds.map(String))].filter(Boolean);
 
     for (let i = 0; i < ids.length; i += 100) {
         const teil = ids.slice(i, i + 100);
         const abfrage = teil.map(id => `user_id=${encodeURIComponent(id)}`).join('&');
         const { ok, json } = await helix(`/streams?${abfrage}&first=100`);
-        if (!ok) continue;
+
+        // **Ein gescheiterter Stapel ist nicht dasselbe wie "niemand ist
+        // live".** Der Aufrufer liest ein fehlendes Ergebnis als "Stream
+        // vorbei" und setzt den Zustand zurueck — bei einem Netzwerkfehler
+        // waeren das ALLE laufenden Streams auf einmal, samt Rueckschau
+        // mitten in der Sendung. Deshalb wird der Fehlschlag gemeldet, nicht
+        // uebersprungen.
+        if (!ok) { vollstaendig = false; continue; }
 
         for (const s of json.data || []) {
             ergebnis.set(String(s.user_id), {
@@ -253,7 +318,7 @@ async function anreichern(kanalIds) {
         }
     }
 
-    return ergebnis;
+    return { angaben: ergebnis, vollstaendig };
 }
 
 // =====================================================
@@ -422,6 +487,7 @@ module.exports = {
     abonnieren,
     abbestellen,
     abosAuflisten,
+    zustandUebersetzen,
     anreichern,
     signaturPruefen,
     zuAlt,

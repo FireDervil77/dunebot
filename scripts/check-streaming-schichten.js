@@ -134,6 +134,24 @@ melde('Kein `const [x] = await …query(INSERT|UPDATE|DELETE)` (Baustelle 63a)',
 // fast gleich aus und faellt erst im Log des Bots auf.
 console.log('\nExportform');
 {
+    // Regel 5: Wer die Plattform nach dem Livezustand fragt, muss den
+    // Fehlschlag mitlesen. `anreichern()` liefert `{ angaben, vollstaendig }`;
+    // wer nur `angaben` nimmt, kann "Abfrage gescheitert" nicht von "Stream
+    // vorbei" unterscheiden - und setzt bei einem Netzwerkfehler ALLE
+    // laufenden Streams auf offline. Gefunden am 2026-08-24 beim Bau des
+    // Abgleichs, vorher genau so gebaut.
+    for (const datei of dateien(WURZEL)) {
+        if (datei.includes(`${path.sep}plattformen${path.sep}`)) continue;
+        const inhalt = fs.readFileSync(datei, 'utf8');
+
+        inhalt.split('\n').forEach((zeile, i) => {
+            if (!/\.anreichern\s*\(/.test(zeile)) return;
+            if (/vollstaendig/.test(zeile)) return;
+            verstoesse++;
+            console.log(`  ✗ ${path.relative(WURZEL, datei)}:${i + 1} ruft anreichern() ohne \`vollstaendig\` zu lesen`);
+        });
+    }
+
     const botIndex = fs.readFileSync(path.join(WURZEL, 'bot/index.js'), 'utf8');
     melde('bot/index.js exportiert eine Instanz (`new …()`)',
         /module\.exports\s*=\s*new\s+\w+\(\)/.test(botIndex) ? []

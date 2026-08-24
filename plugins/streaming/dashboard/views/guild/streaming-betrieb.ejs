@@ -5,8 +5,28 @@
   beschreibung: tr('streaming:OPERATIONS.SUBTITLE')
 }) %>
 
-<% if (gespeichert) { %>
-  <div class="alert alert-success">Zugangsdaten gespeichert.</div>
+<%
+  const meldungen = {
+    '1':               'Zugangsdaten gespeichert.',
+    abgleich:          'Abgleich gelaufen. Das Ergebnis steht unten.',
+    abgleich_probe:    'Probelauf gelaufen — es wurde nichts geaendert. Unten steht, was geschehen waere.',
+    abgleich_abbruch:  'Abgleich abgebrochen: Die Plattform antwortete nicht vollstaendig. Es wurde bewusst nichts geaendert.',
+    ueberall:          'Kanal ueberall entfernt und Abos abbestellt.'
+  };
+  const fehlerTexte = {
+    id:        'Bitte eine Client-ID eintragen.',
+    weg:       'Diesen Kanal gibt es nicht mehr.',
+    technisch: 'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+  };
+  const b = typeof abgleichBericht !== 'undefined' ? abgleichBericht : null;
+  const a = typeof aufraeumBericht !== 'undefined' ? aufraeumBericht : null;
+%>
+
+<% if (meldung && meldungen[meldung]) { %>
+  <div class="alert <%= meldung === 'abgleich_abbruch' ? 'alert-warning' : 'alert-success' %>"><%= meldungen[meldung] %></div>
+<% } %>
+<% if (fehler && fehlerTexte[fehler]) { %>
+  <div class="alert alert-danger"><%= fehlerTexte[fehler] %></div>
 <% } %>
 
 <div class="row row-cards">
@@ -96,6 +116,201 @@
           Kommt mit Stufe 2 — gemessen bei der Plattform, nicht aus unserer
           Tabelle gerechnet.
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row row-cards mt-1">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Abgleich mit der Plattform</h3>
+        <div class="card-actions">
+          <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/betrieb/abgleich" class="d-inline">
+            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+            <input type="hidden" name="trocken" value="1">
+            <button type="submit" class="btn btn-sm">Probelauf</button>
+          </form>
+          <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/betrieb/abgleich" class="d-inline ms-1"
+                onsubmit="return confirm('Abgleich scharf ausfuehren? Ueberzaehlige Abos werden abbestellt, fehlende neu angelegt.');">
+            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+            <button type="submit" class="btn btn-sm btn-primary">Jetzt abgleichen</button>
+          </form>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Laeuft taeglich von selbst und einmal kurz nach dem Start. Er findet,
+          was still auseinanderlaeuft: Abos, die Twitch widerrufen hat, und
+          Abos, die bei Twitch stehen und bei uns nicht mehr.
+          <strong>Ohne diesen Lauf verstummt das Plugin lautlos</strong> — es
+          kommt einfach keine Ankuendigung mehr.
+        </p>
+
+        <% if (!b) { %>
+          <p class="text-secondary mb-0">Noch nie gelaufen.</p>
+        <% } else { %>
+          <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3">
+              <div class="text-secondary small">zuletzt</div>
+              <div class="h3 mb-0"><%= vorWieLange(b.gelaufen_am) || '—' %></div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-secondary small">Abos bei uns</div>
+              <div class="h3 mb-0"><%= b.bei_uns %></div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-secondary small">Abos bei Twitch</div>
+              <div class="h3 mb-0"><%= b.abgebrochen ? '—' : b.bei_ihnen %></div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-secondary small">Kontingent</div>
+              <div class="h3 mb-0">
+                <% if (b.kosten === null || b.kosten === undefined) { %>—
+                <% } else { %><%= b.kosten %> / <%= b.grenze %><% } %>
+              </div>
+              <div class="form-hint">von Twitch gemeldet, nicht gerechnet</div>
+            </div>
+          </div>
+
+          <% if (b.abgebrochen) { %>
+            <div class="alert alert-warning mb-0">
+              <strong>Abgebrochen:</strong> <%= b.abgebrochen %><br>
+              <span class="small">
+                Das ist die Sicherung, nicht der Fehler: Eine halbe Liste sieht
+                aus wie „die Haelfte der Abos ist weg" — ein Lauf, der darauf
+                handelt, raeumt genau das ab, was er schuetzen soll.
+              </span>
+            </div>
+          <% } else { %>
+            <% if (b.trocken) { %>
+              <div class="alert alert-info">Probelauf — es wurde nichts geaendert.</div>
+            <% } %>
+            <div class="table-responsive">
+              <table class="table card-table table-vcenter">
+                <thead>
+                  <tr><th>Befund</th><th class="w-1">Anzahl</th><th>Was damit geschah</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>bei Twitch, nicht bei uns</td>
+                    <td><%= (b.lecks || []).length %></td>
+                    <td class="text-secondary">abbestellt — sonst laeuft das Kontingent voll</td>
+                  </tr>
+                  <tr>
+                    <td>bei uns, nicht bei Twitch</td>
+                    <td><%= (b.verloren || []).length %></td>
+                    <td class="text-secondary">neu angelegt — das sind die verlorenen Meldungen</td>
+                  </tr>
+                  <tr>
+                    <td>Zustand wich ab</td>
+                    <td><%= (b.zustaende || []).length %></td>
+                    <td class="text-secondary">von Twitch uebernommen</td>
+                  </tr>
+                  <tr>
+                    <td>niemand beobachtet mehr</td>
+                    <td><%= (b.verwaist || []).length %></td>
+                    <td class="text-secondary">abbestellt (Referenzzaehlung)</td>
+                  </tr>
+                  <% if ((b.unbekannt || []).length) { %>
+                    <tr class="table-warning">
+                      <td>unbekannter Zustand bei Twitch</td>
+                      <td><%= b.unbekannt.length %></td>
+                      <td class="text-secondary">
+                        <strong>nichts</strong> — bewusst.
+                        <%= b.unbekannt.map(u => u.status).filter((v, i, arr) => arr.indexOf(v) === i).join(', ') %>
+                      </td>
+                    </tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+
+            <% if ((b.verloren || []).length) { %>
+              <div class="text-secondary small">
+                Verloren waren: <%= b.verloren.map(v => v.login + '/' + v.ereignis).join(', ') %>
+              </div>
+            <% } %>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Aufraeumen</h3></div>
+      <div class="card-body">
+        <% if (!a) { %>
+          <p class="text-secondary mb-0">Noch nie gelaufen.</p>
+        <% } else { %>
+          <p class="text-secondary small">zuletzt <%= vorWieLange(a.gelaufen_am) || '—' %></p>
+          <table class="table table-sm">
+            <tbody>
+              <tr><td>Posteingang (erledigt, alt)</td><td class="text-end"><%= a.posteingang?.geloescht ?? '—' %></td></tr>
+              <tr><td>Ausgang (erledigt, alt)</td><td class="text-end"><%= a.ausgang?.geloescht ?? '—' %></td></tr>
+              <tr><td>Nachrichten ohne Ziel</td><td class="text-end"><%= a.nachrichten?.geloescht ?? '—' %></td></tr>
+              <tr><td>Streamer ohne Ziel und Abo</td><td class="text-end"><%= a.streamer?.geloescht ?? '—' %></td></tr>
+            </tbody>
+          </table>
+          <p class="text-secondary small mb-0">
+            Was <strong>schiefging</strong>, bleibt liegen: Fehler im Posteingang
+            und aufgegebene Auftraege werden nie weggeraeumt. Eine leere Tabelle
+            saehe aus wie „alles in Ordnung".
+          </p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Alle beobachteten Kanaele</h3></div>
+      <div class="card-body pb-0">
+        <p class="text-secondary small">
+          Ueber <strong>alle</strong> Guilds. „Ueberall entfernen" ist fuer den
+          Fall gedacht, dass ein Streamer die Loeschung seiner Daten verlangt —
+          das Twitch-Developer-Agreement verlangt, dem nachzukommen.
+        </p>
+        <div class="alert alert-warning small">
+          <strong>Noch unvollstaendig:</strong> Eine Sperre, die das erneute
+          Eintragen verhindert, gibt es nicht. Eine Guild kann denselben Kanal
+          morgen wieder eintragen. Die Sperrliste gehoert in den Admin-Bereich
+          und kommt ab Stufe 8.
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+          <thead>
+            <tr><th>Kanal</th><th>Guilds</th><th>Abos</th><th>zuletzt gehoert</th><th class="w-1"></th></tr>
+          </thead>
+          <tbody>
+            <% if (!alleStreamer || !alleStreamer.length) { %>
+              <tr><td colspan="5" class="text-secondary">Kein Kanal eingetragen.</td></tr>
+            <% } %>
+            <% (alleStreamer || []).forEach(s => { %>
+              <tr>
+                <td>
+                  <span class="fw-bold"><%= s.anzeigename || s.login %></span>
+                  <% if (s.ist_live) { %><span class="badge bg-red ms-1">live</span><% } %>
+                  <div class="text-secondary small"><%= s.plattform %></div>
+                </td>
+                <td><%= s.guilds %></td>
+                <td><%= s.abos %></td>
+                <td class="text-secondary"><%= vorWieLange(s.letzte_meldung_am) || 'noch nie' %></td>
+                <td>
+                  <form method="POST"
+                        action="/guild/<%= guildId %>/plugins/streaming/betrieb/streamer/<%= s.id %>/ueberall-entfernen"
+                        onsubmit="return confirm('<%= (s.anzeigename || s.login) %> aus ALLEN <%= s.guilds %> Guild(s) entfernen und die Abos abbestellen? Das laesst sich nicht rueckgaengig machen.');">
+                    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                    <button type="submit" class="btn btn-sm btn-ghost-danger">Ueberall entfernen</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
