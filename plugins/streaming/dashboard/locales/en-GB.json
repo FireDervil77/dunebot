@@ -31,7 +31,7 @@
     "CHANNEL": "Announcement channel",
     "ROLE": "Mentioned role",
     "ONAIR": "On-air voice channel",
-    "ONAIR_HELP": "Private voice channel of the stream crew. Stored, but not yet in effect: needed for the live role (stage 9). Deliberately NOT shown in the announcement.",
+    "ONAIR_HELP": "Private voice channel of the stream crew. Stored, but currently has no effect: it is deliberately not shown in the announcement, so nobody is invited into a channel they cannot enter.",
     "FILTER_GAME": "Only for this game",
     "FILTER_TITLE": "Only if the title contains this word",
     "CLEANUP": "After the stream",
@@ -68,9 +68,7 @@
     "CLIENT_ID": "Client ID",
     "CLIENT_SECRET": "Client secret",
     "SECRET_SET": "set - not readable again for security reasons",
-    "CREDENTIALS_HELP": "One application for the whole installation — the operator’s developer credentials, normally in the .env. Create it at dev.twitch.tv/console/apps. Individual guilds do not enter keys.",
-    "QUOTA": "Quota",
-    "NOT_MEASURED": "not measured yet"
+    "CREDENTIALS_HELP": "One application for the whole installation — the operator’s developer credentials, normally in the .env. Create it at dev.twitch.tv/console/apps. Individual guilds do not enter keys."
   },
   "COMMON": {
     "SAVE": "Save",

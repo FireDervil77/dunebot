@@ -31,7 +31,7 @@
     "CHANNEL": "Ankuendigungskanal",
     "ROLE": "Erwaehnte Rolle",
     "ONAIR": "On-Air-Sprachkanal",
-    "ONAIR_HELP": "Privater Sprachkanal der Stream-Crew. Wird gespeichert, wirkt aber noch nicht: Er wird fuer die Live-Rolle gebraucht (Stufe 9). In der Ankuendigung erscheint er bewusst NICHT.",
+    "ONAIR_HELP": "Privater Sprachkanal der Stream-Crew. Wird gespeichert, hat aber zurzeit keine Wirkung: In der Ankuendigung erscheint er bewusst nicht, damit niemand in einen Kanal eingeladen wird, den er nicht betreten darf.",
     "FILTER_GAME": "Nur bei diesem Spiel",
     "FILTER_TITLE": "Nur wenn der Titel dieses Wort enthaelt",
     "CLEANUP": "Nach dem Stream",
@@ -68,9 +68,7 @@
     "CLIENT_ID": "Client-ID",
     "CLIENT_SECRET": "Client-Secret",
     "SECRET_SET": "gesetzt - aus Sicherheitsgruenden nicht mehr lesbar",
-    "CREDENTIALS_HELP": "Eine Anwendung fuer die ganze Anlage — die Entwicklerdaten des Betreibers, ueblicherweise in der .env. Anzulegen unter dev.twitch.tv/console/apps. Einzelne Guilds tragen keine Schluessel ein.",
-    "QUOTA": "Kontingent",
-    "NOT_MEASURED": "noch nicht gemessen"
+    "CREDENTIALS_HELP": "Eine Anwendung fuer die ganze Anlage — die Entwicklerdaten des Betreibers, ueblicherweise in der .env. Anzulegen unter dev.twitch.tv/console/apps. Einzelne Guilds tragen keine Schluessel ein."
   },
   "COMMON": {
     "SAVE": "Speichern",
