@@ -46,7 +46,7 @@
               <div class="form-hint">
                 Der Name aus der <strong>Adresszeile</strong> (twitch.tv/<em>name</em>) —
                 nicht der Anzeigename aus dem Profil. Gross- und Kleinschreibung ist egal,
-                eine vollstaendige Adresse geht auch. Der Kanal wird vor dem Speichern
+                eine vollständige Adresse geht auch. Der Kanal wird vor dem Speichern
                 bei Twitch nachgeschlagen; den Streamer selbst benachrichtigt das nicht.
               </div>
             </div>
@@ -60,13 +60,13 @@
                   const normal = (zielkanaele || []).filter(k => !k.istAnkuendigung);
                 %>
                 <% if (ankuendigung.length) { %>
-                  <optgroup label="Ankuendigungskanaele">
+                  <optgroup label="Ankündigungskanäle">
                     <% ankuendigung.forEach(k => { %>
                       <option value="<%= k.id %>" data-ankuendigung="1">📢 <%= k.name %></option>
                     <% }); %>
                   </optgroup>
                 <% } %>
-                <optgroup label="Textkanaele">
+                <optgroup label="Textkanäle">
                   <% normal.forEach(k => { %>
                     <option value="<%= k.id %>"># <%= k.name %></option>
                   <% }); %>
@@ -83,9 +83,9 @@
                 <% }); %>
               </select>
               <div class="form-hint">
-                Wird in der Ankuendigung erwaehnt — alle mit dieser Rolle bekommen
-                eine Benachrichtigung. Ueblich ist eine Rolle, die sich Mitglieder
-                selbst geben koennen. Ohne Auswahl kommt die Ankuendigung ohne Ping.
+                Wird in der Ankündigung erwähnt — alle mit dieser Rolle bekommen
+                eine Benachrichtigung. Üblich ist eine Rolle, die sich Mitglieder
+                selbst geben können. Ohne Auswahl kommt die Ankündigung ohne Ping.
               </div>
             </div>
           </div>
@@ -96,18 +96,18 @@
               <span class="form-check-label"><%= tr('streaming:TARGETS.PUBLISH') %></span>
             </label>
             <div class="form-hint">
-              Wirkt nur in <strong>Ankuendigungskanaelen</strong> (📢): Die Nachricht
+              Wirkt nur in <strong>Ankündigungskanälen</strong> (📢): Die Nachricht
               erscheint dann auch auf Servern, die diesem Kanal folgen. In einem
-              normalen Textkanal passiert nichts — die Ankuendigung selbst kommt
+              normalen Textkanal passiert nichts — die Ankündigung selbst kommt
               trotzdem an.
             </div>
           </div>
 
           <% if (anzahl >= grenze) { %>
             <div class="text-secondary small mt-3">
-              Obergrenze erreicht (<%= grenze %>). Gezaehlt werden eigene Kanaele —
-              ein Kanal, den andere Server schon beobachten, zaehlt trotzdem einmal
-              fuer diesen Server.
+              Obergrenze erreicht (<%= grenze %>). Gezählt werden eigene Kanäle —
+              ein Kanal, den andere Server schon beobachten, zählt trotzdem einmal
+              für diesen Server.
             </div>
           <% } %>
         </div>
@@ -175,7 +175,7 @@
                   <td class="text-nowrap">
                     <a class="btn btn-sm btn-ghost-secondary"
                        href="/guild/<%= guildId %>/plugins/streaming/ziele<%= s.erstes_ziel ? '#ziel-' + s.erstes_ziel : '' %>"
-                       title="Ankuendigungskanal, Rolle, Filter und Aufraeumart aendern">
+                       title="Ankündigungskanal, Rolle, Filter und Aufräumart ändern">
                       Bearbeiten
                     </a>
                     <form method="POST" class="d-inline"

@@ -44,8 +44,8 @@
       <p class="text-secondary mb-1"><%= tr('streaming:TARGETS.EMPTY') %></p>
       <p class="text-secondary small mb-0">
         Ein Ziel entsteht, sobald du unter <a href="/guild/<%= guildId %>/plugins/streaming/streamer">Streamer</a>
-        einen Kanal eintraegst. Soll derselbe Streamer in einen <strong>zweiten</strong>
-        Discord-Kanal melden, trage ihn dort noch einmal ein und waehle den anderen Kanal.
+        einen Kanal einträgst. Soll derselbe Streamer in einen <strong>zweiten</strong>
+        Discord-Kanal melden, trage ihn dort noch einmal ein und wähle den anderen Kanal.
       </p>
     </div>
   </div>
@@ -64,7 +64,7 @@
           <h3 class="card-title">
             <%= z.anzeigename || z.login %>
             <span class="text-secondary fw-normal">→ <% if (kName) { %># <%= kName %><% } else { %>
-              <span class="text-danger">⚠ Kanal geloescht</span><% } %></span>
+              <span class="text-danger">⚠ Kanal gelöscht</span><% } %></span>
           </h3>
           <div class="card-actions">
             <% if (!z.aktiv) { %><span class="badge bg-secondary-lt">pausiert</span><% } %>
@@ -85,16 +85,16 @@
                     const bekannt = (zielkanaele || []).some(k => String(k.id) === String(z.channel_id));
                   %>
                   <% if (!bekannt) { %>
-                    <option value="<%= z.channel_id %>" selected>⚠ geloeschter Kanal (<%= z.channel_id %>)</option>
+                    <option value="<%= z.channel_id %>" selected>⚠ gelöschter Kanal (<%= z.channel_id %>)</option>
                   <% } %>
                   <% if (ankuendigung.length) { %>
-                    <optgroup label="Ankuendigungskanaele">
+                    <optgroup label="Ankündigungskanäle">
                       <% ankuendigung.forEach(k => { %>
                         <option value="<%= k.id %>" <%= String(k.id) === String(z.channel_id) ? 'selected' : '' %>>📢 <%= k.name %></option>
                       <% }); %>
                     </optgroup>
                   <% } %>
-                  <optgroup label="Textkanaele">
+                  <optgroup label="Textkanäle">
                     <% normal.forEach(k => { %>
                       <option value="<%= k.id %>" <%= String(k.id) === String(z.channel_id) ? 'selected' : '' %>># <%= k.name %></option>
                     <% }); %>
@@ -107,13 +107,13 @@
                 <select class="form-select" id="rolle_id_<%= z.id %>" name="rolle_id" <%= darfAendern ? '' : 'disabled' %>>
                   <option value="">— keine —</option>
                   <% if (!rolleDa) { %>
-                    <option value="<%= z.rolle_id %>" selected>⚠ geloeschte Rolle (<%= z.rolle_id %>)</option>
+                    <option value="<%= z.rolle_id %>" selected>⚠ gelöschte Rolle (<%= z.rolle_id %>)</option>
                   <% } %>
                   <% (rollen || []).forEach(r => { %>
                     <option value="<%= r.id %>" <%= String(r.id) === String(z.rolle_id) ? 'selected' : '' %>>@<%= r.name %></option>
                   <% }); %>
                 </select>
-                <div class="form-hint">Wird im Text erwaehnt und loest die Benachrichtigung aus.</div>
+                <div class="form-hint">Wird im Text erwähnt und löst die Benachrichtigung aus.</div>
               </div>
 
               <div class="col-md-4">
@@ -124,7 +124,7 @@
                 <select class="form-select" id="onair_<%= z.id %>" name="onair_channel" <%= darfAendern ? '' : 'disabled' %>>
                   <option value="">— keiner —</option>
                   <% if (z.onair_channel && !oName) { %>
-                    <option value="<%= z.onair_channel %>" selected>⚠ geloeschter Kanal (<%= z.onair_channel %>)</option>
+                    <option value="<%= z.onair_channel %>" selected>⚠ gelöschter Kanal (<%= z.onair_channel %>)</option>
                   <% } %>
                   <% (sprachkanaele || []).forEach(k => { %>
                     <option value="<%= k.id %>" <%= String(k.id) === String(z.onair_channel) ? 'selected' : '' %>>🔊 <%= k.name %></option>
@@ -189,8 +189,8 @@
                   <span class="form-check-label"><%= tr('streaming:TARGETS.PUBLISH') %></span>
                 </label>
                 <div class="form-hint">
-                  Wirkt nur in Ankuendigungskanaelen (📢). In einem normalen
-                  Textkanal passiert nichts — die Ankuendigung kommt trotzdem an.
+                  Wirkt nur in Ankündigungskanälen (📢). In einem normalen
+                  Textkanal passiert nichts — die Ankündigung kommt trotzdem an.
                 </div>
               </div>
 
@@ -200,7 +200,7 @@
           <% if (darfAendern) { %>
             <div class="card-footer d-flex">
               <a href="/guild/<%= guildId %>/plugins/streaming/vorlagen#vorlage-<%= z.id %>" class="btn btn-link">
-                Eigenen Text fuer dieses Ziel
+                Eigenen Text für dieses Ziel
                 <% if (z.vorlage) { %><span class="badge bg-blue-lt ms-1">gesetzt</span><% } %>
               </a>
               <div class="ms-auto">

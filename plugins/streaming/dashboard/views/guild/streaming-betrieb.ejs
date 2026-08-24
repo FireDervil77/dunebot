@@ -40,9 +40,9 @@
         <div class="card-body">
           <p class="text-secondary small"><%= tr('streaming:OPERATIONS.CREDENTIALS_HELP') %></p>
           <p class="text-secondary small">
-            Nicht zu verwechseln mit der spaeteren Anmeldung einzelner Streamer:
-            Die laeuft ueber dieselbe Anwendung, und niemand traegt dabei
-            Schluessel ein — er meldet sich bei Twitch an.
+            Nicht zu verwechseln mit der späteren Anmeldung einzelner Streamer:
+            Die läuft über dieselbe Anwendung, und niemand trägt dabei
+            Schlüssel ein — er meldet sich bei Twitch an.
           </p>
 
           <div class="mb-3">
@@ -57,8 +57,8 @@
                    autocomplete="new-password"
                    placeholder="<%= secretQuelle === 'dashboard' ? tr('streaming:OPERATIONS.SECRET_SET') : '' %>">
             <div class="form-hint">
-              Leer lassen aendert das gespeicherte Geheimnis nicht. Es wird
-              verschluesselt abgelegt und ist danach nicht mehr lesbar.
+              Leer lassen ändert das gespeicherte Geheimnis nicht. Es wird
+              verschlüsselt abgelegt und ist danach nicht mehr lesbar.
             </div>
           </div>
         </div>
@@ -78,29 +78,29 @@
         <% if (secretQuelle === 'dashboard') { %>
           <span class="badge bg-green-lt">aus dem Dashboard</span>
           <p class="text-secondary small mt-2 mb-0">
-            Gesetzt und verschluesselt in der Datenbank. Ein Wechsel braucht keinen Neustart.
+            Gesetzt und verschlüsselt in der Datenbank. Ein Wechsel braucht keinen Neustart.
           </p>
         <% } else if (secretQuelle === 'env') { %>
           <span class="badge bg-green-lt">aus der .env</span>
           <p class="text-secondary small mt-2 mb-0">
             Der vorgesehene Weg: Client-ID und Secret sind die Entwicklerdaten
-            der Anlage — eine Anwendung fuer alle Guilds, wie der Bot-Token.
-            Wer sie hier speichert, ueberschreibt die Datei; noetig ist das nicht.
+            der Anlage — eine Anwendung für alle Guilds, wie der Bot-Token.
+            Wer sie hier speichert, überschreibt die Datei; nötig ist das nicht.
           </p>
         <% } else if (secretQuelle === 'defekt') { %>
-          <span class="badge bg-red-lt">nicht entschluesselbar</span>
+          <span class="badge bg-red-lt">nicht entschlüsselbar</span>
           <p class="text-secondary small mt-2 mb-0">
-            Das gespeicherte Geheimnis passt nicht zum Schluessel der Anlage
+            Das gespeicherte Geheimnis passt nicht zum Schlüssel der Anlage
             (TOKEN_ENCRYPTION_KEY). Bitte neu eintragen.
           </p>
         <% } else { %>
           <span class="badge bg-secondary-lt">nicht hinterlegt</span>
           <p class="text-secondary small mt-2 mb-0">
-            Ohne Zugangsdaten laesst sich kein Abonnement anlegen — es kommen
+            Ohne Zugangsdaten lässt sich kein Abonnement anlegen — es kommen
             keine Meldungen an. Vorgesehen sind
             <code>TWITCH_CLIENT_ID</code> und <code>TWITCH_CLIENT_SECRET</code>
             in der <code>.env</code> des Dashboards; das Formular hier ist nur
-            die Abkuerzung ohne Dateizugriff.
+            die Abkürzung ohne Dateizugriff.
           </p>
         <% } %>
       </div>
@@ -121,7 +121,7 @@
             <button type="submit" class="btn btn-sm">Probelauf</button>
           </form>
           <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/betrieb/abgleich" class="d-inline ms-1"
-                onsubmit="return confirm('Abgleich scharf ausfuehren? Ueberzaehlige Abos werden abbestellt, fehlende neu angelegt.');">
+                onsubmit="return confirm('Abgleich scharf ausführen? Überzählige Abos werden abbestellt, fehlende neu angelegt.');">
             <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
             <button type="submit" class="btn btn-sm btn-primary">Jetzt abgleichen</button>
           </form>
@@ -129,11 +129,11 @@
       </div>
       <div class="card-body">
         <p class="text-secondary small">
-          Laeuft taeglich von selbst und einmal kurz nach dem Start. Er findet,
-          was still auseinanderlaeuft: Abos, die Twitch widerrufen hat, und
+          Läuft täglich von selbst und einmal kurz nach dem Start. Er findet,
+          was still auseinanderläuft: Abos, die Twitch widerrufen hat, und
           Abos, die bei Twitch stehen und bei uns nicht mehr.
           <strong>Ohne diesen Lauf verstummt das Plugin lautlos</strong> — es
-          kommt einfach keine Ankuendigung mehr.
+          kommt einfach keine Ankündigung mehr.
         </p>
 
         <% if (!b) { %>
@@ -167,13 +167,13 @@
               <strong>Abgebrochen:</strong> <%= b.abgebrochen %><br>
               <span class="small">
                 Das ist die Sicherung, nicht der Fehler: Eine halbe Liste sieht
-                aus wie „die Haelfte der Abos ist weg" — ein Lauf, der darauf
-                handelt, raeumt genau das ab, was er schuetzen soll.
+                aus wie „die Hälfte der Abos ist weg" — ein Lauf, der darauf
+                handelt, räumt genau das ab, was er schützen soll.
               </span>
             </div>
           <% } else { %>
             <% if (b.trocken) { %>
-              <div class="alert alert-info">Probelauf — es wurde nichts geaendert.</div>
+              <div class="alert alert-info">Probelauf — es wurde nichts geändert.</div>
             <% } %>
             <div class="table-responsive">
               <table class="table card-table table-vcenter">
@@ -184,7 +184,7 @@
                   <tr>
                     <td>bei Twitch, nicht bei uns</td>
                     <td><%= (b.lecks || []).length %></td>
-                    <td class="text-secondary">abbestellt — sonst laeuft das Kontingent voll</td>
+                    <td class="text-secondary">abbestellt — sonst läuft das Kontingent voll</td>
                   </tr>
                   <tr>
                     <td>bei uns, nicht bei Twitch</td>
@@ -194,12 +194,12 @@
                   <tr>
                     <td>Zustand wich ab</td>
                     <td><%= (b.zustaende || []).length %></td>
-                    <td class="text-secondary">von Twitch uebernommen</td>
+                    <td class="text-secondary">von Twitch übernommen</td>
                   </tr>
                   <tr>
                     <td>niemand beobachtet mehr</td>
                     <td><%= (b.verwaist || []).length %></td>
-                    <td class="text-secondary">abbestellt (Referenzzaehlung)</td>
+                    <td class="text-secondary">abbestellt (Referenzzählung)</td>
                   </tr>
                   <% if ((b.unbekannt || []).length) { %>
                     <tr class="table-warning">
@@ -228,7 +228,7 @@
 
   <div class="col-lg-5">
     <div class="card">
-      <div class="card-header"><h3 class="card-title">Aufraeumen</h3></div>
+      <div class="card-header"><h3 class="card-title">Aufräumen</h3></div>
       <div class="card-body">
         <% if (!a) { %>
           <p class="text-secondary mb-0">Noch nie gelaufen.</p>
@@ -244,8 +244,8 @@
           </table>
           <p class="text-secondary small mb-0">
             Was <strong>schiefging</strong>, bleibt liegen: Fehler im Posteingang
-            und aufgegebene Auftraege werden nie weggeraeumt. Eine leere Tabelle
-            saehe aus wie „alles in Ordnung".
+            und aufgegebene Aufträge werden nie weggeräumt. Eine leere Tabelle
+            sähe aus wie „alles in Ordnung".
           </p>
         <% } %>
       </div>
@@ -254,23 +254,23 @@
 
   <div class="col-lg-7">
     <div class="card">
-      <div class="card-header"><h3 class="card-title">Alle beobachteten Kanaele</h3></div>
+      <div class="card-header"><h3 class="card-title">Alle beobachteten Kanäle</h3></div>
       <div class="card-body pb-0">
         <p class="text-secondary small">
-          Ueber <strong>alle</strong> Guilds. „Ueberall entfernen" ist fuer den
-          Fall gedacht, dass ein Streamer die Loeschung seiner Daten verlangt —
+          Über <strong>alle</strong> Guilds. „Überall entfernen" ist für den
+          Fall gedacht, dass ein Streamer die Löschung seiner Daten verlangt —
           das Twitch-Developer-Agreement verlangt, dem nachzukommen.
         </p>
         <div class="alert alert-warning small">
           <strong>Wichtig:</strong> Entfernen ist nicht dasselbe wie sperren.
           Ein Server kann denselben Kanal danach wieder eintragen. Wenn eine
-          Loeschung dauerhaft sein muss, behalte den Kanal im Blick.
+          Löschung dauerhaft sein muss, behalte den Kanal im Blick.
         </div>
       </div>
       <div class="table-responsive">
         <table class="table card-table table-vcenter">
           <thead>
-            <tr><th>Kanal</th><th>Guilds</th><th>Abos</th><th>zuletzt gehoert</th><th class="w-1"></th></tr>
+            <tr><th>Kanal</th><th>Guilds</th><th>Abos</th><th>zuletzt gehört</th><th class="w-1"></th></tr>
           </thead>
           <tbody>
             <% if (!alleStreamer || !alleStreamer.length) { %>
@@ -288,10 +288,10 @@
                 <td class="text-secondary"><%= vorWieLange(s.letzte_meldung_am) || 'noch nie' %></td>
                 <td>
                   <form method="POST"
-                        action="/guild/<%= guildId %>/plugins/streaming/betrieb/streamer/<%= s.id %>/ueberall-entfernen"
-                        onsubmit="return confirm('<%= (s.anzeigename || s.login) %> aus ALLEN <%= s.guilds %> Guild(s) entfernen und die Abos abbestellen? Das laesst sich nicht rueckgaengig machen.');">
+                        action="/guild/<%= guildId %>/plugins/streaming/betrieb/streamer/<%= s.id %>/überall-entfernen"
+                        onsubmit="return confirm('<%= (s.anzeigename || s.login) %> aus ALLEN <%= s.guilds %> Guild(s) entfernen und die Abos abbestellen? Das lässt sich nicht rückgängig machen.');">
                     <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-                    <button type="submit" class="btn btn-sm btn-ghost-danger">Ueberall entfernen</button>
+                    <button type="submit" class="btn btn-sm btn-ghost-danger">Überall entfernen</button>
                   </form>
                 </td>
               </tr>
