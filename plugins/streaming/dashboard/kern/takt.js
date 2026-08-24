@@ -53,6 +53,29 @@ function log() {
 }
 
 /**
+ * Zeitstempel der Plattform in etwas verwandeln, das MySQL annimmt.
+ *
+ * Twitch liefert ISO-8601 mit `T` und `Z` ("2026-08-24T09:20:55.496Z").
+ * Eine DATETIME-Spalte weist das zurueck:
+ *
+ *     Incorrect datetime value: '2026-08-24T09:20:55.496Z'
+ *
+ * Ein `Date`-Objekt serialisiert der Treiber dagegen richtig. Gefunden am
+ * 2026-08-24 mit `scripts/streaming-probe.js`, bevor je ein echter Stream
+ * lief - das Ereignis waere sonst im Posteingang auf "fehler" gelaufen und
+ * keine Ankuendigung entstanden.
+ *
+ * @param {string|Date|null} wert Zeitstempel
+ * @param {Date|null} [ersatz] Wert, wenn nichts Brauchbares kommt
+ * @returns {Date|null} Datum oder Ersatz
+ */
+function alsDatum(wert, ersatz = null) {
+    if (!wert) return ersatz;
+    const d = wert instanceof Date ? wert : new Date(wert);
+    return Number.isNaN(d.getTime()) ? ersatz : d;
+}
+
+/**
  * Einstellungen einer Guild - heute die Vorgaben, ab Stufe 5 je Guild.
  *
  * @param {string} guildId Guild
@@ -127,7 +150,7 @@ async function gingLive(streamer, zustand, ereignis) {
             sendung_id = VALUES(sendung_id),
             begonnen_am = COALESCE(VALUES(begonnen_am), begonnen_am),
             beendet_am = NULL
-    `, [streamer.id, ereignis.sendung_id || null, ereignis.begonnen_am || new Date()]);
+    `, [streamer.id, ereignis.sendung_id || null, alsDatum(ereignis.begonnen_am, new Date())]);
 
     if (wahl.handlung === 'nichts') return `keine Meldung: ${wahl.grund}`;
     if (wahl.handlung === 'aktualisieren') return `keine zweite Ankuendigung: ${wahl.grund}`;
@@ -152,7 +175,7 @@ async function beendet(streamer, zustand, ereignis) {
         INSERT INTO streaming_state (streamer_id, ist_live, beendet_am)
         VALUES (?, 0, ?)
         ON DUPLICATE KEY UPDATE ist_live = 0, beendet_am = VALUES(beendet_am)
-    `, [streamer.id, ereignis.beendet_am || new Date()]);
+    `, [streamer.id, alsDatum(ereignis.beendet_am, new Date())]);
 
     if (wahl.handlung === 'nichts') return wahl.grund;
 
@@ -346,7 +369,7 @@ async function anreicherungsLauf() {
                        SET titel = ?, kategorie = ?, zuschauer = ?, vorschaubild = ?,
                            begonnen_am = COALESCE(begonnen_am, ?), angereichert_am = NOW()
                      WHERE streamer_id = ?
-                `, [a.titel, a.kategorie, a.zuschauer, a.vorschaubild, a.begonnen_am, zeile.id]);
+                `, [a.titel, a.kategorie, a.zuschauer, a.vorschaubild, alsDatum(a.begonnen_am), zeile.id]);
 
                 // Zweiter Weg, auf dem eine Umbenennung auffaellt: Die
                 // Anreicherung liefert den aktuellen Namen ohnehin mit.
@@ -434,4 +457,4 @@ function anhalten() {
     uhren = [];
 }
 
-module.exports = { TAKT_MS, ANREICHERN_MS, starten, anhalten, posteingangLauf, anreicherungsLauf, verarbeiten };
+module.exports = { TAKT_MS, ANREICHERN_MS, alsDatum, starten, anhalten, posteingangLauf, anreicherungsLauf, verarbeiten };
