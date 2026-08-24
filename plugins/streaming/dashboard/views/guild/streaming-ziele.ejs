@@ -44,7 +44,7 @@
               <% ziele.forEach(z => { %>
                 <tr>
                   <td class="fw-bold"><%= z.anzeigename || z.login %></td>
-                  <td># <%= kanalName(z.channel_id, textkanaele) %></td>
+                  <td># <%= kanalName(z.channel_id, zielkanaele) %></td>
                   <td>
                     <% if (z.rolle_id) { %>@<%= rollenName(z.rolle_id) %><% } else { %>
                       <span class="text-secondary">—</span>

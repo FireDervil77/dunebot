@@ -59,19 +59,31 @@ function renderFehler(res, error, text) {
 }
 
 /**
- * Textkanaele der Guild - fuer den Ankuendigungskanal.
+ * Kanaele, in die eine Ankuendigung gepostet werden kann.
+ *
+ * **Nicht** `GET_GUILD_CHANNELS`: Der liefert ausdruecklich nur `GuildText`
+ * (`GET_GUILD_CHANNELS.js`, Filter auf ChannelType.GuildText) - und damit
+ * fehlten die **Ankuendigungskanaele**. Das ist nicht nur unbequem: Der
+ * Auto-Crosspost (L-2) funktioniert ausschliesslich in Ankuendigungskanaelen.
+ * Solange man keinen waehlen konnte, war die Funktion tot.
+ *
+ * Der ausfuehrliche Handler kennt beide Arten und liefert `type` als Text
+ * ('text', 'announcement', 'voice', …).
  *
  * @param {string} guildId Discord-Guild-ID
- * @returns {Promise<Array>} Kanaele
+ * @returns {Promise<Array>} Text- und Ankuendigungskanaele, Ankuendigung zuerst erkennbar
  */
-async function getTextkanaele(guildId) {
+async function getZielkanaele(guildId) {
     const ipcServer = ServiceManager.get('ipcServer');
     if (!ipcServer) return [];
     try {
-        const antworten = await ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS', { guildId });
-        return antworten?.[0]?.channels || [];
+        const antworten = await ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS_DETAILED', { guildId });
+        const kanaele = antworten?.[0]?.channels || [];
+        return kanaele
+            .filter(k => k.type === 'text' || k.type === 'announcement')
+            .map(k => ({ ...k, istAnkuendigung: k.type === 'announcement' }));
     } catch (err) {
-        ServiceManager.get('Logger').warn(`[Streaming] Textkanaele nicht ladbar: ${err.message}`);
+        ServiceManager.get('Logger').warn(`[Streaming] Zielkanaele nicht ladbar: ${err.message}`);
         return [];
     }
 }
@@ -144,7 +156,7 @@ module.exports = {
     makeTranslator,
     renderView,
     renderFehler,
-    getTextkanaele,
+    getZielkanaele,
     getSprachkanaele,
     getRollen,
     vorWieLange

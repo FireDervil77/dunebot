@@ -50,9 +50,22 @@
               <select class="form-select" id="channel_id" name="channel_id" required
                       <%= anzahl >= grenze ? 'disabled' : '' %>>
                 <option value="">—</option>
-                <% (textkanaele || []).forEach(k => { %>
-                  <option value="<%= k.id %>"># <%= k.name %></option>
-                <% }); %>
+                <%
+                  const ankuendigung = (zielkanaele || []).filter(k => k.istAnkuendigung);
+                  const normal = (zielkanaele || []).filter(k => !k.istAnkuendigung);
+                %>
+                <% if (ankuendigung.length) { %>
+                  <optgroup label="Ankuendigungskanaele">
+                    <% ankuendigung.forEach(k => { %>
+                      <option value="<%= k.id %>" data-ankuendigung="1">📢 <%= k.name %></option>
+                    <% }); %>
+                  </optgroup>
+                <% } %>
+                <optgroup label="Textkanaele">
+                  <% normal.forEach(k => { %>
+                    <option value="<%= k.id %>"># <%= k.name %></option>
+                  <% }); %>
+                </optgroup>
               </select>
             </div>
             <div class="col-md-4">
@@ -66,6 +79,20 @@
               </select>
             </div>
           </div>
+          <div class="mt-3">
+            <label class="form-check">
+              <input type="checkbox" class="form-check-input" name="veroeffentlichen" value="1"
+                     <%= anzahl >= grenze ? 'disabled' : '' %>>
+              <span class="form-check-label"><%= tr('streaming:TARGETS.PUBLISH') %></span>
+            </label>
+            <div class="form-hint">
+              Wirkt nur in <strong>Ankuendigungskanaelen</strong> (📢): Die Nachricht
+              erscheint dann auch auf Servern, die diesem Kanal folgen. In einem
+              normalen Textkanal passiert nichts — die Ankuendigung selbst kommt
+              trotzdem an.
+            </div>
+          </div>
+
           <% if (anzahl >= grenze) { %>
             <div class="text-secondary small mt-3">
               Obergrenze erreicht (<%= grenze %>). Gezaehlt werden eigene Kanaele —

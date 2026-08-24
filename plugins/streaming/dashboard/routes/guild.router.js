@@ -27,7 +27,7 @@ const { requirePermission } = require('../../../../apps/dashboard/middlewares/pe
 const { CheckAdmin } = require('../../../../apps/dashboard/middlewares/admin.middleware');
 const {
     makeTranslator, renderView, renderFehler,
-    getTextkanaele, getSprachkanaele, getRollen, vorWieLange
+    getZielkanaele, getSprachkanaele, getRollen, vorWieLange
 } = require('./_shared');
 const modelle = require('../../shared/models');
 const abos = require('../kern/abos');
@@ -53,11 +53,11 @@ router.get('/streamer', requirePermission('STREAMING.VIEW'), async (req, res) =>
         ]);
 
         const grenze = Number(require('../../config.json').STREAMER_JE_GUILD || 25);
-        const [textkanaele, rollen] = await Promise.all([getTextkanaele(guildId), getRollen(guildId)]);
+        const [zielkanaele, rollen] = await Promise.all([getZielkanaele(guildId), getRollen(guildId)]);
 
         await renderView(res, 'guild/streaming-streamer', {
             tr, guildId, streamer, anzahl, grenze, vorWieLange,
-            textkanaele, rollen,
+            zielkanaele, rollen,
             meldung: req.query.ok || null,
             fehler: req.query.fehler || null
         });
@@ -78,6 +78,7 @@ router.post('/streamer', requirePermission('STREAMING.STREAMERS.MANAGE'), async 
         const eingabe = String(req.body.kanal || '').trim();
         const channelId = String(req.body.channel_id || '').trim();
         const rolleId = String(req.body.rolle_id || '').trim() || null;
+        const veroeffentlichen = req.body.veroeffentlichen ? 1 : 0;
 
         if (!eingabe)   return res.redirect(`${zurueck}?fehler=kanal_fehlt`);
         if (!channelId) return res.redirect(`${zurueck}?fehler=ziel_fehlt`);
@@ -103,10 +104,12 @@ router.post('/streamer', requirePermission('STREAMING.STREAMERS.MANAGE'), async 
 
         // Ziel dieser Guild anlegen (oder wiederbeleben)
         await ServiceManager.get('dbService').query(
-            `INSERT INTO streaming_targets (guild_id, streamer_id, channel_id, rolle_id, angelegt_von)
-             VALUES (?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE rolle_id = VALUES(rolle_id), aktiv = 1`,
-            [guildId, streamer.id, channelId, rolleId, req.session?.user?.info?.id || null]);
+            `INSERT INTO streaming_targets (guild_id, streamer_id, channel_id, rolle_id, veroeffentlichen, angelegt_von)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE rolle_id = VALUES(rolle_id),
+                                     veroeffentlichen = VALUES(veroeffentlichen), aktiv = 1`,
+            [guildId, streamer.id, channelId, rolleId, veroeffentlichen,
+             req.session?.user?.info?.id || null]);
 
         if (gescheitert.length) {
             Logger.warn(`[Streaming] ${kanal.login} eingetragen, aber ${gescheitert.length} Abo(s) scheiterten`);
@@ -159,15 +162,15 @@ router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
     const tr = makeTranslator(req, res);
 
     try {
-        const [ziele, textkanaele, sprachkanaele, rollen] = await Promise.all([
+        const [ziele, zielkanaele, sprachkanaele, rollen] = await Promise.all([
             modelle.zieleDerGuild(guildId),
-            getTextkanaele(guildId),
+            getZielkanaele(guildId),
             getSprachkanaele(guildId),
             getRollen(guildId)
         ]);
 
         await renderView(res, 'guild/streaming-ziele', {
-            tr, guildId, ziele, textkanaele, sprachkanaele, rollen
+            tr, guildId, ziele, zielkanaele, sprachkanaele, rollen
         });
     } catch (error) {
         return renderFehler(res, error, 'Die Ziele konnten nicht geladen werden');
