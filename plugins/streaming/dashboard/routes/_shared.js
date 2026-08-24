@@ -59,6 +59,43 @@ function renderFehler(res, error, text) {
 }
 
 /**
+ * Den Bot fragen - und die Antwort richtig auspacken.
+ *
+ * **Es gibt zwei Huellen**, je nachdem, wo der Handler liegt:
+ *
+ *   - Handler im Switch von `IPCClient.js` (z. B. `GET_GUILD_CHANNELS`)
+ *     antworten flach: `{ success, channels }`
+ *   - Handler als Datei unter `apps/bot/ipc/` (z. B.
+ *     `GET_GUILD_CHANNELS_DETAILED`) werden vom Fallback-Zweig zusaetzlich
+ *     verpackt: `{ success, data: { success, channels } }`
+ *
+ * Wer das verwechselt, bekommt `undefined` und daraus eine leere Liste - ohne
+ * Fehler, ohne Log, ohne Hinweis. Genau daran lag die leere Kanalauswahl am
+ * 2026-08-24.
+ *
+ * `antwort.data ?? antwort` traegt beide Faelle. Das Muster stammt aus
+ * `plugins/discord/dashboard/routes/_shared.js` - dort steht es richtig.
+ *
+ * @param {string} ereignis IPC-Ereignis
+ * @param {Object} nutzlast Nutzlast
+ * @returns {Promise<Object|null>} ausgepackte Antwort
+ */
+async function fragBot(ereignis, nutzlast) {
+    const ipcServer = ServiceManager.get('ipcServer');
+    if (!ipcServer) return null;
+
+    try {
+        const antworten = await ipcServer.broadcast(ereignis, nutzlast);
+        const antwort = Array.isArray(antworten) && antworten.length ? antworten[0] : null;
+        if (!antwort) return null;
+        return antwort.data ?? antwort;
+    } catch (err) {
+        ServiceManager.get('Logger').warn(`[Streaming] IPC ${ereignis} fehlgeschlagen: ${err.message}`);
+        return null;
+    }
+}
+
+/**
  * Kanaele, in die eine Ankuendigung gepostet werden kann.
  *
  * **Nicht** `GET_GUILD_CHANNELS`: Der liefert ausdruecklich nur `GuildText`
@@ -74,14 +111,28 @@ function renderFehler(res, error, text) {
  * @returns {Promise<Array>} Text- und Ankuendigungskanaele, Ankuendigung zuerst erkennbar
  */
 async function getZielkanaele(guildId) {
-    const ipcServer = ServiceManager.get('ipcServer');
-    if (!ipcServer) return [];
     try {
-        const antworten = await ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS_DETAILED', { guildId });
-        const kanaele = antworten?.[0]?.channels || [];
-        return kanaele
-            .filter(k => k.type === 'text' || k.type === 'announcement')
-            .map(k => ({ ...k, istAnkuendigung: k.type === 'announcement' }));
+        const antwort = await fragBot('dashboard:GET_GUILD_CHANNELS_DETAILED', { guildId });
+        const kanaele = antwort?.channels || [];
+
+        // 'news' ist der aeltere Name fuer Ankuendigungskanaele - je nach
+        // Fassung der Bibliothek kann beides auftauchen.
+        const erlaubt = new Set(['text', 'announcement', 'news']);
+        const ziele = kanaele
+            .filter(k => erlaubt.has(k.type))
+            .map(k => ({ ...k, istAnkuendigung: k.type !== 'text' }));
+
+        // Wenn hier nichts oder auffallend wenig ankommt, liegt es fast immer
+        // an den Typnamen. Dann soll im Log stehen, WAS geliefert wurde -
+        // sonst sucht man im Dunkeln.
+        if (!ziele.length || !ziele.some(k => !k.istAnkuendigung)) {
+            const verteilung = kanaele.reduce((m, k) => { m[k.type] = (m[k.type] || 0) + 1; return m; }, {});
+            ServiceManager.get('Logger').warn(
+                `[Streaming] Auffaellige Kanalauswahl fuer Guild ${guildId}: ` +
+                `${ziele.length} Ziel(e) aus ${kanaele.length} Kanaelen. Typen: ${JSON.stringify(verteilung)}`);
+        }
+
+        return ziele;
     } catch (err) {
         ServiceManager.get('Logger').warn(`[Streaming] Zielkanaele nicht ladbar: ${err.message}`);
         return [];
@@ -100,11 +151,9 @@ async function getZielkanaele(guildId) {
  * @returns {Promise<Array>} Sprach- und Buehnenkanaele
  */
 async function getSprachkanaele(guildId) {
-    const ipcServer = ServiceManager.get('ipcServer');
-    if (!ipcServer) return [];
     try {
-        const antworten = await ipcServer.broadcast('dashboard:GET_GUILD_CHANNELS_DETAILED', { guildId });
-        const kanaele = antworten?.[0]?.channels || [];
+        const antwort = await fragBot('dashboard:GET_GUILD_CHANNELS_DETAILED', { guildId });
+        const kanaele = antwort?.channels || [];
         return kanaele.filter(k => k.type === 'voice' || k.type === 'stage');
     } catch (err) {
         ServiceManager.get('Logger').warn(`[Streaming] Sprachkanaele nicht ladbar: ${err.message}`);
@@ -119,11 +168,9 @@ async function getSprachkanaele(guildId) {
  * @returns {Promise<Array>} Rollen
  */
 async function getRollen(guildId) {
-    const ipcServer = ServiceManager.get('ipcServer');
-    if (!ipcServer) return [];
     try {
-        const antworten = await ipcServer.broadcast('dashboard:GET_GUILD_ROLES', { guildId });
-        return antworten?.[0]?.roles || [];
+        const antwort = await fragBot('dashboard:GET_GUILD_ROLES', { guildId });
+        return antwort?.roles || [];
     } catch (err) {
         ServiceManager.get('Logger').warn(`[Streaming] Rollen nicht ladbar: ${err.message}`);
         return [];
@@ -153,6 +200,7 @@ function vorWieLange(zeitpunkt) {
 }
 
 module.exports = {
+    fragBot,
     makeTranslator,
     renderView,
     renderFehler,
