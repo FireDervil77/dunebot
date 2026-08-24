@@ -225,7 +225,9 @@ async function ausfuehren(auftrag) {
             const antwort = await anDenBot('streaming:remove', {
                 guildId: ziel.guild_id, channelId: zeile.channel_id, messageId: zeile.message_id
             });
-            if (!antwort.ok) return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
+            if (!antwort.ok && !istWeg(antwort)) {
+                return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
+            }
 
             await db().query("UPDATE streaming_messages SET zustand = 'weg' WHERE id = ?", [zeile.id]);
             return { ok: true, fehler: null, endgueltig: false };
@@ -236,13 +238,38 @@ async function ausfuehren(auftrag) {
         const antwort = await anDenBot('streaming:edit', {
             guildId: ziel.guild_id, channelId: zeile.channel_id, messageId: zeile.message_id, ...inhalt
         });
-        if (!antwort.ok) return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
+
+        if (!antwort.ok) {
+            // Eine geloeschte Nachricht ist beim AUFRAEUMEN kein Fehler,
+            // sondern der Zielzustand: Jemand hat von Hand weggeraeumt, was wir
+            // wegraeumen wollten. Das gehoert nicht unter "Was klemmt".
+            if (istWeg(antwort)) {
+                await db().query("UPDATE streaming_messages SET zustand = 'weg' WHERE id = ?", [zeile.id]);
+                return { ok: true, fehler: null, endgueltig: true, hinweis: 'Nachricht war schon geloescht' };
+            }
+            return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
+        }
 
         await db().query('UPDATE streaming_messages SET geaendert_am = NOW() WHERE id = ?', [zeile.id]);
         return { ok: true, fehler: null, endgueltig: false };
     }
 
     return { ok: false, fehler: `unbekannte Aktion "${auftrag.aktion}"`, endgueltig: true };
+}
+
+/**
+ * Bedeutet der Fehler, dass Nachricht oder Kanal schlicht nicht mehr da sind?
+ *
+ * Beim Bearbeiten waehrend des Streams ist das ein Fehler. Beim **Aufraeumen**
+ * ist es das Ziel - jemand hat von Hand weggeraeumt, was wir wegraeumen
+ * wollten. Der Unterschied entscheidet, ob es unter "Was klemmt" auftaucht.
+ *
+ * @param {Object} antwort Antwort des Bots
+ * @returns {boolean} true, wenn Nachricht oder Kanal fehlen
+ */
+function istWeg(antwort) {
+    if (antwort.code === 10008 || antwort.code === 10003) return true;
+    return /unknown message|unknown channel/i.test(String(antwort.fehler || ''));
 }
 
 /**
@@ -346,4 +373,4 @@ function anhalten() {
     uhr = null;
 }
 
-module.exports = { TAKT_MS, JE_LAUF, HOECHSTVERSUCHE, starten, anhalten, lauf, ausfuehren, istEndgueltig };
+module.exports = { TAKT_MS, JE_LAUF, HOECHSTVERSUCHE, starten, anhalten, lauf, ausfuehren, istEndgueltig, istWeg };
