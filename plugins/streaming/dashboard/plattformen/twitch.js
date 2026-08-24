@@ -236,6 +236,11 @@ async function anreichern(kanalIds) {
         for (const s of json.data || []) {
             ergebnis.set(String(s.user_id), {
                 sendung_id: s.id,
+                // Der Kanalname kann sich aendern. Twitch gibt alte Namen
+                // spaeter wieder frei - ein veralteter Link zeigt dann ins
+                // Leere oder, schlimmer, auf einen fremden Kanal.
+                login: s.user_login || null,
+                anzeigename: s.user_name || null,
                 titel: s.title || null,
                 kategorie: s.game_name || null,
                 zuschauer: typeof s.viewer_count === 'number' ? s.viewer_count : null,

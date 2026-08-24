@@ -85,6 +85,19 @@ async function verarbeiten(ereignis) {
     }
 
     const streamer = streamerZeilen[0];
+
+    // Der Kanalname kann sich jederzeit aendern. Die Kennung bleibt - deshalb
+    // laeuft das Abo weiter -, aber unser gespeicherter Name veraltet still,
+    // und aus ihm wird der Link der Ankuendigung gebaut. Twitch gibt alte
+    // Namen wieder frei; ein veralteter Link kann irgendwann auf einen
+    // FREMDEN Kanal zeigen.
+    if (ereignis.login && ereignis.login !== streamer.login) {
+        await db().query(
+            'UPDATE streaming_streamers SET login = ?, geprueft_am = NOW() WHERE id = ?',
+            [ereignis.login, streamer.id]);
+        log().info(`[Streaming] Kanal ${streamer.kanal_id} heisst jetzt "${ereignis.login}" (vorher "${streamer.login}")`);
+        streamer.login = ereignis.login;
+    }
     const zustandZeilen = await db().query(
         'SELECT * FROM streaming_state WHERE streamer_id = ?', [streamer.id]);
     const zustand = zustandZeilen[0] || null;
@@ -290,7 +303,7 @@ async function anreicherungsLauf() {
 
     try {
         const offen = await db().query(`
-            SELECT s.id, s.plattform, s.kanal_id
+            SELECT s.id, s.plattform, s.kanal_id, s.login
               FROM streaming_state z
               JOIN streaming_streamers s ON s.id = z.streamer_id
              WHERE z.ist_live = 1
@@ -334,6 +347,15 @@ async function anreicherungsLauf() {
                            begonnen_am = COALESCE(begonnen_am, ?), angereichert_am = NOW()
                      WHERE streamer_id = ?
                 `, [a.titel, a.kategorie, a.zuschauer, a.vorschaubild, a.begonnen_am, zeile.id]);
+
+                // Zweiter Weg, auf dem eine Umbenennung auffaellt: Die
+                // Anreicherung liefert den aktuellen Namen ohnehin mit.
+                if (a.login && a.login !== zeile.login) {
+                    await db().query(
+                        'UPDATE streaming_streamers SET login = ?, anzeigename = COALESCE(?, anzeigename), geprueft_am = NOW() WHERE id = ?',
+                        [a.login, a.anzeigename, zeile.id]);
+                    log().info(`[Streaming] Kanal ${zeile.kanal_id} heisst jetzt "${a.login}" (vorher "${zeile.login}")`);
+                }
 
                 // Jetzt sind Titel und Kategorie da - Ziele mit Filter koennen
                 // erst hier entschieden werden.
