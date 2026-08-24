@@ -45,7 +45,11 @@ function db() {
  * @returns {Promise<Object|null>} Abo-Zeile oder null
  */
 async function aboFinden(koerper) {
-    const aboId = koerper?.subscription?.id;
+    // Der Adapter sagt, was in seinem Koerper steht - der Eingang liest ihn
+    // nicht selbst. Sonst haette Kick spaeter eine zweite Sonderbehandlung
+    // genau hier.
+    const { aboId, kanalId, ereignis } = twitch.kennung(koerper);
+
     if (aboId) {
         const zeilen = await db().query(
             'SELECT * FROM streaming_subscriptions WHERE anbieter_abo_id = ? LIMIT 1', [aboId]);
@@ -54,16 +58,14 @@ async function aboFinden(koerper) {
 
     // Bei der Bestaetigungsanfrage kennen wir die Abo-Kennung unter Umstaenden
     // noch nicht - dann ueber Kanal und Ereignistyp.
-    const kanal = koerper?.subscription?.condition?.broadcaster_user_id;
-    const typ = koerper?.subscription?.type;
-    if (!kanal || !typ) return null;
+    if (!kanalId || !ereignis) return null;
 
     const zeilen = await db().query(`
         SELECT a.* FROM streaming_subscriptions a
         JOIN streaming_streamers s ON s.id = a.streamer_id
         WHERE s.plattform = 'twitch' AND s.kanal_id = ? AND a.ereignis = ?
         LIMIT 1
-    `, [String(kanal), String(typ)]);
+    `, [kanalId, ereignis]);
 
     return zeilen.length ? zeilen[0] : null;
 }
@@ -89,7 +91,7 @@ router.post('/', async (req, res) => {
         const kopf = req.headers;
         const art = twitch.einordnen(kopf);
 
-        if (art === 'unbekannt') return ablehnen(400, `unbekannte Nachrichtenart "${kopf['twitch-eventsub-message-type']}"`);
+        if (art === 'unbekannt') return ablehnen(400, 'unbekannte Nachrichtenart');
         if (!req.rawBody?.length)  return ablehnen(400, 'leerer Koerper');
         if (!req.body)             return ablehnen(400, 'Koerper ist kein JSON');
         if (twitch.zuAlt(kopf))    return ablehnen(403, 'Zeitstempel zu alt oder fehlt');
@@ -125,7 +127,7 @@ router.post('/', async (req, res) => {
         if (art === 'widerruf') {
             res.status(204).end();
 
-            const grund = req.body?.subscription?.status || 'unbekannt';
+            const grund = twitch.widerrufsGrund(req.body);
             await db().query(
                 `UPDATE streaming_subscriptions SET zustand = 'widerrufen', fehlertext = ? WHERE id = ?`,
                 [grund, abo.id]);
@@ -137,13 +139,14 @@ router.post('/', async (req, res) => {
         }
 
         // --- Ereignis: wegschreiben, antworten, fertig ---
-        const msgId = String(kopf['twitch-eventsub-message-id']);
+        const msgId = String(twitch.nachrichtId(kopf) || '');
+        if (!msgId) return ablehnen(400, 'Zustellung ohne Kennung');
 
         try {
             await db().query(
                 `INSERT INTO streaming_events (plattform, anbieter_msg_id, ereignis, nutzlast)
                  VALUES ('twitch', ?, ?, ?)`,
-                [msgId, String(kopf['twitch-eventsub-subscription-type'] || ''), JSON.stringify(req.body)]);
+                [msgId, String(twitch.ereignisTyp(kopf, req.body) || ''), JSON.stringify(req.body)]);
         } catch (e) {
             if (e.code === 'ER_DUP_ENTRY') {
                 // Twitch stellt ausdruecklich "mindestens einmal" zu.
@@ -164,7 +167,7 @@ router.post('/', async (req, res) => {
             'UPDATE streaming_subscriptions SET letzte_meldung_am = NOW() WHERE id = ?', [abo.id]);
 
         const ms = Number(process.hrtime.bigint() - beginn) / 1e6;
-        Logger.info(`[Streaming/Eingang] ${kopf['twitch-eventsub-subscription-type']} angenommen in ${ms.toFixed(1)} ms`);
+        Logger.info(`[Streaming/Eingang] ${twitch.ereignisTyp(kopf, req.body)} angenommen in ${ms.toFixed(1)} ms`);
     } catch (error) {
         Logger.error('[Streaming/Eingang] Fehler:', error);
         if (!res.headersSent) res.status(500).end();

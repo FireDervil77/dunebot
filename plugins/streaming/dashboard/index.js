@@ -51,6 +51,7 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         this._setupRoutes();
         this._eingangAnmelden();
         await this._zugangsdatenPruefen();
+        this._takteStarten();
 
         Logger.success('[Streaming] Dashboard-Plugin aktiviert');
         return true;
@@ -78,6 +79,27 @@ class StreamingDashboardPlugin extends DashboardPlugin {
             // Ohne Eingang kommt nie eine Meldung an. Das darf nicht still
             // bleiben - aber es darf auch nicht das Dashboard mitreissen.
             Logger.error('[Streaming] Eingang konnte NICHT angemeldet werden:', error);
+        }
+    }
+
+    /**
+     * Kern-Takt und Ausgang starten.
+     *
+     * Beide laufen im Dashboard-Vorgang: Dort kommt der Webhook an, dort steht
+     * die Datenbankverbindung. Der Bot bekommt nur fertige Auftraege.
+     *
+     * Der Eingang selbst arbeitet nichts ab - er schreibt weg und antwortet.
+     * Ohne diese Takte bleibt der Posteingang also voll und es passiert nichts.
+     *
+     * @private
+     */
+    _takteStarten() {
+        const Logger = ServiceManager.get('Logger');
+        try {
+            require('./kern/takt').starten();
+            require('./ausgabe/drossel').starten();
+        } catch (error) {
+            Logger.error('[Streaming] Takte konnten nicht gestartet werden:', error);
         }
     }
 
@@ -127,6 +149,11 @@ class StreamingDashboardPlugin extends DashboardPlugin {
      * @returns {Promise<boolean>} true bei Erfolg
      */
     async onDisable() {
+        try {
+            require('./kern/takt').anhalten();
+            require('./ausgabe/drossel').anhalten();
+        } catch { /* beim Abschalten ist ein stehengebliebener Takt das kleinere Uebel */ }
+
         WebhookRegistry.unregister('streaming');
         ServiceManager.get('Logger').info('[Streaming] Dashboard-Plugin deaktiviert, Eingang abgemeldet');
         return true;

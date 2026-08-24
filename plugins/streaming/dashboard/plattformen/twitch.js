@@ -34,6 +34,15 @@ const IDAPI = 'https://id.twitch.tv/oauth2';
 /** Wie alt eine Zustellung hoechstens sein darf. Unsere Festlegung, keine Twitch-Vorgabe. */
 const HOECHSTALTER_MS = 10 * 60 * 1000;
 
+/**
+ * Welche Ereignisse dieser Adapter abonniert.
+ *
+ * Steht hier und nicht im Kern: Es sind Twitch-Woerter. Kick und YouTube
+ * bringen ihre eigenen mit, und der Kern darf keines davon kennen.
+ * `channel.update` kostet 0.
+ */
+const EREIGNISSE = ['stream.online', 'stream.offline', 'channel.update'];
+
 /** App-Token im Speicher - es ist jederzeit neu beschaffbar und gehoert nicht in die Datenbank. */
 let token = { wert: null, gueltigBis: 0 };
 
@@ -304,6 +313,55 @@ function einordnen(headers) {
 }
 
 /**
+ * Woran erkennen wir, zu welchem Abo eine Zustellung gehoert?
+ *
+ * Der Eingang braucht das, um das Geheimnis nachzuschlagen - er soll dafuer
+ * aber nicht in Twitchs Koerper greifen muessen.
+ *
+ * @param {Object} koerper Geparster Koerper
+ * @returns {{aboId: string|null, kanalId: string|null, ereignis: string|null}} Kennung
+ */
+function kennung(koerper) {
+    return {
+        aboId: koerper?.subscription?.id || null,
+        kanalId: koerper?.subscription?.condition?.broadcaster_user_id
+            ? String(koerper.subscription.condition.broadcaster_user_id) : null,
+        ereignis: koerper?.subscription?.type || null
+    };
+}
+
+/**
+ * Eindeutige Kennung der Zustellung - Grundlage der Dublettenerkennung.
+ *
+ * @param {Object} headers Kopfzeilen
+ * @returns {string|null} Kennung
+ */
+function nachrichtId(headers) {
+    return headers['twitch-eventsub-message-id'] || null;
+}
+
+/**
+ * Um welches Ereignis geht es? Aus Kopfzeile oder Koerper.
+ *
+ * @param {Object} headers Kopfzeilen
+ * @param {Object} [koerper] Koerper
+ * @returns {string|null} Ereignistyp
+ */
+function ereignisTyp(headers = {}, koerper = null) {
+    return headers['twitch-eventsub-subscription-type'] || koerper?.subscription?.type || null;
+}
+
+/**
+ * Grund eines Widerrufs, im Klartext.
+ *
+ * @param {Object} koerper Koerper
+ * @returns {string} Grund
+ */
+function widerrufsGrund(koerper) {
+    return koerper?.subscription?.status || 'unbekannt';
+}
+
+/**
  * Twitch-Ereignis in Hausvokabular uebersetzen.
  *
  * @param {Object} headers Kopfzeilen
@@ -311,7 +369,7 @@ function einordnen(headers) {
  * @returns {Object|null} Hausereignis oder null
  */
 function uebersetzen(headers, koerper) {
-    const typ = headers['twitch-eventsub-subscription-type'] || koerper?.subscription?.type;
+    const typ = ereignisTyp(headers, koerper);
     const e = koerper?.event || {};
     const kanal = e.broadcaster_user_id || koerper?.subscription?.condition?.broadcaster_user_id;
     if (!kanal) return null;
@@ -349,6 +407,11 @@ function uebersetzen(headers, koerper) {
 module.exports = {
     name: 'twitch',
     HOECHSTALTER_MS,
+    EREIGNISSE,
+    kennung,
+    nachrichtId,
+    ereignisTyp,
+    widerrufsGrund,
     appToken,
     aufloesen,
     abonnieren,

@@ -1,0 +1,415 @@
+'use strict';
+
+/**
+ * Streaming - der Takt.
+ *
+ * Der Eingang schreibt nur weg und antwortet; **hier** wird gearbeitet. Diese
+ * Trennung ist keine Eleganz, sondern Pflicht: Twitch widerruft bei zu
+ * langsamen Antworten das Abo, und daran haengen alle Guilds.
+ *
+ * Ein Neustart mitten in der Verarbeitung verliert nichts - was `neu` ist,
+ * bleibt `neu`. Der Preis sind bis zu fuenf Sekunden Verzoegerung; die
+ * Abfrage-Bots am Markt brauchen Minuten.
+ *
+ * Zwei Laeufe:
+ *
+ *   - **Posteingang** (5 s): uebersetzen, Zustand fortschreiben, entscheiden,
+ *     auffaechern, Auftraege schreiben.
+ *   - **Anreicherung** (30 s): Titel, Kategorie, Zuschauer, Vorschaubild in
+ *     **einem** Zug fuer alle frisch gestarteten Kanaele nachholen.
+ *     `stream.online` bringt davon nichts mit.
+ *
+ * Die Reihenfolge ist Absicht: **erst melden, dann verschoenern.** Wer auf die
+ * Anreicherung wartet, haengt die Ankuendigung an eine zweite Schnittstelle,
+ * die ausfallen kann. Eine Ankuendigung ohne Vorschaubild ist ein
+ * Schoenheitsfehler - eine ausbleibende ist der Ausfall.
+ *
+ * @module streaming/dashboard/kern/takt
+ */
+
+const { ServiceManager } = require('dunebot-core');
+const entscheidung = require('./entscheidung');
+const abos = require('./abos');
+
+const TAKT_MS = 5_000;
+const ANREICHERN_MS = 30_000;
+
+let laeuftGerade = false;
+let anreicherungLaeuft = false;
+let uhren = [];
+
+/**
+ * @returns {Object} Datenbankdienst
+ */
+function db() {
+    return ServiceManager.get('dbService');
+}
+
+/**
+ * @returns {Object} Logger
+ */
+function log() {
+    return ServiceManager.get('Logger');
+}
+
+/**
+ * Einstellungen einer Guild - heute die Vorgaben, ab Stufe 5 je Guild.
+ *
+ * @param {string} guildId Guild
+ * @returns {Object} { abklingzeitMinuten, karenzMinuten }
+ */
+function einstellungen(guildId) {
+    const config = require('../../config.json');
+    return {
+        abklingzeitMinuten: Number(config.ABKLINGZEIT_MINUTEN || 15),
+        karenzMinuten: Number(config.KARENZ_MINUTEN || 2)
+    };
+}
+
+/**
+ * Ein Hausereignis verarbeiten.
+ *
+ * @param {Object} ereignis Hausereignis aus dem Adapter
+ * @returns {Promise<string>} Was geschehen ist
+ */
+async function verarbeiten(ereignis) {
+    const streamerZeilen = await db().query(
+        'SELECT * FROM streaming_streamers WHERE plattform = ? AND kanal_id = ? LIMIT 1',
+        [ereignis.plattform, String(ereignis.kanal_id)]);
+
+    if (!streamerZeilen.length) {
+        // Kommt vor, wenn ein Abo bei der Plattform lebt, der Streamer bei uns
+        // aber schon geloescht ist. Der Abgleich raeumt das ab; hier ist es
+        // kein Fehler, sondern nichts zu tun.
+        return 'kein Streamer zu diesem Kanal';
+    }
+
+    const streamer = streamerZeilen[0];
+    const zustandZeilen = await db().query(
+        'SELECT * FROM streaming_state WHERE streamer_id = ?', [streamer.id]);
+    const zustand = zustandZeilen[0] || null;
+
+    switch (ereignis.art) {
+        case 'ging_live':   return await gingLive(streamer, zustand, ereignis);
+        case 'beendet':     return await beendet(streamer, zustand, ereignis);
+        case 'geaendert':   return await geaendert(streamer, zustand, ereignis);
+        default:            return `Ereignisart "${ereignis.art}" wird nicht behandelt`;
+    }
+}
+
+/**
+ * @param {Object} streamer Streamer
+ * @param {Object|null} zustand Zustand
+ * @param {Object} ereignis Ereignis
+ * @returns {Promise<string>} Ergebnis
+ */
+async function gingLive(streamer, zustand, ereignis) {
+    const wahl = entscheidung.beiGingLive(ereignis, zustand, einstellungen(), Date.now());
+
+    await db().query(`
+        INSERT INTO streaming_state (streamer_id, ist_live, sendung_id, begonnen_am, beendet_am)
+        VALUES (?, 1, ?, ?, NULL)
+        ON DUPLICATE KEY UPDATE
+            ist_live = 1,
+            sendung_id = VALUES(sendung_id),
+            begonnen_am = COALESCE(VALUES(begonnen_am), begonnen_am),
+            beendet_am = NULL
+    `, [streamer.id, ereignis.sendung_id || null, ereignis.begonnen_am || new Date()]);
+
+    if (wahl.handlung === 'nichts') return `keine Meldung: ${wahl.grund}`;
+    if (wahl.handlung === 'aktualisieren') return `keine zweite Ankuendigung: ${wahl.grund}`;
+
+    const anzahl = await auffaechern(streamer.id, 'posten');
+    await db().query(
+        'UPDATE streaming_state SET zuletzt_gemeldet_am = NOW() WHERE streamer_id = ?', [streamer.id]);
+
+    return `gemeldet an ${anzahl} Ziel(e)`;
+}
+
+/**
+ * @param {Object} streamer Streamer
+ * @param {Object|null} zustand Zustand
+ * @param {Object} ereignis Ereignis
+ * @returns {Promise<string>} Ergebnis
+ */
+async function beendet(streamer, zustand, ereignis) {
+    const wahl = entscheidung.beiBeendet(ereignis, zustand);
+
+    await db().query(`
+        INSERT INTO streaming_state (streamer_id, ist_live, beendet_am)
+        VALUES (?, 0, ?)
+        ON DUPLICATE KEY UPDATE ist_live = 0, beendet_am = VALUES(beendet_am)
+    `, [streamer.id, ereignis.beendet_am || new Date()]);
+
+    if (wahl.handlung === 'nichts') return wahl.grund;
+
+    // Karenz: erst nach Ablauf aufraeumen. Kommt der Streamer vorher zurueck,
+    // hebt `gingLive` den Zustand wieder auf, und der Auftrag findet beim
+    // Ausfuehren eine laufende Sendung vor.
+    const karenzMs = einstellungen().karenzMinuten * 60_000;
+    const anzahl = await auffaechern(streamer.id, 'aufraeumen', karenzMs);
+
+    return `Aufraeumen fuer ${anzahl} Ziel(e) in ${Math.round(karenzMs / 1000)} s vorgemerkt`;
+}
+
+/**
+ * @param {Object} streamer Streamer
+ * @param {Object|null} zustand Zustand
+ * @param {Object} ereignis Ereignis
+ * @returns {Promise<string>} Ergebnis
+ */
+async function geaendert(streamer, zustand, ereignis) {
+    await db().query(`
+        INSERT INTO streaming_state (streamer_id, titel, kategorie)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            titel = COALESCE(VALUES(titel), titel),
+            kategorie = COALESCE(VALUES(kategorie), kategorie)
+    `, [streamer.id, ereignis.titel || null, ereignis.kategorie || null]);
+
+    // Nur solange gesendet wird, hat eine Aenderung eine Nachricht, die
+    // nachziehen koennte.
+    if (!zustand?.ist_live) return 'Angaben gemerkt (nicht live)';
+
+    const anzahl = await auffaechern(streamer.id, 'bearbeiten');
+    return `${anzahl} Nachricht(en) ziehen nach`;
+}
+
+/**
+ * Ein Ereignis auf alle Ziele auffaechern.
+ *
+ * @param {number} streamerId Streamer
+ * @param {string} aktion 'posten' | 'bearbeiten' | 'aufraeumen'
+ * @param {number} [verzoegerungMs] Wartezeit
+ * @returns {Promise<number>} Anzahl geschriebener Auftraege
+ */
+async function auffaechern(streamerId, aktion, verzoegerungMs = 0) {
+    const ziele = await db().query(
+        'SELECT * FROM streaming_targets WHERE streamer_id = ? AND aktiv = 1', [streamerId]);
+
+    const zustandZeilen = await db().query(
+        'SELECT * FROM streaming_state WHERE streamer_id = ?', [streamerId]);
+    const zustand = zustandZeilen[0] || {};
+
+    let geschrieben = 0;
+
+    for (const ziel of ziele) {
+        // Beim Aufraeumen und Bearbeiten zaehlt der Filter nicht mehr: Was
+        // gepostet wurde, muss auch aufgeraeumt werden - selbst wenn sich die
+        // Kategorie zwischendurch geaendert hat.
+        if (aktion === 'posten') {
+            const passt = entscheidung.zielPasst(ziel, zustand);
+            if (!passt.passt) {
+                if (passt.wartetAufAnreicherung) {
+                    // Nicht verwerfen: Der Anreicherungslauf entscheidet gleich
+                    // erneut, dann mit Titel und Kategorie.
+                    log().debug(`[Streaming] Ziel ${ziel.id} wartet auf Anreicherung`);
+                }
+                continue;
+            }
+        }
+
+        await db().query(`
+            INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast, faellig_ab)
+            VALUES (?, ?, ?, ?, DATE_ADD(NOW(3), INTERVAL ? MICROSECOND))
+        `, [ziel.id, ziel.guild_id, aktion, JSON.stringify({ streamer_id: streamerId }), verzoegerungMs * 1000]);
+
+        geschrieben++;
+    }
+
+    return geschrieben;
+}
+
+// =====================================================
+// Die Laeufe
+// =====================================================
+
+/**
+ * Posteingang abarbeiten.
+ *
+ * @returns {Promise<void>}
+ */
+async function posteingangLauf() {
+    if (laeuftGerade) return;
+    laeuftGerade = true;
+
+    try {
+        const offen = await db().query(
+            "SELECT * FROM streaming_events WHERE zustand = 'neu' ORDER BY id ASC LIMIT 50");
+
+        for (const zeile of offen) {
+            try {
+                const adapter = abos.ADAPTER[zeile.plattform];
+                if (!adapter) throw new Error(`Kein Adapter fuer "${zeile.plattform}"`);
+
+                const nutzlast = typeof zeile.nutzlast === 'string'
+                    ? JSON.parse(zeile.nutzlast) : zeile.nutzlast;
+
+                // Kein nachgebauter Kopfzeilen-Satz: Der Adapter liest den Typ
+                // notfalls aus der Nutzlast. Der Kern kennt keine Kopfzeilen.
+                const ereignis = adapter.uebersetzen({}, nutzlast);
+
+                if (!ereignis) {
+                    await db().query(
+                        "UPDATE streaming_events SET zustand = 'fertig', verarbeitet_am = NOW(3), fehlertext = ? WHERE id = ?",
+                        ['nicht uebersetzbar - Ereignisart wird nicht behandelt', zeile.id]);
+                    continue;
+                }
+
+                const ergebnis = await verarbeiten(ereignis);
+
+                await db().query(
+                    "UPDATE streaming_events SET zustand = 'fertig', verarbeitet_am = NOW(3), fehlertext = ? WHERE id = ?",
+                    [String(ergebnis).slice(0, 512), zeile.id]);
+
+                log().info(`[Streaming] ${zeile.ereignis} verarbeitet: ${ergebnis}`);
+            } catch (err) {
+                // Ein kaputtes Ereignis darf den Lauf nicht anhalten - sonst
+                // steht die ganze Warteschlange wegen einer Zeile.
+                await db().query(
+                    "UPDATE streaming_events SET zustand = 'fehler', versuche = versuche + 1, fehlertext = ?, verarbeitet_am = NOW(3) WHERE id = ?",
+                    [String(err.message).slice(0, 512), zeile.id]);
+                log().error(`[Streaming] Ereignis ${zeile.id} fehlgeschlagen:`, err);
+            }
+        }
+    } catch (err) {
+        log().error('[Streaming] Posteingang-Lauf fehlgeschlagen:', err);
+    } finally {
+        laeuftGerade = false;
+    }
+}
+
+/**
+ * Anreicherung: Titel, Kategorie, Zuschauer, Bild - in Stapeln.
+ *
+ * @returns {Promise<void>}
+ */
+async function anreicherungsLauf() {
+    if (anreicherungLaeuft) return;
+    anreicherungLaeuft = true;
+
+    try {
+        const offen = await db().query(`
+            SELECT s.id, s.plattform, s.kanal_id
+              FROM streaming_state z
+              JOIN streaming_streamers s ON s.id = z.streamer_id
+             WHERE z.ist_live = 1
+               AND (z.angereichert_am IS NULL OR z.angereichert_am < DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+             LIMIT 100
+        `);
+        if (!offen.length) return;
+
+        // Nach Plattform gruppieren: jeder Adapter holt seinen Stapel in EINEM
+        // Zug. Eine Schleife je Kanal waere bei 200 Guilds sofort tot.
+        const nachPlattform = new Map();
+        for (const zeile of offen) {
+            if (!nachPlattform.has(zeile.plattform)) nachPlattform.set(zeile.plattform, []);
+            nachPlattform.get(zeile.plattform).push(zeile);
+        }
+
+        for (const [plattform, zeilen] of nachPlattform) {
+            const adapter = abos.ADAPTER[plattform];
+            if (!adapter) continue;
+
+            const angaben = await adapter.anreichern(zeilen.map(z => z.kanal_id));
+
+            for (const zeile of zeilen) {
+                const a = angaben.get(String(zeile.kanal_id));
+
+                if (!a) {
+                    // Nicht in `/streams` gefunden: Der Stream ist vorbei, und
+                    // `stream.offline` ist verlorengegangen. Sonst stuende der
+                    // Kanal fuer immer als live in der Liste - und beim
+                    // naechsten echten Start kaeme keine Ankuendigung.
+                    await db().query(
+                        'UPDATE streaming_state SET ist_live = 0, beendet_am = COALESCE(beendet_am, NOW()), angereichert_am = NOW() WHERE streamer_id = ?',
+                        [zeile.id]);
+                    log().warn(`[Streaming] Kanal ${zeile.kanal_id} ist laut Plattform nicht live - Zustand zurueckgesetzt`);
+                    continue;
+                }
+
+                await db().query(`
+                    UPDATE streaming_state
+                       SET titel = ?, kategorie = ?, zuschauer = ?, vorschaubild = ?,
+                           begonnen_am = COALESCE(begonnen_am, ?), angereichert_am = NOW()
+                     WHERE streamer_id = ?
+                `, [a.titel, a.kategorie, a.zuschauer, a.vorschaubild, a.begonnen_am, zeile.id]);
+
+                // Jetzt sind Titel und Kategorie da - Ziele mit Filter koennen
+                // erst hier entschieden werden.
+                await nachtragen(zeile.id);
+            }
+        }
+    } catch (err) {
+        log().error('[Streaming] Anreicherung fehlgeschlagen:', err);
+    } finally {
+        anreicherungLaeuft = false;
+    }
+}
+
+/**
+ * Ziele bedienen, die auf die Anreicherung gewartet haben - und die
+ * bestehenden Nachrichten nachziehen.
+ *
+ * @param {number} streamerId Streamer
+ * @returns {Promise<void>}
+ */
+async function nachtragen(streamerId) {
+    const ziele = await db().query(
+        'SELECT * FROM streaming_targets WHERE streamer_id = ? AND aktiv = 1', [streamerId]);
+    const zustandZeilen = await db().query('SELECT * FROM streaming_state WHERE streamer_id = ?', [streamerId]);
+    const zustand = zustandZeilen[0] || {};
+    if (!zustand.ist_live || !zustand.sendung_id) return;
+
+    for (const ziel of ziele) {
+        const schonGesendet = await db().query(
+            'SELECT id FROM streaming_messages WHERE target_id = ? AND sendung_id = ? LIMIT 1',
+            [ziel.id, zustand.sendung_id]);
+
+        const passt = entscheidung.zielPasst(ziel, zustand);
+
+        if (schonGesendet.length) {
+            // Steht schon: Titel oder Kategorie koennten sich geaendert haben.
+            await db().query(
+                `INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast)
+                 VALUES (?, ?, 'bearbeiten', ?)`,
+                [ziel.id, ziel.guild_id, JSON.stringify({ streamer_id: streamerId })]);
+        } else if (passt.passt) {
+            // Hat gewartet und passt jetzt.
+            await db().query(
+                `INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast)
+                 VALUES (?, ?, 'posten', ?)`,
+                [ziel.id, ziel.guild_id, JSON.stringify({ streamer_id: streamerId })]);
+            log().info(`[Streaming] Ziel ${ziel.id} nach Anreicherung nachgetragen`);
+        }
+    }
+}
+
+/**
+ * Takt starten.
+ *
+ * @returns {void}
+ */
+function starten() {
+    if (uhren.length) return;
+
+    // `node-cron` kann keine Sekunden - deshalb setInterval mit
+    // Ueberlappungsschutz, wie es der Aufraeumer im Musik-Plugin vormacht.
+    uhren.push(setInterval(() => posteingangLauf().catch(() => {}), TAKT_MS));
+    uhren.push(setInterval(() => anreicherungsLauf().catch(() => {}), ANREICHERN_MS));
+    uhren.forEach(u => u.unref?.());
+
+    log().info(`[Streaming] Takt gestartet (Posteingang ${TAKT_MS / 1000} s, Anreicherung ${ANREICHERN_MS / 1000} s)`);
+}
+
+/**
+ * Takt anhalten.
+ *
+ * @returns {void}
+ */
+function anhalten() {
+    uhren.forEach(u => clearInterval(u));
+    uhren = [];
+}
+
+module.exports = { TAKT_MS, ANREICHERN_MS, starten, anhalten, posteingangLauf, anreicherungsLauf, verarbeiten };

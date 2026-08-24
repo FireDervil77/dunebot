@@ -27,11 +27,22 @@ const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
 const twitch = require('../plattformen/twitch');
 
-/** Welche Ereignisse ein Kanal bekommt. `channel.update` kostet 0. */
-const EREIGNISSE = ['stream.online', 'stream.offline', 'channel.update'];
-
 /** @type {Object<string, Object>} Adapter je Plattform */
 const ADAPTER = { twitch };
+
+/**
+ * Welche Ereignisse ein Kanal bekommt - **der Adapter sagt es**, nicht der Kern.
+ *
+ * Frueher stand die Liste hier. Das war ein Schichtenbruch: `stream.online`
+ * ist ein Twitch-Wort, und Kick wie YouTube bringen eigene mit. Gefunden von
+ * `scripts/check-streaming-schichten.js`.
+ *
+ * @param {string} plattform Plattform
+ * @returns {Array<string>} Ereignisnamen der Plattform
+ */
+function ereignisseVon(plattform) {
+    return ADAPTER[plattform]?.EREIGNISSE || [];
+}
 
 /**
  * @returns {Object} Datenbankdienst
@@ -125,7 +136,7 @@ async function abosSichern(streamerId, plattform, kanalId) {
 
     const ergebnisse = [];
 
-    for (const ereignis of EREIGNISSE) {
+    for (const ereignis of ereignisseVon(plattform)) {
         const zustand = schonDa.get(ereignis);
         if (zustand === 'bestaetigt' || zustand === 'angefragt') {
             ergebnisse.push({ ereignis, uebersprungen: true, zustand });
@@ -207,8 +218,8 @@ async function abosAufraeumen(streamerId) {
 }
 
 module.exports = {
-    EREIGNISSE,
     ADAPTER,
+    ereignisseVon,
     rueckrufAdresse,
     nutzerZaehlen,
     streamerSichern,
