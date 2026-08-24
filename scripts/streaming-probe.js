@@ -14,10 +14,14 @@
  * Die Signatur wird mit dem echten Geheimnis des Abos gebildet. Eine Probe mit
  * falscher Signatur wuerde abgelehnt — genau wie ein Angriff.
  *
- *   node scripts/streaming-probe.js <kanalname> [online|offline|update] [--ja]
+ *   node scripts/streaming-probe.js <kanalname> [online|offline|update] [--ja] [--frisch]
  *
  * Ohne `--ja` wird nur gezeigt, was geschehen wuerde. **Mit `--ja` entsteht
  * eine echte Nachricht im Discord.**
+ *
+ * `--frisch` setzt vorher den Zustand des Streamers zurueck (nicht live, keine
+ * letzte Meldung). Ohne das greift beim zweiten Versuch die Abklingzeit - im
+ * Betrieb genau richtig, beim Proben hinderlich.
  */
 'use strict';
 
@@ -28,6 +32,7 @@ const mysql = require('mysql2/promise');
 
 const [, , kanalArg, artArg = 'online', ...rest] = process.argv;
 const ernst = rest.includes('--ja') || artArg === '--ja';
+const frisch = rest.includes('--frisch') || artArg === '--frisch';
 const art = ['online', 'offline', 'update'].includes(artArg) ? artArg : 'online';
 
 const EREIGNIS = { online: 'stream.online', offline: 'stream.offline', update: 'channel.update' }[art];
@@ -71,11 +76,18 @@ if (!kanalArg) {
         console.log(`  Abo:       ${abo[0].zustand}`);
         console.log(`  Ziele:     ${ziele.length}`);
         console.log(`  Adresse:   ${ADRESSE}/api/streaming/webhook`);
+        if (frisch) console.log('  Zustand:   wird vorher zurueckgesetzt (--frisch)');
 
         if (!ernst) {
             console.log('\n  Das war die Vorschau. Mit --ja wird es wirklich geschickt —');
             console.log('  und dann entsteht eine ECHTE Nachricht in deinem Discord.\n');
             process.exit(0);
+        }
+
+        if (frisch) {
+            await c.query(
+                "UPDATE streaming_state SET ist_live = 0, sendung_id = NULL, zuletzt_gemeldet_am = NULL, beendet_am = NULL WHERE streamer_id = ?",
+                [s.id]);
         }
 
         // Nutzlast wie Twitch sie schickt. Die Sendungskennung traegt die

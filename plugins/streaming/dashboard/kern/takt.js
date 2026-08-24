@@ -156,10 +156,14 @@ async function gingLive(streamer, zustand, ereignis) {
     if (wahl.handlung === 'aktualisieren') return `keine zweite Ankuendigung: ${wahl.grund}`;
 
     const anzahl = await auffaechern(streamer.id, 'posten');
-    await db().query(
-        'UPDATE streaming_state SET zuletzt_gemeldet_am = NOW() WHERE streamer_id = ?', [streamer.id]);
 
-    return `gemeldet an ${anzahl} Ziel(e)`;
+    // `zuletzt_gemeldet_am` wird hier BEWUSST nicht gesetzt. Es steuert die
+    // Abklingzeit, und die darf sich nur auf tatsaechlich gesendete
+    // Ankuendigungen stuetzen. Vorher stand hier ein NOW() direkt nach dem
+    // Auffaechern - scheiterte der Versand danach, behauptete der Zustand
+    // trotzdem "gemeldet" und sperrte 15 Minuten lang jeden neuen Versuch.
+    // Gesetzt wird es jetzt von der Drossel, wenn eine Nachricht wirklich steht.
+    return `${anzahl} Auftrag/Auftraege geschrieben`;
 }
 
 /**

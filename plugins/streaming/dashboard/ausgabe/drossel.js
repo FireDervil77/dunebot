@@ -182,6 +182,12 @@ async function ausfuehren(auftrag) {
               WHERE target_id = ? AND sendung_id = ?`,
             [antwort.daten.messageId, ziel.id, sendungId]);
 
+        // Erst JETZT gilt die Sendung als gemeldet. Daran haengt die
+        // Abklingzeit - und die darf nur zaehlen, was wirklich im Discord steht.
+        await db().query(
+            'UPDATE streaming_state SET zuletzt_gemeldet_am = NOW() WHERE streamer_id = ?',
+            [streamer.id]);
+
         return { ok: true, fehler: null, endgueltig: false };
     }
 
