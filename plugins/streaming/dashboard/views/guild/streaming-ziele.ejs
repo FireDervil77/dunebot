@@ -402,7 +402,7 @@
         %>
 
         <% if (darfProben) { %>
-          <div class="card-footer bg-transparent pt-0">
+          <div class="card-body pt-0 pb-3">
             <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/probe"
                   class="d-flex align-items-center gap-2 flex-wrap" data-toast>
               <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
@@ -420,11 +420,16 @@
 
         <% if (darfAendern) { %>
           <!--
-            Getrennte Zone fuer das Zerstoerende: eigene Fusszeile, oben
-            abgesetzt, rechtsbuendig - weit weg von allem, was man im Alltag
-            drueckt.
+            Getrennte Zone fuer das Zerstoerende: eigene Fusszeile,
+            rechtsbuendig, weit weg von allem, was man im Alltag drueckt.
+
+            **Mit Fusszeilen-Hintergrund, nicht transparent.** Die erste
+            Fassung nach dem Vorfall trug `bg-transparent`, und dann stand der
+            rote Knopf da wie vergessen statt wie der Abschluss der Karte. Der
+            Betreiber hat das am 2026-08-25 zu Recht beanstandet: Die Trennung
+            soll gewollt aussehen, nicht uebersehen.
           -->
-          <div class="card-footer bg-transparent border-top text-end">
+          <div class="card-footer text-end">
             <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/entfernen"
                   onsubmit="return confirm('Dieses Ziel wirklich entfernen?\n\nIst es das letzte Ziel für diesen Kanal, werden auch die Twitch-Abos abbestellt — der Kanal wird dann gar nicht mehr beobachtet.');">
               <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
