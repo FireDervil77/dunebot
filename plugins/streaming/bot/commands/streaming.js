@@ -42,22 +42,36 @@ module.exports = {
     },
 
     /**
+     * **Der Befehl antwortet selbst.**
+     *
+     * `apps/bot/handler.js:77` ruft `await cmd.messageRun(context)` und wirft
+     * die Rueckgabe weg - dasselbe bei `interactionRun` (Zeile 156). Wer hier
+     * ein Antwortobjekt zurueckgibt, bekommt genau nichts: beim Slash-Befehl
+     * bleibt "Bot denkt nach ..." stehen, bis Discord aufgibt, beim
+     * Praefix-Befehl passiert gar nichts. Kein Fehler im Log, weil auch kein
+     * Fehler auftritt.
+     *
      * @param {Object} kontext Kontext
      * @param {Object} kontext.message Nachricht
      * @param {Array} kontext.args Argumente
-     * @returns {Promise<Object>} Antwort
+     * @returns {Promise<void>}
      */
     async messageRun({ message, args }) {
-        return await ausfuehren(args[0] || 'hilfe', message.guild?.id);
+        const antwort = await ausfuehren(args[0] || 'hilfe', message.guild?.id);
+        await message.reply(antwort);
     },
 
     /**
      * @param {Object} kontext Kontext
      * @param {Object} kontext.interaction Interaktion
-     * @returns {Promise<Object>} Antwort
+     * @returns {Promise<void>}
      */
     async interactionRun({ interaction }) {
-        return await ausfuehren(interaction.options.getSubcommand(), interaction.guildId);
+        // Der Handler hat bereits `deferReply()` gerufen - deshalb `followUp`
+        // und nicht `reply`, sonst gibt es "Interaction has already been
+        // acknowledged".
+        const antwort = await ausfuehren(interaction.options.getSubcommand(), interaction.guildId);
+        await interaction.followUp(antwort);
     }
 };
 
