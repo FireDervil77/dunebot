@@ -29,6 +29,7 @@
 
 const { ServiceManager } = require('dunebot-core');
 const entscheidung = require('./entscheidung');
+const { melden } = require('../../shared/signale');
 const abos = require('./abos');
 
 const TAKT_MS = 5_000;
@@ -156,12 +157,22 @@ async function verarbeiten(ereignis) {
         'SELECT * FROM streaming_state WHERE streamer_id = ?', [streamer.id]);
     const zustand = zustandZeilen[0] || null;
 
+    let ergebnis;
     switch (ereignis.art) {
-        case 'ging_live':   return await gingLive(streamer, zustand, ereignis);
-        case 'beendet':     return await beendet(streamer, zustand, ereignis);
-        case 'geaendert':   return await geaendert(streamer, zustand, ereignis);
+        case 'ging_live':   ergebnis = await gingLive(streamer, zustand, ereignis); break;
+        case 'beendet':     ergebnis = await beendet(streamer, zustand, ereignis); break;
+        case 'geaendert':   ergebnis = await geaendert(streamer, zustand, ereignis); break;
         default:            return `Ereignisart "${ereignis.art}" wird nicht behandelt`;
     }
+
+    // Offene Zustandsseiten anstupsen. Bewusst **eine** Stelle statt drei in
+    // den Handlern darunter: Wer den Melder je Zweig einbaut, vergisst ihn beim
+    // vierten - und der fehlende Anstupser faellt nie auf, weil die Seite ja
+    // aussieht wie immer. Nur die unbehandelte Ereignisart oben kommt hier
+    // nicht vorbei, und die hat auch nichts geaendert.
+    melden({ streamerId: streamer.id, grund: ereignis.art });
+
+    return ergebnis;
 }
 
 /**

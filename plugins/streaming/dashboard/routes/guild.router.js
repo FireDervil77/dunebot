@@ -480,20 +480,148 @@ router.get('/zustand', requirePermission('STREAMING.VIEW'), async (req, res) => 
     const tr = makeTranslator(req, res);
 
     try {
-        const [zustand, streamer] = await Promise.all([
-            modelle.zustandDerGuild(guildId),
-            modelle.streamerDerGuild(guildId)
-        ]);
+        const bild = await zustandsBild(guildId, tr);
 
         await renderView(res, 'guild/streaming-zustand', {
-            tr, guildId, zustand, streamer,
-            ampel: ampelFarbe(zustand),
+            tr, guildId,
+            zustand: bild.zustand,
+            streamer: bild.streamer,
+            ampel: bild.ampel,
+            probleme: bild.probleme,
             vorWieLange
         });
     } catch (error) {
         return renderFehler(res, error, 'Der Zustand konnte nicht geladen werden');
     }
 });
+
+/**
+ * Der Zustand als Zahlen - fuer die offene Seite.
+ *
+ * **Warum eine eigene Route und nicht die Daten im Signal?** Weil hier
+ * `requirePermission` steht. Ein Signal traegt nur "es hat sich etwas
+ * geaendert"; abgeholt wird ueber denselben Rechteweg wie jeder andere
+ * Zugriff. Haette der Strom die Daten selbst mitgeschickt, gaebe es eine
+ * zweite Stelle, an der man die Pruefung vergessen kann - und der Fehler kaeme
+ * als fremde Zahlen im falschen Browser heraus, nicht als Fehlermeldung.
+ */
+router.get('/zustand/daten', requirePermission('STREAMING.VIEW'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+
+    try {
+        const bild = await zustandsBild(guildId, tr);
+
+        return res.json({
+            success: true,
+            ampel: bild.ampel,
+            ampelText: bild.ampelText,
+            ueberwacht: bild.zustand.ueberwacht,
+            live: bild.zustand.live,
+            letzteMeldung: vorWieLange(bild.zustand.letzteMeldungAm) || tr('streaming:STATE.NEVER'),
+            streamer: bild.streamer.map(s => ({
+                id: s.id,
+                zustand: (s.abo_zustand === 'widerrufen' || s.abo_zustand === 'fehler')
+                    ? 'abo_kaputt'
+                    : (s.ist_live ? 'live' : 'offline'),
+                aboZustand: s.abo_zustand || null,
+                letztGehoert: vorWieLange(s.letzte_meldung_am) || tr('streaming:STATE.NEVER')
+            })),
+            probleme: bild.probleme,
+            stand: Date.now()
+        });
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Zustandsdaten fehlgeschlagen:', error);
+        return res.status(500).json({ success: false });
+    }
+});
+
+/**
+ * Der Strom: haelt die Zustandsseite offen und stupst sie an.
+ *
+ * Bis zum 2026-08-26 war die Seite **einmal gezeichnet und dann tot** - kein
+ * Poll, kein Nachschub. Sie zeigte "offline" mit derselben Bestimmtheit, ob
+ * die Angabe zwei Sekunden oder zwei Stunden alt war.
+ *
+ * Der `SSEManager` ist vorhanden (`apps/dashboard/helpers/SSEManager.js`) und
+ * wird von `masterserver` bereits benutzt - hier wird angedockt, nicht neu
+ * gebaut.
+ */
+router.get('/zustand/strom', requirePermission('STREAMING.VIEW'), (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const sseManager = ServiceManager.get('sseManager');
+    const guildId = res.locals.guildId;
+
+    // Ohne Dienst keine Verbindung - aber mit klarer Ansage. Ein stiller
+    // Fehlschlag hiesse: die Seite haelt sich fuer aktuell und ist es nie.
+    if (!sseManager) {
+        return res.status(503).json({ success: false, message: 'Strom nicht verfuegbar' });
+    }
+
+    try {
+        const nutzerId = res.locals.user?.id || req.session?.user?.info?.id || 'anonymous';
+        sseManager.addClient(guildId, `streaming-${nutzerId}-${Date.now()}`, res, {
+            metadata: { userId: nutzerId, source: 'streaming' }
+        });
+    } catch (error) {
+        Logger.error('[Streaming] Strom-Anmeldung fehlgeschlagen:', error);
+        if (!res.headersSent) res.status(500).json({ success: false });
+    }
+});
+
+/**
+ * Alles, was die Zustandsseite zeigt - an **einer** Stelle gerechnet.
+ *
+ * Seite und Strom holen hier dasselbe. Waeren es zwei Rechnungen, liefen sie
+ * auseinander: Die frisch geladene Seite zeigte das eine, der Nachschub
+ * daraufhin das andere, und niemand wuesste, welches stimmt.
+ *
+ * @param {string} guildId Guild
+ * @param {Function} tr Uebersetzer
+ * @returns {Promise<Object>} Zustand, Streamer, Ampel, Probleme
+ */
+async function zustandsBild(guildId, tr) {
+    const [zustand, streamer] = await Promise.all([
+        modelle.zustandDerGuild(guildId),
+        modelle.streamerDerGuild(guildId)
+    ]);
+
+    const ampel = ampelFarbe(zustand);
+
+    return {
+        zustand, streamer, ampel,
+        ampelText: ampel === 'rot' ? tr('streaming:STATE.BROKEN')
+            : (ampel === 'gelb' ? tr('streaming:STATE.DELAYED') : tr('streaming:STATE.OK')),
+        probleme: problemListe(zustand)
+    };
+}
+
+/**
+ * Was klemmt - als Liste aus Text und Abhilfe, nicht als HTML.
+ *
+ * Die Ansicht baut daraus ihre Eintraege, der Strom schickt dieselbe Form. So
+ * kennt die Browserseite **kein** Markup, das hier nochmal steht - der
+ * Doppelbau, den man sonst beim naechsten Umbau an einer der beiden Stellen
+ * vergisst.
+ *
+ * @param {Object} z Zustandszahlen
+ * @returns {Array<{text: string, abhilfe: string}>} Probleme
+ */
+function problemListe(z) {
+    const liste = (z.kaputteAbos || []).map(a => ({
+        text: `${a.login}: Abo ${a.zustand}` + (a.fehlertext ? ` — ${a.fehlertext}` : ''),
+        abhilfe: 'Kanal einmal entfernen und neu eintragen.'
+    }));
+
+    if (z.gescheitert > 0) {
+        liste.push({
+            text: `${z.gescheitert} Auftrag/Aufträge aufgegeben`,
+            abhilfe: 'Rechte des Bots im Zielkanal prüfen.'
+        });
+    }
+
+    return liste;
+}
 
 /**
  * Die Ampel wird gerechnet, nicht gesetzt.

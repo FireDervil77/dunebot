@@ -29,6 +29,7 @@ const nachricht = require('./nachricht');
 const modelle = require('../../shared/models');
 const { vorlageWaehlen, VORGABE_LIVE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
 const { inhaltsStand } = require('../kern/entscheidung');
+const { melden } = require('../../shared/signale');
 
 const TAKT_MS = 500;
 const JE_LAUF = 20;
@@ -449,6 +450,12 @@ async function lauf() {
                     await db().query(
                         "UPDATE streaming_outbox SET zustand = 'fertig', erledigt_am = NOW(3), fehlertext = ? WHERE id = ?",
                         [ergebnis.hinweis || null, auftrag.id]);
+
+                    // Die Zustandsseite zaehlt offene Auftraege mit - ohne
+                    // diesen Anstupser bliebe die Zahl stehen, bis jemand neu
+                    // laedt. Der Strom sammelt 300 ms, ein Schwall von zwanzig
+                    // erledigten Auftraegen ergibt also einen Anstupser.
+                    melden({ guildId: auftrag.guild_id, grund: 'auftrag_fertig' });
                     continue;
                 }
 
@@ -468,6 +475,12 @@ async function lauf() {
                 // gescheiterten Auftraegen fuer immer "nie ausgefuehrt".
                 if (aufgeben) {
                     await db().query('UPDATE streaming_outbox SET erledigt_am = NOW(3) WHERE id = ?', [auftrag.id]);
+
+                    // Aufgeben ist der Fall, bei dem Zusehen am meisten wert
+                    // ist: Es ist genau das, was auf der Zustandsseite unter
+                    // "was klemmt" erscheinen soll - und zwar sofort, nicht
+                    // beim naechsten Neuladen.
+                    melden({ guildId: auftrag.guild_id, grund: 'auftrag_aufgegeben' });
                 }
 
                 // Jeder Fehlversuch gehoert ins Log, nicht nur das Aufgeben:

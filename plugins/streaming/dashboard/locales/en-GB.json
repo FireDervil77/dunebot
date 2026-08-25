@@ -59,7 +59,11 @@
     "LAST_EVENT": "last heard",
     "NEVER": "never",
     "PROBLEMS": "What is stuck",
-    "NO_PROBLEMS": "Nothing. All subscriptions active, no pending jobs."
+    "NO_PROBLEMS": "Nothing. All subscriptions active, no pending jobs.",
+    "LIVEFEED_CONNECTING": "connecting …",
+    "LIVEFEED_ON": "live",
+    "LIVEFEED_OFF": "Connection lost — figures may be stale",
+    "LIVEFEED_HINT": "This page updates itself whenever something changes. If the connection drops, it says so here."
   },
   "OPERATIONS": {
     "TITLE": "Operations",

@@ -59,7 +59,11 @@
     "LAST_EVENT": "zuletzt gehört",
     "NEVER": "noch nie",
     "PROBLEMS": "Was klemmt",
-    "NO_PROBLEMS": "Nichts. Alle Abos stehen, keine offenen Aufträge."
+    "NO_PROBLEMS": "Nichts. Alle Abos stehen, keine offenen Aufträge.",
+    "LIVEFEED_CONNECTING": "verbinde …",
+    "LIVEFEED_ON": "aktuell",
+    "LIVEFEED_OFF": "Verbindung unterbrochen — Zahlen können veraltet sein",
+    "LIVEFEED_HINT": "Diese Seite aktualisiert sich selbst, sobald sich etwas ändert. Reißt die Verbindung ab, steht es hier."
   },
   "OPERATIONS": {
     "TITLE": "Betrieb",

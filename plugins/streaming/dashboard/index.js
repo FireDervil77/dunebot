@@ -91,6 +91,12 @@ class StreamingDashboardPlugin extends DashboardPlugin {
      * Der Eingang selbst arbeitet nichts ab - er schreibt weg und antwortet.
      * Ohne diese Takte bleibt der Posteingang also voll und es passiert nichts.
      *
+     * Der Strom ist kein Takt, sondern eine Anmeldung: Er haengt den
+     * hausinternen Signalweg an den `SSEManager`, damit offene Zustandsseiten
+     * mitbekommen, dass sich etwas geaendert hat. Faellt er aus, bleibt alles
+     * andere heil - die Seite ist dann nur wieder so alt wie vor dem
+     * 2026-08-26.
+     *
      * @private
      */
     _takteStarten() {
@@ -98,6 +104,7 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         try {
             require('./kern/takt').starten();
             require('./ausgabe/drossel').starten();
+            require('./ausgabe/strom').starten();
         } catch (error) {
             Logger.error('[Streaming] Takte konnten nicht gestartet werden:', error);
         }
@@ -152,6 +159,7 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         try {
             require('./kern/takt').anhalten();
             require('./ausgabe/drossel').anhalten();
+            require('./ausgabe/strom').anhalten();
         } catch { /* beim Abschalten ist ein stehengebliebener Takt das kleinere Uebel */ }
 
         WebhookRegistry.unregister('streaming');
