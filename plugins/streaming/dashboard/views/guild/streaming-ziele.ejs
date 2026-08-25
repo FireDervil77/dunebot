@@ -158,6 +158,8 @@
           </div>
         </div>
       </div>
+    </div><%# schliesst die card-body — sie umfasst Rolle UND Zeitzone %>
+
     <% if (darfEinstellen) { %>
       <div class="card-footer text-end">
         <button type="submit" class="btn btn-primary"><%= tr('streaming:COMMON.SAVE') %></button>
@@ -373,49 +375,64 @@
             </div>
           </div>
 
-          <% if (darfAendern) { %>
-            <div class="card-footer d-flex">
-              <a href="/guild/<%= guildId %>/plugins/streaming/vorlagen#vorlage-<%= z.id %>" class="btn btn-link">
-                Eigenen Text für dieses Ziel
-                <% if (z.vorlage) { %><span class="badge bg-blue-lt ms-1">gesetzt</span><% } %>
-              </a>
-              <div class="ms-auto">
-                <button type="submit" class="btn btn-primary"><%= tr('streaming:COMMON.SAVE') %></button>
-              </div>
+          <%
+            /*
+             * **Ein Aktionsband, nicht drei.**
+             *
+             * Vorher standen "Probe senden" und "Dieses Ziel entfernen" in je
+             * einer eigenen Fusszeile hinter der Hauptfusszeile - die Karte
+             * las sich damit als Inhalt, Fusszeile, Inhalt, Fusszeile. Ein
+             * `card-body` nach einer `card-footer` sieht immer falsch aus, und
+             * genau das hat der Betreiber am 2026-08-25 als "weisse Seite
+             * darunter" beanstandet.
+             *
+             * Die Probe steht deshalb HIER, im Band der alltaeglichen
+             * Handlungen. Sie gehoert neben "Speichern", nicht neben
+             * "Entfernen" - Speichern zerstoert nichts.
+             *
+             * Moeglich wird das ohne verschachtelte Formulare durch das
+             * `form`-Attribut: Knopf und Kaestchen liegen im Markup der
+             * Hauptfusszeile, gehoeren aber dem versteckten Probenformular
+             * darunter. `new FormData(...)` sammelt sie mit, weil sich die
+             * Zugehoerigkeit nach dem Formularbesitzer richtet und nicht nach
+             * der Verschachtelung.
+             */
+          %>
+          <% if (darfAendern || darfProben) { %>
+            <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
+              <% if (darfAendern) { %>
+                <a href="/guild/<%= guildId %>/plugins/streaming/vorlagen#vorlage-<%= z.id %>" class="btn btn-link ps-0">
+                  Eigenen Text für dieses Ziel
+                  <% if (z.vorlage) { %><span class="badge bg-blue-lt ms-1">gesetzt</span><% } %>
+                </a>
+              <% } %>
+
+              <% if (darfProben) { %>
+                <button type="submit" form="probe-<%= z.id %>" class="btn btn-outline-primary">
+                  <i class="fa-solid fa-paper-plane me-1"></i><%= tr('streaming:TARGETS.PROBE') %>
+                </button>
+                <label class="form-check form-check-inline mb-0" title="<%= tr('streaming:TARGETS.PROBE_MENTION_HINT') %>">
+                  <input class="form-check-input" type="checkbox" name="mit_erwaehnung" value="1"
+                         form="probe-<%= z.id %>" <%= z.rolle_id ? '' : 'disabled' %>>
+                  <span class="form-check-label small text-secondary"><%= tr('streaming:TARGETS.PROBE_MENTION') %></span>
+                </label>
+              <% } %>
+
+              <% if (darfAendern) { %>
+                <div class="ms-auto">
+                  <button type="submit" class="btn btn-primary"><%= tr('streaming:COMMON.SAVE') %></button>
+                </div>
+              <% } %>
             </div>
           <% } %>
         </form>
 
-        <%
-          /*
-           * **Zwei Fusszeilen, und das ist der Punkt.**
-           *
-           * Am 2026-08-25 stand "Probe senden" kurzzeitig in derselben Zeile
-           * wie "Dieses Ziel entfernen" - und der Betreiber hat prompt sein
-           * Ziel geloescht, statt eine Probe zu schicken. Mit ihm gingen die
-           * drei Twitch-Abos, weil es das letzte Ziel fuer diesen Kanal war.
-           *
-           * Eine Handlung, die man oft ausloest, gehoert nicht neben eine, die
-           * etwas zerstoert. Ein Bestaetigungsdialog macht das nicht wett: Wer
-           * den Knopf trifft, den er treffen wollte, klickt den Dialog weg.
-           */
-        %>
-
         <% if (darfProben) { %>
-          <div class="card-body pt-0 pb-3">
-            <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/probe"
-                  class="d-flex align-items-center gap-2 flex-wrap" data-toast>
-              <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-              <button type="submit" class="btn btn-sm btn-outline-primary">
-                <i class="fa-solid fa-paper-plane me-1"></i><%= tr('streaming:TARGETS.PROBE') %>
-              </button>
-              <label class="form-check form-check-inline mb-0" title="<%= tr('streaming:TARGETS.PROBE_MENTION_HINT') %>">
-                <input class="form-check-input" type="checkbox" name="mit_erwaehnung" value="1"
-                       <%= z.rolle_id ? '' : 'disabled' %>>
-                <span class="form-check-label small text-secondary"><%= tr('streaming:TARGETS.PROBE_MENTION') %></span>
-              </label>
-            </form>
-          </div>
+          <!-- Traegt nur die Adresse und den Token; die Bedienelemente stehen oben. -->
+          <form id="probe-<%= z.id %>" method="POST" data-toast
+                action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/probe" hidden>
+            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+          </form>
         <% } %>
 
         <% if (darfAendern) { %>
