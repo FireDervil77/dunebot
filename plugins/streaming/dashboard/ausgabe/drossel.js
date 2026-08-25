@@ -28,6 +28,7 @@ const { ServiceManager } = require('dunebot-core');
 const nachricht = require('./nachricht');
 const modelle = require('../../shared/models');
 const { vorlageWaehlen, VORGABE_LIVE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
+const { inhaltsStand } = require('../kern/entscheidung');
 
 const TAKT_MS = 500;
 const JE_LAUF = 20;
@@ -273,9 +274,10 @@ async function ausfuehren(auftrag) {
         }
 
         await db().query(
-            `UPDATE streaming_messages SET message_id = ?, gesendet_am = NOW(), zustand = 'steht'
+            `UPDATE streaming_messages SET message_id = ?, gesendet_am = NOW(), zustand = 'steht',
+                    inhalt_stand = ?
               WHERE target_id = ? AND sendung_id = ?`,
-            [antwort.daten.messageId, ziel.id, sendungId]);
+            [antwort.daten.messageId, inhaltsStand(zustand), ziel.id, sendungId]);
 
         // Erst JETZT gilt die Sendung als gemeldet. Daran haengt die
         // Abklingzeit - und die darf nur zaehlen, was wirklich im Discord steht.
@@ -303,7 +305,11 @@ async function ausfuehren(auftrag) {
         });
         if (!antwort.ok) return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
 
-        await db().query('UPDATE streaming_messages SET geaendert_am = NOW() WHERE id = ?', [zeile.id]);
+        // Den gezeigten Stand mitschreiben - er entscheidet, ob spaeter
+        // ueberhaupt noch einmal bearbeitet werden muss.
+        await db().query(
+            'UPDATE streaming_messages SET geaendert_am = NOW(), inhalt_stand = ? WHERE id = ?',
+            [inhaltsStand(zustand), zeile.id]);
         return { ok: true, fehler: null, endgueltig: false };
     }
 

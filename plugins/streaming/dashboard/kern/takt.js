@@ -594,15 +594,31 @@ async function nachtragen(streamerId) {
     }
     if (!zustand.ist_live || !zustand.sendung_id) return;
 
+    // Was zeigt die Nachricht jetzt? Einmal rechnen, nicht je Ziel.
+    const stand = entscheidung.inhaltsStand(zustand);
+
     for (const ziel of ziele) {
         const schonGesendet = await db().query(
-            'SELECT id FROM streaming_messages WHERE target_id = ? AND sendung_id = ? LIMIT 1',
+            'SELECT id, inhalt_stand FROM streaming_messages WHERE target_id = ? AND sendung_id = ? LIMIT 1',
             [ziel.id, zustand.sendung_id]);
 
         const passt = entscheidung.zielPasst(ziel, { ...zustand, minutenJetzt: zonen.get(ziel.guild_id) });
 
         if (schonGesendet.length) {
-            // Steht schon: Titel oder Kategorie koennten sich geaendert haben.
+            // **Nur, wenn sich wirklich etwas geaendert hat.**
+            //
+            // Hier stand bis zum 2026-08-25 ein bedingungsloses Einreihen mit
+            // der Begruendung "Titel oder Kategorie koennten sich geaendert
+            // haben". Das `koennten` wurde nie geprueft - und weil dieser Lauf
+            // alle fuenf Minuten je laufendem Streamer kommt, entstand eine
+            // Discord-Bearbeitung alle fuenf Minuten, dauerhaft, ohne
+            // Unterschied. In einer Nacht 32 Stueck fuer zwei Kanaele.
+            //
+            // Es faellt nicht auf, weil das Ergebnis richtig aussieht: Die
+            // Nachricht stimmt ja. Es kostet nur Kontingent, das sich alle
+            // Guilds teilen.
+            if (schonGesendet[0].inhalt_stand === stand) continue;
+
             await db().query(
                 `INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast)
                  VALUES (?, ?, 'bearbeiten', ?)`,

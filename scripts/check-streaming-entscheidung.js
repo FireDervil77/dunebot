@@ -221,6 +221,37 @@ pruefe('ausserhalb der Ruhezeit normal',
 pruefe('ohne minutenJetzt greift die Ruhezeit nicht',
     e.zielPasst(zielAus({ ruhe_von: '23:00', ruhe_bis: '08:00' }), { kategorie: 'x', titel: 'x' }).passt, true);
 
+// ---------------------------------------------------------------
+console.log('\nVergleichswert der Nachricht');
+// ---------------------------------------------------------------
+const A = { titel: 'Erster Versuch', kategorie: 'Minecraft', vorschaubild: 'https://x/1.jpg', zuschauer: 42 };
+
+pruefe('gleicher Inhalt -> gleicher Wert',
+    e.inhaltsStand(A) === e.inhaltsStand({ ...A }), true);
+pruefe('anderer Titel -> anderer Wert',
+    e.inhaltsStand(A) === e.inhaltsStand({ ...A, titel: 'Zweiter' }), false);
+pruefe('andere Kategorie -> anderer Wert',
+    e.inhaltsStand(A) === e.inhaltsStand({ ...A, kategorie: 'Fortnite' }), false);
+pruefe('anderes Bild -> anderer Wert',
+    e.inhaltsStand(A) === e.inhaltsStand({ ...A, vorschaubild: 'https://x/2.jpg' }), false);
+
+// **Der Fall, um den es geht.** Nimmt man die Zuschauerzahl in den Wert auf,
+// aendert er sich bei jedem Anreicherungslauf - und die Bearbeitungsschleife,
+// die dieser Vergleich verhindern soll, waere sofort wieder da.
+pruefe('andere Zuschauerzahl -> GLEICHER Wert',
+    e.inhaltsStand(A) === e.inhaltsStand({ ...A, zuschauer: 999 }), true);
+
+// Leere Angaben duerfen nicht ineinanderfallen: Ein Titel "a" ohne Kategorie
+// darf nicht denselben Wert haben wie kein Titel mit Kategorie "a".
+pruefe('leer und gesetzt sind unterscheidbar',
+    e.inhaltsStand({ titel: 'a' }) === e.inhaltsStand({ kategorie: 'a' }), false);
+pruefe('null und leerer Text gelten gleich',
+    e.inhaltsStand({ titel: null }) === e.inhaltsStand({ titel: '' }), true);
+pruefe('leerer Zustand stuerzt nicht ab',
+    typeof e.inhaltsStand({}), 'string');
+pruefe('ohne Argument auch nicht',
+    typeof e.inhaltsStand(), 'string');
+
 console.log(gescheitert === 0
     ? `\nErgebnis: ${geprueft} Faelle, 0 Abweichungen.\n`
     : `\nErgebnis: ${geprueft} Faelle, ${gescheitert} Abweichung(en).\n`);

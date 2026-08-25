@@ -248,6 +248,26 @@ function minutenIn(zone, zeitpunkt = new Date()) {
     }
 }
 
+/**
+ * Fingerabdruck dessen, was eine Ankuendigung an Bedeutung traegt.
+ *
+ * Damit laesst sich beantworten: Hat sich seit der letzten Bearbeitung
+ * wirklich etwas geaendert - oder wuerde man dieselbe Nachricht noch einmal
+ * schreiben?
+ *
+ * **Die Zuschauerzahl gehoert bewusst nicht dazu.** Sie aendert sich staendig;
+ * naehme man sie auf, entstuende genau die Bearbeitungsschleife wieder, die
+ * dieser Vergleich verhindern soll - nur mit besserer Begruendung.
+ *
+ * @param {Object} zustand Zustand mit titel, kategorie, vorschaubild
+ * @returns {string} Vergleichswert
+ */
+function inhaltsStand(zustand = {}) {
+    const teile = [zustand.titel, zustand.kategorie, zustand.vorschaubild]
+        .map(w => (w === null || w === undefined) ? '' : String(w));
+    return require('crypto').createHash('sha256').update(teile.join('\u0000')).digest('hex').slice(0, 32);
+}
+
 function inSchonfrist(begonnenAm, jetzt, schonfristMs) {
     if (!begonnenAm) return false;
     const start = new Date(begonnenAm).getTime();
@@ -259,5 +279,6 @@ function inSchonfrist(begonnenAm, jetzt, schonfristMs) {
 
 module.exports = {
     inSchonfrist,
+    inhaltsStand,
     inRuhezeit,
     minutenIn, VORGABE, beiGingLive, beiBeendet, zielPasst };
