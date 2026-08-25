@@ -328,7 +328,17 @@ async function ausfuehren(auftrag) {
         // Verhalten, das erst nach einem Bot-Neustart stimmt, ist schlimmer als
         // keins - es klappt beim Ausprobieren und pingt beim naechsten Mal.
         const probeZiel = nutzlast.mit_erwaehnung ? ziel : { ...ziel, rolle_id: null };
-        const inhalt = nachricht.live({ streamer, zustand, ziel: probeZiel });
+
+        // **Beide Vorlagen sind probierbar.** Die erste Fassung kannte nur die
+        // Ankuendigung - also genau die Haelfte. Der Betreiber fragte, wie er
+        // den Text nach dem Stream zu sehen bekommt, und die ehrliche Antwort
+        // war: gar nicht. Die Rueckschau rechnet ihre Dauer aus dem
+        // gespeicherten Zustand, ist also eine echte Vorschau und keine
+        // erfundene.
+        const rueckschau = nutzlast.art === 'rueckschau';
+        const inhalt = rueckschau
+            ? nachricht.rueckschau({ streamer, zustand, ziel: probeZiel })
+            : nachricht.live({ streamer, zustand, ziel: probeZiel });
 
         const antwort = await anDenBot('streaming:post', {
             guildId: ziel.guild_id, channelId: ziel.channel_id,
@@ -340,11 +350,17 @@ async function ausfuehren(auftrag) {
         // Ehrlich sagen, wenn die Probe duenn aussieht: Ohne je gemessenen
         // Zustand sind Titel, Kategorie und Bild leer. Das ist kein Fehler,
         // aber es erklaert, warum die Probe anders aussieht als erwartet.
-        const duenn = !zustand.titel && !zustand.kategorie && !zustand.vorschaubild;
+        const duenn = rueckschau
+            ? (!zustand.begonnen_am || !zustand.beendet_am)
+            : (!zustand.titel && !zustand.kategorie && !zustand.vorschaubild);
+
+        const fehlt = rueckschau
+            ? ' (noch kein beendeter Stream - die Dauer bleibt leer)'
+            : ' (noch keine Streamdaten - Titel und Bild bleiben leer)';
 
         return {
             ok: true, fehler: null, endgueltig: false,
-            hinweis: 'Probe gesendet' + (duenn ? ' (noch keine Streamdaten - Titel und Bild bleiben leer)' : '')
+            hinweis: `Probe gesendet (${rueckschau ? 'Rueckschau' : 'Ankuendigung'})` + (duenn ? fehlt : '')
         };
     }
 

@@ -43,7 +43,10 @@
     "ACTIVE": "Active",
     "PROBE": "Send test",
     "PROBE_MENTION": "with mention",
-    "PROBE_MENTION_HINT": "Unticked, the test stays silent. Ticked, it pings the role exactly like a real announcement. With no role set, the tick has no effect."
+    "PROBE_MENTION_HINT": "Unticked, the test stays silent. Ticked, it pings the role exactly like a real announcement. The recap never mentions anyone anyway.",
+    "PROBE_KIND": "Which message",
+    "PROBE_LIVE": "Announcement",
+    "PROBE_RECAP": "Recap"
   },
   "TEMPLATES": {
     "TITLE": "Templates",

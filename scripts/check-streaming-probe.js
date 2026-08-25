@@ -150,6 +150,18 @@ if (probeZweig) {
     melde('Die Probe veroeffentlicht nie',
         /veroeffentlichen:\s*false/.test(probeZweig)
             ? [] : ['der Probezweig setzt `veroeffentlichen: false` nicht ausdruecklich']);
+
+    // Regel 3b: **Beide Vorlagen muessen probierbar sein.** Die erste Fassung
+    // kannte nur die Ankuendigung - also genau die Haelfte dessen, was das
+    // Plugin schreibt. Wer den Text nach dem Stream aendert, konnte ihn bis
+    // zum 2026-08-25 nur im Ernstfall sehen, also fruehestens beim naechsten
+    // Streamende.
+    melde('Die Probe kann Ankuendigung UND Rueckschau', (() => {
+        const fehler = [];
+        if (!/nachricht\.live\(/.test(probeZweig))       fehler.push('der Probezweig baut keine Ankuendigung');
+        if (!/nachricht\.rueckschau\(/.test(probeZweig)) fehler.push('der Probezweig baut keine Rueckschau — die Haelfte der Vorlagen bliebe ungetestet');
+        return fehler;
+    })());
 }
 
 console.log('\nDie Route');

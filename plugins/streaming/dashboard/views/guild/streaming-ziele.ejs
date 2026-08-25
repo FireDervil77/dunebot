@@ -408,9 +408,25 @@
               <% } %>
 
               <% if (darfProben) { %>
-                <button type="submit" form="probe-<%= z.id %>" class="btn btn-outline-primary">
-                  <i class="fa-solid fa-paper-plane me-1"></i><%= tr('streaming:TARGETS.PROBE') %>
-                </button>
+                <div class="input-group w-auto">
+                  <button type="submit" form="probe-<%= z.id %>" class="btn btn-outline-primary">
+                    <i class="fa-solid fa-paper-plane me-1"></i><%= tr('streaming:TARGETS.PROBE') %>
+                  </button>
+                  <%
+                    /*
+                     * Beide Vorlagen sind probierbar. Vorher ging nur die
+                     * Ankuendigung - also die Haelfte. Die Rueckschau rechnet
+                     * ihre Dauer aus dem gespeicherten Zustand des letzten
+                     * Streams; ohne beendeten Stream bleibt sie leer, und der
+                     * Ausgang sagt das auch.
+                     */
+                  %>
+                  <select class="form-select" name="art" form="probe-<%= z.id %>"
+                          aria-label="<%= tr('streaming:TARGETS.PROBE_KIND') %>">
+                    <option value="live"><%= tr('streaming:TARGETS.PROBE_LIVE') %></option>
+                    <option value="rueckschau"><%= tr('streaming:TARGETS.PROBE_RECAP') %></option>
+                  </select>
+                </div>
                 <label class="form-check form-check-inline mb-0" title="<%= tr('streaming:TARGETS.PROBE_MENTION_HINT') %>">
                   <input class="form-check-input" type="checkbox" name="mit_erwaehnung" value="1"
                          form="probe-<%= z.id %>" <%= z.rolle_id ? '' : 'disabled' %>>

@@ -439,10 +439,11 @@ router.post('/ziele/:id/probe', requirePermission('STREAMING.TEST'), async (req,
             });
         }
 
-        await modelle.probeVormerken(guildId, zielId, Boolean(req.body?.mit_erwaehnung));
+        const art = req.body?.art === 'rueckschau' ? 'rueckschau' : 'live';
+        await modelle.probeVormerken(guildId, zielId, Boolean(req.body?.mit_erwaehnung), art);
 
         Logger.info(`[Streaming] Probe fuer Ziel ${zielId} (Guild ${guildId}) vorgemerkt` +
-            (req.body?.mit_erwaehnung ? ', mit Erwaehnung' : ', ohne Erwaehnung'));
+            ` (${art}${req.body?.mit_erwaehnung ? ', mit Erwaehnung' : ''})`);
 
         // **Der erste Aufrufer von `FormAntwort`.** Ohne JavaScript laeuft
         // genau die Weiterleitung wie vorher; mit JavaScript kommt ein Toast
@@ -450,8 +451,9 @@ router.post('/ziele/:id/probe', requirePermission('STREAMING.TEST'), async (req,
         // will ja gleich die naechste schicken.
         return antworte(req, res, {
             zurueck, ok: 'probe',
-            text: 'Probe ist unterwegs — sie steht in wenigen Sekunden im Kanal. '
-                + 'Sie wird nicht veröffentlicht und hinterlässt keine Spur; aufräumen musst du sie selbst.'
+            text: `Probe ist unterwegs (${art === 'rueckschau' ? 'Rückschau' : 'Ankündigung'}) — `
+                + 'sie steht in wenigen Sekunden im Kanal. Sie wird nicht veröffentlicht, '
+                + 'räumt sich aber auch nicht selbst weg: Sie bleibt stehen, bis du sie löschst.'
         });
     } catch (error) {
         Logger.error('[Streaming] Probe fehlgeschlagen:', error);

@@ -43,7 +43,10 @@
     "ACTIVE": "Aktiv",
     "PROBE": "Probe senden",
     "PROBE_MENTION": "mit Erwähnung",
-    "PROBE_MENTION_HINT": "Ohne Haken bleibt die Probe still. Mit Haken pingt sie die Rolle — genau wie eine echte Ankündigung. Ist keine Rolle gesetzt, ist der Haken ohne Wirkung."
+    "PROBE_MENTION_HINT": "Ohne Haken bleibt die Probe still. Mit Haken pingt sie die Rolle — genau wie eine echte Ankündigung. Bei der Rückschau wird ohnehin nie erwähnt.",
+    "PROBE_KIND": "Welche Nachricht",
+    "PROBE_LIVE": "Ankündigung",
+    "PROBE_RECAP": "Rückschau"
   },
   "TEMPLATES": {
     "TITLE": "Vorlagen",

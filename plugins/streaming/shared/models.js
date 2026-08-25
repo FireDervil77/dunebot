@@ -416,13 +416,19 @@ async function liveRolleSetzen(guildId, rolleId) {
  * @param {string} guildId Discord-Guild-ID
  * @param {number} zielId Ziel
  * @param {boolean} [mitErwaehnung=false] Rolle wirklich anpingen?
+ * @param {string} [art='live'] 'live' = Ankuendigung, 'rueckschau' = Text nach dem Stream
  * @returns {Promise<void>}
  */
-async function probeVormerken(guildId, zielId, mitErwaehnung = false) {
+async function probeVormerken(guildId, zielId, mitErwaehnung = false, art = 'live') {
+    // **Die Art wird hier geprueft, nicht in der Route.** Wer sie spaeter von
+    // woanders aufruft, soll denselben Schutz haben: Ein unbekannter Wert wird
+    // zu 'live' und nicht zu einem Absturz im Ausgang, wo ihn niemand sieht.
+    const gueltig = art === 'rueckschau' ? 'rueckschau' : 'live';
+
     await db().query(
         `INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast, zustand)
          VALUES (?, ?, 'probe', ?, 'offen')`,
-        [zielId, guildId, JSON.stringify({ mit_erwaehnung: Boolean(mitErwaehnung) })]);
+        [zielId, guildId, JSON.stringify({ mit_erwaehnung: Boolean(mitErwaehnung), art: gueltig })]);
 }
 
 /** Zeitzone, in der Ruhezeiten gelten, solange die Guild nichts anderes sagt. */
