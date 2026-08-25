@@ -226,6 +226,64 @@
     </div>
   </div>
 
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Pünktlichkeit des Ausgangs</h3></div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Wie lange lag zwischen „fällig" und „ausgeführt"? Ein Auftrag kann
+          erledigt sein und trotzdem Stunden zu spät gekommen sein — im Discord
+          heißt das: Die Rückschau erschien mitten in der Nacht. Der Ausgang
+          meldet so etwas nicht von selbst, weil aus seiner Sicht nichts
+          schiefging.
+        </p>
+        <% const v = typeof verzug !== 'undefined' ? verzug : null; %>
+        <% if (!v || !v.auftraege) { %>
+          <p class="text-secondary mb-0">Keine ausgeführten Aufträge in den letzten 48 Stunden.</p>
+        <% } else { %>
+          <div class="row g-3">
+            <div class="col-6 col-md-4">
+              <div class="text-secondary small">Aufträge (48 h)</div>
+              <div class="h3 mb-0"><%= v.auftraege %></div>
+            </div>
+            <div class="col-6 col-md-4">
+              <div class="text-secondary small">größter Verzug</div>
+              <div class="h3 mb-0 <%= v.schlimmsterVerzugS > 60 ? 'text-danger' : '' %>">
+                <%= v.schlimmsterVerzugS < 60 ? v.schlimmsterVerzugS + ' s'
+                     : Math.round(v.schlimmsterVerzugS / 60) + ' min' %>
+              </div>
+            </div>
+            <div class="col-6 col-md-4">
+              <div class="text-secondary small">im Mittel</div>
+              <div class="h3 mb-0"><%= v.mittlererVerzugS %> s</div>
+            </div>
+          </div>
+
+          <% if (v.spaete && v.spaete.length) { %>
+            <div class="table-responsive mt-3">
+              <table class="table table-sm">
+                <thead><tr><th>Auftrag</th><th>Aktion</th><th>fällig</th><th>ausgeführt</th><th>Verzug</th></tr></thead>
+                <tbody>
+                  <% v.spaete.forEach(a => { %>
+                    <tr>
+                      <td>#<%= a.id %></td>
+                      <td><%= a.aktion %></td>
+                      <td class="text-secondary"><%= new Date(a.faellig_ab).toLocaleString('de-DE') %></td>
+                      <td class="text-secondary"><%= new Date(a.erledigt_am).toLocaleString('de-DE') %></td>
+                      <td class="text-danger"><%= Math.round(a.verzug_s / 60) %> min</td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } else { %>
+            <p class="text-secondary small mb-0 mt-2">Kein Auftrag lief mehr als eine Minute nach Fälligkeit.</p>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
   <div class="col-lg-5">
     <div class="card">
       <div class="card-header"><h3 class="card-title">Aufräumen</h3></div>

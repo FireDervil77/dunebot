@@ -34,6 +34,14 @@ const TAKT_MS = 500;
 const JE_LAUF = 20;
 const HOECHSTVERSUCHE = 5;
 
+/**
+ * Ab wann ein verspaeteter Auftrag ins Protokoll gehoert.
+ *
+ * Der Takt ist 500 ms; eine Minute Verzug ist also nicht Schwankung, sondern
+ * Stillstand. Grosszuegig genug, dass ein kurzer Neustart nichts meldet.
+ */
+const VERZUG_WARNEN_MS = 60_000;
+
 let laeuftGerade = false;
 let uhr = null;
 
@@ -405,6 +413,27 @@ async function lauf() {
         const belegteKanaele = new Set();
 
         for (const auftrag of faellig) {
+            // **Verzug messen, nicht vermuten.**
+            //
+            // Am 2026-08-24 kam die Rueckschau eines echten Streams rund drei
+            // Stunden zu spaet: Die Auftraege waren um 21:37 und 21:51 faellig,
+            // die Nachrichten wurden erst um 00:26 und 01:18 umgebaut - bei
+            // `zustand = fertig` und NULL Versuchen. Es gab also keinen
+            // Fehlschlag, der wiederholt wurde, und in den Tabellen stand
+            // hinterher nichts, woraus sich der Verzug haette ablesen lassen.
+            //
+            // Ein Auftrag, der lange nach seiner Faelligkeit ausgefuehrt wird,
+            // ist kein Fehler im Sinne des Ausgangs - er wird ja erledigt. Er
+            // ist aber genau das, was der Betreiber als "dauerte sehr sehr
+            // lange" bemerkt. Deshalb steht er ab jetzt im Protokoll, mit
+            // Auftragsnummer, damit sich der Fall beim naechsten Mal
+            // zurueckverfolgen laesst statt rekonstruiert werden zu muessen.
+            const verzugMs = Date.now() - new Date(auftrag.faellig_ab).getTime();
+            if (verzugMs > VERZUG_WARNEN_MS) {
+                log().warn(`[Streaming/Ausgang] Auftrag #${auftrag.id} (${auftrag.aktion}) laeuft ` +
+                    `${Math.round(verzugMs / 1000)} s nach Faelligkeit — Ausgang stand oder war ueberlastet`);
+            }
+
             const ziel = await db().query('SELECT channel_id FROM streaming_targets WHERE id = ?', [auftrag.target_id]);
             const kanal = ziel[0]?.channel_id;
 
@@ -417,7 +446,8 @@ async function lauf() {
                 const ergebnis = await ausfuehren(auftrag);
 
                 if (ergebnis.ok) {
-                    await db().query("UPDATE streaming_outbox SET zustand = 'fertig', fehlertext = ? WHERE id = ?",
+                    await db().query(
+                        "UPDATE streaming_outbox SET zustand = 'fertig', erledigt_am = NOW(3), fehlertext = ? WHERE id = ?",
                         [ergebnis.hinweis || null, auftrag.id]);
                     continue;
                 }
@@ -433,6 +463,12 @@ async function lauf() {
                      WHERE id = ?
                 `, [versuche, String(ergebnis.fehler).slice(0, 512),
                     aufgeben ? 'aufgegeben' : 'offen', Math.min(60, 2 ** versuche), auftrag.id]);
+
+                // Auch das Aufgeben ist ein Ende - sonst steht bei den
+                // gescheiterten Auftraegen fuer immer "nie ausgefuehrt".
+                if (aufgeben) {
+                    await db().query('UPDATE streaming_outbox SET erledigt_am = NOW(3) WHERE id = ?', [auftrag.id]);
+                }
 
                 // Jeder Fehlversuch gehoert ins Log, nicht nur das Aufgeben:
                 // Sonst steht am Ende "aufgegeben" da, und warum es fuenfmal

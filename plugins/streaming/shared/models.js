@@ -170,6 +170,41 @@ async function zustandDerGuild(guildId) {
     };
 }
 
+/**
+ * Wie puenktlich lief der Ausgang zuletzt?
+ *
+ * Die Frage, die sich nach einer verspaeteten Rueckschau als Erstes stellt -
+ * und die bis zum 2026-08-26 niemand beantworten konnte, weil der Ausgang zwar
+ * `fertig` vermerkte, aber nicht wann.
+ *
+ * @param {number} [stunden=48] Zeitraum
+ * @returns {Promise<{auftraege: number, schlimmsterVerzugS: number|null, mittlererVerzugS: number|null, spaete: Array}>} Zahlen
+ */
+async function verzugStatistik(stunden = 48) {
+    const zeilen = await db().query(`
+        SELECT id, aktion, guild_id, faellig_ab, erledigt_am,
+               TIMESTAMPDIFF(SECOND, faellig_ab, erledigt_am) AS verzug_s
+          FROM streaming_outbox
+         WHERE erledigt_am IS NOT NULL
+           AND erledigt_am >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+    `, [stunden]);
+
+    if (!zeilen.length) {
+        return { auftraege: 0, schlimmsterVerzugS: null, mittlererVerzugS: null, spaete: [] };
+    }
+
+    const werte = zeilen.map(z => Math.max(0, Number(z.verzug_s || 0)));
+    return {
+        auftraege: zeilen.length,
+        schlimmsterVerzugS: Math.max(...werte),
+        mittlererVerzugS: Math.round(werte.reduce((a, b) => a + b, 0) / werte.length),
+        // Nur die auffaelligen zeigen - eine Liste aller Auftraege waere eine
+        // Tabelle, die niemand liest.
+        spaete: zeilen.filter(z => Number(z.verzug_s || 0) > 60)
+                      .sort((a, b) => b.verzug_s - a.verzug_s).slice(0, 10)
+    };
+}
+
 // =====================================================
 // Zugangsdaten (global, Betreiber-Ebene)
 // =====================================================
@@ -466,6 +501,7 @@ module.exports = {
     alleStreamer,
     anzahlStreamer,
     zustandDerGuild,
+    verzugStatistik,
     zielLesen,
     zielSpeichern,
     zielEntfernen,

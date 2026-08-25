@@ -528,12 +528,13 @@ router.get('/betrieb', CheckAdmin, async (req, res) => {
             aufraeumen.letzterBericht(),
             modelle.alleStreamer()
         ]);
+        const verzug = await modelle.verzugStatistik();
 
         await renderView(res, 'guild/streaming-betrieb', {
             tr, guildId,
             clientId: daten.clientId || '',
             secretQuelle: daten.quelle,
-            abgleichBericht, aufraeumBericht, alleStreamer,
+            abgleichBericht, aufraeumBericht, alleStreamer, verzug,
             vorWieLange,
             gespeichert: req.query.ok === '1',
             meldung: req.query.ok || null,
