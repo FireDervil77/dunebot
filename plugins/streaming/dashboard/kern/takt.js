@@ -699,6 +699,16 @@ async function tagesLauf() {
         await require('../ausgabe/liverolle').lauf();
     } catch (err) {
         log().error('[Streaming] Rollenabgleich fehlgeschlagen:', err);
+    }
+
+    try {
+        // Und ganz zum Schluss: Ist etwas zu melden? Erst jetzt, weil der
+        // Abgleich davor kaputte Abos vielleicht schon repariert hat - eine
+        // Meldung ueber eine Stoerung, die es nicht mehr gibt, ist schlimmer
+        // als keine.
+        await require('../ausgabe/meldung').lauf();
+    } catch (err) {
+        log().error('[Streaming] Meldelauf fehlgeschlagen:', err);
     } finally {
         tagLaeuft = false;
     }
