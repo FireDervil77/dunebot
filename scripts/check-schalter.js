@@ -52,7 +52,8 @@ const GEWOLLTE_KAESTCHEN = [
     ['permissions/users.ejs', 'Rechtekatalog je Nutzer — Mehrfachauswahl'],
     ['server-detail-files.ejs', 'Dateiauswahl — Mehrfachauswahl'],
     ['moderation-settings.ejs', 'modlog_events — mehrere Ereignisarten'],
-    ['moderation.ejs', 'modlog_events — mehrere Ereignisarten']
+    ['moderation.ejs', 'modlog_events — mehrere Ereignisarten'],
+    ['streaming-ziele.ejs', 'Erwähnung bei der Probe — begleitet einen Knopfdruck und ist danach wieder leer; ein Schalter würde behaupten, es sei dauerhaft an']
 ];
 
 /**
