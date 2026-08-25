@@ -617,6 +617,11 @@ async function nachtragen(streamerId) {
             // Es faellt nicht auf, weil das Ergebnis richtig aussieht: Die
             // Nachricht stimmt ja. Es kostet nur Kontingent, das sich alle
             // Guilds teilen.
+            //
+            // Der Vergleich umfasst auch die Zuschauerzahl. Waehrend jemand
+            // sendet, aendert sie sich - dann wird bearbeitet, und das ist
+            // richtig so. Unterdrueckt wird nur, was sich in keinem Feld
+            // unterscheidet.
             if (schonGesendet[0].inhalt_stand === stand) continue;
 
             await db().query(

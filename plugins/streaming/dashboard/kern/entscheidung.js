@@ -249,21 +249,32 @@ function minutenIn(zone, zeitpunkt = new Date()) {
 }
 
 /**
- * Fingerabdruck dessen, was eine Ankuendigung an Bedeutung traegt.
+ * Fingerabdruck dessen, was eine Ankuendigung zeigt.
  *
- * Damit laesst sich beantworten: Hat sich seit der letzten Bearbeitung
- * wirklich etwas geaendert - oder wuerde man dieselbe Nachricht noch einmal
- * schreiben?
+ * Damit laesst sich beantworten: Hat sich seit der letzten Bearbeitung wirklich
+ * etwas geaendert - oder wuerde man dieselbe Nachricht noch einmal schreiben?
  *
- * **Die Zuschauerzahl gehoert bewusst nicht dazu.** Sie aendert sich staendig;
- * naehme man sie auf, entstuende genau die Bearbeitungsschleife wieder, die
- * dieser Vergleich verhindern soll - nur mit besserer Begruendung.
+ * **Die Zuschauerzahl gehoert dazu**, und das ist eine Korrektur vom
+ * 2026-08-25. Ich hatte sie zuerst herausgenommen, um eine Bearbeitungsschleife
+ * zu schliessen. Der Einwand des Betreibers trifft aber:
  *
- * @param {Object} zustand Zustand mit titel, kategorie, vorschaubild
+ * > „wenn der Streamer live ist, dann ist es auch mit den Zuschauerzahlen eine
+ * > richtige Kennung. nur eben wenn er nicht mehr live ist, muss man sowas auch
+ * > nicht abfragen."
+ *
+ * Genau so ist es. Eine laufende Ankuendigung mit aktueller Zuschauerzahl ist
+ * der Sinn der Sache, keine Verschwendung. Verschwendung war der Fall, in dem
+ * sich **gar nichts** unterscheidet - und den faengt dieser Vergleich weiter
+ * ab, gerade weil er alle Felder umfasst.
+ *
+ * Wer nicht mehr sendet, wird ohnehin nicht abgefragt: Der Anreicherungslauf
+ * filtert auf `ist_live = 1`.
+ *
+ * @param {Object} zustand Zustand mit titel, kategorie, vorschaubild, zuschauer
  * @returns {string} Vergleichswert
  */
 function inhaltsStand(zustand = {}) {
-    const teile = [zustand.titel, zustand.kategorie, zustand.vorschaubild]
+    const teile = [zustand.titel, zustand.kategorie, zustand.vorschaubild, zustand.zuschauer]
         .map(w => (w === null || w === undefined) ? '' : String(w));
     return require('crypto').createHash('sha256').update(teile.join('\u0000')).digest('hex').slice(0, 32);
 }

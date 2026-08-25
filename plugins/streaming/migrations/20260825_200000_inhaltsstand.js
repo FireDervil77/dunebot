@@ -14,11 +14,17 @@
  * Nachricht stimmt. Es kostet nur Discord-Kontingent, das sich alle Guilds
  * teilen.
  *
- * Der Vergleichswert deckt **Titel, Kategorie und Vorschaubild** ab, also das,
- * was Bedeutung traegt. Die Zuschauerzahl steht ausdruecklich NICHT darin: Sie
- * aendert sich fortlaufend, und eine Bearbeitung im Minutentakt fuer eine Zahl,
- * die ohnehin veraltet ist, waere genau derselbe Fehler mit besserer
- * Begruendung.
+ * Der Vergleichswert deckt **alles ab, was die Karte zeigt** - Titel,
+ * Kategorie, Vorschaubild und Zuschauerzahl.
+ *
+ * Die Zuschauerzahl war zuerst ausgenommen, um die Schleife zu schliessen. Der
+ * Betreiber hat widersprochen, und zu Recht: Waehrend jemand sendet, ist eine
+ * aktuelle Zahl der Sinn der Ankuendigung, keine Verschwendung. Verschwendung
+ * war der Fall, in dem sich GAR NICHTS unterscheidet - und den faengt der
+ * Vergleich weiterhin ab, gerade weil er vollstaendig ist.
+ *
+ * Wer nicht mehr sendet, wird ohnehin nicht abgefragt: Der Anreicherungslauf
+ * filtert auf `ist_live = 1`.
  */
 module.exports = {
     description: 'Vergleichswert je Nachricht, damit nur bei echten Aenderungen bearbeitet wird',

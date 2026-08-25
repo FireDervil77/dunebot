@@ -235,11 +235,13 @@ pruefe('andere Kategorie -> anderer Wert',
 pruefe('anderes Bild -> anderer Wert',
     e.inhaltsStand(A) === e.inhaltsStand({ ...A, vorschaubild: 'https://x/2.jpg' }), false);
 
-// **Der Fall, um den es geht.** Nimmt man die Zuschauerzahl in den Wert auf,
-// aendert er sich bei jedem Anreicherungslauf - und die Bearbeitungsschleife,
-// die dieser Vergleich verhindern soll, waere sofort wieder da.
-pruefe('andere Zuschauerzahl -> GLEICHER Wert',
-    e.inhaltsStand(A) === e.inhaltsStand({ ...A, zuschauer: 999 }), true);
+// Die Zuschauerzahl zaehlt mit: Waehrend jemand sendet, ist eine aktuelle Zahl
+// der Sinn der Ankuendigung. Was der Vergleich abfaengt, ist der Fall, in dem
+// sich GAR NICHTS unterscheidet - und der wird dadurch nicht schwaecher.
+pruefe('andere Zuschauerzahl -> anderer Wert',
+    e.inhaltsStand(A) === e.inhaltsStand({ ...A, zuschauer: 999 }), false);
+pruefe('nichts unterscheidet sich -> gleicher Wert (das war die Schleife)',
+    e.inhaltsStand(A) === e.inhaltsStand({ ...A }), true);
 
 // Leere Angaben duerfen nicht ineinanderfallen: Ein Titel "a" ohne Kategorie
 // darf nicht denselben Wert haben wie kein Titel mit Kategorie "a".
