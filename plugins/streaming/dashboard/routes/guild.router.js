@@ -34,6 +34,7 @@ const {
 const modelle = require('../../shared/models');
 const abos = require('../kern/abos');
 const { PLATZHALTER, pruefeVorlage, VORGABE_LIVE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
+const { antworte, antworteFehler } = require('dunebot-sdk').FormAntwort;
 
 /**
  * Auswaehlbare Zeitzonen.
@@ -432,16 +433,32 @@ router.post('/ziele/:id/probe', requirePermission('STREAMING.TEST'), async (req,
         // Adresszeile. Der Router prueft das Recht, nicht die Zugehoerigkeit;
         // das muss hier passieren.
         const ziel = await modelle.zielLesen(guildId, zielId);
-        if (!ziel) return res.redirect(`${zurueck}?fehler=weg`);
+        if (!ziel) {
+            return antworteFehler(req, res, {
+                zurueck, fehler: 'weg', text: 'Dieses Ziel gibt es nicht mehr.'
+            });
+        }
 
         await modelle.probeVormerken(guildId, zielId, Boolean(req.body.mit_erwaehnung));
 
         Logger.info(`[Streaming] Probe fuer Ziel ${zielId} (Guild ${guildId}) vorgemerkt` +
             (req.body.mit_erwaehnung ? ', mit Erwaehnung' : ', ohne Erwaehnung'));
-        return res.redirect(`${zurueck}?ok=probe`);
+
+        // **Der erste Aufrufer von `FormAntwort`.** Ohne JavaScript laeuft
+        // genau die Weiterleitung wie vorher; mit JavaScript kommt ein Toast
+        // und die Seite bleibt stehen - das ist bei einer Probe der Punkt, man
+        // will ja gleich die naechste schicken.
+        return antworte(req, res, {
+            zurueck, ok: 'probe',
+            text: 'Probe ist unterwegs — sie steht in wenigen Sekunden im Kanal. '
+                + 'Sie wird nicht veröffentlicht und hinterlässt keine Spur; aufräumen musst du sie selbst.'
+        });
     } catch (error) {
         Logger.error('[Streaming] Probe fehlgeschlagen:', error);
-        return res.redirect(`${zurueck}?fehler=technisch`);
+        return antworteFehler(req, res, {
+            zurueck, fehler: 'technisch',
+            text: 'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+        });
     }
 });
 

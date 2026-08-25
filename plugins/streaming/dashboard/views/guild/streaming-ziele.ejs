@@ -404,7 +404,7 @@
         <% if (darfProben) { %>
           <div class="card-footer bg-transparent pt-0">
             <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/probe"
-                  class="d-flex align-items-center gap-2 flex-wrap">
+                  class="d-flex align-items-center gap-2 flex-wrap" data-toast>
               <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
               <button type="submit" class="btn btn-sm btn-outline-primary">
                 <i class="fa-solid fa-paper-plane me-1"></i><%= tr('streaming:TARGETS.PROBE') %>
