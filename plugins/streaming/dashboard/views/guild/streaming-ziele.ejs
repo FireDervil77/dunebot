@@ -386,41 +386,50 @@
           <% } %>
         </form>
 
-        <% if (darfProben || darfAendern) { %>
-          <div class="card-footer bg-transparent pt-0 d-flex flex-wrap gap-2 align-items-center">
+        <%
+          /*
+           * **Zwei Fusszeilen, und das ist der Punkt.**
+           *
+           * Am 2026-08-25 stand "Probe senden" kurzzeitig in derselben Zeile
+           * wie "Dieses Ziel entfernen" - und der Betreiber hat prompt sein
+           * Ziel geloescht, statt eine Probe zu schicken. Mit ihm gingen die
+           * drei Twitch-Abos, weil es das letzte Ziel fuer diesen Kanal war.
+           *
+           * Eine Handlung, die man oft ausloest, gehoert nicht neben eine, die
+           * etwas zerstoert. Ein Bestaetigungsdialog macht das nicht wett: Wer
+           * den Knopf trifft, den er treffen wollte, klickt den Dialog weg.
+           */
+        %>
 
-            <% if (darfProben) { %>
-              <!--
-                Probe senden.
+        <% if (darfProben) { %>
+          <div class="card-footer bg-transparent pt-0">
+            <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/probe"
+                  class="d-flex align-items-center gap-2 flex-wrap">
+              <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+              <button type="submit" class="btn btn-sm btn-outline-primary">
+                <i class="fa-solid fa-paper-plane me-1"></i><%= tr('streaming:TARGETS.PROBE') %>
+              </button>
+              <label class="form-check form-check-inline mb-0" title="<%= tr('streaming:TARGETS.PROBE_MENTION_HINT') %>">
+                <input class="form-check-input" type="checkbox" name="mit_erwaehnung" value="1"
+                       <%= z.rolle_id ? '' : 'disabled' %>>
+                <span class="form-check-label small text-secondary"><%= tr('streaming:TARGETS.PROBE_MENTION') %></span>
+              </label>
+            </form>
+          </div>
+        <% } %>
 
-                Sie geht durch denselben Ausgang wie eine echte Ankuendigung -
-                gleiche Vorlage, gleicher Nachrichtenbau, gleicher Weg zum Bot.
-                Eine Probe auf einem Sonderweg wuerde nichts beweisen.
-
-                Standardmaessig OHNE Erwaehnung: Eine Probe, die eine Rolle
-                anpingt, macht man genau einmal.
-              -->
-              <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/probe"
-                    class="d-flex align-items-center gap-2 me-auto">
-                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-                <button type="submit" class="btn btn-sm btn-outline-primary">
-                  <i class="fa-solid fa-paper-plane me-1"></i><%= tr('streaming:TARGETS.PROBE') %>
-                </button>
-                <label class="form-check form-check-inline mb-0" title="<%= tr('streaming:TARGETS.PROBE_MENTION_HINT') %>">
-                  <input class="form-check-input" type="checkbox" name="mit_erwaehnung" value="1"
-                         <%= z.rolle_id ? '' : 'disabled' %>>
-                  <span class="form-check-label small text-secondary"><%= tr('streaming:TARGETS.PROBE_MENTION') %></span>
-                </label>
-              </form>
-            <% } %>
-
-            <% if (darfAendern) { %>
-              <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/entfernen"
-                    onsubmit="return confirm('Dieses Ziel entfernen? Der Kanal bleibt beobachtet, solange ein anderes Ziel darauf zeigt.');">
-                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-                <button type="submit" class="btn btn-sm btn-ghost-danger">Dieses Ziel entfernen</button>
-              </form>
-            <% } %>
+        <% if (darfAendern) { %>
+          <!--
+            Getrennte Zone fuer das Zerstoerende: eigene Fusszeile, oben
+            abgesetzt, rechtsbuendig - weit weg von allem, was man im Alltag
+            drueckt.
+          -->
+          <div class="card-footer bg-transparent border-top text-end">
+            <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/entfernen"
+                  onsubmit="return confirm('Dieses Ziel wirklich entfernen?\n\nIst es das letzte Ziel fuer diesen Kanal, werden auch die Twitch-Abos abbestellt — der Kanal wird dann gar nicht mehr beobachtet.');">
+              <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+              <button type="submit" class="btn btn-sm btn-ghost-danger">Dieses Ziel entfernen</button>
+            </form>
           </div>
         <% } %>
       </div>

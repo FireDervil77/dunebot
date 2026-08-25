@@ -172,6 +172,40 @@ melde('Die Proberoute prueft die Zugehoerigkeit zur Guild', (() => {
         ? [] : ['kein `zielLesen(guildId, …)` — die Ziel-ID aus der Adresszeile wird nicht gegen die Guild geprueft'];
 })());
 
+console.log('\nDie Nachbarschaft');
+
+// ---------------------------------------------------------------------------
+// **Der teuerste Fehler dieses Tages, und er stand in keinem Pruefskript.**
+//
+// Am 2026-08-25 landete "Probe senden" in derselben Fusszeile wie "Dieses Ziel
+// entfernen". Der Betreiber wollte proben und loeschte sein Ziel - mit ihm
+// gingen die drei Twitch-Abos, weil es das letzte Ziel fuer diesen Kanal war.
+// Danach rutschte der naechste Streamer auf denselben Platz, und der zweite
+// Klick traf den Falschen.
+//
+// Ein Bestaetigungsdialog rettet das nicht: Wer den Knopf trifft, den er
+// treffen wollte, klickt den Dialog weg. Die Trennung muss raeumlich sein.
+// ---------------------------------------------------------------------------
+melde('Das Loeschen steht allein in seiner Fusszeile', (() => {
+    const ansicht = fs.readFileSync(
+        path.join(WURZEL, 'dashboard/views/guild/streaming-ziele.ejs'), 'utf8');
+
+    const stelle = ansicht.indexOf('/entfernen"');
+    if (stelle < 0) return ['Formular zum Entfernen nicht gefunden'];
+
+    // Rueckwaerts bis zur oeffnenden Fusszeile, vorwaerts bis zu ihrem Ende.
+    const anfang = ansicht.lastIndexOf('card-footer', stelle);
+    if (anfang < 0) return ['Formular zum Entfernen steht in keiner card-footer'];
+
+    const naechsteFusszeile = ansicht.indexOf('card-footer', stelle);
+    const block = ansicht.slice(anfang, naechsteFusszeile > 0 ? naechsteFusszeile : ansicht.length);
+
+    const formulare = (block.match(/<form\b/g) || []).length;
+    return formulare === 1
+        ? []
+        : [`in der Fusszeile des Loeschens stehen ${formulare} Formulare — eine zerstoerende Handlung darf nicht neben einer alltaeglichen sitzen`];
+})());
+
 console.log(verstoesse === 0
     ? '\nErgebnis: 0 Verstoesse.\n'
     : `\nErgebnis: ${verstoesse} Verstoss/Verstoesse.\n`);
