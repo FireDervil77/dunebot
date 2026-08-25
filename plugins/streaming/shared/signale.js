@@ -12,7 +12,7 @@
  * redet nach draussen. Ein `sseManager.broadcast(...)` in `takt.js` waere
  * genau die Vermischung, die `scripts/check-streaming-schichten.js` verhindern
  * soll - und der Kern liesse sich nicht mehr ohne Browser durchspielen.
- * Nachgesehen am 2026-08-26, ob es im Projekt schon einen allgemeinen Bus
+ * Nachgesehen am 2026-08-25, ob es im Projekt schon einen allgemeinen Bus
  * gibt: `IPMEventRouter` ist der Draht zum Daemon, `SSEManager` selbst ist ein
  * EventEmitter, aber beides ist keine Anlaufstelle fuer Plugins. Also ein
  * eigener, kleiner - im selben Vorgang, ohne Netz dazwischen.

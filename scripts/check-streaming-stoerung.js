@@ -31,7 +31,7 @@ function pruefe(was, ist, soll, zusatz = '') {
         (gut ? '' : ` (soll: ${JSON.stringify(soll)})`) + (zusatz ? `  — ${zusatz}` : ''));
 }
 
-const JETZT = Date.parse('2026-08-26T12:00:00Z');
+const JETZT = Date.parse('2026-08-25T12:00:00Z');
 const vor = (stunden) => new Date(JETZT - stunden * 3_600_000).toISOString();
 
 console.log('\nWann geschwiegen wird');

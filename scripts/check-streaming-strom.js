@@ -41,7 +41,7 @@ function lies(rel) {
  * Derselbe Inhalt, aber ohne Kommentare.
  *
  * **Das ist keine Kosmetik, sondern der Unterschied zwischen Waechter und
- * Zierde.** Bei der Gegenprobe am 2026-08-26 blieb Regel 3 gruen, obwohl der
+ * Zierde.** Bei der Gegenprobe am 2026-08-25 blieb Regel 3 gruen, obwohl der
  * Zuhoerer abgemeldet war: Ich hatte ihn mit `//` stillgelegt, und die Suche
  * fand ihn im Kommentar weiter. Derselbe Fehler wie am 2026-08-25 beim
  * Schichten-Waechter - dort suchte er nach `fragBot(` und die Probe schrieb
@@ -140,7 +140,7 @@ const strom = liesCode('dashboard/ausgabe/strom.js');
 const index = liesCode('dashboard/index.js');
 
 // **"Mindestens einer" ist zu schwach.** Genau diese Regel stand hier zuerst
-// und blieb am 2026-08-26 gruen, waehrend die Melder in der Drossel
+// und blieb am 2026-08-25 gruen, waehrend die Melder in der Drossel
 // verschwunden waren - takt.js hatte ja noch einen. Verloren gegangen waren
 // sie durch ein `git checkout` in meiner eigenen Gegenprobe, also unbemerkt
 // und ohne Fehler. Ein Waechter, der schon bei einem von zwei zufrieden ist,

@@ -143,7 +143,7 @@ const NACH_SAMMELN = strom.SAMMELN_MS + 120;
 
     // **Der Fall, der wirklich vorkommt.** Die Drossel arbeitet Auftraege mit
     // `await` dazwischen ab - die Signale liegen also in verschiedenen Ticks,
-    // nicht in einer Schleife. Die Gegenprobe am 2026-08-26 zeigte, dass der
+    // nicht in einer Schleife. Die Gegenprobe am 2026-08-25 zeigte, dass der
     // Fall darueber das nicht abdeckt: Er blieb gruen, als ich SAMMELN_MS auf
     // 0 setzte, weil eine synchrone Schleife schon von der `wartend`-Sperre
     // zusammengefasst wird. Erst hier entscheidet die Wartezeit.

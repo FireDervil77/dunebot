@@ -174,7 +174,7 @@ async function zustandDerGuild(guildId) {
  * Wie puenktlich lief der Ausgang zuletzt?
  *
  * Die Frage, die sich nach einer verspaeteten Rueckschau als Erstes stellt -
- * und die bis zum 2026-08-26 niemand beantworten konnte, weil der Ausgang zwar
+ * und die bis zum 2026-08-25 niemand beantworten konnte, weil der Ausgang zwar
  * `fertig` vermerkte, aber nicht wann.
  *
  * @param {number} [stunden=48] Zeitraum

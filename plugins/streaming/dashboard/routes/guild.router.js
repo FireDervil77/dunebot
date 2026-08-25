@@ -539,7 +539,7 @@ router.get('/zustand/daten', requirePermission('STREAMING.VIEW'), async (req, re
 /**
  * Der Strom: haelt die Zustandsseite offen und stupst sie an.
  *
- * Bis zum 2026-08-26 war die Seite **einmal gezeichnet und dann tot** - kein
+ * Bis zum 2026-08-25 war die Seite **einmal gezeichnet und dann tot** - kein
  * Poll, kein Nachschub. Sie zeigte "offline" mit derselben Bestimmtheit, ob
  * die Angabe zwei Sekunden oder zwei Stunden alt war.
  *

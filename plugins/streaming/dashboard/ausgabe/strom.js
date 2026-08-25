@@ -3,7 +3,7 @@
 /**
  * Streaming - der Ausgang zum Browser.
  *
- * Die Zustandsseite war bis zum 2026-08-26 **einmal gezeichnet und dann tot**.
+ * Die Zustandsseite war bis zum 2026-08-25 **einmal gezeichnet und dann tot**.
  * Sie pollte nicht - sie stand einfach. Wer sie offen liess, sah eine halbe
  * Stunde spaeter dieselben Zahlen und hatte keinen Anhalt, dass sie alt sind.
  * Das ist schlimmer als eine leere Seite: Sie behauptet "offline" mit
@@ -12,7 +12,7 @@
  *
  * Hier haengt der hausinterne Signalweg (`shared/signale`) am `SSEManager` des
  * Dashboards. **Nicht neu gebaut, sondern angedockt** - nachgesehen am
- * 2026-08-26: `apps/dashboard/helpers/SSEManager.js` gibt es seit langem, mit
+ * 2026-08-25: `apps/dashboard/helpers/SSEManager.js` gibt es seit langem, mit
  * Herzschlag, Abmeldung und Statistik, und `masterserver` benutzt ihn bereits.
  * Ein zweiter Strommechanismus waere die Sorte Doppelbau, die man drei Monate
  * spaeter beim Aufraeumen findet.

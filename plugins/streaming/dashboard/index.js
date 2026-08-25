@@ -95,7 +95,7 @@ class StreamingDashboardPlugin extends DashboardPlugin {
      * hausinternen Signalweg an den `SSEManager`, damit offene Zustandsseiten
      * mitbekommen, dass sich etwas geaendert hat. Faellt er aus, bleibt alles
      * andere heil - die Seite ist dann nur wieder so alt wie vor dem
-     * 2026-08-26.
+     * 2026-08-25.
      *
      * @private
      */
