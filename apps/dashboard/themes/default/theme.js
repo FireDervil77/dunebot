@@ -113,6 +113,7 @@ class DefaultTheme {
 
         am.registerScript('csrf-helper', 'csrf-helper.js', { inFooter: false, version: this.version });
         am.registerScript('global-toast', 'global-toast.js', { deps: ['toastr-js'], version: this.version });
+        am.registerScript('form-toast', 'form-toast.js', { deps: ['global-toast', 'csrf-helper'], version: this.version });
         am.registerScript('toast-notification-center', 'toast-notification-center.js', { deps: ['global-toast'], version: this.version });
         am.registerScript('button-loading', 'button-loading.js', { version: this.version });
         // DuneDataTable. Beim Umstieg von AdminLTE auf Tabler ist es haengen
@@ -215,6 +216,7 @@ class DefaultTheme {
         am.enqueueScript('toastr-js');
         am.enqueueScript('sortable');
         am.enqueueScript('global-toast');
+        am.enqueueScript('form-toast');
         am.enqueueScript('toast-notification-center');
         am.enqueueScript('button-loading');
         am.enqueueScript('data-table');

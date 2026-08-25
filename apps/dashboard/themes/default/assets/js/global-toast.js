@@ -17,6 +17,20 @@
     // Toastr Globale Konfiguration
     if (typeof toastr !== 'undefined') {
         toastr.options = {
+            // **Text bleibt Text.**
+            //
+            // toastrs Vorgabe ist `escapeHtml: false` — die Nachricht wird als
+            // HTML in die Seite geschrieben. Solange alle Toast-Texte fest im
+            // Quelltext standen, war das folgenlos. Mit `FormAntwort` liefert
+            // ab dem 2026-08-25 der Server den Text, und der enthaelt
+            // Nutzereingaben ("Kanal xyz nicht gefunden"). Ohne diese Zeile
+            // waere jede solche Meldung ein Weg, fremdes Markup in die Seite
+            // zu bekommen.
+            //
+            // Nachgezaehlt, bevor es umgestellt wurde: Kein einziger Aufrufer
+            // im Projekt schickt HTML in einen Toast. Es geht also nichts
+            // verloren.
+            escapeHtml: true,
             closeButton: true,
             debug: false,
             newestOnTop: true,
