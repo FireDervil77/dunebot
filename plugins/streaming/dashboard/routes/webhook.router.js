@@ -151,11 +151,35 @@ router.post('/', async (req, res) => {
             if (e.code === 'ER_DUP_ENTRY') {
                 // Twitch stellt ausdruecklich "mindestens einmal" zu.
                 // Mehrfachzustellung ist Normalbetrieb, kein Fehler.
+                //
+                // **Und die vorhandene Zeile wird dabei NICHT angefasst.**
+                //
+                // Hier stand bis zum 2026-08-25:
+                //
+                //     UPDATE streaming_events SET zustand = 'dublette'
+                //      WHERE anbieter_msg_id = ? AND zustand = 'neu'
+                //
+                // Das war genau falsch herum. `zustand = 'neu'` ist die
+                // Warteschlange - `takt.js` holt sich daraus alle 5 Sekunden
+                // die Arbeit. Eine Wiederholung, die ankommt, BEVOR das
+                // Original verarbeitet wurde, nahm es damit aus der
+                // Warteschlange und es wurde nie wieder angesehen: Die
+                // Ankuendigung blieb aus, ohne Fehler, ohne Meldung.
+                //
+                // Der Fall ist nicht theoretisch. Twitch wiederholt, wenn
+                // unsere 204 nicht ankommt - dann steht die Zeile noch auf
+                // `neu`. Nach einem Neustart des Dashboards ebenso, und dort
+                // ist das Fenster beliebig gross.
+                //
+                // Gebraucht wurde die Markierung ohnehin nicht: `dublette`
+                // liest im ganzen Plugin nur `aufraeumen.js`, und zwar als
+                // "darf geloescht werden" - dieselbe Behandlung wie `fertig`.
+                // Der eindeutige Schluessel erledigt das Entdoppeln allein;
+                // die zweite Einfuegung scheitert, und genau das ist der Zweck.
+                //
+                // Gefunden bei der Abnahme (Stufe 8, Fall 9) am 2026-08-25.
                 res.status(204).end();
-                await db().query(
-                    `UPDATE streaming_events SET zustand = 'dublette'
-                      WHERE plattform = 'twitch' AND anbieter_msg_id = ? AND zustand = 'neu'`, [msgId]);
-                Logger.debug(`[Streaming/Eingang] Dublette ${msgId}`);
+                Logger.info(`[Streaming/Eingang] Wiederholte Zustellung ${msgId} — verworfen, Original bleibt unberuehrt`);
                 return;
             }
             throw e;
