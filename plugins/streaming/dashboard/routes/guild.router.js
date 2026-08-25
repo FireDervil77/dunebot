@@ -439,10 +439,10 @@ router.post('/ziele/:id/probe', requirePermission('STREAMING.TEST'), async (req,
             });
         }
 
-        await modelle.probeVormerken(guildId, zielId, Boolean(req.body.mit_erwaehnung));
+        await modelle.probeVormerken(guildId, zielId, Boolean(req.body?.mit_erwaehnung));
 
         Logger.info(`[Streaming] Probe fuer Ziel ${zielId} (Guild ${guildId}) vorgemerkt` +
-            (req.body.mit_erwaehnung ? ', mit Erwaehnung' : ', ohne Erwaehnung'));
+            (req.body?.mit_erwaehnung ? ', mit Erwaehnung' : ', ohne Erwaehnung'));
 
         // **Der erste Aufrufer von `FormAntwort`.** Ohne JavaScript laeuft
         // genau die Weiterleitung wie vorher; mit JavaScript kommt ein Toast

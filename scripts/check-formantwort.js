@@ -98,6 +98,37 @@ melde('Ein abgelehntes Formular bleibt 200',
     /antworteFehler[\s\S]*?res\.status\(\s*4\d\d/.test(server)
         ? ['antworteFehler sendet 4xx — das loest den Rueckfall bei jedem Nutzerfehler aus'] : []);
 
+console.log('\nKodierung');
+
+// ---------------------------------------------------------------------------
+// **Der Fehler, den kein Pruefskript gefunden hat, weil keins einen Browser
+// hatte.** Die erste Fassung schickte `body: new FormData(form)`. Der Browser
+// kodiert das als `multipart/form-data`; `express.urlencoded()` versteht das
+// nicht, `req.body` bleibt `undefined`, und die Route stirbt an einem
+// TypeError. Der Nutzer sieht "hat technisch nicht geklappt".
+//
+// Gefunden hat es der Betreiber beim ersten Klick - nicht sechs Gegenproben.
+// ---------------------------------------------------------------------------
+melde('Gesendet wird urlencoded, nicht FormData', (() => {
+    const fehler = [];
+    if (!/URLSearchParams/.test(browser)) {
+        fehler.push('form-toast.js baut keine URLSearchParams — mit roher FormData kodiert der Browser multipart, und express.urlencoded() liest das nicht');
+    }
+    if (/body:\s*daten\b/.test(browser) || /body:\s*new FormData/.test(browser)) {
+        fehler.push('form-toast.js sendet die FormData direkt');
+    }
+    if (!/application\/x-www-form-urlencoded/.test(browser)) {
+        fehler.push('form-toast.js setzt den Content-Type nicht auf application/x-www-form-urlencoded');
+    }
+    return fehler;
+})());
+
+// Wer Dateien hochlaedt, BRAUCHT multipart. Dann darf dieser Helfer gar nicht
+// erst abfangen - lieber klassisch als halb.
+melde('Formulare mit Dateien werden nicht abgefangen',
+    /input\[type="file"\]/.test(browser) && /multipart/.test(browser)
+        ? [] : ['form-toast.js faengt auch Formulare mit Datei-Feldern ab — die brauchen multipart und gingen dabei verloren']);
+
 console.log(verstoesse === 0
     ? '\nErgebnis: 0 Verstoesse.\n'
     : `\nErgebnis: ${verstoesse} Verstoss/Verstoesse.\n`);

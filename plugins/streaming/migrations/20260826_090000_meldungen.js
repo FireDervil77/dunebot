@@ -1,15 +1,5 @@
 'use strict';
 
-/*
- * Hinweis zum Dateinamen: Er traegt "20260826", angelegt wurde die Migration
- * aber am **2026-08-25**. Der Tagesstempel war um einen Tag versetzt; das fiel
- * erst auf, als die Uhrzeiten des Servers gegen die Papiere gehalten wurden.
- *
- * Der Name bleibt trotzdem stehen: Er ist der Schluessel in der Tabelle
- * `migrations` und die Migration ist dort bereits verbucht. Ein Umbenennen
- * liesse sie als "neu" erscheinen und wuerde sie ein zweites Mal ausfuehren.
- */
-
 /**
  * Merken, welche Stoerung bereits gemeldet wurde.
  *

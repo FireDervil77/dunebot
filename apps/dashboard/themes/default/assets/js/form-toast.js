@@ -104,10 +104,32 @@
         // Ohne fetch bleibt der klassische Weg — und der funktioniert.
         if (!window.fetch || !window.FormData) return;
 
+        // **Dateien gehen nur klassisch.** Ein Datei-Upload braucht
+        // `multipart/form-data`; das liest `express.urlencoded()` nicht, und
+        // ein eigener Parser gehoert nicht in diesen Helfer. Lieber gar nicht
+        // abfangen als halb.
+        if (String(form.enctype || '').indexOf('multipart') >= 0) return;
+        if (form.querySelector('input[type="file"]')) return;
+
         e.preventDefault();
 
-        var daten = new FormData(form);
-        var kopf = {};
+        // **Nicht die FormData selbst senden.**
+        //
+        // Genau daran ist die erste Fassung am 2026-08-25 im Betrieb
+        // gescheitert: Wer `body: new FormData(...)` schickt, laesst den
+        // Browser `multipart/form-data` kodieren. `express.urlencoded()`
+        // versteht das nicht, `req.body` bleibt `undefined`, und die Route
+        // stirbt an "Cannot read properties of undefined". Der Nutzer sieht
+        // "hat technisch nicht geklappt" und im Protokoll steht ein
+        // TypeError, der nichts mit der Sache zu tun hat.
+        //
+        // Ein klassisches Formular sendet `application/x-www-form-urlencoded`
+        // — also senden wir das auch. Der Sinn dieses Helfers ist, dass die
+        // Route BEIDE Wege gleich sieht.
+        var koerper = new URLSearchParams();
+        new FormData(form).forEach(function (wert, name) { koerper.append(name, wert); });
+
+        var kopf = { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' };
         kopf[KOPFZEILE] = '1';
 
         knopfSperren(form, true);
@@ -121,7 +143,7 @@
 
         window.fetch(form.action, {
             method: (form.method || 'POST').toUpperCase(),
-            body: daten,
+            body: koerper,
             headers: kopf,
             credentials: 'same-origin',
             redirect: 'follow'
