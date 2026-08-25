@@ -402,6 +402,29 @@ async function liveRolleSetzen(guildId, rolleId) {
     await db().setConfig(PLUGIN, 'LIVE_ROLLE_ID', String(rolleId || '').trim(), 'shared', guildId, false);
 }
 
+/**
+ * Eine Probeankuendigung in den Ausgang legen.
+ *
+ * Bewusst ein normaler Auftrag und kein Sonderweg: Er laeuft durch dieselbe
+ * Drossel, dieselbe Vorlagenaufloesung und dieselbe IPC-Strecke wie eine echte
+ * Ankuendigung. Eine Probe, die anders sendet als der Ernstfall, beweist
+ * nichts.
+ *
+ * `faellig_ab` bleibt auf jetzt - die Drossel taktet alle 500 ms, mehr Wartezeit
+ * braucht niemand, der auf einen Knopf gedrueckt hat.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {number} zielId Ziel
+ * @param {boolean} [mitErwaehnung=false] Rolle wirklich anpingen?
+ * @returns {Promise<void>}
+ */
+async function probeVormerken(guildId, zielId, mitErwaehnung = false) {
+    await db().query(
+        `INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast, zustand)
+         VALUES (?, ?, 'probe', ?, 'offen')`,
+        [zielId, guildId, JSON.stringify({ mit_erwaehnung: Boolean(mitErwaehnung) })]);
+}
+
 /** Zeitzone, in der Ruhezeiten gelten, solange die Guild nichts anderes sagt. */
 const VORGABE_ZEITZONE = 'Europe/Berlin';
 
@@ -506,6 +529,7 @@ module.exports = {
     zielSpeichern,
     zielEntfernen,
     zielVorlageSetzen,
+    probeVormerken,
     liveRolle,
     liveRolleSetzen,
     vergebeneRolle,

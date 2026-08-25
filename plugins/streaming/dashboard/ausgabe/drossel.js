@@ -297,6 +297,57 @@ async function ausfuehren(auftrag) {
         return { ok: true, fehler: null, endgueltig: false };
     }
 
+    // -----------------------------------------------------------------
+    // Die Probe: derselbe Weg, aber ohne Spuren.
+    //
+    // **Warum ueberhaupt ueber den Ausgang und nicht direkt gesendet?** Weil
+    // eine Probe, die einen anderen Weg nimmt, nichts beweist. Hier laeuft
+    // dieselbe Vorlagenaufloesung, derselbe Nachrichtenbau, dieselbe
+    // IPC-Strecke, dieselbe Fehlerbehandlung. Was hier klappt, klappt im
+    // Ernstfall - und was hier scheitert, scheitert dort genauso, nur um
+    // 20:00 Uhr vor Publikum.
+    //
+    // Drei Unterschiede, alle bewusst:
+    //
+    //   1. **Kein Eintrag in `streaming_messages`.** Sonst hielte ein spaeterer
+    //      echter Stream die Probe fuer seine Ankuendigung und wuerde sie
+    //      bearbeiten oder aufraeumen.
+    //   2. **Nie veroeffentlichen.** Ein Crosspost geht an alle folgenden
+    //      Server hinaus und laesst sich nicht zurueckholen.
+    //   3. **Standardmaessig ohne Erwaehnung.** Eine Probe, die eine Rolle
+    //      anpingt, ist eine Probe, die man genau einmal macht. Wer den
+    //      Ernstfall vollstaendig sehen will, setzt `mit_erwaehnung` - dann
+    //      pingt sie, wie sie soll.
+    // -----------------------------------------------------------------
+    if (auftrag.aktion === 'probe') {
+        const nutzlast = typeof auftrag.nutzlast === 'string'
+            ? JSON.parse(auftrag.nutzlast) : (auftrag.nutzlast || {});
+
+        // Die Erwaehnung wird durch Weglassen der Rollen-ID unterdrueckt, nicht
+        // durch `allowed_mentions`: Der Bot setzt es heute nicht, und ein
+        // Verhalten, das erst nach einem Bot-Neustart stimmt, ist schlimmer als
+        // keins - es klappt beim Ausprobieren und pingt beim naechsten Mal.
+        const probeZiel = nutzlast.mit_erwaehnung ? ziel : { ...ziel, rolle_id: null };
+        const inhalt = nachricht.live({ streamer, zustand, ziel: probeZiel });
+
+        const antwort = await anDenBot('streaming:post', {
+            guildId: ziel.guild_id, channelId: ziel.channel_id,
+            veroeffentlichen: false, ...inhalt
+        });
+
+        if (!antwort.ok) return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
+
+        // Ehrlich sagen, wenn die Probe duenn aussieht: Ohne je gemessenen
+        // Zustand sind Titel, Kategorie und Bild leer. Das ist kein Fehler,
+        // aber es erklaert, warum die Probe anders aussieht als erwartet.
+        const duenn = !zustand.titel && !zustand.kategorie && !zustand.vorschaubild;
+
+        return {
+            ok: true, fehler: null, endgueltig: false,
+            hinweis: 'Probe gesendet' + (duenn ? ' (noch keine Streamdaten - Titel und Bild bleiben leer)' : '')
+        };
+    }
+
     // Bearbeiten und Aufraeumen brauchen eine stehende Nachricht.
     const gesendet = await db().query(
         "SELECT * FROM streaming_messages WHERE target_id = ? AND sendung_id = ? AND zustand = 'steht' LIMIT 1",

@@ -397,6 +397,54 @@ router.post('/ziele/:id/entfernen', requirePermission('STREAMING.TARGETS.MANAGE'
     }
 });
 
+/**
+ * Eine Probeankuendigung ausloesen.
+ *
+ * **Warum hier und nicht als `/streaming test` im Bot**, wie das Stufenpapier
+ * es vorsah: `STREAMING.TEST` liesse sich dort gar nicht pruefen. Gemessen am
+ * 2026-08-25 - Bot-Befehle kennen nur **Discord**-Berechtigungen
+ * (`apps/bot/handler.js:38`, `userPermissions: [...]`), und der Bot-Vorgang hat
+ * ueberhaupt keinen `permissionManager` (`apps/bot/bot.js` registriert Logger,
+ * dbService, client, commandManager, pluginManager, i18n, ipcClient,
+ * guildManager - sonst nichts). Ein Recht, das nirgends geprueft wird, ist
+ * genau das Muster, das beim ersten Einsatz lautlos versagt.
+ *
+ * Dazu passt die Regel, die im Befehlskopf selbst steht: Was man **einmal
+ * einrichtet**, gehoert ins Dashboard. Eine Probe gehoert neben das Ziel, das
+ * sie prueft.
+ *
+ * Der Auftrag geht durch den **normalen** Ausgang - dieselbe Vorlage,
+ * derselbe Nachrichtenbau, dieselbe IPC-Strecke. Eine Probe auf einem
+ * Sonderweg wuerde nichts beweisen.
+ */
+router.post('/ziele/:id/probe', requirePermission('STREAMING.TEST'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/ziele`;
+
+    try {
+        const zielId = Number(req.params.id);
+        if (!Number.isInteger(zielId)) return res.redirect(`${zurueck}?fehler=technisch`);
+
+        // **Das Ziel muss dieser Guild gehoeren.** Ohne diese Zeile koennte
+        // jemand mit STREAMING.TEST in seiner eigenen Guild eine Ankuendigung
+        // in den Kanal einer FREMDEN schicken - die Ziel-ID steht in der
+        // Adresszeile. Der Router prueft das Recht, nicht die Zugehoerigkeit;
+        // das muss hier passieren.
+        const ziel = await modelle.zielLesen(guildId, zielId);
+        if (!ziel) return res.redirect(`${zurueck}?fehler=weg`);
+
+        await modelle.probeVormerken(guildId, zielId, Boolean(req.body.mit_erwaehnung));
+
+        Logger.info(`[Streaming] Probe fuer Ziel ${zielId} (Guild ${guildId}) vorgemerkt` +
+            (req.body.mit_erwaehnung ? ', mit Erwaehnung' : ', ohne Erwaehnung'));
+        return res.redirect(`${zurueck}?ok=probe`);
+    } catch (error) {
+        Logger.error('[Streaming] Probe fehlgeschlagen:', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
 // =====================================================
 // Vorlagen
 // =====================================================

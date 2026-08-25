@@ -40,7 +40,10 @@
     "CLEANUP_KEEP": "Leave it",
     "OWN_IMAGE": "Custom preview image",
     "PUBLISH": "Publish in announcement channels",
-    "ACTIVE": "Active"
+    "ACTIVE": "Active",
+    "PROBE": "Send test",
+    "PROBE_MENTION": "with mention",
+    "PROBE_MENTION_HINT": "Unticked, the test stays silent. Ticked, it pings the role exactly like a real announcement. With no role set, the tick has no effect."
   },
   "TEMPLATES": {
     "TITLE": "Templates",

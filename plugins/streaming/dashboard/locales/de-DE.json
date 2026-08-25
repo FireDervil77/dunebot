@@ -40,7 +40,10 @@
     "CLEANUP_KEEP": "stehen lassen",
     "OWN_IMAGE": "Eigenes Vorschaubild",
     "PUBLISH": "In Ankündigungskanälen veröffentlichen",
-    "ACTIVE": "Aktiv"
+    "ACTIVE": "Aktiv",
+    "PROBE": "Probe senden",
+    "PROBE_MENTION": "mit Erwähnung",
+    "PROBE_MENTION_HINT": "Ohne Haken bleibt die Probe still. Mit Haken pingt sie die Rolle — genau wie eine echte Ankündigung. Ist keine Rolle gesetzt, ist der Haken ohne Wirkung."
   },
   "TEMPLATES": {
     "TITLE": "Vorlagen",

@@ -9,12 +9,14 @@
   // Ob jemand aendern darf, weiss der Theme-Helfer. Das ist Hoeflichkeit:
   // Die Sperre, die zaehlt, steht in der Route.
   const darfAendern = typeof hasPermission === 'function' && hasPermission('STREAMING.TARGETS.MANAGE');
+  const darfProben  = typeof hasPermission === 'function' && hasPermission('STREAMING.TEST');
 
   const meldungen = {
     gespeichert: 'Gespeichert. Ab der naechsten Ankuendigung gilt die neue Einstellung.',
     entfernt:         'Ziel entfernt. Der Kanal wird weiter beobachtet, wenn noch ein anderes Ziel darauf zeigt.',
     rolle_gewechselt: 'Live-Rolle gewechselt. Die alte Rolle wird allen entzogen, denen sie das Plugin gegeben haben könnte.',
-    rolle_aus:        'Live-Rolle abgeschaltet und allen entzogen.'
+    rolle_aus:        'Live-Rolle abgeschaltet und allen entzogen.',
+    probe:            'Probe ist unterwegs — sie steht in wenigen Sekunden im Kanal. Sie wird nicht veröffentlicht und hinterlässt keine Spur; aufräumen musst du sie selbst.'
   };
   const fehlerTexte = {
     ziel_fehlt: 'Bitte einen Kanal fuer die Ankuendigung waehlen.',
@@ -384,13 +386,41 @@
           <% } %>
         </form>
 
-        <% if (darfAendern) { %>
-          <div class="card-footer bg-transparent pt-0">
-            <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/entfernen"
-                  onsubmit="return confirm('Dieses Ziel entfernen? Der Kanal bleibt beobachtet, solange ein anderes Ziel darauf zeigt.');">
-              <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-              <button type="submit" class="btn btn-sm btn-ghost-danger">Dieses Ziel entfernen</button>
-            </form>
+        <% if (darfProben || darfAendern) { %>
+          <div class="card-footer bg-transparent pt-0 d-flex flex-wrap gap-2 align-items-center">
+
+            <% if (darfProben) { %>
+              <!--
+                Probe senden.
+
+                Sie geht durch denselben Ausgang wie eine echte Ankuendigung -
+                gleiche Vorlage, gleicher Nachrichtenbau, gleicher Weg zum Bot.
+                Eine Probe auf einem Sonderweg wuerde nichts beweisen.
+
+                Standardmaessig OHNE Erwaehnung: Eine Probe, die eine Rolle
+                anpingt, macht man genau einmal.
+              -->
+              <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/probe"
+                    class="d-flex align-items-center gap-2 me-auto">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                  <i class="fa-solid fa-paper-plane me-1"></i><%= tr('streaming:TARGETS.PROBE') %>
+                </button>
+                <label class="form-check form-check-inline mb-0" title="<%= tr('streaming:TARGETS.PROBE_MENTION_HINT') %>">
+                  <input class="form-check-input" type="checkbox" name="mit_erwaehnung" value="1"
+                         <%= z.rolle_id ? '' : 'disabled' %>>
+                  <span class="form-check-label small text-secondary"><%= tr('streaming:TARGETS.PROBE_MENTION') %></span>
+                </label>
+              </form>
+            <% } %>
+
+            <% if (darfAendern) { %>
+              <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/entfernen"
+                    onsubmit="return confirm('Dieses Ziel entfernen? Der Kanal bleibt beobachtet, solange ein anderes Ziel darauf zeigt.');">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <button type="submit" class="btn btn-sm btn-ghost-danger">Dieses Ziel entfernen</button>
+              </form>
+            <% } %>
           </div>
         <% } %>
       </div>
