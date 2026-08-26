@@ -596,30 +596,58 @@ class DBService extends DBClient {
      */
     async upsertUser(data) {
         if (!data._id) throw new Error("Benutzer-ID (_id) ist erforderlich");
-        
-        // Prüfen, ob tokens als JSON gespeichert werden sollen
-        let tokens = data.tokens || '{}';
-        if (typeof tokens === 'object') {
-            tokens = JSON.stringify(tokens);
+
+        // ----------------------------------------------------------------
+        // **Nur schreiben, was mitgegeben wurde.**
+        //
+        // Bis zum 2026-08-26 setzte diese Methode `locale` und `tokens`
+        // IMMER — auch dann, wenn der Aufrufer sie gar nicht erwaehnte. Der
+        // Abmeldevorgang ruft sie mit `{_id, logged_in: 0}` auf, und aus
+        // `data.locale || 'de-DE'` wurde dabei ein echter Schreibvorgang:
+        // **Jede Abmeldung ueberschrieb die persoenliche Sprachwahl mit
+        // Deutsch.** Wer auf Englisch gestellt hatte, fand sich nach dem
+        // naechsten Anmelden auf Deutsch wieder — ohne dass irgendwo ein
+        // Fehler aufgetreten waere.
+        //
+        // `locale = NULL` ist dabei ein eigener, gueltiger Wert und heisst
+        // "folge der Guild" (base.middleware.js:98). Der Vorgabewert 'de-DE'
+        // war also nicht nur ueberschreibend, sondern auch sachlich falsch:
+        // Er machte aus "keine eigene Wahl" eine Wahl.
+        //
+        // Wer `tokens` oder `locale` wirklich leeren will, gibt sie
+        // ausdruecklich mit — so wie es der Abmeldevorgang jetzt tut.
+        // ----------------------------------------------------------------
+        const setzt = [];
+        const werte = [];
+
+        setzt.push('logged_in = VALUES(logged_in)');
+
+        let tokens = null;
+        if (data.tokens !== undefined) {
+            tokens = typeof data.tokens === 'object' ? JSON.stringify(data.tokens) : data.tokens;
+            setzt.push('tokens = VALUES(tokens)');
         }
-        
+        if (data.locale !== undefined) {
+            setzt.push('locale = VALUES(locale)');
+        }
+        setzt.push('updated_at = NOW()');
+
         const sql = `
             INSERT INTO users (_id, locale, logged_in, tokens, created_at, updated_at)
             VALUES (?, ?, ?, ?, NOW(), NOW())
             ON DUPLICATE KEY UPDATE
-                locale = VALUES(locale),
-                logged_in = VALUES(logged_in),
-                tokens = VALUES(tokens),
-                updated_at = NOW()
+                ${setzt.join(',\n                ')}
         `;
-        
-        await this.query(sql, [
+
+        werte.push(
             data._id,
-            data.locale || 'de-DE',
+            data.locale !== undefined ? data.locale : null,
             data.logged_in || 0,
-            tokens
-        ]);
-        
+            tokens !== null ? tokens : '{}'
+        );
+
+        await this.query(sql, werte);
+
         return this.getUser(data._id);
     }
     

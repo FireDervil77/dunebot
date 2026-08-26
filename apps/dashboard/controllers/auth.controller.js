@@ -148,9 +148,30 @@ exports.callback = async (req, res) => {
         
         // In Datenbank speichern mit nativer MySQL-Methode
         try {
+            // **Der Zugangsschluessel wird NICHT gespeichert — auch nicht
+            // verschluesselt.**
+            //
+            // Bis zum 2026-08-26 landeten `access_token` und `refresh_token`
+            // hier als blankes JSON in `users.tokens` (Baustelle 74). Beim
+            // Nachsehen ueber das ganze Projekt hatte KEINER der beiden einen
+            // Leser: Die Guildliste wird oben einmal geholt und liegt danach
+            // in der Sitzung; danach spricht niemand mehr im Namen des
+            // Benutzers mit Discord.
+            //
+            // Zwei Geheimnisse ohne Verwender aufzubewahren ist kein
+            // Abwaegungsfall — es ist Risiko ohne Gegenleistung. Deshalb
+            // weglassen statt verschluesseln: Ein Schluessel, der in derselben
+            // `.env` liegt wie die Datenbankzugangsdaten, hilft gegen
+            // Sicherungskopien, nicht gegen einen Einbruch.
+            //
+            // Was bleibt, wird angezeigt: Art und Ablauf der Anmeldung stehen
+            // im Profil (`routes/guild/profile.router.js`).
+            //
+            // **Falls je ein `refresh_token` gebraucht wird** — etwa um die
+            // Guildliste ohne neue Anmeldung aufzufrischen — gehoert er
+            // verschluesselt und mit einem echten Verwender wieder herein,
+            // nicht auf Vorrat.
             const userTokens = {
-                access_token: tokens.access_token,
-                refresh_token: tokens.refresh_token, 
                 token_type: tokens.token_type,
                 expires_at: Date.now() + tokens.expires_in * 1000
             };
@@ -198,7 +219,10 @@ exports.callback = async (req, res) => {
             info: userData,
             guilds: guildsData,
             admin: isAdmin,
-            token: tokens.access_token,
+            // `token` stand hier bis zum 2026-08-26 und wurde nirgends
+            // gelesen — der Zugangsschluessel lag damit zusaetzlich in jeder
+            // Sitzungszeile der Datenbank. Der Aufruf oben benutzt `tokens`
+            // direkt, die Sitzung braucht ihn nicht.
             lastLogin: lastLogin
         };
         
@@ -278,11 +302,23 @@ exports.logout = async (req, res) => {
             await dbService.query('START TRANSACTION');
 
             try {
-                // 1. User logged_in Status aktualisieren
+                // 1. Abmeldung vermerken und die Anmeldeangaben leeren.
+                //
+                // `tokens: {}` steht seit dem 2026-08-26 ausdruecklich da.
+                // Vorher passierte dasselbe als **Nebenwirkung**, weil
+                // `upsertUser` jede nicht mitgegebene Spalte trotzdem
+                // ueberschrieb — was gleichzeitig die persoenliche Sprachwahl
+                // zerstoerte (Baustelle 74). Die Methode schreibt jetzt nur
+                // noch, was sie bekommt; das Leeren muss deshalb hier stehen.
+                //
+                // `last_logout` stand hier ebenfalls und war folgenlos: Die
+                // Spalte gibt es in `users` nicht, und `upsertUser` hat sie nie
+                // in ihr SQL uebernommen. Ein Feld, das seit jeher ins Leere
+                // ging — deshalb entfernt statt stillschweigend weitergereicht.
                 await dbService.upsertUser({
                     _id: userId,
                     logged_in: 0,
-                    last_logout: new Date()
+                    tokens: {}
                 });
 
                 // 2. Alle aktiven Guild-Zuweisungen des Users entfernen
