@@ -474,10 +474,108 @@ function uebersetzen(headers, koerper) {
     }
 }
 
+// =====================================================
+// Kontoverknuepfung
+// =====================================================
+//
+// **Warum hier und nicht im Kern:** Der Kern kennt keine Plattform. Er
+// schickt den Benutzer weg und nimmt ihn wieder entgegen; WOHIN und WAS
+// dabei zurueckkommt, weiss nur der Adapter. Genau dafuer gibt es
+// `VerbindungsRegistry` — dieselbe Bauform wie `WebhookRegistry`.
+//
+// **Kein Scope.** `GET /helix/users` liefert mit einem Benutzertoken die
+// eigenen Daten auch ohne jede Berechtigung; nur die E-Mail-Adresse braeuchte
+// `user:read:email`, und die wollen wir nicht. Wer verknuepft, gibt uns damit
+// **nichts** ausser dem Nachweis, dass ihm das Konto gehoert.
+//
+// Der leere `scope`-Wert ist Absicht und zulaessig — nachgesehen am
+// 2026-08-26 im Twitch-Entwicklerforum, wo ein Moderator die Frage
+// "Authorization Code Flow with a blank scope attribute?" mit "Yes"
+// beantwortet (discuss.dev.twitch.com/t/…/17270). Der Parameter selbst gilt
+// als erforderlich, sein Wert darf leer sein. **Nicht "aufraeumen":** Ihn
+// wegzulassen ist etwas anderes, als ihn leer zu lassen.
+//
+// Offener Punkt: Twitchs Abo-Kontingent rechnet ein Abo mit 0 statt 1, wenn
+// "that user has authorized your application (i.e., you have an OAuth scope
+// for that user)". Ob eine Zustimmung OHNE Scope dafuer zaehlt, sagt die
+// Dokumentation nicht. Erst messen, wenn es zaehlt — nicht vorsorglich
+// Berechtigungen erfragen, die niemand braucht.
+
+/**
+ * Wohin der Benutzer zum Verknuepfen geschickt wird.
+ *
+ * @param {Object} opt { state, rueckrufUrl }
+ * @returns {Promise<string|null>} Adresse oder null ohne Zugangsdaten
+ */
+async function verknuepfungsUrl({ state, rueckrufUrl }) {
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId) return null;
+
+    return `${IDAPI}/authorize?` + new URLSearchParams({
+        client_id: daten.clientId,
+        redirect_uri: rueckrufUrl,
+        response_type: 'code',
+        scope: '',
+        state
+    }).toString();
+}
+
+/**
+ * Aus dem Rueckruf-Code die Identitaet feststellen.
+ *
+ * **Der Benutzertoken wird nicht zurueckgegeben und nirgends abgelegt.** Er
+ * lebt genau so lange wie dieser Aufruf. Gebraucht wird er nur, um Twitch
+ * einmal zu fragen "wer bist du" — die Antwort ist der Nachweis, der Token
+ * nicht.
+ *
+ * @param {Object} opt { code, rueckrufUrl }
+ * @returns {Promise<{kontoId: string, kontoName: string}|null>} Identitaet
+ */
+async function verknuepfteIdentitaet({ code, rueckrufUrl }) {
+    const Logger = ServiceManager.get('Logger');
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId || !daten.clientSecret) {
+        Logger.warn('[Streaming/Twitch] Verknuepfung ohne hinterlegte Zugangsdaten');
+        return null;
+    }
+
+    const tausch = await fetch(`${IDAPI}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            client_id: daten.clientId,
+            client_secret: daten.clientSecret,
+            code,
+            grant_type: 'authorization_code',
+            redirect_uri: rueckrufUrl
+        })
+    });
+    if (!tausch.ok) {
+        Logger.warn(`[Streaming/Twitch] Code abgelehnt (${tausch.status}): ${await tausch.text()}`);
+        return null;
+    }
+    const { access_token: benutzerToken } = await tausch.json();
+    if (!benutzerToken) return null;
+
+    const wer = await fetch(`${HELIX}/users`, {
+        headers: { 'Client-Id': daten.clientId, Authorization: `Bearer ${benutzerToken}` }
+    });
+    if (!wer.ok) {
+        Logger.warn(`[Streaming/Twitch] Identitaet nicht lesbar (${wer.status})`);
+        return null;
+    }
+    const [konto] = (await wer.json()).data || [];
+    if (!konto || !konto.id) return null;
+
+    return { kontoId: String(konto.id), kontoName: konto.display_name || konto.login };
+}
+
 module.exports = {
     name: 'twitch',
     HOECHSTALTER_MS,
     EREIGNISSE,
+    verknuepfungsUrl,
+    verknuepfteIdentitaet,
     kennung,
     nachrichtId,
     ereignisTyp,

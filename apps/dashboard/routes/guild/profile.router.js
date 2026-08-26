@@ -35,6 +35,8 @@
 const express = require('express');
 const router = express.Router({ mergeParams: true });
 const { ServiceManager } = require('dunebot-core');
+const { VerbindungsRegistry } = require('dunebot-sdk');
+const { rueckrufUrl } = require('../verbindungen.router');
 
 /**
  * Die eigene Zeile aus `users`.
@@ -116,6 +118,65 @@ router.get('/', async (req, res) => {
             .filter(k => k !== 'wildcard').length,
         istBesitzer: Boolean(rechte.is_owner),
         hatSystemzugang: Boolean(res.locals.user?.hasSystemAccess)
+    });
+});
+
+/**
+ * Verbundene Konten dieses Benutzers, zusammengefuehrt mit den Anbietern,
+ * die gerade eingetragen sind.
+ *
+ * **Nur eingetragene Anbieter erscheinen.** Eine Zeile "Kick (demnaechst)"
+ * waere ein leeres Versprechen — genau die Bauart, die diese Seite ueberhaupt
+ * erst noetig gemacht hat (Baustelle 73). Ist ein Plugin abgeschaltet, faellt
+ * sein Anbieter weg; die Verknuepfung selbst bleibt in der Tabelle stehen und
+ * kommt zurueck, sobald das Plugin wieder laeuft.
+ *
+ * @param {string} userId Discord-ID
+ * @returns {Promise<Array<Object>>} je Anbieter eine Zeile
+ */
+async function konten(userId) {
+    const dbService = ServiceManager.get('dbService');
+    let vorhanden = [];
+    try {
+        vorhanden = await dbService.query(
+            'SELECT plattform, konto_id, konto_name, angelegt_am FROM user_connections WHERE user_id = ?',
+            [userId]) || [];
+    } catch (error) {
+        // Die Tabelle entsteht erst mit der Migration. Fehlt sie, ist die
+        // Seite trotzdem brauchbar — sie zeigt dann keine Verknuepfungen.
+        ServiceManager.get('Logger').warn('[Profil] user_connections nicht lesbar:', error.message);
+    }
+
+    return VerbindungsRegistry.list().map(a => {
+        const da = vorhanden.find(v => v.plattform === a.name) || null;
+        return {
+            name: a.name, label: a.label, symbol: a.symbol,
+            farbe: a.farbe, hinweis: a.hinweis,
+            verbunden: Boolean(da),
+            kontoName: da ? (da.konto_name || da.konto_id) : null,
+            seit: da ? da.angelegt_am : null
+        };
+    });
+}
+
+// GET /profile/verbindungen
+router.get('/verbindungen', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    const guildId = res.locals.guildId;
+    const userId = req.session?.user?.info?.id || null;
+
+    await themeManager.renderView(res, 'guild/profile-verbindungen', {
+        title: 'Verbundene Konten',
+        activeMenu: `/guild/${guildId}/profile/verbindungen`,
+        guildId,
+        anbieter: userId ? await konten(userId) : [],
+        // Nur der Betreiber sieht, wo die Rueckrufadresse einzutragen ist —
+        // fuer alle anderen ist sie Rauschen.
+        rueckrufe: res.locals.user?.hasSystemAccess || res.locals.user?.isOwner
+            ? VerbindungsRegistry.list().map(a => ({ label: a.label, url: rueckrufUrl(a.name) }))
+            : [],
+        meldung: req.query.ok || null,
+        fehler: req.query.fehler || null
     });
 });
 

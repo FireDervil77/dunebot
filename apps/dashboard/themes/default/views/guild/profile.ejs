@@ -150,6 +150,27 @@ const tage = zeile ? tageSeit(zeile.created_at) : null;
     </div>
   </div>
 
+  <%# ── Verbundene Konten ─────────────────────────────────────────────────
+      Nur ein Weg dorthin, keine Zusammenfassung: Wie viele Konten verbunden
+      sind, steht auf der Seite selbst. Eine Zahl hier waere eine zweite
+      Wahrheit, die getrennt altert. %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div style="min-width: 14rem;">
+          <h3 class="card-title mb-1">Verbundene Konten</h3>
+          <div class="text-secondary">
+            Twitch, YouTube und andere Plattformen mit diesem Konto verknüpfen —
+            nötig für Funktionen, die etwas über <em>dich</em> aussagen.
+          </div>
+        </div>
+        <a href="/guild/<%= guildId %>/profile/verbindungen" class="btn btn-outline-primary">
+          <i class="fa-solid fa-link me-2"></i>Verwalten
+        </a>
+      </div>
+    </div>
+  </div>
+
   <%# ── Anmeldung ─────────────────────────────────────────────────────────── %>
   <div class="col-12">
     <div class="card">

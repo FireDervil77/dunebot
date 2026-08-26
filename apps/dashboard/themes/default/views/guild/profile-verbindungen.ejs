@@ -1,0 +1,128 @@
+<%#
+ * Verbundene Konten.
+ *
+ * **Nur eingetragene Anbieter erscheinen.** Kein "Kick (demnaechst)" — die
+ * Liste kommt aus der `VerbindungsRegistry`, und wer sich nicht eingetragen
+ * hat, wird nicht versprochen.
+ *
+ * @context {string}  guildId
+ * @context {Array}   anbieter   - { name, label, symbol, farbe, hinweis, verbunden, kontoName, seit }
+ * @context {Array}   rueckrufe  - nur fuer Betreiber: { label, url }
+ * @context {string?} meldung
+ * @context {string?} fehler
+%>
+<%
+const TEXTE = {
+  verbunden: ['success', 'Das Konto ist jetzt verknüpft.'],
+  geloest:   ['success', 'Die Verknüpfung wurde gelöst.'],
+  abgebrochen:['info',   'Du hast den Vorgang bei der Plattform abgebrochen. Es wurde nichts gespeichert.'],
+  vergeben:  ['danger',  'Dieses Konto ist bereits mit einem anderen Benutzer verknüpft. Wenn das deins ist, muss die andere Verknüpfung zuerst gelöst werden.'],
+  state:     ['warning', 'Der Vorgang ist abgelaufen oder wurde doppelt geöffnet. Bitte noch einmal starten.'],
+  code:      ['warning', 'Die Plattform hat keinen Nachweis mitgeschickt. Bitte noch einmal versuchen.'],
+  anbieter:  ['warning', 'Die Plattform hat nicht wie erwartet geantwortet. Der Grund steht im Protokoll.'],
+  unbekannt: ['warning', 'Diese Plattform kennen wir nicht (mehr).'],
+  basis:     ['danger',  'Die Basisadresse des Dashboards ist nicht eingestellt (DASHBOARD_BASE_URL). Ohne sie kann keine Rückrufadresse gebildet werden.'],
+  technisch: ['danger',  'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.']
+};
+const hinweis = TEXTE[fehler] || TEXTE[meldung] || null;
+%>
+
+<% if (hinweis) { %>
+  <div class="alert alert-<%= hinweis[0] %>"><%= hinweis[1] %></div>
+<% } %>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h3 class="card-title">Verbundene Konten</h3>
+  </div>
+  <div class="card-body">
+    <p class="text-secondary">
+      Eine Verknüpfung belegt, dass dir ein Konto auf einer anderen Plattform
+      <strong>gehört</strong>. Sie wird gebraucht, wo eine Funktion etwas über
+      <em>dich</em> aussagt — etwa eine Rolle, die du bekommst, weil du sendest.
+      Um einen Kanal nur <em>anzukündigen</em>, braucht es sie nicht.
+    </p>
+    <p class="text-secondary mb-0">
+      <strong>Wir speichern dabei keinen Zugangsschlüssel.</strong> Nach dem
+      Verknüpfen merken wir uns nur, wer du auf der Plattform bist — nicht,
+      wie man in deinem Namen dort handelt.
+    </p>
+  </div>
+</div>
+
+<% if (!anbieter || anbieter.length === 0) { %>
+  <div class="card">
+    <div class="card-body text-secondary">
+      Zurzeit bietet kein Plugin eine Verknüpfung an. Sobald eines eingeschaltet
+      ist, das eine braucht, erscheint es hier.
+    </div>
+  </div>
+<% } else { %>
+  <div class="row row-cards">
+    <% anbieter.forEach(a => { %>
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body d-flex align-items-center gap-3">
+            <span class="avatar rounded"
+                  style="<%= a.farbe ? `background-color:${a.farbe}1a;color:${a.farbe};` : '' %>">
+              <i class="<%= a.symbol %> fs-2"></i>
+            </span>
+            <div class="flex-fill" style="min-width: 0;">
+              <div class="fw-medium"><%= a.label %></div>
+              <% if (a.verbunden) { %>
+                <div class="text-secondary" style="overflow-wrap: anywhere;">
+                  verbunden als <strong><%= a.kontoName %></strong>
+                </div>
+              <% } else { %>
+                <div class="text-secondary">nicht verbunden</div>
+              <% } %>
+              <% if (a.hinweis) { %>
+                <div class="text-secondary small mt-1"><%= a.hinweis %></div>
+              <% } %>
+            </div>
+          </div>
+          <div class="card-footer">
+            <% if (a.verbunden) { %>
+              <form method="POST" action="/verbindungen/<%= a.name %>/loesen"
+                    onsubmit="return confirm('Verknüpfung mit <%= a.label %> lösen? Funktionen, die sie voraussetzen, wirken danach nicht mehr.');">
+                <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+                <input type="hidden" name="zurueck" value="/guild/<%= guildId %>/profile/verbindungen">
+                <button type="submit" class="btn btn-outline-danger w-100">Verknüpfung lösen</button>
+              </form>
+            <% } else { %>
+              <a class="btn btn-primary w-100"
+                 href="/verbindungen/<%= a.name %>/start?zurueck=<%= encodeURIComponent(`/guild/${guildId}/profile/verbindungen`) %>">
+                Mit <%= a.label %> verbinden
+              </a>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+<% } %>
+
+<% if (rueckrufe && rueckrufe.length) { %>
+  <%# Nur fuer den Betreiber: Diese Adressen muessen beim Anbieter Zeichen
+      fuer Zeichen so hinterlegt sein, sonst bricht der Rueckruf ab. %>
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">Rückrufadressen (nur für dich sichtbar)</h3></div>
+    <div class="card-body">
+      <p class="text-secondary">
+        Diese Adressen müssen beim jeweiligen Anbieter als <em>Redirect URI</em>
+        hinterlegt sein — <strong>Zeichen für Zeichen</strong>. Stimmt eine
+        nicht, bricht der Rückruf ab, und die Plattform sagt nicht, warum.
+      </p>
+      <dl class="row mb-0">
+        <% rueckrufe.forEach(r => { %>
+          <dt class="col-sm-3"><%= r.label %></dt>
+          <dd class="col-sm-9"><code style="overflow-wrap: anywhere;"><%= r.url %></code></dd>
+        <% }) %>
+      </dl>
+    </div>
+  </div>
+<% } %>
+
+<div class="mt-3">
+  <a href="/guild/<%= guildId %>/profile" class="btn btn-link">← zurück zum Profil</a>
+</div>

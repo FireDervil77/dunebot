@@ -19,6 +19,7 @@ const MessageValidator = require("./lib/ipm/MessageValidator");
 const permissionManager = require("./lib/PermissionManager");
 const WidgetManager = require("./lib/WidgetManager");
 const WebhookRegistry = require("./lib/WebhookRegistry");
+const VerbindungsRegistry = require("./lib/VerbindungsRegistry");
 const FormAntwort = require("./lib/FormAntwort");
 
 module.exports = {
@@ -38,6 +39,7 @@ module.exports = {
     permissionManager,
     WidgetManager,
     WebhookRegistry,
+    VerbindungsRegistry,
     FormAntwort,
     // IPM (Inter-Process Messaging) - Event-Bus Architecture
     MessageTypes,

@@ -17,7 +17,7 @@
  * @author FireBot Team
  */
 
-const { DashboardPlugin, VersionHelper, WebhookRegistry } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper, WebhookRegistry, VerbindungsRegistry } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class StreamingDashboardPlugin extends DashboardPlugin {
@@ -75,6 +75,22 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         try {
             WebhookRegistry.register('streaming', require('./routes/webhook.router'));
             Logger.info('[Streaming] Eingang angemeldet: /api/streaming/webhook');
+
+            // **Die Kontoverknuepfung.** Sie ist die Voraussetzung dafuer,
+            // dass die Live-Rolle etwas BELEGTES ueber eine Person aussagt
+            // statt einer Behauptung der Serverleitung zu folgen (F-16,
+            // entschieden am 2026-08-26). Der Kern kennt Twitch nicht — er
+            // bekommt hier zwei Funktionen und sonst nichts.
+            const twitch = require('./plattformen/twitch');
+            VerbindungsRegistry.register('twitch', {
+                label: 'Twitch',
+                symbol: 'fa-brands fa-twitch',
+                farbe: '#9146FF',
+                hinweis: 'Belegt, dass dir der Kanal gehört. Wir fragen dabei keine Berechtigungen ab.',
+                autorisierUrl: twitch.verknuepfungsUrl,
+                identitaet: twitch.verknuepfteIdentitaet
+            });
+            Logger.info('[Streaming] Kontoverknuepfung angemeldet: twitch');
         } catch (error) {
             // Ohne Eingang kommt nie eine Meldung an. Das darf nicht still
             // bleiben - aber es darf auch nicht das Dashboard mitreissen.
@@ -163,7 +179,11 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         } catch { /* beim Abschalten ist ein stehengebliebener Takt das kleinere Uebel */ }
 
         WebhookRegistry.unregister('streaming');
-        ServiceManager.get('Logger').info('[Streaming] Dashboard-Plugin deaktiviert, Eingang abgemeldet');
+        // Der Anbieter verschwindet, die Verknuepfungen bleiben. Ein
+        // abgeschaltetes Plugin ist kein Widerruf — der Benutzer hat seine
+        // Zugehoerigkeit belegt, und das bleibt wahr. Loesen darf nur er.
+        VerbindungsRegistry.unregister('twitch');
+        ServiceManager.get('Logger').info('[Streaming] Dashboard-Plugin deaktiviert, Eingang und Verknuepfung abgemeldet');
         return true;
     }
 

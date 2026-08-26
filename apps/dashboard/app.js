@@ -166,6 +166,11 @@ module.exports = class App {
             this.routerManager
                 .register('/', this.routers.frontend)
                 .register('/auth', this.routers.auth)
+                // Kontoverknuepfungen. **Oberste Ebene, nicht unter /guild:**
+                // Die Rueckrufadresse muss beim Anbieter fest hinterlegt
+                // werden; mit einer Guild-ID darin waere sie je Guild eine
+                // andere. Wohin es danach zurueckgeht, merkt sich der `state`.
+                .register('/verbindungen', require('./routes/verbindungen.router'))
                 .register('/downloads', this.routers.downloads) // Öffentlich, keine Auth
                 .register('/guild', this.routers.guild, { 
                     auth: true,  // Aktiviert CheckAuth Middleware
