@@ -5,6 +5,15 @@ const { ChannelType } = require("discord.js");
 
 class IPCClient {
     /**
+     * Ab wann die Dauer eines IPC-Handlers eine Warnung wert ist.
+     *
+     * Ein Handler macht ein, zwei Discord-Aufrufe; alles ueber fuenf Sekunden
+     * ist keine Schwankung mehr. Grosszuegig genug, dass ein Handler, der
+     * einmal Mitglieder nachlaedt, nicht jedes Mal meldet.
+     */
+    static LANGSAM_MS = 5000;
+
+    /**
      * @param {import('discord.js').Client} discordClient
      */
     constructor(discordClient) {
@@ -214,10 +223,41 @@ class IPCClient {
     }
 
     /**
+     * Wie lange ein Handler gebraucht hat — und ab wann das auffaellt.
+     *
+     * Am 2026-08-26 stellte sich heraus, dass ein `streaming:edit` **exakt
+     * 1200 Sekunden** bis zur Antwort brauchte, 23-mal hintereinander
+     * (Baustelle 76). Im Bot-Protokoll stand davon nichts: Es gab eine Zeile
+     * "empfaengt IPC-Event" und danach nie wieder etwas. Damit liess sich
+     * nicht einmal entscheiden, ob der Handler lange rechnete oder ob die
+     * Antwort auf dem Rueckweg verlorenging.
+     *
+     * Deshalb wird **vor** dem Antworten gemessen: Die Zahl hier ist die Zeit
+     * des Handlers allein. Weicht sie von dem ab, was der Aufrufer im
+     * Dashboard erlebt, liegt es an der Leitung und nicht am Handler — und
+     * genau diese Unterscheidung fehlte.
+     *
+     * @param {string} event Vollstaendiger Ereignisname
+     * @param {number} start Zeitpunkt des Eintreffens
+     * @returns {void}
+     */
+    #dauerMelden(event, start) {
+        const dauer = Date.now() - start;
+        if (dauer >= IPCClient.LANGSAM_MS) {
+            this.logger.warn(`[IPC] ${event} brauchte ${dauer} ms — der Aufrufer wartet so lange mit`);
+        } else {
+            this.logger.debug(`[IPC] ${event} fertig in ${dauer} ms`);
+        }
+    }
+
+    /**
      * Handlet die eingehenden messages
      * ruft für jede message den passenden message context auf
      */
     async handleMessage(message) {
+        const start = Date.now();
+        let event = message?.data?.event || 'unbekannt';
+
         try {
             // DEBUG: Message-Struktur loggen
             this.logger.debug(`[IPC-DEBUG] handleMessage() aufgerufen, event: ${message?.data?.event}`);
@@ -227,7 +267,8 @@ class IPCClient {
                 return;
             }
 
-            const { event, payload } = message.data;
+            const { payload } = message.data;
+            event = message.data.event;
             this.logger.info(`[IPC] Bot empfängt IPC-Event: ${event}`);
             
             const [pluginName, eventName] = event.split(":");
@@ -239,7 +280,15 @@ class IPCClient {
 
             if (pluginName === "dashboard") {
                 this.logger.debug(`[IPC] Verarbeite Dashboard-Event: ${eventName}`);
-                return await this.#handleBaseMessage(eventName, message);
+                try {
+                    return await this.#handleBaseMessage(eventName, message);
+                } finally {
+                    // Auch die Kernereignisse werden gemessen: Der Herzschlag
+                    // ist der einzige Verkehr, der waehrend eines Stillstands
+                    // weiterlaeuft — bleibt er schnell, waehrend ein
+                    // Plugin-Ereignis haengt, ist die Leitung nachweislich heil.
+                    this.#dauerMelden(event, start);
+                }
             }
 
             const plugin = this.discordClient.pluginManager.getPlugin(pluginName);
@@ -251,18 +300,23 @@ class IPCClient {
             try {
                 const handler = plugin.ipcEvents.get(eventName);
                 const data = await handler(payload, this.discordClient);
+                this.#dauerMelden(event, start);
                 return message.reply({
                     success: true,
                     data: data,
                 });
             } catch (error) {
-                this.logger.error(`Error in plugin ${pluginName} IPC handler: ${error.message}`, error);
+                // Der Text gehoert in die Nachricht, das Error-Objekt ins
+                // zweite Argument — nicht beides vermischt.
+                this.logger.error(`Error in plugin ${pluginName} IPC handler`, error);
+                this.#dauerMelden(event, start);
                 return message.reply({
                     success: false,
                     error: error.message,
                 });
             }
         } catch (error) {
+            this.#dauerMelden(event, start);
             this.logger.error(`[IPC] FATAL ERROR in handleMessage():`, error);
             if (message?.reply) {
                 return message.reply({ success: false, error: error.message });

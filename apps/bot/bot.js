@@ -10,6 +10,7 @@ const { ServiceManager } = require("dunebot-core");
 const { Logger } = require("dunebot-sdk/utils");
 const BotClient = require("./extenders/BotClient");
 const IPCClient = require("./helpers/IPCClient");
+const Ratenbremse = require("./helpers/Ratenbremse");
 const { DBService, models } = require("dunebot-db-client");
 const { HookSystem } = require("dunebot-sdk");
 
@@ -186,6 +187,20 @@ ServiceManager.register("bootHooks", bootHooks);
                 });
             }
         });
+
+        // **Ab hier hoeren wir Discords Ratenbremse zu.**
+        //
+        // Bis zum 2026-08-26 tat das niemand — ein `grep` ueber `apps/bot/`
+        // und die SDK fand keinen einzigen Zuhoerer auf `rateLimited`. Das ist
+        // kein Schoenheitsfehler: Bremst Discord uns aus, wartet
+        // `@discordjs/rest` die geforderte Zeit **still** ab. Der Aufruf
+        // gelingt danach, niemand sieht einen Fehler, und im Protokoll steht
+        // nichts. Ein Auftrag, der dadurch 20 Minuten braucht, ist hinterher
+        // nicht von einem zu unterscheiden, der einfach lange dauerte —
+        // genau die Sackgasse aus Baustelle 76.
+        //
+        // Vor dem Login angemeldet, damit auch die Anmeldephase mitzaehlt.
+        Ratenbremse.anmelden(client.rest, Logger);
 
         // Einloggen des Bots
         await client.login(process.env.BOT_TOKEN);
