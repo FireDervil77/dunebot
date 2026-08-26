@@ -1,0 +1,188 @@
+<%#
+ * Profil des angemeldeten Benutzers.
+ *
+ * Bis zum 2026-08-26 fuehrte der Menuepunkt "Profil" ins Nichts (Baustelle
+ * 73). Diese Ansicht ersetzt auch `guild/profile/tokens.ejs`, die von
+ * `/auth/tokens` gerendert wurde und die niemand verlinkt hatte.
+ *
+ * **Nur nachgesehene Felder.** Was hier steht, kommt aus der Sitzung, der
+ * `users`-Zeile oder `res.locals.userPermissions`. Kein Platzhalter fuer
+ * spaeter — leere Versprechen sind genau das, was hier repariert wird.
+ *
+ * @context {string}       guildId
+ * @context {Object|null}  zeile          - users-Zeile (locale, created_at, updated_at)
+ * @context {Object|null}  anmeldung      - { typ, ablauf, abgelaufen }
+ * @context {Array}        gruppen        - Rechtegruppen in dieser Guild
+ * @context {boolean}      alleRechte     - Besitzer: darf alles
+ * @context {number}       anzahlRechte
+ * @context {boolean}      istBesitzer
+ * @context {boolean}      hatSystemzugang
+%>
+<%
+const _u    = (typeof locals !== 'undefined' && locals.user) ? locals.user : null;
+const _info = _u && _u.info ? _u.info : _u;
+
+/** Datum in der Sprache der Oberflaeche; null bleibt sichtbar leer. */
+const datum = (d) => {
+    if (!d) return null;
+    try { return new Date(d).toLocaleDateString(locale || 'de-DE',
+        { year: 'numeric', month: 'long', day: 'numeric' }); }
+    catch { return String(d); }
+};
+const datumZeit = (d) => {
+    if (!d) return null;
+    try { return new Date(d).toLocaleString(locale || 'de-DE'); }
+    catch { return String(d); }
+};
+/** Ganze Tage seit einem Datum. */
+const tageSeit = (d) => {
+    if (!d) return null;
+    const ms = Date.now() - new Date(d).getTime();
+    return ms > 0 ? Math.floor(ms / 86400000) : 0;
+};
+const seit = zeile ? datum(zeile.created_at) : null;
+const tage = zeile ? tageSeit(zeile.created_at) : null;
+%>
+
+<%# ── Kopf ────────────────────────────────────────────────────────────────── %>
+<div class="card mb-3">
+  <div class="card-body d-flex flex-wrap align-items-center gap-3">
+    <span class="avatar avatar-xl rounded"
+          style="background-image: url(<%= typeof getUserAvatar === 'function' ? getUserAvatar(_u, 128) : '' %>)"></span>
+    <div class="flex-fill" style="min-width: 12rem;">
+      <h2 class="mb-1"><%= _info && (_info.global_name || _info.username) ? (_info.global_name || _info.username) : 'Angemeldet' %></h2>
+      <% if (_info && _info.username) { %>
+        <div class="text-secondary">@<%= _info.username %></div>
+      <% } %>
+      <div class="mt-2">
+        <% if (istBesitzer) { %><span class="badge bg-yellow-lt me-1">Serverbesitzer</span><% } %>
+        <% if (hatSystemzugang) { %><span class="badge bg-purple-lt me-1">Systemzugang</span><% } %>
+      </div>
+    </div>
+    <div class="text-secondary small text-end">
+      <div>Discord-ID</div>
+      <code><%= _info && _info.id ? _info.id : '—' %></code>
+    </div>
+  </div>
+</div>
+
+<div class="row row-cards">
+
+  <%# ── Konto ─────────────────────────────────────────────────────────────── %>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><h3 class="card-title">Konto</h3></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5"><%= tr('DASHBOARD_COMMON.MEMBER_SINCE') || 'Mitglied seit' %></dt>
+          <dd class="col-7">
+            <% if (seit) { %>
+              <%= seit %>
+              <span class="text-secondary">(<%= tage %> <%= tr('DASHBOARD_COMMON.DAYS') || 'Tagen' %>)</span>
+            <% } else { %>
+              <span class="text-secondary">unbekannt</span>
+            <% } %>
+          </dd>
+
+          <dt class="col-5"><%= tr('DASHBOARD_COMMON.LAST_LOGIN') || 'Letzter Login am' %></dt>
+          <dd class="col-7">
+            <%# Ausgabe-Tags maskieren HTML — ein Ersatztext mit span-Auszeichnung
+                erschiene sonst woertlich auf der Seite, deshalb ein Zweig. %>
+            <% if (zeile && zeile.updated_at) { %>
+              <%= datumZeit(zeile.updated_at) %>
+            <% } else { %>
+              <span class="text-secondary">unbekannt</span>
+            <% } %>
+          </dd>
+
+          <dt class="col-5">Sprache</dt>
+          <dd class="col-7">
+            <% if (zeile && zeile.locale) { %>
+              <%= zeile.locale %>
+              <span class="text-secondary d-block small">eigene Wahl — gilt auf allen Servern</span>
+            <% } else { %>
+              <span class="text-secondary">folgt dem Server</span>
+            <% } %>
+          </dd>
+        </dl>
+      </div>
+      <div class="card-footer text-secondary small">
+        Die Sprache stellst du oben rechts um. Deine Wahl hat Vorrang vor der
+        Einstellung des Servers.
+      </div>
+    </div>
+  </div>
+
+  <%# ── Was hier gilt ─────────────────────────────────────────────────────── %>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header"><h3 class="card-title">Auf diesem Server</h3></div>
+      <div class="card-body">
+        <div class="mb-3">
+          <div class="text-secondary small mb-1">Gruppen</div>
+          <% if (gruppen && gruppen.length) { %>
+            <%# Felder nachgesehen in PermissionManager.js:462 — id, name, slug, color, icon %>
+            <% gruppen.forEach(g => { %>
+              <span class="badge me-1 mb-1"
+                    style="<%= g.color ? `background-color:${g.color}1a;color:${g.color};` : '' %>">
+                <% if (g.icon) { %><i class="<%= g.icon %> me-1"></i><% } %><%= g.name %>
+              </span>
+            <% }) %>
+          <% } else { %>
+            <span class="text-secondary">keine</span>
+          <% } %>
+        </div>
+        <div>
+          <div class="text-secondary small mb-1">Rechte</div>
+          <% if (alleRechte) { %>
+            <span class="h2 mb-0">alle</span>
+            <span class="text-secondary">— als Serverbesitzer</span>
+          <% } else { %>
+            <span class="h2 mb-0"><%= anzahlRechte %></span>
+            <span class="text-secondary">einzelne Berechtigungen</span>
+          <% } %>
+        </div>
+      </div>
+      <div class="card-footer text-secondary small">
+        Gruppen und Rechte gelten <strong>nur auf diesem Server</strong>. Auf
+        einem anderen Server kann dasselbe Konto ganz andere haben.
+      </div>
+    </div>
+  </div>
+
+  <%# ── Anmeldung ─────────────────────────────────────────────────────────── %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Anmeldung</h3></div>
+      <div class="card-body">
+        <% if (anmeldung) { %>
+          <% if (anmeldung.abgelaufen) { %>
+            <div class="alert alert-warning mb-3">
+              Deine Discord-Anmeldung ist abgelaufen. Beim nächsten Seitenwechsel
+              wirst du neu angemeldet.
+            </div>
+          <% } %>
+          <dl class="row mb-0">
+            <dt class="col-sm-3">Art</dt>
+            <dd class="col-sm-9"><span class="badge bg-secondary-lt"><%= anmeldung.typ %></span></dd>
+            <dt class="col-sm-3">Gültig bis</dt>
+            <dd class="col-sm-9"><%= datumZeit(anmeldung.ablauf) || 'unbekannt' %></dd>
+          </dl>
+        <% } else { %>
+          <p class="text-secondary mb-0">Zu dieser Sitzung liegen keine Angaben vor.</p>
+        <% } %>
+      </div>
+      <div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span class="text-secondary small">
+          Das ist die Anmeldung bei <strong>Discord</strong>, mit der du dieses
+          Dashboard benutzt. Der Zugangsschlüssel selbst wird hier nicht
+          angezeigt — er nützt dir nicht und stünde sonst in jedem Bildschirmfoto.
+        </span>
+        <a href="/auth/logout" class="btn btn-outline-danger">
+          <i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Abmelden
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>

@@ -21,6 +21,7 @@ router.use("/:guildId", loadUserPermissions);
 
 const permissionsRouter = require("./permissions.router");
 const settingsRouter = require("./guild/settings.router");
+const profileRouter = require("./guild/profile.router");
 const feedbackRouter = require("./guild/feedback.router");
 const { donateRouter, hallOfFameRouter } = require('./guild/donations.router');
 const pluginReloadRouter = require("./guild/plugin-reload.router");
@@ -35,6 +36,13 @@ router.get("/", (req, res) => {
 
 // Dashboard der gewählten Guild
 router.get("/:guildId", CheckGuildAccess, guildController.getDashboard); 
+
+// Eigenes Profil. **Kein requirePermission** — die Seite gehoert dem
+// Angemeldeten selbst. Bis zum 2026-08-26 fehlte diese Zeile ganz, waehrend
+// das Nutzermenue seit jeher darauf verwies (Baustelle 73): jeder Klick ein
+// 404. Sie steht bewusst VOR den Settings, damit der Unterschied im Code
+// sichtbar bleibt — Profil ist persoenlich, Settings ist Serverleitung.
+router.use("/:guildId/profile", CheckAuth, CheckGuildAccess, profileRouter);
 
 // Kern-Settings-Routes (direkt, nicht über Plugin-System)
 router.use("/:guildId/settings", CheckAuth, CheckGuildAccess, settingsRouter);

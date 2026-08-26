@@ -323,46 +323,24 @@ exports.logout = async (req, res) => {
 };
 
 /**
- * API-Tokens anzeigen
+ * Frueher: eine eigene Seite, die den Discord-Zugangsschluessel abgeschnitten
+ * anzeigte. Sie rendert nichts mehr, sondern leitet ins Profil weiter.
+ *
+ * **Warum nicht einfach geloescht:** Die Adresse steht moeglicherweise in
+ * Lesezeichen. Eine Weiterleitung kostet nichts und fuehrt dorthin, wo die
+ * Angaben jetzt stehen.
+ *
+ * **Warum nicht beides nebeneinander:** Genau daraus entstand Baustelle 73 —
+ * eine Ansicht, die niemand verlinkte, und ein Verweis ohne Route. Zwei
+ * Kopien derselben Auskunft altern getrennt; eine davon faellt irgendwann
+ * hinter den Theme-Umbau zurueck, so wie es `guild/profile/tokens.ejs`
+ * ergangen ist (die Datei benutzte bis zuletzt AdminLTE-Formen).
+ *
+ * Ohne gewaehlten Server gibt es keinen Profilpfad — dann zur Serverauswahl.
  */
 exports.getTokens = async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
-    const themeManager = ServiceManager.get('themeManager');
-
-    try {
-        // User mit Tokens aus der Datenbank laden
-        const user = await dbService.query(
-            "SELECT tokens FROM users WHERE _id = ?",
-            [req.session.user.info.id]
-        );
-
-        // Tokens aus dem JSON-Feld extrahieren
-        let userTokens = [];
-        if (user && user[0]?.tokens) {
-            const tokensData = JSON.parse(user[0].tokens);
-            // OAuth2 Token-Informationen anzeigen
-            userTokens = [{
-                name: "Discord OAuth2",
-                token: tokensData.access_token,
-                type: tokensData.token_type,
-                expires_at: new Date(tokensData.expires_at).toLocaleString()
-            }];
-        }
-        
-        await themeManager.renderView(res, 'guild/profile/tokens', {
-            title: 'API-Tokens',
-            activeMenu: '/guild/profile/tokens',
-            user: req.session.user,
-            tokens: userTokens
-        });
-    } catch (error) {
-        Logger.error("Fehler beim Anzeigen der API-Tokens:", error);
-        res.status(500).render("error", {
-            message: "Ein Fehler ist aufgetreten.",
-            error
-        });
-    }
+    const guildId = req.session?.user?.guilds?.find(g => g.botPresent)?.id || null;
+    return res.redirect(guildId ? `/guild/${guildId}/profile` : '/guild');
 };
 
 /**
