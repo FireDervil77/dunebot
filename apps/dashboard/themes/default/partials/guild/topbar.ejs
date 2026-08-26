@@ -153,26 +153,64 @@
             <span class="badge bg-orange position-absolute top-0 end-0"><%= _meldungen.length %></span>
           <% } %>
         </a>
-        <div class="dropdown-menu dropdown-menu-end dropdown-menu-card" style="min-width: 20rem;">
+        <%#
+          **Breite: `width`, nicht `min-width`.** Vorher stand hier
+          `min-width: 20rem` — zusammen mit `text-truncate` in einer
+          Flex-Spalte ergab das den Fehler, den der Betreiber gemeldet hat:
+          "diese nachrichten sind immer derartig breit, das man sie nicht
+          lesen kann".
+
+          Der Grund ist eine Flexbox-Eigenheit, die genau andersherum wirkt,
+          als der Klassenname verspricht: `text-truncate` setzt
+          `white-space: nowrap`. Ein Flex-Element darf aber nicht unter seine
+          **min-content**-Breite schrumpfen, und die ist bei `nowrap` die
+          ganze Zeile. Die Spalte wuchs also auf die laengste Meldung, das
+          Klappmenue mit ihr — `min-width` deckelte nichts. Abgeschnitten
+          wurde nie etwas; stattdessen wurde alles zu breit.
+
+          Zwei Auswege: `min-width: 0` setzen (dann kuerzt es wirklich, aber
+          man liest weiterhin nur den Anfang) — oder umbrechen lassen. Da die
+          Beschwerde "man kann sie nicht lesen" lautet, wird umgebrochen.
+
+          `overflow-wrap: anywhere` steht dabei, weil eine lange Adresse ohne
+          Leerzeichen sonst genau dasselbe wieder ausloest.
+        %>
+        <div class="dropdown-menu dropdown-menu-end dropdown-menu-card"
+             style="width: 24rem; max-width: calc(100vw - 1.5rem);">
           <div class="card">
             <div class="card-header py-2">
               <h3 class="card-title mb-0">Systemmeldungen</h3>
             </div>
-            <div class="list-group list-group-flush">
+            <%# Deckel gegen fuenf lange Meldungen, wie ihn die Glocke daneben auch hat. %>
+            <div class="list-group list-group-flush" style="max-height: 24rem; overflow-y: auto;">
               <% if (_meldungen.length === 0) { %>
                 <div class="list-group-item text-secondary small">Nichts Neues.</div>
               <% } else { %>
                 <% _meldungen.slice(0, 5).forEach(m => { %>
                   <div class="list-group-item">
-                    <div class="row align-items-center">
-                      <div class="col-auto"><span class="status-dot bg-<%= m.type || 'blue' %> d-block"></span></div>
-                      <div class="col text-truncate">
-                        <span class="text-reset d-block"><%- m.title || '' %></span>
-                        <div class="d-block text-secondary text-truncate mt-n1"><%- m.message || '' %></div>
+                    <div class="row align-items-start">
+                      <div class="col-auto pt-1">
+                        <span class="status-dot bg-<%= m.type || 'blue' %> d-block"></span>
+                      </div>
+                      <%#
+                        Titel und Text werden bewusst UNMASKIERT ausgegeben:
+                        Diese Meldungen schreibt ausschliesslich der Betreiber
+                        im Adminbereich (alle INSERTs stehen in
+                        routes/admin/content.router.js). Auf maskierte Ausgabe
+                        umzustellen wuerde seine Formatierung als Text zeigen.
+                      %>
+                      <div class="col" style="min-width: 0; overflow-wrap: anywhere;">
+                        <span class="text-reset d-block fw-medium"><%- m.title || '' %></span>
+                        <div class="d-block text-secondary small mt-1"><%- m.message || '' %></div>
                       </div>
                     </div>
                   </div>
                 <% }); %>
+                <% if (_meldungen.length > 5) { %>
+                  <div class="list-group-item text-secondary small text-center">
+                    … und <%= _meldungen.length - 5 %> weitere
+                  </div>
+                <% } %>
               <% } %>
             </div>
           </div>
