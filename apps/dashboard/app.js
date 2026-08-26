@@ -250,6 +250,20 @@ module.exports = class App {
                 }
             }, 3000); // 3s Verzögerung für IPC-Connect
 
+            // **Stuendliche Pruefung erteilter Zusagen — eine Auflage, keine
+            // Kuer.** Twitch verlangt sie ausdruecklich beim Start und danach
+            // stuendlich, mit Audits und angedrohtem Entzug des
+            // API-Schluessels. Sie laeuft deshalb im Kern und nicht im Plugin:
+            // Wird `streaming` abgeschaltet, darf die Pflicht nicht mit
+            // abgeschaltet werden (docs/streamer-plugin/12-Anmeldung-und-Chat.md).
+            //
+            // Ohne erteilte Zusagen kostet der Lauf eine leere Abfrage.
+            try {
+                require('./helpers/Verbindungsspeicher').starten();
+            } catch (error) {
+                Logger.error('[INIT] Zusagen-Pruefung konnte nicht gestartet werden:', error);
+            }
+
             this.#initializeErrorHandling();
             
             Logger.success("Dashboard-App erfolgreich initialisiert");

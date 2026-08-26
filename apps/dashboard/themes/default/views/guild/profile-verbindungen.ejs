@@ -79,9 +79,33 @@ const hinweis = TEXTE[fehler] || TEXTE[meldung] || null;
               <% if (a.hinweis) { %>
                 <div class="text-secondary small mt-1"><%= a.hinweis %></div>
               <% } %>
+              <%# Erteilte Berechtigungen: nur zeigen, wenn es welche gibt.
+                  Eine leere Ueberschrift "Berechtigungen" waere die Sorte
+                  Geruest, die aussieht, als koennte man etwas tun. %>
+              <% if (a.scopes && a.scopes.length) { %>
+                <div class="mt-2">
+                  <div class="text-secondary small">Du hast uns erlaubt:</div>
+                  <% a.scopes.forEach(function (s) { %>
+                    <span class="badge bg-blue-lt me-1"><%= s %></span>
+                  <% }); %>
+                </div>
+                <% if (a.zusageFehler) { %>
+                  <div class="text-warning small mt-1">
+                    Die Berechtigung gilt nicht mehr (<%= a.zusageFehler %>) — bitte neu erteilen.
+                  </div>
+                <% } %>
+              <% } %>
             </div>
           </div>
           <div class="card-footer">
+            <% if (a.verbunden && a.scopes && a.scopes.length) { %>
+              <form method="POST" action="/verbindungen/<%= a.name %>/zusage-widerrufen" class="mb-2"
+                    onsubmit="return confirm('Berechtigungen für <%= a.label %> zurücknehmen? Die Verknüpfung selbst bleibt bestehen.');">
+                <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+                <input type="hidden" name="zurueck" value="/guild/<%= guildId %>/profile/verbindungen">
+                <button type="submit" class="btn btn-outline-warning w-100">Berechtigungen zurücknehmen</button>
+              </form>
+            <% } %>
             <% if (a.verbunden) { %>
               <form method="POST" action="/verbindungen/<%= a.name %>/loesen"
                     onsubmit="return confirm('Verknüpfung mit <%= a.label %> lösen? Funktionen, die sie voraussetzen, wirken danach nicht mehr.');">

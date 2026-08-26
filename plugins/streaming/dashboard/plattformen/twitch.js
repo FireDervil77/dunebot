@@ -507,7 +507,7 @@ function uebersetzen(headers, koerper) {
  * @param {Object} opt { state, rueckrufUrl }
  * @returns {Promise<string|null>} Adresse oder null ohne Zugangsdaten
  */
-async function verknuepfungsUrl({ state, rueckrufUrl }) {
+async function verknuepfungsUrl({ state, rueckrufUrl, scopes = [] }) {
     const daten = await zugangsdaten('TWITCH');
     if (!daten.clientId) return null;
 
@@ -515,9 +515,149 @@ async function verknuepfungsUrl({ state, rueckrufUrl }) {
         client_id: daten.clientId,
         redirect_uri: rueckrufUrl,
         response_type: 'code',
-        scope: '',
+        // Leer bei der reinen Verknuepfung, gefuellt bei einer Zusage. Beides
+        // ist derselbe Weg — der Unterschied ist genau diese Zeile.
+        scope: (scopes || []).join(' '),
         state
     }).toString();
+}
+
+/**
+ * Den Autorisierungscode gegen Schluessel tauschen.
+ *
+ * Gemeinsamer Rumpf mit `verknuepfteIdentitaet`, aber eine andere Zusage nach
+ * aussen: Hier bleiben die Schluessel erhalten und wandern verschluesselt in
+ * `user_connection_grants`.
+ *
+ * @param {Object} opt { code, rueckrufUrl }
+ * @returns {Promise<Object|null>} { kontoId, kontoName, zugang, erneuerung, laeuftAbSek, scopes }
+ */
+async function tauschen({ code, rueckrufUrl }) {
+    const Logger = ServiceManager.get('Logger');
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId || !daten.clientSecret) return null;
+
+    const tausch = await fetch(`${IDAPI}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            client_id: daten.clientId,
+            client_secret: daten.clientSecret,
+            code,
+            grant_type: 'authorization_code',
+            redirect_uri: rueckrufUrl
+        })
+    });
+    if (!tausch.ok) {
+        Logger.warn(`[Streaming/Twitch] Code abgelehnt (${tausch.status})`);
+        return null;
+    }
+
+    const antwort = await tausch.json();
+    if (!antwort.access_token) return null;
+
+    const konto = await werBinIch(daten.clientId, antwort.access_token);
+    if (!konto) return null;
+
+    return {
+        ...konto,
+        zugang: antwort.access_token,
+        erneuerung: antwort.refresh_token || null,
+        laeuftAbSek: Number(antwort.expires_in) || null,
+        scopes: Array.isArray(antwort.scope) ? antwort.scope : String(antwort.scope || '').split(' ').filter(Boolean)
+    };
+}
+
+/**
+ * Einen neuen Zugang aus der Erneuerung holen.
+ *
+ * **Twitch gibt oft einen NEUEN Erneuerungsschluessel zurueck.** Wer den alten
+ * behaelt, bemerkt es nicht sofort - es funktioniert weiter, bis es das nicht
+ * mehr tut. Deshalb wird er hier immer mitgegeben, und der Speicher schreibt
+ * ihn weg.
+ *
+ * @param {Object} opt { erneuerung }
+ * @returns {Promise<Object|null>} { zugang, erneuerung, laeuftAbSek, scopes }
+ */
+async function erneuern({ erneuerung }) {
+    const Logger = ServiceManager.get('Logger');
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId || !daten.clientSecret || !erneuerung) return null;
+
+    const antwort = await fetch(`${IDAPI}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            client_id: daten.clientId,
+            client_secret: daten.clientSecret,
+            grant_type: 'refresh_token',
+            refresh_token: erneuerung
+        })
+    });
+    if (!antwort.ok) {
+        // 400 heisst hier fast immer: Der Benutzer hat sein Passwort geaendert
+        // oder uns getrennt. Kein Grund, es gleich noch einmal zu versuchen -
+        // ein Erneuerungsschluessel stirbt ohnehin nach 50 Zugaengen.
+        Logger.warn(`[Streaming/Twitch] Erneuern abgelehnt (${antwort.status})`);
+        return null;
+    }
+
+    const daten2 = await antwort.json();
+    if (!daten2.access_token) return null;
+
+    return {
+        zugang: daten2.access_token,
+        erneuerung: daten2.refresh_token || erneuerung,
+        laeuftAbSek: Number(daten2.expires_in) || null,
+        scopes: Array.isArray(daten2.scope) ? daten2.scope : String(daten2.scope || '').split(' ').filter(Boolean)
+    };
+}
+
+/**
+ * Die Pflichtpruefung: gilt dieser Schluessel noch?
+ *
+ * Twitch verlangt sie **beim Start und danach stuendlich**, mit Audits und
+ * angedrohtem Entzug des API-Schluessels. `/oauth2/validate` antwortet mit
+ * 401, sobald der Benutzer widerrufen oder sein Passwort geaendert hat — das
+ * erfahren wir auf keinem anderen Weg.
+ *
+ * @param {Object} opt { zugang }
+ * @returns {Promise<{gueltig: boolean, scopes: Array<string>, kontoId: string|null}>} Ergebnis
+ */
+async function pruefen({ zugang }) {
+    const antwort = await fetch(`${IDAPI}/validate`, {
+        headers: { Authorization: `OAuth ${zugang}` }
+    });
+
+    if (!antwort.ok) return { gueltig: false, scopes: [], kontoId: null };
+
+    const d = await antwort.json();
+    return {
+        gueltig: true,
+        scopes: Array.isArray(d.scopes) ? d.scopes : [],
+        kontoId: d.user_id ? String(d.user_id) : null
+    };
+}
+
+/**
+ * "Wer bist du" — gemeinsam genutzt von `identitaet` und `tauschen`.
+ *
+ * @param {string} clientId Client-ID
+ * @param {string} benutzerToken Zugang
+ * @returns {Promise<{kontoId: string, kontoName: string}|null>} Identitaet
+ */
+async function werBinIch(clientId, benutzerToken) {
+    const Logger = ServiceManager.get('Logger');
+    const wer = await fetch(`${HELIX}/users`, {
+        headers: { 'Client-Id': clientId, Authorization: `Bearer ${benutzerToken}` }
+    });
+    if (!wer.ok) {
+        Logger.warn(`[Streaming/Twitch] Identitaet nicht lesbar (${wer.status})`);
+        return null;
+    }
+    const [konto] = (await wer.json()).data || [];
+    if (!konto || !konto.id) return null;
+    return { kontoId: String(konto.id), kontoName: konto.display_name || konto.login };
 }
 
 /**
@@ -572,6 +712,7 @@ async function verknuepfteIdentitaet({ code, rueckrufUrl }) {
 
 module.exports = {
     name: 'twitch',
+    tauschen, erneuern, pruefen,
     HOECHSTALTER_MS,
     EREIGNISSE,
     verknuepfungsUrl,

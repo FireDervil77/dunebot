@@ -147,14 +147,34 @@ async function konten(userId) {
         ServiceManager.get('Logger').warn('[Profil] user_connections nicht lesbar:', error.message);
     }
 
+    // Erteilte Berechtigungen dazu. Getrennt gelesen, weil die Tabelle
+    // juenger ist als die Seite — fehlt sie, bleibt die Seite brauchbar.
+    let zusagen = [];
+    try {
+        zusagen = await dbService.query(`
+            SELECT v.plattform, g.scopes, g.geprueft_am, g.fehlertext
+              FROM user_connection_grants g
+              JOIN user_connections v ON v.id = g.verbindung_id
+             WHERE v.user_id = ?
+        `, [userId]) || [];
+    } catch (error) {
+        ServiceManager.get('Logger').warn('[Profil] user_connection_grants nicht lesbar:', error.message);
+    }
+
     return VerbindungsRegistry.list().map(a => {
         const da = vorhanden.find(v => v.plattform === a.name) || null;
+        const z = zusagen.find(x => x.plattform === a.name) || null;
         return {
             name: a.name, label: a.label, symbol: a.symbol,
             farbe: a.farbe, hinweis: a.hinweis,
             verbunden: Boolean(da),
             kontoName: da ? (da.konto_name || da.konto_id) : null,
-            seit: da ? da.angelegt_am : null
+            seit: da ? da.angelegt_am : null,
+            // **Auskunft, nicht Deko.** Wer uns etwas erlaubt hat, muss sehen
+            // koennen was — und es einzeln zuruecknehmen koennen, ohne die
+            // Verknuepfung aufzugeben.
+            scopes: z ? String(z.scopes || '').split(' ').filter(Boolean) : [],
+            zusageFehler: z ? z.fehlertext : null
         };
     });
 }

@@ -88,7 +88,20 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                 farbe: '#9146FF',
                 hinweis: 'Belegt, dass dir der Kanal gehört. Wir fragen dabei keine Berechtigungen ab.',
                 autorisierUrl: twitch.verknuepfungsUrl,
-                identitaet: twitch.verknuepfteIdentitaet
+                identitaet: twitch.verknuepfteIdentitaet,
+
+                // **Noch keine `zusagen` — und das ist Absicht.** Eine Zusage
+                // anzubieten, die keine Funktion einloest, waere genau das
+                // leere Versprechen, gegen das diese Registry gebaut wurde.
+                // Die erste kommt mit Stufe 12b (Abonnenten-Rollen).
+                //
+                // Die drei Funktionen stehen trotzdem schon hier: Sobald die
+                // erste Zusage entsteht, muss die stuendliche Pflichtpruefung
+                // sie erreichen koennen. Sie danach nachzureichen hiesse, das
+                // Netz erst nach dem Sprung zu spannen.
+                tauschen: twitch.tauschen,
+                erneuern: twitch.erneuern,
+                pruefen:  twitch.pruefen
             });
             Logger.info('[Streaming] Kontoverknuepfung angemeldet: twitch');
         } catch (error) {

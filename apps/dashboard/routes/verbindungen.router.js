@@ -27,6 +27,7 @@ const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { VerbindungsRegistry } = require('dunebot-sdk');
 const { CheckAuth } = require('../middlewares/auth.middleware');
+const Verbindungsspeicher = require('../helpers/Verbindungsspeicher');
 
 /**
  * Wie lange ein begonnener Vorgang gilt. Grosszuegig, weil das Anmelden bei
@@ -66,6 +67,33 @@ function sicheresZiel(wert) {
     return z;
 }
 
+/**
+ * Der `state` traegt die angefragte Zusage mit.
+ *
+ * **Warum nicht in der Datenbank:** `saveState` kennt genau zwei Felder,
+ * Zufallswert und Rueckkehrziel. Das Ziel dafuer zu missbrauchen wuerde
+ * `sicheresZiel` aushebeln - und ein drittes Feld waere eine Schema-Aenderung
+ * fuer eine Zeichenkette.
+ *
+ * Der Zufallswert ist hexadezimal, ein Zusage-Name passt auf
+ * `NAME_MUSTER` (klein, Ziffern, Bindestrich). Ein Punkt dazwischen ist
+ * deshalb eindeutig, und der State bleibt als Ganzes das, was er war: ein
+ * Wert, der einmal gilt.
+ *
+ * @param {string} state Roher State aus der Anfrage
+ * @returns {{roh: string, zusage: string|null}} Zerlegung
+ */
+function stateZerlegen(state) {
+    const wert = String(state || '');
+    const punkt = wert.indexOf('.');
+    if (punkt < 0) return { roh: wert, zusage: null };
+    const zusage = wert.slice(punkt + 1);
+    return {
+        roh: wert,
+        zusage: VerbindungsRegistry.NAME_MUSTER.test(zusage) ? zusage : null
+    };
+}
+
 // =====================================================
 // Hinschicken
 // =====================================================
@@ -94,11 +122,30 @@ router.get('/:plattform/start', CheckAuth, async (req, res) => {
         // Derselbe Mechanismus wie bei der Discord-Anmeldung: ein einmaliger
         // Zufallswert, der Hin- und Rueckweg verbindet. Ohne ihn koennte ein
         // Fremder einen Rueckruf unterschieben.
-        const state = crypto.randomBytes(16).toString('hex');
+        // **Eine Zusage wird beim Namen genannt, nie als Scope-Liste.** Kaeme
+        // die Liste aus der Adresszeile, koennte jeder Link jede Berechtigung
+        // erfragen — der Benutzer saehe einen Twitch-Dialog voller
+        // Moderationsrechte und haette keinen Grund zu misstrauen. Der Name
+        // waehlt aus dem, was das Plugin im Quelltext angemeldet hat.
+        const zusage = String(req.query.zusage || '') || null;
+        let scopes = [];
+        if (zusage) {
+            scopes = VerbindungsRegistry.scopesVon(name, zusage) || [];
+            if (!scopes.length) {
+                // Ein erfundener Name fuehrt NICHT zu "dann eben ohne
+                // Berechtigungen". Der Benutzer klickte auf etwas Bestimmtes;
+                // ihn stattdessen durch einen wirkungslosen Dialog zu
+                // schicken waere die schlechtere Antwort.
+                Logger.warn(`[Verbindungen] ${name}: unbekannte Zusage "${zusage}"`);
+                return res.redirect(`${zurueck}?fehler=zusage`);
+            }
+        }
+
+        const state = crypto.randomBytes(16).toString('hex') + (zusage ? `.${zusage}` : '');
         await dbService.saveState(state, zurueck);
 
         const ziel = await anbieter.autorisierUrl({
-            state, rueckrufUrl: rueckrufUrl(name)
+            state, rueckrufUrl: rueckrufUrl(name), scopes
         });
         if (!ziel) return res.redirect(`${zurueck}?fehler=anbieter`);
 
@@ -157,9 +204,18 @@ router.get('/:plattform/rueckruf', CheckAuth, async (req, res) => {
         if (!req.query.code) return res.redirect(`${zurueck}?fehler=code`);
 
         // 3. Identitaet feststellen - das macht das Plugin, nicht der Kern.
-        const wer = await anbieter.identitaet({
-            code: String(req.query.code), rueckrufUrl: rueckrufUrl(name)
-        });
+        //
+        //    Wurde eine Zusage angefragt, uebernimmt `tauschen`: Es liefert
+        //    dieselbe Identitaet PLUS die Schluessel. Zwei Aufrufe waeren hier
+        //    nicht nur verschwenderisch, sondern unmoeglich — ein
+        //    Autorisierungscode laesst sich genau einmal einloesen.
+        const zusage = stateZerlegen(req.query.state).zusage;
+        const mitZusage = Boolean(zusage) && typeof anbieter.tauschen === 'function';
+
+        const wer = mitZusage
+            ? await anbieter.tauschen({ code: String(req.query.code), rueckrufUrl: rueckrufUrl(name) })
+            : await anbieter.identitaet({ code: String(req.query.code), rueckrufUrl: rueckrufUrl(name) });
+
         if (!wer || !wer.kontoId) {
             Logger.warn(`[Verbindungen] ${name}: keine Identitaet erhalten`);
             return res.redirect(`${zurueck}?fehler=anbieter`);
@@ -187,8 +243,29 @@ router.get('/:plattform/rueckruf', CheckAuth, async (req, res) => {
             throw err;
         }
 
-        Logger.success(`[Verbindungen] ${name}: ${wer.kontoName || wer.kontoId} mit ${userId} verknuepft`);
-        return res.redirect(`${zurueck}?ok=verbunden`);
+        // 5. Erst jetzt die Zusage - sie haengt per Fremdschluessel am Nachweis
+        //    und braucht ihn deshalb zwingend vorher.
+        if (mitZusage) {
+            if (!wer.zugang) {
+                // Identitaet steht, Schluessel fehlt. Die Verknuepfung ist
+                // damit gerettet, die Berechtigung nicht — und der Benutzer
+                // erfaehrt es, statt sich spaeter zu wundern, warum nichts
+                // funktioniert.
+                Logger.warn(`[Verbindungen] ${name}: Zusage "${zusage}" ohne Zugangsschluessel zurueckgekommen`);
+                return res.redirect(`${zurueck}?fehler=zusage`);
+            }
+            await Verbindungsspeicher.zusageSpeichern({
+                userId, plattform: name,
+                scopes: wer.scopes || VerbindungsRegistry.scopesVon(name, zusage) || [],
+                zugang: wer.zugang,
+                erneuerung: wer.erneuerung || null,
+                laeuftAbSek: wer.laeuftAbSek || null
+            });
+        }
+
+        Logger.success(`[Verbindungen] ${name}: ${wer.kontoName || wer.kontoId} mit ${userId} verknuepft` +
+            (mitZusage ? ` (Zusage "${zusage}")` : ''));
+        return res.redirect(`${zurueck}?ok=${mitZusage ? 'zugesagt' : 'verbunden'}`);
     } catch (error) {
         Logger.error(`[Verbindungen] Rueckruf ${name} fehlgeschlagen:`, error);
         return res.redirect(`${zurueck}?fehler=technisch`);
@@ -226,6 +303,35 @@ router.post('/:plattform/loesen', CheckAuth, async (req, res) => {
     }
 });
 
+// =====================================================
+// Eine Zusage zuruecknehmen - ohne den Nachweis anzutasten
+// =====================================================
+//
+// **Getrennt vom Loesen, und das ist der Punkt.** Wer die Berechtigung
+// entzieht, sagt nicht "das Konto gehoert mir nicht mehr". Waere es derselbe
+// Knopf, muesste man die Verknuepfung aufgeben, um eine einzelne Erlaubnis
+// zurueckzunehmen — und danach alles neu einrichten.
+router.post('/:plattform/zusage-widerrufen', CheckAuth, async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const name = String(req.params.plattform || '');
+    const zurueck = sicheresZiel(req.body?.zurueck) || '/guild';
+    const userId = req.session?.user?.info?.id;
+
+    if (!VerbindungsRegistry.NAME_MUSTER.test(name)) {
+        return res.redirect(`${zurueck}?fehler=unbekannt`);
+    }
+
+    try {
+        // Wie beim Loesen ohne Registry-Abfrage: Eine Ruecknahme darf nicht
+        // davon abhaengen, ob das Plugin gerade laeuft.
+        await Verbindungsspeicher.widerrufen(userId, name);
+        return res.redirect(`${zurueck}?ok=widerrufen`);
+    } catch (error) {
+        Logger.error(`[Verbindungen] Widerruf ${name} fehlgeschlagen:`, error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
 module.exports = router;
 
 // Die Profilseite braucht die Rueckrufadresse, um sie anzuzeigen - sie muss
@@ -236,3 +342,7 @@ module.exports.rueckrufUrl = rueckrufUrl;
 // Weiterleitung wirklich PRUEFEN kann statt sie im Quelltext zu suchen. Eine
 // Sicherheitszusage, die nur als Regex geprueft wird, ist keine.
 module.exports.sicheresZiel = sicheresZiel;
+
+// Ebenfalls nach aussen: Die Zerlegung des States entscheidet, ob eine Zusage
+// gespeichert wird. Sie gehoert gepruefft, nicht angenommen.
+module.exports.stateZerlegen = stateZerlegen;
