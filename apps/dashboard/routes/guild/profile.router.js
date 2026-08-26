@@ -164,6 +164,7 @@ async function konten(userId) {
     return VerbindungsRegistry.list().map(a => {
         const da = vorhanden.find(v => v.plattform === a.name) || null;
         const z = zusagen.find(x => x.plattform === a.name) || null;
+        const erteilt = z ? String(z.scopes || '').split(' ').filter(Boolean) : [];
         return {
             name: a.name, label: a.label, symbol: a.symbol,
             farbe: a.farbe, hinweis: a.hinweis,
@@ -173,8 +174,22 @@ async function konten(userId) {
             // **Auskunft, nicht Deko.** Wer uns etwas erlaubt hat, muss sehen
             // koennen was — und es einzeln zuruecknehmen koennen, ohne die
             // Verknuepfung aufzugeben.
-            scopes: z ? String(z.scopes || '').split(' ').filter(Boolean) : [],
-            zusageFehler: z ? z.fehlertext : null
+            scopes: erteilt,
+            zusageFehler: z ? z.fehlertext : null,
+
+            // **Und was er noch erlauben KANN.** Ohne diese Liste ist die
+            // Verknuepfung eine Sackgasse: Der Anbieter meldet Zusagen an,
+            // niemand kann sie erteilen. Genau so gefunden am 2026-08-26,
+            // beim ersten Blick des Betreibers auf die fertige Seite.
+            zusagen: Object.values(a.zusagen || {}).map(x => ({
+                name: x.name,
+                label: x.label,
+                hinweis: x.hinweis,
+                // Erteilt ist sie, wenn JEDER ihrer Scopes vorliegt. Eine
+                // halb erteilte Zusage ist nicht erteilt — sonst behauptet
+                // die Seite eine Faehigkeit, die beim ersten Aufruf scheitert.
+                erteilt: x.scopes.every(sc => erteilt.includes(sc))
+            }))
         };
     });
 }
@@ -201,3 +216,10 @@ router.get('/verbindungen', async (req, res) => {
 });
 
 module.exports = router;
+
+// Nach aussen gegeben, damit `scripts/check-verbindungs-zusagen.js` den Weg
+// von der Anmeldung bis zum Knopf wirklich durchgehen kann. Am 2026-08-26
+// fiel genau hier etwas aus: Die Zusage war angemeldet, der Speicher stand,
+// die Route lief — und im Profil gab es nichts zu klicken. Aufgefallen ist es
+// nicht einem Pruefskript, sondern dem Betreiber beim ersten Blick.
+module.exports.konten = konten;

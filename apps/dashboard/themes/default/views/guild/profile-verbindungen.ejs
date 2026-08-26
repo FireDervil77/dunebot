@@ -79,19 +79,37 @@ const hinweis = TEXTE[fehler] || TEXTE[meldung] || null;
               <% if (a.hinweis) { %>
                 <div class="text-secondary small mt-1"><%= a.hinweis %></div>
               <% } %>
-              <%# Erteilte Berechtigungen: nur zeigen, wenn es welche gibt.
-                  Eine leere Ueberschrift "Berechtigungen" waere die Sorte
-                  Geruest, die aussieht, als koennte man etwas tun. %>
-              <% if (a.scopes && a.scopes.length) { %>
-                <div class="mt-2">
-                  <div class="text-secondary small">Du hast uns erlaubt:</div>
-                  <% a.scopes.forEach(function (s) { %>
-                    <span class="badge bg-blue-lt me-1"><%= s %></span>
+              <%# Was erlaubt ist und was erlaubt werden kann.
+                  Nur bei verbundenen Konten: Eine Berechtigung ohne Konto,
+                  dem sie gehoert, gibt es nicht. %>
+              <% if (a.verbunden && a.zusagen && a.zusagen.length) { %>
+                <div class="mt-3">
+                  <div class="text-secondary small mb-1">Berechtigungen</div>
+                  <% a.zusagen.forEach(function (z) { %>
+                    <div class="d-flex align-items-start gap-2 py-1">
+                      <div class="flex-fill" style="min-width: 0;">
+                        <div class="d-flex align-items-center gap-2">
+                          <span class="fw-medium"><%= z.label %></span>
+                          <% if (z.erteilt) { %>
+                            <span class="badge bg-green-lt">erlaubt</span>
+                          <% } %>
+                        </div>
+                        <% if (z.hinweis) { %>
+                          <div class="text-secondary small"><%= z.hinweis %></div>
+                        <% } %>
+                      </div>
+                      <% if (!z.erteilt) { %>
+                        <a class="btn btn-sm btn-outline-primary flex-shrink-0"
+                           href="/verbindungen/<%= a.name %>/start?zusage=<%= encodeURIComponent(z.name) %>&zurueck=<%= encodeURIComponent(`/guild/${guildId}/profile/verbindungen`) %>">
+                          Erlauben
+                        </a>
+                      <% } %>
+                    </div>
                   <% }); %>
                 </div>
                 <% if (a.zusageFehler) { %>
                   <div class="text-warning small mt-1">
-                    Die Berechtigung gilt nicht mehr (<%= a.zusageFehler %>) — bitte neu erteilen.
+                    Eine Berechtigung gilt nicht mehr (<%= a.zusageFehler %>) — bitte neu erteilen.
                   </div>
                 <% } %>
               <% } %>

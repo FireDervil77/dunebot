@@ -42,6 +42,9 @@ function pruefe(gut, text, zusatz = '') {
 /** Ein Benutzer, den es nicht gibt — damit nichts Echtes angefasst wird. */
 const PRUEFNUTZER = '999999999999999999';
 
+/** Wird unten gesetzt; erteilt dem Pruefnutzer die Zusage. */
+let speicherVorbereiten = async () => {};
+
 (async () => {
     const c = await mysql.createConnection({
         host: process.env.MYSQL_HOST, port: process.env.MYSQL_PORT || 3306,
@@ -70,6 +73,10 @@ const PRUEFNUTZER = '999999999999999999';
     });
 
     const speicher = require('../apps/dashboard/helpers/Verbindungsspeicher');
+    speicherVorbereiten = async (userId) => speicher.zusageSpeichern({
+        userId, plattform: 'pruef', scopes: ['channel:read:subscriptions'],
+        zugang: 'X', erneuerung: null, laeuftAbSek: null
+    });
     const router   = require('../apps/dashboard/routes/verbindungen.router');
     const twitch   = require('../plugins/streaming/dashboard/plattformen/twitch');
 
@@ -129,6 +136,38 @@ const PRUEFNUTZER = '999999999999999999';
         'ohne Zusage bleibt der State ein reiner Nachweis-Vorgang');
     pruefe(router.stateZerlegen('abc123.Boese/Sache').zusage === null,
         'ein Name, der ein Muster verletzt, wird verworfen');
+
+    // ---------------------------------------------------------------
+    console.log('\nEine angemeldete Zusage muss erreichbar sein');
+    // ---------------------------------------------------------------
+
+    // **Der Fall vom 2026-08-26.** Alles war gebaut — Registry, Speicher,
+    // Routen — und im Profil gab es trotzdem nichts zu klicken. Aufgefallen
+    // ist es nicht hier, sondern dem Betreiber beim ersten Blick auf die
+    // fertige Seite. Seitdem geht dieser Fall den Weg bis zum Knopf.
+    const profil = require('../apps/dashboard/routes/guild/profile.router');
+    await q('DELETE FROM user_connections WHERE user_id = ?', [PRUEFNUTZER]);
+    await q(`INSERT INTO user_connections (user_id, plattform, konto_id, konto_name)
+             VALUES (?, 'pruef', ?, 'Pruefkonto')`, [PRUEFNUTZER, 'k-' + PRUEFNUTZER]);
+
+    const liste = await profil.konten(PRUEFNUTZER);
+    const eintrag = liste.find(x => x.name === 'pruef');
+
+    pruefe(Boolean(eintrag?.verbunden), 'das verbundene Konto erscheint im Profil');
+    pruefe(Array.isArray(eintrag?.zusagen) && eintrag.zusagen.length === 1,
+        'die angemeldete Zusage erscheint dort ebenfalls',
+        'ohne sie ist die Verknuepfung eine Sackgasse');
+    pruefe(eintrag?.zusagen?.[0]?.erteilt === false,
+        'und zwar als NICHT erteilt — also mit Knopf',
+        `"${eintrag?.zusagen?.[0]?.label}"`);
+
+    // Und nach dem Erteilen verschwindet der Knopf wieder.
+    await speicherVorbereiten(PRUEFNUTZER);
+    const danachListe = await profil.konten(PRUEFNUTZER);
+    pruefe(danachListe.find(x => x.name === 'pruef')?.zusagen?.[0]?.erteilt === true,
+        'nach dem Erteilen gilt sie als erteilt');
+
+    await q('DELETE FROM user_connections WHERE user_id = ?', [PRUEFNUTZER]);
 
     // ---------------------------------------------------------------
     console.log('\nDie Tabelle und ihre Sicherheitseigenschaft');
