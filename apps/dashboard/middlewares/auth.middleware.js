@@ -216,7 +216,16 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
         // WICHTIG: .info verwenden, damit isOwner/hasSystemAccess korrekt gesetzt ist!
         res.locals.user = req.session.user?.info || null;
         res.locals.userGuilds = req.session.user?.guilds || [];
-        res.locals.isServerOwner = guild.owner === true;
+        // `guild` kann undefined sein — genau dafuer stehen drei Zeilen weiter
+        // oben die `guild ? … : false`-Absicherungen (Zeile 126-128). Hier
+        // fehlte sie als einzige, und die Folge war kein falsches Ergebnis,
+        // sondern ein Absturz: TypeError -> der aeussere catch -> HTTP 500
+        // "Ein Fehler ist aufgetreten." Betroffen ist, wer ueber `guild_users`
+        // Zugang hat, aber nicht in der OAuth-Guildliste der Sitzung steht —
+        // etwa weil er dem Discord-Server erst NACH seiner Anmeldung am
+        // Dashboard beigetreten ist (die Liste wird beim Login einmal geholt
+        // und danach nicht mehr aufgefrischt).
+        res.locals.isServerOwner = guild?.owner === true;
         res.locals.isServerAdmin = hasAccess;
         
         next();
