@@ -28,6 +28,7 @@
  */
 
 const { ServiceManager } = require('dunebot-core');
+const abonnenten = require('./abonnenten');
 const entscheidung = require('./entscheidung');
 const { melden } = require('../../shared/signale');
 const abos = require('./abos');
@@ -69,6 +70,76 @@ let laeuftGerade = false;
 let anreicherungLaeuft = false;
 let tagLaeuft = false;
 let uhren = [];
+
+/**
+ * Abonnentenlisten auffrischen und Rollen abgleichen.
+ *
+ * **Nur fuer Kanaele, die es brauchen** — also solche, bei denen mindestens
+ * eine Guild eine Abonnenten-Rolle vergibt. Alle anderen kosten hier nichts.
+ *
+ * Die Liste kommt vom Kanalinhaber, nicht von uns: `channel:read:subscriptions`
+ * ist eine Auskunft ueber SEINEN Kanal. Fehlt seine Zusage oder ist sie
+ * abgelaufen, wird der Kanal **uebersprungen** und NICHT als "keine
+ * Abonnenten" gelesen — sonst naehme der Abgleich allen die Rolle weg.
+ *
+ * @returns {Promise<void>}
+ */
+async function abonnentenLauf() {
+    const abonnenten = require('./abonnenten');
+    const speicher = require('../../../../apps/dashboard/helpers/Verbindungsspeicher');
+    const twitch = require('../plattformen/twitch');
+
+    const streamer = await db().query(`
+        SELECT DISTINCT s.* FROM streaming_streamers s
+          JOIN streaming_targets t ON t.streamer_id = s.id
+         WHERE t.aktiv = 1 AND t.abo_rolle_id IS NOT NULL AND t.abo_rolle_id <> ''
+    `);
+
+    for (const s of streamer) {
+        const inhaber = await abonnenten.kanalInhaber(s);
+        if (!inhaber) {
+            log().warn(`[Streaming/Abos] ${s.login}: niemand hat den Kanal verknuepft - keine Abonnentenliste`);
+            continue;
+        }
+
+        const ergebnis = await speicher.mitZugang({ userId: inhaber, plattform: s.plattform },
+            async (zugang) => await twitch.abonnentenLesen(s.kanal_id, zugang));
+
+        if (!ergebnis) {
+            log().warn(`[Streaming/Abos] ${s.login}: keine Zusage des Kanalinhabers - uebersprungen`);
+            continue;
+        }
+        if (!ergebnis.ok) {
+            log().warn(`[Streaming/Abos] ${s.login}: Abonnentenliste nicht lesbar - uebersprungen, nichts geaendert`);
+            continue;
+        }
+
+        // Erst die Liste auffrischen, dann urteilen. Andersherum urteilte man
+        // ueber einen veralteten Stand.
+        const kennungen = ergebnis.abonnenten.map(a => a.kontoId);
+        for (const a of ergebnis.abonnenten) {
+            await db().query(`
+                INSERT INTO streaming_subscribers (streamer_id, konto_id, konto_name, stufe, geschenkt, gesehen_am)
+                VALUES (?, ?, ?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE konto_name = VALUES(konto_name), stufe = VALUES(stufe),
+                                        geschenkt = VALUES(geschenkt), gesehen_am = NOW()
+            `, [s.id, a.kontoId, a.kontoName, a.stufe, a.geschenkt ? 1 : 0]);
+        }
+
+        // Wer nicht mehr in der Liste steht, hat aufgehoert. Das ist die
+        // Stelle, an der ein verlorenes `subscription.end` doch noch wirkt.
+        if (kennungen.length) {
+            await db().query(
+                `DELETE FROM streaming_subscribers
+                  WHERE streamer_id = ? AND konto_id NOT IN (${kennungen.map(() => '?').join(',')})`,
+                [s.id, ...kennungen]);
+        } else {
+            await db().query('DELETE FROM streaming_subscribers WHERE streamer_id = ?', [s.id]);
+        }
+
+        await abonnenten.abgleichen(s);
+    }
+}
 
 /**
  * @returns {Object} Datenbankdienst
@@ -162,6 +233,13 @@ async function verarbeiten(ereignis) {
         case 'ging_live':   ergebnis = await gingLive(streamer, zustand, ereignis); break;
         case 'beendet':     ergebnis = await beendet(streamer, zustand, ereignis); break;
         case 'geaendert':   ergebnis = await geaendert(streamer, zustand, ereignis); break;
+
+        // Abonnements ruehren den Sendezustand NICHT an. Sie laufen deshalb
+        // an `zustand` vorbei — ein Abonnement waehrend einer laufenden
+        // Sendung darf die Ankuendigung nicht anfassen.
+        case 'abonniert':   ergebnis = await abonnenten.aufnehmen(streamer, ereignis.abonnent); break;
+        case 'abo_beendet': ergebnis = await abonnenten.entfernen(streamer, ereignis.abonnent); break;
+
         default:            return `Ereignisart "${ereignis.art}" wird nicht behandelt`;
     }
 
@@ -710,6 +788,17 @@ async function tagesLauf() {
         await require('../ausgabe/liverolle').lauf();
     } catch (err) {
         log().error('[Streaming] Rollenabgleich fehlgeschlagen:', err);
+    }
+
+    try {
+        // **Abonnenten frisch von Twitch holen, dann Rollen abgleichen.**
+        // Zwei Vorsichtsmassnahmen in einem Lauf: Ein verlorenes
+        // `channel.subscription.end` liesse die Rolle sonst fuer immer stehen,
+        // und wer sein Discord-Konto erst NACH dem Abonnieren verknuepft hat,
+        // bekaeme sie ohne diesen Lauf nie.
+        await abonnentenLauf();
+    } catch (err) {
+        log().error('[Streaming] Abonnenten-Abgleich fehlgeschlagen:', err);
     }
 
     try {

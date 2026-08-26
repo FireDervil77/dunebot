@@ -101,7 +101,22 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                 // Netz erst nach dem Sprung zu spannen.
                 tauschen: twitch.tauschen,
                 erneuern: twitch.erneuern,
-                pruefen:  twitch.pruefen
+                pruefen:  twitch.pruefen,
+
+                // **Die erste Zusage (Stufe 12b).** Genau ein Scope, und er
+                // wird nur vom Kanalinhaber gebraucht: Twitch gibt die
+                // Abonnentenliste eines Kanals nur ihm selbst.
+                //
+                // Der Name steht im Link, die Scopes nie — sonst koennte ein
+                // untergeschobener Link jede Berechtigung erfragen.
+                zusagen: {
+                    abonnenten: {
+                        label: 'Abonnenten lesen',
+                        hinweis: 'Nötig, damit deine Twitch-Abonnenten auf Discord automatisch eine Rolle bekommen. '
+                               + 'Wir lesen nur, wer abonniert hat — nicht deinen Chat und nichts sonst.',
+                        scopes: ['channel:read:subscriptions']
+                    }
+                }
             });
             Logger.info('[Streaming] Kontoverknuepfung angemeldet: twitch');
         } catch (error) {

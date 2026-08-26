@@ -45,6 +45,41 @@ function ereignisseVon(plattform) {
 }
 
 /**
+ * Die zusaetzlichen Ereignisse fuer Abonnenten-Rollen (Stufe 12b).
+ *
+ * **Getrennt und nur auf Anforderung**, aus zwei Gruenden. Erstens kosten sie
+ * eine Zusage des Kanalinhabers (`channel:read:subscriptions`) — sie
+ * vorsorglich zu bestellen scheiterte einfach. Zweitens kostet jedes Abo
+ * Kontingent: Ein Kanal, dessen Guilds gar keine Abonnenten-Rolle vergeben,
+ * soll dafuer nichts bezahlen.
+ *
+ * @param {string} plattform Anbieter
+ * @returns {Array<string>} Ereignisse
+ */
+function aboEreignisseVon(plattform) {
+    return ADAPTER[plattform]?.EREIGNISSE_ABO || [];
+}
+
+/**
+ * Will fuer diesen Kanal ueberhaupt jemand eine Abonnenten-Rolle vergeben?
+ *
+ * Referenzzaehlung wie bei allem anderen: Es genuegt EINE Guild, die es will,
+ * und es braucht KEINE mehr, sobald es die letzte abschaltet.
+ *
+ * @param {number} streamerId Streamer
+ * @returns {Promise<boolean>} true, wenn mindestens ein Ziel es will
+ */
+async function aboRollenGewuenscht(streamerId) {
+    const zeilen = await db().query(`
+        SELECT 1 FROM streaming_targets
+         WHERE streamer_id = ? AND aktiv = 1
+           AND abo_rolle_id IS NOT NULL AND abo_rolle_id <> ''
+         LIMIT 1
+    `, [streamerId]);
+    return zeilen.length > 0;
+}
+
+/**
  * @returns {Object} Datenbankdienst
  */
 function db() {
@@ -136,7 +171,11 @@ async function abosSichern(streamerId, plattform, kanalId) {
 
     const ergebnisse = [];
 
-    for (const ereignis of ereignisseVon(plattform)) {
+    // Die Abo-Ereignisse kommen nur dazu, wenn eine Guild sie braucht.
+    const gewuenscht = [...ereignisseVon(plattform)];
+    if (await aboRollenGewuenscht(streamerId)) gewuenscht.push(...aboEreignisseVon(plattform));
+
+    for (const ereignis of gewuenscht) {
         const zustand = schonDa.get(ereignis);
         if (zustand === 'bestaetigt' || zustand === 'angefragt') {
             ergebnisse.push({ ereignis, uebersprungen: true, zustand });
@@ -186,6 +225,52 @@ async function abosSichern(streamerId, plattform, kanalId) {
  * @param {number} streamerId Streamer
  * @returns {Promise<{abbestellt: number, behalten: boolean}>} Ergebnis
  */
+async function aboEreignisseAufraeumen(streamerId) {
+    const Logger = ServiceManager.get('Logger');
+
+    // Solange EINE Guild die Rolle vergibt, bleiben die Abos. Referenzzaehlung
+    // wie ueberall sonst.
+    if (await aboRollenGewuenscht(streamerId)) return { abbestellt: 0, behalten: true };
+
+    const zeilen = await db().query(
+        'SELECT s.plattform, a.id, a.ereignis, a.anbieter_abo_id FROM streaming_subscriptions a ' +
+        'JOIN streaming_streamers s ON s.id = a.streamer_id WHERE a.streamer_id = ?', [streamerId]);
+
+    let abbestellt = 0;
+
+    for (const zeile of zeilen) {
+        const adapter = ADAPTER[zeile.plattform];
+        if (!adapter || !aboEreignisseVon(zeile.plattform).includes(zeile.ereignis)) continue;
+
+        if (zeile.anbieter_abo_id) {
+            try {
+                if (await adapter.abbestellen(zeile.anbieter_abo_id)) abbestellt++;
+            } catch (err) {
+                // Zeile stehen lassen: Sonst kennt niemand mehr ein Abo, das
+                // bei Twitch weiterlebt und Kontingent kostet.
+                Logger.warn(`[Streaming] Abo-Ereignis abbestellen fehlgeschlagen (${zeile.ereignis}): ${err.message}`);
+                continue;
+            }
+        }
+        await db().query('DELETE FROM streaming_subscriptions WHERE id = ?', [zeile.id]);
+    }
+
+    // **Die Abonnentenliste geht mit.** Sie ohne Zusage weiterzufuehren waere
+    // ein Vorrat an Daten, den niemand mehr braucht und niemand mehr pflegt.
+    if (abbestellt) {
+        await db().query('DELETE FROM streaming_subscribers WHERE streamer_id = ?', [streamerId]);
+        Logger.info(`[Streaming] Abonnenten-Ereignisse fuer Streamer ${streamerId} abbestellt (${abbestellt})`);
+    }
+
+    return { abbestellt, behalten: false };
+}
+
+/**
+ * Abos abbestellen, wenn die letzte Guild ihr Ziel entfernt hat.
+ *
+ * @param {number} streamerId Streamer
+ * @returns {Promise<{abbestellt: number, behalten: boolean}>} Ergebnis
+ */
 async function abosAufraeumen(streamerId) {
     const Logger = ServiceManager.get('Logger');
 
@@ -218,6 +303,7 @@ async function abosAufraeumen(streamerId) {
 }
 
 module.exports = {
+    aboEreignisseVon, aboRollenGewuenscht, aboEreignisseAufraeumen,
     ADAPTER,
     ereignisseVon,
     rueckrufAdresse,

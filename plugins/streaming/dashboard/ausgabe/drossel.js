@@ -138,11 +138,22 @@ async function rolleSetzen(auftrag) {
         return { ok: false, fehler: 'Auftrag ohne Mitglied oder Rolle', endgueltig: true };
     }
 
+    // **Welche Rolle ist gemeint?** Bis zum 2026-08-26 gab es nur eine, und
+    // die beiden Nachfragen unten galten unbesehen. Seit den Abonnenten-Rollen
+    // (Stufe 12b) waeren sie falsch: Ein Abonnement gilt auch nachts um vier,
+    // wenn niemand sendet — die Live-Pruefung wuerde jede Abo-Rolle
+    // stillschweigend verschlucken und als Erfolg buchen.
+    //
+    // Fehlt `grund`, ist es ein Auftrag der Live-Rolle. Das ist Absicht: Alle
+    // vorhandenen Auftraege stammen von dort, und ein Vorgabewert, der die
+    // Pruefung UEBERSPRINGT, waere die gefaehrlichere Richtung.
+    const istLiveRolle = (nutzlast.grund || 'live') === 'live';
+
     // Beim Geben wird noch einmal nachgesehen, ob die Person ueberhaupt (noch)
     // live ist. Zwischen Vormerken und Ausfuehren koennen Minuten liegen, und
     // eine Rolle "ist live" an jemandem, der nicht mehr sendet, ist genau die
     // Art Fehler, die niemand meldet.
-    if (richtung === 'geben' && nutzlast.streamer_id) {
+    if (istLiveRolle && richtung === 'geben' && nutzlast.streamer_id) {
         const zeilen = await db().query(
             'SELECT ist_live FROM streaming_state WHERE streamer_id = ?', [nutzlast.streamer_id]);
         if (zeilen.length && !zeilen[0].ist_live) {
@@ -152,7 +163,7 @@ async function rolleSetzen(auftrag) {
 
     // Beim Nehmen umgekehrt: Kam die Person innerhalb der Karenz zurueck, darf
     // die Rolle bleiben.
-    if (richtung === 'nehmen' && nutzlast.streamer_id) {
+    if (istLiveRolle && richtung === 'nehmen' && nutzlast.streamer_id) {
         const zeilen = await db().query(
             'SELECT ist_live FROM streaming_state WHERE streamer_id = ?', [nutzlast.streamer_id]);
         if (zeilen.length && zeilen[0].ist_live) {

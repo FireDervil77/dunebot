@@ -43,6 +43,23 @@ const HOECHSTALTER_MS = 10 * 60 * 1000;
  */
 const EREIGNISSE = ['stream.online', 'stream.offline', 'channel.update'];
 
+/**
+ * Ereignisse fuer Abonnenten-Rollen (Stufe 12b).
+ *
+ * **Getrennt von `EREIGNISSE`, weil sie etwas anderes kosten:** Diese drei
+ * verlangen `channel:read:subscriptions` vom Kanalinhaber. Ein Kanal ohne
+ * diese Zusage bekommt sie nicht — und soll deshalb auch nicht so tun, als
+ * fehle etwas.
+ *
+ * **`channel.subscribe` allein genuegt nicht.** Es meldet nur das erste
+ * Abonnement. Wer verlaengert, loest `channel.subscription.message` aus; wer
+ * beschenkt wird, `channel.subscription.gift` fuer den Schenkenden UND
+ * `channel.subscribe` fuer den Beschenkten. Das Ende meldet
+ * `channel.subscription.end` — es ist das wichtigste der drei, denn ohne es
+ * bleibt eine Rolle fuer immer.
+ */
+const EREIGNISSE_ABO = ['channel.subscribe', 'channel.subscription.end', 'channel.subscription.message'];
+
 /** App-Token im Speicher - es ist jederzeit neu beschaffbar und gehoert nicht in die Datenbank. */
 let token = { wert: null, gueltigBis: 0 };
 
@@ -469,6 +486,18 @@ function uebersetzen(headers, koerper) {
                 kategorie: e.category_name || null
             };
 
+        // **Abonnements (Stufe 12b).** `channel.subscribe` meldet das erste
+        // Abonnement, `channel.subscription.message` jede Verlaengerung — fuer
+        // die Rolle sind beide dasselbe: "diese Person ist Abonnent". Die
+        // Unterscheidung braucht erst 12c, wenn daraus eine Meldung im Chat
+        // werden soll.
+        case 'channel.subscribe':
+        case 'channel.subscription.message':
+            return { ...gemeinsam, art: 'abonniert', abonnent: abonnentAus(koerper) };
+
+        case 'channel.subscription.end':
+            return { ...gemeinsam, art: 'abo_beendet', abonnent: abonnentAus(koerper) };
+
         default:
             return null;
     }
@@ -640,6 +669,83 @@ async function pruefen({ zugang }) {
 }
 
 /**
+ * Die Abonnenten eines Kanals lesen.
+ *
+ * **Braucht den Nutzer-Token des Kanalinhabers**, nicht unseren App-Token:
+ * `channel:read:subscriptions` ist eine Auskunft ueber SEINEN Kanal, und
+ * Twitch gibt sie nur ihm. Das ist der Unterschied zum Anlegen eines
+ * EventSub-Abos, das mit App-Token laeuft — beides in derselben Stufe, und
+ * genau hier verwechselt man es.
+ *
+ * Der Aufrufer uebergibt deshalb keinen Token, sondern bekommt einen: Der
+ * Speicher reicht ihn durch `mitZugang` herein und faengt die Ablehnung ab.
+ *
+ * @param {string} kanalId Numerische Kanalkennung
+ * @param {string} zugang Nutzer-Token des Kanalinhabers
+ * @returns {Promise<{ok: boolean, abgelehnt: boolean, abonnenten: Array<Object>}>} Ergebnis
+ */
+async function abonnentenLesen(kanalId, zugang) {
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId) return { ok: false, abgelehnt: false, abonnenten: [] };
+
+    const abonnenten = [];
+    let cursor = null;
+
+    do {
+        const abfrage = new URLSearchParams({ broadcaster_id: String(kanalId), first: '100' });
+        if (cursor) abfrage.set('after', cursor);
+
+        const antwort = await fetch(`${HELIX}/subscriptions?${abfrage}`, {
+            headers: { 'Client-Id': daten.clientId, Authorization: `Bearer ${zugang}` }
+        });
+
+        // 401 wird NICHT als "keine Abonnenten" gelesen. Ein abgelaufener
+        // Token saehe sonst aus wie ein Kanal, den niemand mehr abonniert hat
+        // — und der Abgleich naehme allen die Rolle weg.
+        if (antwort.status === 401) return { ok: false, abgelehnt: true, abonnenten: [] };
+        if (!antwort.ok) return { ok: false, abgelehnt: false, abonnenten: [] };
+
+        const d = await antwort.json();
+        for (const a of d.data || []) {
+            // Der Kanalinhaber steht in der eigenen Liste. Ihm die
+            // Abonnenten-Rolle zu geben waere albern.
+            if (String(a.user_id) === String(kanalId)) continue;
+            abonnenten.push({
+                kontoId: String(a.user_id),
+                kontoName: a.user_name || a.user_login || null,
+                stufe: a.tier || null,
+                geschenkt: Boolean(a.is_gift)
+            });
+        }
+        cursor = d.pagination?.cursor || null;
+    } while (cursor);
+
+    return { ok: true, abgelehnt: false, abonnenten };
+}
+
+/**
+ * Aus einem Abo-Ereignis die beteiligte Person herausziehen.
+ *
+ * **Beim Verschenken ist es nicht der Schenkende.** `channel.subscribe` traegt
+ * bei einem Geschenk `is_gift: true` und im `user_id` den **Beschenkten** —
+ * und der soll die Rolle bekommen. Wer hier den Schenkenden nimmt, gibt die
+ * Rolle einer Person, die selbst gar nicht abonniert hat.
+ *
+ * @param {Object} koerper Zustellung
+ * @returns {{kontoId: string, kontoName: string|null, stufe: string|null, geschenkt: boolean}|null} Person
+ */
+function abonnentAus(koerper) {
+    const e = koerper?.event;
+    if (!e || !e.user_id) return null;
+    return {
+        kontoId: String(e.user_id),
+        kontoName: e.user_name || e.user_login || null,
+        stufe: e.tier || null,
+        geschenkt: Boolean(e.is_gift)
+    };
+}
+
+/**
  * "Wer bist du" — gemeinsam genutzt von `identitaet` und `tauschen`.
  *
  * @param {string} clientId Client-ID
@@ -713,6 +819,7 @@ async function verknuepfteIdentitaet({ code, rueckrufUrl }) {
 module.exports = {
     name: 'twitch',
     tauschen, erneuern, pruefen,
+    EREIGNISSE_ABO, abonnentenLesen, abonnentAus,
     HOECHSTALTER_MS,
     EREIGNISSE,
     verknuepfungsUrl,

@@ -219,6 +219,35 @@ router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
                 .length;
         }
 
+        // **Stand der Abonnenten-Zusage je Ziel.** Ohne diese Auskunft waere
+        // das Feld "Abonnenten-Rolle" ein Versprechen: Man waehlt eine Rolle,
+        // speichert, und nichts passiert — weil der Kanalinhaber gar nicht
+        // verknuepft ist. Diese Sorte stiller Wirkungslosigkeit ist genau das,
+        // was dieses Plugin an anderen Bots kritisiert.
+        const abonnenten = require('../kern/abonnenten');
+        for (const z of ziele) {
+            try {
+                const streamer = (await ServiceManager.get('dbService').query(
+                    'SELECT id, plattform, kanal_id, login FROM streaming_streamers WHERE id = ?',
+                    [z.streamer_id]))[0];
+                if (!streamer) continue;
+
+                const inhaber = await abonnenten.kanalInhaber(streamer);
+                if (!inhaber) { z.aboZusage = false; continue; }
+
+                const zusage = await require('../../../../apps/dashboard/helpers/Verbindungsspeicher')
+                    .zusageLesen(inhaber, streamer.plattform);
+
+                z.aboInhaber = zusage?.konto_name || streamer.login;
+                z.aboZusage = String(zusage?.scopes || '').includes('channel:read:subscriptions')
+                    ? true : 'ohne-zusage';
+            } catch {
+                // Die Auskunft ist eine Freundlichkeit, kein Muss. Faellt sie
+                // aus, bleibt die Seite brauchbar.
+                z.aboZusage = false;
+            }
+        }
+
         await renderView(res, 'guild/streaming-ziele', {
             tr, guildId, ziele, zielkanaele, sprachkanaele, rollen, mitglieder, liveRolleId,
             fremdeTraeger, zeitzone, zonen: ZEITZONEN,
@@ -340,6 +369,11 @@ router.post('/ziele/:id', requirePermission('STREAMING.TARGETS.MANAGE'), async (
         const geaendert = await modelle.zielSpeichern(guildId, zielId, {
             channel_id:       channelId,
             rolle_id:         String(req.body.rolle_id || '').trim() || null,
+            // Nur Ziffern, wie bei `mitglied_id`: Eine Discord-Kennung ist eine
+            // Zahl. Ein eingetippter Rollenname ginge sonst als Kennung durch
+            // und die Vergabe liefe stumm ins Leere.
+            abo_rolle_id:     /^\d{5,32}$/.test(String(req.body.abo_rolle_id || '').trim())
+                                ? String(req.body.abo_rolle_id).trim() : null,
             onair_channel:    String(req.body.onair_channel || '').trim() || null,
             filter_spiel:     String(req.body.filter_spiel || '').trim() || null,
             filter_titel:     String(req.body.filter_titel || '').trim() || null,
@@ -362,6 +396,30 @@ router.post('/ziele/:id', requirePermission('STREAMING.TARGETS.MANAGE'), async (
         if (!geaendert) {
             const vorhanden = await modelle.zielLesen(guildId, zielId);
             if (!vorhanden) return res.redirect(`${zurueck}?fehler=weg`);
+        }
+
+        // **Die Abo-Ereignisse muessen mitziehen.** Wer eine Abonnenten-Rolle
+        // einschaltet, braucht `channel.subscribe` und Verwandte — und wer sie
+        // ausschaltet, soll das Kontingent nicht weiter belasten. Ohne diesen
+        // Aufruf stuende das Feld da und nichts geschaehe, bis irgendwann
+        // zufaellig jemand den Kanal neu eintraegt.
+        try {
+            const ziel = await modelle.zielLesen(guildId, zielId);
+            if (ziel) {
+                const streamer = (await ServiceManager.get('dbService').query(
+                    'SELECT plattform, kanal_id FROM streaming_streamers WHERE id = ?', [ziel.streamer_id]))[0];
+                if (streamer) {
+                    await abos.abosSichern(ziel.streamer_id, streamer.plattform, streamer.kanal_id);
+                    // Gezielt nur die Abo-Ereignisse: `abosAufraeumen` wuerde
+                    // ALLES abbestellen, sobald die letzte Guild das Ziel
+                    // entfernt — hier geht es nur um die Abonnenten-Rolle.
+                    await abos.aboEreignisseAufraeumen(ziel.streamer_id);
+                }
+            }
+        } catch (err) {
+            // Ein Fehlschlag hier darf das Speichern nicht zuruecknehmen. Der
+            // taegliche Abgleich holt es nach.
+            Logger.warn(`[Streaming] Abos nach Zieländerung nicht nachgezogen: ${err.message}`);
         }
 
         Logger.info(`[Streaming] Ziel ${zielId} in Guild ${guildId} geaendert`);

@@ -233,6 +233,40 @@
                 <div class="form-hint">Wird im Text erwähnt und löst die Benachrichtigung aus.</div>
               </div>
 
+              <%# Abonnenten-Rolle (Stufe 12b). Sie hängt an einer Zusage des
+                  Kanalinhabers — ohne sie wäre das Feld ein Versprechen, das
+                  niemand einlöst. Deshalb steht der Stand darunter im
+                  Klartext, statt das Feld wortlos wirkungslos zu lassen. %>
+              <div class="col-md-4">
+                <label class="form-label" for="abo_rolle_<%= z.id %>">Abonnenten-Rolle</label>
+                <select class="form-select" id="abo_rolle_<%= z.id %>" name="abo_rolle_id" <%= darfAendern ? '' : 'disabled' %>>
+                  <option value="">— keine —</option>
+                  <% const aboRolleDa = !z.abo_rolle_id || (rollen || []).some(r => String(r.id) === String(z.abo_rolle_id)); %>
+                  <% if (!aboRolleDa) { %>
+                    <option value="<%= z.abo_rolle_id %>" selected>⚠ gelöschte Rolle (<%= z.abo_rolle_id %>)</option>
+                  <% } %>
+                  <% (rollen || []).forEach(r => { %>
+                    <option value="<%= r.id %>" <%= String(r.id) === String(z.abo_rolle_id) ? 'selected' : '' %>>@<%= r.name %></option>
+                  <% }); %>
+                </select>
+                <% if (z.aboZusage === true) { %>
+                  <div class="form-hint text-success">
+                    <%= z.aboInhaber %> hat den Kanal verknüpft und das Lesen der Abonnenten erlaubt.
+                  </div>
+                <% } else if (z.aboZusage === 'ohne-zusage') { %>
+                  <div class="form-hint text-warning">
+                    <%= z.aboInhaber %> hat den Kanal verknüpft, aber das Lesen der Abonnenten
+                    <strong>noch nicht erlaubt</strong>. Bis dahin wird die Rolle nicht vergeben —
+                    er erteilt es unter „Verbundene Konten“ in seinem Profil.
+                  </div>
+                <% } else { %>
+                  <div class="form-hint text-secondary">
+                    Wirkt erst, wenn der <strong>Kanalinhaber selbst</strong> sein Twitch-Konto hier
+                    verknüpft und das Lesen der Abonnenten erlaubt. Niemand sonst kann das für ihn tun.
+                  </div>
+                <% } %>
+              </div>
+
               <div class="col-md-4">
                 <label class="form-label" for="onair_<%= z.id %>">
                   <%= tr('streaming:TARGETS.ONAIR') %>
