@@ -80,8 +80,13 @@ ServiceManager.register('dbService', {
             return [];
         }
         return [];
-    }
+    },
+    // `abonnentenLesen` holt die Client-ID ueber `zugangsdaten`. Hier genuegt
+    // ein erfundener Wert — geprueft wird der Filter, nicht die Anmeldung.
+    async getConfig() { return null; }
 });
+process.env.TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID || 'pruef-id';
+process.env.TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET || 'pruef-secret';
 
 const abonnenten = require('../plugins/streaming/dashboard/kern/abonnenten');
 const twitch     = require('../plugins/streaming/dashboard/plattformen/twitch');
@@ -129,6 +134,46 @@ const drossel    = require('../plugins/streaming/dashboard/ausgabe/drossel');
           event: { broadcaster_user_id: '42', user_id: '111' } });
     pruefe(verlaengert?.art === 'abonniert', 'eine Verlaengerung zaehlt wie ein Abonnement',
         'sonst verlaere jemand die Rolle beim Verlaengern');
+
+    // ---------------------------------------------------------------
+    console.log('\nDer Kanalinhaber ist nicht sein eigener Abonnent');
+    // ---------------------------------------------------------------
+
+    // **Gemessen am 2026-08-26 an einem echten Kanal:** Twitch liefert den
+    // Inhaber in `data` mit (tier 3000), zaehlt ihn in `total` aber NICHT.
+    // Wer `data.length` nimmt, gibt dem Streamer seine eigene Abo-Rolle.
+    // Hier mit einer Attrappe nachgestellt, damit der Fall ohne Netz und ohne
+    // Zugangsdaten festgenagelt ist.
+    const echtesFetch = global.fetch;
+    global.fetch = async () => ({
+        ok: true, status: 200,
+        json: async () => ({
+            total: 0,
+            data: [
+                { user_id: '42', user_name: 'DerInhaber', tier: '3000', is_gift: false },
+                { user_id: '77', user_name: 'EchterAbonnent', tier: '1000', is_gift: false }
+            ],
+            pagination: {}
+        })
+    });
+
+    const gelesen = await twitch.abonnentenLesen('42', 'egal');
+    global.fetch = echtesFetch;
+
+    pruefe(gelesen.ok === true, 'die Liste wird gelesen');
+    pruefe(gelesen.abonnenten.length === 1,
+        'der Kanalinhaber faellt heraus', `${gelesen.abonnenten.length} statt 2 Eintraegen in data`);
+    pruefe(gelesen.abonnenten[0]?.kontoId === '77',
+        'und der echte Abonnent bleibt', gelesen.abonnenten[0]?.kontoName);
+
+    // Die Gegenprobe zur Vorsichtsmassnahme: 401 ist NICHT "keine Abonnenten".
+    global.fetch = async () => ({ ok: false, status: 401, json: async () => ({}) });
+    const abgelehnt = await twitch.abonnentenLesen('42', 'abgelaufen');
+    global.fetch = echtesFetch;
+
+    pruefe(abgelehnt.abgelehnt === true && abgelehnt.ok === false,
+        'ein 401 wird als Ablehnung gemeldet, nicht als leere Liste',
+        'sonst naehme der Abgleich allen die Rolle weg');
 
     // ---------------------------------------------------------------
     console.log('\nVom Ereignis zum Auftrag');

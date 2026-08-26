@@ -707,8 +707,22 @@ async function abonnentenLesen(kanalId, zugang) {
 
         const d = await antwort.json();
         for (const a of d.data || []) {
-            // Der Kanalinhaber steht in der eigenen Liste. Ihm die
-            // Abonnenten-Rolle zu geben waere albern.
+            // **Der Kanalinhaber steht in seiner eigenen Liste — gemessen,
+            // nicht vermutet.** Am 2026-08-26 an `firedervil` (37883778)
+            // nachgesehen, roh und ungefiltert:
+            //
+            //     HTTP 200
+            //     total laut Twitch:   0
+            //     Eintraege in data:   1
+            //       - 37883778 FireDervil tier 3000
+            //
+            // Twitch widerspricht sich also selbst: `total` zaehlt ihn nicht
+            // mit, `data` liefert ihn aus. **Wer `data.length` zaehlt, bekommt
+            // 1 statt 0** und gibt dem Streamer seine eigene Abonnenten-Rolle.
+            //
+            // Der Betreiber hatte denselben Gedanken unabhaengig: "man ist ja
+            // sein eigener Abonnement, aber das zaehlt ja auch nicht". Twitchs
+            // `total` gibt ihm recht — nur eben nicht `data`.
             if (String(a.user_id) === String(kanalId)) continue;
             abonnenten.push({
                 kontoId: String(a.user_id),
