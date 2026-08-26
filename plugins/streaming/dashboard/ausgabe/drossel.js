@@ -43,6 +43,31 @@ const HOECHSTVERSUCHE = 5;
  */
 const VERZUG_WARNEN_MS = 60_000;
 
+/**
+ * Wie lange auf die Antwort des Bots gewartet wird.
+ *
+ * **Ohne diese Zahl war es unbegrenzt** — veza sendet per Vorgabe mit
+ * `timeout = -1`. Am 2026-08-25 antwortete ein `streaming:edit` exakt
+ * 1200 s lang nicht; der Auftrag galt danach als `fertig` mit null Versuchen,
+ * und drei Stunden Verzug hinterliessen keine Spur (Baustelle 76).
+ *
+ * 30 s sind grosszuegig: Ein Handler macht zwei, drei Discord-Aufrufe, und
+ * `@discordjs/rest` gibt nach 15 s je Aufruf selbst auf. Wer laenger
+ * braucht, antwortet nicht mehr, sondern haengt — und dann ist ein
+ * Fehlversuch mit Wiederholung die richtige Antwort, kein stilles Warten.
+ */
+const BOT_FRIST_MS = 30_000;
+
+/**
+ * Welche Aktionen eine Nachricht in einen Kanal schreiben.
+ *
+ * Nur fuer sie gilt die Kanalgrenze. Ein Rollenauftrag fasst keinen Kanal an;
+ * ihn hinter einer Ankuendigung anzustellen, hat ihn nur unnoetig aufgehalten
+ * — und beim Streamende ist genau er der eilige (die Rolle soll weg, wenn die
+ * Sendung endet).
+ */
+const BRAUCHT_KANAL = new Set(['posten', 'bearbeiten', 'aufraeumen', 'probe']);
+
 let laeuftGerade = false;
 let uhr = null;
 
@@ -79,7 +104,7 @@ async function anDenBot(ereignis, nutzlast) {
     const ipcServer = ServiceManager.get('ipcServer');
     if (!ipcServer) return { ok: false, daten: {}, fehler: 'IPC nicht verfuegbar', code: null };
 
-    const antwort = await ipcServer.broadcastOne(ereignis, nutzlast);
+    const antwort = await ipcServer.broadcastOne(ereignis, nutzlast, true, { timeout: BOT_FRIST_MS });
     const aeussere = Array.isArray(antwort) ? antwort[0] : antwort;
 
     if (!aeussere?.success) {
@@ -463,7 +488,151 @@ function istEndgueltig(antwort) {
 }
 
 /**
+ * Verzug messen, nicht vermuten.
+ *
+ * Am 2026-08-24 kam die Rueckschau eines echten Streams rund drei Stunden zu
+ * spaet: Die Auftraege waren um 21:37 und 21:51 faellig, die Nachrichten
+ * wurden erst um 00:26 und 01:18 umgebaut - bei `zustand = fertig` und NULL
+ * Versuchen. Es gab also keinen Fehlschlag, der wiederholt wurde, und in den
+ * Tabellen stand hinterher nichts, woraus sich der Verzug haette ablesen
+ * lassen.
+ *
+ * Ein Auftrag, der lange nach seiner Faelligkeit ausgefuehrt wird, ist kein
+ * Fehler im Sinne des Ausgangs - er wird ja erledigt. Er ist aber genau das,
+ * was der Betreiber als "dauerte sehr sehr lange" bemerkt.
+ *
+ * @param {Object} auftrag Outbox-Zeile
+ * @returns {void}
+ */
+function verzugMelden(auftrag) {
+    const verzugMs = Date.now() - new Date(auftrag.faellig_ab).getTime();
+    if (verzugMs > VERZUG_WARNEN_MS) {
+        log().warn(`[Streaming/Ausgang] Auftrag #${auftrag.id} (${auftrag.aktion}) laeuft ` +
+            `${Math.round(verzugMs / 1000)} s nach Faelligkeit — Ausgang stand oder war ueberlastet`);
+    }
+}
+
+/**
+ * Einen Auftrag abarbeiten und das Ergebnis wegschreiben.
+ *
+ * Eigene Funktion, seit die Auftraege eines Laufs **nebeneinander** laufen:
+ * Als Rumpf in einer Schleife war "der naechste Auftrag" an "dieser Auftrag
+ * ist fertig" gekettet.
+ *
+ * Wirft nie - ein gescheiterter Auftrag darf die anderen desselben Laufs
+ * nicht mitreissen.
+ *
+ * @param {Object} auftrag Outbox-Zeile
+ * @returns {Promise<void>}
+ */
+async function abarbeiten(auftrag) {
+    try {
+        const ergebnis = await ausfuehren(auftrag);
+
+        if (ergebnis.ok) {
+            await db().query(
+                "UPDATE streaming_outbox SET zustand = 'fertig', erledigt_am = NOW(3), fehlertext = ? WHERE id = ?",
+                [ergebnis.hinweis || null, auftrag.id]);
+
+            // Die Zustandsseite zaehlt offene Auftraege mit - ohne diesen
+            // Anstupser bliebe die Zahl stehen, bis jemand neu laedt. Der
+            // Strom sammelt 300 ms, ein Schwall von zwanzig erledigten
+            // Auftraegen ergibt also einen Anstupser.
+            melden({ guildId: auftrag.guild_id, grund: 'auftrag_fertig' });
+            return;
+        }
+
+        const versuche = auftrag.versuche + 1;
+        const aufgeben = ergebnis.endgueltig || versuche >= HOECHSTVERSUCHE;
+
+        await db().query(`
+            UPDATE streaming_outbox
+               SET versuche = ?, fehlertext = ?,
+                   zustand = ?,
+                   faellig_ab = DATE_ADD(NOW(3), INTERVAL ? SECOND)
+             WHERE id = ?
+        `, [versuche, String(ergebnis.fehler).slice(0, 512),
+            aufgeben ? 'aufgegeben' : 'offen', Math.min(60, 2 ** versuche), auftrag.id]);
+
+        // Auch das Aufgeben ist ein Ende - sonst steht bei den gescheiterten
+        // Auftraegen fuer immer "nie ausgefuehrt".
+        if (aufgeben) {
+            await db().query('UPDATE streaming_outbox SET erledigt_am = NOW(3) WHERE id = ?', [auftrag.id]);
+
+            // Aufgeben ist der Fall, bei dem Zusehen am meisten wert ist: Es
+            // ist genau das, was auf der Zustandsseite unter "was klemmt"
+            // erscheinen soll - und zwar sofort, nicht beim naechsten
+            // Neuladen.
+            melden({ guildId: auftrag.guild_id, grund: 'auftrag_aufgegeben' });
+        }
+
+        // Jeder Fehlversuch gehoert ins Log, nicht nur das Aufgeben: Sonst
+        // steht am Ende "aufgegeben" da, und warum es fuenfmal scheiterte,
+        // weiss niemand mehr.
+        if (aufgeben) {
+            log().error(`[Streaming] Auftrag ${auftrag.id} (${auftrag.aktion}) aufgegeben nach ${versuche} Versuch(en): ${ergebnis.fehler}`);
+        } else {
+            log().warn(`[Streaming] Auftrag ${auftrag.id} (${auftrag.aktion}) Versuch ${versuche} fehlgeschlagen: ${ergebnis.fehler}`);
+        }
+    } catch (err) {
+        await db().query(
+            "UPDATE streaming_outbox SET versuche = versuche + 1, fehlertext = ?, zustand = IF(versuche + 1 >= ?, 'aufgegeben', 'offen') WHERE id = ?",
+            [String(err.message).slice(0, 512), HOECHSTVERSUCHE, auftrag.id]).catch(() => {});
+        log().error(`[Streaming] Auftrag ${auftrag.id} fehlgeschlagen:`, err);
+    }
+}
+
+/**
+ * Welche Auftraege dieses Laufs an die Reihe kommen.
+ *
+ * Je Kanal hoechstens **einer** - das haelt Discords Grenze von 5 Nachrichten
+ * je 5 Sekunden ohne Nachzaehlen. Rollenauftraege zaehlen nicht mit, sie
+ * schreiben in keinen Kanal.
+ *
+ * @param {Array<Object>} faellig Faellige Outbox-Zeilen, aelteste zuerst
+ * @returns {Promise<Array<Object>>} Die Auswahl
+ */
+async function auswaehlen(faellig) {
+    const belegteKanaele = new Set();
+    const dranSind = [];
+
+    for (const auftrag of faellig) {
+        verzugMelden(auftrag);
+
+        if (!BRAUCHT_KANAL.has(auftrag.aktion)) {
+            dranSind.push(auftrag);
+            continue;
+        }
+
+        const ziel = await db().query('SELECT channel_id FROM streaming_targets WHERE id = ?', [auftrag.target_id]);
+        const kanal = ziel[0]?.channel_id;
+
+        if (kanal && belegteKanaele.has(kanal)) continue;
+        if (kanal) belegteKanaele.add(kanal);
+        dranSind.push(auftrag);
+    }
+
+    return dranSind;
+}
+
+/**
  * Ein Durchlauf.
+ *
+ * **Nebeneinander, nicht nacheinander.** Bis zum 2026-08-26 lief die Auswahl
+ * als Schleife mit `await` je Auftrag. Die Kanalgrenze war dabei richtig
+ * gedacht - je Kanal einer -, aber die Schleife machte daraus: je Kanal einer,
+ * *und alle anderen Kanaele warten mit*. Ein einziger Bot-Aufruf, der 1200 s
+ * brauchte, hat so die Ankuendigungen **jeder** Guild angehalten
+ * (Baustelle 76). Die Auswahl enthaelt je Kanal genau einen Auftrag, sie kann
+ * also gefahrlos gemeinsam laufen.
+ *
+ * Was bleibt: `laeuftGerade` verhindert weiter, dass sich zwei Laeufe
+ * ueberholen und denselben Auftrag zweimal ausfuehren. Ein haengender Kanal
+ * haelt damit den **naechsten** Lauf noch auf - aber hoechstens bis zur Frist
+ * (`BOT_FRIST_MS`), nicht mehr unbegrenzt. Diese Restkopplung ganz zu loesen,
+ * hiesse Auftraege in der Tabelle zu beanspruchen (`zustand = 'laeuft'`) samt
+ * Wiederherstellung nach einem Neustart; das ist ein eigener Schnitt und
+ * bewusst nicht mit hier hineingezogen.
  *
  * @returns {Promise<void>}
  */
@@ -478,93 +647,11 @@ async function lauf() {
              ORDER BY id ASC LIMIT ?
         `, [JE_LAUF]);
 
-        const belegteKanaele = new Set();
+        const dranSind = await auswaehlen(faellig);
 
-        for (const auftrag of faellig) {
-            // **Verzug messen, nicht vermuten.**
-            //
-            // Am 2026-08-24 kam die Rueckschau eines echten Streams rund drei
-            // Stunden zu spaet: Die Auftraege waren um 21:37 und 21:51 faellig,
-            // die Nachrichten wurden erst um 00:26 und 01:18 umgebaut - bei
-            // `zustand = fertig` und NULL Versuchen. Es gab also keinen
-            // Fehlschlag, der wiederholt wurde, und in den Tabellen stand
-            // hinterher nichts, woraus sich der Verzug haette ablesen lassen.
-            //
-            // Ein Auftrag, der lange nach seiner Faelligkeit ausgefuehrt wird,
-            // ist kein Fehler im Sinne des Ausgangs - er wird ja erledigt. Er
-            // ist aber genau das, was der Betreiber als "dauerte sehr sehr
-            // lange" bemerkt. Deshalb steht er ab jetzt im Protokoll, mit
-            // Auftragsnummer, damit sich der Fall beim naechsten Mal
-            // zurueckverfolgen laesst statt rekonstruiert werden zu muessen.
-            const verzugMs = Date.now() - new Date(auftrag.faellig_ab).getTime();
-            if (verzugMs > VERZUG_WARNEN_MS) {
-                log().warn(`[Streaming/Ausgang] Auftrag #${auftrag.id} (${auftrag.aktion}) laeuft ` +
-                    `${Math.round(verzugMs / 1000)} s nach Faelligkeit — Ausgang stand oder war ueberlastet`);
-            }
-
-            const ziel = await db().query('SELECT channel_id FROM streaming_targets WHERE id = ?', [auftrag.target_id]);
-            const kanal = ziel[0]?.channel_id;
-
-            // Je Kanal hoechstens einer je Lauf - das haelt die Grenze von
-            // 5 Nachrichten je 5 Sekunden ohne Nachzaehlen.
-            if (kanal && belegteKanaele.has(kanal)) continue;
-            if (kanal) belegteKanaele.add(kanal);
-
-            try {
-                const ergebnis = await ausfuehren(auftrag);
-
-                if (ergebnis.ok) {
-                    await db().query(
-                        "UPDATE streaming_outbox SET zustand = 'fertig', erledigt_am = NOW(3), fehlertext = ? WHERE id = ?",
-                        [ergebnis.hinweis || null, auftrag.id]);
-
-                    // Die Zustandsseite zaehlt offene Auftraege mit - ohne
-                    // diesen Anstupser bliebe die Zahl stehen, bis jemand neu
-                    // laedt. Der Strom sammelt 300 ms, ein Schwall von zwanzig
-                    // erledigten Auftraegen ergibt also einen Anstupser.
-                    melden({ guildId: auftrag.guild_id, grund: 'auftrag_fertig' });
-                    continue;
-                }
-
-                const versuche = auftrag.versuche + 1;
-                const aufgeben = ergebnis.endgueltig || versuche >= HOECHSTVERSUCHE;
-
-                await db().query(`
-                    UPDATE streaming_outbox
-                       SET versuche = ?, fehlertext = ?,
-                           zustand = ?,
-                           faellig_ab = DATE_ADD(NOW(3), INTERVAL ? SECOND)
-                     WHERE id = ?
-                `, [versuche, String(ergebnis.fehler).slice(0, 512),
-                    aufgeben ? 'aufgegeben' : 'offen', Math.min(60, 2 ** versuche), auftrag.id]);
-
-                // Auch das Aufgeben ist ein Ende - sonst steht bei den
-                // gescheiterten Auftraegen fuer immer "nie ausgefuehrt".
-                if (aufgeben) {
-                    await db().query('UPDATE streaming_outbox SET erledigt_am = NOW(3) WHERE id = ?', [auftrag.id]);
-
-                    // Aufgeben ist der Fall, bei dem Zusehen am meisten wert
-                    // ist: Es ist genau das, was auf der Zustandsseite unter
-                    // "was klemmt" erscheinen soll - und zwar sofort, nicht
-                    // beim naechsten Neuladen.
-                    melden({ guildId: auftrag.guild_id, grund: 'auftrag_aufgegeben' });
-                }
-
-                // Jeder Fehlversuch gehoert ins Log, nicht nur das Aufgeben:
-                // Sonst steht am Ende "aufgegeben" da, und warum es fuenfmal
-                // scheiterte, weiss niemand mehr.
-                if (aufgeben) {
-                    log().error(`[Streaming] Auftrag ${auftrag.id} (${auftrag.aktion}) aufgegeben nach ${versuche} Versuch(en): ${ergebnis.fehler}`);
-                } else {
-                    log().warn(`[Streaming] Auftrag ${auftrag.id} (${auftrag.aktion}) Versuch ${versuche} fehlgeschlagen: ${ergebnis.fehler}`);
-                }
-            } catch (err) {
-                await db().query(
-                    "UPDATE streaming_outbox SET versuche = versuche + 1, fehlertext = ?, zustand = IF(versuche + 1 >= ?, 'aufgegeben', 'offen') WHERE id = ?",
-                    [String(err.message).slice(0, 512), HOECHSTVERSUCHE, auftrag.id]);
-                log().error(`[Streaming] Auftrag ${auftrag.id} fehlgeschlagen:`, err);
-            }
-        }
+        // `abarbeiten` wirft nicht - deshalb genuegt `all`, und ein
+        // gescheiterter Auftrag reisst die anderen nicht mit.
+        await Promise.all(dranSind.map(abarbeiten));
     } catch (err) {
         log().error('[Streaming] Ausgang-Lauf fehlgeschlagen:', err);
     } finally {
@@ -590,4 +677,7 @@ function anhalten() {
     uhr = null;
 }
 
-module.exports = { TAKT_MS, JE_LAUF, HOECHSTVERSUCHE, starten, anhalten, lauf, ausfuehren, istEndgueltig, istWeg };
+module.exports = {
+    TAKT_MS, JE_LAUF, HOECHSTVERSUCHE, BOT_FRIST_MS, BRAUCHT_KANAL,
+    starten, anhalten, lauf, auswaehlen, abarbeiten, ausfuehren, istEndgueltig, istWeg
+};

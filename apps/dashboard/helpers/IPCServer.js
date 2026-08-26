@@ -64,7 +64,31 @@ class IPCServer {
         }
     }
 
-    async broadcastOne(event, data, receptive = true) {
+    /**
+     * Ein Ereignis an EINEN Bot-Vorgang, und auf die Antwort warten.
+     *
+     * **Zur Frist.** veza sendet per Vorgabe unbegrenzt: In
+     * `Structures/Base/SocketHandler.js` steht `const { receptive = true,
+     * timeout = -1 } = options`, und -1 heisst "warte ewig". Am 2026-08-26
+     * kostete genau das drei Stunden (Baustelle 76) — ein Bot-Handler
+     * antwortete 1200 s lang nicht, der Aufrufer wartete mit, und weil er in
+     * einer Schlange sass, stand die Schlange.
+     *
+     * Die Vorgabe bleibt hier trotzdem `-1`, und das ist Absicht: Ueber
+     * zwanzig Aufrufer haengen an dieser Methode, und was von ihnen
+     * berechtigterweise lange dauert, ist nicht gemessen. Eine Frist, die
+     * ungeprueft fuer alle gilt, tauscht einen bekannten Stillstand gegen
+     * unbekannte Abbrueche. Wer in einer Schlange oder Schleife auf die
+     * Antwort wartet, gibt seine Frist deshalb **selbst** mit.
+     *
+     * @param {string} event Ereignisname
+     * @param {Object} data Nutzlast
+     * @param {boolean} [receptive=true] Ob auf eine Antwort gewartet wird
+     * @param {Object} [optionen] Weitere Angaben
+     * @param {number} [optionen.timeout=-1] Frist in ms, -1 = unbegrenzt
+     * @returns {Promise<Object>} Antwort des Bots
+     */
+    async broadcastOne(event, data, receptive = true, { timeout = -1 } = {}) {
         const Logger = ServiceManager.get('Logger');
         
         const startTime = Date.now();
@@ -74,7 +98,7 @@ class IPCServer {
             const sockets = this.getSockets();
             if (!sockets.length) {
                 Logger.warn("[IPC] No available sockets for broadcast");
-                return { success: false, data: null };
+                return { success: false, data: null, error: 'Kein Bot verbunden' };
             }
 
             const result = await sockets[0][1]
@@ -83,11 +107,16 @@ class IPCServer {
                         event,
                         payload: data,
                     },
-                    { receptive },
+                    { receptive, timeout },
                 )
                 .catch((error) => {
+                    // Der Grund gehoert in die Antwort, nicht nur ins
+                    // Protokoll: Der Aufrufer entscheidet damit, ob er es
+                    // noch einmal versucht. Ohne ihn stand beim Aufrufer
+                    // "unbekannter Fehler", und eine ueberschrittene Frist
+                    // sah aus wie ein kaputter Handler.
                     Logger.error(`[IPC] Failed to send message to socket: ${error.message}`);
-                    return { success: false, data: null };
+                    return { success: false, data: null, error: error.message };
                 });
 
             const endTime = Date.now();
@@ -97,7 +126,7 @@ class IPCServer {
         } catch (error) {
             const endTime = Date.now();
             Logger.error(`[IPC] BroadcastOne error (took ${endTime - startTime}ms):`, error);
-            return { success: false, data: null };
+            return { success: false, data: null, error: error.message };
         }
     }
 
