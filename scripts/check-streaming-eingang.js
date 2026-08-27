@@ -137,8 +137,21 @@ console.log('\nUebersetzung ins Hausvokabular');
         { plattform: 'twitch', kanal_id: '12345', login: 'ninja', art: 'geaendert',
           titel: 'Neuer Titel', kategorie: 'Just Chatting' });
 
+    // **Der Beispieltyp wird geprueft, nicht geraten.** Hier stand
+    // `channel.follow` — mit 12c wurde daraus ein Melder, und der Fall schlug
+    // fehl, obwohl nichts kaputt war. Ein Name, den keine der drei Listen
+    // kennt, kann nicht auf dieselbe Weise veralten; und falls doch, sagt es
+    // die Zeile davor.
+    const bekannt = new Set([
+        ...twitch.typenVon(twitch.EREIGNISSE),
+        ...twitch.typenVon(twitch.EREIGNISSE_ABO),
+        ...twitch.typenVon(twitch.EREIGNISSE_MELDER)
+    ]);
+    const unbekannterTyp = 'channel.charity_campaign.start';
+    pruefe('der Beispieltyp steht in keiner Liste', bekannt.has(unbekannterTyp), false);
+
     const fremd = zustellung({ koerper: {
-        subscription: { id: 'x', type: 'channel.follow', condition: { broadcaster_user_id: '12345' } },
+        subscription: { id: 'x', type: unbekannterTyp, condition: { broadcaster_user_id: '12345' } },
         event: { broadcaster_user_id: '12345' } } });
     pruefe('unbekannter Typ -> null', twitch.uebersetzen(fremd.headers, fremd.koerper), null);
 

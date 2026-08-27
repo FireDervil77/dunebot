@@ -37,8 +37,12 @@ const ADAPTER = { twitch };
  * ist ein Twitch-Wort, und Kick wie YouTube bringen eigene mit. Gefunden von
  * `scripts/check-streaming-schichten.js`.
  *
+ * Seit 12c liefert der Adapter **Beschreibungen** statt blosser Namen:
+ * `{typ, version, bedingung, scope, melder}`. Der Name steht in `typ` — und
+ * nur der gehoert in die Datenbank, denn dort ist `ereignis` eine Spalte.
+ *
  * @param {string} plattform Plattform
- * @returns {Array<string>} Ereignisnamen der Plattform
+ * @returns {Array<Object>} Ereignisbeschreibungen der Plattform
  */
 function ereignisseVon(plattform) {
     return ADAPTER[plattform]?.EREIGNISSE || [];
@@ -54,7 +58,7 @@ function ereignisseVon(plattform) {
  * soll dafuer nichts bezahlen.
  *
  * @param {string} plattform Anbieter
- * @returns {Array<string>} Ereignisse
+ * @returns {Array<Object>} Ereignisbeschreibungen
  */
 function aboEreignisseVon(plattform) {
     return ADAPTER[plattform]?.EREIGNISSE_ABO || [];
@@ -175,7 +179,11 @@ async function abosSichern(streamerId, plattform, kanalId) {
     const gewuenscht = [...ereignisseVon(plattform)];
     if (await aboRollenGewuenscht(streamerId)) gewuenscht.push(...aboEreignisseVon(plattform));
 
-    for (const ereignis of gewuenscht) {
+    for (const beschreibung of gewuenscht) {
+        // Der Name ist der Schluessel — in `schonDa`, in der Tabelle und im
+        // Ergebnis. Die Beschreibung selbst geht nur an den Adapter, der
+        // Version und Bedingung daraus baut.
+        const ereignis = beschreibung.typ;
         const zustand = schonDa.get(ereignis);
         if (zustand === 'bestaetigt' || zustand === 'angefragt') {
             ergebnisse.push({ ereignis, uebersprungen: true, zustand });
@@ -196,7 +204,7 @@ async function abosSichern(streamerId, plattform, kanalId) {
              ON DUPLICATE KEY UPDATE geheimnis = VALUES(geheimnis), zustand = 'angefragt', fehlertext = NULL`,
             [streamerId, ereignis, geheimnis]);
 
-        const [antwort] = await adapter.abonnieren(kanalId, [ereignis], rueckrufAdresse(), geheimnis);
+        const [antwort] = await adapter.abonnieren(kanalId, [beschreibung], rueckrufAdresse(), geheimnis);
 
         if (antwort.ok) {
             await db().query(
@@ -240,7 +248,7 @@ async function aboEreignisseAufraeumen(streamerId) {
 
     for (const zeile of zeilen) {
         const adapter = ADAPTER[zeile.plattform];
-        if (!adapter || !aboEreignisseVon(zeile.plattform).includes(zeile.ereignis)) continue;
+        if (!adapter || !aboEreignisseVon(zeile.plattform).some(b => b.typ === zeile.ereignis)) continue;
 
         if (zeile.anbieter_abo_id) {
             try {

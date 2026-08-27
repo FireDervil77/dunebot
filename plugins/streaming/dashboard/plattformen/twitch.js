@@ -35,13 +35,46 @@ const IDAPI = 'https://id.twitch.tv/oauth2';
 const HOECHSTALTER_MS = 10 * 60 * 1000;
 
 /**
- * Welche Ereignisse dieser Adapter abonniert.
+ * Eine Ereignisbeschreibung.
+ *
+ * **Warum das keine Zeichenkette mehr ist (2026-08-27, Stufe 12c).** Bis hierher
+ * war jedes Ereignis ein Name, und `abonnieren()` setzte `version: '1'` und
+ * `condition: { broadcaster_user_id }` fest dazu. Das trug genau so lange, wie
+ * alle Ereignisse gleich gebaut waren — bei den Meldern hoert das auf:
+ *
+ *   channel.follow  ist **Version 2** und will zusaetzlich `moderator_user_id`
+ *   channel.raid    kennt gar kein `broadcaster_user_id`, sondern
+ *                   `to_broadcaster_user_id`
+ *
+ * Beides an der Doku geprueft, nicht angenommen. Wer es als Zeichenkette
+ * anlegte, bekaeme von Twitch ein 400 — oder schlimmer: ein Abo auf die
+ * falsche Richtung.
+ *
+ * @typedef {Object} Ereignisbeschreibung
+ * @property {string} typ Name bei Twitch; zugleich unser Schluessel in `streaming_subscriptions.ereignis`
+ * @property {string} version EventSub-Version — **nicht** immer '1'
+ * @property {function(string): Object} bedingung Kanalkennung -> `condition`
+ * @property {string|null} scope Zusage, die der Kanalinhaber erteilt haben muss
+ * @property {string|null} melder Meldungsart im Hausvokabular (Stufe 12c), sonst null
+ */
+
+/** Die haeufigste Bedingung — der Kanal, um den es geht. */
+const AM_KANAL = (id) => ({ broadcaster_user_id: String(id) });
+
+/**
+ * Welche Ereignisse dieser Adapter immer abonniert.
  *
  * Steht hier und nicht im Kern: Es sind Twitch-Woerter. Kick und YouTube
  * bringen ihre eigenen mit, und der Kern darf keines davon kennen.
  * `channel.update` kostet 0.
+ *
+ * @type {Array<Ereignisbeschreibung>}
  */
-const EREIGNISSE = ['stream.online', 'stream.offline', 'channel.update'];
+const EREIGNISSE = [
+    { typ: 'stream.online',  version: '1', bedingung: AM_KANAL, scope: null, melder: null },
+    { typ: 'stream.offline', version: '1', bedingung: AM_KANAL, scope: null, melder: null },
+    { typ: 'channel.update', version: '1', bedingung: AM_KANAL, scope: null, melder: null }
+];
 
 /**
  * Ereignisse fuer Abonnenten-Rollen (Stufe 12b).
@@ -57,8 +90,63 @@ const EREIGNISSE = ['stream.online', 'stream.offline', 'channel.update'];
  * `channel.subscribe` fuer den Beschenkten. Das Ende meldet
  * `channel.subscription.end` — es ist das wichtigste der drei, denn ohne es
  * bleibt eine Rolle fuer immer.
+ *
+ * @type {Array<Ereignisbeschreibung>}
  */
-const EREIGNISSE_ABO = ['channel.subscribe', 'channel.subscription.end', 'channel.subscription.message'];
+const EREIGNISSE_ABO = [
+    { typ: 'channel.subscribe',            version: '1', bedingung: AM_KANAL, scope: 'channel:read:subscriptions', melder: 'abonniert' },
+    { typ: 'channel.subscription.end',     version: '1', bedingung: AM_KANAL, scope: 'channel:read:subscriptions', melder: null },
+    { typ: 'channel.subscription.message', version: '1', bedingung: AM_KANAL, scope: 'channel:read:subscriptions', melder: 'verlaengert' }
+];
+
+/**
+ * Die Melder (Stufe 12c) — Ereignisse, die **nur** eine Meldung erzeugen.
+ *
+ * Sie ruehren weder Sendezustand noch Rollen an. Jedes kostet eine eigene
+ * Zusage, und `channel.raid` **keine** — das ist der Grund, warum Raids auch
+ * fuer Kanaele funktionieren, deren Besitzer nie etwas verknuepfen wird.
+ *
+ * `channel.subscription.gift` faellt unter dieselbe Zusage wie 12b und ist
+ * damit ohne weiteres Zutun zu haben.
+ *
+ * @type {Array<Ereignisbeschreibung>}
+ */
+const EREIGNISSE_MELDER = [
+    {
+        typ: 'channel.raid', version: '1',
+        // **Nicht `broadcaster_user_id`.** `to_…` heisst "jemand raidet
+        // HIERHER"; mit `from_…` bekaeme man das Gegenteil — wann dieser
+        // Kanal woandershin raidet. Beides gibt es, nur eines ist gemeint.
+        bedingung: (id) => ({ to_broadcaster_user_id: String(id) }),
+        scope: null, melder: 'raid'
+    },
+    {
+        typ: 'channel.subscription.gift', version: '1',
+        bedingung: AM_KANAL, scope: 'channel:read:subscriptions', melder: 'geschenkt'
+    },
+    {
+        typ: 'channel.cheer', version: '1',
+        bedingung: AM_KANAL, scope: 'bits:read', melder: 'bits'
+    },
+    {
+        typ: 'channel.follow', version: '2',
+        // Version 2 UND ein zweites Feld. `moderator_user_id` ist die Person,
+        // in deren Namen wir lesen — der Kanalinhaber ist Moderator seines
+        // eigenen Kanals, und genau er hat uns die Zusage gegeben.
+        bedingung: (id) => ({ broadcaster_user_id: String(id), moderator_user_id: String(id) }),
+        scope: 'moderator:read:followers', melder: 'follow'
+    }
+];
+
+/**
+ * Nur die Namen — fuer alles, was mit `streaming_subscriptions.ereignis` vergleicht.
+ *
+ * @param {Array<Ereignisbeschreibung>} liste Beschreibungen
+ * @returns {Array<string>} Namen
+ */
+function typenVon(liste) {
+    return (liste || []).map(b => b.typ);
+}
 
 /** App-Token im Speicher - es ist jederzeit neu beschaffbar und gehoert nicht in die Datenbank. */
 let token = { wert: null, gueltigBis: 0 };
@@ -153,8 +241,12 @@ async function aufloesen(eingabe) {
 /**
  * Abonnements anlegen.
  *
+ * **Nimmt Beschreibungen, keine Namen.** Version und Bedingung standen hier
+ * frueher fest (`'1'` und `broadcaster_user_id`) — siehe `Ereignisbeschreibung`
+ * oben, warum das ab Stufe 12c nicht mehr traegt.
+ *
  * @param {string} kanalId Numerische Twitch-ID
- * @param {Array<string>} ereignisse z. B. ['stream.online']
+ * @param {Array<Ereignisbeschreibung>} ereignisse Beschreibungen
  * @param {string} rueckrufAdresse Vollstaendige HTTPS-Adresse
  * @param {string} geheimnis Geheimnis dieses Abos
  * @returns {Promise<Array>} je Ereignis ein Ergebnis
@@ -162,13 +254,14 @@ async function aufloesen(eingabe) {
 async function abonnieren(kanalId, ereignisse, rueckrufAdresse, geheimnis) {
     const ergebnisse = [];
 
-    for (const typ of ereignisse) {
+    for (const b of ereignisse) {
+        const typ = b.typ;
         const { ok, status, json } = await helix('/eventsub/subscriptions', {
             method: 'POST',
             body: JSON.stringify({
                 type: typ,
-                version: '1',
-                condition: { broadcaster_user_id: String(kanalId) },
+                version: b.version,
+                condition: b.bedingung(kanalId),
                 transport: { method: 'webhook', callback: rueckrufAdresse, secret: geheimnis }
             })
         });
@@ -458,10 +551,22 @@ function widerrufsGrund(koerper) {
 function uebersetzen(headers, koerper) {
     const typ = ereignisTyp(headers, koerper);
     const e = koerper?.event || {};
-    const kanal = e.broadcaster_user_id || koerper?.subscription?.condition?.broadcaster_user_id;
+    const bed = koerper?.subscription?.condition || {};
+
+    // **`channel.raid` kennt kein `broadcaster_user_id`.** Es traegt
+    // `to_broadcaster_user_id` (wer geraidet wird) und
+    // `from_broadcaster_user_id` (wer raidet). Ohne diese Zeile faende die
+    // Zuordnung keinen Kanal und das Ereignis waere lautlos verschwunden —
+    // mit `zustand = fertig`, wie immer bei dieser Sorte Fehler.
+    const kanal = e.broadcaster_user_id || e.to_broadcaster_user_id
+        || bed.broadcaster_user_id || bed.to_broadcaster_user_id;
     if (!kanal) return null;
 
-    const gemeinsam = { plattform: 'twitch', kanal_id: String(kanal), login: e.broadcaster_user_login || null };
+    const gemeinsam = {
+        plattform: 'twitch',
+        kanal_id: String(kanal),
+        login: e.broadcaster_user_login || e.to_broadcaster_user_login || null
+    };
 
     switch (typ) {
         case 'stream.online':
@@ -488,18 +593,102 @@ function uebersetzen(headers, koerper) {
 
         // **Abonnements (Stufe 12b).** `channel.subscribe` meldet das erste
         // Abonnement, `channel.subscription.message` jede Verlaengerung — fuer
-        // die Rolle sind beide dasselbe: "diese Person ist Abonnent". Die
-        // Unterscheidung braucht erst 12c, wenn daraus eine Meldung im Chat
-        // werden soll.
+        // die Rolle sind beide dasselbe: "diese Person ist Abonnent".
+        //
+        // Seit 12c tragen sie **zusaetzlich** einen Melder. Die Rolle bleibt
+        // die Hauptsache (`art`), die Meldung kommt obendrauf — wer daraus
+        // `art: 'melden'` machte, naehme dem Abonnenten seine Rolle weg.
         case 'channel.subscribe':
         case 'channel.subscription.message':
-            return { ...gemeinsam, art: 'abonniert', abonnent: abonnentAus(koerper) };
+            return {
+                ...gemeinsam, art: 'abonniert',
+                abonnent: abonnentAus(koerper),
+                melder: melderAus(typ, koerper)
+            };
 
+        // **Kein Melder.** Ein beendetes Abonnement ist nichts, was man im
+        // Discord feiert — und der Betroffene laese es dort auch.
         case 'channel.subscription.end':
             return { ...gemeinsam, art: 'abo_beendet', abonnent: abonnentAus(koerper) };
 
+        // **Reine Melder (Stufe 12c).** Sie ruehren weder Sendezustand noch
+        // Rollen an. Deshalb tragen sie alle dieselbe Hausart und
+        // unterscheiden sich nur in `melder.was` — der Kern braucht keinen
+        // neuen Zweig je Twitch-Ereignis.
+        case 'channel.subscription.gift':
+        case 'channel.cheer':
+        case 'channel.follow':
+        case 'channel.raid':
+            return { ...gemeinsam, art: 'melden', melder: melderAus(typ, koerper) };
+
         default:
             return null;
+    }
+}
+
+/**
+ * Die Melde-Angaben eines Ereignisses, im Hausvokabular.
+ *
+ * **Jedes Feld ist optional und darf fehlen.** Was Twitch nicht mitschickt,
+ * bleibt `null` und wird in der Meldung ausgelassen — es wird nichts erfunden
+ * und nichts geschaetzt.
+ *
+ * @param {string} typ Twitch-Ereignisname
+ * @param {Object} koerper Zustellung
+ * @returns {{was: string, person: string|null, menge: number|null, stufe: string|null, geschenkt: boolean}} Angaben
+ */
+function melderAus(typ, koerper) {
+    const e = koerper?.event || {};
+    const leer = { person: null, menge: null, stufe: null, geschenkt: false };
+
+    switch (typ) {
+        case 'channel.subscribe':
+        case 'channel.subscription.message':
+            return {
+                ...leer,
+                was: typ === 'channel.subscribe' ? 'abonniert' : 'verlaengert',
+                person: e.user_name || e.user_login || null,
+                stufe: e.tier || null,
+                geschenkt: Boolean(e.is_gift),
+                // Nur `channel.subscription.message` traegt die Zahl der Monate.
+                menge: Number(e.cumulative_months) || null
+            };
+
+        case 'channel.subscription.gift':
+            return {
+                ...leer,
+                was: 'geschenkt',
+                // **Bei einem anonymen Geschenk ist `user_name` null**, und
+                // `is_anonymous` sagt es ausdruecklich. Wer hier den Namen
+                // erzwingt, schreibt "null hat 5 Abos verschenkt".
+                person: e.is_anonymous ? null : (e.user_name || e.user_login || null),
+                menge: Number(e.total) || null,
+                stufe: e.tier || null,
+                geschenkt: true
+            };
+
+        case 'channel.cheer':
+            return {
+                ...leer,
+                was: 'bits',
+                person: e.is_anonymous ? null : (e.user_name || e.user_login || null),
+                menge: Number(e.bits) || null
+            };
+
+        case 'channel.follow':
+            return { ...leer, was: 'follow', person: e.user_name || e.user_login || null };
+
+        case 'channel.raid':
+            return {
+                ...leer,
+                was: 'raid',
+                // Der Raidende steht in `from_…` — `to_…` waeren wir selbst.
+                person: e.from_broadcaster_user_name || e.from_broadcaster_user_login || null,
+                menge: Number(e.viewers) || null
+            };
+
+        default:
+            return { ...leer, was: 'unbekannt' };
     }
 }
 
@@ -833,7 +1022,8 @@ async function verknuepfteIdentitaet({ code, rueckrufUrl }) {
 module.exports = {
     name: 'twitch',
     tauschen, erneuern, pruefen,
-    EREIGNISSE_ABO, abonnentenLesen, abonnentAus,
+    EREIGNISSE_ABO, EREIGNISSE_MELDER, typenVon,
+    abonnentenLesen, abonnentAus, melderAus,
     HOECHSTALTER_MS,
     EREIGNISSE,
     verknuepfungsUrl,

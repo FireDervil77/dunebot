@@ -152,7 +152,8 @@ function melde(art, text, tun = '') {
         console.log('\n5. Stehen die EventSub-Abos?');
         // ---------------------------------------------------------------
 
-        const noetig = twitch.EREIGNISSE_ABO;
+        // Beschreibungen herein, Namen heraus — in der Tabelle steht `typ`.
+        const noetig = twitch.typenVon(twitch.EREIGNISSE_ABO);
         const haben = await q(
             'SELECT ereignis, zustand FROM streaming_subscriptions WHERE streamer_id = ?', [k.streamer_id]);
         const stand = new Map(haben.map(h => [h.ereignis, h.zustand]));

@@ -32,7 +32,7 @@ const mysql = require('mysql2/promise');
 // Aus dem Adapter, nicht von Hand: Die Liste gehoert der Plattform. Stuende
 // sie hier noch einmal, pruefte das Skript irgendwann etwas anderes als das
 // Plugin tut.
-const { EREIGNISSE } = require('../plugins/streaming/dashboard/plattformen/twitch');
+const { EREIGNISSE, typenVon } = require('../plugins/streaming/dashboard/plattformen/twitch');
 
 let faelle = 0;
 let abweichungen = 0;
@@ -80,7 +80,10 @@ function pruefe(was, gut, zusatz = '') {
         }
 
         // Loch und Doppelung in einem Durchgang: je Pflichtereignis genau eins.
-        const soll = s.plattform === 'twitch' ? EREIGNISSE : [];
+        // `EREIGNISSE` sind seit 12c Beschreibungen; in der Tabelle steht der
+        // blosse Name. Ohne `typenVon` verglichen wir Objekt gegen Zeichenkette
+        // — jede Zeile faende null Abos und der Waechter schrie ueberall.
+        const soll = s.plattform === 'twitch' ? typenVon(EREIGNISSE) : [];
         for (const e of soll) {
             const n = meineAbos.filter(a => a.ereignis === e).length;
             pruefe(`${s.login}: genau ein Abo fuer ${e}`, n === 1, `${n} gefunden, ${wo}`);
