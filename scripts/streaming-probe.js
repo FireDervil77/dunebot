@@ -14,10 +14,18 @@
  * Die Signatur wird mit dem echten Geheimnis des Abos gebildet. Eine Probe mit
  * falscher Signatur wuerde abgelehnt — genau wie ein Angriff.
  *
- *   node scripts/streaming-probe.js <kanalname> [online|offline|update] [--ja] [--frisch]
+ *   node scripts/streaming-probe.js <kanalname> [online|offline|update|abo|abo-ende] [--ja] [--frisch]
  *
  * Ohne `--ja` wird nur gezeigt, was geschehen wuerde. **Mit `--ja` entsteht
- * eine echte Nachricht im Discord.**
+ * eine echte Nachricht im Discord** — bei `abo`/`abo-ende` stattdessen eine
+ * echte Rollenaenderung.
+ *
+ * `abo` und `abo-ende` schicken `channel.subscribe` bzw.
+ * `channel.subscription.end`. Wer abonniert, steht in `--abonnent=<Konto-ID>`;
+ * ohne Angabe ist es der Kanalinhaber. Der Grund fuer diese Vorgabe: Eine Rolle
+ * kann nur bei einem Twitch-Konto entstehen, das einem Discord-Mitglied
+ * zugeordnet ist — ein erfundenes Konto laesst die Kette vorher enden, und dann
+ * beweist die Probe nichts.
  *
  * `--frisch` setzt vorher den Zustand des Streamers zurueck (nicht live, keine
  * letzte Meldung). Ohne das greift beim zweiten Versuch die Abklingzeit - im
@@ -42,14 +50,74 @@ const [, , kanalArg, artArg = 'online', ...rest] = process.argv;
 const ernst = rest.includes('--ja') || artArg === '--ja';
 const frisch = rest.includes('--frisch') || artArg === '--frisch';
 const kette = rest.includes('--kette') || artArg === '--kette';
-const art = ['online', 'offline', 'update'].includes(artArg) ? artArg : 'online';
+const ARTEN = ['online', 'offline', 'update', 'abo', 'abo-ende'];
+const art = ARTEN.includes(artArg) ? artArg : 'online';
 
-const EREIGNIS = { online: 'stream.online', offline: 'stream.offline', update: 'channel.update' }[art];
+const EREIGNIS = {
+    online: 'stream.online', offline: 'stream.offline', update: 'channel.update',
+    abo: 'channel.subscribe', 'abo-ende': 'channel.subscription.end'
+}[art];
+
+/**
+ * Wer abonniert (nur bei `abo`/`abo-ende`).
+ *
+ * **Vorgabe ist der Kanalinhaber selbst.** Nicht, weil das realistisch waere —
+ * Twitch zaehlt ihn gar nicht als Abonnenten — sondern weil die Rolle nur bei
+ * einem Konto entstehen kann, das in `user_connections` einem Discord-Mitglied
+ * zugeordnet ist. Ein erfundenes Konto laesst die Kette schon eine Station
+ * vorher enden, und dann beweist die Probe nichts.
+ */
+const abonnentArg = (rest.find(x => x.startsWith('--abonnent=')) || '').split('=')[1] || null;
+const ABO_ART = art === 'abo' || art === 'abo-ende';
 const ADRESSE = (process.env.DASHBOARD_BASE_URL || 'http://127.0.0.1:3000').replace(/\/+$/, '');
 
 if (!kanalArg) {
-    console.log('\n  node scripts/streaming-probe.js <kanalname> [online|offline|update] [--ja]\n');
+    console.log(`\n  node scripts/streaming-probe.js <kanalname> [${ARTEN.join('|')}] [--ja]`);
+    console.log('  bei abo/abo-ende zusaetzlich: [--abonnent=<Twitch-Konto-ID>]\n');
     process.exit(1);
+}
+
+/**
+ * Die Nutzlast, wie Twitch sie schickt.
+ *
+ * **Eine Stelle, nicht zwei.** Sie stand vorher doppelt da — im Einzelversand
+ * und in der Kette — und wer ein Ereignis dazunimmt, pflegt sonst genau eine
+ * der beiden.
+ *
+ * @param {Object} s Streamer-Zeile
+ * @param {string} ereignis Ereignisname
+ * @param {string} sendungId Kennung der Sendung
+ * @param {Object} opt { startVorMin, titel }
+ * @returns {Object} `event`-Teil der Zustellung
+ */
+function nutzlastBauen(s, ereignis, sendungId, { startVorMin = 0, titel = 'Titel aus der Probe' } = {}) {
+    const kanal = {
+        broadcaster_user_id: String(s.kanal_id),
+        broadcaster_user_login: s.login,
+        broadcaster_user_name: s.anzeigename
+    };
+
+    if (ereignis === 'channel.update') {
+        return { ...kanal, title: titel, category_name: 'Software and Game Development' };
+    }
+
+    if (ereignis === 'channel.subscribe' || ereignis === 'channel.subscription.end') {
+        const kontoId = abonnentArg || String(s.kanal_id);
+        const eigen = kontoId === String(s.kanal_id);
+        return {
+            ...kanal,
+            user_id: kontoId,
+            user_login: eigen ? s.login : `probe-${kontoId}`,
+            user_name: eigen ? (s.anzeigename || s.login) : `Probe ${kontoId}`,
+            tier: '1000',
+            is_gift: false
+        };
+    }
+
+    return {
+        ...kanal, id: sendungId, type: 'live',
+        started_at: new Date(Date.now() - startVorMin * 60000).toISOString()
+    };
 }
 
 /**
@@ -72,17 +140,10 @@ async function schicken(c, s, ereignis, sendungId) {
             id: abo[0].anbieter_abo_id, type: ereignis, version: '1', status: 'enabled',
             condition: { broadcaster_user_id: String(s.kanal_id) }
         },
-        event: ereignis === 'channel.update'
-            ? {
-                broadcaster_user_id: String(s.kanal_id), broadcaster_user_login: s.login,
-                broadcaster_user_name: s.anzeigename, title: `Titel gewechselt um ${new Date().toLocaleTimeString('de-DE')}`,
-                category_name: 'Software and Game Development'
-            }
-            : {
-                id: sendungId, broadcaster_user_id: String(s.kanal_id),
-                broadcaster_user_login: s.login, broadcaster_user_name: s.anzeigename,
-                type: 'live', started_at: new Date(Date.now() - 45 * 60000).toISOString()
-            }
+        event: nutzlastBauen(s, ereignis, sendungId, {
+            startVorMin: 45,
+            titel: `Titel gewechselt um ${new Date().toLocaleTimeString('de-DE')}`
+        })
     };
 
     const roh = Buffer.from(JSON.stringify(koerper), 'utf8');
@@ -200,6 +261,30 @@ async function ketteFahren(c, s) {
         console.log(`  Adresse:   ${ADRESSE}/api/streaming/webhook`);
         if (frisch) console.log('  Zustand:   wird vorher zurueckgesetzt (--frisch)');
 
+        // Bei einem Abo entscheiden zwei Dinge VOR dem Absenden, ob ueberhaupt
+        // etwas entstehen kann. Beide versagen lautlos - deshalb stehen sie
+        // hier, bevor man auf --ja drueckt.
+        if (ABO_ART) {
+            const kontoId = abonnentArg || String(s.kanal_id);
+            const [verkn] = await c.query(
+                'SELECT user_id FROM user_connections WHERE plattform = ? AND konto_id = ? LIMIT 1',
+                [s.plattform, kontoId]);
+            const [mitRolle] = await c.query(
+                `SELECT id, guild_id, abo_rolle_id FROM streaming_targets
+                  WHERE streamer_id = ? AND aktiv = 1 AND abo_rolle_id IS NOT NULL`, [s.id]);
+
+            console.log(`  Abonnent:  ${kontoId}${abonnentArg ? '' : '  (der Kanalinhaber selbst — Vorgabe)'}`);
+            console.log(`  Mitglied:  ${verkn[0]?.user_id || 'KEINES — ohne Verknuepfung kann keine Rolle entstehen'}`);
+            console.log('  Abo-Rolle: ' + (mitRolle.length
+                ? mitRolle.map(z => `${z.abo_rolle_id} (Ziel ${z.id})`).join(', ')
+                : 'KEINE — kein aktives Ziel hat eine Abonnenten-Rolle'));
+
+            if (!verkn.length || !mitRolle.length) {
+                console.log('\n  ⚠ So endet die Kette vor der Rolle. Das ist kein Fehler im Code,');
+                console.log('    aber die Probe wuerde nichts beweisen.');
+            }
+        }
+
         if (!ernst) {
             console.log('\n  Das war die Vorschau. Mit --ja wird es wirklich geschickt —');
             console.log('  und dann entsteht eine ECHTE Nachricht in deinem Discord.\n');
@@ -226,17 +311,7 @@ async function ketteFahren(c, s) {
                 id: abo[0].anbieter_abo_id, type: EREIGNIS, version: '1', status: 'enabled',
                 condition: { broadcaster_user_id: String(s.kanal_id) }
             },
-            event: art === 'update'
-                ? {
-                    broadcaster_user_id: String(s.kanal_id), broadcaster_user_login: s.login,
-                    broadcaster_user_name: s.anzeigename, title: 'Titel aus der Probe',
-                    category_name: 'Software and Game Development'
-                }
-                : {
-                    id: sendungId, broadcaster_user_id: String(s.kanal_id),
-                    broadcaster_user_login: s.login, broadcaster_user_name: s.anzeigename,
-                    type: 'live', started_at: new Date().toISOString()
-                }
+            event: nutzlastBauen(s, EREIGNIS, sendungId)
         };
 
         const roh = Buffer.from(JSON.stringify(koerper), 'utf8');
@@ -301,6 +376,37 @@ async function ketteFahren(c, s) {
             console.log('     das ist die Karenz und richtig so: Kommt der Streamer innerhalb');
             console.log('     dieser Zeit zurueck, waere das Aufraeumen ein Fehler gewesen.');
             console.log('     Also warten und DANN nachsehen.');
+        }
+
+        // Bei einem Abo ist die Nachricht nicht das Ergebnis — die Rolle ist es.
+        // Und die Buchfuehrung entscheidet, ob wir sie je wieder abziehen
+        // duerfen ("nur zurueck, was wir gaben").
+        if (ABO_ART) {
+            const kontoId = abonnentArg || String(s.kanal_id);
+
+            const [abonnent] = await c.query(
+                `SELECT konto_name, stufe, geschenkt FROM streaming_subscribers
+                  WHERE streamer_id = ? AND konto_id = ?`, [s.id, kontoId]);
+            console.log('  Abonnent:    ' + (abonnent.length
+                ? `vermerkt — Stufe ${abonnent[0].stufe || '—'}${abonnent[0].geschenkt ? ', geschenkt' : ''}`
+                : 'steht NICHT in streaming_subscribers'));
+
+            const [gaben] = await c.query(`
+                SELECT g.guild_id, g.rolle_id, g.mitglied_id
+                  FROM streaming_role_grants g
+                 WHERE g.mitglied_id = (SELECT user_id FROM user_connections
+                                         WHERE plattform = ? AND konto_id = ? LIMIT 1)`,
+                [s.plattform, kontoId]);
+            console.log('  Buchfuehrung: ' + (gaben.length
+                ? gaben.map(g => `Rolle ${g.rolle_id} an ${g.mitglied_id}`).join(', ')
+                : 'kein Eintrag in streaming_role_grants'));
+
+            console.log('\n  Der Beweis steht in Discord, nicht hier: Traegt das Mitglied die Rolle?');
+            if (art === 'abo') {
+                console.log('  ⚠ Sie flackert. Der taegliche Abonnenten-Lauf holt die echte Liste bei');
+                console.log('    Twitch — wer dort nicht steht, verliert sie wieder. Bei einer Probe');
+                console.log('    mit dem Kanalinhaber ist das sicher: Twitch fuehrt ihn nicht als Abonnenten.');
+            }
         }
 
         const [nachrichten] = await c.query(`
