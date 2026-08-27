@@ -239,13 +239,32 @@ async function widerrufen(userId, plattform) {
  * Benutzer inzwischen widerrufen hat. Ein ungueltiger Schluessel wird
  * **vermerkt, nicht geloescht** - siehe `vermerken`.
  *
- * @returns {Promise<{geprueft: number, ungueltig: number, uebersprungen: number}>} Bilanz
+ * ## Abgelaufen ist nicht widerrufen
+ *
+ * Ein Zugangsschluessel von Twitch lebt Stunden, nicht Tage. Ist er abgelaufen,
+ * antwortet `/validate` mit demselben 401 wie bei einem echten Widerruf - und
+ * eine Pruefung, die beides gleich behandelt, meldet **nach jeder Zustimmung
+ * verlaesslich Fehlalarm**, sobald der erste Ablauf vorbei ist.
+ *
+ * Deshalb wird ein Schluessel, von dem wir wissen, dass er abgelaufen ist, gar
+ * nicht erst gefragt: Der Aufruf koennte nichts beweisen. Erneuern ist hier
+ * ebenfalls falsch - ein Erneuerungsschluessel stirbt nach 50 ausgegebenen
+ * Zugaengen, und stuendlich erneuern hiesse, das Kontingent in gut einer Woche
+ * zu verbrennen (siehe Modulkopf).
+ *
+ * **Der Preis, offen benannt:** Wer widerruft und dessen Zusage danach
+ * ungenutzt bleibt, faellt nicht mehr stuendlich auf, sondern beim naechsten
+ * Gebrauch - dort erneuert `mitZugang`, das Erneuern scheitert, und der
+ * Vermerk steht. Genau dann ist es auch relevant: Ohne Gebrauch handeln wir
+ * nicht in seinem Namen.
+ *
+ * @returns {Promise<{geprueft: number, ungueltig: number, abgelaufen: number, uebersprungen: number}>} Bilanz
  */
 async function pruefen() {
-    const bilanz = { geprueft: 0, ungueltig: 0, uebersprungen: 0 };
+    const bilanz = { geprueft: 0, ungueltig: 0, abgelaufen: 0, uebersprungen: 0 };
 
     const zeilen = await db().query(`
-        SELECT g.id, g.zugang_ver, v.plattform, v.user_id
+        SELECT g.id, g.zugang_ver, g.laeuft_ab_am, v.plattform, v.user_id
           FROM user_connection_grants g
           JOIN user_connections v ON v.id = g.verbindung_id
     `);
@@ -257,6 +276,14 @@ async function pruefen() {
         // im Moment nicht pruefen.
         if (!anbieter?.pruefen) { bilanz.uebersprungen++; continue; }
 
+        // Bekannt abgelaufen: nicht fragen, nicht alarmieren, und den
+        // vorhandenen Vermerk **nicht** anfassen - dort koennte ein echter
+        // Widerruf stehen, den `mitZugang` beim letzten Gebrauch gefunden hat.
+        if (zeile.laeuft_ab_am && new Date(zeile.laeuft_ab_am).getTime() <= Date.now()) {
+            bilanz.abgelaufen++;
+            continue;
+        }
+
         try {
             const ergebnis = await anbieter.pruefen({ zugang: decrypt(zeile.zugang_ver) });
             bilanz.geprueft++;
@@ -266,6 +293,9 @@ async function pruefen() {
                     'UPDATE user_connection_grants SET geprueft_am = NOW(), fehlertext = NULL WHERE id = ?',
                     [zeile.id]);
             } else {
+                // Der Schluessel haette noch leben muessen - abgelaufene sind
+                // oben schon aussortiert. Bleibt: widerrufen, Passwort
+                // geaendert, oder App getrennt. Das ist echt.
                 bilanz.ungueltig++;
                 await vermerken(zeile.id, 'von der Plattform als ungueltig gemeldet');
                 log().warn(`[Verbindungen] ${zeile.plattform}/${zeile.user_id}: Zusage ungueltig - neue Zustimmung noetig`);
@@ -296,9 +326,10 @@ function starten() {
         laeuftGerade = true;
         try {
             const b = await pruefen();
-            if (b.geprueft || b.ungueltig) {
+            if (b.geprueft || b.ungueltig || b.abgelaufen) {
                 log().info(`[Verbindungen] Zusagen geprueft: ${b.geprueft} gueltig geprueft, ` +
-                    `${b.ungueltig} ungueltig, ${b.uebersprungen} uebersprungen`);
+                    `${b.ungueltig} ungueltig, ${b.abgelaufen} abgelaufen (wird bei Gebrauch erneuert), ` +
+                    `${b.uebersprungen} uebersprungen`);
             }
         } catch (err) {
             log().error('[Verbindungen] Stuendliche Pruefung fehlgeschlagen', err);

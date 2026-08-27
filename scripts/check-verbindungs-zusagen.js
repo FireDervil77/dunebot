@@ -286,6 +286,74 @@ let speicherVorbereiten = async () => {};
         'nicht pruefbar ist nicht dasselbe wie ungueltig');
 
     // ---------------------------------------------------------------
+    console.log('\nAbgelaufen ist nicht widerrufen');
+    // ---------------------------------------------------------------
+    // Der Fehlalarm vom 2026-08-27: Ein abgelaufener Zugang antwortet mit
+    // demselben 401 wie ein echter Widerruf. Wer beides gleich behandelt,
+    // meldet nach JEDER Zustimmung verlaesslich Alarm, sobald die ersten
+    // Stunden um sind — und ein Waechter, der grundlos schreit, wird ignoriert.
+
+    let gefragt = 0;
+    const mitZaehler = (antwort) => VerbindungsRegistry.register('pruef', {
+        ...grund,
+        zusagen: { 'abo-rollen': { label: 'Abos', scopes: ['channel:read:subscriptions'] } },
+        tauschen: async () => ({}), erneuern: async () => ({}),
+        pruefen: async () => { gefragt++; return antwort; }
+    });
+    mitZaehler({ gueltig: false, scopes: [], kontoId: null });
+
+    // Ein Zugang, der vor einer Minute abgelaufen ist — und ein Vermerk, wie
+    // ihn `mitZugang` bei einem echten Widerruf hinterlassen haette.
+    await speicher.zusageSpeichern({
+        userId: PRUEFNUTZER, plattform: 'pruef',
+        scopes: [], zugang: 'ABGELAUFEN', erneuerung: 'ERNEUERUNG', laeuftAbSek: -60
+    });
+    await speicher.vermerken((await speicher.zusageLesen(PRUEFNUTZER, 'pruef')).id, 'echter Widerruf');
+
+    const alt = await speicher.pruefen();
+    pruefe(alt.abgelaufen >= 1 && gefragt === 0,
+        'ein bekannt abgelaufener Zugang wird gar nicht erst gefragt',
+        `abgelaufen=${alt.abgelaufen}, Anfragen an die Plattform=${gefragt}`);
+    pruefe(alt.ungueltig === 0, 'und loest keinen Alarm aus',
+        'sonst steht binnen Stunden nach jeder Zustimmung "bitte neu erteilen" im Profil');
+
+    pruefe((await speicher.zusageLesen(PRUEFNUTZER, 'pruef')).fehlertext === 'echter Widerruf',
+        'ein vorhandener Vermerk wird dabei nicht weggewischt',
+        'ein echter Widerruf darf nicht durch blossen Ablauf verschwinden');
+
+    // Gegenprobe: derselbe ablehnende Anbieter, aber der Zugang lebt noch.
+    // Jetzt IST es ein Alarm — sonst faellt ein Widerruf nirgends mehr auf.
+    await speicher.zusageSpeichern({
+        userId: PRUEFNUTZER, plattform: 'pruef',
+        scopes: [], zugang: 'LEBT-NOCH', erneuerung: 'ERNEUERUNG', laeuftAbSek: 3600
+    });
+    const frisch = await speicher.pruefen();
+    pruefe(frisch.ungueltig >= 1 && gefragt === 1,
+        'ein noch gueltiger Zugang, den die Plattform ablehnt, IST ein Alarm',
+        `ungueltig=${frisch.ungueltig}, Anfragen an die Plattform=${gefragt}`);
+    pruefe(Boolean((await speicher.zusageLesen(PRUEFNUTZER, 'pruef')).fehlertext),
+        'und wird vermerkt');
+
+    // Und: die stuendliche Pruefung erneuert NIE von sich aus. Ein
+    // Erneuerungsschluessel stirbt nach 50 Ausgaben — stuendlich erneuern
+    // haette das Kontingent in gut einer Woche verbrannt.
+    let erneuert = 0;
+    VerbindungsRegistry.register('pruef', {
+        ...grund,
+        zusagen: { 'abo-rollen': { label: 'Abos', scopes: ['channel:read:subscriptions'] } },
+        tauschen: async () => ({}),
+        erneuern: async () => { erneuert++; return { zugang: 'X', erneuerung: 'Y', laeuftAbSek: 3600 }; },
+        pruefen: async () => ({ gueltig: false, scopes: [], kontoId: null })
+    });
+    await speicher.zusageSpeichern({
+        userId: PRUEFNUTZER, plattform: 'pruef',
+        scopes: [], zugang: 'EGAL', erneuerung: 'ERNEUERUNG', laeuftAbSek: -60
+    });
+    await speicher.pruefen();
+    pruefe(erneuert === 0, 'die stuendliche Pruefung erneuert nie von sich aus',
+        '50 Ausgaben je Erneuerungsschluessel — stuendlich waere das Kontingent in 8 Tagen leer');
+
+    // ---------------------------------------------------------------
     console.log('\nWiderruf und Loeschung');
     // ---------------------------------------------------------------
 
