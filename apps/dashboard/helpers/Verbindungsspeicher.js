@@ -110,11 +110,35 @@ async function zusageSpeichern({ userId, plattform, scopes, zugang, erneuerung, 
         return false;
     }
 
+    // **Was hier steht, muss der Schluessel auch koennen.**
+    //
+    // Bis zum 2026-08-27 wurden die Scopes blind zusammengefuehrt: Wer eine
+    // zweite Zusage erteilte, behielt die erste in der Spalte — aber nicht im
+    // Schluessel. Twitch gibt einen Schluessel genau ueber das, wonach der
+    // Dialog gefragt hat. Gemessen: Spalte drei Scopes, `/validate` einer,
+    // Helix `401 Missing scope`. Die Datenbank behauptete eine Berechtigung,
+    // die es nicht mehr gab — die schlimmste Sorte Auskunft.
+    //
+    // Jetzt gilt, was der Anbieter zum Schluessel meldet. Damit dabei nichts
+    // verlorengeht, bittet die Startroute schon um die **Vereinigung** aus
+    // alten und neuen Scopes; die Antwort enthaelt dann ohnehin beides.
+    //
+    // Meldet der Anbieter gar nichts (manche liefern bei der Erneuerung kein
+    // `scope`), bleibt der bisherige Stand stehen — eine leere Spalte waere
+    // eine andere Luege, nur in die andere Richtung.
     const vorher = await zusageLesen(userId, plattform);
-    const zusammen = [...new Set([
-        ...(vorher ? String(vorher.scopes || '').split(' ').filter(Boolean) : []),
-        ...(scopes || []).map(String)
-    ])].sort();
+    const gemeldet = [...new Set((scopes || []).map(String).filter(Boolean))].sort();
+    const bisher = vorher ? String(vorher.scopes || '').split(' ').filter(Boolean).sort() : [];
+    const zusammen = gemeldet.length ? gemeldet : bisher;
+
+    const verloren = bisher.filter(x => !zusammen.includes(x));
+    if (verloren.length) {
+        // Laut, nicht still: Eine Berechtigung, die weg ist, muss der Benutzer
+        // neu erteilen — und der Betreiber muss wissen, warum etwas aufhoert
+        // zu funktionieren.
+        log().warn(`[Verbindungen] ${plattform}/${userId}: Zusage verliert ${verloren.join(' ')} - `
+                 + 'der neue Schluessel deckt sie nicht mehr ab');
+    }
 
     await db().query(`
         INSERT INTO user_connection_grants
@@ -264,7 +288,7 @@ async function pruefen() {
     const bilanz = { geprueft: 0, ungueltig: 0, abgelaufen: 0, uebersprungen: 0 };
 
     const zeilen = await db().query(`
-        SELECT g.id, g.zugang_ver, g.laeuft_ab_am, v.plattform, v.user_id
+        SELECT g.id, g.zugang_ver, g.laeuft_ab_am, g.scopes, v.plattform, v.user_id
           FROM user_connection_grants g
           JOIN user_connections v ON v.id = g.verbindung_id
     `);
@@ -289,9 +313,24 @@ async function pruefen() {
             bilanz.geprueft++;
 
             if (ergebnis?.gueltig) {
+                // **Die Pruefung weiss es besser als unsere Spalte.**
+                // `/validate` nennt die Scopes, die der Schluessel wirklich
+                // traegt. Sie wegzuwerfen war der Grund, warum die Luege vom
+                // 2026-08-27 eine Stunde nach der anderen ueberlebte: Die
+                // Pruefung sah den Schluessel, sagte "gueltig", und ruehrte die
+                // falsche Spalte nicht an. Jetzt heilt sie sich stuendlich
+                // selbst.
+                const echt = Array.isArray(ergebnis.scopes) ? [...ergebnis.scopes].sort() : null;
+                const stand = String(zeile.scopes || '').split(' ').filter(Boolean).sort();
+
+                if (echt && echt.join(' ') !== stand.join(' ')) {
+                    log().warn(`[Verbindungen] ${zeile.plattform}/${zeile.user_id}: Spalte und Schluessel `
+                             + `weichen ab - vermerkt: "${stand.join(' ')}", wirklich: "${echt.join(' ')}"`);
+                }
+
                 await db().query(
-                    'UPDATE user_connection_grants SET geprueft_am = NOW(), fehlertext = NULL WHERE id = ?',
-                    [zeile.id]);
+                    'UPDATE user_connection_grants SET scopes = ?, geprueft_am = NOW(), fehlertext = NULL WHERE id = ?',
+                    [echt ? echt.join(' ') : String(zeile.scopes || ''), zeile.id]);
             } else {
                 // Der Schluessel haette noch leben muessen - abgelaufene sind
                 // oben schon aussortiert. Bleibt: widerrufen, Passwort

@@ -139,6 +139,32 @@ router.get('/:plattform/start', CheckAuth, async (req, res) => {
                 Logger.warn(`[Verbindungen] ${name}: unbekannte Zusage "${zusage}"`);
                 return res.redirect(`${zurueck}?fehler=zusage`);
             }
+
+            // **Die schon erteilten Scopes gehen mit — sonst nimmt die zweite
+            // Zusage der ersten ihre Wirkung.**
+            //
+            // Gemessen am 2026-08-27: Nach der Zustimmung zu "Follower lesen"
+            // trug der Schluessel nur noch `moderator:read:followers`, waehrend
+            // die Spalte weiter alle drei Scopes auswies. Twitch gibt einen
+            // Schluessel genau ueber das, wonach der Dialog gefragt hat — wer
+            // nur den neuen Scope erbittet, bekommt einen Schluessel, der nur
+            // den neuen kann. Die Abonnenten-Rolle war damit tot, und die
+            // Datenbank behauptete das Gegenteil.
+            //
+            // Der Benutzer sieht dadurch im Dialog auch die Berechtigungen,
+            // die er frueher schon gegeben hat. Das ist richtig so: Er
+            // bestaetigt damit den Gesamtumfang, und nichts wird ihm
+            // untergeschoben.
+            try {
+                const vorhanden = await Verbindungsspeicher.zusageLesen(req.session?.user?.info?.id, name);
+                scopes = erbeteneScopes(vorhanden?.scopes, scopes);
+            } catch (err) {
+                // Nicht lesbar heisst: ohne die alten weiterfragen. Der
+                // Benutzer verliert dann eine Berechtigung und muss sie neu
+                // erteilen — unangenehm, aber sichtbar. Stillstand waere
+                // schlechter.
+                Logger.warn(`[Verbindungen] ${name}: bisherige Zusagen nicht lesbar (${err.message})`);
+            }
         }
 
         const state = crypto.randomBytes(16).toString('hex') + (zusage ? `.${zusage}` : '');
@@ -332,6 +358,28 @@ router.post('/:plattform/zusage-widerrufen', CheckAuth, async (req, res) => {
     }
 });
 
+/**
+ * Welche Scopes der Dialog erbitten muss.
+ *
+ * **Die Vereinigung, nicht nur die neuen.** Twitch — und jeder andere Anbieter
+ * mit diesem Ablauf — gibt einen Schluessel genau ueber das, wonach der Dialog
+ * gefragt hat. Wer nur den neuen Scope erbittet, bekommt einen Schluessel, der
+ * nur den neuen kann, und die frueher erteilte Berechtigung ist weg. Gemessen
+ * am 2026-08-27: Spalte drei Scopes, `/validate` einer, Helix
+ * `401 Missing scope`.
+ *
+ * Als eigene Funktion, weil sie sich sonst nicht pruefen laesst — in der Route
+ * steckt sie hinter Sitzung, Datenbank und Weiterleitung.
+ *
+ * @param {string|null} vorhandene Bisher erteilte Scopes, durch Leerzeichen getrennt
+ * @param {Array<string>} neue Neu erbetene Scopes
+ * @returns {Array<string>} die Vereinigung, sortiert
+ */
+function erbeteneScopes(vorhandene, neue) {
+    const alt = String(vorhandene || '').split(' ').filter(Boolean);
+    return [...new Set([...alt, ...(neue || []).filter(Boolean)])].sort();
+}
+
 module.exports = router;
 
 // Die Profilseite braucht die Rueckrufadresse, um sie anzuzeigen - sie muss
@@ -346,3 +394,4 @@ module.exports.sicheresZiel = sicheresZiel;
 // Ebenfalls nach aussen: Die Zerlegung des States entscheidet, ob eine Zusage
 // gespeichert wird. Sie gehoert gepruefft, nicht angenommen.
 module.exports.stateZerlegen = stateZerlegen;
+module.exports.erbeteneScopes = erbeteneScopes;

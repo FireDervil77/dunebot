@@ -215,21 +215,59 @@ let speicherVorbereiten = async () => {};
     pruefe(String(roh.scopes) === 'channel:read:subscriptions', 'die Scopes liegen im Klartext',
         '"das hast du erlaubt" muss man zeigen koennen');
 
-    // Zweite Zusage: Scopes muessen ZUSAMMENGEFUEHRT werden, nicht ersetzt.
+    // -----------------------------------------------------------------
+    // **Die Spalte darf nicht mehr behaupten als der Schluessel kann.**
+    //
+    // Hier stand bis zum 2026-08-27 der Fall "eine zweite Zusage verliert die
+    // erste nicht" — und er hat die falsche Zusicherung festgeschrieben. Die
+    // Spalte fuehrte zusammen, der Schluessel wurde ersetzt. Gemessen an der
+    // echten Verknuepfung: Spalte drei Scopes, `/validate` einer, Helix
+    // `401 Missing scope`. Der Waechter war gruen.
+    //
+    // Nicht verlieren ist weiter das Ziel — nur wird es an der richtigen
+    // Stelle erreicht: Die Startroute bittet um die Vereinigung, und was
+    // zurueckkommt, gilt.
+    // -----------------------------------------------------------------
     await speicher.zusageSpeichern({
         userId: PRUEFNUTZER, plattform: 'pruef',
         scopes: ['user:read:chat'], zugang: 'ZWEITER', erneuerung: null, laeuftAbSek: null
     });
     const nachher = await speicher.zusageLesen(PRUEFNUTZER, 'pruef');
-    pruefe(String(nachher.scopes).includes('channel:read:subscriptions') &&
-           String(nachher.scopes).includes('user:read:chat'),
-        'eine zweite Zusage verliert die erste nicht', nachher.scopes);
+    pruefe(String(nachher.scopes) === 'user:read:chat',
+        'was der Anbieter meldet, steht in der Spalte — nicht mehr',
+        `"${nachher.scopes}" (frueher stand hier faelschlich auch der alte Scope)`);
+
+    // Der Anbieter meldet nichts: dann bleibt der Stand stehen, statt geleert
+    // zu werden. Eine leere Spalte waere die Luege in die andere Richtung.
+    await speicher.zusageSpeichern({
+        userId: PRUEFNUTZER, plattform: 'pruef',
+        scopes: [], zugang: 'DRITTER', erneuerung: null, laeuftAbSek: null
+    });
+    const ohneMeldung = await speicher.zusageLesen(PRUEFNUTZER, 'pruef');
+    pruefe(String(ohneMeldung.scopes) === 'user:read:chat',
+        'meldet der Anbieter keine Scopes, bleibt der bisherige Stand stehen',
+        `"${ohneMeldung.scopes}"`);
+
+    // Und die Vereinigung, wie die Startroute sie erbittet, kommt heil an.
+    await speicher.zusageSpeichern({
+        userId: PRUEFNUTZER, plattform: 'pruef',
+        scopes: ['user:read:chat', 'channel:read:subscriptions'],
+        zugang: 'VIERTER', erneuerung: null, laeuftAbSek: null
+    });
+    const vereint = await speicher.zusageLesen(PRUEFNUTZER, 'pruef');
+    pruefe(String(vereint.scopes) === 'channel:read:subscriptions user:read:chat',
+        'die erbetene Vereinigung steht vollstaendig und sortiert in der Spalte',
+        `"${vereint.scopes}"`);
 
     // `mitZugang`: der Aufrufer bekommt den Klartext, aber nur durch diese Tuer.
     let gesehen = null;
     await speicher.mitZugang({ userId: PRUEFNUTZER, plattform: 'pruef' },
         async (z) => { gesehen = z; return { ok: true }; });
-    pruefe(gesehen === 'ZWEITER', 'mitZugang reicht den entschluesselten Zugang durch');
+    // Der zuletzt gespeicherte Schluessel ist 'VIERTER' — die drei Faelle
+    // darueber schreiben ihn nacheinander fort. Genau das gehoert geprueft:
+    // Der Schluessel wird ERSETZT, nicht zusammengefuehrt.
+    pruefe(gesehen === 'VIERTER', 'mitZugang reicht den zuletzt gespeicherten Zugang durch',
+        `bekommen: "${gesehen}"`);
 
     pruefe(typeof speicher.zugangHolen !== 'function',
         'es gibt KEIN zugangHolen()',
@@ -261,11 +299,100 @@ let speicherVorbereiten = async () => {};
         'der erneuerte Schluessel ist weggeschrieben');
 
     // ---------------------------------------------------------------
+    console.log('\nWas der Dialog erbittet');
+    // ---------------------------------------------------------------
+    //
+    // **Der Kern des Fehlers vom 2026-08-27.** Wer nur den neuen Scope
+    // erbittet, bekommt einen Schluessel, der nur den neuen kann — die frueher
+    // erteilte Berechtigung ist damit still weg, obwohl die Spalte sie noch
+    // auswies.
+    const verbindungsRouter = require('../apps/dashboard/routes/verbindungen.router');
+
+    pruefe(typeof verbindungsRouter.erbeteneScopes === 'function',
+        'die Rechnung steht als eigene Funktion, nicht in der Route vergraben',
+        'sonst laesst sie sich hinter Sitzung und Weiterleitung nicht pruefen');
+
+    pruefe(String(verbindungsRouter.erbeteneScopes('channel:read:subscriptions', ['bits:read']))
+           === 'bits:read,channel:read:subscriptions',
+        'die schon erteilte Berechtigung geht mit in den Dialog');
+
+    pruefe(String(verbindungsRouter.erbeteneScopes(null, ['bits:read'])) === 'bits:read',
+        'ohne bisherige Zusage wird nur die neue erbeten');
+
+    pruefe(String(verbindungsRouter.erbeteneScopes('bits:read', ['bits:read'])) === 'bits:read',
+        'nichts wird doppelt erbeten');
+
+    pruefe(String(verbindungsRouter.erbeteneScopes('a b', [])) === 'a,b',
+        'ohne neue Zusage bleiben die alten erhalten - der Schluessel darf nicht schrumpfen');
+
+    pruefe(String(verbindungsRouter.erbeteneScopes('', [''])) === '',
+        'Leerwerte fallen weg statt als Scope durchzugehen');
+
+    // **Und die Route muss sie auch rufen.** Eine richtige Rechnung, die
+    // niemand benutzt, ist der Fehler vom 2026-08-26 in neuer Kleidung: Damals
+    // war die Zusage angemeldet und nicht anklickbar, 35 Pruefungen gruen.
+    // Deshalb hier ausdruecklich am Quelltext.
+    const routerQuelle = require('fs').readFileSync(
+        require('path').join(__dirname, '../apps/dashboard/routes/verbindungen.router.js'), 'utf8');
+    const ohneKommentare = routerQuelle
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n').filter(z => !z.trim().startsWith('//')).join('\n');
+
+    pruefe(/scopes\s*=\s*erbeteneScopes\s*\(/.test(ohneKommentare),
+        'die Startroute benutzt die Rechnung wirklich',
+        'sonst steht sie da und der Dialog erbittet weiter nur den neuen Scope');
+    pruefe(/zusageLesen\s*\(/.test(ohneKommentare),
+        'und holt sich dafuer die schon erteilten Zusagen');
+
+    // ---------------------------------------------------------------
     console.log('\nDie stuendliche Pflichtpruefung');
     // ---------------------------------------------------------------
 
     const bilanz = await speicher.pruefen();
     pruefe(bilanz.geprueft >= 1, 'die Pruefung erreicht die Zusage', JSON.stringify(bilanz));
+
+    // -----------------------------------------------------------------
+    // **Die Pruefung heilt eine luegende Spalte — der Fall vom 2026-08-27.**
+    //
+    // Damals stand in `scopes` mehr, als der Schluessel konnte. Die Pruefung
+    // sah den Schluessel, sagte "gueltig" und ruehrte die Spalte nicht an. Sie
+    // hatte die Wahrheit in der Hand (`/validate` nennt die Scopes) und warf
+    // sie weg. Eine Stunde nach der anderen.
+    // -----------------------------------------------------------------
+    await speicher.zusageSpeichern({
+        userId: PRUEFNUTZER, plattform: 'pruef',
+        scopes: ['channel:read:subscriptions', 'bits:read'],
+        zugang: 'BEHAUPTET-VIEL', erneuerung: 'E', laeuftAbSek: 3600
+    });
+
+    VerbindungsRegistry.register('pruef', {
+        ...grund,
+        zusagen: { 'abo-rollen': { label: 'Abos', scopes: ['channel:read:subscriptions'] } },
+        tauschen: async () => ({}),
+        erneuern: async () => ({ zugang: 'FRISCH', erneuerung: 'NEU', laeuftAbSek: 3600 }),
+        // Der Schluessel kann in Wahrheit nur eines der beiden.
+        pruefen: async () => ({ gueltig: true, scopes: ['bits:read'], kontoId: null })
+    });
+
+    await speicher.pruefen();
+    const geheilt = await speicher.zusageLesen(PRUEFNUTZER, 'pruef');
+    pruefe(String(geheilt.scopes) === 'bits:read',
+        'die Pruefung schreibt zurueck, was der Schluessel wirklich kann',
+        `"${geheilt.scopes}" (vorher behauptete die Spalte zwei Scopes)`);
+
+    // Und andersherum: Meldet die Pruefung mehr, wird auch das uebernommen —
+    // sonst blieben nachgeforderte Berechtigungen unsichtbar.
+    VerbindungsRegistry.register('pruef', {
+        ...grund,
+        zusagen: { 'abo-rollen': { label: 'Abos', scopes: ['channel:read:subscriptions'] } },
+        tauschen: async () => ({}),
+        erneuern: async () => ({ zugang: 'FRISCH', erneuerung: 'NEU', laeuftAbSek: 3600 }),
+        pruefen: async () => ({ gueltig: true, scopes: ['bits:read', 'channel:read:subscriptions'], kontoId: null })
+    });
+    await speicher.pruefen();
+    const gewachsen = await speicher.zusageLesen(PRUEFNUTZER, 'pruef');
+    pruefe(String(gewachsen.scopes) === 'bits:read channel:read:subscriptions',
+        'und mehr wird ebenso uebernommen', `"${gewachsen.scopes}"`);
 
     VerbindungsRegistry.register('pruef', {
         ...grund,
