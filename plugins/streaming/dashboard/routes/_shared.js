@@ -80,12 +80,12 @@ function renderFehler(res, error, text) {
  * @param {Object} nutzlast Nutzlast
  * @returns {Promise<Object|null>} ausgepackte Antwort
  */
-async function fragBot(ereignis, nutzlast) {
+async function fragBot(ereignis, nutzlast, fristMs = BOT_FRIST_MS) {
     const ipcServer = ServiceManager.get('ipcServer');
     if (!ipcServer) return null;
 
     try {
-        const antworten = await ipcServer.broadcast(ereignis, nutzlast);
+        const antworten = await ipcServer.broadcast(ereignis, nutzlast, true, { timeout: fristMs });
         const antwort = Array.isArray(antworten) && antworten.length ? antworten[0] : null;
         if (!antwort) return null;
         return antwort.data ?? antwort;
@@ -190,6 +190,20 @@ async function getRollen(guildId) {
  * @param {string} guildId Discord-Guild-ID
  * @returns {Promise<Array>} Mitglieder, nach Anzeigename sortiert
  */
+/**
+ * Frist fuer jede Frage an den Bot.
+ *
+ * **Der Aufrufer ist hier immer eine Seite**, auf die jemand wartet. Die Frist
+ * liegt bewusst ueber der des Bots (15 s in `bot/helpers/Mitglieder.js`):
+ * Antwortet er dort ehrlich mit "unvollstaendig", soll diese Antwort noch
+ * ankommen, statt hier vorher abgeschnitten zu werden.
+ *
+ * Gemessen am 2026-08-27, vor der Frist: 120 003 ms fuer eine Liste mit 14
+ * Eintraegen. Der Benutzer haelt so etwas fuer einen Netzfehler, nicht fuer
+ * eine langsame Seite.
+ */
+const BOT_FRIST_MS = 20_000;
+
 async function getMitglieder(guildId) {
     try {
         const antwort = await fragBot('dashboard:GET_ALL_GUILD_MEMBERS', { guildId });

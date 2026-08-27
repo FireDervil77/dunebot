@@ -18,7 +18,27 @@ class IPCServer {
         return Array.from(this.server.sockets).filter((c) => /\d+$/.test(c[0]));
     }
 
-    async broadcast(event, data, receptive = true) {
+    /**
+     * Ein Ereignis an ALLE Bot-Vorgaenge.
+     *
+     * **Zur Frist — dieselbe Falle wie bei `broadcastOne`.** veza sendet per
+     * Vorgabe unbegrenzt (`timeout = -1`). Ein Bot, der auf eine
+     * Gateway-Antwort wartet, haelt damit die aufrufende Dashboard-Seite
+     * beliebig lange fest. Gemessen am 2026-08-27: 120 Sekunden fuer eine
+     * Mitgliederliste mit 14 Eintraegen — die Seite baute sich zwei Minuten
+     * lang nicht auf, und der Benutzer hielt es fuer einen Netzfehler.
+     *
+     * Die **Vorgabe bleibt -1**, damit sich bestehende Aufrufer nicht
+     * unbemerkt aendern. Wer eine Seite bedient, setzt sie selbst.
+     *
+     * @param {string} event Ereignisname
+     * @param {Object} data Nutzlast
+     * @param {boolean} [receptive] auf Antwort warten
+     * @param {Object} [opt] Optionen
+     * @param {number} [opt.timeout] Frist in ms; -1 = unbegrenzt
+     * @returns {Promise<Array>} Antworten
+     */
+    async broadcast(event, data, receptive = true, { timeout = -1 } = {}) {
         const Logger = ServiceManager.get('Logger');
 
         const startTime = Date.now();
@@ -39,7 +59,7 @@ class IPCServer {
                                 event,
                                 payload: data,
                             },
-                            { receptive },
+                            { receptive, timeout },
                         )
                         .catch((error) => {
                             Logger.error(

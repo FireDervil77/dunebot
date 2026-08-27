@@ -188,7 +188,7 @@
           </div>
         </div>
 
-        <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>">
+        <form data-toast data-toast-neuladen method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>">
           <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
           <div class="card-body">
             <div class="row g-3">

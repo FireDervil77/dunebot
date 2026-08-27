@@ -1,4 +1,5 @@
 const veza = require("veza");
+const Mitglieder = require('./Mitglieder');
 const { Logger } = require("dunebot-sdk/utils");
 const { languagesMeta, ServiceManager } = require("dunebot-core");
 const { ChannelType } = require("discord.js");
@@ -694,15 +695,9 @@ class IPCClient {
 
             const members = {};
             
-            // Batch-Fetch falls Member nicht im Cache
-            if (guild.members.cache.size < guild.memberCount) {
-                try {
-                    await guild.members.fetch();
-                    this.logger.debug('[IPC] GET_GUILD_MEMBERS: Members aus API gefetcht');
-                } catch (err) {
-                    this.logger.warn('[IPC] Member-Fetch fehlgeschlagen, nutze Cache:', err.message);
-                }
-            }
+            // Frist und ehrliche Antwort kommen aus dem gemeinsamen Helfer —
+            // die Pruefung auf den Zwischenspeicher steckt dort schon drin.
+            await Mitglieder.holen(guild, this.logger);
             
             // User-Daten für alle übergebenen IDs abrufen
             for (const userId of payload.userIds) {
@@ -789,16 +784,19 @@ class IPCClient {
                 });
             }
 
-            // Fetch ALLE Members (force = true holt ALLE, auch Offline!)
-            try {
-                await guild.members.fetch({ force: true });
-                this.logger.debug(`[IPC] GET_ALL_GUILD_MEMBERS: ${guild.members.cache.size} Members gefetcht (inkl. Offline)`);
-            } catch (err) {
-                this.logger.warn('[IPC] Member-Fetch fehlgeschlagen, nutze Cache:', err.message);
-            }
+            // **Frueher stand hier `fetch({ force: true })` ohne Frist.**
+            // Ohne `time` gilt die Vorgabe von discord.js: 120 Sekunden.
+            // Gemessen am 2026-08-27: 120 003 ms fuer 14 Mitglieder, waehrend
+            // ein anderer Aufruf derselben Guild 107 ms brauchte. Die
+            // aufrufende Dashboard-Seite wartete zwei Minuten und bekam danach
+            // still eine Liste, die nur aus dem Zwischenspeicher stammte.
+            //
+            // Das `force: true` war dabei wirkungslos — beim Vollabruf liest
+            // discord.js es nicht aus. Nachgesehen, nicht angenommen.
+            const { mitglieder: cache, vollstaendig, grund } = await Mitglieder.holen(guild, this.logger);
             
             // Alle Members formatieren
-            const members = guild.members.cache.map(member => ({
+            const members = cache.map(member => ({
                 user: {
                     id: member.user.id,
                     username: member.user.username,
@@ -829,7 +827,8 @@ class IPCClient {
                 return nameA.localeCompare(nameB);
             });
 
-            this.logger.info(`[IPC] GET_ALL_GUILD_MEMBERS: ${members.length} Members für Guild ${payload.guildId}`);
+            this.logger.info(`[IPC] GET_ALL_GUILD_MEMBERS: ${members.length} Members für Guild ${payload.guildId}`
+                + (vollstaendig ? '' : ` — UNVOLLSTAENDIG (${grund})`));
 
             return message.reply({
                 success: true,
@@ -1216,8 +1215,11 @@ class IPCClient {
                 if (methods.includes('discord_dm')) {
                     // An alle Admins per DM senden
                     try {
-                        // Hole alle Members mit ManageGuild-Permission
-                        const members = await guild.members.fetch();
+                        // Hole alle Members mit ManageGuild-Permission.
+                        // Eine unvollstaendige Liste ist hier nicht gefaehrlich
+                        // (es werden dann weniger Admins erreicht), aber sie
+                        // darf den Aufrufer nicht zwei Minuten aufhalten.
+                        const { mitglieder: members } = await Mitglieder.holen(guild, this.logger);
                         const admins = members.filter(member => 
                             member.permissions.has('ManageGuild') && !member.user.bot
                         );

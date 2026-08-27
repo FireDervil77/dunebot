@@ -1,6 +1,7 @@
 'use strict';
 
 const { ServiceManager } = require('dunebot-core');
+const Mitglieder = require('../helpers/Mitglieder');
 const { EmbedBuilder } = require('discord.js');
 
 /**
@@ -190,7 +191,11 @@ module.exports = async (payload, client) => {
 
             if (methods.includes('discord_dm')) {
                 try {
-                    const members = await guild.members.fetch();
+                    // Ueber den gemeinsamen Helfer: Frist statt der 120 s von
+                    // discord.js. Eine unvollstaendige Liste erreicht hier
+                    // weniger Admins — das ist schlechter als alle, aber weit
+                    // besser als eine Meldung, die zwei Minuten haengt.
+                    const { mitglieder: members } = await Mitglieder.holen(guild, Logger);
                     const admins = members.filter(m => m.permissions.has('ManageGuild') && !m.user.bot);
                     const dmIds = [];
                     for (const [, member] of admins) {

@@ -431,30 +431,55 @@ router.post('/ziele/:id', requirePermission('STREAMING.TARGETS.MANAGE'), async (
         // ausschaltet, soll das Kontingent nicht weiter belasten. Ohne diesen
         // Aufruf stuende das Feld da und nichts geschaehe, bis irgendwann
         // zufaellig jemand den Kanal neu eintraegt.
+        // **Was hier passiert, gehoert in die Rueckmeldung.** Ein Speichern,
+        // das nebenbei Abonnements bei Twitch bestellt oder abbestellt, ist
+        // mehr als "gespeichert" — und wer es nicht erfaehrt, haelt die
+        // Wartezeit fuer einen Fehler. Deshalb wird gezaehlt statt geschwiegen.
+        let bestellt = 0;
+        let abbestellt = 0;
+        let nachzugFehler = null;
+
         try {
             const ziel = await modelle.zielLesen(guildId, zielId);
             if (ziel) {
                 const streamer = (await ServiceManager.get('dbService').query(
                     'SELECT plattform, kanal_id FROM streaming_streamers WHERE id = ?', [ziel.streamer_id]))[0];
                 if (streamer) {
-                    await abos.abosSichern(ziel.streamer_id, streamer.plattform, streamer.kanal_id);
+                    const ergebnisse = await abos.abosSichern(ziel.streamer_id, streamer.plattform, streamer.kanal_id);
+                    bestellt = (ergebnisse || []).filter(e => e && e.ok && !e.uebersprungen).length;
+
                     // Gezielt nur die Abo-Ereignisse: `abosAufraeumen` wuerde
                     // ALLES abbestellen, sobald die letzte Guild das Ziel
                     // entfernt — hier geht es nur um die Abonnenten-Rolle.
-                    await abos.aboEreignisseAufraeumen(ziel.streamer_id);
+                    const a = await abos.aboEreignisseAufraeumen(ziel.streamer_id);
                     // Dasselbe fuer die Melder: Wer eine Art abwaehlt, soll
                     // ihr Ereignis nicht weiter bezahlen.
-                    await abos.melderEreignisseAufraeumen(ziel.streamer_id);
+                    const b = await abos.melderEreignisseAufraeumen(ziel.streamer_id);
+                    abbestellt = (a?.abbestellt || 0) + (b?.abbestellt || 0);
                 }
             }
         } catch (err) {
             // Ein Fehlschlag hier darf das Speichern nicht zuruecknehmen. Der
-            // taegliche Abgleich holt es nach.
+            // taegliche Abgleich holt es nach — aber gesagt wird es trotzdem.
+            nachzugFehler = err.message;
             Logger.warn(`[Streaming] Abos nach Zieländerung nicht nachgezogen: ${err.message}`);
         }
 
-        Logger.info(`[Streaming] Ziel ${zielId} in Guild ${guildId} geaendert`);
-        return res.redirect(`${zurueck}?ok=gespeichert`);
+        Logger.info(`[Streaming] Ziel ${zielId} in Guild ${guildId} geaendert`
+            + (bestellt || abbestellt ? ` (${bestellt} bestellt, ${abbestellt} abbestellt)` : ''));
+
+        const teile = [];
+        if (bestellt)   teile.push(`${bestellt} Ereignis${bestellt === 1 ? '' : 'se'} bei Twitch bestellt`);
+        if (abbestellt) teile.push(`${abbestellt} abbestellt`);
+        if (nachzugFehler) teile.push('die Twitch-Abos konnten nicht nachgezogen werden — der tägliche Abgleich holt es nach');
+
+        return antworte(req, res, {
+            zurueck, ok: 'gespeichert',
+            // Bei einem Fehlschlag im Nachzug ist "gespeichert" wahr, aber
+            // unvollstaendig. Gelb statt gruen sagt genau das.
+            art: nachzugFehler ? 'warning' : 'success',
+            text: 'Ziel gespeichert' + (teile.length ? ' — ' + teile.join(', ') : '')
+        });
     } catch (error) {
         Logger.error('[Streaming] Ziel speichern fehlgeschlagen:', error);
         return res.redirect(`${zurueck}?fehler=technisch`);
