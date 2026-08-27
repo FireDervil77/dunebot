@@ -377,7 +377,50 @@ class PluginManager extends BasePluginManager {
             Logger.info(`📋 Registriere ${permissionsData.permissions.length} Permissions für Plugin ${plugin.name}...`);
             
             let registeredCount = 0;
-            
+
+            // **Gescheiterte Rechte werden gesammelt, nicht nur beklagt.**
+            // Am 2026-08-27 stand genau eine Zeile im Startprotokoll — "Data
+            // too long for column 'description_translation_key'" —, und
+            // `DISCORD.ROLEMENUS.MANAGE` existierte danach nicht. Ein Recht,
+            // das es nicht gibt, laesst sich keiner Gruppe zuteilen: Die
+            // Funktion dahinter ist fuer JEDEN gesperrt, und niemand sucht die
+            // Ursache in einer Spaltenbreite.
+            const gescheitert = [];
+
+            // Die Breiten aus der Datenbank holen, nicht raten. Damit kann die
+            // Meldung sagen, WAS zu lang ist und um wie viel — statt einen
+            // MySQL-Fehler durchzureichen, mit dem niemand etwas anfangen kann.
+            const breiten = new Map();
+            try {
+                const spalten = await dbService.query(`
+                    SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH AS laenge
+                      FROM information_schema.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'permission_definitions'
+                `) || [];
+                for (const z of spalten) breiten.set(z.COLUMN_NAME || z.column_name, Number(z.laenge) || 0);
+            } catch (err) {
+                Logger.debug(`Spaltenbreiten nicht lesbar (${err.message}) - Laengenpruefung entfaellt`);
+            }
+
+            /**
+             * Ist ein Text zu lang fuer seine Spalte?
+             *
+             * Gezaehlt werden **Zeichen**, nicht Bytes: MySQL misst `varchar`
+             * in Zeichen, und `String.length` zaehlt UTF-16-Einheiten. Fuer
+             * deutsche Texte ist das dasselbe; ein Emoji zaehlte hier zwei und
+             * dort eins — die Pruefung schlaegt dann zu frueh an, nie zu spaet.
+             *
+             * @param {string} spalte Spaltenname
+             * @param {string} wert Text
+             * @returns {string|null} Klartext-Grund oder null
+             */
+            const zuLang = (spalte, wert) => {
+                const grenze = breiten.get(spalte);
+                const laenge = wert ? [...String(wert)].length : 0;
+                if (!grenze || laenge <= grenze) return null;
+                return `${spalte} ist ${laenge} Zeichen lang, erlaubt sind ${grenze}`;
+            };
+
             // Jede Permission registrieren
             for (const perm of permissionsData.permissions) {
                 const {
@@ -403,6 +446,14 @@ class PluginManager extends BasePluginManager {
                     requiresJson = JSON.stringify(requiresArray);
                 }
                 
+                // Vor dem Schreiben pruefen, damit die Meldung brauchbar ist.
+                const zuLangGrund = zuLang('name_translation_key', name)
+                                 || zuLang('description_translation_key', description);
+                if (zuLangGrund) {
+                    gescheitert.push({ key, grund: zuLangGrund });
+                    continue;
+                }
+
                 try {
                     // INSERT ... ON DUPLICATE KEY UPDATE Pattern
                     // Schema: permission_key, name_translation_key, description_translation_key, category, is_dangerous, requires_permissions, plugin_name
@@ -423,11 +474,23 @@ class PluginManager extends BasePluginManager {
                     Logger.debug(`  ✅ Permission registriert: ${key}`);
                     
                 } catch (err) {
-                    Logger.error(`Fehler beim Registrieren von Permission ${key}:`, err);
+                    gescheitert.push({ key, grund: err.message || String(err) });
                 }
             }
-            
+
             Logger.success(`✅ ${registeredCount} Permissions für Plugin ${plugin.name} registriert`);
+
+            // **Am Stueck und als Fehler, nicht verstreut als Warnung.** Eine
+            // Zeile je Recht geht im Startprotokoll unter; eine Liste mit der
+            // Folge davor tut das nicht.
+            if (gescheitert.length) {
+                Logger.error(`⛔ ${plugin.name}: ${gescheitert.length} Recht(e) konnten NICHT angelegt werden. `
+                    + 'Sie stehen nicht in permission_definitions, lassen sich also niemandem zuteilen — '
+                    + 'die Funktionen dahinter sind fuer jeden gesperrt:');
+                for (const g of gescheitert) Logger.error(`   ⛔ ${g.key} — ${g.grund}`);
+                Logger.error('   Pruefen mit: node scripts/check-rechte-registriert.js');
+            }
+
             return registeredCount;
             
         } catch (error) {
@@ -470,7 +533,50 @@ class PluginManager extends BasePluginManager {
             Logger.info(`📋 Registriere ${permissionsData.permissions.length} Permissions für Plugin ${plugin.name} in Guild ${guildId}...`);
             
             let registeredCount = 0;
-            
+
+            // **Gescheiterte Rechte werden gesammelt, nicht nur beklagt.**
+            // Am 2026-08-27 stand genau eine Zeile im Startprotokoll — "Data
+            // too long for column 'description_translation_key'" —, und
+            // `DISCORD.ROLEMENUS.MANAGE` existierte danach nicht. Ein Recht,
+            // das es nicht gibt, laesst sich keiner Gruppe zuteilen: Die
+            // Funktion dahinter ist fuer JEDEN gesperrt, und niemand sucht die
+            // Ursache in einer Spaltenbreite.
+            const gescheitert = [];
+
+            // Die Breiten aus der Datenbank holen, nicht raten. Damit kann die
+            // Meldung sagen, WAS zu lang ist und um wie viel — statt einen
+            // MySQL-Fehler durchzureichen, mit dem niemand etwas anfangen kann.
+            const breiten = new Map();
+            try {
+                const spalten = await dbService.query(`
+                    SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH AS laenge
+                      FROM information_schema.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'permission_definitions'
+                `) || [];
+                for (const z of spalten) breiten.set(z.COLUMN_NAME || z.column_name, Number(z.laenge) || 0);
+            } catch (err) {
+                Logger.debug(`Spaltenbreiten nicht lesbar (${err.message}) - Laengenpruefung entfaellt`);
+            }
+
+            /**
+             * Ist ein Text zu lang fuer seine Spalte?
+             *
+             * Gezaehlt werden **Zeichen**, nicht Bytes: MySQL misst `varchar`
+             * in Zeichen, und `String.length` zaehlt UTF-16-Einheiten. Fuer
+             * deutsche Texte ist das dasselbe; ein Emoji zaehlte hier zwei und
+             * dort eins — die Pruefung schlaegt dann zu frueh an, nie zu spaet.
+             *
+             * @param {string} spalte Spaltenname
+             * @param {string} wert Text
+             * @returns {string|null} Klartext-Grund oder null
+             */
+            const zuLang = (spalte, wert) => {
+                const grenze = breiten.get(spalte);
+                const laenge = wert ? [...String(wert)].length : 0;
+                if (!grenze || laenge <= grenze) return null;
+                return `${spalte} ist ${laenge} Zeichen lang, erlaubt sind ${grenze}`;
+            };
+
             // Jede Permission registrieren
             for (const perm of permissionsData.permissions) {
                 const {

@@ -47,14 +47,18 @@ module.exports = {
         // deshalb von Hand nachgesehen, statt einen Fehler zu erzeugen, der
         // wie ein kaputter Umzug aussieht. Dasselbe Muster wie bei
         // `abo_rolle_id` am 2026-08-26.
-        const [vorhanden] = await db.query(`
+        // **`db.query` liefert die Zeilen direkt.** Hier stand
+        // `const [vorhanden] = ...` — das griff die erste ZEILE statt der Liste.
+        // Es ging trotzdem gut, weil der Irrtum in Richtung "Spalte anlegen"
+        // ausschlug; bei der Rechtetexte-Migration am selben Tag schlug er in
+        // die andere Richtung aus und tat lautlos nichts. Siehe Baustelle 81.
+        const vorhanden = await db.query(`
             SELECT COLUMN_NAME FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
                AND TABLE_NAME = 'streaming_targets'
                AND COLUMN_NAME IN ('melder_channel_id', 'melder_arten')
         `);
-        const zeilen = Array.isArray(vorhanden) ? vorhanden : [];
-        const namen = new Set(zeilen.map(z => z.COLUMN_NAME || z.column_name));
+        const namen = new Set((vorhanden || []).map(z => z.COLUMN_NAME || z.column_name));
 
         if (!namen.has('melder_channel_id')) {
             await db.query(`
