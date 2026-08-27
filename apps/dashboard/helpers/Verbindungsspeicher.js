@@ -327,8 +327,12 @@ function starten() {
         try {
             const b = await pruefen();
             if (b.geprueft || b.ungueltig || b.abgelaufen) {
-                log().info(`[Verbindungen] Zusagen geprueft: ${b.geprueft} gueltig geprueft, ` +
-                    `${b.ungueltig} ungueltig, ${b.abgelaufen} abgelaufen (wird bei Gebrauch erneuert), ` +
+                // `geprueft` zaehlt die **gefragten**, nicht die gueltigen - die
+                // ungueltigen stecken darin. "1 gueltig geprueft, 1 ungueltig"
+                // stand fuer EINE Zusage und las sich wie zwei.
+                log().info(`[Verbindungen] Zusagen: ${b.geprueft} gefragt ` +
+                    `(davon ${b.ungueltig} ungueltig), ` +
+                    `${b.abgelaufen} abgelaufen (wird bei Gebrauch erneuert), ` +
                     `${b.uebersprungen} uebersprungen`);
             }
         } catch (err) {
