@@ -97,7 +97,76 @@ pruefe('im Buch, aber traegt sie nicht -> nichts',
 pruefe('im Buch, traegt sie nicht, sendet -> geben',
     vergleichen([], ['A'], ['A']), { geben: ['A'], nehmen: [] });
 
-console.log(abweichungen === 0
-    ? `\nErgebnis: ${faelle} Faelle, 0 Abweichungen.\n`
-    : `\nErgebnis: ${faelle} Faelle, ${abweichungen} Abweichung(en).\n`);
-process.exit(abweichungen === 0 ? 0 : 1);
+// -------------------------------------------------------------------
+// Die Auskunft selbst: Wer traegt die Rolle?
+// -------------------------------------------------------------------
+// `vergleichen` oben rechnet richtig — mit dem, was hereinkommt. Am
+// 2026-08-26 um 20:02:38 kam eine **halbe** Liste herein, und niemand konnte
+// das sehen: `guild.members.fetch()` lief in seine Vorgabefrist von 120 s
+// (discord.js `_fetchMany`, `time = 120e3`), der Fehlschlag wurde von einem
+// `.catch(() => {})` verschluckt, und die bis dahin angekommenen Bruchstuecke
+// sahen aus wie das Ergebnis.
+//
+// Fuer `vergleichen` ist das der schlimmste Fall: Wer in der Liste fehlt, gilt
+// als "traegt die Rolle nicht" und bekommt sie erneut gegeben.
+
+const roleHolders = require('../plugins/streaming/bot/events/ipc/roleHolders');
+
+/**
+ * Ein Client, der sich so verhaelt wie gewuenscht.
+ *
+ * @param {Object} opt { fetchFehler, traeger, merker }
+ * @returns {Object} Attrappe
+ */
+function attrappe({ fetchFehler = null, traeger = ['A', 'B'], merker = {} } = {}) {
+    const rolle = { members: { map: (fn) => traeger.map(id => fn({ id })) } };
+    return {
+        guilds: {
+            cache: {
+                get: () => ({
+                    roles: { cache: { get: () => rolle } },
+                    members: {
+                        fetch: async (opt) => {
+                            merker.optionen = opt;
+                            if (fetchFehler) throw fetchFehler;
+                            return null;
+                        }
+                    }
+                })
+            }
+        }
+    };
+}
+
+(async () => {
+    console.log('\nDie Auskunft "wer traegt die Rolle"');
+
+    const merker = {};
+    const gut = await roleHolders({ guildId: '1', roleId: '2' }, attrappe({ merker }));
+    pruefe('geht der Abruf durch, kommt die Liste', gut, { success: true, traeger: ['A', 'B'] });
+
+    pruefe('und der Abruf bekommt eine Frist unter 30 s',
+        Boolean(merker.optionen?.time) && merker.optionen.time < 30000, true);
+
+    const zeitablauf = Object.assign(new Error('Members didn\'t arrive in time.'),
+        { code: 'GuildMembersTimeout' });
+    const schlecht = await roleHolders({ guildId: '1', roleId: '2' },
+        attrappe({ fetchFehler: zeitablauf }));
+
+    pruefe('laeuft er in die Frist, ist es KEIN Erfolg', schlecht.success, false);
+    pruefe('und es kommt gar keine Liste mit',
+        Object.prototype.hasOwnProperty.call(schlecht, 'traeger'), false);
+    pruefe('der Grund steht in der Antwort',
+        /unvollstaendig/.test(String(schlecht.error)), true);
+
+    // Ohne Guild ebenfalls kein Erfolg — sonst saehe "Bot kennt die Guild
+    // nicht" aus wie "niemand traegt die Rolle".
+    const ohneGuild = await roleHolders({ guildId: '1', roleId: '2' },
+        { guilds: { cache: { get: () => null } } });
+    pruefe('eine unbekannte Guild ist auch kein Erfolg', ohneGuild.success, false);
+
+    console.log(abweichungen === 0
+        ? `\nErgebnis: ${faelle} Faelle, 0 Abweichungen.\n`
+        : `\nErgebnis: ${faelle} Faelle, ${abweichungen} Abweichung(en).\n`);
+    process.exit(abweichungen === 0 ? 0 : 1);
+})();
