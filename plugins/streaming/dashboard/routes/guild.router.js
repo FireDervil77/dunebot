@@ -33,6 +33,7 @@ const {
 } = require('./_shared');
 const modelle = require('../../shared/models');
 const abos = require('../kern/abos');
+const melder = require('../kern/melder');
 const { PLATZHALTER, pruefeVorlage, VORGABE_LIVE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
 const { antworte, antworteFehler } = require('dunebot-sdk').FormAntwort;
 
@@ -233,7 +234,7 @@ router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
                 if (!streamer) continue;
 
                 const inhaber = await abonnenten.kanalInhaber(streamer);
-                if (!inhaber) { z.aboZusage = false; continue; }
+                if (!inhaber) { z.aboZusage = false; z.melderScopes = []; continue; }
 
                 const zusage = await require('../../../../apps/dashboard/helpers/Verbindungsspeicher')
                     .zusageLesen(inhaber, streamer.plattform);
@@ -241,16 +242,33 @@ router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
                 z.aboInhaber = zusage?.konto_name || streamer.login;
                 z.aboZusage = String(zusage?.scopes || '').includes('channel:read:subscriptions')
                     ? true : 'ohne-zusage';
-            } catch {
-                // Die Auskunft ist eine Freundlichkeit, kein Muss. Faellt sie
-                // aus, bleibt die Seite brauchbar.
-                z.aboZusage = false;
+
+                // Dieselbe Auskunft fuer die Melder (12c). Sie brauchen je
+                // nach Art einen anderen Scope — `bits:read`,
+                // `moderator:read:followers`, oder gar keinen (Raid).
+                z.melderScopes = String(zusage?.scopes || '').split(' ').filter(Boolean);
+            } catch (err) {
+                // **Nicht pruefbar ist nicht dasselbe wie nicht erteilt.**
+                // Frueher stand hier `z.aboZusage = false`, und die Seite
+                // behauptete dann "der Kanal ist nicht verknuepft" — eine
+                // falsche Auskunft, die wie eine richtige aussieht. Jetzt sagt
+                // sie, dass sie es nicht weiss.
+                ServiceManager.get('Logger').warn(
+                    `[Streaming] Zusagenstand fuer Ziel ${z.id} nicht lesbar: ${err.message}`);
+                z.aboZusage = 'unbekannt';
+                z.melderScopes = null;
             }
         }
 
         await renderView(res, 'guild/streaming-ziele', {
             tr, guildId, ziele, zielkanaele, sprachkanaele, rollen, mitglieder, liveRolleId,
             fremdeTraeger, zeitzone, zonen: ZEITZONEN,
+            // Die Melderarten kommen aus dem Kern, nicht aus der Ansicht:
+            // Sonst stuende die Liste an zwei Stellen und waeche beim
+            // naechsten Ereignis nur an einer mit.
+            melderArten: melder.ARTEN,
+            melderBeschreibung: (art) => melder.beschreibungFuer(
+                require('../plattformen/twitch'), art),
             meldung: req.query.ok || null,
             fehler: req.query.fehler || null
         });
@@ -375,6 +393,16 @@ router.post('/ziele/:id', requirePermission('STREAMING.TARGETS.MANAGE'), async (
             abo_rolle_id:     /^\d{5,32}$/.test(String(req.body.abo_rolle_id || '').trim())
                                 ? String(req.body.abo_rolle_id).trim() : null,
             onair_channel:    String(req.body.onair_channel || '').trim() || null,
+
+            // Melder (12c). Der Kanal darf leer bleiben — dann gehen die
+            // Meldungen in den Ankuendigungskanal (Entscheidung des Betreibers
+            // am 2026-08-27). Die Arten laufen durch `artenSchreiben`: Was
+            // dort nicht als gueltiger Name steht, faellt weg, statt in die
+            // Spalte zu geraten.
+            melder_channel_id: String(req.body.melder_channel_id || '').trim() || null,
+            melder_arten:     melder.artenSchreiben(
+                                Array.isArray(req.body.melder_arten) ? req.body.melder_arten
+                                : (req.body.melder_arten ? [req.body.melder_arten] : [])),
             filter_spiel:     String(req.body.filter_spiel || '').trim() || null,
             filter_titel:     String(req.body.filter_titel || '').trim() || null,
             filter_spiel_aus: String(req.body.filter_spiel_aus || '').trim() || null,
@@ -414,6 +442,9 @@ router.post('/ziele/:id', requirePermission('STREAMING.TARGETS.MANAGE'), async (
                     // ALLES abbestellen, sobald die letzte Guild das Ziel
                     // entfernt — hier geht es nur um die Abonnenten-Rolle.
                     await abos.aboEreignisseAufraeumen(ziel.streamer_id);
+                    // Dasselbe fuer die Melder: Wer eine Art abwaehlt, soll
+                    // ihr Ereignis nicht weiter bezahlen.
+                    await abos.melderEreignisseAufraeumen(ziel.streamer_id);
                 }
             }
         } catch (err) {

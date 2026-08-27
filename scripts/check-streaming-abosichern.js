@@ -52,8 +52,9 @@ function pruefe(gut, text, zusatz = '') {
 process.env.DASHBOARD_BASE_URL = 'https://pruefung.example';
 
 // --- Attrappen -----------------------------------------------------------
-const daten = { abos: [], ziele: [], abonnenten: [] };
+const daten = { abos: [], ziele: [], abonnenten: [], inhaber: null, scopes: '' };
 const mitschrift = { insert: [], update: [], abonniert: [], abbestellt: [], geloescht: [] };
+const unbekannteAbfragen = [];
 
 ServiceManager.register('Logger', { info: () => {}, debug: () => {}, warn: () => {}, error: () => {}, success: () => {} });
 ServiceManager.register('dbService', {
@@ -67,6 +68,20 @@ ServiceManager.register('dbService', {
         if (s.startsWith('SELECT 1 FROM streaming_targets')) {
             return daten.ziele.filter(z => z.streamer_id === w[0] && z.aktiv && z.abo_rolle_id);
         }
+        // Die Melder (12c) haengen am selben Weg: `abosSichern` fragt, welche
+        // Arten eine Guild will. Hier will keine eine — geprueft werden die
+        // Abo-Ereignisse, nicht die Melder. Die haben ihren eigenen Waechter.
+        if (s.startsWith('SELECT melder_arten FROM streaming_targets')) {
+            return daten.ziele.filter(z => z.streamer_id === w[0] && z.aktiv);
+        }
+        // `kanalInhaber` und die Zusage des Kanalinhabers. Beides steuerbar,
+        // weil der Melder-Schutz beim Aufraeumen genau daran haengt.
+        if (s.startsWith('SELECT user_id FROM user_connections')) {
+            return daten.inhaber ? [{ user_id: daten.inhaber }] : [];
+        }
+        if (s.startsWith('SELECT g.*, v.id AS verbindung')) {
+            return daten.inhaber ? [{ scopes: daten.scopes, konto_name: 'Inhaber' }] : [];
+        }
         if (s.startsWith('INSERT INTO streaming_subscriptions')) {
             mitschrift.insert.push({ streamer_id: w[0], ereignis: w[1] });
             daten.abos.push({ id: daten.abos.length + 1, streamer_id: w[0], ereignis: w[1], zustand: 'angefragt' });
@@ -76,14 +91,32 @@ ServiceManager.register('dbService', {
             mitschrift.update.push({ ereignis: w[3] });
             return [];
         }
-        if (s.startsWith('SELECT s.plattform, a.id, a.ereignis, a.anbieter_abo_id')) {
+        if (s.startsWith('SELECT s.plattform, s.kanal_id, a.id, a.ereignis, a.anbieter_abo_id')) {
             return daten.abos.filter(a => a.streamer_id === w[0])
-                .map(a => ({ plattform: 'twitch', id: a.id, ereignis: a.ereignis, anbieter_abo_id: a.anbieter_abo_id || 'twitch-' + a.id }));
+                .map(a => ({ plattform: 'twitch', kanal_id: '12345', id: a.id, ereignis: a.ereignis, anbieter_abo_id: a.anbieter_abo_id || 'twitch-' + a.id }));
         }
         if (s.startsWith('DELETE FROM streaming_subscriptions')) {
             mitschrift.geloescht.push(w[0]);
             daten.abos = daten.abos.filter(a => a.id !== w[0]);
             return [];
+        }
+
+        // Beim Abbestellen der Abo-Ereignisse geht die Abonnentenliste mit —
+        // sie ohne Zusage weiterzufuehren waere ein Vorrat, den niemand mehr
+        // pflegt. Hier nur zur Kenntnis genommen.
+        if (s.startsWith('DELETE FROM streaming_subscribers')) {
+            mitschrift.geloescht.push('subscribers');
+            return [];
+        }
+
+        // **Eine unbekannte Abfrage ist ein Befund, keine leere Liste.**
+        // Genau daran ist dieser Waechter am 2026-08-27 blind geworden: Der
+        // Code bekam eine Spalte mehr in seinem SELECT, die Attrappe erkannte
+        // ihn nicht wieder und lieferte `[]` — "nichts abzubestellen" sah aus
+        // wie ein bestandener Fall. Wer eine Abfrage aendert, soll es hier
+        // merken, nicht in drei Wochen im Betrieb.
+        if (/^(SELECT|INSERT|UPDATE|DELETE)/i.test(s)) {
+            unbekannteAbfragen.push(s.slice(0, 90));
         }
         return [];
     },
@@ -112,9 +145,13 @@ const abos = require('../plugins/streaming/dashboard/kern/abos');
  * @param {boolean} [rolleGewuenscht] ob eine Guild eine Abo-Rolle vergibt
  * @returns {void}
  */
-function neuAufsetzen(bestand = [], rolleGewuenscht = false) {
+function neuAufsetzen(bestand = [], rolleGewuenscht = false, melderArten = null, scopes = '') {
     daten.abos = bestand.map((b, i) => ({ id: i + 1, streamer_id: 1, ...b }));
-    daten.ziele = rolleGewuenscht ? [{ streamer_id: 1, aktiv: 1, abo_rolle_id: '999' }] : [];
+    daten.ziele = (rolleGewuenscht || melderArten)
+        ? [{ streamer_id: 1, aktiv: 1, abo_rolle_id: rolleGewuenscht ? '999' : null, melder_arten: melderArten }]
+        : [];
+    daten.inhaber = scopes ? '4711' : null;
+    daten.scopes = scopes;
     mitschrift.insert = []; mitschrift.update = []; mitschrift.abonniert = [];
     mitschrift.abbestellt = []; mitschrift.geloescht = [];
 }
@@ -225,6 +262,30 @@ console.log('\nAufraeumen erkennt seine Ereignisse am Namen');
         'solange eine Guild die Rolle vergibt, bleibt alles stehen');
 }
 
+console.log('\nEin Melder haelt sein Ereignis fest');
+{
+    // **Der Fall, der beim Abschalten der Abonnenten-Rolle wehtut.**
+    // `channel.subscribe` traegt zweierlei: die Rolle und die Meldung. Wer es
+    // mit der Rolle abraeumt, nimmt der Meldung lautlos ihr Abo weg — und
+    // niemand merkt es, weil das Haekchen "Neue Abonnements" stehen bleibt.
+    neuAufsetzen([...NAMEN, ...ABO_NAMEN].map(e => ({ ereignis: e, zustand: 'bestaetigt' })),
+        false, 'abonniert', 'channel:read:subscriptions');
+    const ergebnis = await abos.aboEreignisseAufraeumen(1);
+
+    pruefe(daten.abos.some(a => a.ereignis === 'channel.subscribe'),
+        'channel.subscribe bleibt stehen, weil die Meldung es braucht',
+        daten.abos.map(a => a.ereignis).join(' '));
+    pruefe(!daten.abos.some(a => a.ereignis === 'channel.subscription.end'),
+        'channel.subscription.end geht weg — kein Melder braucht es');
+    pruefe(ergebnis.abbestellt === 2, 'genau zwei der drei werden abbestellt', String(ergebnis.abbestellt));
+
+    // Die Gegenprobe im Fall selbst: ohne Melder faellt alles drei weg.
+    neuAufsetzen([...NAMEN, ...ABO_NAMEN].map(e => ({ ereignis: e, zustand: 'bestaetigt' })), false);
+    await abos.aboEreignisseAufraeumen(1);
+    pruefe(!daten.abos.some(a => a.ereignis === 'channel.subscribe'),
+        'ohne Melder faellt channel.subscribe wie die anderen weg');
+}
+
 console.log('\nDie Bauform jeder Beschreibung');
 {
     // Fuer Kick und YouTube spaeter: Die Form ist der Vertrag zwischen Kern
@@ -260,6 +321,13 @@ console.log('\nDie Bauform jeder Beschreibung');
     const stummeMelder = twitch.EREIGNISSE_MELDER.filter(b => !b.melder);
     pruefe(stummeMelder.length === 0, 'jeder Melder hat einen Meldernamen',
         stummeMelder.map(b => b.typ).join(' '));
+}
+
+console.log('\nHat die Attrappe alles verstanden?');
+{
+    pruefe(unbekannteAbfragen.length === 0,
+        'keine Abfrage lief an der Attrappe vorbei',
+        unbekannteAbfragen.length ? unbekannteAbfragen[0] : 'alle erkannt');
 }
 
 console.log(abweichungen === 0

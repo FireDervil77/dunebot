@@ -61,7 +61,7 @@ ServiceManager.register('Logger', {
 });
 
 /** Auftraege und Ziele im Speicher, mit Mitschrift der Schreibzugriffe. */
-const daten = { auftraege: [], kanaele: new Map(), geschrieben: [] };
+const daten = { auftraege: [], kanaele: new Map(), melderKanaele: new Map(), geschrieben: [] };
 
 ServiceManager.register('dbService', {
     async query(sql, werte = []) {
@@ -70,9 +70,14 @@ ServiceManager.register('dbService', {
         if (s.startsWith('SELECT * FROM streaming_outbox')) {
             return daten.auftraege.filter(a => a.zustand === 'offen');
         }
-        if (s.startsWith('SELECT channel_id FROM streaming_targets')) {
+        // Seit 12c holt `auswaehlen` **zwei** Kanaele: den Ankuendigungs- und
+        // den Meldekanal. Die Attrappe hing vorher am alten SELECT und lieferte
+        // danach eine leere Liste — die Kanalgrenze schien dann zu greifen,
+        // obwohl sie gar keinen Kanal mehr kannte. Ein Waechter, der beim
+        // Aendern der Abfrage lautlos blind wird, ist keiner.
+        if (s.startsWith('SELECT channel_id, melder_channel_id FROM streaming_targets')) {
             const kanal = daten.kanaele.get(werte[0]);
-            return kanal ? [{ channel_id: kanal }] : [];
+            return kanal ? [{ channel_id: kanal, melder_channel_id: daten.melderKanaele.get(werte[0]) || null }] : [];
         }
         if (s.startsWith('UPDATE streaming_outbox')) {
             daten.geschrieben.push({ sql: s, werte });
@@ -85,9 +90,27 @@ ServiceManager.register('dbService', {
             }
             return [];
         }
+
+        // **Die Buchfuehrung der Rollen.** Sie wird hier mitgeschrieben und
+        // nicht geprueft — dafuer gibt es `check-streaming-liverolle.js` und
+        // `check-streaming-abonnenten.js`. Sie muss trotzdem stehen, sonst
+        // faellt sie unten als "unbekannte Abfrage" auf, und die Warnung
+        // verloere ihren Wert: Ein Waechter, der immer etwas meldet, wird
+        // weggeklickt.
+        if (s.startsWith('INSERT INTO streaming_role_grants')
+            || s.startsWith('DELETE FROM streaming_role_grants')) {
+            daten.geschrieben.push({ sql: s, werte });
+            return [];
+        }
+
+        // Eine Abfrage, die hier vorbeilaeuft, ist ein Befund. Genau so ist
+        // dieser Waechter am 2026-08-27 blind geworden.
+        if (/^(SELECT|INSERT|UPDATE|DELETE)/i.test(s)) unbekannteAbfragen.push(s.slice(0, 90));
         return [];
     }
 });
+
+const unbekannteAbfragen = [];
 
 const drossel = require('../plugins/streaming/dashboard/ausgabe/drossel');
 
@@ -238,6 +261,11 @@ const drossel = require('../plugins/streaming/dashboard/ausgabe/drossel');
         'vorher stand dort nichts und der Auftrag galt als sauber erledigt');
     pruefe(protokoll.some(z => z.includes('#20') || z.includes('Auftrag 20')),
         'und im Protokoll steht es auch');
+
+    console.log('\nHat die Attrappe alles verstanden?');
+    pruefe(unbekannteAbfragen.length === 0,
+        'keine Abfrage lief an der Attrappe vorbei',
+        unbekannteAbfragen.length ? [...new Set(unbekannteAbfragen)].join(' | ') : 'alle erkannt');
 
     console.log(`\nErgebnis: ${faelle} Pruefungen, ${abweichungen} Abweichung(en).\n`);
     process.exit(abweichungen ? 1 : 0);

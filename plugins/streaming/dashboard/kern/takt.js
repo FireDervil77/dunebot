@@ -32,6 +32,7 @@ const abonnenten = require('./abonnenten');
 const entscheidung = require('./entscheidung');
 const { melden } = require('../../shared/signale');
 const abos = require('./abos');
+const melder = require('./melder');
 
 const TAKT_MS = 5_000;
 const ANREICHERN_MS = 30_000;
@@ -240,7 +241,29 @@ async function verarbeiten(ereignis) {
         case 'abonniert':   ergebnis = await abonnenten.aufnehmen(streamer, ereignis.abonnent); break;
         case 'abo_beendet': ergebnis = await abonnenten.entfernen(streamer, ereignis.abonnent); break;
 
+        // **Reine Meldungen (Stufe 12c).** Raid, Geschenk-Abo, Bits, Follow.
+        // Sie ruehren nichts an, was der Zustand kennt — deshalb laufen sie
+        // wie die Abonnements an `zustand` vorbei.
+        case 'melden':      ergebnis = await melder.melden(streamer, ereignis.melder); break;
+
         default:            return `Ereignisart "${ereignis.art}" wird nicht behandelt`;
+    }
+
+    // **Die Meldung kommt obendrauf, sie ersetzt nichts.** `channel.subscribe`
+    // und `channel.subscription.message` tragen beides: die Rolle (`art`) und
+    // eine Melde-Angabe. Wer daraus `art: 'melden'` gemacht haette, naehme dem
+    // Abonnenten seine Rolle weg — deshalb laeuft die Meldung hier als
+    // zweiter Schritt und nicht als anderer Zweig.
+    //
+    // Ein Fehlschlag hier darf die Rolle nicht mitreissen: Sie ist die
+    // Hauptsache, die Nachricht die Zugabe.
+    if ((ereignis.art === 'abonniert') && ereignis.melder) {
+        try {
+            const dazu = await melder.melden(streamer, ereignis.melder);
+            ergebnis = `${ergebnis}; ${dazu}`;
+        } catch (err) {
+            log().warn(`[Streaming] Meldung zum Abonnement fehlgeschlagen: ${err.message}`);
+        }
     }
 
     // Offene Zustandsseiten anstupsen. Bewusst **eine** Stelle statt drei in

@@ -197,4 +197,102 @@ function rueckschau({ streamer, zustand = {}, ziel = {}, vodUrl = null }) {
     };
 }
 
-module.exports = { FARBEN, FARBE_VORBEI, VORGABE_VORLAGE, VORGABE_RUECKSCHAU, kanalAdresse, dauerText, textFuellen, live, rueckschau };
+
+/**
+ * Namen einer gesammelten Meldung auflisten.
+ *
+ * **Ohne Namen ist die Zahl die Meldung.** Bei anonymen Bits und anonymen
+ * Geschenk-Abos schickt Twitch keinen Namen; "null hat 500 Bits geschickt"
+ * waere die Sorte Fehler, die niemand im Test sieht und jeder im Betrieb.
+ *
+ * @param {Array<Object>} posten Einzelangaben
+ * @param {number} anzahl Gesamtzahl (kann groesser sein als `posten`)
+ * @returns {string} Klartext, moeglicherweise leer
+ */
+function namenListe(posten, anzahl) {
+    const namen = (posten || []).map(p => p && p.person).filter(Boolean);
+    if (!namen.length) return '';
+
+    const fehlen = Math.max(0, (Number(anzahl) || namen.length) - namen.length);
+    const text = namen.join(', ');
+    return fehlen ? `${text} und ${fehlen} weitere` : text;
+}
+
+/**
+ * Eine Meldung (Stufe 12c): Raid, Geschenk-Abo, Bits, Follow, Abonnement.
+ *
+ * **Bewusst schlicht, und zwar aus einem Grund:** Diese Meldungen kommen im
+ * Schub. Ein Embed je Follow verwandelt einen Kanal in eine Wand aus Kaesten,
+ * und die Live-Ankuendigung — die einzige Nachricht, auf die es ankommt —
+ * verschwindet darin. Eine Zeile Text ist hier die richtige Groesse.
+ *
+ * **Keine Erwaehnung, nie.** Eine Rolle bei jedem Follow anzupingen waere der
+ * schnellste Weg, dass jeder die Benachrichtigungen des Kanals abschaltet —
+ * und damit auch die Ankuendigung nicht mehr sieht.
+ *
+ * @param {Object} daten Angaben
+ * @param {Object} daten.streamer Streamer
+ * @param {Object} daten.nutzlast Nutzlast des Auftrags
+ * @returns {{content: string, embeds: Array, components: Array}} Discord-Nutzlast
+ */
+function melder({ streamer, nutzlast = {} }) {
+    const name = streamer.anzeigename || streamer.login;
+    const url = kanalAdresse(streamer.plattform, streamer.login);
+    const anzahl = Number(nutzlast.anzahl) || 1;
+    const summe = Number(nutzlast.summe) || 0;
+    const liste = namenListe(nutzlast.posten, anzahl);
+    const einer = (nutzlast.posten || [])[0] || {};
+
+    /** @returns {string} Zeile */
+    const zeile = () => {
+        switch (nutzlast.art) {
+            case 'raid':
+                // Ein Raid wird nicht gesammelt, es gibt immer genau einen.
+                return einer.person
+                    ? `**${einer.person}** raidet **${name}**`
+                      + (einer.menge ? ` mit ${einer.menge} Zuschauer${einer.menge === 1 ? '' : 'n'}` : '')
+                    : `Ein Raid ist bei **${name}** angekommen`;
+
+            case 'follow':
+                return anzahl === 1
+                    ? (liste ? `**${liste}** folgt **${name}** jetzt` : `**${name}** hat einen neuen Follower`)
+                    : `**${name}** hat ${anzahl} neue Follower${liste ? `: ${liste}` : ''}`;
+
+            case 'bits':
+                // Die Summe ist die Aussage, nicht die Zahl der Meldungen.
+                return summe
+                    ? `${summe} Bits für **${name}**${liste ? ` — von ${liste}` : ''}`
+                    : `Bits für **${name}**${liste ? ` — von ${liste}` : ''}`;
+
+            case 'geschenkt':
+                return summe
+                    ? `${summe} geschenkte Abos für **${name}**${liste ? ` — von ${liste}` : ''}`
+                    : `Geschenkte Abos für **${name}**${liste ? ` — von ${liste}` : ''}`;
+
+            case 'abonniert':
+                return anzahl === 1
+                    ? (liste ? `**${liste}** abonniert **${name}**` : `**${name}** hat ein neues Abo`)
+                    : `${anzahl} neue Abos für **${name}**${liste ? `: ${liste}` : ''}`;
+
+            case 'verlaengert':
+                // Monate werden **nicht** addiert (siehe `melder.zusammenlegen`):
+                // Aus drei Verlaengerungen "42 Monate" zu machen waere falsch.
+                return anzahl === 1
+                    ? (liste
+                        ? `**${liste}** verlängert bei **${name}**`
+                          + (einer.menge ? ` — ${einer.menge} Monate` : '')
+                        : `Ein Abo bei **${name}** wurde verlängert`)
+                    : `${anzahl} verlängerte Abos bei **${name}**${liste ? `: ${liste}` : ''}`;
+
+            default:
+                // Sichtbar falsch ist besser als still weg: Kaeme je eine Art
+                // hier an, die niemand gebaut hat, steht sie im Kanal statt
+                // nirgends.
+                return `Meldung "${nutzlast.art}" für **${name}**`;
+        }
+    };
+
+    return { content: `${zeile()} — <${url}>`, embeds: [], components: [] };
+}
+
+module.exports = { FARBEN, FARBE_VORBEI, VORGABE_VORLAGE, VORGABE_RUECKSCHAU, kanalAdresse, dauerText, textFuellen, live, rueckschau, melder, namenListe };

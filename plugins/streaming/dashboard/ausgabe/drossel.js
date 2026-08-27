@@ -66,7 +66,7 @@ const BOT_FRIST_MS = 30_000;
  * — und beim Streamende ist genau er der eilige (die Rolle soll weg, wenn die
  * Sendung endet).
  */
-const BRAUCHT_KANAL = new Set(['posten', 'bearbeiten', 'aufraeumen', 'probe']);
+const BRAUCHT_KANAL = new Set(['posten', 'bearbeiten', 'aufraeumen', 'probe', 'melden']);
 
 let laeuftGerade = false;
 let uhr = null;
@@ -400,6 +400,46 @@ async function ausfuehren(auftrag) {
         };
     }
 
+    // -----------------------------------------------------------------
+    // **Meldungen (Stufe 12c).** Raid, Geschenk-Abo, Bits, Follow, Abo.
+    //
+    // Drei Unterschiede zur Ankuendigung, alle bewusst:
+    //
+    //   1. **Kein Eintrag in `streaming_messages`.** Eine Meldung wird nie
+    //      bearbeitet und nie aufgeraeumt — sie gehoert keiner Sendung. Wer
+    //      sie dort eintruege, brauchte auch einen Grund, sie wieder zu
+    //      loeschen, und den gibt es nicht.
+    //   2. **Nie veroeffentlichen.** Wie bei der Probe: Ein Crosspost geht an
+    //      alle folgenden Server und ist nicht zurueckholbar.
+    //   3. **Der Kanal steht in der Nutzlast**, nicht im Ziel. Er wurde beim
+    //      Schreiben festgelegt; aendert der Betreiber die Einstellung,
+    //      waehrend ein Auftrag wartet, geht die schon gesammelte Meldung
+    //      dorthin, wo sie angefangen hat — und nicht halb hierhin, halb
+    //      dorthin.
+    // -----------------------------------------------------------------
+    if (auftrag.aktion === 'melden') {
+        const nutzlast = typeof auftrag.nutzlast === 'string'
+            ? JSON.parse(auftrag.nutzlast) : (auftrag.nutzlast || {});
+
+        const kanal = nutzlast.kanal || ziel.channel_id;
+        if (!kanal) return { ok: false, fehler: 'kein Kanal fuer die Meldung', endgueltig: true };
+
+        const inhalt = nachricht.melder({ streamer, nutzlast });
+
+        const antwort = await anDenBot('streaming:post', {
+            guildId: ziel.guild_id, channelId: kanal,
+            veroeffentlichen: false, ...inhalt
+        });
+
+        if (!antwort.ok) return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
+
+        const anzahl = Number(nutzlast.anzahl) || 1;
+        return {
+            ok: true, fehler: null, endgueltig: false,
+            hinweis: `Meldung gesendet (${nutzlast.art}${anzahl > 1 ? `, ${anzahl} gesammelt` : ''})`
+        };
+    }
+
     // Bearbeiten und Aufraeumen brauchen eine stehende Nachricht.
     const gesendet = await db().query(
         "SELECT * FROM streaming_messages WHERE target_id = ? AND sendung_id = ? AND zustand = 'steht' LIMIT 1",
@@ -615,8 +655,15 @@ async function auswaehlen(faellig) {
             continue;
         }
 
-        const ziel = await db().query('SELECT channel_id FROM streaming_targets WHERE id = ?', [auftrag.target_id]);
-        const kanal = ziel[0]?.channel_id;
+        // **Der wirkliche Kanal, nicht der Ankuendigungskanal.** Eine Meldung
+        // geht seit 12c moeglicherweise woandershin. Wer hier stur
+        // `channel_id` liest, sperrt einen Kanal, der gar nicht benutzt wird —
+        // und laesst zwei Meldungen in denselben Kanal nebeneinander laufen.
+        const ziel = await db().query(
+            'SELECT channel_id, melder_channel_id FROM streaming_targets WHERE id = ?', [auftrag.target_id]);
+        const kanal = auftrag.aktion === 'melden'
+            ? (ziel[0]?.melder_channel_id || ziel[0]?.channel_id)
+            : ziel[0]?.channel_id;
 
         if (kanal && belegteKanaele.has(kanal)) continue;
         if (kanal) belegteKanaele.add(kanal);

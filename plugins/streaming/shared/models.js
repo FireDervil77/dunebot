@@ -309,6 +309,8 @@ async function zielSpeichern(guildId, zielId, f) {
                rolle_id         = ?,
                abo_rolle_id     = ?,
                onair_channel    = ?,
+               melder_channel_id = ?,
+               melder_arten     = ?,
                filter_spiel     = ?,
                filter_titel     = ?,
                filter_spiel_aus = ?,
@@ -321,7 +323,8 @@ async function zielSpeichern(guildId, zielId, f) {
                aktiv            = ?,
                mitglied_id      = ?
          WHERE id = ? AND guild_id = ?
-    `, [f.channel_id, f.rolle_id, f.abo_rolle_id, f.onair_channel, f.filter_spiel, f.filter_titel,
+    `, [f.channel_id, f.rolle_id, f.abo_rolle_id, f.onair_channel,
+        f.melder_channel_id, f.melder_arten, f.filter_spiel, f.filter_titel,
         f.filter_spiel_aus, f.filter_titel_aus, f.ruhe_von, f.ruhe_bis,
         f.aufraeumen, f.eigenes_bild, f.veroeffentlichen, f.aktiv, f.mitglied_id, zielId, guildId]);
     return Number(ergebnis?.affectedRows || 0);

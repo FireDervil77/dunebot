@@ -115,6 +115,29 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                         hinweis: 'Nötig, damit deine Twitch-Abonnenten auf Discord automatisch eine Rolle bekommen. '
                                + 'Wir lesen nur, wer abonniert hat — nicht deinen Chat und nichts sonst.',
                         scopes: ['channel:read:subscriptions']
+                    },
+
+                    // **Getrennt, nicht gebündelt (Stufe 12c).** Wer nur
+                    // Follower melden will, soll nicht seine Bits-Einnahmen
+                    // freigeben müssen. Twitch führt beide einzeln, also
+                    // fragen wir beide einzeln — eine Sammelzusage wäre für
+                    // uns bequemer und für ihn schlechter.
+                    //
+                    // Raids stehen absichtlich nicht hier: Sie brauchen keine
+                    // Zusage. Eine anzubieten, die nichts freischaltet, wäre
+                    // das leere Versprechen, gegen das diese Registry gebaut
+                    // wurde.
+                    bits: {
+                        label: 'Bits lesen',
+                        hinweis: 'Nötig, damit Bits in deinem Kanal auf Discord gemeldet werden können. '
+                               + 'Wir lesen nur, wie viele Bits geschickt wurden und von wem.',
+                        scopes: ['bits:read']
+                    },
+                    follower: {
+                        label: 'Follower lesen',
+                        hinweis: 'Nötig, damit neue Follower auf Discord gemeldet werden können. '
+                               + 'Wir lesen nur, wer dir folgt.',
+                        scopes: ['moderator:read:followers']
                     }
                 }
             });
