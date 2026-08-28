@@ -138,6 +138,30 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                         hinweis: 'Nötig, damit neue Follower auf Discord gemeldet werden können. '
                                + 'Wir lesen nur, wer dir folgt.',
                         scopes: ['moderator:read:followers']
+                    },
+
+                    // **Die einzige Zusage, die nicht einem Menschen gehört**
+                    // (Stufe 13a). Hier stimmt unser eigenes Bot-Konto zu, und
+                    // zwar genau einmal — Twitch: *„only needed to be
+                    // performed once and kept alive through refreshing the
+                    // access token."*
+                    //
+                    // `nurAnlage` hält sie aus jedem Benutzerprofil heraus.
+                    // Dort wäre sie ein Knopf, der das eigene Twitch-Konto
+                    // zum Chatbot machen würde — und `uniq_benutzer_plattform`
+                    // wiese ihn ohnehin ab.
+                    //
+                    // **Was hier NICHT steht:** `channel:bot`. Das erteilt der
+                    // Streamer für seinen Kanal, nicht der Bot für sich — und
+                    // `/mod` ist die Alternative dazu (Twitch: *„either
+                    // channel:bot scope from broadcaster or moderator
+                    // status"*).
+                    chatbot: {
+                        label: 'Chat lesen und schreiben (Bot-Konto)',
+                        hinweis: 'Einmalige Zustimmung des Bot-Kontos. Ohne sie kann der Bot in '
+                               + 'keinem Twitch-Chat mitlesen oder etwas sagen.',
+                        scopes: ['user:bot', 'user:read:chat', 'user:write:chat'],
+                        nurAnlage: true
                     }
                 }
             });

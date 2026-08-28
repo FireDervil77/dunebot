@@ -181,7 +181,13 @@ async function konten(userId) {
             // Verknuepfung eine Sackgasse: Der Anbieter meldet Zusagen an,
             // niemand kann sie erteilen. Genau so gefunden am 2026-08-26,
             // beim ersten Blick des Betreibers auf die fertige Seite.
-            zusagen: Object.values(a.zusagen || {}).map(x => ({
+            // **`nurAnlage` fliegt raus** (Stufe 13a). Die Chatbot-Zusage
+            // gehoert dem Bot-Konto der Anlage, nicht einem Menschen. Hier
+            // waere sie ein Knopf, der das eigene Twitch-Konto zum Chatbot
+            // machen wuerde — und `uniq_benutzer_plattform` wiese ihn ohnehin
+            // ab. Ein Knopf, der nur scheitern kann, gehoert nicht auf die
+            // Seite.
+            zusagen: Object.values(a.zusagen || {}).filter(x => !x.nurAnlage).map(x => ({
                 name: x.name,
                 label: x.label,
                 hinweis: x.hinweis,

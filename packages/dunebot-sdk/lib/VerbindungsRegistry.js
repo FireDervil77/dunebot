@@ -172,7 +172,13 @@ function pruefeZusagen(name, beschreibung) {
             name: schluessel,
             label: wert.label || schluessel,
             hinweis: wert.hinweis || null,
-            scopes
+            scopes,
+            // **Gehoert diese Zusage der Anlage statt einem Menschen?**
+            // (Stufe 13a) Ein Bot-Konto stimmt einmal zu, und zwar vom
+            // Betreiber ausgeloest. Im Profil eines Benutzers hat so eine
+            // Zusage nichts verloren: Sie waere dort ein Knopf, der sein
+            // eigenes Konto zum Chatbot machen wuerde.
+            nurAnlage: wert.nurAnlage === true
         };
     }
     return geprueft;

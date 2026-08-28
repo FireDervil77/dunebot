@@ -229,11 +229,16 @@ async function mitZugang({ userId, plattform }, tun) {
  *
  * @param {number} id Zusage
  * @param {string} text Grund
+ * @param {string} [tabelle] Welche Zusagenart - Benutzer oder Anlage
  * @returns {Promise<void>}
  */
-async function vermerken(id, text) {
+async function vermerken(id, text, tabelle = 'user_connection_grants') {
+    // **Der Tabellenname wird nicht durchgereicht, sondern gewaehlt.** Ein
+    // Bezeichner laesst sich nicht als Wert binden; eine Freitextangabe waere
+    // hier eine Einladung.
+    const ziel = tabelle === 'betreiber_zusagen' ? 'betreiber_zusagen' : 'user_connection_grants';
     await db().query(
-        'UPDATE user_connection_grants SET fehlertext = ?, geprueft_am = NOW() WHERE id = ?',
+        `UPDATE ${ziel} SET fehlertext = ?, geprueft_am = NOW() WHERE id = ?`,
         [String(text).slice(0, 512), id]);
 }
 
@@ -254,6 +259,166 @@ async function widerrufen(userId, plattform) {
          WHERE v.user_id = ? AND v.plattform = ?
     `, [userId, plattform]);
     log().info(`[Verbindungen] Zusage ${plattform} von ${userId} widerrufen`);
+}
+
+// =====================================================
+// Zusagen der Anlage selbst (Stufe 13a)
+// =====================================================
+//
+// **Warum das hier steht und nicht in einem eigenen Speicher.** Twitch
+// verlangt die stuendliche Pruefung fuer JEDEN Nutzer-Token, auch fuer den des
+// Chatbot-Kontos. Ein zweiter Speicher hiesse eine zweite Pruefschleife, und
+// die eine, die man vergisst, faellt erst bei einem Audit auf.
+//
+// Der Unterschied zu den Benutzer-Zusagen ist nicht die Mechanik, sondern der
+// Eigentuemer: Diese Zusage gehoert der **Anlage**. Sie haengt an keinem
+// Discord-Konto, kein Profil kann sie widerrufen, und ihr Verschwinden waere
+// ein Betriebsausfall, kein Datenschutzvorgang.
+
+/**
+ * Die Zusage der Anlage lesen.
+ *
+ * @param {string} plattform Anbieter
+ * @param {string} [zweck] Wofuer das Konto da ist
+ * @returns {Promise<Object|null>} Zeile oder null
+ */
+async function betreiberZusageLesen(plattform, zweck = 'chatbot') {
+    const zeilen = await db().query(
+        'SELECT * FROM betreiber_zusagen WHERE plattform = ? AND zweck = ? LIMIT 1',
+        [plattform, zweck]);
+    return zeilen[0] || null;
+}
+
+/**
+ * Die Zusage der Anlage wegschreiben.
+ *
+ * **Was der Anbieter zum Schluessel meldet, gilt** - dieselbe Regel wie bei
+ * `zusageSpeichern` und aus demselben Grund: Am 2026-08-27 behauptete die
+ * Spalte drei Scopes, wo der Schluessel einen konnte. Meldet er nichts, bleibt
+ * der bisherige Stand stehen.
+ *
+ * @param {Object} opt Angaben
+ * @param {string} opt.plattform Anbieter
+ * @param {string} [opt.zweck] Zweck
+ * @param {string} [opt.kontoId] Kontokennung bei der Plattform
+ * @param {string} [opt.kontoName] Anzeigename
+ * @param {Array<string>} opt.scopes Erteilte Scopes
+ * @param {string} opt.zugang Zugangsschluessel im Klartext
+ * @param {string|null} opt.erneuerung Erneuerungsschluessel im Klartext
+ * @param {number|null} opt.laeuftAbSek Gueltigkeit in Sekunden
+ * @returns {Promise<boolean>} true bei Erfolg
+ */
+async function betreiberZusageSpeichern({ plattform, zweck = 'chatbot', kontoId = null,
+                                          kontoName = null, scopes, zugang, erneuerung, laeuftAbSek }) {
+    const vorher = await betreiberZusageLesen(plattform, zweck);
+    const gemeldet = [...new Set((scopes || []).map(String).filter(Boolean))].sort();
+    const bisher = vorher ? String(vorher.scopes || '').split(' ').filter(Boolean).sort() : [];
+    const zusammen = gemeldet.length ? gemeldet : bisher;
+
+    const verloren = bisher.filter(x => !zusammen.includes(x));
+    if (verloren.length) {
+        log().warn(`[Verbindungen] Anlage/${plattform}/${zweck}: Zusage verliert ${verloren.join(' ')} - `
+                 + 'der neue Schluessel deckt sie nicht mehr ab');
+    }
+
+    await db().query(`
+        INSERT INTO betreiber_zusagen
+            (plattform, zweck, konto_id, konto_name, scopes, zugang_ver, erneuerung_ver,
+             laeuft_ab_am, geprueft_am, fehlertext)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ${laeuftAbSek ? 'DATE_ADD(NOW(), INTERVAL ? SECOND)' : 'NULL'}, NOW(), NULL)
+        ON DUPLICATE KEY UPDATE
+            konto_id = VALUES(konto_id),
+            konto_name = VALUES(konto_name),
+            scopes = VALUES(scopes),
+            zugang_ver = VALUES(zugang_ver),
+            erneuerung_ver = VALUES(erneuerung_ver),
+            laeuft_ab_am = VALUES(laeuft_ab_am),
+            geprueft_am = NOW(),
+            fehlertext = NULL
+    `, laeuftAbSek
+        ? [plattform, zweck, kontoId, kontoName, zusammen.join(' '),
+           encrypt(zugang), erneuerung ? encrypt(erneuerung) : null, laeuftAbSek]
+        : [plattform, zweck, kontoId, kontoName, zusammen.join(' '),
+           encrypt(zugang), erneuerung ? encrypt(erneuerung) : null]);
+
+    log().success(`[Verbindungen] Anlage/${plattform}/${zweck} als ${kontoName || kontoId || '?'} `
+                + `zugelassen: ${zusammen.join(' ') || '(keine)'}`);
+    return true;
+}
+
+/**
+ * Etwas im Namen der Anlage tun - **der einzige Weg an ihren Schluessel**.
+ *
+ * Wortgleich zu `mitZugang`, nur ohne Benutzer: einmal erneuern, einmal
+ * wiederholen, dann Schluss.
+ *
+ * @param {Object} opt { plattform, zweck }
+ * @param {Function} tun `async (zugang) => ({ abgelehnt?: boolean, … })`
+ * @returns {Promise<Object|null>} Ergebnis von `tun`, oder null ohne Zusage
+ */
+async function mitBetreiberZugang({ plattform, zweck = 'chatbot' }, tun) {
+    const zusage = await betreiberZusageLesen(plattform, zweck);
+    if (!zusage) return null;
+
+    let zugang;
+    try {
+        zugang = decrypt(zusage.zugang_ver);
+    } catch (err) {
+        log().error(`[Verbindungen] Anlage/${plattform}/${zweck} nicht entschluesselbar`, err);
+        return null;
+    }
+
+    const ergebnis = await tun(zugang);
+    if (!ergebnis?.abgelehnt) return ergebnis;
+
+    const anbieter = VerbindungsRegistry.get(plattform);
+    if (!anbieter?.erneuern || !zusage.erneuerung_ver) {
+        // **Das ist ein Betriebsausfall, kein Benutzervorgang.** Deshalb
+        // `error` und nicht `warn`: Ohne diesen Schluessel schweigt der Chatbot
+        // in jedem Kanal, und niemand bemerkt es an einer einzelnen Guild.
+        log().error(`[Verbindungen] Anlage/${plattform}/${zweck} abgelehnt und nicht erneuerbar - `
+                  + 'der Betreiber muss das Konto neu zulassen');
+        return ergebnis;
+    }
+
+    let frisch = null;
+    try {
+        frisch = await anbieter.erneuern({ erneuerung: decrypt(zusage.erneuerung_ver) });
+    } catch (err) {
+        log().error(`[Verbindungen] Erneuern Anlage/${plattform}/${zweck} fehlgeschlagen`, err);
+    }
+
+    if (!frisch?.zugang) {
+        await vermerken(zusage.id, 'Erneuern fehlgeschlagen', 'betreiber_zusagen');
+        return ergebnis;
+    }
+
+    await betreiberZusageSpeichern({
+        plattform, zweck,
+        kontoId: zusage.konto_id, kontoName: zusage.konto_name,
+        scopes: frisch.scopes || String(zusage.scopes || '').split(' ').filter(Boolean),
+        zugang: frisch.zugang,
+        erneuerung: frisch.erneuerung || decrypt(zusage.erneuerung_ver),
+        laeuftAbSek: frisch.laeuftAbSek || null
+    });
+
+    return await tun(frisch.zugang);
+}
+
+/**
+ * Die Zulassung der Anlage zuruecknehmen.
+ *
+ * **Anders als bei einem Benutzer wird hier wirklich geloescht.** Es gibt
+ * keinen Nachweis, der stehenbleiben muesste - die Zeile IST der Schluessel.
+ *
+ * @param {string} plattform Anbieter
+ * @param {string} [zweck] Zweck
+ * @returns {Promise<void>}
+ */
+async function betreiberWiderrufen(plattform, zweck = 'chatbot') {
+    await db().query('DELETE FROM betreiber_zusagen WHERE plattform = ? AND zweck = ?', [plattform, zweck]);
+    log().warn(`[Verbindungen] Anlage/${plattform}/${zweck} zurueckgenommen - `
+             + 'der Chatbot kann in keinem Kanal mehr lesen oder schreiben');
 }
 
 /**
@@ -287,11 +452,24 @@ async function widerrufen(userId, plattform) {
 async function pruefen() {
     const bilanz = { geprueft: 0, ungueltig: 0, abgelaufen: 0, uebersprungen: 0 };
 
-    const zeilen = await db().query(`
-        SELECT g.id, g.zugang_ver, g.laeuft_ab_am, g.scopes, v.plattform, v.user_id
-          FROM user_connection_grants g
-          JOIN user_connections v ON v.id = g.verbindung_id
-    `);
+    // **Beide Arten in EINER Schleife.** Twitchs Auflage gilt fuer jeden
+    // Nutzer-Token, auch fuer den des Chatbot-Kontos. Zwei Schleifen hiessen:
+    // eine davon vergisst irgendwann jemand, und es faellt erst bei einem
+    // Audit auf. `tabelle` merkt sich, wohin ein Vermerk gehoert.
+    const zeilen = [
+        ...(await db().query(`
+            SELECT g.id, g.zugang_ver, g.laeuft_ab_am, g.scopes, v.plattform, v.user_id,
+                   'user_connection_grants' AS tabelle
+              FROM user_connection_grants g
+              JOIN user_connections v ON v.id = g.verbindung_id
+        `)),
+        ...(await db().query(`
+            SELECT id, zugang_ver, laeuft_ab_am, scopes, plattform,
+                   CONCAT('Anlage/', zweck) AS user_id,
+                   'betreiber_zusagen' AS tabelle
+              FROM betreiber_zusagen
+        `))
+    ];
 
     for (const zeile of zeilen) {
         const anbieter = VerbindungsRegistry.get(zeile.plattform);
@@ -328,19 +506,21 @@ async function pruefen() {
                              + `weichen ab - vermerkt: "${stand.join(' ')}", wirklich: "${echt.join(' ')}"`);
                 }
 
+                const ziel = zeile.tabelle === 'betreiber_zusagen'
+                    ? 'betreiber_zusagen' : 'user_connection_grants';
                 await db().query(
-                    'UPDATE user_connection_grants SET scopes = ?, geprueft_am = NOW(), fehlertext = NULL WHERE id = ?',
+                    `UPDATE ${ziel} SET scopes = ?, geprueft_am = NOW(), fehlertext = NULL WHERE id = ?`,
                     [echt ? echt.join(' ') : String(zeile.scopes || ''), zeile.id]);
             } else {
                 // Der Schluessel haette noch leben muessen - abgelaufene sind
                 // oben schon aussortiert. Bleibt: widerrufen, Passwort
                 // geaendert, oder App getrennt. Das ist echt.
                 bilanz.ungueltig++;
-                await vermerken(zeile.id, 'von der Plattform als ungueltig gemeldet');
+                await vermerken(zeile.id, 'von der Plattform als ungueltig gemeldet', zeile.tabelle);
                 log().warn(`[Verbindungen] ${zeile.plattform}/${zeile.user_id}: Zusage ungueltig - neue Zustimmung noetig`);
             }
         } catch (err) {
-            await vermerken(zeile.id, err.message || 'Pruefung fehlgeschlagen');
+            await vermerken(zeile.id, err.message || 'Pruefung fehlgeschlagen', zeile.tabelle);
             log().error(`[Verbindungen] Pruefung ${zeile.plattform}/${zeile.user_id} fehlgeschlagen`, err);
         }
     }
@@ -396,5 +576,6 @@ function anhalten() {
 module.exports = {
     PRUEF_TAKT_MS,
     zusageLesen, zusageSpeichern, mitZugang, widerrufen, vermerken, pruefen,
+    betreiberZusageLesen, betreiberZusageSpeichern, mitBetreiberZugang, betreiberWiderrufen,
     starten, anhalten
 };

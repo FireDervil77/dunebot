@@ -1,0 +1,157 @@
+<%#
+  Konten der Anlage (Stufe 13a).
+
+  Die Seite hat eine Aufgabe, die ueber "Knopf zeigen" hinausgeht: Sie muss
+  erklaeren, was der Betreiber hier tut und was er damit NICHT erledigt. Der
+  Bot-Status im Chat haengt am Streamer (`/mod`), nicht an dieser Seite — wer
+  das nicht liest, sucht spaeter den Fehler bei uns.
+%>
+
+<div class="alert alert-info">
+    <i class="fas fa-circle-info me-2"></i>
+    <strong>Konten, die dem Bot gehören — nicht dir.</strong>
+    Hier stimmt ein eigenes Konto der Anwendung zu, damit der Bot in fremden Chats
+    handeln darf. Das ist <strong>keine</strong> Verknüpfung deines Profils: Ein
+    Dienstkonto darf nicht daran hängen, dass ein Mensch seine Verknüpfung löst.
+</div>
+
+<% if (meldung) { %>
+    <div class="alert alert-success">
+        <% if (meldung === 'zurueckgenommen') { %>
+            Die Zulassung wurde zurückgenommen. Der Bot kann in keinem Kanal mehr lesen oder schreiben.
+        <% } else { %>
+            Erledigt.
+        <% } %>
+    </div>
+<% } %>
+<% if (fehler) { %>
+    <div class="alert alert-danger">
+        <% if (fehler === 'recht') { %>
+            Dafür fehlt dir <code>SYSTEM.ACCESS</code>.
+        <% } else if (fehler === 'zusage') { %>
+            Die Zustimmung kam ohne Schlüssel zurück. Bei Twitch abgebrochen?
+        <% } else if (fehler === 'unbekannt') { %>
+            Diese Plattform oder diesen Zweck gibt es nicht.
+        <% } else { %>
+            Das hat technisch nicht geklappt — Einzelheiten stehen im Protokoll.
+        <% } %>
+    </div>
+<% } %>
+
+<% if (!konten.length) { %>
+    <div class="card">
+        <div class="card-body text-secondary">
+            Kein Anbieter meldet derzeit ein Konto für die Anlage an. Das ist kein Fehler:
+            Die Zwecke kommen aus den Plugins, und solange keines einen anbietet, gibt es
+            hier nichts einzurichten.
+        </div>
+    </div>
+<% } %>
+
+<% konten.forEach(k => { %>
+    <div class="card mb-3">
+        <div class="card-status-top <%= k.vollstaendig ? 'bg-success' : 'bg-warning' %>"></div>
+
+        <div class="card-header">
+            <h3 class="card-title">
+                <% if (k.symbol) { %><i class="<%= k.symbol %> me-2" style="color: <%= k.farbe || 'inherit' %>"></i><% } %>
+                <%= k.titel %> <span class="text-secondary fw-normal">— <%= k.label %></span>
+            </h3>
+        </div>
+
+        <div class="card-body">
+            <p class="text-secondary"><%= k.erklaerung %></p>
+
+            <% if (k.vollstaendig) { %>
+                <div class="mb-3">
+                    <span class="badge bg-success me-2">zugelassen</span>
+                    als <strong><%= k.kontoName || 'unbekannt' %></strong>
+                    <% if (k.geprueft) { %>
+                        <span class="text-secondary">· zuletzt geprüft <%= new Date(k.geprueft).toLocaleString('de-DE') %></span>
+                    <% } %>
+                </div>
+            <% } else if (k.kontoName) { %>
+                <%# Der gefaehrliche Zwischenzustand: Es sieht eingerichtet aus,
+                    aber ein Scope fehlt. Ein Bot, der lesen aber nicht reden kann,
+                    faellt sonst erst im Betrieb auf. %>
+                <div class="alert alert-warning">
+                    <strong>Unvollständig.</strong> Das Konto <strong><%= k.kontoName %></strong>
+                    hat zugestimmt, aber es fehlt:
+                    <% k.fehlend.forEach(s => { %><code class="ms-1"><%= s %></code><% }); %>
+                    <div class="mt-2">Noch einmal zustimmen holt alle zusammen.</div>
+                </div>
+            <% } else { %>
+                <div class="mb-3">
+                    <span class="badge bg-secondary me-2">nicht eingerichtet</span>
+                    Der Bot kann derzeit in keinem Chat lesen oder schreiben.
+                </div>
+            <% } %>
+
+            <% if (k.fehler) { %>
+                <div class="alert alert-danger">
+                    <strong>Vermerkt:</strong> <%= k.fehler %>
+                    <div class="mt-1">Das heißt nicht zwingend, dass die Zustimmung weg ist — aber der letzte Versuch schlug fehl.</div>
+                </div>
+            <% } %>
+
+            <details class="mb-3">
+                <summary class="text-secondary">Welche Berechtigungen dafür nötig sind</summary>
+                <ul class="mt-2 mb-0">
+                    <% k.noetig.forEach(s => { %>
+                        <li>
+                            <code><%= s %></code>
+                            <% if (k.erteilt.includes(s)) { %>
+                                <span class="text-success">— erteilt</span>
+                            <% } else { %>
+                                <span class="text-warning">— fehlt</span>
+                            <% } %>
+                        </li>
+                    <% }); %>
+                </ul>
+            </details>
+
+            <%#
+              Der wichtigste Absatz der Seite. Twitch verlangt fuer Lesen und
+              Schreiben "either channel:bot scope from broadcaster or moderator
+              status" — beides liegt beim Streamer. Diese Seite erledigt das NICHT,
+              und das muss sie sagen, statt es offenzulassen.
+            %>
+            <div class="alert alert-secondary mb-0">
+                <strong>Das reicht allein noch nicht.</strong>
+                Damit der Bot in einem bestimmten Kanal etwas darf, muss der
+                <strong>Kanalinhaber</strong> ihn dort zum Moderator machen —
+                <code>/mod <%= k.kontoName || 'botname' %></code> in seinem Chat.
+                Das kann niemand von hier aus tun, auch du nicht.
+            </div>
+        </div>
+
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <a class="btn btn-primary"
+               href="/verbindungen/<%= k.plattform %>/start?zusage=<%= k.zweck %>&ziel=anlage&zurueck=<%= encodeURIComponent('/admin/anlagenkonten') %>">
+                <i class="fas fa-right-to-bracket me-1"></i>
+                <%= k.vollstaendig ? 'Erneut zustimmen' : 'Bot-Konto zulassen' %>
+            </a>
+
+            <% if (k.kontoName) { %>
+                <form method="POST"
+                      action="/admin/anlagenkonten/<%= k.plattform %>/<%= k.zweck %>/zuruecknehmen"
+                      onsubmit="return confirm('Zulassung wirklich zurücknehmen?\n\nDer Bot kann danach in KEINEM Kanal mehr lesen oder schreiben — auch nicht dort, wo er Moderator ist.');">
+                    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                    <button type="submit" class="btn btn-sm btn-ghost-danger">Zulassung zurücknehmen</button>
+                </form>
+            <% } %>
+        </div>
+    </div>
+<% }); %>
+
+<div class="card">
+    <div class="card-body text-secondary">
+        <strong>Warum steht das hier und nicht in deinem Profil?</strong>
+        Der Nachweis im Profil sagt „mir gehört dieses Konto“. Für ein Dienstkonto
+        wäre das nicht wahr. Außerdem lässt die Datenbank es gar nicht zu — ein
+        Discord-Konto kann je Plattform nur ein Twitch-Konto verknüpfen, und deines
+        liegt dort schon. Und drittens hängen Profil-Zusagen per
+        <code>ON DELETE CASCADE</code> an der Verknüpfung eines Menschen: Löst er sie,
+        wäre der Chatbot überall tot.
+    </div>
+</div>

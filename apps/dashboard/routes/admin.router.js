@@ -329,4 +329,10 @@ router.use('/docs', docsRouter);
 const contentRouter = require('./admin/content.router');
 router.use('/content', contentRouter);
 
+// Konten, die der Anlage gehoeren (Stufe 13a) — Chatbot-Konto und was noch
+// folgt. Gehoert unter /admin, weil es fuer den ganzen Betrieb gilt und an
+// keinem Menschen haengen darf.
+const anlagenkontenRouter = require('./admin/anlagenkonten.router');
+router.use('/anlagenkonten', anlagenkontenRouter);
+
 module.exports = router;

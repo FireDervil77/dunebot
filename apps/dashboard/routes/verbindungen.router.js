@@ -85,13 +85,42 @@ function sicheresZiel(wert) {
  */
 function stateZerlegen(state) {
     const wert = String(state || '');
-    const punkt = wert.indexOf('.');
-    if (punkt < 0) return { roh: wert, zusage: null };
-    const zusage = wert.slice(punkt + 1);
+    const teile = wert.split('.');
+    const zusage = teile[1] || null;
+    const ziel = teile[2] || 'benutzer';
+
     return {
         roh: wert,
-        zusage: VerbindungsRegistry.NAME_MUSTER.test(zusage) ? zusage : null
+        zusage: zusage && VerbindungsRegistry.NAME_MUSTER.test(zusage) ? zusage : null,
+        // **Wem die Zustimmung gehoert.** `benutzer` ist der Normalfall und die
+        // Vorgabe: Ein alter oder verstuemmelter `state` fuehrt nie versehentlich
+        // in den Betreiber-Zweig, der ganz andere Rechte hat.
+        ziel: ziel === 'anlage' ? 'anlage' : 'benutzer'
     };
+}
+
+/**
+ * Darf dieser Aufrufer im Namen der **Anlage** handeln?
+ *
+ * Dieselbe Pruefung wie `/admin` (`SYSTEM.ACCESS`), aber als Funktion statt
+ * als Middleware: Der Rueckruf durchlaeuft schon die Anbieter-Route und kann
+ * nicht einfach eine zweite Middleware davorhaengen.
+ *
+ * @param {Object} req Anfrage
+ * @returns {Promise<boolean>} true bei Systemzugriff
+ */
+async function istAdmin(req) {
+    const userId = req.session?.user?.info?.id;
+    if (!userId) return false;
+    const pm = ServiceManager.get('permissionManager');
+    if (!pm?.hasSystemPermission) return false;
+    try {
+        return Boolean(await pm.hasSystemPermission(userId, 'SYSTEM.ACCESS'));
+    } catch {
+        // **Im Zweifel nein.** Eine nicht durchfuehrbare Rechtepruefung ist
+        // kein Freibrief.
+        return false;
+    }
 }
 
 // =====================================================
@@ -128,6 +157,23 @@ router.get('/:plattform/start', CheckAuth, async (req, res) => {
         // Moderationsrechte und haette keinen Grund zu misstrauen. Der Name
         // waehlt aus dem, was das Plugin im Quelltext angemeldet hat.
         const zusage = String(req.query.zusage || '') || null;
+
+        // **Wer stimmt hier zu — ein Mensch oder die Anlage?** (Stufe 13a)
+        //
+        // `?ziel=anlage` meldet das Bot-Konto an, nicht den angemeldeten
+        // Benutzer. Das ist ein Betreiber-Vorgang und braucht `SYSTEM.ACCESS`.
+        const fuerAnlage = String(req.query.ziel || '') === 'anlage';
+        if (fuerAnlage) {
+            if (!await istAdmin(req)) {
+                Logger.warn(`[Verbindungen] ${name}: Anlagen-Zustimmung ohne SYSTEM.ACCESS abgewiesen`);
+                return res.redirect(`${zurueck}?fehler=recht`);
+            }
+            if (!zusage) {
+                Logger.warn(`[Verbindungen] ${name}: Anlagen-Zustimmung ohne Zweck angefordert`);
+                return res.redirect(`${zurueck}?fehler=zusage`);
+            }
+        }
+
         let scopes = [];
         if (zusage) {
             scopes = VerbindungsRegistry.scopesVon(name, zusage) || [];
@@ -156,7 +202,14 @@ router.get('/:plattform/start', CheckAuth, async (req, res) => {
             // bestaetigt damit den Gesamtumfang, und nichts wird ihm
             // untergeschoben.
             try {
-                const vorhanden = await Verbindungsspeicher.zusageLesen(req.session?.user?.info?.id, name);
+                // **Die Anlage fragt ihre eigenen Scopes ab, nicht die des
+                // angemeldeten Menschen.** Wer hier `zusageLesen(userId, …)`
+                // stehenliesse, erbaete beim Bot-Konto die Berechtigungen des
+                // Betreibers mit — und der Dialog verlangte vom Bot-Konto
+                // Zugriff auf einen fremden Kanal.
+                const vorhanden = fuerAnlage
+                    ? await Verbindungsspeicher.betreiberZusageLesen(name, zusage)
+                    : await Verbindungsspeicher.zusageLesen(req.session?.user?.info?.id, name);
                 scopes = erbeteneScopes(vorhanden?.scopes, scopes);
             } catch (err) {
                 // Nicht lesbar heisst: ohne die alten weiterfragen. Der
@@ -167,7 +220,13 @@ router.get('/:plattform/start', CheckAuth, async (req, res) => {
             }
         }
 
-        const state = crypto.randomBytes(16).toString('hex') + (zusage ? `.${zusage}` : '');
+        // Der `state` traegt drei Dinge: Zufall, Zweck und Ziel. Ohne das Ziel
+        // muesste der Rueckruf raten, wem die Zustimmung gehoert — oder es
+        // braeuchte eine zweite Rueckrufadresse, die der Betreiber bei Twitch
+        // von Hand nachtragen muesste.
+        const state = crypto.randomBytes(16).toString('hex')
+            + (zusage ? `.${zusage}` : '')
+            + (fuerAnlage ? '.anlage' : '');
         await dbService.saveState(state, zurueck);
 
         const ziel = await anbieter.autorisierUrl({
@@ -235,7 +294,7 @@ router.get('/:plattform/rueckruf', CheckAuth, async (req, res) => {
         //    dieselbe Identitaet PLUS die Schluessel. Zwei Aufrufe waeren hier
         //    nicht nur verschwenderisch, sondern unmoeglich — ein
         //    Autorisierungscode laesst sich genau einmal einloesen.
-        const zusage = stateZerlegen(req.query.state).zusage;
+        const { zusage, ziel } = stateZerlegen(req.query.state);
         const mitZusage = Boolean(zusage) && typeof anbieter.tauschen === 'function';
 
         const wer = mitZusage
@@ -245,6 +304,50 @@ router.get('/:plattform/rueckruf', CheckAuth, async (req, res) => {
         if (!wer || !wer.kontoId) {
             Logger.warn(`[Verbindungen] ${name}: keine Identitaet erhalten`);
             return res.redirect(`${zurueck}?fehler=anbieter`);
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // **Zustimmung der Anlage (Stufe 13a)** — ein anderer Zweig, nicht
+        // eine Abwandlung.
+        //
+        // Hier meldet sich das Bot-Konto an, nicht ein Mensch. Es bekommt
+        // deshalb **keine** Zeile in `user_connections`: Der Nachweis dort
+        // sagt "diesem Discord-Benutzer gehoert dieses Konto", und das waere
+        // schlicht falsch. Ausserdem lehnte `uniq_benutzer_plattform` es ab,
+        // weil der Betreiber sein eigenes Konto dort schon liegen hat.
+        //
+        // Die Rueckrufadresse ist dieselbe wie sonst — absichtlich. Twitch
+        // verlangt exakte Uebereinstimmung, und eine zweite Adresse muesste
+        // der Betreiber von Hand in der Developer-Konsole nachtragen.
+        // Unterschieden wird am `state`, nicht am Pfad.
+        // ─────────────────────────────────────────────────────────────
+        if (ziel === 'anlage') {
+            // Die Rechtepruefung steht **hier noch einmal**, obwohl die
+            // Startroute sie schon macht: Der Rueckruf ist eine eigene
+            // Anfrage, und ein `state` laesst sich aus einem Protokoll
+            // abschreiben.
+            const darf = await istAdmin(req);
+            if (!darf) {
+                Logger.warn(`[Verbindungen] ${name}: Anlagen-Rueckruf ohne SYSTEM.ACCESS abgewiesen`);
+                return res.redirect(`${zurueck}?fehler=recht`);
+            }
+            if (!wer.zugang) {
+                Logger.warn(`[Verbindungen] ${name}: Anlagen-Zustimmung ohne Zugangsschluessel zurueckgekommen`);
+                return res.redirect(`${zurueck}?fehler=zusage`);
+            }
+
+            await Verbindungsspeicher.betreiberZusageSpeichern({
+                plattform: name, zweck: zusage || 'chatbot',
+                kontoId: String(wer.kontoId), kontoName: wer.kontoName || null,
+                scopes: wer.scopes || VerbindungsRegistry.scopesVon(name, zusage) || [],
+                zugang: wer.zugang,
+                erneuerung: wer.erneuerung || null,
+                laeuftAbSek: wer.laeuftAbSek || null
+            });
+
+            Logger.success(`[Verbindungen] ${name}: Anlage nutzt jetzt das Konto `
+                + `${wer.kontoName || wer.kontoId} (Zweck "${zusage || 'chatbot'}")`);
+            return res.redirect(`${zurueck}?ok=anlage`);
         }
 
         // 4. Wegschreiben. Die zweite Eindeutigkeit der Tabelle
