@@ -927,6 +927,68 @@ async function abonnentenLesen(kanalId, zugang) {
 }
 
 /**
+ * Die Kanaele, in denen ein Konto Moderator ist.
+ *
+ * **Gefragt wird aus der Sicht des Bots, nicht des Streamers.** Twitch fuehrt
+ * beide Richtungen getrennt:
+ *
+ *     GET /moderation/moderators  broadcaster_id=X   scope moderation:read
+ *         -> "wer moderiert meinen Kanal"  — Token des STREAMERS
+ *     GET /moderation/channels    user_id=X          scope user:read:moderated_channels
+ *         -> "welche Kanaele moderiere ich" — Token des BOTS
+ *
+ * Die zweite ist die richtige, und der Unterschied ist keine Feinheit: Bei der
+ * ersten muesste **jeder** Streamer uns einen Scope erteilen, nur damit die
+ * Seite ihm sagen kann, ob er `/mod` schon getippt hat. Bei der zweiten fragt
+ * unser eigenes Bot-Konto einmal fuer alle Kanaele. Der Streamer erteilt
+ * nichts, und wir erfahren nichts ueber ihn, was nicht ohnehin unsere eigene
+ * Rolle in seinem Kanal waere.
+ *
+ * `moderator:read:channels` gibt es **nicht** — der Name taucht in
+ * Zusammenfassungen der Doku auf, steht aber in Twitchs Scope-Liste nicht
+ * drin. Am 2026-08-28 gegengeprueft, weil drei Abrufe drei verschiedene Namen
+ * nannten.
+ *
+ * @param {string} kontoId Twitch-ID des Bot-Kontos (muss zum Token gehoeren)
+ * @param {string} zugang Zugangsschluessel des Bot-Kontos
+ * @returns {Promise<{ok: boolean, abgelehnt: boolean, kanaele: Array<{kontoId: string, kontoName: string|null}>}>}
+ */
+async function moderierteKanaele(kontoId, zugang) {
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId) return { ok: false, abgelehnt: false, kanaele: [] };
+
+    const kanaele = [];
+    let cursor = null;
+
+    do {
+        const abfrage = new URLSearchParams({ user_id: String(kontoId), first: '100' });
+        if (cursor) abfrage.set('after', cursor);
+
+        const antwort = await fetch(`${HELIX}/moderation/channels?${abfrage}`, {
+            headers: { 'Client-Id': daten.clientId, Authorization: `Bearer ${zugang}` }
+        });
+
+        // Wie bei `abonnentenLesen`: 401 ist NICHT "moderiert nirgends". Sonst
+        // saehe ein abgelaufener Schluessel aus wie ein Bot, den alle Streamer
+        // gleichzeitig entmoddet haben — und die Seite wuerde jedem von ihnen
+        // raten, `/mod` noch einmal zu tippen.
+        if (antwort.status === 401) return { ok: false, abgelehnt: true, kanaele: [] };
+        if (!antwort.ok) return { ok: false, abgelehnt: false, kanaele: [] };
+
+        const d = await antwort.json();
+        for (const k of d.data || []) {
+            kanaele.push({
+                kontoId: String(k.broadcaster_id),
+                kontoName: k.broadcaster_name || k.broadcaster_login || null
+            });
+        }
+        cursor = d.pagination?.cursor || null;
+    } while (cursor);
+
+    return { ok: true, abgelehnt: false, kanaele };
+}
+
+/**
  * Aus einem Abo-Ereignis die beteiligte Person herausziehen.
  *
  * **Beim Verschenken ist es nicht der Schenkende.** `channel.subscribe` traegt
@@ -1024,6 +1086,7 @@ module.exports = {
     tauschen, erneuern, pruefen,
     EREIGNISSE_ABO, EREIGNISSE_MELDER, typenVon,
     abonnentenLesen, abonnentAus, melderAus,
+    moderierteKanaele,
     HOECHSTALTER_MS,
     EREIGNISSE,
     verknuepfungsUrl,

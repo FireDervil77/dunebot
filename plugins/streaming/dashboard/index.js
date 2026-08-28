@@ -19,6 +19,7 @@
 
 const { DashboardPlugin, VersionHelper, WebhookRegistry, VerbindungsRegistry } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
+const meinkanal = require('./kern/meinkanal');
 
 class StreamingDashboardPlugin extends DashboardPlugin {
     constructor(app) {
@@ -160,9 +161,40 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                         label: 'Chat lesen und schreiben (Bot-Konto)',
                         hinweis: 'Einmalige Zustimmung des Bot-Kontos. Ohne sie kann der Bot in '
                                + 'keinem Twitch-Chat mitlesen oder etwas sagen.',
-                        scopes: ['user:bot', 'user:read:chat', 'user:write:chat'],
+                        // **`user:read:moderated_channels` ist der vierte, und
+                        // er ist der Grund, warum die Profilseite ueberhaupt
+                        // etwas Wahres sagen kann** (Stufe 13a, 2026-08-28).
+                        // Damit fragt unser Bot-Konto einmal "welche Kanaele
+                        // moderiere ich" und beantwortet damit fuer JEDEN
+                        // Streamer die Frage "ist der Bot in meinem Chat".
+                        //
+                        // Die Gegenrichtung (`moderation:read` am Token des
+                        // Streamers) taete dasselbe, aber jeder einzelne
+                        // Streamer muesste dafuer einen Scope erteilen - fuer
+                        // eine reine Anzeige. Das waere zu viel verlangt.
+                        //
+                        // Er steht hier VOR der ersten Zustimmung. Wird er
+                        // spaeter nachgereicht, muss der Betreiber ein
+                        // weiteres Mal zulassen: Twitch gibt einen Schluessel
+                        // genau ueber das, wonach der Dialog gefragt hat.
+                        scopes: ['user:bot', 'user:read:chat', 'user:write:chat',
+                                 'user:read:moderated_channels'],
                         nurAnlage: true
                     }
+                },
+
+                // **Der Abschnitt "Mein Kanal" im Profil** (Stufe 13a,
+                // 2026-08-28). Er haengt am Nachweis, nicht an einer Guild:
+                // Chat-Einstellungen gehoeren dem Kanalinhaber (F-18), und
+                // laegen sie hinter einem Guild-Recht, entschiede die
+                // Serverleitung darueber, ob jemand den Bot in SEINEM Chat
+                // regeln darf. Der Vertrag steht im Kopf der Registry, der
+                // Inhalt in `kern/meinkanal.js`.
+                einstellungen: {
+                    titel: 'Mein Kanal',
+                    hinweis: 'Gilt fuer deinen Twitch-Kanal - unabhaengig davon, '
+                           + 'auf welchem Discord-Server du gerade bist.',
+                    lesen: meinkanal.modZeile
                 }
             });
             Logger.info('[Streaming] Kontoverknuepfung angemeldet: twitch');

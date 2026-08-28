@@ -161,7 +161,7 @@ async function konten(userId) {
         ServiceManager.get('Logger').warn('[Profil] user_connection_grants nicht lesbar:', error.message);
     }
 
-    return VerbindungsRegistry.list().map(a => {
+    return Promise.all(VerbindungsRegistry.list().map(async a => {
         const da = vorhanden.find(v => v.plattform === a.name) || null;
         const z = zusagen.find(x => x.plattform === a.name) || null;
         const erteilt = z ? String(z.scopes || '').split(' ').filter(Boolean) : [];
@@ -195,9 +195,31 @@ async function konten(userId) {
                 // halb erteilte Zusage ist nicht erteilt — sonst behauptet
                 // die Seite eine Faehigkeit, die beim ersten Aufruf scheitert.
                 erteilt: x.scopes.every(sc => erteilt.includes(sc))
-            }))
+            })),
+
+            // **Der eigene Abschnitt des Anbieters** (Stufe 13a). Nur fuer
+            // wirklich verknuepfte Konten: Ohne Nachweis gibt es niemanden,
+            // ueber den zu berichten waere - und ein Netzaufruf fuer eine
+            // Zeile, die ohnehin leer bliebe, waere Verschwendung bei jedem
+            // Seitenaufruf.
+            //
+            // `einstellungenLesen` faellt nie durch; was klemmt, kommt als
+            // 'unbekannt' mit Grund zurueck. Deshalb steht hier kein
+            // try/catch: Es waere eines um etwas, das nicht wirft - und
+            // genau so entstehen die `.catch(() => {})`, die dieses Projekt
+            // als Befund fuehrt.
+            einstellungen: da
+                ? {
+                    titel: a.einstellungen?.titel || null,
+                    hinweis: a.einstellungen?.hinweis || null,
+                    zeilen: await VerbindungsRegistry.einstellungenLesen(
+                        a.name,
+                        { userId, kontoId: da.konto_id, kontoName: da.konto_name },
+                        ServiceManager.get('Logger'))
+                }
+                : null
         };
-    });
+    }));
 }
 
 // GET /profile/verbindungen

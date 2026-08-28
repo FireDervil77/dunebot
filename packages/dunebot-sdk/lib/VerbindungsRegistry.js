@@ -76,6 +76,42 @@
  * });
  * ```
  *
+ * ## Was ein Anbieter mitbringen kann, wenn der Benutzer etwas einstellen soll
+ *
+ * ```js
+ * VerbindungsRegistry.register('twitch', {
+ *     …,
+ *     // Ein Abschnitt im Profil, der am Nachweis haengt (Stufe 13a).
+ *     einstellungen: {
+ *         titel: 'Mein Kanal',
+ *         hinweis: 'Gilt fuer deinen Twitch-Kanal, unabhaengig von Discord.',
+ *         // Wird nur fuer den Inhaber des Nachweises gerufen.
+ *         // Rueckgabe: Liste von { label, zustand, text, hinweis?, tat? }
+ *         async lesen({ userId, kontoId, kontoName }) { … }
+ *     }
+ * });
+ * ```
+ *
+ * **Warum das ins Profil gehoert und nicht ins Plugin-Menue** (entschieden
+ * 2026-08-28): Chat-Einstellungen gehoeren dem Kanalinhaber (F-18). Laegen sie
+ * hinter einem Guild-Recht, entschiede die Serverleitung darueber, ob jemand
+ * den Bot in **seinem eigenen** Chat regeln darf - und bei einem Streamer in
+ * zwei Guilds waere gar nicht bestimmbar, wessen Recht zaehlt. Im Profil ist
+ * die Tuer der Nachweis selbst, den niemand sonst vergeben oder entziehen
+ * kann. Es gilt dieselbe Linie wie oben: Speicher in den Kern, Seite ins
+ * Profil, Wissen ueber die Plattform ins Plugin.
+ *
+ * **`zustand` ist dreiwertig, und das ist der Kern der Sache.** `'ja'`,
+ * `'nein'` und `'unbekannt'`. Wer nicht fragen konnte, muss `'unbekannt'`
+ * melden - nie `'nein'`. Ein Streamer, dem die Seite "der Bot ist nicht in
+ * deinem Chat" sagt, weil gerade eine Schnittstelle klemmte, sucht den Fehler
+ * bei sich und tippt `/mod` ein zweites Mal.
+ *
+ * **Es gibt bewusst kein `schreiben()`.** Stufe 13a schliesst an und hoert zu;
+ * der Bot sagt noch nichts. Ein Schalter fuer eine Faehigkeit, die es nicht
+ * gibt, waere genau das leere Versprechen, gegen das diese Registry gebaut
+ * wurde. Er kommt mit der Faehigkeit, nicht davor.
+ *
  * **Alle drei oder keine.** Ein Anbieter mit `zusagen`, aber ohne `pruefen`,
  * wuerde Schluessel sammeln, die niemand nachhaelt - und bei Twitch waere das
  * ein Verstoss gegen die Auflage, Token stuendlich zu pruefen. Deshalb weist
@@ -118,6 +154,7 @@ function register(name, beschreibung) {
     // pruefen kann, faellt sonst erst Wochen spaeter auf: dann naemlich, wenn
     // der erste Token ablaeuft und niemand zustaendig ist.
     const zusagen = pruefeZusagen(name, beschreibung);
+    const einstellungen = pruefeEinstellungen(name, beschreibung);
 
     anbieter.set(name, {
         name,
@@ -130,7 +167,8 @@ function register(name, beschreibung) {
         zusagen,
         tauschen: beschreibung.tauschen || null,
         erneuern: beschreibung.erneuern || null,
-        pruefen: beschreibung.pruefen || null
+        pruefen: beschreibung.pruefen || null,
+        einstellungen
     });
     return true;
 }
@@ -185,6 +223,94 @@ function pruefeZusagen(name, beschreibung) {
 }
 
 /**
+ * Den Einstellungs-Abschnitt eines Anbieters pruefen und in eine feste Form
+ * bringen.
+ *
+ * **Freiwillig, aber nicht halb.** Wer einen Abschnitt anbietet, muss sagen
+ * wie er heisst und woher sein Inhalt kommt. Ein Abschnitt ohne `lesen()`
+ * waere eine Ueberschrift ohne Inhalt - und die Seite haette keine
+ * Moeglichkeit, das von "gerade nichts zu zeigen" zu unterscheiden.
+ *
+ * @param {string} name Anbieter
+ * @param {Object} beschreibung Rohe Angaben
+ * @returns {Object|null} geprueft, oder null wenn keiner angeboten wird
+ */
+function pruefeEinstellungen(name, beschreibung) {
+    const roh = beschreibung.einstellungen;
+    if (roh === undefined || roh === null) return null;
+
+    if (typeof roh !== 'object' || Array.isArray(roh)) {
+        throw new Error(`VerbindungsRegistry: "${name}" hat einstellungen, die kein Objekt sind`);
+    }
+    if (typeof roh.lesen !== 'function') {
+        throw new Error(`VerbindungsRegistry: "${name}" bietet einstellungen an, hat aber kein lesen()`);
+    }
+    if (!roh.titel || typeof roh.titel !== 'string') {
+        throw new Error(`VerbindungsRegistry: einstellungen von "${name}" haben keinen titel`);
+    }
+
+    return {
+        titel: roh.titel,
+        hinweis: roh.hinweis || null,
+        lesen: roh.lesen
+    };
+}
+
+/** Die drei erlaubten Zustaende einer Zeile. Alles andere gilt als unbekannt. */
+const ZUSTAENDE = ['ja', 'nein', 'unbekannt'];
+
+/**
+ * Den Abschnitt eines Anbieters fuer einen Benutzer holen.
+ *
+ * **Diese Funktion faellt nie durch.** Sie wird beim Aufbau einer Seite
+ * gerufen, die auch ohne sie ihren Zweck erfuellt - das Profil zeigt
+ * Verknuepfungen, ob der Chatbot nun erreichbar ist oder nicht. Ein Anbieter,
+ * dessen Schnittstelle klemmt, darf die Seite nicht mitnehmen.
+ *
+ * **Aber sie schweigt auch nicht.** Was schiefging, steht als `'unbekannt'` mit
+ * Grund in der Liste und im Protokoll. Der Rueckfall auf `'nein'` waere die
+ * halbe Auskunft, die schlimmer ist als keine.
+ *
+ * @param {string} name Anbieter
+ * @param {Object} ctx `{ userId, kontoId, kontoName }`
+ * @param {Object} [logger] Etwas mit `.warn`; fehlt es, wird nur zurueckgegeben
+ * @returns {Promise<Array<Object>>} Zeilen, ggf. leer
+ */
+async function einstellungenLesen(name, ctx, logger = null) {
+    const a = anbieter.get(name);
+    if (!a || !a.einstellungen) return [];
+
+    let roh;
+    try {
+        roh = await a.einstellungen.lesen(ctx);
+    } catch (error) {
+        if (logger && typeof logger.warn === 'function') {
+            logger.warn(`[VerbindungsRegistry] einstellungen.lesen von "${name}" gescheitert:`, error.message);
+        }
+        return [{
+            label: a.einstellungen.titel,
+            zustand: 'unbekannt',
+            text: 'Konnte gerade nicht abgefragt werden.',
+            hinweis: error.message || null,
+            tat: null
+        }];
+    }
+
+    if (!Array.isArray(roh)) return [];
+
+    // Jede Zeile in die feste Form bringen. Ein Anbieter, der `zustand`
+    // vergisst oder etwas Eigenes hineinschreibt, bekommt `'unbekannt'` -
+    // nicht `'nein'`, aus demselben Grund wie oben.
+    return roh.filter(Boolean).map(z => ({
+        label: String(z.label || ''),
+        zustand: ZUSTAENDE.includes(z.zustand) ? z.zustand : 'unbekannt',
+        text: z.text ? String(z.text) : null,
+        hinweis: z.hinweis ? String(z.hinweis) : null,
+        tat: z.tat ? String(z.tat) : null
+    })).filter(z => z.label);
+}
+
+/**
  * Eintrag entfernen - beim Abschalten eines Plugins.
  *
  * **Die Verknuepfungen bleiben.** Ein abgeschaltetes Plugin ist kein Widerruf:
@@ -230,4 +356,4 @@ function scopesVon(name, zusage) {
     return z ? [...z.scopes] : null;
 }
 
-module.exports = { register, unregister, get, list, scopesVon, NAME_MUSTER };
+module.exports = { register, unregister, get, list, scopesVon, einstellungenLesen, NAME_MUSTER };

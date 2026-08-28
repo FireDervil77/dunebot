@@ -8,6 +8,7 @@
  * @context {string}  guildId
  * @context {Array}   anbieter   - { name, label, symbol, farbe, hinweis, verbunden, kontoName, seit }
  * @context {Array}   rueckrufe  - nur fuer Betreiber: { label, url }
+ * @context {Object?} anbieter[].einstellungen - { titel, hinweis, zeilen[] }
  * @context {string?} meldung
  * @context {string?} fehler
 %>
@@ -112,6 +113,46 @@ const hinweis = TEXTE[fehler] || TEXTE[meldung] || null;
                     Eine Berechtigung gilt nicht mehr (<%= a.zusageFehler %>) — bitte neu erteilen.
                   </div>
                 <% } %>
+              <% } %>
+              <%# Der eigene Abschnitt des Anbieters (Stufe 13a).
+                  Ist die Liste leer, erscheint hier NICHTS — keine leere
+                  Ueberschrift, kein "noch keine Daten". Eine Ueberschrift
+                  ohne Inhalt ist das leere Versprechen, gegen das diese
+                  Seite gebaut wurde.
+                  Der Kern kennt die Plattform nicht: Er rendert Bezeichnung,
+                  Zustand und Text — was sie bedeuten, weiss nur das Plugin. %>
+              <% if (a.einstellungen && a.einstellungen.zeilen && a.einstellungen.zeilen.length) { %>
+                <div class="mt-3">
+                  <div class="text-secondary small mb-1"><%= a.einstellungen.titel %></div>
+                  <% a.einstellungen.zeilen.forEach(function (z) { %>
+                    <div class="py-1">
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="fw-medium"><%= z.label %></span>
+                        <% if (z.zustand === 'ja') { %>
+                          <span class="badge bg-green-lt">ja</span>
+                        <% } else if (z.zustand === 'nein') { %>
+                          <span class="badge bg-yellow-lt">nein</span>
+                        <% } else { %>
+                          <%# 'unbekannt' ist grau, nicht rot: Es ist keine
+                              schlechte Nachricht, sondern gar keine. %>
+                          <span class="badge bg-secondary-lt">unbekannt</span>
+                        <% } %>
+                      </div>
+                      <% if (z.text) { %>
+                        <div class="text-secondary small"><%= z.text %></div>
+                      <% } %>
+                      <% if (z.hinweis) { %>
+                        <div class="text-secondary small"><%= z.hinweis %></div>
+                      <% } %>
+                      <% if (z.tat) { %>
+                        <div class="small mt-1">Zu tun: <code><%= z.tat %></code></div>
+                      <% } %>
+                    </div>
+                  <% }); %>
+                  <% if (a.einstellungen.hinweis) { %>
+                    <div class="text-secondary small mt-2"><%= a.einstellungen.hinweis %></div>
+                  <% } %>
+                </div>
               <% } %>
             </div>
           </div>
