@@ -50,7 +50,7 @@
 
 <% konten.forEach(k => { %>
     <div class="card mb-3">
-        <div class="card-status-top <%= k.vollstaendig ? 'bg-success' : 'bg-warning' %>"></div>
+        <div class="card-status-top <%= k.vollstaendig && !k.auchBenutzerkonto ? 'bg-success' : (k.auchBenutzerkonto ? 'bg-danger' : 'bg-warning') %>"></div>
 
         <div class="card-header">
             <h3 class="card-title">
@@ -64,7 +64,7 @@
 
             <% if (k.vollstaendig) { %>
                 <div class="mb-3">
-                    <span class="badge bg-success me-2">zugelassen</span>
+                    <span class="badge <%= k.auchBenutzerkonto ? 'bg-warning' : 'bg-success' %> me-2">zugelassen</span>
                     als <strong><%= k.kontoName || 'unbekannt' %></strong>
                     <% if (k.geprueft) { %>
                         <span class="text-secondary">· zuletzt geprüft <%= new Date(k.geprueft).toLocaleString('de-DE') %></span>
@@ -84,6 +84,30 @@
                 <div class="mb-3">
                     <span class="badge bg-secondary me-2">nicht eingerichtet</span>
                     Der Bot kann derzeit in keinem Chat lesen oder schreiben.
+                </div>
+            <% } %>
+
+            <% if (k.auchBenutzerkonto) { %>
+                <%# Der Befund, den die Zahlen sonst verschweigen: Es sieht
+                    eingerichtet aus, aber es ist das falsche Konto. %>
+                <div class="alert alert-danger">
+                    <strong>Das ist vermutlich das falsche Konto.</strong>
+                    <code><%= k.kontoName %></code> ist zugleich die Twitch-Verknüpfung eines
+                    Discord-Benutzers (<code><%= k.auchBenutzerkonto %></code>) — also ein
+                    persönliches Konto, kein Bot-Konto.
+                    <div class="mt-2">
+                        Der Bot würde damit unter diesem Namen in fremden Chats schreiben.
+                        Wahrscheinlich war dein Browser bei Twitch noch angemeldet, als du
+                        zugestimmt hast.
+                    </div>
+                    <div class="mt-2">
+                        <strong>So geht es richtig:</strong> Bei Twitch abmelden oder ein privates
+                        Fenster öffnen, dort als das Bot-Konto anmelden, dann hier erneut zustimmen.
+                    </div>
+                    <div class="mt-2 text-secondary">
+                        Falls das Absicht war — ein eigener Kanal, der bewusst unter seinem eigenen
+                        Namen schreibt —, kannst du diesen Hinweis stehen lassen. Er sperrt nichts.
+                    </div>
                 </div>
             <% } %>
 
@@ -122,6 +146,24 @@
                 <strong>Kanalinhaber</strong> ihn dort zum Moderator machen —
                 <code>/mod <%= k.kontoName || 'botname' %></code> in seinem Chat.
                 Das kann niemand von hier aus tun, auch du nicht.
+            </div>
+        </div>
+
+        <%#
+          **Die Warnung steht VOR dem Knopf, nicht in der Hilfe.**
+          Am 2026-08-28 stimmte das falsche Konto zu, weil der Browser bei
+          Twitch noch am Betreiber angemeldet war. Der Eintrag sah danach
+          tadellos aus — gruener Haken, vollstaendige Scopes — und war falsch.
+          Wer die Warnung erst nachher liest, hat sie zu spaet gelesen.
+        %>
+        <div class="alert alert-warning m-3 mb-0">
+            <i class="fas fa-triangle-exclamation me-2"></i>
+            <strong>Es zählt, mit welchem Twitch-Konto dein Browser gerade angemeldet ist.</strong>
+            Twitch fragt nicht, welches Konto du meinst — es nimmt das, das eingeloggt ist.
+            <div class="mt-2">
+                Melde dich also bei Twitch <strong>zuerst ab</strong> oder benutze ein
+                <strong>privates Fenster</strong>, und melde dich dort als das Bot-Konto an.
+                Sonst schreibt der Bot später unter deinem eigenen Namen.
             </div>
         </div>
 

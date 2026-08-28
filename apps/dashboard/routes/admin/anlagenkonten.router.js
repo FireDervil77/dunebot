@@ -79,6 +79,34 @@ async function stand() {
 
             const erteilt = zusage ? String(zusage.scopes || '').split(' ').filter(Boolean) : [];
 
+            // **Hat hier das falsche Konto zugestimmt?**
+            //
+            // Gemessen am 2026-08-28: Der Betreiber klickte "Bot-Konto
+            // zulassen", war im Browser aber noch als er selbst bei Twitch
+            // angemeldet — und Twitch nahm die Zustimmung von DIESEM Konto.
+            // Der Eintrag sah danach tadellos aus: Scopes vollstaendig, kein
+            // Fehler, gruener Haken. Nur haette der Bot unter dem Namen des
+            // Betreibers geschrieben.
+            //
+            // Erkennbar ist es daran, dass dasselbe Konto in
+            // `user_connections` als Verknuepfung eines Menschen steht. Das
+            // ist kein Beweis fuer einen Irrtum — jemand kann sein eigenes
+            // Konto bewusst als Bot einsetzen —, aber es ist der einzige
+            // Hinweis, den wir haben, und er ist stark genug fuer eine
+            // deutliche Warnung.
+            let auchBenutzerkonto = null;
+            if (zusage?.konto_id) {
+                try {
+                    const zeilen = await ServiceManager.get('dbService').query(
+                        'SELECT user_id FROM user_connections WHERE plattform = ? AND konto_id = ? LIMIT 1',
+                        [anbieter.name, String(zusage.konto_id)]);
+                    auchBenutzerkonto = zeilen[0] ? String(zeilen[0].user_id) : null;
+                } catch (err) {
+                    ServiceManager.get('Logger').warn(
+                        `[Anlagenkonten] Abgleich mit user_connections fehlgeschlagen: ${err.message}`);
+                }
+            }
+
             zeilen.push({
                 plattform: anbieter.name,
                 label: anbieter.label,
@@ -94,7 +122,8 @@ async function stand() {
                 fehlend: scopes.filter(sc => !erteilt.includes(sc)),
                 kontoName: zusage ? (zusage.konto_name || zusage.konto_id) : null,
                 geprueft: zusage ? zusage.geprueft_am : null,
-                fehler: zusage ? zusage.fehlertext : null
+                fehler: zusage ? zusage.fehlertext : null,
+                auchBenutzerkonto
             });
         }
     }

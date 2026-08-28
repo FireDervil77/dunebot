@@ -213,6 +213,45 @@ console.log('\nDie stuendliche Pflichtpruefung erreicht beide Arten');
         'es gibt keine Abkuerzung am `mitBetreiberZugang` vorbei');
 }
 
+console.log('\nEin persoenliches Konto als Bot faellt auf');
+{
+    // **Der Fall vom 2026-08-28.** Der Betreiber klickte "Bot-Konto zulassen",
+    // war im Browser aber noch als er selbst bei Twitch angemeldet. Twitch
+    // nahm die Zustimmung von DIESEM Konto. Der Eintrag sah danach tadellos
+    // aus — Scopes vollstaendig, kein Fehler, gruener Haken — und der Bot
+    // haette unter dem Namen des Betreibers in fremden Chats geschrieben.
+    //
+    // Zahlen allein verraten das nie. Erkennbar ist es nur daran, dass
+    // dasselbe Konto in `user_connections` als Verknuepfung eines Menschen
+    // steht.
+    const router = code('apps/dashboard/routes/admin/anlagenkonten.router.js');
+    pruefe(/FROM user_connections WHERE plattform = \? AND konto_id = \?/.test(router),
+        'die Seite gleicht das zugelassene Konto gegen `user_connections` ab',
+        'sonst sieht das falsche Konto genauso aus wie das richtige');
+    pruefe(/auchBenutzerkonto/.test(router),
+        'und reicht den Befund an die Ansicht durch');
+
+    const ansicht = fs.readFileSync(
+        path.join(wurzel, 'apps/dashboard/themes/default/views/admin/anlagenkonten.ejs'), 'utf8');
+
+    pruefe(/k\.auchBenutzerkonto/.test(ansicht),
+        'die Ansicht wertet ihn aus');
+    pruefe(/falsche Konto/.test(ansicht),
+        'und sagt im Klartext, dass es vermutlich das falsche Konto ist');
+
+    // **Die Warnung muss VOR dem Knopf stehen.** Wer sie erst danach liest,
+    // hat sie zu spaet gelesen.
+    const warnung = ansicht.indexOf('privates Fenster');
+    const knopf = ansicht.indexOf('ziel=anlage');
+    pruefe(warnung > 0 && warnung < knopf,
+        'der Hinweis auf das angemeldete Twitch-Konto steht VOR dem Knopf',
+        warnung < 0 ? 'fehlt ganz' : `Warnung bei ${warnung}, Knopf bei ${knopf}`);
+
+    // Und der gruene Haken darf nicht gruen bleiben, wenn das Konto faul ist.
+    pruefe(/k\.vollstaendig && !k\.auchBenutzerkonto/.test(ansicht),
+        'der Status meldet nicht "alles gut", wenn das Konto einem Menschen gehoert');
+}
+
 console.log('\nDas Bot-Konto landet nicht in `user_connections`');
 {
     const router = code('apps/dashboard/routes/verbindungen.router.js');
