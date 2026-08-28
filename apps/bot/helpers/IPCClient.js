@@ -4,6 +4,40 @@ const { Logger } = require("dunebot-sdk/utils");
 const { languagesMeta, ServiceManager } = require("dunebot-core");
 const { ChannelType } = require("discord.js");
 
+/**
+ * Etwas mit einer Frist tun.
+ *
+ * **Wirft, statt still weiterzulaufen.** Der Rueckgabewert eines ueberzogenen
+ * Aufrufs ist wertlos — der Aufrufer hat laengst aufgegeben —, und ihn spaeter
+ * doch noch zu liefern ist schlimmer als nichts: Am 2026-08-27 hat der Bot so
+ * die halbe Nacht stundenalte Nachrichtenaenderungen ausgeliefert.
+ *
+ * **Der begonnene Aufruf laeuft weiter, und das ist bewusst so benannt statt
+ * verschwiegen:** discord.js reicht keinen Abbruch bis in `messages.fetch()`
+ * oder `edit()` durch. Was diese Frist leistet, ist die *Antwort* rechtzeitig
+ * und ehrlich zu machen — nicht die Arbeit dahinter abzubrechen.
+ *
+ * @param {number} ms Frist in Millisekunden
+ * @param {Function} tun Was zu tun ist; gibt ein Promise zurueck
+ * @param {string} was Name fuer die Fehlermeldung
+ * @returns {Promise<*>} Ergebnis von `tun`
+ * @throws {Error} wenn die Frist ablaeuft
+ */
+function mitFrist(ms, tun, was = 'Aufruf') {
+    let uhr = null;
+    const wecker = new Promise((_, ablehnen) => {
+        uhr = setTimeout(
+            () => ablehnen(new Error(`${was} hat die Frist von ${ms} ms ueberschritten`)),
+            ms);
+    });
+
+    // `finally` raeumt den Wecker in BEIDEN Faellen ab. Ohne das haelt ein
+    // offener Timer den Vorgang am Leben - bei einem Handler, der schnell
+    // antwortet, waeren das 25 s Nachlauf je Aufruf.
+    return Promise.race([Promise.resolve().then(tun), wecker])
+        .finally(() => clearTimeout(uhr));
+}
+
 class IPCClient {
     /**
      * Ab wann die Dauer eines IPC-Handlers eine Warnung wert ist.
@@ -13,6 +47,34 @@ class IPCClient {
      * einmal Mitglieder nachlaedt, nicht jedes Mal meldet.
      */
     static LANGSAM_MS = 5000;
+
+    /**
+     * Wie lange ein **Plugin**-Handler hoechstens antworten darf.
+     *
+     * **Der Fall, der das noetig gemacht hat (2026-08-27):** Ab 17:29 Uhr
+     * brauchte jedes `streaming:edit` fuer einen bestimmten Kanal exakt
+     * 1200 Sekunden. Der Aufrufer im Dashboard gibt nach 30 s auf — die
+     * Handler liefen aber weiter und wurden ueber die ganze Nacht fertig, der
+     * letzte um 13:32 Uhr des Folgetages. Ergebnis: 26 Auftraege als
+     * `Timed out.` aufgegeben, eine Ankuendigung blieb auf „ist live" stehen,
+     * und der Bot schrieb stundenalte Aenderungen in einen Kanal, in dem
+     * laengst niemand mehr darauf wartete.
+     *
+     * **Keine Ratenbremse** — der Zuhoerer aus `Ratenbremse.js` meldete in
+     * dieser Zeit null Ereignisse, und dass er feuert, wurde gegengeprueft.
+     * Die Ursache der 1200 s ist offen; diese Frist behebt sie nicht, sondern
+     * macht aus einem stillen Stundenhaenger einen gemeldeten Fehlschlag.
+     *
+     * **25 s, und die Zahl ist nicht frei gewaehlt:** Sie muss unter der Frist
+     * des Aufrufers liegen (das Dashboard wartet 30 s, `drossel.js`), sonst
+     * gibt der Aufrufer zuerst auf und erfaehrt wieder nur „Timed out." statt
+     * des Grundes.
+     *
+     * **Nur Plugin-Ereignisse.** Die Kernereignisse unter `dashboard:` bleiben
+     * ausgenommen: `GET_ALL_GUILD_MEMBERS` darf laenger dauern und bringt
+     * seine eigene Frist mit (`Mitglieder.js`).
+     */
+    static HANDLER_FRIST_MS = 25_000;
 
     /**
      * @param {import('discord.js').Client} discordClient
@@ -300,7 +362,10 @@ class IPCClient {
 
             try {
                 const handler = plugin.ipcEvents.get(eventName);
-                const data = await handler(payload, this.discordClient);
+                const data = await mitFrist(
+                    IPCClient.HANDLER_FRIST_MS,
+                    () => handler(payload, this.discordClient),
+                    event);
                 this.#dauerMelden(event, start);
                 return message.reply({
                     success: true,
@@ -2033,3 +2098,4 @@ class IPCClient {
 }
 
 module.exports = IPCClient;
+module.exports.mitFrist = mitFrist;

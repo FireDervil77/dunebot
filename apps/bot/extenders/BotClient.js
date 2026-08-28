@@ -31,7 +31,18 @@ class BotClient extends Client {
             allowedMentions: {
                 repliedUser: false,
             },
-            restRequestTimeout: 20000,
+            // **`restRequestTimeout` stand hier und war wirkungslos.**
+            // Das ist eine Option von discord.js **v13**; v14 liest sie nicht
+            // — nachgesehen, kein Treffer im Quelltext von discord.js, und
+            // `Options.createDefault()` fuehrt die Frist unter `rest.timeout`.
+            // Die beabsichtigte Obergrenze je Anfrage gab es also nie: Es galt
+            // still die Vorgabe von 15 s.
+            //
+            // Gefunden am 2026-08-28 bei der Suche nach den 1200-Sekunden-
+            // Haengern vom Vortag. Sie erklaert die 1200 s **nicht** — aber
+            // eine Einstellung, die aussieht als wirke sie, ist genau die
+            // Sorte Auskunft, die eine Ursachensuche in die Irre fuehrt.
+            rest: { timeout: 20_000 },
         });
 
         // Initialize properties (but not the instances)
