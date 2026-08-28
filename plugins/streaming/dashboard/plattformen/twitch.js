@@ -284,6 +284,96 @@ async function abonnieren(kanalId, ereignisse, rueckrufAdresse, geheimnis) {
 }
 
 /**
+ * Den Conduit der Anlage holen - oder anlegen, wenn es noch keinen gibt.
+ *
+ * **Warum Conduit und nicht der Webhook, den wir schon haben** (Stufe 13a):
+ * Jede Chatnachricht kaeme sonst als einzelner HTTP-Aufruf durch den
+ * Webhook-Mount, der bewusst **vor** den Sicherheits-Middlewares haengt. Was
+ * fuer ein `stream.online` alle paar Stunden richtig ist, ist fuer einen
+ * Nachrichtenstrom die falsche Tuer. Der eigentliche Gewinn ist aber ein
+ * anderer: **Ein Neustart reisst die Abonnements nicht ab** - sie haengen am
+ * Conduit, nicht an der Verbindung.
+ *
+ * **Es gibt genau einen fuer die ganze Anlage**, so wie es genau ein Bot-Konto
+ * gibt. Deshalb wird zuerst gesucht und nur angelegt, was fehlt: Ein zweiter
+ * Conduit waere nicht falsch, aber niemand wuesste mehr, welcher der echte
+ * ist - und die Abos haengen an genau einem.
+ *
+ * App-Token, kein Benutzer-Token - am 2026-08-28 in der Doku nachgesehen.
+ *
+ * @param {number} [shards=1] Gewuenschte Zahl der Shards
+ * @returns {Promise<{ok: boolean, conduitId: string|null, shards: number, neu: boolean, fehler: string|null}>}
+ */
+async function conduitSichern(shards = 1) {
+    const da = await helix('/eventsub/conduits');
+    if (!da.ok) {
+        return { ok: false, conduitId: null, shards: 0, neu: false,
+                 fehler: da.json?.message || `HTTP ${da.status}` };
+    }
+
+    const vorhanden = da.json?.data?.[0] || null;
+    if (vorhanden) {
+        return { ok: true, conduitId: String(vorhanden.id), shards: vorhanden.shard_count ?? 0,
+                 neu: false, fehler: null };
+    }
+
+    const neu = await helix('/eventsub/conduits', {
+        method: 'POST',
+        body: JSON.stringify({ shard_count: shards })
+    });
+    const angelegt = neu.json?.data?.[0] || null;
+    if (!neu.ok || !angelegt) {
+        return { ok: false, conduitId: null, shards: 0, neu: false,
+                 fehler: neu.json?.message || `HTTP ${neu.status}` };
+    }
+
+    return { ok: true, conduitId: String(angelegt.id), shards: angelegt.shard_count ?? shards,
+             neu: true, fehler: null };
+}
+
+/**
+ * Eine WebSocket-Sitzung an einen Shard haengen.
+ *
+ * **Hier laeuft eine Uhr.** Twitch: *„you have 10 seconds from the time you
+ * receive the Welcome message to associate it with a shard."* Wer diese
+ * Sitzung also erst durch einen anderen Vorgang reicht, hat die Frist schon
+ * halb verbraucht - und ein haengender Zwischenschritt kostet die Verbindung.
+ *
+ * Twitch meldet Fehlschlaege **nicht** ueber den Statuscode: Ein Shard kann in
+ * `errors` stehen, waehrend die Antwort 202 ist. Deshalb wird beides gelesen.
+ *
+ * @param {string} conduitId Conduit
+ * @param {number} shardId Shard-Nummer (0-basiert)
+ * @param {string} sitzungId `session_id` aus der Welcome-Nachricht
+ * @returns {Promise<{ok: boolean, zustand: string|null, fehler: string|null}>}
+ */
+async function shardSetzen(conduitId, shardId, sitzungId) {
+    const { ok, status, json } = await helix('/eventsub/conduits/shards', {
+        method: 'PATCH',
+        body: JSON.stringify({
+            conduit_id: String(conduitId),
+            shards: [{
+                id: String(shardId),
+                transport: { method: 'websocket', session_id: String(sitzungId) }
+            }]
+        })
+    });
+
+    // **Der Statuscode allein genuegt nicht.** `errors` traegt die Shards, die
+    // Twitch abgelehnt hat - etwa weil die Sitzung schon zu alt war.
+    const abgelehnt = json?.errors?.[0] || null;
+    if (abgelehnt) {
+        return { ok: false, zustand: null,
+                 fehler: abgelehnt.message || abgelehnt.code || 'Shard abgelehnt' };
+    }
+    if (!ok) {
+        return { ok: false, zustand: null, fehler: json?.message || `HTTP ${status}` };
+    }
+
+    return { ok: true, zustand: json?.data?.[0]?.status || null, fehler: null };
+}
+
+/**
  * Abonnement abbestellen.
  *
  * @param {string} aboId Abo-Kennung bei Twitch
@@ -1087,6 +1177,7 @@ module.exports = {
     EREIGNISSE_ABO, EREIGNISSE_MELDER, typenVon,
     abonnentenLesen, abonnentAus, melderAus,
     moderierteKanaele,
+    conduitSichern, shardSetzen,
     HOECHSTALTER_MS,
     EREIGNISSE,
     verknuepfungsUrl,

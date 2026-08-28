@@ -231,6 +231,22 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         } catch (error) {
             Logger.error('[Streaming] Takte konnten nicht gestartet werden:', error);
         }
+
+        // **Der zweite Eingang (Stufe 13a).** Kein Takt, sondern eine
+        // Dauerverbindung — deshalb getrennt und mit eigenem Fangnetz: Ein
+        // Conduit, den Twitch gerade ablehnt, darf weder die Takte oben
+        // verhindern noch das Dashboard mitnehmen. Die Ankuendigungen laufen
+        // ueber den Webhook und sind davon unberuehrt.
+        //
+        // `starten()` ist asynchron und wird bewusst NICHT abgewartet: Es holt
+        // einen App-Token und legt ggf. einen Conduit an. Der Start des
+        // Plugins darauf warten zu lassen hiesse, das Dashboard von Twitchs
+        // Erreichbarkeit abhaengig zu machen.
+        require('./eingang/conduit').starten()
+            .then(ok => {
+                if (!ok) Logger.warn('[Streaming] Chat-Eingang nicht verfuegbar — der Rest laeuft weiter');
+            })
+            .catch(error => Logger.error('[Streaming] Chat-Eingang gescheitert', error));
     }
 
     /**
@@ -283,6 +299,11 @@ class StreamingDashboardPlugin extends DashboardPlugin {
             require('./kern/takt').anhalten();
             require('./ausgabe/drossel').anhalten();
             require('./ausgabe/strom').anhalten();
+            // **Die Leitung muss ausdruecklich zu.** Ein WebSocket haelt den
+            // Vorgang am Leben und baut sich nach jedem Abriss selbst wieder
+            // auf - ein abgeschaltetes Plugin haette sonst eine Verbindung,
+            // die niemand mehr abfragt und die trotzdem weiterlaeuft.
+            require('./eingang/conduit').beenden();
         } catch { /* beim Abschalten ist ein stehengebliebener Takt das kleinere Uebel */ }
 
         WebhookRegistry.unregister('streaming');
