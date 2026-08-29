@@ -131,8 +131,11 @@
 
       <% if (!streamer || streamer.length === 0) { %>
         <div class="card-body">
-          <p class="text-secondary mb-1"><%= tr('streaming:STREAMERS.EMPTY') %></p>
-          <p class="text-secondary small mb-0"><%= tr('streaming:STREAMERS.EMPTY_HINT') %></p>
+          <%- include('shared/leerzustand', {
+                icon:  'fa-solid fa-video',
+                titel: tr('streaming:STREAMERS.EMPTY'),
+                text:  tr('streaming:STREAMERS.EMPTY_HINT')
+              }) %>
         </div>
       <% } else { %>
         <div class="table-responsive">

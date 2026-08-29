@@ -1,10 +1,14 @@
 <%
 /**
- * Gemeinsamer Seitenkopf der AutoMod-Seiten.
+ * Seitenkopf der automod-Seiten.
  *
- * Traegt die Basisadresse und die Meldungstexte fuer die Skripte - die lesen
- * beides aus den data-Attributen, statt dass jede View einen eigenen
- * Inline-Block mitschleppt.
+ * **Nur noch eine Weiche.** Das Markup steht seit dem 2026-08-29 einmal im
+ * Kern (`views/shared/seitenkopf.ejs`, Baustelle 83) — vorher trug jedes
+ * Plugin seine eigene Kopie, und die sieben waren bereits
+ * auseinandergelaufen.
+ *
+ * **Die Meldungstexte bleiben hier.** Sie gehoeren diesem Plugin; im Kern
+ * waeren sie der Anfang eines Sammelbeckens.
  *
  * Erwartet: guildId, tr, titel, beschreibung, icon
  * Optional:  bedingungen (Bedingungstypen der Kombinations-Regeln)
@@ -35,20 +39,14 @@ const jsTexte = {
   AUFGERAEUMT:               tr('automod:JS.AUFGERAEUMT')
 };
 %>
-<div class="page-header d-print-none mb-3"
-     data-automod-basis="/guild/<%= guildId %>/plugins/automod"
-     data-automod-texte="<%= JSON.stringify(jsTexte) %>"
-     <% if (typeof bedingungen !== 'undefined' && bedingungen) { %>data-automod-bedingungen="<%= JSON.stringify(bedingungen) %>"<% } %>>
-  <div class="row align-items-center">
-    <div class="col">
-      <div class="page-pretitle"><%= tr('automod:TITLE') %></div>
-      <h2 class="page-title">
-        <i class="<%= icon %> me-2"></i>
-        <%= titel %>
-      </h2>
-      <% if (beschreibung) { %>
-        <div class="text-secondary mt-1"><%= beschreibung %></div>
-      <% } %>
-    </div>
-  </div>
-</div>
+<%- include('shared/seitenkopf', {
+      plugin:       'automod',
+      vortitel:     tr('automod:TITLE'),
+      titel:        titel,
+      beschreibung: (typeof beschreibung !== 'undefined' ? beschreibung : null),
+      icon:         icon,
+      guildId:      guildId,
+      texte:        jsTexte,
+      daten:        (typeof bedingungen !== 'undefined' && bedingungen)
+                      ? { bedingungen } : {}
+}) %>

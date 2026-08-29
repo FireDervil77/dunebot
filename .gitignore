@@ -90,3 +90,5 @@ docs/*
 docs_OLD/
 docs_OLD/*
 !apps/dashboard/themes/default/views/admin/docs/
+
+streamerbot_must_haves/

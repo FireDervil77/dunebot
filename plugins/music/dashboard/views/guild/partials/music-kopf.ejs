@@ -1,6 +1,14 @@
 <%
 /**
- * Gemeinsamer Seitenkopf der Musik-Seiten.
+ * Seitenkopf der music-Seiten.
+ *
+ * **Nur noch eine Weiche.** Das Markup steht seit dem 2026-08-29 einmal im
+ * Kern (`views/shared/seitenkopf.ejs`, Baustelle 83) — vorher trug jedes
+ * Plugin seine eigene Kopie, und die sieben waren bereits
+ * auseinandergelaufen.
+ *
+ * **Die Meldungstexte bleiben hier.** Sie gehoeren diesem Plugin; im Kern
+ * waeren sie der Anfang eines Sammelbeckens.
  *
  * Erwartet: guildId, tr, titel, beschreibung, icon
  * Optional:  aktion (HTML rechts im Kopf)
@@ -27,22 +35,13 @@ const jsTexte = {
   DATEI_ABGELEGT:    tr('music:JS.DATEI_ABGELEGT')
 };
 %>
-<div class="page-header d-print-none mb-3"
-     data-music-basis="/guild/<%= guildId %>/plugins/music"
-     data-music-texte="<%= JSON.stringify(jsTexte) %>">
-  <div class="row align-items-center">
-    <div class="col">
-      <div class="page-pretitle"><%= tr('music:TITLE') %></div>
-      <h2 class="page-title">
-        <i class="<%= icon %> me-2"></i>
-        <%= titel %>
-      </h2>
-      <% if (beschreibung) { %>
-        <div class="text-secondary mt-1"><%= beschreibung %></div>
-      <% } %>
-    </div>
-    <% if (typeof aktion !== 'undefined' && aktion) { %>
-      <div class="col-auto ms-auto d-print-none"><%- aktion %></div>
-    <% } %>
-  </div>
-</div>
+<%- include('shared/seitenkopf', {
+      plugin:       'music',
+      vortitel:     tr('music:TITLE'),
+      titel:        titel,
+      beschreibung: (typeof beschreibung !== 'undefined' ? beschreibung : null),
+      icon:         icon,
+      guildId:      guildId,
+      texte:        jsTexte,
+      aktion:       (typeof aktion !== 'undefined' ? aktion : null)
+}) %>

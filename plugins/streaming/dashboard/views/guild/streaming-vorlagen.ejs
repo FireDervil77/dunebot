@@ -85,7 +85,10 @@
       </div>
       <% if (!ziele || ziele.length === 0) { %>
         <div class="card-body">
-          <p class="text-secondary mb-0"><%= tr('streaming:TARGETS.EMPTY') %></p>
+          <%- include('shared/leerzustand', {
+                icon:  'fa-solid fa-comment-dots',
+                titel: tr('streaming:TARGETS.EMPTY')
+              }) %>
         </div>
       <% } else { %>
         <div class="card-body">

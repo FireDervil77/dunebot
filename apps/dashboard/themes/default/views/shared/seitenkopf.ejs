@@ -1,0 +1,89 @@
+<%
+/**
+ * Der gemeinsame Seitenkopf aller Plugin-Seiten.
+ *
+ * **Warum es das gibt (2026-08-29, Baustelle 83).** Sieben Plugins trugen
+ * sieben Kopien desselben Kopfes — automod 54 Zeilen, greeting 22, dazwischen
+ * alles. Sie taten dasselbe und waren trotzdem verschieden, weil sich in
+ * einige zusaetzlich Uebersetzungsbloecke gesetzt hatten. Wer die Kopfzeile
+ * aendern wollte, aenderte sie sechzehnmal.
+ *
+ * ## Aufruf
+ *
+ *     include('shared/seitenkopf', {
+ *         plugin:       'streaming',
+ *         vortitel:     tr('streaming:TITLE'),
+ *         titel:        'Ziele',
+ *         beschreibung: 'Wohin angekuendigt wird',
+ *         icon:         'fa-solid fa-bullseye',
+ *         guildId,
+ *         aktion: '…HTML…',            // freiwillig, rechts im Kopf
+ *         texte:  { FEHLER: '…' },     // freiwillig, fuer das Seitenskript
+ *         daten:  { bedingungen: [] }  // freiwillig, weitere data-Attribute
+ *     })
+ *
+ * ## Zwei Zeichenfolgen, die in diesem Kommentar nichts zu suchen haben
+ *
+ * Beide beim ersten Bau getroffen, beide mit unbrauchbarer Fehlermeldung:
+ *
+ *   - `%` direkt gefolgt von `>` schliesst den EJS-Block vorzeitig
+ *     -> „Could not find matching close tag"
+ *   - `*` direkt gefolgt von `/` (etwa in einem Pfadmuster) schliesst den
+ *     JSDoc-Block vorzeitig; der Resttext wird dann als JavaScript gelesen
+ *     -> „Unexpected identifier 'data'"
+ *
+ * Deshalb steht oben `plugins/<name>/…` und nicht das Sternchen-Muster.
+ *
+ * ## Die data-Attribute heissen weiter nach dem Plugin
+ *
+ * Und das ist kein Schoenheitsfehler, sondern Absicht: Die Skripte lesen
+ * `dataset.automodBasis`, `dataset.ticketTexte` und so fort — nachgesehen in
+ * `plugins/<name>/dashboard/assets/js/`. Ein gemeinsames `data-basis` haette jedes
+ * dieser Skripte stillschweigend blind gemacht. Deshalb wird der Name aus
+ * `plugin` gebaut.
+ *
+ * ## Fehlt `plugin`, bricht die Seite ab — mit Absicht
+ *
+ * Ein Kopf ohne seine data-Attribute rendert sauber und laesst das
+ * Seitenskript ins Leere laufen: Knoepfe tun nichts, und niemand sieht warum.
+ * Ein Abbruch beim ersten Aufruf ist die guenstigere Art zu scheitern.
+ */
+
+const _plugin = (typeof plugin !== 'undefined' && plugin) ? String(plugin) : null;
+if (!_plugin) {
+    throw new Error('seitenkopf: `plugin` fehlt — ohne den Namen tragen die '
+                  + 'data-Attribute nicht und das Seitenskript findet nichts.');
+}
+
+const _basis = (typeof basis !== 'undefined' && basis)
+    ? String(basis)
+    : `/guild/${guildId}/plugins/${_plugin}`;
+
+/* Zusaetzliche data-Attribute, die einzelne Seiten brauchen (automod reicht
+   so seine Bedingungstypen durch). Als Objekt, damit der Kopf nicht fuer
+   jedes neue Feld angefasst werden muss. */
+const _daten = (typeof daten !== 'undefined' && daten) ? daten : {};
+%>
+<%# Die Attribute stehen bewusst auf EINER Zeile: Ein Zeilenumbruch zwischen
+    bedingten Attributen hinterlaesst Leerzeichen vor dem `>`, und dann weicht
+    die Ausgabe von der ab, die sie ersetzt. Gepruefte Gleichheit ist bei einer
+    Zusammenfuehrung das einzige belastbare Argument. %>
+<div class="page-header d-print-none mb-3" data-<%= _plugin %>-basis="<%= _basis %>"<% if (typeof texte !== 'undefined' && texte) { %> data-<%= _plugin %>-texte="<%= JSON.stringify(texte) %>"<% } %><% Object.keys(_daten).forEach(function (schluessel) { %> data-<%= _plugin %>-<%= schluessel %>="<%= JSON.stringify(_daten[schluessel]) %>"<% }); %>>
+  <div class="row align-items-center">
+    <div class="col">
+      <% if (typeof vortitel !== 'undefined' && vortitel) { %>
+        <div class="page-pretitle"><%= vortitel %></div>
+      <% } %>
+      <h2 class="page-title">
+        <% if (typeof icon !== 'undefined' && icon) { %><i class="<%= icon %> me-2"></i><% } %>
+        <%= titel %>
+      </h2>
+      <% if (typeof beschreibung !== 'undefined' && beschreibung) { %>
+        <div class="text-secondary mt-1"><%= beschreibung %></div>
+      <% } %>
+    </div>
+    <% if (typeof aktion !== 'undefined' && aktion) { %>
+      <div class="col-auto ms-auto d-print-none"><%- aktion %></div>
+    <% } %>
+  </div>
+</div>

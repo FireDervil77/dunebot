@@ -1,0 +1,46 @@
+<%
+/**
+ * Der gemeinsame Leerzustand.
+ *
+ * **Nichts hier ist neu erfunden.** `.empty`, `.empty-icon`, `.empty-title`,
+ * `.empty-subtitle` und `.empty-action` sind Tabler-Klassen und stehen bereits
+ * in 29 Ansichten dieses Hauses — nur eben jedesmal von Hand. Gezaehlt am
+ * 2026-08-29: 31-mal `empty-title`, 22-mal `empty-subtitle`, 6-mal
+ * `empty-action`. Diese Datei schreibt die vorhandene Gewohnheit fest, statt
+ * eine zweite danebenzustellen.
+ *
+ * ## Warum ein Leerzustand ueberhaupt zaehlt
+ *
+ * Ein leerer Kasten sagt „hier ist nichts" und laesst offen, ob das richtig
+ * ist, ob etwas fehlt oder ob gerade etwas klemmt. Drei Zeilen und ein Knopf
+ * sagen stattdessen, was zu tun ist. Das ist derselbe Grundsatz wie bei
+ * `'unbekannt'` statt `'nein'`: lieber eine ehrliche Auskunft als eine
+ * schweigende.
+ *
+ * ## Aufruf
+ *
+ *     include('shared/leerzustand', {
+ *         icon:   'fa-solid fa-comment-dots',
+ *         titel:  'Noch keine Vorlage',
+ *         text:   'Vorlagen bestimmen, wie eine Ankuendigung aussieht.',
+ *         aktion: '…HTML eines Knopfes…'
+ *     })
+ *
+ * **Keine EJS-Zeichen im Kommentar** — siehe `seitenkopf.ejs`.
+ *
+ * `text` und `aktion` sind freiwillig. **`aktion` weglassen, wenn es nichts zu
+ * tun gibt** — ein Knopf, der nur „Aktualisieren" heisst, ist eine Attrappe.
+ */
+
+const _icon = (typeof icon !== 'undefined' && icon) ? icon : 'fa-regular fa-folder-open';
+%>
+<div class="empty">
+  <div class="empty-icon"><i class="<%= _icon %> fa-3x text-secondary"></i></div>
+  <p class="empty-title mt-3"><%= titel %></p>
+  <% if (typeof text !== 'undefined' && text) { %>
+    <p class="empty-subtitle text-secondary"><%= text %></p>
+  <% } %>
+  <% if (typeof aktion !== 'undefined' && aktion) { %>
+    <div class="empty-action"><%- aktion %></div>
+  <% } %>
+</div>

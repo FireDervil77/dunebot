@@ -46,11 +46,17 @@
 <% if (!ziele || ziele.length === 0) { %>
   <div class="card">
     <div class="card-body">
-      <p class="text-secondary mb-1"><%= tr('streaming:TARGETS.EMPTY') %></p>
-      <p class="text-secondary small mb-0">
-        Ein Ziel entsteht, sobald du unter <a href="/guild/<%= guildId %>/plugins/streaming/streamer">Streamer</a>
-        einen Kanal einträgst. Soll derselbe Streamer in einen <strong>zweiten</strong>
-        Discord-Kanal melden, trage ihn dort noch einmal ein und wähle den anderen Kanal.
+      <%# Der Hinweistext bleibt Prosa und wandert nicht in `text`: Er enthaelt
+          einen Verweis, und `text` wird bewusst maskiert ausgegeben. %>
+      <%- include('shared/leerzustand', {
+            icon:   'fa-solid fa-bullseye',
+            titel:  tr('streaming:TARGETS.EMPTY'),
+            aktion: `<a class="btn btn-primary" href="/guild/${guildId}/plugins/streaming/streamer">`
+                  + `<i class="fa-solid fa-video me-2"></i>Kanal eintragen</a>`
+          }) %>
+      <p class="text-secondary small text-center mt-3 mb-0">
+        Soll derselbe Streamer in einen <strong>zweiten</strong> Discord-Kanal melden,
+        trage ihn dort noch einmal ein und wähle den anderen Kanal.
       </p>
     </div>
   </div>
