@@ -53,7 +53,11 @@ const GEWOLLTE_KAESTCHEN = [
     ['server-detail-files.ejs', 'Dateiauswahl — Mehrfachauswahl'],
     ['moderation-settings.ejs', 'modlog_events — mehrere Ereignisarten'],
     ['moderation.ejs', 'modlog_events — mehrere Ereignisarten'],
-    ['streaming-ziele.ejs', 'Erwähnung bei der Probe — begleitet einen Knopfdruck und ist danach wieder leer; ein Schalter würde behaupten, es sei dauerhaft an']
+    // Beide standen bis zum 2026-08-29 in `streaming-ziele.ejs`; ein Eintrag
+    // deckte die ganze Datei. Mit der Zerlegung in Funktionskarten sind sie
+    // in eigene Teile gezogen und brauchen je eine eigene Begruendung.
+    ['ziel-kopf.ejs', 'Erwähnung bei der Probe — begleitet einen Knopfdruck und ist danach wieder leer; ein Schalter würde behaupten, es sei dauerhaft an'],
+    ['ziel-meldungen.ejs', 'melder_arten — Mehrfachauswahl aus Raid, Bits, Followern und Abonnenten']
 ];
 
 /**

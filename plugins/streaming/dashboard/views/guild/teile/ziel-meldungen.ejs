@@ -1,0 +1,64 @@
+<%
+/**
+ * Meldungen - Raid, Bits, Follower, Abonnenten (Stufe 12c).
+ *
+ * Je Art wird gesagt, ob sie wirken kann. Ein Haekchen, das nichts tut, weil
+ * eine Zusage fehlt, ist genau das leere Versprechen, das dieses Plugin an
+ * anderen Bots kritisiert.
+ */
+const melderBekannt = !z.melder_channel_id
+    || (zielkanaele || []).some(k => String(k.id) === String(z.melder_channel_id));
+const gewaehlt = String(z.melder_arten || '').split(',').map(x => x.trim()).filter(Boolean);
+%>
+<div class="row g-3">
+  <div class="col-md-4">
+    <label class="form-label" for="melder_kanal_<%= z.id %>">Kanal für Meldungen</label>
+    <select class="form-select" id="melder_kanal_<%= z.id %>" name="melder_channel_id" <%= darfAendern ? '' : 'disabled' %>>
+      <option value="">— derselbe wie für Ankündigungen —</option>
+      <% if (!melderBekannt) { %>
+        <option value="<%= z.melder_channel_id %>" selected>⚠ gelöschter Kanal (<%= z.melder_channel_id %>)</option>
+      <% } %>
+      <% (zielkanaele || []).forEach(k => { %>
+        <option value="<%= k.id %>" <%= String(k.id) === String(z.melder_channel_id) ? 'selected' : '' %>># <%= k.name %></option>
+      <% }); %>
+    </select>
+    <div class="form-hint">
+      <% if (z.melder_channel_id) { %>
+        Meldungen gehen in diesen Kanal.
+      <% } else { %>
+        <strong>Achtung:</strong> Ohne eigenen Kanal gehen die Meldungen in den
+        Ankündigungskanal — ein Follower-Schub schiebt die Live-Ankündigung
+        dann nach oben aus dem Blick.
+      <% } %>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <label class="form-label">Was gemeldet wird</label>
+    <div class="row g-1">
+      <% Object.keys(melderArten).forEach(art => {
+           const a = melderArten[art];
+           const b = melderBeschreibung(art);
+           const scope = b && b.scope;
+           const fehlt = scope && Array.isArray(z.melderScopes) && !z.melderScopes.includes(scope);
+           const unbekannt = z.melderScopes === null; %>
+        <div class="col-md-6">
+          <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="melder_arten"
+                   value="<%= art %>" <%= gewaehlt.includes(art) ? 'checked' : '' %>
+                   <%= darfAendern ? '' : 'disabled' %>>
+            <span class="form-check-label"><%= a.label %></span>
+            <span class="form-check-description">
+              <%= a.hinweis %>
+              <% if (unbekannt && scope) { %>
+                <span class="text-danger">Zusage nicht prüfbar.</span>
+              <% } else if (fehlt) { %>
+                <span class="text-warning">Wirkt noch nicht — dem Kanalinhaber fehlt die Zusage.</span>
+              <% } %>
+            </span>
+          </label>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</div>

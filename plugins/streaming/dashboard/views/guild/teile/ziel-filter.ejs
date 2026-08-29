@@ -1,0 +1,63 @@
+<%
+/**
+ * Filter und Ruhezeit - wann NICHT angekuendigt wird.
+ *
+ * Sechs Felder, und alle sechs sagen dasselbe auf verschiedene Weise: Sie
+ * halten eine Ankuendigung zurueck. Deshalb stehen sie zusammen und nicht
+ * verstreut zwischen Kanal und Rolle.
+ */
+%>
+<div class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label" for="filter_spiel_<%= z.id %>"><%= tr('streaming:TARGETS.FILTER_GAME') %></label>
+    <input type="text" class="form-control" id="filter_spiel_<%= z.id %>" name="filter_spiel"
+           value="<%= z.filter_spiel || '' %>" placeholder="leer = jedes Spiel" <%= darfAendern ? '' : 'disabled' %>>
+    <div class="form-hint">
+      Mehrere durch Komma. Es wird <strong>genau</strong> verglichen, nicht
+      auf Wortteile — so, wie die Kategorie bei Twitch heisst.
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <label class="form-label" for="filter_titel_<%= z.id %>"><%= tr('streaming:TARGETS.FILTER_TITLE') %></label>
+    <input type="text" class="form-control" id="filter_titel_<%= z.id %>" name="filter_titel"
+           value="<%= z.filter_titel || '' %>" placeholder="leer = jeder Titel" <%= darfAendern ? '' : 'disabled' %>>
+    <div class="form-hint">Ein Wort. Gross- und Kleinschreibung ist egal.</div>
+  </div>
+
+  <div class="col-md-6">
+    <label class="form-label" for="filter_spiel_aus_<%= z.id %>">Nicht bei diesen Spielen</label>
+    <input type="text" class="form-control" id="filter_spiel_aus_<%= z.id %>" name="filter_spiel_aus"
+           value="<%= z.filter_spiel_aus || '' %>" placeholder="z. B. Just Chatting" <%= darfAendern ? '' : 'disabled' %>>
+    <div class="form-hint">
+      Mehrere durch Komma. <strong>Schlägt die Erlaubnis oben:</strong>
+      Steht dasselbe Spiel in beiden Feldern, wird nicht gemeldet.
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <label class="form-label" for="filter_titel_aus_<%= z.id %>">Nicht, wenn der Titel dieses Wort enthält</label>
+    <input type="text" class="form-control" id="filter_titel_aus_<%= z.id %>" name="filter_titel_aus"
+           value="<%= z.filter_titel_aus || '' %>" placeholder="z. B. test" <%= darfAendern ? '' : 'disabled' %>>
+    <div class="form-hint">Ein Wort. Groß- und Kleinschreibung ist egal.</div>
+  </div>
+
+  <div class="col-12">
+    <label class="form-label">Ruhezeit — keine Ankündigung</label>
+    <div class="input-group">
+      <input type="time" class="form-control" name="ruhe_von"
+             value="<%= z.ruhe_von ? String(z.ruhe_von).slice(0, 5) : '' %>" <%= darfAendern ? '' : 'disabled' %>>
+      <span class="input-group-text">bis</span>
+      <input type="time" class="form-control" name="ruhe_bis"
+             value="<%= z.ruhe_bis ? String(z.ruhe_bis).slice(0, 5) : '' %>" <%= darfAendern ? '' : 'disabled' %>>
+    </div>
+    <div class="form-hint">
+      Beide leer = immer melden. Über Mitternacht geht (23:00 bis 08:00).
+      Zeitzone: <strong><%= zeitzone %></strong>.
+      <br>
+      In der Ruhezeit wird <strong>nicht nachgeholt</strong> — wer dann
+      live geht, wird für diesen Stream nicht angekündigt. Das Aufräumen
+      danach läuft trotzdem.
+    </div>
+  </div>
+</div>

@@ -1,0 +1,20 @@
+<%
+/**
+ * Aufraeumen - was mit der Ankuendigung geschieht, wenn der Stream endet.
+ *
+ * Ein Feld. Es steht trotzdem in einer eigenen Karte, weil es das einzige ist,
+ * das eine bereits abgeschickte Nachricht nachtraeglich veraendert - und weil
+ * genau hier der Fehler vom 2026-08-28 sass, bei dem stundenalte Bearbeitungen
+ * die ganze Nacht in einen Kanal liefen (Baustelle 82).
+ */
+%>
+<div class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label" for="aufraeumen_<%= z.id %>"><%= tr('streaming:TARGETS.CLEANUP') %></label>
+    <select class="form-select" id="aufraeumen_<%= z.id %>" name="aufraeumen" <%= darfAendern ? '' : 'disabled' %>>
+      <option value="bearbeiten"   <%= z.aufraeumen === 'bearbeiten'   ? 'selected' : '' %>><%= tr('streaming:TARGETS.CLEANUP_EDIT') %></option>
+      <option value="loeschen"     <%= z.aufraeumen === 'loeschen'     ? 'selected' : '' %>><%= tr('streaming:TARGETS.CLEANUP_DELETE') %></option>
+      <option value="stehenlassen" <%= z.aufraeumen === 'stehenlassen' ? 'selected' : '' %>><%= tr('streaming:TARGETS.CLEANUP_KEEP') %></option>
+    </select>
+  </div>
+</div>

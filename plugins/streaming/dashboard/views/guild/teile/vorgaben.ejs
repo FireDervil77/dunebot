@@ -1,0 +1,86 @@
+<%
+/**
+ * Vorgaben dieses Servers - Live-Rolle und Zeitzone.
+ *
+ * Zwei Felder, die fuer ALLE Ziele der Guild gelten. Deshalb stehen sie ueber
+ * den Zielen und nicht in einem davon.
+ */
+%>
+<% if (fremdeTraeger > 0) { %>
+  <div class="alert alert-warning">
+    <strong>Diese Rolle bedeutet auf diesem Server schon etwas anderes.</strong>
+    <p class="mb-1">
+      <%= fremdeTraeger %> Mitglied<%= fremdeTraeger === 1 ? '' : 'er' %>
+      trägt sie, ohne dass der Bot sie vergeben hat — sie wurde also von Hand
+      oder von woanders gesetzt. Typischer Fall: Die Rolle schaltet einen
+      Bereich frei.
+    </p>
+    <p class="mb-0">
+      <strong>Nimm dafür eine eigene, leere Rolle</strong>, die nichts
+      freischaltet und nur anzeigt, wer gerade sendet. Der Bot rührt fremde
+      Träger nicht an — er nimmt nur zurück, was er selbst vergeben hat —
+      aber eine Rolle mit zwei Bedeutungen verwirrt jeden, der sie sieht.
+    </p>
+  </div>
+<% } %>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label" for="live_rolle_id">Live-Rolle</label>
+    <select class="form-select" id="live_rolle_id" name="live_rolle_id" <%= darfEinstellen ? '' : 'disabled' %>>
+      <option value="">— keine, Live-Rolle aus —</option>
+      <% if (liveRolleId && !liveRolleName) { %>
+        <option value="<%= liveRolleId %>" selected>⚠ gelöschte Rolle (<%= liveRolleId %>)</option>
+      <% } %>
+      <% (rollen || []).forEach(r => { %>
+        <option value="<%= r.id %>" <%= String(r.id) === String(liveRolleId) ? 'selected' : '' %>>@<%= r.name %></option>
+      <% }); %>
+    </select>
+    <div class="form-hint">
+      Wer gerade sendet, bekommt diese Rolle — und verliert sie, wenn der Stream
+      endet.
+      <br>
+      <strong>Wichtig:</strong> Die Rolle muss in der Rangliste <em>unter</em>
+      der Rolle des Bots stehen — sonst darf er sie nicht vergeben, und es
+      passiert nichts.
+      <br>
+      Umbenennen reicht nicht, um hier etwas zu ändern: Discord behält beim
+      Umbenennen dieselbe Rolle. Wer eine <em>andere</em> Rolle will, wählt
+      sie hier aus.
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="text-secondary small">
+      Die Rolle bekommt nur, wem in „Rollen und Kanäle“ ein Discord-Mitglied
+      zugeordnet ist. Ohne Zuordnung wissen wir nicht, wem der Kanal gehört —
+      ein Kanalname ist kein Discord-Konto.
+      <br><br>
+      Sie hängt am Live-Zustand, <strong>nicht</strong> am Filter: Wer
+      sendet, bekommt sie auch dann, wenn wegen eines Spielfilters keine
+      Ankündigung erscheint. Andernfalls ginge sie mitten im Stream an und
+      aus, sobald jemand die Kategorie wechselt.
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <label class="form-label" for="zeitzone">Zeitzone für Ruhezeiten</label>
+    <select class="form-select" id="zeitzone" name="zeitzone" <%= darfEinstellen ? '' : 'disabled' %>>
+      <% (zonen || []).forEach(zo => { %>
+        <option value="<%= zo %>" <%= zo === zeitzone ? 'selected' : '' %>><%= zo %></option>
+      <% }); %>
+    </select>
+    <div class="form-hint">
+      Gilt für die Ruhezeiten in jedem Ziel. Ohne diese Angabe wäre es die
+      Zeitzone des Servers — und die kennt niemand, der „23:00 bis 08:00“
+      in ein Feld tippt.
+    </div>
+  </div>
+
+  <div class="col-md-6 pt-md-4">
+    <div class="text-secondary small">
+      Es ist dort gerade
+      <strong><%= new Date().toLocaleTimeString('de-DE', { timeZone: zeitzone, hour: '2-digit', minute: '2-digit' }) %> Uhr</strong>.
+    </div>
+  </div>
+</div>

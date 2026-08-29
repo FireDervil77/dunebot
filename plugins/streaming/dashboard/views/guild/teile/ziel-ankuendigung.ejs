@@ -1,0 +1,72 @@
+<%
+/**
+ * Ankuendigung - wohin gemeldet wird, wenn der Stream startet.
+ *
+ * Vier Felder aus `KARTEN_SPALTEN.ankuendigung`. `aktiv` ist bewusst NICHT
+ * dabei: Es schaltet das ganze Ziel ab, nicht nur diese Karte.
+ */
+const kName = kanalName(z.channel_id, zielkanaele);
+const rolleDa = !z.rolle_id || (rollen || []).some(r => String(r.id) === String(z.rolle_id));
+const ankuendigung = (zielkanaele || []).filter(k => k.istAnkuendigung);
+const normal = (zielkanaele || []).filter(k => !k.istAnkuendigung);
+const bekannt = (zielkanaele || []).some(k => String(k.id) === String(z.channel_id));
+%>
+<div class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label" for="channel_id_<%= z.id %>"><%= tr('streaming:TARGETS.CHANNEL') %></label>
+    <select class="form-select" id="channel_id_<%= z.id %>" name="channel_id" required <%= darfAendern ? '' : 'disabled' %>>
+      <% if (!bekannt) { %>
+        <option value="<%= z.channel_id %>" selected>⚠ gelöschter Kanal (<%= z.channel_id %>)</option>
+      <% } %>
+      <% if (ankuendigung.length) { %>
+        <optgroup label="Ankündigungskanäle">
+          <% ankuendigung.forEach(k => { %>
+            <option value="<%= k.id %>" <%= String(k.id) === String(z.channel_id) ? 'selected' : '' %>>📢 <%= k.name %></option>
+          <% }); %>
+        </optgroup>
+      <% } %>
+      <optgroup label="Textkanäle">
+        <% normal.forEach(k => { %>
+          <option value="<%= k.id %>" <%= String(k.id) === String(z.channel_id) ? 'selected' : '' %>># <%= k.name %></option>
+        <% }); %>
+      </optgroup>
+    </select>
+  </div>
+
+  <div class="col-md-6">
+    <label class="form-label" for="rolle_id_<%= z.id %>"><%= tr('streaming:TARGETS.ROLE') %></label>
+    <select class="form-select" id="rolle_id_<%= z.id %>" name="rolle_id" <%= darfAendern ? '' : 'disabled' %>>
+      <option value="">— keine —</option>
+      <% if (!rolleDa) { %>
+        <option value="<%= z.rolle_id %>" selected>⚠ gelöschte Rolle (<%= z.rolle_id %>)</option>
+      <% } %>
+      <% (rollen || []).forEach(r => { %>
+        <option value="<%= r.id %>" <%= String(r.id) === String(z.rolle_id) ? 'selected' : '' %>>@<%= r.name %></option>
+      <% }); %>
+    </select>
+    <div class="form-hint">Wird im Text erwähnt und löst die Benachrichtigung aus.</div>
+  </div>
+
+  <div class="col-12">
+    <label class="form-label" for="bild_<%= z.id %>"><%= tr('streaming:TARGETS.OWN_IMAGE') %></label>
+    <input type="url" class="form-control" id="bild_<%= z.id %>" name="eigenes_bild"
+           value="<%= z.eigenes_bild || '' %>" placeholder="https://…" <%= darfAendern ? '' : 'disabled' %>>
+    <div class="form-hint">
+      Leer lassen heisst: das Vorschaubild des laufenden Streams. Ein
+      eigenes Bild bleibt dagegen immer gleich — es zeigt nicht, was
+      gerade gespielt wird.
+    </div>
+  </div>
+
+  <div class="col-12">
+    <label class="form-check form-switch">
+      <input type="checkbox" class="form-check-input" name="veroeffentlichen" value="1"
+             <%= z.veroeffentlichen ? 'checked' : '' %> <%= darfAendern ? '' : 'disabled' %>>
+      <span class="form-check-label"><%= tr('streaming:TARGETS.PUBLISH') %></span>
+    </label>
+    <div class="form-hint">
+      Wirkt nur in Ankündigungskanälen (📢). In einem normalen
+      Textkanal passiert nichts — die Ankündigung kommt trotzdem an.
+    </div>
+  </div>
+</div>

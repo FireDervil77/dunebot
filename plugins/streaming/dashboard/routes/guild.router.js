@@ -362,7 +362,134 @@ async function altRolleAbraeumen(guildId, rolleId) {
 }
 
 // Ein Ziel aendern
-router.post('/ziele/:id', requirePermission('STREAMING.TARGETS.MANAGE'), async (req, res) => {
+/**
+ * **Die Felder einer Funktionskarte aus dem Formular lesen.**
+ *
+ * Je Karte eine Funktion. Sie gibt entweder die Spaltenwerte zurueck oder eine
+ * Fehlermarke - dann wird nichts geschrieben.
+ *
+ * **Warum je Karte und nicht einmal fuer alles.** Bis zum 2026-08-29 las eine
+ * einzige Route saemtliche neunzehn Felder und schrieb alle siebzehn Spalten.
+ * Solange EIN Formular alles mitschickte, ging das gut. Sobald die Seite in
+ * Karten zerfaellt, schickt jede nur ihre eigenen Felder - und dieselbe Route
+ * haette die uebrigen zwoelf still auf NULL gesetzt. Die Trennung hier und die
+ * Spaltenliste in `KARTEN_SPALTEN` sind zwei Haelften derselben Zusage.
+ *
+ * @type {Object<string, function(Object): (Object|{fehler: string})>}
+ */
+const KARTEN_FELDER = {
+    schalter: (b) => ({ aktiv: b.aktiv ? 1 : 0 }),
+
+    ankuendigung: (b) => {
+        const channelId = String(b.channel_id || '').trim();
+        if (!channelId) return { fehler: 'ziel_fehlt' };
+        const bild = String(b.eigenes_bild || '').trim();
+        if (bild && !/^https:\/\//i.test(bild)) return { fehler: 'bild' };
+        return {
+            channel_id:       channelId,
+            rolle_id:         String(b.rolle_id || '').trim() || null,
+            eigenes_bild:     bild || null,
+            veroeffentlichen: b.veroeffentlichen ? 1 : 0
+        };
+    },
+
+    meldungen: (b) => ({
+        // Der Kanal darf leer bleiben - dann gehen die Meldungen in den
+        // Ankuendigungskanal (Entscheidung des Betreibers am 2026-08-27).
+        melder_channel_id: String(b.melder_channel_id || '').trim() || null,
+        // Die Arten laufen durch `artenSchreiben`: Was dort nicht als
+        // gueltiger Name steht, faellt weg, statt in die Spalte zu geraten.
+        melder_arten:      melder.artenSchreiben(
+                               Array.isArray(b.melder_arten) ? b.melder_arten
+                               : (b.melder_arten ? [b.melder_arten] : []))
+    }),
+
+    filter: (b) => ({
+        filter_spiel:     String(b.filter_spiel || '').trim() || null,
+        filter_titel:     String(b.filter_titel || '').trim() || null,
+        filter_spiel_aus: String(b.filter_spiel_aus || '').trim() || null,
+        filter_titel_aus: String(b.filter_titel_aus || '').trim() || null,
+        ruhe_von:         uhrzeit(b.ruhe_von),
+        ruhe_bis:         uhrzeit(b.ruhe_bis)
+    }),
+
+    aufraeumen: (b) => {
+        // 'bearbeiten' ist die Vorgabe. Ein unbekannter Wert kaeme aus einem
+        // veraenderten Formular - dann gilt die Vorgabe, nicht der Wunsch.
+        const erlaubt = ['bearbeiten', 'loeschen', 'stehenlassen'];
+        return { aufraeumen: erlaubt.includes(b.aufraeumen) ? b.aufraeumen : 'bearbeiten' };
+    },
+
+    rollen: (b) => ({
+        // Nur Ziffern: Eine Discord-Kennung ist eine Zahl. Ein eingetippter
+        // Name kaeme sonst als Kennung durch und die Vergabe liefe ins Leere.
+        abo_rolle_id:  /^\d{5,32}$/.test(String(b.abo_rolle_id || '').trim())
+                          ? String(b.abo_rolle_id).trim() : null,
+        mitglied_id:   /^\d{5,32}$/.test(String(b.mitglied_id || '').trim())
+                          ? String(b.mitglied_id).trim() : null,
+        onair_channel: String(b.onair_channel || '').trim() || null
+    })
+};
+
+/**
+ * **Karten, nach deren Aenderung die Twitch-Abos nachziehen muessen.**
+ *
+ * Nicht alle. `aktiv` steht in vierzehn Abfragen als Bedingung, die
+ * Melder-Arten bestellen eigene Ereignisse, und die Abonnenten-Rolle braucht
+ * `channel.subscribe` und Verwandte. Ein Filter oder eine Ruhezeit aendert
+ * dagegen nichts an dem, was wir bei Twitch bestellt haben - dort waere der
+ * Nachzug nur Wartezeit ohne Wirkung.
+ *
+ * @type {Set<string>}
+ */
+const KARTEN_MIT_ABONACHZUG = new Set(['schalter', 'meldungen', 'rollen']);
+
+/**
+ * Die Twitch-Abos einer Zieländerung nachziehen.
+ *
+ * **Was hier passiert, gehoert in die Rueckmeldung.** Ein Speichern, das
+ * nebenbei Abonnements bestellt oder abbestellt, ist mehr als "gespeichert" -
+ * und wer es nicht erfaehrt, haelt die Wartezeit fuer einen Fehler.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {number} zielId Ziel-ID
+ * @returns {Promise<{bestellt: number, abbestellt: number, fehler: string|null}>} Bilanz
+ */
+async function abosNachziehen(guildId, zielId) {
+    const Logger = ServiceManager.get('Logger');
+    try {
+        const ziel = await modelle.zielLesen(guildId, zielId);
+        if (!ziel) return { bestellt: 0, abbestellt: 0, fehler: null };
+
+        const streamer = (await ServiceManager.get('dbService').query(
+            'SELECT plattform, kanal_id FROM streaming_streamers WHERE id = ?', [ziel.streamer_id]))[0];
+        if (!streamer) return { bestellt: 0, abbestellt: 0, fehler: null };
+
+        const ergebnisse = await abos.abosSichern(ziel.streamer_id, streamer.plattform, streamer.kanal_id);
+        const bestellt = (ergebnisse || []).filter(e => e && e.ok && !e.uebersprungen).length;
+
+        // Gezielt nur die Abo- und Melder-Ereignisse: `abosAufraeumen` wuerde
+        // ALLES abbestellen, sobald die letzte Guild das Ziel entfernt.
+        const a = await abos.aboEreignisseAufraeumen(ziel.streamer_id);
+        const b = await abos.melderEreignisseAufraeumen(ziel.streamer_id);
+        return { bestellt, abbestellt: (a?.abbestellt || 0) + (b?.abbestellt || 0), fehler: null };
+    } catch (err) {
+        // Ein Fehlschlag hier darf das Speichern nicht zuruecknehmen. Der
+        // taegliche Abgleich holt es nach - aber gesagt wird es trotzdem.
+        Logger.warn(`[Streaming] Abos nach Zieländerung nicht nachgezogen: ${err.message}`);
+        return { bestellt: 0, abbestellt: 0, fehler: err.message };
+    }
+}
+
+/**
+ * Eine Funktionskarte speichern.
+ *
+ * @param {string} karte Name der Karte
+ * @param {Object} req Anfrage
+ * @param {Object} res Antwort
+ * @returns {Promise<void>} nichts
+ */
+async function karteSpeichern(karte, req, res) {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
     const zurueck = `/guild/${guildId}/plugins/streaming/ziele`;
@@ -371,119 +498,56 @@ router.post('/ziele/:id', requirePermission('STREAMING.TARGETS.MANAGE'), async (
         const zielId = Number(req.params.id);
         if (!Number.isInteger(zielId)) return res.redirect(`${zurueck}?fehler=technisch`);
 
-        const channelId = String(req.body.channel_id || '').trim();
-        if (!channelId) return res.redirect(`${zurueck}?fehler=ziel_fehlt`);
+        const felder = KARTEN_FELDER[karte](req.body);
+        if (felder.fehler) return res.redirect(`${zurueck}?fehler=${felder.fehler}`);
 
-        // 'bearbeiten' ist die Vorgabe. Ein unbekannter Wert kaeme aus einem
-        // veraenderten Formular - dann gilt die Vorgabe, nicht der Wunsch.
-        const erlaubteArten = ['bearbeiten', 'loeschen', 'stehenlassen'];
-        const aufraeumen = erlaubteArten.includes(req.body.aufraeumen) ? req.body.aufraeumen : 'bearbeiten';
-
-        const bild = String(req.body.eigenes_bild || '').trim();
-        if (bild && !/^https:\/\//i.test(bild)) {
-            return res.redirect(`${zurueck}?fehler=bild`);
-        }
-
-        const geaendert = await modelle.zielSpeichern(guildId, zielId, {
-            channel_id:       channelId,
-            rolle_id:         String(req.body.rolle_id || '').trim() || null,
-            // Nur Ziffern, wie bei `mitglied_id`: Eine Discord-Kennung ist eine
-            // Zahl. Ein eingetippter Rollenname ginge sonst als Kennung durch
-            // und die Vergabe liefe stumm ins Leere.
-            abo_rolle_id:     /^\d{5,32}$/.test(String(req.body.abo_rolle_id || '').trim())
-                                ? String(req.body.abo_rolle_id).trim() : null,
-            onair_channel:    String(req.body.onair_channel || '').trim() || null,
-
-            // Melder (12c). Der Kanal darf leer bleiben — dann gehen die
-            // Meldungen in den Ankuendigungskanal (Entscheidung des Betreibers
-            // am 2026-08-27). Die Arten laufen durch `artenSchreiben`: Was
-            // dort nicht als gueltiger Name steht, faellt weg, statt in die
-            // Spalte zu geraten.
-            melder_channel_id: String(req.body.melder_channel_id || '').trim() || null,
-            melder_arten:     melder.artenSchreiben(
-                                Array.isArray(req.body.melder_arten) ? req.body.melder_arten
-                                : (req.body.melder_arten ? [req.body.melder_arten] : [])),
-            filter_spiel:     String(req.body.filter_spiel || '').trim() || null,
-            filter_titel:     String(req.body.filter_titel || '').trim() || null,
-            filter_spiel_aus: String(req.body.filter_spiel_aus || '').trim() || null,
-            filter_titel_aus: String(req.body.filter_titel_aus || '').trim() || null,
-            ruhe_von:         uhrzeit(req.body.ruhe_von),
-            ruhe_bis:         uhrzeit(req.body.ruhe_bis),
-            aufraeumen,
-            eigenes_bild:     bild || null,
-            veroeffentlichen: req.body.veroeffentlichen ? 1 : 0,
-            aktiv:            req.body.aktiv ? 1 : 0,
-            // Nur Ziffern: Eine Discord-ID ist eine Zahl. Ein eingetippter
-            // Name kaeme sonst als Mitglied durch und die Rolle ginge ins Leere.
-            mitglied_id:      /^\d{5,32}$/.test(String(req.body.mitglied_id || '').trim())
-                                ? String(req.body.mitglied_id).trim() : null
-        });
+        const geaendert = await modelle.zielTeilSpeichern(guildId, zielId, karte, felder);
 
         // Null geaenderte Zeilen heisst hier: das Ziel gehoert dieser Guild
         // nicht (oder gibt es nicht mehr). Das ist kein Erfolg.
+        //
+        // **Aber auch kein sicherer Fehler:** MySQL meldet 0, wenn sich nichts
+        // GEAENDERT hat - wer zweimal dasselbe speichert, bekaeme sonst "Dieses
+        // Ziel gibt es nicht mehr" zu lesen. Deshalb wird nachgesehen, statt
+        // aus der Zahl zu schliessen.
         if (!geaendert) {
             const vorhanden = await modelle.zielLesen(guildId, zielId);
             if (!vorhanden) return res.redirect(`${zurueck}?fehler=weg`);
         }
 
-        // **Die Abo-Ereignisse muessen mitziehen.** Wer eine Abonnenten-Rolle
-        // einschaltet, braucht `channel.subscribe` und Verwandte — und wer sie
-        // ausschaltet, soll das Kontingent nicht weiter belasten. Ohne diesen
-        // Aufruf stuende das Feld da und nichts geschaehe, bis irgendwann
-        // zufaellig jemand den Kanal neu eintraegt.
-        // **Was hier passiert, gehoert in die Rueckmeldung.** Ein Speichern,
-        // das nebenbei Abonnements bei Twitch bestellt oder abbestellt, ist
-        // mehr als "gespeichert" — und wer es nicht erfaehrt, haelt die
-        // Wartezeit fuer einen Fehler. Deshalb wird gezaehlt statt geschwiegen.
-        let bestellt = 0;
-        let abbestellt = 0;
-        let nachzugFehler = null;
+        const nachzug = KARTEN_MIT_ABONACHZUG.has(karte)
+            ? await abosNachziehen(guildId, zielId)
+            : { bestellt: 0, abbestellt: 0, fehler: null };
 
-        try {
-            const ziel = await modelle.zielLesen(guildId, zielId);
-            if (ziel) {
-                const streamer = (await ServiceManager.get('dbService').query(
-                    'SELECT plattform, kanal_id FROM streaming_streamers WHERE id = ?', [ziel.streamer_id]))[0];
-                if (streamer) {
-                    const ergebnisse = await abos.abosSichern(ziel.streamer_id, streamer.plattform, streamer.kanal_id);
-                    bestellt = (ergebnisse || []).filter(e => e && e.ok && !e.uebersprungen).length;
-
-                    // Gezielt nur die Abo-Ereignisse: `abosAufraeumen` wuerde
-                    // ALLES abbestellen, sobald die letzte Guild das Ziel
-                    // entfernt — hier geht es nur um die Abonnenten-Rolle.
-                    const a = await abos.aboEreignisseAufraeumen(ziel.streamer_id);
-                    // Dasselbe fuer die Melder: Wer eine Art abwaehlt, soll
-                    // ihr Ereignis nicht weiter bezahlen.
-                    const b = await abos.melderEreignisseAufraeumen(ziel.streamer_id);
-                    abbestellt = (a?.abbestellt || 0) + (b?.abbestellt || 0);
-                }
-            }
-        } catch (err) {
-            // Ein Fehlschlag hier darf das Speichern nicht zuruecknehmen. Der
-            // taegliche Abgleich holt es nach — aber gesagt wird es trotzdem.
-            nachzugFehler = err.message;
-            Logger.warn(`[Streaming] Abos nach Zieländerung nicht nachgezogen: ${err.message}`);
-        }
-
-        Logger.info(`[Streaming] Ziel ${zielId} in Guild ${guildId} geaendert`
-            + (bestellt || abbestellt ? ` (${bestellt} bestellt, ${abbestellt} abbestellt)` : ''));
+        Logger.info(`[Streaming] Ziel ${zielId} in Guild ${guildId}: ${karte} geaendert`
+            + (nachzug.bestellt || nachzug.abbestellt
+                ? ` (${nachzug.bestellt} bestellt, ${nachzug.abbestellt} abbestellt)` : ''));
 
         const teile = [];
-        if (bestellt)   teile.push(`${bestellt} Ereignis${bestellt === 1 ? '' : 'se'} bei Twitch bestellt`);
-        if (abbestellt) teile.push(`${abbestellt} abbestellt`);
-        if (nachzugFehler) teile.push('die Twitch-Abos konnten nicht nachgezogen werden — der tägliche Abgleich holt es nach');
+        if (nachzug.bestellt)   teile.push(`${nachzug.bestellt} Ereignis${nachzug.bestellt === 1 ? '' : 'se'} bei Twitch bestellt`);
+        if (nachzug.abbestellt) teile.push(`${nachzug.abbestellt} abbestellt`);
+        if (nachzug.fehler)     teile.push('die Twitch-Abos konnten nicht nachgezogen werden — der tägliche Abgleich holt es nach');
 
         return antworte(req, res, {
             zurueck, ok: 'gespeichert',
             // Bei einem Fehlschlag im Nachzug ist "gespeichert" wahr, aber
             // unvollstaendig. Gelb statt gruen sagt genau das.
-            art: nachzugFehler ? 'warning' : 'success',
-            text: 'Ziel gespeichert' + (teile.length ? ' — ' + teile.join(', ') : '')
+            art: nachzug.fehler ? 'warning' : 'success',
+            text: 'Gespeichert' + (teile.length ? ' — ' + teile.join(', ') : '')
         });
     } catch (error) {
-        Logger.error('[Streaming] Ziel speichern fehlgeschlagen:', error);
+        Logger.error(`[Streaming] Karte ${karte} speichern fehlgeschlagen:`, error);
         return res.redirect(`${zurueck}?fehler=technisch`);
     }
+}
+
+// **Je Karte eine eigene Adresse.** Nicht `/ziele/:id/:karte` mit einer
+// Weiche: Dieses Muster faengt auch `/ziele/7/entfernen` und `/ziele/7/probe`
+// ab, sobald es vor ihnen steht - und wer die Reihenfolge spaeter umstellt,
+// merkt davon nichts, bis ein Entfernen-Knopf ploetzlich speichert.
+Object.keys(KARTEN_FELDER).forEach((karte) => {
+    router.post(`/ziele/:id/${karte}`, requirePermission('STREAMING.TARGETS.MANAGE'),
+        (req, res) => karteSpeichern(karte, req, res));
 });
 
 // Ein einzelnes Ziel entfernen

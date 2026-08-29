@@ -291,42 +291,69 @@ async function zielLesen(guildId, zielId) {
 }
 
 /**
- * Ein Ziel aendern.
+ * **Die Spalten, die eine Funktionskarte schreiben darf.**
  *
- * Nur die Felder, die die Oberflaeche wirklich anbietet - eine Schleife ueber
- * `req.body` waere kuerzer und wuerde `guild_id` oder `streamer_id`
- * mitschreiben lassen.
+ * Der Schluessel ist der Name der Karte, der Wert ihre Spalten. Was hier nicht
+ * steht, kommt auch nicht in die Datenbank - eine Schleife ueber `req.body`
+ * waere kuerzer und liesse `guild_id` oder `streamer_id` mitschreiben.
+ *
+ * @type {Object<string, Array<string>>}
+ */
+const KARTEN_SPALTEN = {
+    // **`aktiv` steht allein**, und zwar nicht aus Ordnungsliebe: Nachgesehen
+    // am 2026-08-29, es steht in vierzehn Abfragen als `aktiv = 1` - Melder,
+    // Abo-Rolle, Live-Rolle, Chat-Abos, Aufraeumen. Es ist der Hauptschalter
+    // des **Ziels**, nicht der der Ankuendigung. Haette ich es zur
+    // Ankuendigungskarte gelegt, haette ein Schalter mit der Aufschrift
+    // "Ankuendigung" heimlich auch die Follower-Meldungen abgeschaltet.
+    schalter:     ['aktiv'],
+    ankuendigung: ['channel_id', 'rolle_id', 'eigenes_bild', 'veroeffentlichen'],
+    meldungen:    ['melder_channel_id', 'melder_arten'],
+    filter:       ['filter_spiel', 'filter_titel', 'filter_spiel_aus', 'filter_titel_aus',
+                   'ruhe_von', 'ruhe_bis'],
+    aufraeumen:   ['aufraeumen'],
+    rollen:       ['abo_rolle_id', 'mitglied_id', 'onair_channel']
+};
+
+/**
+ * **Einen Teil eines Ziels aendern - und nur ihn.**
+ *
+ * Der Grund, warum es diese Funktion ueberhaupt gibt: `zielSpeichern` schreibt
+ * **alle siebzehn Spalten** bedingungslos. Solange ein einziges Formular alle
+ * Felder mitschickte, war das richtig. Sobald die Seite in Funktionskarten
+ * zerfaellt, schickt jede Karte nur ihre eigenen - und `zielSpeichern` wuerde
+ * die zwoelf anderen still auf `NULL` setzen.
+ *
+ * Das waere kein Absturz, sondern ein lautloser Verlust: Wer die Ruhezeit
+ * aendert, verlaere seine Filter, und niemand erfuehre es. Deshalb baut diese
+ * Funktion ihr `SET` aus genau den Spalten, die ihre Karte besitzt.
+ *
+ * **Der Kartenname ist die Grenze, nicht der Aufrufer.** Wuerde die Spaltenliste
+ * aus `Object.keys(felder)` kommen, entschiede der Aufrufer - und damit
+ * mittelbar das Formular -, was geschrieben wird. Eine erfundene Spalte im
+ * Formular waere dann ein SQL-Fehler, eine echte fremde Spalte ein Schaden.
  *
  * @param {string} guildId Discord-Guild-ID
  * @param {number} zielId Ziel-ID
- * @param {Object} f Felder
+ * @param {string} karte Name der Funktionskarte, siehe `KARTEN_SPALTEN`
+ * @param {Object} felder Werte, nach Spaltennamen
  * @returns {Promise<number>} Anzahl geaenderter Zeilen
+ * @throws {Error} wenn die Karte unbekannt ist
  */
-async function zielSpeichern(guildId, zielId, f) {
-    const ergebnis = await db().query(`
-        UPDATE streaming_targets
-           SET channel_id       = ?,
-               rolle_id         = ?,
-               abo_rolle_id     = ?,
-               onair_channel    = ?,
-               melder_channel_id = ?,
-               melder_arten     = ?,
-               filter_spiel     = ?,
-               filter_titel     = ?,
-               filter_spiel_aus = ?,
-               filter_titel_aus = ?,
-               ruhe_von         = ?,
-               ruhe_bis         = ?,
-               aufraeumen       = ?,
-               eigenes_bild     = ?,
-               veroeffentlichen = ?,
-               aktiv            = ?,
-               mitglied_id      = ?
-         WHERE id = ? AND guild_id = ?
-    `, [f.channel_id, f.rolle_id, f.abo_rolle_id, f.onair_channel,
-        f.melder_channel_id, f.melder_arten, f.filter_spiel, f.filter_titel,
-        f.filter_spiel_aus, f.filter_titel_aus, f.ruhe_von, f.ruhe_bis,
-        f.aufraeumen, f.eigenes_bild, f.veroeffentlichen, f.aktiv, f.mitglied_id, zielId, guildId]);
+async function zielTeilSpeichern(guildId, zielId, karte, felder) {
+    const spalten = KARTEN_SPALTEN[karte];
+    if (!spalten) throw new Error(`Unbekannte Funktionskarte: ${karte}`);
+
+    // Nur Spalten, die der Aufrufer wirklich mitgegeben hat. Eine Karte darf
+    // eine ihrer Spalten auslassen (etwa wenn ein Feld gesperrt war); sie darf
+    // nur keine fremde anfassen.
+    const zu = spalten.filter(sp => Object.prototype.hasOwnProperty.call(felder, sp));
+    if (!zu.length) return 0;
+
+    const ergebnis = await db().query(
+        `UPDATE streaming_targets SET ${zu.map(sp => `${sp} = ?`).join(', ')}
+          WHERE id = ? AND guild_id = ?`,
+        [...zu.map(sp => felder[sp]), zielId, guildId]);
     return Number(ergebnis?.affectedRows || 0);
 }
 
@@ -536,7 +563,8 @@ module.exports = {
     zustandDerGuild,
     verzugStatistik,
     zielLesen,
-    zielSpeichern,
+    zielTeilSpeichern,
+    KARTEN_SPALTEN,
     zielEntfernen,
     zielVorlageSetzen,
     probeVormerken,

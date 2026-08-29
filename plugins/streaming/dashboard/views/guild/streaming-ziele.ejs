@@ -6,10 +6,37 @@
 }) %>
 
 <%
+  /*
+   * **Eine Karte je Funktion, statt eines Formulars mit neunzehn Feldern.**
+   *
+   * Bis zum 2026-08-29 stand hier je Ziel EIN Formular mit EINEM
+   * Speichern-Knopf. Wer die Follower-Meldungen anhakte, schickte die
+   * Ruhezeiten, die Filter und die Rollenzuordnung mit ab - und ein Fehler in
+   * einem Feld nahm die anderen vier Funktionen mit.
+   *
+   * Die Felder selbst stehen jetzt in `teile/ziel-*.ejs`, der Rahmen kommt aus
+   * `shared/funktionskarte`. Jede Karte spricht ihre eigene Route an und
+   * schreibt ueber `zielTeilSpeichern` nur ihre eigenen Spalten. Das ist keine
+   * Bequemlichkeit, sondern die Bedingung: Die abgeloeste `zielSpeichern`
+   * schrieb alle siebzehn Spalten bedingungslos, und ein Teilformular haette
+   * die anderen zwoelf still auf NULL gesetzt. Sie ist deshalb geloescht und
+   * nicht nur ungenutzt liegengeblieben - ungenutztes Geraet versagt beim
+   * ersten Einsatz lautlos.
+   *
+   * **Was ein Teil NICHT erbt.** Ein eingebundener Teil sieht die `locals` der
+   * Route, aber KEINE hier mit `const` erklaerten Namen. `kanalName` und
+   * `darfAendern` muessen deshalb ausdruecklich mitgegeben werden - sonst sind
+   * sie im Teil undefiniert, und das faellt erst beim Rendern auf.
+   */
+
   // Ob jemand aendern darf, weiss der Theme-Helfer. Das ist Hoeflichkeit:
   // Die Sperre, die zaehlt, steht in der Route.
-  const darfAendern = typeof hasPermission === 'function' && hasPermission('STREAMING.TARGETS.MANAGE');
-  const darfProben  = typeof hasPermission === 'function' && hasPermission('STREAMING.TEST');
+  const darfAendern   = typeof hasPermission === 'function' && hasPermission('STREAMING.TARGETS.MANAGE');
+  const darfProben    = typeof hasPermission === 'function' && hasPermission('STREAMING.TEST');
+  const darfEinstellen = typeof hasPermission === 'function' && hasPermission('STREAMING.SETTINGS.EDIT');
+
+  const basis = `/guild/${guildId}/plugins/streaming`;
+  const marke = typeof csrfToken !== 'undefined' ? csrfToken : '';
 
   const meldungen = {
     gespeichert: 'Gespeichert. Ab der nächsten Ankündigung gilt die neue Einstellung.',
@@ -34,6 +61,8 @@
     const k = (liste || []).find(x => String(x.id) === String(id));
     return k ? k.name : null;
   };
+
+  const liveRolleName = (rollen || []).find(r => String(r.id) === String(liveRolleId));
 %>
 
 <% if (meldung && meldungen[meldung]) { %>
@@ -44,14 +73,14 @@
 <% } %>
 
 <% if (!ziele || ziele.length === 0) { %>
-  <div class="card">
+  <div class="card mb-3">
     <div class="card-body">
       <%# Der Hinweistext bleibt Prosa und wandert nicht in `text`: Er enthaelt
           einen Verweis, und `text` wird bewusst maskiert ausgegeben. %>
       <%- include('shared/leerzustand', {
             icon:   'fa-solid fa-bullseye',
             titel:  tr('streaming:TARGETS.EMPTY'),
-            aktion: `<a class="btn btn-primary" href="/guild/${guildId}/plugins/streaming/streamer">`
+            aktion: `<a class="btn btn-primary" href="${basis}/streamer">`
                   + `<i class="fa-solid fa-video me-2"></i>Kanal eintragen</a>`
           }) %>
       <p class="text-secondary small text-center mt-3 mb-0">
@@ -62,534 +91,107 @@
   </div>
 <% } %>
 
-<%
-  const darfEinstellen = typeof hasPermission === 'function' && hasPermission('STREAMING.SETTINGS.EDIT');
-  const liveRolleName = (rollen || []).find(r => String(r.id) === String(liveRolleId));
-%>
+<%- include('shared/funktionskarte', {
+      titel:        'Vorgaben dieses Servers',
+      beschreibung: 'Gilt für alle Ziele dieser Guild.',
+      icon:         'fa-solid fa-sliders',
+      id:           'vorgaben',
+      aktion:       `${basis}/ziele/live-rolle`,
+      csrfToken:    marke,
+      darf:         darfEinstellen,
+      koerper:      include('teile/vorgaben', {
+                        darfEinstellen, liveRolleName, fremdeTraeger:
+                          (typeof fremdeTraeger !== 'undefined' ? fremdeTraeger : 0)
+                    })
+}) %>
 
-<div class="card mb-3">
-  <div class="card-header">
-    <h3 class="card-title">Vorgaben dieses Servers</h3>
-    <div class="card-actions">
-      <% if (liveRolleId) { %>
-        <span class="badge bg-green-lt">an</span>
-      <% } else { %>
-        <span class="badge bg-secondary-lt">aus</span>
-      <% } %>
-    </div>
-  </div>
-  <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/live-rolle">
-    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-    <div class="card-body">
-      <% if (typeof fremdeTraeger !== 'undefined' && fremdeTraeger > 0) { %>
-        <div class="alert alert-warning">
-          <strong>Diese Rolle bedeutet auf diesem Server schon etwas anderes.</strong>
-          <p class="mb-1">
-            <%= fremdeTraeger %> Mitglied<%= fremdeTraeger === 1 ? '' : 'er' %>
-            trägt sie, ohne dass der Bot sie vergeben hat — sie wurde also von Hand
-            oder von woanders gesetzt. Typischer Fall: Die Rolle schaltet einen
-            Bereich frei.
-          </p>
-          <p class="mb-0">
-            <strong>Nimm dafür eine eigene, leere Rolle</strong>, die nichts
-            freischaltet und nur anzeigt, wer gerade sendet. Der Bot rührt fremde
-            Träger nicht an — er nimmt nur zurück, was er selbst vergeben hat —
-            aber eine Rolle mit zwei Bedeutungen verwirrt jeden, der sie sieht.
-          </p>
+<% (ziele || []).forEach(z => { %>
+  <%
+    const kName = kanalName(z.channel_id, zielkanaele);
+    const uebergabe = { z, kanalName, darfAendern };
+  %>
+  <div id="ziel-<%= z.id %>" class="mb-4">
+
+    <%- include('shared/funktionskarte', {
+          titel:        (z.anzeigename || z.login) + ' → ' + (kName ? '#' + kName : '⚠ Kanal gelöscht'),
+          beschreibung: 'Aus heisst: Der Kanal wird weiter beobachtet, aber in diesem Discord passiert nichts — keine Ankündigung, keine Meldung, keine Rolle. Das Twitch-Abo bleibt bestehen.',
+          icon:         'fa-solid fa-satellite-dish',
+          id:           `ziel-schalter-${z.id}`,
+          aktion:       `${basis}/ziele/${z.id}/schalter`,
+          csrfToken:    marke,
+          darf:         darfAendern,
+          schalter:     { name: 'aktiv', an: !!z.aktiv },
+          speichern:    'Schalter übernehmen',
+          koerper:      include('teile/ziel-kopf', Object.assign({ basis, darfProben, marke }, uebergabe))
+    }) %>
+
+    <% if (darfProben) { %>
+      <%# Traegt nur die Adresse und die Marke; die Bedienelemente stehen in
+          der Karte darueber und haengen per form="…" hieran. Es steht NEBEN
+          der Karte, weil ein Formular im Formular ungueltiges HTML ist - der
+          Browser verwuerfe das innere, und der Probe-Knopf taete nichts. %>
+      <form id="probe-<%= z.id %>" method="POST" data-toast
+            action="<%= basis %>/ziele/<%= z.id %>/probe" hidden>
+        <input type="hidden" name="_csrf" value="<%= marke %>">
+      </form>
+    <% } %>
+
+    <%- include('shared/funktionskarte', {
+          titel: 'Ankündigung', icon: 'fa-solid fa-bullhorn',
+          beschreibung: 'Wohin gemeldet wird, wenn der Stream startet.',
+          id: `ank-${z.id}`, aktion: `${basis}/ziele/${z.id}/ankuendigung`,
+          csrfToken: marke, darf: darfAendern,
+          koerper: include('teile/ziel-ankuendigung', uebergabe)
+    }) %>
+
+    <%- include('shared/funktionskarte', {
+          titel: 'Meldungen', icon: 'fa-solid fa-bell',
+          beschreibung: 'Raid, Bits, Follower, Abonnenten — einzeln anhakbar.',
+          id: `mld-${z.id}`, aktion: `${basis}/ziele/${z.id}/meldungen`,
+          csrfToken: marke, darf: darfAendern,
+          koerper: include('teile/ziel-meldungen', uebergabe)
+    }) %>
+
+    <%- include('shared/funktionskarte', {
+          titel: 'Filter und Ruhezeit', icon: 'fa-solid fa-filter',
+          beschreibung: 'Wann trotz laufendem Stream NICHT angekündigt wird.',
+          id: `flt-${z.id}`, aktion: `${basis}/ziele/${z.id}/filter`,
+          csrfToken: marke, darf: darfAendern,
+          koerper: include('teile/ziel-filter', uebergabe)
+    }) %>
+
+    <%- include('shared/funktionskarte', {
+          titel: 'Aufräumen', icon: 'fa-solid fa-broom',
+          beschreibung: 'Was mit der Ankündigung geschieht, wenn der Stream endet.',
+          id: `auf-${z.id}`, aktion: `${basis}/ziele/${z.id}/aufraeumen`,
+          csrfToken: marke, darf: darfAendern,
+          koerper: include('teile/ziel-aufraeumen', uebergabe)
+    }) %>
+
+    <%- include('shared/funktionskarte', {
+          titel: 'Rollen und Kanäle', icon: 'fa-solid fa-user-tag',
+          beschreibung: 'Was ein laufender Stream am Discord verändert.',
+          id: `rol-${z.id}`, aktion: `${basis}/ziele/${z.id}/rollen`,
+          csrfToken: marke, darf: darfAendern,
+          koerper: include('teile/ziel-rollen', uebergabe)
+    }) %>
+
+    <% if (darfAendern) { %>
+      <%#
+        Getrennte Zone fuer das Zerstoerende: eigene Karte, rechtsbuendig, weit
+        weg von allem, was man im Alltag drueckt. Sie steht am Ende des Ziels
+        und nicht in einer der Funktionskarten - dort waere sie neben einem
+        Speichern-Knopf gelandet.
+      %>
+      <div class="card">
+        <div class="card-footer text-end">
+          <form method="POST" action="<%= basis %>/ziele/<%= z.id %>/entfernen"
+                onsubmit="return confirm('Dieses Ziel wirklich entfernen?\n\nIst es das letzte Ziel für diesen Kanal, werden auch die Twitch-Abos abbestellt — der Kanal wird dann gar nicht mehr beobachtet.');">
+            <input type="hidden" name="_csrf" value="<%= marke %>">
+            <button type="submit" class="btn btn-sm btn-ghost-danger">Dieses Ziel entfernen</button>
+          </form>
         </div>
-      <% } %>
-
-      <p class="text-secondary small">
-        Wer gerade sendet, bekommt diese Rolle — und verliert sie, wenn der Stream
-        endet. Sie ist dafür gedacht, Streamende in der Mitgliederliste nach oben
-        zu holen oder ihnen währenddessen einen eigenen Kanal zu öffnen.
-      </p>
-
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label" for="live_rolle_id">Rolle</label>
-          <select class="form-select" id="live_rolle_id" name="live_rolle_id" <%= darfEinstellen ? '' : 'disabled' %>>
-            <option value="">— keine, Live-Rolle aus —</option>
-            <% if (liveRolleId && !liveRolleName) { %>
-              <option value="<%= liveRolleId %>" selected>⚠ gelöschte Rolle (<%= liveRolleId %>)</option>
-            <% } %>
-            <% (rollen || []).forEach(r => { %>
-              <option value="<%= r.id %>" <%= String(r.id) === String(liveRolleId) ? 'selected' : '' %>>@<%= r.name %></option>
-            <% }); %>
-          </select>
-          <div class="form-hint">
-            <strong>Wichtig:</strong> Die Rolle muss in der Rangliste <em>unter</em>
-            der Rolle des Bots stehen — sonst darf er sie nicht vergeben, und es
-            passiert nichts.
-            <br>
-            Umbenennen reicht nicht, um hier etwas zu ändern: Discord behält beim
-            Umbenennen dieselbe Rolle. Wer eine <em>andere</em> Rolle will, wählt
-            sie hier aus.
-          </div>
-        </div>
-        <div class="col-md-6">
-          <div class="text-secondary small">
-            Die Rolle bekommt nur, wem unten ein Discord-Mitglied zugeordnet ist.
-            Ohne Zuordnung wissen wir nicht, wem der Kanal gehört — ein Kanalname
-            ist kein Discord-Konto.
-            <br><br>
-            Sie hängt am Live-Zustand, <strong>nicht</strong> am Filter: Wer
-            sendet, bekommt sie auch dann, wenn wegen eines Spielfilters keine
-            Ankündigung erscheint. Andernfalls ginge sie mitten im Stream an und
-            aus, sobald jemand die Kategorie wechselt.
-          </div>
-        </div>
-      </div>
-
-      <hr class="my-3">
-
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label" for="zeitzone">Zeitzone für Ruhezeiten</label>
-          <select class="form-select" id="zeitzone" name="zeitzone" <%= darfEinstellen ? '' : 'disabled' %>>
-            <% (zonen || []).forEach(z => { %>
-              <option value="<%= z %>" <%= z === zeitzone ? 'selected' : '' %>><%= z %></option>
-            <% }); %>
-          </select>
-          <div class="form-hint">
-            Gilt für die Ruhezeiten weiter unten. Ohne diese Angabe wäre es die
-            Zeitzone des Servers — und die kennt niemand, der „23:00 bis 08:00"
-            in ein Feld tippt.
-          </div>
-        </div>
-        <div class="col-md-6 pt-md-4">
-          <div class="text-secondary small">
-            Es ist dort gerade
-            <strong><%= new Date().toLocaleTimeString('de-DE', { timeZone: zeitzone, hour: '2-digit', minute: '2-digit' }) %> Uhr</strong>.
-          </div>
-        </div>
-      </div>
-    </div><%# schliesst die card-body — sie umfasst Rolle UND Zeitzone %>
-
-    <% if (darfEinstellen) { %>
-      <div class="card-footer text-end">
-        <button type="submit" class="btn btn-primary"><%= tr('streaming:COMMON.SAVE') %></button>
       </div>
     <% } %>
-  </form>
-</div>
-
-<div class="row row-cards">
-  <% (ziele || []).forEach(z => { %>
-    <%
-      const kName = kanalName(z.channel_id, zielkanaele);
-      const oName = kanalName(z.onair_channel, sprachkanaele);
-      const rolleDa = !z.rolle_id || (rollen || []).some(r => String(r.id) === String(z.rolle_id));
-    %>
-    <div class="col-12" id="ziel-<%= z.id %>">
-      <div class="card <%= z.aktiv ? '' : 'opacity-75' %>">
-        <div class="card-header">
-          <h3 class="card-title">
-            <%= z.anzeigename || z.login %>
-            <span class="text-secondary fw-normal">→ <% if (kName) { %># <%= kName %><% } else { %>
-              <span class="text-danger">⚠ Kanal gelöscht</span><% } %></span>
-          </h3>
-          <div class="card-actions">
-            <% if (!z.aktiv) { %><span class="badge bg-secondary-lt">pausiert</span><% } %>
-          </div>
-        </div>
-
-        <form data-toast data-toast-neuladen method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>">
-          <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-          <div class="card-body">
-            <div class="row g-3">
-
-              <div class="col-md-4">
-                <label class="form-label" for="channel_id_<%= z.id %>"><%= tr('streaming:TARGETS.CHANNEL') %></label>
-                <select class="form-select" id="channel_id_<%= z.id %>" name="channel_id" required <%= darfAendern ? '' : 'disabled' %>>
-                  <%
-                    const ankuendigung = (zielkanaele || []).filter(k => k.istAnkuendigung);
-                    const normal = (zielkanaele || []).filter(k => !k.istAnkuendigung);
-                    const bekannt = (zielkanaele || []).some(k => String(k.id) === String(z.channel_id));
-                  %>
-                  <% if (!bekannt) { %>
-                    <option value="<%= z.channel_id %>" selected>⚠ gelöschter Kanal (<%= z.channel_id %>)</option>
-                  <% } %>
-                  <% if (ankuendigung.length) { %>
-                    <optgroup label="Ankündigungskanäle">
-                      <% ankuendigung.forEach(k => { %>
-                        <option value="<%= k.id %>" <%= String(k.id) === String(z.channel_id) ? 'selected' : '' %>>📢 <%= k.name %></option>
-                      <% }); %>
-                    </optgroup>
-                  <% } %>
-                  <optgroup label="Textkanäle">
-                    <% normal.forEach(k => { %>
-                      <option value="<%= k.id %>" <%= String(k.id) === String(z.channel_id) ? 'selected' : '' %>># <%= k.name %></option>
-                    <% }); %>
-                  </optgroup>
-                </select>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label" for="rolle_id_<%= z.id %>"><%= tr('streaming:TARGETS.ROLE') %></label>
-                <select class="form-select" id="rolle_id_<%= z.id %>" name="rolle_id" <%= darfAendern ? '' : 'disabled' %>>
-                  <option value="">— keine —</option>
-                  <% if (!rolleDa) { %>
-                    <option value="<%= z.rolle_id %>" selected>⚠ gelöschte Rolle (<%= z.rolle_id %>)</option>
-                  <% } %>
-                  <% (rollen || []).forEach(r => { %>
-                    <option value="<%= r.id %>" <%= String(r.id) === String(z.rolle_id) ? 'selected' : '' %>>@<%= r.name %></option>
-                  <% }); %>
-                </select>
-                <div class="form-hint">Wird im Text erwähnt und löst die Benachrichtigung aus.</div>
-              </div>
-
-              <%# Abonnenten-Rolle (Stufe 12b). Sie hängt an einer Zusage des
-                  Kanalinhabers — ohne sie wäre das Feld ein Versprechen, das
-                  niemand einlöst. Deshalb steht der Stand darunter im
-                  Klartext, statt das Feld wortlos wirkungslos zu lassen. %>
-              <div class="col-md-4">
-                <label class="form-label" for="abo_rolle_<%= z.id %>">Abonnenten-Rolle</label>
-                <select class="form-select" id="abo_rolle_<%= z.id %>" name="abo_rolle_id" <%= darfAendern ? '' : 'disabled' %>>
-                  <option value="">— keine —</option>
-                  <% const aboRolleDa = !z.abo_rolle_id || (rollen || []).some(r => String(r.id) === String(z.abo_rolle_id)); %>
-                  <% if (!aboRolleDa) { %>
-                    <option value="<%= z.abo_rolle_id %>" selected>⚠ gelöschte Rolle (<%= z.abo_rolle_id %>)</option>
-                  <% } %>
-                  <% (rollen || []).forEach(r => { %>
-                    <option value="<%= r.id %>" <%= String(r.id) === String(z.abo_rolle_id) ? 'selected' : '' %>>@<%= r.name %></option>
-                  <% }); %>
-                </select>
-                <% if (z.aboZusage === true) { %>
-                  <div class="form-hint text-success">
-                    <%= z.aboInhaber %> hat den Kanal verknüpft und das Lesen der Abonnenten erlaubt.
-                  </div>
-                <% } else if (z.aboZusage === 'ohne-zusage') { %>
-                  <div class="form-hint text-warning">
-                    <%= z.aboInhaber %> hat den Kanal verknüpft, aber das Lesen der Abonnenten
-                    <strong>noch nicht erlaubt</strong>. Bis dahin wird die Rolle nicht vergeben —
-                    er erteilt es unter „Verbundene Konten“ in seinem Profil.
-                  </div>
-                <% } else if (z.aboZusage === 'unbekannt') { %>
-                  <div class="form-hint text-danger">
-                    Der Stand der Zusage <strong>konnte nicht geprüft werden</strong>. Das heißt nicht,
-                    dass sie fehlt — es heißt, dass wir es gerade nicht wissen. Einzelheiten im Protokoll.
-                  </div>
-                <% } else { %>
-                  <div class="form-hint text-secondary">
-                    Wirkt erst, wenn der <strong>Kanalinhaber selbst</strong> sein Twitch-Konto hier
-                    verknüpft und das Lesen der Abonnenten erlaubt. Niemand sonst kann das für ihn tun.
-                  </div>
-                <% } %>
-              </div>
-
-              <%# ---------------------------------------------------------
-                  Meldungen (Stufe 12c).
-
-                  Der Kanal steht bewusst NEBEN den Häkchen und nicht darunter:
-                  Wer eine Art anhakt, soll im selben Blick sehen, wohin sie
-                  geht. Leer heißt Ankündigungskanal — das ist die Entscheidung
-                  des Betreibers vom 2026-08-27, und deshalb steht es hier
-                  ausgeschrieben statt als stille Vorgabe.
-
-                  Je Art wird gesagt, ob sie wirken kann. Ein Häkchen, das
-                  nichts tut, weil eine Zusage fehlt, ist genau das leere
-                  Versprechen, das dieses Plugin an anderen Bots kritisiert.
-              --- %>
-              <div class="col-12">
-                <hr class="my-2">
-                <div class="row g-2">
-                  <div class="col-md-4">
-                    <label class="form-label" for="melder_kanal_<%= z.id %>">Kanal für Meldungen</label>
-                    <select class="form-select" id="melder_kanal_<%= z.id %>" name="melder_channel_id" <%= darfAendern ? '' : 'disabled' %>>
-                      <option value="">— derselbe wie für Ankündigungen —</option>
-                      <% const melderBekannt = !z.melder_channel_id
-                           || (zielkanaele || []).some(k => String(k.id) === String(z.melder_channel_id)); %>
-                      <% if (!melderBekannt) { %>
-                        <option value="<%= z.melder_channel_id %>" selected>⚠ gelöschter Kanal (<%= z.melder_channel_id %>)</option>
-                      <% } %>
-                      <% (zielkanaele || []).forEach(k => { %>
-                        <option value="<%= k.id %>" <%= String(k.id) === String(z.melder_channel_id) ? 'selected' : '' %>># <%= k.name %></option>
-                      <% }); %>
-                    </select>
-                    <div class="form-hint">
-                      <% if (z.melder_channel_id) { %>
-                        Meldungen gehen in diesen Kanal.
-                      <% } else { %>
-                        <strong>Achtung:</strong> Ohne eigenen Kanal gehen die Meldungen in den
-                        Ankündigungskanal oben — ein Follower-Schub schiebt die Live-Ankündigung
-                        dann nach oben aus dem Blick.
-                      <% } %>
-                    </div>
-                  </div>
-
-                  <div class="col-md-8">
-                    <label class="form-label">Was gemeldet wird</label>
-                    <% const gewaehlt = String(z.melder_arten || '').split(',').map(x => x.trim()).filter(Boolean); %>
-                    <div class="row g-1">
-                      <% Object.keys(melderArten).forEach(art => {
-                           const a = melderArten[art];
-                           const b = melderBeschreibung(art);
-                           const scope = b && b.scope;
-                           const fehlt = scope && Array.isArray(z.melderScopes) && !z.melderScopes.includes(scope);
-                           const unbekannt = z.melderScopes === null; %>
-                        <div class="col-md-6">
-                          <label class="form-check">
-                            <input class="form-check-input" type="checkbox" name="melder_arten"
-                                   value="<%= art %>" <%= gewaehlt.includes(art) ? 'checked' : '' %>
-                                   <%= darfAendern ? '' : 'disabled' %>>
-                            <span class="form-check-label"><%= a.label %></span>
-                            <span class="form-check-description">
-                              <%= a.hinweis %>
-                              <% if (unbekannt && scope) { %>
-                                <span class="text-danger">Zusage nicht prüfbar.</span>
-                              <% } else if (fehlt) { %>
-                                <span class="text-warning">Wirkt noch nicht — dem Kanalinhaber fehlt die Zusage.</span>
-                              <% } else if (!scope) { %>
-                                <span class="text-success">Braucht keine Zusage.</span>
-                              <% } %>
-                            </span>
-                          </label>
-                        </div>
-                      <% }); %>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label" for="onair_<%= z.id %>">
-                  <%= tr('streaming:TARGETS.ONAIR') %>
-                  <span class="badge bg-secondary-lt ms-1">wirkt noch nicht</span>
-                </label>
-                <select class="form-select" id="onair_<%= z.id %>" name="onair_channel" <%= darfAendern ? '' : 'disabled' %>>
-                  <option value="">— keiner —</option>
-                  <% if (z.onair_channel && !oName) { %>
-                    <option value="<%= z.onair_channel %>" selected>⚠ gelöschter Kanal (<%= z.onair_channel %>)</option>
-                  <% } %>
-                  <% (sprachkanaele || []).forEach(k => { %>
-                    <option value="<%= k.id %>" <%= String(k.id) === String(z.onair_channel) ? 'selected' : '' %>>🔊 <%= k.name %></option>
-                  <% }); %>
-                </select>
-                <div class="form-hint"><%= tr('streaming:TARGETS.ONAIR_HELP') %></div>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label" for="mitglied_<%= z.id %>">
-                  Wem gehört dieser Kanal?
-                  <% if (!liveRolleId) { %>
-                    <span class="badge bg-secondary-lt ms-1">Live-Rolle ist aus</span>
-                  <% } %>
-                </label>
-                <select class="form-select" id="mitglied_<%= z.id %>" name="mitglied_id" <%= darfAendern ? '' : 'disabled' %>>
-                  <option value="">— niemand zugeordnet —</option>
-                  <%
-                    const mDa = (mitglieder || []).some(m => String(m.id) === String(z.mitglied_id));
-                  %>
-                  <% if (z.mitglied_id && !mDa) { %>
-                    <option value="<%= z.mitglied_id %>" selected>⚠ nicht mehr auf dem Server (<%= z.mitglied_id %>)</option>
-                  <% } %>
-                  <% (mitglieder || []).forEach(m => { %>
-                    <option value="<%= m.id %>" <%= String(m.id) === String(z.mitglied_id) ? 'selected' : '' %>><%= m.name %></option>
-                  <% }); %>
-                </select>
-                <div class="form-hint">
-                  Nur für die Live-Rolle. Für die Ankündigung wird das nicht
-                  gebraucht — ohne Zuordnung funktioniert alles andere weiter.
-                </div>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label" for="filter_spiel_<%= z.id %>"><%= tr('streaming:TARGETS.FILTER_GAME') %></label>
-                <input type="text" class="form-control" id="filter_spiel_<%= z.id %>" name="filter_spiel"
-                       value="<%= z.filter_spiel || '' %>" placeholder="leer = jedes Spiel" <%= darfAendern ? '' : 'disabled' %>>
-                <div class="form-hint">
-                  Mehrere durch Komma. Es wird <strong>genau</strong> verglichen, nicht
-                  auf Wortteile — so, wie die Kategorie bei Twitch heisst.
-                </div>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label" for="filter_titel_<%= z.id %>"><%= tr('streaming:TARGETS.FILTER_TITLE') %></label>
-                <input type="text" class="form-control" id="filter_titel_<%= z.id %>" name="filter_titel"
-                       value="<%= z.filter_titel || '' %>" placeholder="leer = jeder Titel" <%= darfAendern ? '' : 'disabled' %>>
-                <div class="form-hint">Ein Wort. Gross- und Kleinschreibung ist egal.</div>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label" for="filter_spiel_aus_<%= z.id %>">Nicht bei diesen Spielen</label>
-                <input type="text" class="form-control" id="filter_spiel_aus_<%= z.id %>" name="filter_spiel_aus"
-                       value="<%= z.filter_spiel_aus || '' %>" placeholder="z. B. Just Chatting" <%= darfAendern ? '' : 'disabled' %>>
-                <div class="form-hint">
-                  Mehrere durch Komma. <strong>Schlägt die Erlaubnis oben:</strong>
-                  Steht dasselbe Spiel in beiden Feldern, wird nicht gemeldet.
-                </div>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label" for="filter_titel_aus_<%= z.id %>">Nicht, wenn der Titel dieses Wort enthält</label>
-                <input type="text" class="form-control" id="filter_titel_aus_<%= z.id %>" name="filter_titel_aus"
-                       value="<%= z.filter_titel_aus || '' %>" placeholder="z. B. test" <%= darfAendern ? '' : 'disabled' %>>
-                <div class="form-hint">Ein Wort. Groß- und Kleinschreibung ist egal.</div>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label">Ruhezeit — keine Ankündigung</label>
-                <div class="input-group">
-                  <input type="time" class="form-control" name="ruhe_von"
-                         value="<%= z.ruhe_von ? String(z.ruhe_von).slice(0, 5) : '' %>" <%= darfAendern ? '' : 'disabled' %>>
-                  <span class="input-group-text">bis</span>
-                  <input type="time" class="form-control" name="ruhe_bis"
-                         value="<%= z.ruhe_bis ? String(z.ruhe_bis).slice(0, 5) : '' %>" <%= darfAendern ? '' : 'disabled' %>>
-                </div>
-                <div class="form-hint">
-                  Beide leer = immer melden. Über Mitternacht geht (23:00 bis 08:00).
-                  Zeitzone: <strong><%= zeitzone %></strong>.
-                  <br>
-                  In der Ruhezeit wird <strong>nicht nachgeholt</strong> — wer dann
-                  live geht, wird für diesen Stream nicht angekündigt. Das Aufräumen
-                  danach läuft trotzdem.
-                </div>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label" for="aufraeumen_<%= z.id %>"><%= tr('streaming:TARGETS.CLEANUP') %></label>
-                <select class="form-select" id="aufraeumen_<%= z.id %>" name="aufraeumen" <%= darfAendern ? '' : 'disabled' %>>
-                  <option value="bearbeiten"   <%= z.aufraeumen === 'bearbeiten'   ? 'selected' : '' %>><%= tr('streaming:TARGETS.CLEANUP_EDIT') %></option>
-                  <option value="loeschen"     <%= z.aufraeumen === 'loeschen'     ? 'selected' : '' %>><%= tr('streaming:TARGETS.CLEANUP_DELETE') %></option>
-                  <option value="stehenlassen" <%= z.aufraeumen === 'stehenlassen' ? 'selected' : '' %>><%= tr('streaming:TARGETS.CLEANUP_KEEP') %></option>
-                </select>
-              </div>
-
-              <div class="col-12">
-                <label class="form-label" for="bild_<%= z.id %>"><%= tr('streaming:TARGETS.OWN_IMAGE') %></label>
-                <input type="url" class="form-control" id="bild_<%= z.id %>" name="eigenes_bild"
-                       value="<%= z.eigenes_bild || '' %>" placeholder="https://…" <%= darfAendern ? '' : 'disabled' %>>
-                <div class="form-hint">
-                  Leer lassen heisst: das Vorschaubild des laufenden Streams. Ein
-                  eigenes Bild bleibt dagegen immer gleich — es zeigt nicht, was
-                  gerade gespielt wird.
-                </div>
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-check form-switch">
-                  <input type="checkbox" class="form-check-input" name="aktiv" value="1"
-                         <%= z.aktiv ? 'checked' : '' %> <%= darfAendern ? '' : 'disabled' %>>
-                  <span class="form-check-label"><%= tr('streaming:TARGETS.ACTIVE') %></span>
-                </label>
-                <div class="form-hint">
-                  Aus heisst: Der Kanal wird weiter beobachtet, aber in diesen
-                  Discord-Kanal kommt nichts. Das Abo bleibt bestehen.
-                </div>
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-check form-switch">
-                  <input type="checkbox" class="form-check-input" name="veroeffentlichen" value="1"
-                         <%= z.veroeffentlichen ? 'checked' : '' %> <%= darfAendern ? '' : 'disabled' %>>
-                  <span class="form-check-label"><%= tr('streaming:TARGETS.PUBLISH') %></span>
-                </label>
-                <div class="form-hint">
-                  Wirkt nur in Ankündigungskanälen (📢). In einem normalen
-                  Textkanal passiert nichts — die Ankündigung kommt trotzdem an.
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          <%
-            /*
-             * **Ein Aktionsband, nicht drei.**
-             *
-             * Vorher standen "Probe senden" und "Dieses Ziel entfernen" in je
-             * einer eigenen Fusszeile hinter der Hauptfusszeile - die Karte
-             * las sich damit als Inhalt, Fusszeile, Inhalt, Fusszeile. Ein
-             * `card-body` nach einer `card-footer` sieht immer falsch aus, und
-             * genau das hat der Betreiber am 2026-08-25 als "weisse Seite
-             * darunter" beanstandet.
-             *
-             * Die Probe steht deshalb HIER, im Band der alltaeglichen
-             * Handlungen. Sie gehoert neben "Speichern", nicht neben
-             * "Entfernen" - Speichern zerstoert nichts.
-             *
-             * Moeglich wird das ohne verschachtelte Formulare durch das
-             * `form`-Attribut: Knopf und Kaestchen liegen im Markup der
-             * Hauptfusszeile, gehoeren aber dem versteckten Probenformular
-             * darunter. `new FormData(...)` sammelt sie mit, weil sich die
-             * Zugehoerigkeit nach dem Formularbesitzer richtet und nicht nach
-             * der Verschachtelung.
-             */
-          %>
-          <% if (darfAendern || darfProben) { %>
-            <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
-              <% if (darfAendern) { %>
-                <a href="/guild/<%= guildId %>/plugins/streaming/vorlagen#vorlage-<%= z.id %>" class="btn btn-link ps-0">
-                  Eigenen Text für dieses Ziel
-                  <% if (z.vorlage) { %><span class="badge bg-blue-lt ms-1">gesetzt</span><% } %>
-                </a>
-              <% } %>
-
-              <% if (darfProben) { %>
-                <div class="input-group w-auto">
-                  <button type="submit" form="probe-<%= z.id %>" class="btn btn-outline-primary">
-                    <i class="fa-solid fa-paper-plane me-1"></i><%= tr('streaming:TARGETS.PROBE') %>
-                  </button>
-                  <%
-                    /*
-                     * Beide Vorlagen sind probierbar. Vorher ging nur die
-                     * Ankuendigung - also die Haelfte. Die Rueckschau rechnet
-                     * ihre Dauer aus dem gespeicherten Zustand des letzten
-                     * Streams; ohne beendeten Stream bleibt sie leer, und der
-                     * Ausgang sagt das auch.
-                     */
-                  %>
-                  <select class="form-select" name="art" form="probe-<%= z.id %>"
-                          aria-label="<%= tr('streaming:TARGETS.PROBE_KIND') %>">
-                    <option value="live"><%= tr('streaming:TARGETS.PROBE_LIVE') %></option>
-                    <option value="rueckschau"><%= tr('streaming:TARGETS.PROBE_RECAP') %></option>
-                  </select>
-                </div>
-                <label class="form-check form-check-inline mb-0" title="<%= tr('streaming:TARGETS.PROBE_MENTION_HINT') %>">
-                  <input class="form-check-input" type="checkbox" name="mit_erwaehnung" value="1"
-                         form="probe-<%= z.id %>" <%= z.rolle_id ? '' : 'disabled' %>>
-                  <span class="form-check-label small text-secondary"><%= tr('streaming:TARGETS.PROBE_MENTION') %></span>
-                </label>
-              <% } %>
-
-              <% if (darfAendern) { %>
-                <div class="ms-auto">
-                  <button type="submit" class="btn btn-primary"><%= tr('streaming:COMMON.SAVE') %></button>
-                </div>
-              <% } %>
-            </div>
-          <% } %>
-        </form>
-
-        <% if (darfProben) { %>
-          <!-- Traegt nur die Adresse und den Token; die Bedienelemente stehen oben. -->
-          <form id="probe-<%= z.id %>" method="POST" data-toast
-                action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/probe" hidden>
-            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-          </form>
-        <% } %>
-
-        <% if (darfAendern) { %>
-          <!--
-            Getrennte Zone fuer das Zerstoerende: eigene Fusszeile,
-            rechtsbuendig, weit weg von allem, was man im Alltag drueckt.
-
-            **Mit Fusszeilen-Hintergrund, nicht transparent.** Die erste
-            Fassung nach dem Vorfall trug `bg-transparent`, und dann stand der
-            rote Knopf da wie vergessen statt wie der Abschluss der Karte. Der
-            Betreiber hat das am 2026-08-25 zu Recht beanstandet: Die Trennung
-            soll gewollt aussehen, nicht uebersehen.
-          -->
-          <div class="card-footer text-end">
-            <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ziele/<%= z.id %>/entfernen"
-                  onsubmit="return confirm('Dieses Ziel wirklich entfernen?\n\nIst es das letzte Ziel für diesen Kanal, werden auch die Twitch-Abos abbestellt — der Kanal wird dann gar nicht mehr beobachtet.');">
-              <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-              <button type="submit" class="btn btn-sm btn-ghost-danger">Dieses Ziel entfernen</button>
-            </form>
-          </div>
-        <% } %>
-      </div>
-    </div>
-  <% }); %>
-</div>
+  </div>
+<% }); %>

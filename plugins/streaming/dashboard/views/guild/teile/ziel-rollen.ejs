@@ -1,0 +1,88 @@
+<%
+/**
+ * Rollen und Kanaele - was ein laufender Stream am Discord veraendert.
+ *
+ * Drei Felder, die nichts mit der Ankuendigung zu tun haben und trotzdem
+ * bisher in demselben Formular standen.
+ */
+const oName = kanalName(z.onair_channel, sprachkanaele);
+const aboRolleDa = !z.abo_rolle_id || (rollen || []).some(r => String(r.id) === String(z.abo_rolle_id));
+const mDa = (mitglieder || []).some(m => String(m.id) === String(z.mitglied_id));
+%>
+<div class="row g-3">
+  <%# Abonnenten-Rolle (Stufe 12b). Sie haengt an einer Zusage des
+      Kanalinhabers — ohne sie waere das Feld ein Versprechen, das
+      niemand einloest. Deshalb steht der Stand darunter im Klartext. %>
+  <div class="col-md-4">
+    <label class="form-label" for="abo_rolle_<%= z.id %>">Abonnenten-Rolle</label>
+    <select class="form-select" id="abo_rolle_<%= z.id %>" name="abo_rolle_id" <%= darfAendern ? '' : 'disabled' %>>
+      <option value="">— keine —</option>
+      <% if (!aboRolleDa) { %>
+        <option value="<%= z.abo_rolle_id %>" selected>⚠ gelöschte Rolle (<%= z.abo_rolle_id %>)</option>
+      <% } %>
+      <% (rollen || []).forEach(r => { %>
+        <option value="<%= r.id %>" <%= String(r.id) === String(z.abo_rolle_id) ? 'selected' : '' %>>@<%= r.name %></option>
+      <% }); %>
+    </select>
+    <% if (z.aboZusage === true) { %>
+      <div class="form-hint text-success">
+        <%= z.aboInhaber %> hat den Kanal verknüpft und das Lesen der Abonnenten erlaubt.
+      </div>
+    <% } else if (z.aboZusage === 'ohne-zusage') { %>
+      <div class="form-hint text-warning">
+        <%= z.aboInhaber %> hat den Kanal verknüpft, aber das Lesen der Abonnenten
+        <strong>noch nicht erlaubt</strong>. Bis dahin wird die Rolle nicht vergeben —
+        er erteilt es unter „Verbundene Konten“ in seinem Profil.
+      </div>
+    <% } else if (z.aboZusage === 'unbekannt') { %>
+      <div class="form-hint text-danger">
+        Der Stand der Zusage <strong>konnte nicht geprüft werden</strong>. Das heißt nicht,
+        dass sie fehlt — es heißt, dass wir es gerade nicht wissen. Einzelheiten im Protokoll.
+      </div>
+    <% } else { %>
+      <div class="form-hint text-secondary">
+        Wirkt erst, wenn der <strong>Kanalinhaber selbst</strong> sein Twitch-Konto hier
+        verknüpft und das Lesen der Abonnenten erlaubt. Niemand sonst kann das für ihn tun.
+      </div>
+    <% } %>
+  </div>
+
+  <div class="col-md-4">
+    <label class="form-label" for="onair_<%= z.id %>">
+      <%= tr('streaming:TARGETS.ONAIR') %>
+      <span class="badge bg-secondary-lt ms-1">wirkt noch nicht</span>
+    </label>
+    <select class="form-select" id="onair_<%= z.id %>" name="onair_channel" <%= darfAendern ? '' : 'disabled' %>>
+      <option value="">— keiner —</option>
+      <% if (z.onair_channel && !oName) { %>
+        <option value="<%= z.onair_channel %>" selected>⚠ gelöschter Kanal (<%= z.onair_channel %>)</option>
+      <% } %>
+      <% (sprachkanaele || []).forEach(k => { %>
+        <option value="<%= k.id %>" <%= String(k.id) === String(z.onair_channel) ? 'selected' : '' %>>🔊 <%= k.name %></option>
+      <% }); %>
+    </select>
+    <div class="form-hint"><%= tr('streaming:TARGETS.ONAIR_HELP') %></div>
+  </div>
+
+  <div class="col-md-4">
+    <label class="form-label" for="mitglied_<%= z.id %>">
+      Wem gehört dieser Kanal?
+      <% if (!liveRolleId) { %>
+        <span class="badge bg-secondary-lt ms-1">Live-Rolle ist aus</span>
+      <% } %>
+    </label>
+    <select class="form-select" id="mitglied_<%= z.id %>" name="mitglied_id" <%= darfAendern ? '' : 'disabled' %>>
+      <option value="">— niemand zugeordnet —</option>
+      <% if (z.mitglied_id && !mDa) { %>
+        <option value="<%= z.mitglied_id %>" selected>⚠ nicht mehr auf dem Server (<%= z.mitglied_id %>)</option>
+      <% } %>
+      <% (mitglieder || []).forEach(m => { %>
+        <option value="<%= m.id %>" <%= String(m.id) === String(z.mitglied_id) ? 'selected' : '' %>><%= m.name %></option>
+      <% }); %>
+    </select>
+    <div class="form-hint">
+      Nur für die Live-Rolle. Für die Ankündigung wird das nicht
+      gebraucht — ohne Zuordnung funktioniert alles andere weiter.
+    </div>
+  </div>
+</div>

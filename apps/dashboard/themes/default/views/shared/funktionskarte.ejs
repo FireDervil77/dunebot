@@ -1,0 +1,128 @@
+<%
+/**
+ * Die gemeinsame Funktionskarte.
+ *
+ * **Eine Funktion ist etwas, das man einschaltet — kein Formular, das man
+ * ausfuellt.** Das ist der eine Gedanke, der hinter dieser Vorlage steht, und
+ * er hat eine messbare Ursache: `streaming-ziele.ejs` trug 589 Zeilen mit
+ * neunzehn Feldern in **einem** Formular und **einem** Speichern-Knopf. Wer
+ * die Follower-Meldungen einschalten wollte, schickte die Ruhezeiten und die
+ * Filter mit ab.
+ *
+ * Diese Karte ist die Gegenform: ein Titel, ein Schalter, wenige Felder, ein
+ * eigenes Speichern. Wer eine Karte verstanden hat, versteht alle.
+ *
+ * ## Der Schalter steht im Kopf und gehoert trotzdem zum Formular
+ *
+ * Tabler formatiert `.card-header` als **direktes** Kind von `.card` — ein
+ * `form` dazwischen nimmt der Kopfzeile ihr Aussehen. Deshalb beginnt das
+ * Formular erst darunter, und der Schalter im Kopf haengt per `form="…"` daran.
+ * Das ist kein Kniff fuer diese Datei: Dasselbe Mittel steht schon in
+ * `streaming-ziele.ejs` bei der Probe-Auswahl.
+ *
+ * **Ein Schalter ohne `aktion` waere eine Attrappe** — er saehe bedienbar aus
+ * und sendete nirgendwohin. Die Vorlage bricht dann ab, statt ihn zu zeichnen.
+ *
+ * ## Aufruf
+ *
+ * Der Koerper kommt als **fertiger Text**, nicht als zweite halbe Vorlage.
+ * `include()` liefert in einem Ausdruck den gerenderten Text zurueck, und so
+ * bleibt jede Datei fuer sich HTML-ausgeglichen. Eine Aufteilung in
+ * `karte-auf` und `karte-zu` waere genau die Bauform, an der schon einmal ein
+ * ueberzaehliges schliessendes div eine ganze Kachel verschluckt hat.
+ *
+ *     include('shared/funktionskarte', {
+ *         titel:        'Ankuendigung',
+ *         beschreibung: 'Wohin gemeldet wird, wenn der Stream startet.',
+ *         icon:         'fa-solid fa-bullhorn',
+ *         id:           'ank-7',
+ *         aktion:       basis + '/ziele/7/ankuendigung',
+ *         csrfToken:    csrfToken,
+ *         darf:         darfAendern,
+ *         schalter:     { name: 'aktiv', an: true },
+ *         koerper:      include('teile/ankuendigung', { z: z })
+ *     })
+ *
+ * **Keine EJS-Zeichen und kein Sternchen vor einem Schraegstrich im
+ * Kommentar** — beide schliessen den Block vorzeitig, und die Fehlermeldung
+ * zeigt dann woandershin. Siehe `seitenkopf.ejs`.
+ *
+ * @param {string} titel Ueberschrift der Karte, Pflicht
+ * @param {string} koerper Gerenderte Felder, Pflicht
+ * @param {string} [id] Kennung des Formulars, noetig sobald ein Schalter da ist
+ * @param {string} [icon] Font-Awesome-Klassen
+ * @param {string} [beschreibung] Ein Satz unter dem Titel
+ * @param {string} [hinweis] Prosa ueber den Feldern, HTML erlaubt
+ * @param {string} [aktion] Ziel des POST; ohne sie ist die Karte nur Anzeige
+ * @param {string} [csrfToken] Sitzungsmarke
+ * @param {boolean} [darf] Ob gespeichert werden darf
+ * @param {Object} [schalter] Kopfschalter, Form name plus an
+ * @param {string} [speichern] Beschriftung des Knopfes
+ * @param {string} [fuss] HTML links im Fuss, etwa ein Entfernen-Knopf
+ */
+
+if (typeof titel === 'undefined' || !titel) {
+    throw new Error('funktionskarte: `titel` fehlt — eine Karte ohne Titel ist im Menue nicht wiederfindbar');
+}
+if (typeof koerper === 'undefined') {
+    throw new Error('funktionskarte: `koerper` fehlt — die Karte hat sonst nichts zu zeigen');
+}
+
+const _aktion  = (typeof aktion !== 'undefined' && aktion) ? aktion : null;
+const _schalt  = (typeof schalter !== 'undefined' && schalter) ? schalter : null;
+const _darf    = (typeof darf === 'undefined') ? true : !!darf;
+const _id      = (typeof id !== 'undefined' && id) ? id : null;
+
+// Ein Schalter, der nichts sendet, ist eine Attrappe. Laut abbrechen statt ihn
+// zu zeichnen: Wer ihn umlegt und nichts geschieht, sucht den Fehler bei sich.
+if (_schalt && !_aktion) {
+    throw new Error('funktionskarte: `schalter` ohne `aktion` — der Schalter haette kein Ziel');
+}
+if (_schalt && !_id) {
+    throw new Error('funktionskarte: `schalter` braucht `id` — er haengt per form="…" am Formular');
+}
+%>
+<div class="card mb-3">
+  <div class="card-header">
+    <h3 class="card-title">
+      <% if (typeof icon !== 'undefined' && icon) { %><i class="<%= icon %> me-2 text-secondary"></i><% } %>
+      <%= titel %>
+    </h3>
+    <div class="card-actions">
+      <% if (_schalt) { %>
+        <label class="form-check form-switch form-check-reverse mb-0">
+          <input class="form-check-input" type="checkbox" role="switch"
+                 name="<%= _schalt.name %>" value="1" form="<%= _id %>"
+                 <%= _schalt.an ? 'checked' : '' %> <%= _darf ? '' : 'disabled' %>>
+          <span class="form-check-label"><%= _schalt.an ? 'an' : 'aus' %></span>
+        </label>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (typeof beschreibung !== 'undefined' && beschreibung) { %>
+    <div class="card-body pb-0"><p class="text-secondary mb-0"><%= beschreibung %></p></div>
+  <% } %>
+
+  <% if (_aktion) { %><form<% if (_id) { %> id="<%= _id %>"<% } %> data-toast data-toast-neuladen method="POST" action="<%= _aktion %>"><% } %>
+    <% if (_aktion) { %>
+      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' && csrfToken ? csrfToken : '' %>">
+    <% } %>
+    <div class="card-body">
+      <% if (typeof hinweis !== 'undefined' && hinweis) { %>
+        <div class="alert alert-info"><%- hinweis %></div>
+      <% } %>
+      <%- koerper %>
+    </div>
+    <% if (_aktion && (_darf || (typeof fuss !== 'undefined' && fuss))) { %>
+      <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
+        <% if (typeof fuss !== 'undefined' && fuss) { %><%- fuss %><% } %>
+        <% if (_darf) { %>
+          <button type="submit" class="btn btn-primary ms-auto">
+            <%= (typeof speichern !== 'undefined' && speichern) ? speichern : 'Speichern' %>
+          </button>
+        <% } %>
+      </div>
+    <% } %>
+  <% if (_aktion) { %></form><% } %>
+</div>

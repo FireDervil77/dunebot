@@ -1,0 +1,43 @@
+<%
+/**
+ * Der Kopf eines Ziels - Zustand und die alltaeglichen Handlungen.
+ *
+ * **Warum die Probe hier steht und nicht im Formular.** Ein `form` in einem
+ * `form` ist ungueltiges HTML; der Browser verwirft das innere lautlos, und
+ * der Knopf taete nichts. Die Bedienelemente liegen deshalb im Koerper dieser
+ * Karte, gehoeren aber per `form="probe-…"` dem versteckten Formular, das die
+ * Ansicht NEBEN der Karte auswirft. `new FormData(...)` sammelt sie mit, weil
+ * sich die Zugehoerigkeit nach dem Formularbesitzer richtet und nicht nach der
+ * Verschachtelung. Dasselbe Mittel stand schon vorher hier - nur andersherum.
+ */
+%>
+<div class="d-flex flex-wrap gap-2 align-items-center">
+  <% if (darfAendern) { %>
+    <a href="<%= basis %>/vorlagen#vorlage-<%= z.id %>" class="btn btn-link ps-0">
+      Eigenen Text für dieses Ziel
+      <% if (z.vorlage) { %><span class="badge bg-blue-lt ms-1">gesetzt</span><% } %>
+    </a>
+  <% } %>
+
+  <% if (darfProben) { %>
+    <div class="input-group w-auto">
+      <button type="submit" form="probe-<%= z.id %>" class="btn btn-outline-primary">
+        <i class="fa-solid fa-paper-plane me-1"></i><%= tr('streaming:TARGETS.PROBE') %>
+      </button>
+      <%# Beide Vorlagen sind probierbar. Vorher ging nur die Ankuendigung -
+          also die Haelfte. Die Rueckschau rechnet ihre Dauer aus dem
+          gespeicherten Zustand des letzten Streams; ohne beendeten Stream
+          bleibt sie leer, und der Ausgang sagt das auch. %>
+      <select class="form-select" name="art" form="probe-<%= z.id %>"
+              aria-label="<%= tr('streaming:TARGETS.PROBE_KIND') %>">
+        <option value="live"><%= tr('streaming:TARGETS.PROBE_LIVE') %></option>
+        <option value="rueckschau"><%= tr('streaming:TARGETS.PROBE_RECAP') %></option>
+      </select>
+    </div>
+    <label class="form-check form-check-inline mb-0" title="<%= tr('streaming:TARGETS.PROBE_MENTION_HINT') %>">
+      <input class="form-check-input" type="checkbox" name="mit_erwaehnung" value="1"
+             form="probe-<%= z.id %>" <%= z.rolle_id ? '' : 'disabled' %>>
+      <span class="form-check-label small text-secondary"><%= tr('streaming:TARGETS.PROBE_MENTION') %></span>
+    </label>
+  <% } %>
+</div>
