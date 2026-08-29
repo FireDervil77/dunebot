@@ -377,3 +377,23 @@
 .alert {
     display: block;
 }
+
+/* ── Die obere Leiste laeuft mit ─────────────────────────────────────────────
+ *
+ * Das Kleben selbst macht `sticky-lg-top` am <header> (siehe `guild/topbar`).
+ * Hier steht nur, was daraus folgt: Ein Sprungziel landet sonst UNTER der
+ * Leiste.
+ *
+ * Betroffen ist zuerst der Sprunglink „Zum Inhalt springen" — er ist fuer
+ * Menschen da, die mit der Tastatur navigieren, und ein Sprung, der die ersten
+ * Zeilen hinter der Leiste versteckt, verfehlt genau seinen Zweck. Dieselbe
+ * Rechnung gilt fuer jeden Anker in einer Seite.
+ *
+ * `3.5rem` ist Tablers `--tblr-navbar-height` (`.navbar { min-height: 3.5rem }`),
+ * ein halbes rem Luft dazu. Unter 992px klebt nichts, also ist auch nichts
+ * abzuziehen — `scroll-margin-top` schadet dort aber nicht.
+ */
+#content,
+.page-body [id]:target {
+    scroll-margin-top: 4rem;
+}

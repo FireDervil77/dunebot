@@ -40,7 +40,26 @@
   });
 %>
 
-<header class="navbar navbar-expand-md d-print-none">
+<%#
+ * ── Warum `sticky-lg-top` und nicht `sticky-top` ──────────────────────────
+ *
+ * Die Leiste soll mitlaufen; unter 992px darf sie es aber NICHT.
+ *
+ * Grund ist der Umschalter links („navbar-toggler"): Er sitzt hier in der
+ * oberen Leiste, sein Ziel `#sidebar-menu` steht aber im <aside> DARUEBER.
+ * Ab 992px ist dieses aside `position: fixed` und immer sichtbar — dort gibt
+ * es kein Problem. Darunter steht es im Fluss: Waere die Leiste dann klebrig,
+ * koennte man weit unten auf der Seite den Umschalter druecken und das Menue
+ * klappte ausserhalb des Bildes auf. Ein Knopf, der sichtbar nichts tut.
+ *
+ * 992px ist genau die Grenze, an der `navbar-expand-lg` am aside umschaltet —
+ * also keine gewaehlte Zahl, sondern dieselbe.
+ *
+ * Die Sidebar liegt bei `z-index: 1030`, `.sticky-lg-top` bei 1020. Sie
+ * ueberlappen sich nicht (die eine links, die andere rechts daneben), aber die
+ * Reihenfolge stimmt damit auch dann, wenn es einmal anders kommt.
+%>
+<header class="navbar navbar-expand-md sticky-lg-top d-print-none">
   <div class="container-fluid">
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
