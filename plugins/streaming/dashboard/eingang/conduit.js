@@ -24,10 +24,16 @@
  * Hier liegt beides im selben Vorgang: Die Welcome-Nachricht kommt an, und der
  * PATCH geht ohne Umweg raus.
  *
- * **Was diese Datei NICHT tut:** Sie bestellt keine Abonnements und schreibt
- * keine Chatnachrichten weg. Sie stellt die Leitung her und haelt sie. Was mit
- * ankommenden Nachrichten geschieht, ist eine eigene Entscheidung (auch eine
- * datenschutzrechtliche) und wird nicht nebenbei mitgebaut.
+ * **Was diese Datei NICHT tut:** Sie bestellt keine Abonnements (das tut
+ * `kern/chatabos.js`) und sie schreibt **keine Chatnachrichten weg**. Sie
+ * stellt die Leitung her, haelt sie, und zaehlt, was hereinkommt.
+ *
+ * **Der Zaehler ist die ganze Verarbeitung, und das ist Absicht.** Ob, wie
+ * lange und wofuer vollstaendige Chatverlaeufe fremder Kanaele gespeichert
+ * werden duerfen, ist keine technische Entscheidung; sie gehoert zur
+ * ausstehenden Rechtspruefung. Bis dahin gilt: Fuer den Nachweis, dass die
+ * Leitung traegt, genuegt eine Zahl je Kanal - **kein Text, kein Absender,
+ * keine Kennung eines Zuschauers.**
  *
  * @module streaming/dashboard/eingang/conduit
  */
@@ -65,6 +71,19 @@ let neuerVersuch = null;
 let fehlversuche = 0;
 let beendet = false;
 
+/**
+ * Was ueber den Chat hereinkam - **Zahlen, kein Inhalt.**
+ *
+ * Kanalkennung -> `{ name, anzahl, letzte }`. Der Name ist der des Kanals,
+ * nicht der eines Zuschauers: Er steht ohnehin in `streaming_streamers` und
+ * auf jeder Twitch-Seite. Was ein Mensch geschrieben hat und wer er war,
+ * beruehrt diese Datei nicht.
+ *
+ * Die Karte waechst nur mit der Zahl der abonnierten Kanaele, nicht mit der
+ * Zahl der Nachrichten.
+ */
+const chat = new Map();
+
 /** Was von aussen sichtbar ist. Nur Messwerte, keine Vermutungen. */
 const stand = {
     conduitId: null,
@@ -91,7 +110,41 @@ const db = () => ServiceManager.get('dbService');
  * @returns {Object} Stand
  */
 function zustand() {
-    return { ...stand };
+    return {
+        ...stand,
+        // Als eigene Liste, nicht als Verweis auf die Karte: `{...stand}`
+        // kopiert nur die oberste Ebene, und wer den Stand anzeigt, soll ihn
+        // nicht aus Versehen veraendern koennen.
+        chat: [...chat.entries()].map(([kanalId, e]) => ({ kanal_id: kanalId, ...e }))
+    };
+}
+
+/**
+ * Eine Chatnachricht zaehlen - mehr nicht.
+ *
+ * **Der Eingang kennt Twitchs Woerter nicht.** Welches Feld die Kanalkennung
+ * traegt, weiss `twitch.chatAus`; hier stehen nur `kanalId` und `kanalName`.
+ * Sonst zoege sich das Vokabular einer Plattform durch das ganze Plugin, und
+ * ein zweiter Anbieter passte nie hinein
+ * (`scripts/check-streaming-schichten.js`).
+ *
+ * **Was der Uebersetzer bewusst NICHT liefert:** den Text der Nachricht und
+ * wer sie geschrieben hat (bei Twitch `message.text` und `chatter_user_*`).
+ * Wer das spaeter braucht, baut es mit einer Rechtsgrundlage und einer
+ * Aufbewahrungsfrist, nicht nebenbei in einem Zaehler.
+ *
+ * @param {Object} nutz Der Nutzteil der Nachricht
+ * @returns {void}
+ */
+function chatGezaehlt(nutz) {
+    const kanal = twitch.chatAus(nutz);
+    if (!kanal) return;
+
+    const eintrag = chat.get(kanal.kanalId) || { name: null, anzahl: 0, letzte: null };
+    eintrag.name = kanal.kanalName || eintrag.name;
+    eintrag.anzahl++;
+    eintrag.letzte = new Date();
+    chat.set(kanal.kanalId, eintrag);
 }
 
 /**
@@ -193,10 +246,16 @@ async function verarbeiten(nachricht) {
         case 'notification': {
             stand.ereignisse++;
             stand.letzteNachricht = new Date();
-            // Noch bestellt niemand Abonnements auf diesen Conduit, also kann
-            // hier nichts ankommen. Kaeme doch etwas, ist das eine Auskunft
+
+            const typ = nutz.subscription?.type || 'unbekannt';
+            if (typ === twitch.EREIGNIS_CHAT.typ) {
+                chatGezaehlt(nutz);
+                break;
+            }
+
+            // Alles andere hat hier nichts bestellt. Das ist eine Auskunft
             // wert - und keine stille Verwerfung.
-            log().debug(`[Streaming/Conduit] Ereignis: ${nutz.subscription?.type || 'unbekannt'}`);
+            log().debug(`[Streaming/Conduit] unerwartetes Ereignis: ${typ}`);
             break;
         }
 
@@ -302,6 +361,9 @@ async function starten() {
  */
 function beenden() {
     beendet = true;
+    // Die Zaehler gehen mit: Sie sagen "seit dem Start der Leitung", und eine
+    // Zahl, die eine abgerissene Leitung ueberlebt, behauptet mehr als sie weiss.
+    chat.clear();
     if (wache) { clearTimeout(wache); wache = null; }
     if (neuerVersuch) { clearTimeout(neuerVersuch); neuerVersuch = null; }
     if (draht) {

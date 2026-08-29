@@ -7,17 +7,46 @@
 
 <%
   /*
-   * **Diese Seite verspricht noch nichts.** Sie zeigt, was angeschlossen ist -
-   * Befehle, Ansagen und Filter kommen mit Stufe 15.
+   * **Diese Seite verspricht noch nichts, sie misst.** Sie zeigt, was
+   * angeschlossen ist und ob die Leitung trägt - Befehle, Ansagen und Filter
+   * kommen mit Stufe 15.
    *
    * Das ist Absicht und kein Versehen: Die Heim-Guild ist die Entscheidung,
-   * WO das spaeter bedient wird. Sie hat einen sichtbaren Ausgang (dieser
-   * Menuepunkt gibt es hier und sonst nirgends), und mehr behauptet sie nicht.
-   * Karten mit Schaltern fuer Faehigkeiten, die es nicht gibt, waeren genau
-   * das leere Versprechen, gegen das dieses Plugin geschrieben ist.
+   * WO das später bedient wird. Sie hat einen sichtbaren Ausgang (diesen
+   * Menüpunkt gibt es hier und sonst nirgends), und mehr behauptet sie nicht.
+   * Karten mit Schaltern für Fähigkeiten, die es nicht gibt, wären genau das
+   * leere Versprechen, gegen das dieses Plugin geschrieben ist.
+   *
+   * Was hier an Zahlen steht, kommt aus dem letzten Abgleich und aus dem
+   * Zähler der Leitung - nichts davon ist geschätzt.
    */
   const basis = `/guild/${guildId}/plugins/streaming`;
+  const darf  = hasPermission('STREAMING.CHAT.MANAGE');
+
+  const meldungen = {
+    abgeglichen: 'Der Chat-Anschluss wurde abgeglichen.'
+  };
+  const fehlerTexte = {
+    kein_heim:   'Dieser Server ist für keinen Kanal das Heim.',
+    abgebrochen: 'Es wurde nichts abgeglichen — der Grund steht in der Karte unten.',
+    technisch:   'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+  };
+
+  /**
+   * Ein Abzeichen für einen dreiwertigen Zustand.
+   */
+  const abzeichen = (wert, gut, schlecht) =>
+      wert === gut      ? `<span class="badge bg-green-lt">${wert}</span>`
+    : wert === schlecht ? `<span class="badge bg-yellow-lt">${wert}</span>`
+                        : `<span class="badge bg-secondary-lt">${wert}</span>`;
 %>
+
+<% if (meldung && meldungen[meldung]) { %>
+  <div class="alert alert-success"><%= meldungen[meldung] %></div>
+<% } %>
+<% if (fehler && fehlerTexte[fehler]) { %>
+  <div class="alert alert-warning"><%= fehlerTexte[fehler] %></div>
+<% } %>
 
 <% if (!kanaele || kanaele.length === 0) { %>
   <div class="card mb-3">
@@ -45,17 +74,43 @@
   <% kanaele.forEach(k => { %>
     <%
       const a = k.anschluss;
-      const zustand = a ? a.zustand : 'unbekannt';
+      const modZustand = a ? a.zustand : 'unbekannt';
+
+      /*
+       * **Zwei Zeilen, und die zweite hängt an der ersten.** Der Mod-Status
+       * ist die Tür, das Abo ist der Durchgang. Ohne Mod-Status ein „Abo
+       * fehlt" zu zeigen wäre eine Beschwerde über eine Folge statt über die
+       * Ursache — und der Streamer suchte an der falschen Stelle.
+       */
+      let leitungZeile;
+      if (modZustand !== 'ja') {
+        leitungZeile = '<div class="text-secondary small">Der Chat wird erst abonniert, wenn der Bot '
+                     + 'Moderator ist.</div>';
+      } else if (k.abo && k.abo.fehler) {
+        leitungZeile = `<div><span class="badge bg-red-lt">abgelehnt</span></div>
+                        <div class="text-secondary small mt-1">Twitch sagt: ${k.abo.fehler}</div>`;
+      } else if (k.abo) {
+        const empfangen = k.empfangen
+          ? `${k.empfangen.anzahl} Nachricht${k.empfangen.anzahl === 1 ? '' : 'en'} seit dem Verbinden`
+          : 'noch nichts empfangen — der Kanal ist vermutlich still';
+        leitungZeile = `<div>${abzeichen(k.abo.zustand || 'unbekannt', 'bestaetigt', 'fehler')}</div>
+                        <div class="text-secondary small mt-1">${empfangen}</div>`;
+      } else {
+        leitungZeile = '<div><span class="badge bg-secondary-lt">nicht abonniert</span></div>'
+                     + '<div class="text-secondary small mt-1">Der nächste Abgleich holt das nach.</div>';
+      }
+
       const koerper = `
         <div class="d-flex align-items-center gap-2 mb-2">
           <span class="fw-medium">Bot im Chat</span>
-          ${zustand === 'ja'   ? '<span class="badge bg-green-lt">ja</span>'
-          : zustand === 'nein' ? '<span class="badge bg-yellow-lt">nein</span>'
-                               : '<span class="badge bg-secondary-lt">unbekannt</span>'}
+          ${abzeichen(modZustand, 'ja', 'nein')}
         </div>
         ${a && a.text    ? `<div class="text-secondary small">${a.text}</div>` : ''}
         ${a && a.hinweis ? `<div class="text-secondary small">${a.hinweis}</div>` : ''}
-        ${a && a.tat     ? `<div class="small mt-2">Zu tun: <code>${a.tat}</code></div>` : ''}`;
+        ${a && a.tat     ? `<div class="small mt-2">Zu tun: <code>${a.tat}</code></div>` : ''}
+        <hr class="my-3">
+        <div class="fw-medium mb-2">Chat-Leitung</div>
+        ${leitungZeile}`;
     %>
     <%- include('shared/funktionskarte', {
           titel:        (k.anzeigename || k.login),
@@ -65,11 +120,74 @@
     }) %>
   <% }); %>
 
+  <%
+    /*
+     * **Der Knopf und der Bericht stehen in derselben Karte.** Wer abgleicht,
+     * will wissen, was dabei herauskam; ein Knopf ohne Ausgang wäre wieder
+     * die Attrappe.
+     */
+    const b = bericht;
+    let berichtKoerper;
+    if (!b) {
+      berichtKoerper = '<p class="text-secondary mb-0">Noch kein Abgleich gelaufen. '
+                     + 'Der Tageslauf holt das nach — oder du stößt ihn hier an.</p>';
+    } else {
+      const wann = vorWieLange(b.gelaufen_am) || 'gerade eben';
+      const zeilen = [];
+      if (b.abgebrochen) {
+        zeilen.push(`<div class="alert alert-warning mb-2">Abgebrochen: ${b.abgebrochen}.
+                     Es wurde nichts bestellt und nichts abbestellt.</div>`);
+      } else {
+        zeilen.push(`<div>${b.gewuenscht} Kanal-Chat(s) sollen anliegen, `
+                  + `${b.vorhanden} Abo(s) stehen bei Twitch.</div>`);
+        if (b.bestellt.length)   zeilen.push(`<div class="small text-secondary">neu angeschlossen: ${b.bestellt.join(', ')}</div>`);
+        if (b.abbestellt.length) zeilen.push(`<div class="small text-secondary">abgemeldet: ${b.abbestellt.join(', ')}</div>`);
+      }
+      if (b.fehler && b.fehler.length) {
+        zeilen.push(`<div class="alert alert-danger mt-2 mb-0"><strong>Abgelehnt:</strong><br>`
+                  + b.fehler.map(f => String(f)).join('<br>') + '</div>');
+      }
+      zeilen.push(`<div class="text-secondary small mt-2">Letzter Lauf: ${wann}.</div>`);
+      berichtKoerper = zeilen.join('\n');
+    }
+
+    /*
+     * Die Leitung selbst: Sie liegt im Dashboard und gilt für alle Kanäle
+     * zusammen. Steht sie nicht, ist jede Zeile darüber ohne Bedeutung —
+     * deshalb steht sie hier und nicht bei einem einzelnen Kanal.
+     */
+    const l = leitung;
+    berichtKoerper += `
+      <hr class="my-3">
+      <div class="d-flex align-items-center gap-2">
+        <span class="fw-medium">Leitung zu Twitch</span>
+        ${l && l.verbunden
+          ? '<span class="badge bg-green-lt">verbunden</span>'
+          : '<span class="badge bg-red-lt">getrennt</span>'}
+      </div>
+      ${l && l.fehler ? `<div class="text-secondary small mt-1">${l.fehler}</div>` : ''}
+      ${l && !l.conduitId ? '<div class="text-secondary small mt-1">Ohne Conduit kann kein Chat abonniert werden.</div>' : ''}`;
+  %>
+
+  <%- include('shared/funktionskarte', {
+        titel:        'Anschluss abgleichen',
+        icon:         'fa-solid fa-rotate',
+        beschreibung: 'Wer gerade /mod getippt hat, muss nicht bis zum nächsten Tageslauf warten.',
+        id:           'chat-abgleich',
+        aktion:       basis + '/chatbot/abgleich',
+        csrfToken:    typeof csrfToken !== 'undefined' ? csrfToken : '',
+        darf:         darf,
+        speichern:    'Jetzt abgleichen',
+        koerper:      berichtKoerper
+  }) %>
+
   <div class="card">
     <div class="card-body text-secondary small">
       <strong>Befehle, Ansagen und Chat-Filter kommen mit Stufe 15.</strong>
-      Diese Seite zeigt heute nur den Anschluss — was hier steht, ist gemessen,
-      nicht versprochen.
+      Heute liest der Bot mit und zählt, mehr nicht — <strong>Chatnachrichten
+      werden nicht gespeichert.</strong> Ob, wie lange und wofür das zulässig
+      wäre, gehört zur ausstehenden Rechtsprüfung und wird nicht nebenbei
+      entschieden.
     </div>
   </div>
 <% } %>

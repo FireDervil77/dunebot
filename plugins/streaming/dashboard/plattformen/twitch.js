@@ -374,6 +374,99 @@ async function shardSetzen(conduitId, shardId, sitzungId) {
 }
 
 /**
+ * Das Chat-Ereignis (Stufe 13a).
+ *
+ * Steht **nicht** in `EREIGNISSE` oder `EREIGNISSE_MELDER`: Die dortigen
+ * Ereignisse kommen ueber den Webhook, haben ein Geheimnis und landen in
+ * `streaming_subscriptions`. Dieses hier geht ueber den Conduit, hat kein
+ * Geheimnis und wird nirgends gespeichert - `streaming_subscriptions.geheimnis`
+ * ist `NOT NULL` und wuerde eine Spalte zwingen, etwas zu behaupten, das es
+ * nicht gibt.
+ *
+ * @type {{typ: string, version: string}}
+ */
+const EREIGNIS_CHAT = { typ: 'channel.chat.message', version: '1' };
+
+/**
+ * Den Chat eines Kanals abonnieren - ueber den Conduit.
+ *
+ * **Die Bedingung braucht zwei Kennungen, und die zweite wird gern vergessen:**
+ * `broadcaster_user_id` ist der Kanal, `user_id` ist **das lesende Konto** -
+ * also unser Bot. Mit der Kanal-ID an beiden Stellen abonniert man den Chat
+ * aus Sicht des Streamers, und Twitch lehnt es ab, weil dessen Zusage fehlt.
+ *
+ * Wortlaut der Auflage, am 2026-08-28 nachgesehen: *„Requires `user:read:chat`
+ * scope from the chatting user. If app access token used, then additionally
+ * requires `user:bot` scope from chatting user, and either `channel:bot` scope
+ * from broadcaster or moderator status."* Wir gehen den Mod-Weg.
+ *
+ * @param {string} kanalId Twitch-ID des Kanals
+ * @param {string} botKontoId Twitch-ID unseres Bot-Kontos
+ * @param {string} conduitId Conduit, ueber den zugestellt wird
+ * @returns {Promise<{ok: boolean, aboId: string|null, zustand: string|null, unbekannt: string|null, kosten: number, fehler: string|null}>}
+ */
+async function chatAbonnieren(kanalId, botKontoId, conduitId) {
+    const { ok, status, json } = await helix('/eventsub/subscriptions', {
+        method: 'POST',
+        body: JSON.stringify({
+            type: EREIGNIS_CHAT.typ,
+            version: EREIGNIS_CHAT.version,
+            condition: {
+                broadcaster_user_id: String(kanalId),
+                user_id: String(botKontoId)
+            },
+            transport: { method: 'conduit', conduit_id: String(conduitId) }
+        })
+    });
+
+    const abo = json?.data?.[0] || null;
+
+    // **Derselbe Wortschatz wie `abosAuflisten`.** Twitchs Rohwert
+    // (`enabled`, `chat_user_banned`, ...) geht durch dieselbe Uebersetzung -
+    // sonst stuende auf der Seite fuer ein frisch bestelltes Abo `enabled`
+    // und fuer ein bestehendes `bestaetigt`, und dasselbe Ding haette zwei
+    // Namen. Was sie nicht kennt, bleibt im Klartext in `unbekannt` stehen.
+    const zustand = abo ? zustandUebersetzen(abo.status) : null;
+
+    return {
+        ok: ok && Boolean(abo),
+        aboId: abo?.id || null,
+        zustand,
+        unbekannt: (abo && zustand === null) ? abo.status : null,
+        kosten: abo?.cost ?? 0,
+        // Twitchs Text wird durchgereicht, nicht gedeutet - er nennt bei
+        // diesem Ereignis meist genau, welche Zustimmung fehlt.
+        fehler: (ok && abo) ? null : (json?.message || `HTTP ${status}`)
+    };
+}
+
+/**
+ * Ein `channel.chat.message` in unser Vokabular uebersetzen.
+ *
+ * **Warum es diese vier Zeilen gibt.** `broadcaster_user_id` ist Twitchs Wort;
+ * der Eingang darf es nicht kennen, sonst zieht sich das Vokabular einer
+ * Plattform durch das ganze Plugin und YouTube passt spaeter nirgends hinein
+ * (`scripts/check-streaming-schichten.js`). Dieselbe Aufgabe wie
+ * `abonnentAus` und `melderAus`, nur fuer den Chat.
+ *
+ * **Der Inhalt kommt bewusst nicht mit.** `event.message.text` und
+ * `event.chatter_user_*` bleiben liegen, wo sie sind. Wer Chatverlaeufe
+ * speichern will, braucht eine Rechtsgrundlage und eine Aufbewahrungsfrist -
+ * nicht einen Uebersetzer, der schon mal alles mitnimmt.
+ *
+ * @param {Object} koerper Twitchs `payload`
+ * @returns {{kanalId: string, kanalName: string|null}|null} Kanal oder null
+ */
+function chatAus(koerper) {
+    const e = koerper?.event;
+    if (!e || !e.broadcaster_user_id) return null;
+    return {
+        kanalId: String(e.broadcaster_user_id),
+        kanalName: e.broadcaster_user_name || e.broadcaster_user_login || null
+    };
+}
+
+/**
  * Abonnement abbestellen.
  *
  * @param {string} aboId Abo-Kennung bei Twitch
@@ -1178,6 +1271,7 @@ module.exports = {
     abonnentenLesen, abonnentAus, melderAus,
     moderierteKanaele,
     conduitSichern, shardSetzen,
+    chatAbonnieren, chatAus, EREIGNIS_CHAT,
     HOECHSTALTER_MS,
     EREIGNISSE,
     verknuepfungsUrl,

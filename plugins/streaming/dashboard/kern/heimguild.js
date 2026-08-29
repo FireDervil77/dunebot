@@ -73,11 +73,40 @@ async function streamerZuKonto(plattform, kontoId) {
  * selbst wenn nicht: Die Wahl schaltet nur um, wo SEINE eigenen
  * Chat-Einstellungen bedient werden. Fremde Daten erreicht sie nicht.
  *
+ * ## Warum zwei Abfragen und kein Join (2026-08-29, gegen die echte DB)
+ *
+ * Der erste Entwurf verband `streaming_targets` in einem Zug mit `guilds` und
+ * `guild_plugins`. Gegen eine Attrappe lief das; **gegen die Datenbank warf
+ * es**:
+ *
+ *     Illegal mix of collations (utf8mb4_unicode_ci,IMPLICIT)
+ *                           and (utf8mb4_general_ci,IMPLICIT)
+ *
+ * Die Kern-Tabellen sind `utf8mb4_unicode_ci`, die `streaming_*`-Tabellen
+ * `utf8mb4_general_ci`. Beide Spalten tragen dieselbe Discord-Kennung aus
+ * Ziffern, aber MySQL vergleicht sie nicht - **jeder** Join ueber diese Grenze
+ * bricht ab, statt still falsch zu antworten.
+ *
+ * Deshalb hier derselbe Weg, den der Rest des Hauses ohnehin geht: Die
+ * Kennungen kommen aus der einen Tabelle und gehen als **Parameter** in die
+ * andere. Ein gebundener Wert nimmt die Kollation seiner Spalte an, also gibt
+ * es nichts zu mischen. Ein `COLLATE` im SQL taete es auch - aber dann muesste
+ * jede kuenftige Abfrage daran denken, und die erste, die es vergisst, faellt
+ * wieder um. Der Schema-Unterschied selbst steht als Befund in
+ * `docs/Baustellen.md`; `scripts/check-kollationen.js` misst ihn.
+ *
  * @param {Object} streamer Zeile aus `streaming_streamers`
  * @returns {Promise<Array<{guild_id: string, name: string, ziele: number}>>} Auswahl
  */
 async function moeglicheGuilds(streamer) {
     if (!streamer) return [];
+
+    const ziele = await db().query(
+        `SELECT guild_id, COUNT(*) AS ziele
+           FROM streaming_targets
+          WHERE streamer_id = ?
+          GROUP BY guild_id`, [streamer.id]) || [];
+    if (!ziele.length) return [];
 
     // **Nachgesehen, nicht geraten** (2026-08-29): Die Tabelle `guilds` hat
     // `_id` und `guild_name` - nicht `guild_id` und `name`, wie es der
@@ -86,18 +115,26 @@ async function moeglicheGuilds(streamer) {
     //
     // `left_at IS NULL` haelt Guilds heraus, aus denen der Bot geflogen ist -
     // sie stehen weiter in der Tabelle, koennen aber nichts mehr ausfuehren.
-    return await db().query(`
-        SELECT t.guild_id,
-               COALESCE(g.guild_name, t.guild_id) AS name,
-               COUNT(*)                           AS ziele
-          FROM streaming_targets t
-          JOIN guilds g        ON g._id = t.guild_id AND g.left_at IS NULL
-          JOIN guild_plugins p ON p.guild_id = t.guild_id
-                              AND p.plugin_name = 'streaming'
-                              AND p.is_enabled = 1
-         WHERE t.streamer_id = ?
-         GROUP BY t.guild_id, g.guild_name
-         ORDER BY name`, [streamer.id]) || [];
+    const kennungen = ziele.map(z => String(z.guild_id));
+    const platzhalter = kennungen.map(() => '?').join(',');
+    const guilds = await db().query(
+        `SELECT g._id AS guild_id, g.guild_name
+           FROM guilds g
+           JOIN guild_plugins p ON p.guild_id = g._id
+                               AND p.plugin_name = 'streaming'
+                               AND p.is_enabled = 1
+          WHERE g._id IN (${platzhalter})
+            AND g.left_at IS NULL`, kennungen) || [];
+
+    const namen = new Map(guilds.map(g => [String(g.guild_id), g.guild_name]));
+    return ziele
+        .filter(z => namen.has(String(z.guild_id)))
+        .map(z => ({
+            guild_id: String(z.guild_id),
+            name: namen.get(String(z.guild_id)) || String(z.guild_id),
+            ziele: Number(z.ziele) || 0
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'de'));
 }
 
 /**
@@ -134,6 +171,7 @@ async function setzen(userId, streamer, guildId) {
     if (!ziel) {
         await db().query('UPDATE streaming_streamers SET heim_guild_id = NULL WHERE id = ?', [streamer.id]);
         await navigationAuffrischen([vorher]);
+        chatAbosAnstossen();
         return { ok: true };
     }
 
@@ -153,7 +191,42 @@ async function setzen(userId, streamer, guildId) {
     // Chatbot-Punkt verschwinden. Wer nur die neue auffrischt, laesst
     // dahinter einen Menuepunkt stehen, der ins Leere zeigt.
     await navigationAuffrischen([vorher, ziel]);
+    chatAbosAnstossen();
     return { ok: true };
+}
+
+/**
+ * Den Chat-Anschluss nachziehen, ohne auf ihn zu warten.
+ *
+ * **Warum ueberhaupt.** Die Wahl bestimmt, wo der Chatbot wohnt - und
+ * `chatabos.gewuenscht()` liest genau diese Spalte. Ohne diesen Anstoss
+ * geschaehe bis zum naechsten Tageslauf nichts: Der Streamer waehlt seinen
+ * Server, sieht den neuen Menuepunkt und wartet bis zu 24 Stunden darauf, dass
+ * der Bot tatsaechlich in seinem Chat auftaucht. Beim Abschalten waere es
+ * schlimmer herum - der Bot bliebe einen Tag laenger sitzen, als jemand ihn
+ * haben wollte.
+ *
+ * **Warum ohne `await`.** Der Abgleich redet mehrfach mit Twitch; das dauert
+ * Sekunden und kann haengen. Die Wahl ist zu diesem Zeitpunkt gespeichert -
+ * den Streamer davor warten zu lassen hiesse, eine erledigte Sache als offen
+ * darzustellen. Scheitert der Anstoss, holt ihn der Tageslauf nach, und der
+ * Grund steht im Protokoll.
+ *
+ * @returns {void} nichts - absichtlich nicht abwartbar
+ */
+function chatAbosAnstossen() {
+    require('./chatabos').abgleichen()
+        .then((bericht) => {
+            if (bericht?.abgebrochen) {
+                ServiceManager.get('Logger').info(
+                    `[Streaming] Chat-Abgleich nach der Wahl nicht gelaufen: ${bericht.abgebrochen}`);
+            }
+        })
+        .catch((error) => {
+            // **Kein leeres `catch`.** Ein verschluckter Fehler hiesse: Der
+            // Bot kommt nicht in den Chat, und niemand erfaehrt warum.
+            ServiceManager.get('Logger').error('[Streaming] Chat-Abgleich nach der Wahl fehlgeschlagen', error);
+        });
 }
 
 /**

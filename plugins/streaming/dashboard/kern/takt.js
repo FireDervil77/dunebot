@@ -806,6 +806,17 @@ async function tagesLauf() {
     }
 
     try {
+        // **Die Chat-Abos nach dem Aufraeumen**, und das ist keine Willkuer:
+        // Der Aufraeumer loescht Streamer ohne Ziel und ohne Abo - mitsamt
+        // ihrer `heim_guild_id`. Liefe der Chat-Abgleich davor, bestellte er
+        // ein Abo fuer einen Kanal, den es eine Zeile spaeter nicht mehr gibt,
+        // und der Bot saesse in einem Chat, von dem hier niemand mehr weiss.
+        await require('./chatabos').abgleichen();
+    } catch (err) {
+        log().error('[Streaming] Chat-Abgleich fehlgeschlagen:', err);
+    }
+
+    try {
         // Der Rollenabgleich zum Schluss: Er stuetzt sich auf `streaming_state`,
         // und das ist nach Abgleich und Aufraeumen am ehesten richtig.
         await require('../ausgabe/liverolle').lauf();

@@ -125,9 +125,23 @@ console.log('\n3. Nachgesehene Spaltennamen (nicht geratene)');
 // ---------------------------------------------------------------------
 
 const hg = lies('plugins/streaming/dashboard/kern/heimguild.js');
-pruefe(/g\._id\s*=\s*t\.guild_id/.test(hg),
-    '`guilds` wird ueber `_id` verbunden, nicht ueber `guild_id`',
+pruefe(/g\._id\s+IN \(/.test(hg),
+    'die Guilds werden ueber `_id` geholt, nicht ueber `guild_id`',
     'ein falscher Spaltenname stuerzt hier nicht ab — er zeigt still die nackte Kennung');
+
+// **Der Befund vom 2026-08-29, gegen die echte Datenbank gemessen.** Der erste
+// Entwurf verband `streaming_targets` direkt mit `guilds` — und warf:
+//
+//     Illegal mix of collations (utf8mb4_unicode_ci) and (utf8mb4_general_ci)
+//
+// Der Kern ist `unicode_ci`, die `streaming_*`-Tabellen sind `general_ci`.
+// **Eine Attrappe kann das nicht finden** — sie hat keine Kollationen. Also
+// wird hier die Bauform bewacht statt des Ergebnisses: keine Kennung aus einer
+// Plugin-Tabelle direkt an einer Kern-Spalte. `scripts/check-kollationen.js`
+// misst dasselbe an der echten Datenbank.
+pruefe(!/g\._id\s*=\s*[a-z]+\.(guild_id|heim_guild_id)/.test(hg),
+    'keine Plugin-Spalte wird direkt an `guilds._id` verglichen',
+    'die Kollationen weichen ab — so ein Join wirft, statt still falsch zu antworten');
 pruefe(/g\.guild_name/.test(hg) && !/COALESCE\(g\.name/.test(hg),
     'der Name kommt aus `guild_name`, nicht aus `name`');
 pruefe(/left_at IS NULL/.test(hg),
@@ -149,7 +163,8 @@ const STREAMER = { id: 3, plattform: 'twitch', kanal_id: '77', login: 'firedervi
  */
 const welt = (inhaber, guilds = [{ guild_id: '42', name: 'Heim', ziele: 1 }]) => dbAttrappe({
     'FROM user_connections': inhaber ? [{ user_id: inhaber }] : [],
-    'FROM streaming_targets t': guilds,
+    'FROM streaming_targets': guilds.map(g => ({ guild_id: g.guild_id, ziele: g.ziele })),
+    'FROM guilds g': guilds.map(g => ({ guild_id: g.guild_id, guild_name: g.name })),
     'UPDATE streaming_streamers': { affectedRows: 1 },
     'FROM streaming_streamers': []
 });
@@ -262,12 +277,62 @@ console.log('\n7. Die Seiten rendern');
 // ---------------------------------------------------------------------
 
 const tr = (k) => `«${k}»`;
+
+/**
+ * Was die Route der Ansicht mitgibt - **vollstaendig**, nicht nur das, was der
+ * gerade gepruefte Zweig braucht.
+ *
+ * Eine Ansicht greift auf einen fehlenden Namen nicht still zu: EJS wirft eine
+ * `ReferenceError`. Genau deshalb steht hier die ganze Liste - laesst die Route
+ * kuenftig eine Angabe weg, faellt es hier auf und nicht erst im Betrieb.
+ */
+const grundgeruest = {
+    tr, guildId: '42', meldung: null, fehler: null,
+    bericht: null, leitung: { verbunden: false, conduitId: null, fehler: null, chat: [] },
+    vorWieLange: () => 'vor 1 Minute',
+    hasPermission: () => true,
+    csrfToken: 'x'
+};
+
+const einKanal = {
+    id: 3, login: 'firedervil', anzeigename: 'FireDervil', kanal_id: '77',
+    anschluss: { label: 'Bot im Chat', zustand: 'unbekannt', text: 'Nicht abfragbar.' },
+    abo: null, empfangen: null
+};
+
 for (const [was, daten] of [
-    ['leer', { tr, guildId: '42', kanaele: [], meldung: null, fehler: null }],
-    ['mit Kanal', {
-        tr, guildId: '42', meldung: null, fehler: null,
-        kanaele: [{ id: 3, login: 'firedervil', anzeigename: 'FireDervil', kanal_id: '77',
-                    anschluss: { label: 'Bot im Chat', zustand: 'unbekannt', text: 'Nicht abfragbar.' } }]
+    ['leer', { ...grundgeruest, kanaele: [] }],
+    ['mit Kanal', { ...grundgeruest, kanaele: [einKanal] }],
+    ['mit stehender Leitung', {
+        ...grundgeruest,
+        leitung: { verbunden: true, conduitId: 'c-1', fehler: null,
+                   chat: [{ kanal_id: '77', name: 'FireDervil', anzahl: 12, letzte: new Date() }] },
+        bericht: {
+            gelaufen_am: new Date().toISOString(), abgebrochen: null,
+            gewuenscht: 1, vorhanden: 1, kanaele: [], bestellt: ['FireDervil'],
+            abbestellt: [], fehler: []
+        },
+        kanaele: [{
+            ...einKanal,
+            anschluss: { label: 'Bot im Chat', zustand: 'ja', text: 'firebot_mod ist Moderator.' },
+            abo: { kanal_id: '77', kanal_name: 'FireDervil', zustand: 'bestaetigt', fehler: null },
+            empfangen: { kanal_id: '77', name: 'FireDervil', anzahl: 12, letzte: new Date() }
+        }]
+    }],
+    ['mit Abbruch und Ablehnung', {
+        ...grundgeruest,
+        bericht: {
+            gelaufen_am: new Date().toISOString(),
+            abgebrochen: 'Mod-Status nicht abfragbar',
+            gewuenscht: 0, vorhanden: 0, kanaele: [], bestellt: [], abbestellt: [],
+            fehler: ['FireDervil: subscription missing proof of authorization']
+        },
+        kanaele: [{
+            ...einKanal,
+            anschluss: { label: 'Bot im Chat', zustand: 'ja', text: 'firebot_mod ist Moderator.' },
+            abo: { kanal_id: '77', kanal_name: 'FireDervil', zustand: null,
+                   fehler: 'subscription missing proof of authorization' }
+        }]
     }]
 ]) {
     let ok = true, meldung = '';

@@ -773,13 +773,85 @@ router.get('/chatbot', requirePermission('STREAMING.CHAT.MANAGE'), async (req, r
             k.anschluss = zeilen[0] || null;
         }
 
+        // **Die Chat-Leitung, aus gespeicherten Messwerten statt aus einem
+        // Abruf beim Seitenaufbau.** Twitch nach jedem Klick zu fragen waere
+        // langsam und wuerde am Kontingent zehren; der Bericht des letzten
+        // Abgleichs sagt dasselbe und sagt dazu, wann er entstand.
+        const bericht = await require('../kern/chatabos').letzterBericht();
+        const leitung = require('../eingang/conduit').zustand();
+        const jeKanal = new Map((bericht?.kanaele || []).map(k => [String(k.kanal_id), k]));
+        const gezaehlt = new Map((leitung.chat || []).map(c => [String(c.kanal_id), c]));
+        for (const k of kanaele) {
+            k.abo = jeKanal.get(String(k.kanal_id)) || null;
+            k.empfangen = gezaehlt.get(String(k.kanal_id)) || null;
+        }
+
         await renderView(res, 'guild/streaming-chatbot', {
-            tr, guildId, kanaele,
+            tr, guildId, kanaele, bericht, leitung,
+            vorWieLange,
             meldung: req.query.ok || null,
             fehler: req.query.fehler || null
         });
     } catch (error) {
         return renderFehler(res, error, 'Der Chatbot-Bereich konnte nicht geladen werden');
+    }
+});
+
+/**
+ * Den Chat-Anschluss jetzt abgleichen.
+ *
+ * **Warum es diesen Knopf gibt.** Der Mod-Status vergibt der Kanalinhaber mit
+ * `/mod` bei Twitch - davon erfaehrt diese Anlage nichts. Ohne den Knopf
+ * dauerte es bis zum naechsten Tageslauf, bis der Bot den Chat betritt, und
+ * niemand koennte den Unterschied zwischen "dauert noch" und "geht nicht"
+ * sehen.
+ *
+ * **Die Route prueft das Heim ein zweites Mal**, wie die Anzeige darueber:
+ * Der Abgleich betrifft alle Kanaele der Anlage, nicht nur die dieser Guild -
+ * er darf also nur von einem Ort ausgeloest werden, der ueberhaupt einer ist.
+ */
+router.post('/chatbot/abgleich', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/chatbot`;
+
+    try {
+        if (!await require('../kern/heimguild').istHeim(guildId)) {
+            return antworteFehler(req, res, {
+                zurueck, fehler: 'kein_heim',
+                text: 'Dieser Server ist fuer keinen Kanal das Heim.'
+            });
+        }
+
+        const bericht = await require('../kern/chatabos').abgleichen();
+
+        // **Der Abbruchgrund wird durchgereicht, nicht uebersetzt.** Er sagt
+        // genau, woran es lag - "hat nicht geklappt" saehe bei einem fehlenden
+        // Bot-Konto genauso aus wie bei einer klemmenden Twitch-Abfrage.
+        if (bericht.abgebrochen) {
+            return antworteFehler(req, res, {
+                zurueck, fehler: 'abgebrochen', art: 'warning',
+                text: `Nichts abgeglichen: ${bericht.abgebrochen}.`
+            });
+        }
+
+        const teile = [];
+        if (bericht.bestellt.length)   teile.push(`${bericht.bestellt.length} angeschlossen`);
+        if (bericht.abbestellt.length) teile.push(`${bericht.abbestellt.length} abgemeldet`);
+        if (bericht.fehler.length)     teile.push(`${bericht.fehler.length} abgelehnt`);
+
+        return antworte(req, res, {
+            zurueck, ok: 'abgeglichen',
+            art: bericht.fehler.length ? 'warning' : 'success',
+            text: teile.length
+                ? `Abgeglichen: ${teile.join(', ')}.`
+                : `Nichts zu tun — ${bericht.gewuenscht} Kanal(-Chats) stehen bereits.`
+        });
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Chat-Abgleich von Hand fehlgeschlagen', error);
+        return antworteFehler(req, res, {
+            zurueck, fehler: 'technisch',
+            text: 'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+        });
     }
 });
 
