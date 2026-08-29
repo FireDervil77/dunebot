@@ -1,0 +1,22 @@
+<%
+/**
+ * Der eigene Text EINES Ziels.
+ *
+ * **Warum das eine eigene Karte ist und kein Feld in der Ankuendigungskarte.**
+ * Sie haengt an einem anderen Recht: `STREAMING.TEMPLATES.EDIT` statt
+ * `STREAMING.TARGETS.MANAGE`. Waere das Feld in der Ankuendigungskarte
+ * gelandet, koennte plotzlich jeder Texte aendern, der Ziele pflegen darf -
+ * eine Rechteerweiterung, die niemand beschlossen hat und die beim Falten der
+ * Seiten still passiert waere.
+ */
+%>
+<div class="input-group">
+  <textarea class="form-control vorlage-feld" id="vorlage_<%= z.id %>" name="vorlage" rows="1"
+            data-vorschau="vorschau_<%= z.id %>" data-streamer="<%= z.anzeigename || z.login %>"
+            placeholder="leer = Standard dieses Servers" <%= darfVorlagen ? '' : 'disabled' %>><%= z.vorlage || '' %></textarea>
+</div>
+<div class="mt-1 small text-secondary">Vorschau: <span id="vorschau_<%= z.id %>"></span></div>
+<div class="form-hint">
+  Leer lassen heisst: Es gilt der Standard oben. Das ist der Regelfall —
+  eine Abweichung lohnt sich, wenn ein Kanal einen anderen Ton hat.
+</div>

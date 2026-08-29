@@ -1,0 +1,48 @@
+<%
+/**
+ * Platzhalter und wie die fertige Ankuendigung aussieht.
+ *
+ * Nachschlagewerk, kein Formular. Es steht unter den Karten, weil man es beim
+ * Schreiben eines Textes braucht - und nicht darueber, weil es nichts tut.
+ */
+%>
+<div class="row">
+  <div class="col-lg-6">
+    <div class="table-responsive">
+      <table class="table table-sm table-vcenter mb-0">
+        <tbody>
+          <% platzhalter.forEach(p => { %>
+            <tr>
+              <td class="w-1"><code><%= p.name %></code></td>
+              <td class="text-secondary"><%= p.bedeutung %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <div class="text-secondary small mt-2">
+      Andere Platzhalter werden beim Speichern abgelehnt. Sie würden sonst
+      wörtlich in der Ankündigung stehen — ein Fehler, den man erst im
+      Discord sieht.
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <p class="text-secondary small">
+      Der Text erscheint als Klartext, darunter die Karte. Die Erwähnung
+      gehört bewusst in den Klartext: Discord löst Erwähnungen innerhalb
+      einer Karte <strong>nicht</strong> als Benachrichtigung aus.
+    </p>
+    <ul class="text-secondary small mb-0">
+      <li>Kopf: Kanalname und Bild des Kanals</li>
+      <li>Titel der Sendung, verlinkt auf den Stream</li>
+      <li>Kategorie und Zuschauerzahl nebeneinander</li>
+      <li>Vorschaubild des Streams</li>
+      <li>Knopf „Zum Stream“ — dazu „Beitreten“, wenn ein On-Air-Kanal gesetzt ist</li>
+    </ul>
+    <p class="text-secondary small mb-0 mt-2">
+      Die Karte selbst ist festgelegt und nicht frei formatierbar — die
+      Vorlage steuert nur den Text darüber.
+    </p>
+  </div>
+</div>

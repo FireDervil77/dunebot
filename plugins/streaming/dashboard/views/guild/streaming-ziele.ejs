@@ -51,6 +51,7 @@
   const darfAendern    = typeof hasPermission === 'function' && hasPermission('STREAMING.TARGETS.MANAGE');
   const darfProben     = typeof hasPermission === 'function' && hasPermission('STREAMING.TEST');
   const darfEinstellen = typeof hasPermission === 'function' && hasPermission('STREAMING.SETTINGS.EDIT');
+  const darfVorlagen   = typeof hasPermission === 'function' && hasPermission('STREAMING.TEMPLATES.EDIT');
 
   const basis = `/guild/${guildId}/plugins/streaming`;
   const marke = typeof csrfToken !== 'undefined' ? csrfToken : '';
@@ -60,6 +61,7 @@
     entfernt:         'Ziel entfernt. Der Kanal wird weiter beobachtet, wenn noch ein anderes Ziel darauf zeigt.',
     rolle_gewechselt: 'Live-Rolle gewechselt. Die alte Rolle wird allen entzogen, denen sie das Plugin gegeben haben könnte.',
     rolle_aus:        'Live-Rolle abgeschaltet und allen entzogen.',
+    zurueckgesetzt:   'Eigener Text entfernt — für dieses Ziel gilt wieder der Standard.',
     probe:            'Probe ist unterwegs — sie steht in wenigen Sekunden im Kanal. Sie wird nicht veröffentlicht und hinterlässt keine Spur; aufräumen musst du sie selbst.'
   };
   const fehlerTexte = {
@@ -68,6 +70,8 @@
     weg:        'Dieses Ziel gibt es nicht mehr.',
     rolle:      'Das war keine gültige Rollen-Auswahl.',
     zone:       'Das war keine gültige Zeitzone.',
+    zu_lang:     'Der Text ist zu lang. Discord nimmt 2000 Zeichen; wir lassen 1000 zu, weil Platzhalter beim Füllen wachsen.',
+    platzhalter: 'Da steht ein Platzhalter, den es nicht gibt. Er würde wörtlich in der Ankündigung landen — die Liste unten zeigt alle gültigen.',
     technisch:  'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
   };
 
@@ -121,6 +125,25 @@
         csrfToken:    marke,
         darf:         darfEinstellen,
         koerper:      include('teile/vorgaben-zeitzone', { darfEinstellen })
+  }) %>
+<% } %>
+
+<% if (seite === 'ankuendigung') { %>
+  <%# **Die Standardtexte** — seit dem 2026-08-29 hier statt unter einem
+      eigenen Menuepunkt "Vorlagen". Der Text gehoert zu der Sache, deren Text
+      er ist; vorher stand die Ankuendigung unter "Ziele" und ihr Wortlaut
+      woanders. %>
+  <%- include('shared/funktionskarte', {
+        titel:        'Text der Ankündigung',
+        beschreibung: 'Gilt für alle Ziele dieser Guild, solange ein Ziel nichts Eigenes sagt.',
+        icon:         'fa-solid fa-comment-dots',
+        id:           'vorlagen-standard',
+        aktion:       `${basis}/vorlagen`,
+        csrfToken:    marke,
+        darf:         darfVorlagen,
+        koerper:      include('teile/vorlagen-standard', {
+                          darfVorlagen, vorlagen, vorgabeLive, vorgabeRueckschau
+                      })
   }) %>
 <% } %>
 
@@ -184,6 +207,18 @@
             koerper: include('teile/ziel-ankuendigung', uebergabe)
       }) %>
 
+      <%# Eigene Karte, eigenes Recht: `STREAMING.TEMPLATES.EDIT` statt
+          `TARGETS.MANAGE`. Als Feld in der Ankuendigungskarte haette das
+          Falten der Seiten still ein Recht erweitert. %>
+      <%- include('shared/funktionskarte', {
+            titel: 'Eigener Text', icon: 'fa-solid fa-comment-dots',
+            beschreibung: z.vorlage ? 'Dieses Ziel weicht vom Standard ab.'
+                                    : 'Leer — es gilt der Standard dieses Servers.',
+            id: `vor-${z.id}`, aktion: `${basis}/vorlagen/${z.id}`,
+            csrfToken: marke, darf: darfVorlagen,
+            koerper: include('teile/ziel-vorlage', { z, darfVorlagen })
+      }) %>
+
       <%- include('shared/funktionskarte', {
             titel: 'Filter und Ruhezeit', icon: 'fa-solid fa-filter',
             beschreibung: 'Wann trotz laufendem Stream NICHT angekündigt wird.',
@@ -241,3 +276,61 @@
     <% } %>
   </div>
 <% }); %>
+
+<% if (seite === 'ankuendigung') { %>
+  <%- include('shared/funktionskarte', {
+        titel:   'Platzhalter und Aufbau',
+        icon:    'fa-solid fa-list',
+        koerper: include('teile/vorlagen-platzhalter', { platzhalter })
+  }) %>
+
+  <script>
+  // Vorschau im Browser, mit Beispielwerten. Bewusst kein Testversand: Wer eine
+  // Vorschau sehen will, soll dafuer niemandem eine Nachricht schicken.
+  //
+  // Die Werte sind erkennbar Beispiele. Erfundene Zahlen, die wie gemessene
+  // aussehen, waeren schlimmer als keine.
+  (function () {
+    var BEISPIEL = {
+      '{streamer}':  'BeispielKanal',
+      '{titel}':     'Erster Versuch, zweiter Anlauf',
+      '{kategorie}': 'Just Chatting',
+      '{url}':       'https://twitch.tv/beispielkanal',
+      '{zuschauer}': '42',
+      '{rolle}':     '@Stream-Ping',
+      '{plattform}': 'Twitch',
+      '{dauer}':     '2 h 14 min'
+    };
+
+    function fuellen(text, streamerName) {
+      var werte = Object.assign({}, BEISPIEL);
+      if (streamerName) werte['{streamer}'] = streamerName;
+
+      return String(text || '').replace(/\{[a-z_]+\}/gi, function (treffer) {
+        var schluessel = treffer.toLowerCase();
+        // Unbekannter Platzhalter: stehen lassen und markieren. Genau so
+        // erschiene er auch im Discord.
+        return Object.prototype.hasOwnProperty.call(werte, schluessel)
+          ? werte[schluessel]
+          : treffer;
+      }).trim();
+    }
+
+    function zeichnen(feld) {
+      var ziel = document.getElementById(feld.dataset.vorschau);
+      if (!ziel) return;
+      var text = feld.value.trim();
+      if (!text) {
+        ziel.innerHTML = '<em class="text-secondary">— es gilt der Standard —</em>';
+        return;
+      }
+      ziel.textContent = fuellen(text, feld.dataset.streamer);
+    }
+
+    document.querySelectorAll('.vorlage-feld').forEach(function (feld) {
+      zeichnen(feld);
+      feld.addEventListener('input', function () { zeichnen(feld); });
+    });
+  })();
+  </script>
+<% } %>

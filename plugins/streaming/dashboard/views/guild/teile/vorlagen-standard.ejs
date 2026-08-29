@@ -1,0 +1,42 @@
+<%
+/**
+ * Die Standardtexte dieser Guild.
+ *
+ * **Warum sie auf der Ankuendigungsseite stehen** (2026-08-29): Der Text
+ * gehoert zu der Sache, deren Text er ist. Bis dahin gab es dafuer einen
+ * eigenen Menuepunkt "Vorlagen" - wer den Ankuendigungstext aendern wollte,
+ * fand ihn dort, die Ankuendigung selbst aber unter "Ziele". Zwei Orte, eine
+ * Sache.
+ */
+%>
+<div class="mb-3">
+  <label class="form-label" for="vorlage_live">Wenn jemand live geht</label>
+  <textarea class="form-control vorlage-feld" id="vorlage_live" name="vorlage_live" rows="2"
+            data-vorschau="vorschau_live" <%= darfVorlagen ? '' : 'disabled' %>><%= vorlagen.live %></textarea>
+  <div class="form-hint">
+    <%= tr('streaming:TEMPLATES.HINT') %>
+    <% if (!vorlagen.eigeneLive) { %>
+      <br>Zurzeit gilt die Vorgabe: <code><%= vorgabeLive %></code>
+    <% } %>
+  </div>
+  <div class="mt-2 p-2 rounded bg-secondary-lt small">
+    <span class="text-secondary">Vorschau:</span> <span id="vorschau_live"></span>
+  </div>
+</div>
+
+<div class="mb-1">
+  <label class="form-label" for="vorlage_rueckschau">Wenn der Stream vorbei ist</label>
+  <textarea class="form-control vorlage-feld" id="vorlage_rueckschau" name="vorlage_rueckschau" rows="2"
+            data-vorschau="vorschau_rueck" <%= darfVorlagen ? '' : 'disabled' %>><%= vorlagen.rueckschau %></textarea>
+  <div class="form-hint">
+    Gilt für Ziele mit „<%= tr('streaming:TARGETS.CLEANUP_EDIT') %>“. Hier ist
+    <code>{dauer}</code> gefüllt — während des Streams ist er leer, weil
+    noch niemand weiss, wie lange es dauert.
+    <% if (!vorlagen.eigeneRueckschau) { %>
+      <br>Zurzeit gilt die Vorgabe: <code><%= vorgabeRueckschau %></code>
+    <% } %>
+  </div>
+  <div class="mt-2 p-2 rounded bg-secondary-lt small">
+    <span class="text-secondary">Vorschau:</span> <span id="vorschau_rueck"></span>
+  </div>
+</div>

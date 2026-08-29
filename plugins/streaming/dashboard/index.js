@@ -443,16 +443,16 @@ class StreamingDashboardPlugin extends DashboardPlugin {
             // auf `/ankuendigung`: Die Adresse steht in Lesezeichen und in
             // jeder Rueckmeldung, die vor heute verschickt wurde.
             //
-            // **"Vorlagen" bleibt vorerst ein eigener Punkt.** Der Entwurf sah
-            // vor, ihn in die Ankuendigung zu falten - dort haengt der Text ja
-            // hin. Nur liegt auf der Seite auch die Vorlage der GANZEN Guild,
-            // und die waere danach nur noch ueber einen Ziel-Verweis
-            // erreichbar. Etwas unauffindbar zu machen ist keine Ordnung.
-            // Er rueckt deshalb neben die Ankuendigung, bis das Falten
-            // wirklich gebaut ist.
+            // **"Vorlagen" ist gefaltet** (2026-08-29). Der Text steht jetzt
+            // auf der Ankuendigungsseite - der Standard der Guild als Karte
+            // oben, der eigene Text je Ziel als Karte beim Ziel. `/vorlagen`
+            // leitet dorthin weiter, weil die Adresse in Lesezeichen steht.
+            //
+            // Beim ersten Anlauf hatte ich den Punkt stehenlassen, weil die
+            // Vorlage der GANZEN Guild sonst unauffindbar geworden waere. Das
+            // ist geloest: Sie steht als eigene Karte oben auf der Seite.
             eintrag('NAV.CHANNELS', `${basis}/streamer`,     'fa-solid fa-video', 10),
             eintrag('NAV.ANNOUNCE', `${basis}/ankuendigung`, 'fa-solid fa-bullhorn', 20),
-            eintrag('NAV.TEMPLATES', `${basis}/vorlagen`,    'fa-solid fa-comment-dots', 25),
             eintrag('NAV.ALERTS',   `${basis}/meldungen`,    'fa-solid fa-bell', 30),
             eintrag('NAV.ROLES',    `${basis}/rollen`,       'fa-solid fa-user-tag', 40),
             eintrag('NAV.STATE',    `${basis}/zustand`,      'fa-solid fa-heart-pulse', 50),

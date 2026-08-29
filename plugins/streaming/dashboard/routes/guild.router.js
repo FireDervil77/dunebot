@@ -205,9 +205,9 @@ router.post('/streamer/:id/entfernen', requirePermission('STREAMING.STREAMERS.MA
  * @type {Object<string, {mitglieder: boolean, sprachkanaele: boolean, zusagen: boolean}>}
  */
 const SEITEN_BEDARF = {
-    ankuendigung: { mitglieder: false, sprachkanaele: false, zusagen: false },
-    meldungen:    { mitglieder: false, sprachkanaele: false, zusagen: true  },
-    rollen:       { mitglieder: true,  sprachkanaele: true,  zusagen: true  }
+    ankuendigung: { mitglieder: false, sprachkanaele: false, zusagen: false, vorlagen: true  },
+    meldungen:    { mitglieder: false, sprachkanaele: false, zusagen: true,  vorlagen: false },
+    rollen:       { mitglieder: true,  sprachkanaele: true,  zusagen: true,  vorlagen: false }
 };
 
 /**
@@ -239,6 +239,9 @@ async function zielSeite(seite, req, res) {
 
         const sprachkanaele = bedarf.sprachkanaele ? await getSprachkanaele(guildId) : [];
         const mitglieder = bedarf.mitglieder ? await getMitglieder(guildId) : [];
+        // Die Vorlagen stehen seit dem 2026-08-29 auf der Ankuendigungsseite -
+        // der Text gehoert zu der Sache, deren Text er ist.
+        const vorlagen = bedarf.vorlagen ? await modelle.vorlagenLesen(guildId) : null;
 
         // **Trägt die gewählte Rolle Mitglieder, die nicht von uns kommen?**
         // Dann bedeutet sie auf diesem Server noch etwas anderes - ein
@@ -301,6 +304,8 @@ async function zielSeite(seite, req, res) {
         await renderView(res, 'guild/streaming-ziele', {
             tr, guildId, seite, ziele, zielkanaele, sprachkanaele, rollen, mitglieder, liveRolleId,
             fremdeTraeger, zeitzone, zonen: ZEITZONEN,
+            vorlagen, platzhalter: PLATZHALTER,
+            vorgabeLive: VORGABE_LIVE, vorgabeRueckschau: VORGABE_RUECKSCHAU,
             // Die Melderarten kommen aus dem Kern, nicht aus der Ansicht:
             // Sonst stuende die Liste an zwei Stellen und waeche beim
             // naechsten Ereignis nur an einer mit.
@@ -778,34 +783,18 @@ router.get('/chatbot', requirePermission('STREAMING.CHAT.MANAGE'), async (req, r
     }
 });
 
-router.get('/vorlagen', requirePermission('STREAMING.VIEW'), async (req, res) => {
-    const guildId = res.locals.guildId;
-    const tr = makeTranslator(req, res);
-
-    try {
-        const [ziele, vorlagen] = await Promise.all([
-            modelle.zieleDerGuild(guildId),
-            modelle.vorlagenLesen(guildId)
-        ]);
-
-        await renderView(res, 'guild/streaming-vorlagen', {
-            tr, guildId, ziele, vorlagen,
-            platzhalter: PLATZHALTER,
-            vorgabeLive: VORGABE_LIVE,
-            vorgabeRueckschau: VORGABE_RUECKSCHAU,
-            meldung: req.query.ok || null,
-            fehler: req.query.fehler || null
-        });
-    } catch (error) {
-        return renderFehler(res, error, 'Die Vorlagen konnten nicht geladen werden');
-    }
+// **`/vorlagen` bleibt erreichbar.** Die Seite ist am 2026-08-29 in die
+// Ankuendigung gefaltet worden - der Text gehoert zu der Sache, deren Text er
+// ist. Die Adresse steht aber in Lesezeichen und in jeder Rueckmeldung, die
+// vor heute verschickt wurde; ein 404 dort waere kein sauberer Schnitt.
+router.get('/vorlagen', requirePermission('STREAMING.VIEW'), (req, res) => {
+    res.redirect(`/guild/${res.locals.guildId}/plugins/streaming/ankuendigung`);
 });
 
-// Die Standardtexte der Guild
 router.post('/vorlagen', requirePermission('STREAMING.TEMPLATES.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
-    const zurueck = `/guild/${guildId}/plugins/streaming/vorlagen`;
+    const zurueck = `/guild/${guildId}/plugins/streaming/ankuendigung`;
 
     try {
         const live  = String(req.body.vorlage_live || '').trim();
@@ -827,7 +816,7 @@ router.post('/vorlagen', requirePermission('STREAMING.TEMPLATES.EDIT'), async (r
 router.post('/vorlagen/:id', requirePermission('STREAMING.TEMPLATES.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
-    const zurueck = `/guild/${guildId}/plugins/streaming/vorlagen`;
+    const zurueck = `/guild/${guildId}/plugins/streaming/ankuendigung`;
 
     try {
         const zielId = Number(req.params.id);

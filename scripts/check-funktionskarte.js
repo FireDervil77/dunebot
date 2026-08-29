@@ -171,13 +171,20 @@ const daten = {
     mitglieder: [{ id: '5551234567', name: 'FireDervil' }],
     melderArten: { raid: { label: 'Raid', hinweis: 'h' } },
     melderBeschreibung: () => ({ scope: null }),
+    // Seit dem Falten am 2026-08-29 traegt die Ankuendigungsseite auch die
+    // Vorlagen. Fehlen sie hier, rendert sie nicht - und genau so soll es
+    // sein: Eine Route, die sie zu uebergeben vergisst, faellt sofort auf.
+    vorlagen: { live: '{streamer} ist live!', rueckschau: 'War {dauer}.',
+                eigeneLive: true, eigeneRueckschau: false },
+    platzhalter: [{ name: '{streamer}', bedeutung: 'Kanalname' }],
+    vorgabeLive: 'V-live', vorgabeRueckschau: 'V-rueck',
     ziele: [{
         id: 7, streamer_id: 3, anzeigename: 'FireDervil', login: 'firedervil',
         channel_id: '10', rolle_id: '900', abo_rolle_id: '900', onair_channel: '20',
         melder_channel_id: '10', melder_arten: 'raid', filter_spiel: null,
         filter_titel: null, filter_spiel_aus: null, filter_titel_aus: null,
         ruhe_von: null, ruhe_bis: null, aufraeumen: 'bearbeiten', eigenes_bild: null,
-        veroeffentlichen: 1, aktiv: 1, mitglied_id: '5551234567', vorlage: null,
+        veroeffentlichen: 1, aktiv: 1, mitglied_id: '5551234567', vorlage: 'Eigener Text',
         aboZusage: true, aboInhaber: 'F', melderScopes: []
     }]
 };
@@ -279,6 +286,47 @@ for (const { schluessel } of ziele) {
 pruefe(/router\.get\('\/ziele'[\s\S]{0,300}redirect/.test(router),
     '/ziele leitet weiter, statt 404 zu liefern',
     'ein toter Verweis ist kein sauberer Schnitt');
+
+// ---------------------------------------------------------------------
+console.log('\n6. Das Falten der Vorlagen hat kein Recht erweitert');
+// ---------------------------------------------------------------------
+//
+// **Die eigentliche Gefahr beim Zusammenlegen von Seiten.** Der Text eines
+// Ziels haengt an `STREAMING.TEMPLATES.EDIT`, die uebrigen Felder der
+// Ankuendigung an `STREAMING.TARGETS.MANAGE`. Waere `vorlage` beim Falten in
+// die Ankuendigungskarte gerutscht, koennte plotzlich jeder Texte aendern, der
+// Ziele pflegen darf - eine Rechteerweiterung, die niemand beschlossen hat und
+// die man der Seite nicht ansieht.
+
+pruefe(!Object.values(KARTEN_SPALTEN).flat().includes('vorlage'),
+    '`vorlage` steht in KEINER Ziel-Karte',
+    'sonst schriebe sie die Ankuendigungsroute mit TARGETS.MANAGE statt TEMPLATES.EDIT');
+
+for (const pfad of ["'/vorlagen'", "'/vorlagen/:id'"]) {
+    pruefe(new RegExp(`router\\.post\\(${pfad.replace(/[/:]/g, m => '\\' + m)}, requirePermission\\('STREAMING\\.TEMPLATES\\.EDIT'\\)`).test(router),
+        `POST ${pfad} haengt weiter an STREAMING.TEMPLATES.EDIT`);
+}
+
+pruefe(/router\.get\('\/vorlagen'[\s\S]{0,400}redirect/.test(router),
+    '/vorlagen leitet weiter, statt 404 zu liefern',
+    'die Adresse steht in Lesezeichen und in jeder Rueckmeldung von vor dem Falten');
+
+pruefe(!fs.existsSync(path.join(PV, 'guild/streaming-vorlagen.ejs')),
+    'die alte Vorlagen-Ansicht ist geloescht, nicht nur unverlinkt',
+    'eine Ansicht ohne Route ist totes Geraet — beim naechsten Umbau wird sie fuer aktuell gehalten');
+
+pruefe(!/NAV\.TEMPLATES/.test(index),
+    'der Menuepunkt "Vorlagen" ist weg');
+
+// Und die Probe aufs Exempel: Wer NUR Ziele pflegen darf, sieht kein
+// Textfeld zum Speichern.
+const nurZiele = await ejs.renderFile(path.join(PV, 'guild/streaming-ziele.ejs'),
+    { ...daten, seite: 'ankuendigung',
+      hasPermission: (r) => r !== 'STREAMING.TEMPLATES.EDIT' },
+    { views: [KERN, PV, path.join(PV, 'guild')] });
+pruefe(/name="vorlage"[^>]*disabled/.test(nurZiele) && /name="vorlage_live"[^>]*disabled/.test(nurZiele),
+    'ohne TEMPLATES.EDIT sind die Textfelder gesperrt',
+    'die Sperre, die zaehlt, steht in der Route — aber ein bedienbares Feld, das 403 liefert, ist eine falsche Einladung');
 
 console.log(abweichungen === 0
     ? `\nErgebnis: ${faelle} Pruefungen, 0 Abweichungen.\n`

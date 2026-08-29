@@ -12,12 +12,6 @@
  */
 %>
 <div class="d-flex flex-wrap gap-2 align-items-center">
-  <% if (darfAendern) { %>
-    <a href="<%= basis %>/vorlagen#vorlage-<%= z.id %>" class="btn btn-link ps-0">
-      Eigenen Text für dieses Ziel
-      <% if (z.vorlage) { %><span class="badge bg-blue-lt ms-1">gesetzt</span><% } %>
-    </a>
-  <% } %>
 
   <% if (darfProben) { %>
     <div class="input-group w-auto">
