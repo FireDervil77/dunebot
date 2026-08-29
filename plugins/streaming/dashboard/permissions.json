@@ -53,7 +53,7 @@
     {
       "key": "STREAMING.CHAT.MANAGE",
       "name": "Chatbot dieses Kanals einstellen",
-      "description": "Berechtigung um Befehle, Ansagen und Chat-Verhalten des Twitch-Chatbots zu setzen. Wirkt nur in der Heim-Guild eines Kanals - also dort, wo der Kanalinhaber selbst seinen Chatbot verwalten laesst. In jeder anderen Guild bleibt sie wirkungslos.",
+      "description": "Chatbot dieses Kanals einstellen. Wirkt nur in der Heim-Guild, sonst nirgends.",
       "category": "streaming",
       "is_dangerous": 0,
       "requires": "STREAMING.VIEW"
