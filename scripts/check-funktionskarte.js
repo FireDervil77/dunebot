@@ -157,7 +157,7 @@ pruefe(!/module\.exports[\s\S]*\bzielSpeichern\b/.test(lies('plugins/streaming/s
     'ungenutztes Geraet versagt beim ersten Einsatz lautlos');
 
 // ---------------------------------------------------------------------
-console.log('\n4. Die gerenderte Seite: flach, verdrahtet, vollstaendig');
+console.log('\n4. Die drei Seiten teilen die Felder genau auf');
 // ---------------------------------------------------------------------
 
 const tr = (k) => `«${k}»`;
@@ -182,40 +182,103 @@ const daten = {
     }]
 };
 
-let html = null;
-try {
-    html = await ejs.renderFile(path.join(PV, 'guild/streaming-ziele.ejs'), daten,
-        { views: [KERN, PV, path.join(PV, 'guild')] });
-} catch (err) {
-    pruefe(false, 'streaming-ziele.ejs rendert', err.message.split('\n')[0]);
+// Die Zuordnung Karte -> Seite steht im Router. Sie hier NICHT abzuschreiben
+// ist der Punkt: Sonst pruefte der Waechter seine eigene Kopie.
+const seiteVonKarte = {};
+for (const [, karte, seite] of router.matchAll(/^\s{4}(\w+):\s*'(\w+)'/gm)) {
+    seiteVonKarte[karte] = seite;
 }
+const abschnitt = router.slice(router.indexOf('const KARTEN_SEITE'), router.indexOf('const KARTEN_SEITE') + 900);
+const zuordnung = Object.fromEntries([...abschnitt.matchAll(/(\w+):\s*'(\w+)'/g)].map(m => [m[1], m[2]]));
 
-if (html) {
-    pruefe(true, 'streaming-ziele.ejs rendert');
+pruefe(Object.keys(zuordnung).length === Object.keys(KARTEN_SPALTEN).length,
+    'jede Karte hat eine Seite in KARTEN_SEITE',
+    `zugeordnet: ${Object.keys(zuordnung).join(', ')} — Karten: ${Object.keys(KARTEN_SPALTEN).join(', ')}`);
 
-    const fehlend = Object.values(KARTEN_SPALTEN).flat()
-        .filter(sp => !new RegExp(`name="${sp}"`).test(html));
-    pruefe(fehlend.length === 0, 'jede Spalte hat ein Feld in der Seite',
-        `ohne Feld ist die Spalte nicht mehr aenderbar: ${fehlend.join(', ')}`);
+const SEITEN = ['ankuendigung', 'meldungen', 'rollen'];
+const gesehen = new Map();   // Feldname -> Seiten, auf denen es steht
+
+for (const seite of SEITEN) {
+    let html = null;
+    try {
+        html = await ejs.renderFile(path.join(PV, 'guild/streaming-ziele.ejs'),
+            { ...daten, seite }, { views: [KERN, PV, path.join(PV, 'guild')] });
+    } catch (err) {
+        pruefe(false, `Seite „${seite}" rendert`, err.message.split('\n')[0]);
+        continue;
+    }
+    pruefe(true, `Seite „${seite}" rendert`);
+
+    for (const sp of Object.values(KARTEN_SPALTEN).flat()) {
+        if (new RegExp(`name="${sp}"`).test(html)) {
+            if (!gesehen.has(sp)) gesehen.set(sp, []);
+            gesehen.get(sp).push(seite);
+        }
+    }
 
     let tiefe = 0, max = 0;
     html.replace(/<form|<\/form>/g, (m) => { tiefe += m === '<form' ? 1 : -1; max = Math.max(max, tiefe); return m; });
-    pruefe(max === 1, 'kein Formular steckt in einem anderen',
+    pruefe(max === 1, `${seite}: kein Formular steckt in einem anderen`,
         'der Browser verwirft das innere lautlos — der Probe-Knopf taete dann nichts');
 
     const ids = new Set([...html.matchAll(/<form[^>]*\bid="([^"]+)"/g)].map(m => m[1]));
-    const verweise = new Set([...html.matchAll(/\bform="([^"]+)"/g)].map(m => m[1]));
-    const tot = [...verweise].filter(v => !ids.has(v));
-    pruefe(tot.length === 0, 'jeder form-Verweis trifft ein vorhandenes Formular',
+    const tot = [...new Set([...html.matchAll(/\bform="([^"]+)"/g)].map(m => m[1]))].filter(v => !ids.has(v));
+    pruefe(tot.length === 0, `${seite}: jeder form-Verweis trifft ein Formular`,
         `ins Leere: ${tot.join(', ')} — die Knoepfe dort sind Attrappen`);
 
-    // Jede Kartenadresse muss es als Route geben.
-    const ziele = [...html.matchAll(/action="[^"]*\/ziele\/7\/([a-z]+)"/g)].map(m => m[1]);
-    const ohneRoute = ziele.filter(z => !new RegExp(`'/ziele/:id/${z}'|\\\`/ziele/:id/\\\$\\{karte\\}\\\``).test(router)
-                                        && !Object.keys(KARTEN_SPALTEN).includes(z));
-    pruefe(ohneRoute.length === 0, 'jede Kartenadresse hat eine Route',
-        `ohne Route: ${ohneRoute.join(', ')}`);
+    // **Jede Karte auf der Seite, die der Router ihr zuweist.** Sonst wirft
+    // das Speichern einen auf eine andere Seite als die, auf der man stand.
+    const fremde = [...new Set([...html.matchAll(/action="[^"]*\/ziele\/7\/(\w+)"/g)].map(m => m[1]))]
+        .filter(k => zuordnung[k] && zuordnung[k] !== seite);
+    pruefe(fremde.length === 0, `${seite}: keine Karte einer anderen Seite`,
+        `${fremde.join(', ')} gehoert laut Router woandershin — nach dem Speichern landet man dort`);
 }
+
+const fehlend = Object.values(KARTEN_SPALTEN).flat().filter(sp => !gesehen.has(sp));
+pruefe(fehlend.length === 0, 'jede Spalte steht auf genau einer Seite — keine fehlt',
+    `ohne Feld ist die Spalte nicht mehr aenderbar: ${fehlend.join(', ')}`);
+
+const doppelt = [...gesehen.entries()].filter(([, s]) => s.length > 1);
+pruefe(doppelt.length === 0, 'keine Spalte steht auf zwei Seiten',
+    doppelt.map(([f, s]) => `${f}: ${s.join(' + ')}`).join('; ')
+    + ' — zwei Formulare fuer dasselbe Feld, und das zweite ueberschreibt still das erste');
+
+// ---------------------------------------------------------------------
+console.log('\n5. Die Navigation zeigt auf Seiten, die es gibt');
+// ---------------------------------------------------------------------
+
+const index = lies('plugins/streaming/dashboard/index.js');
+const ziele = [...index.matchAll(/eintrag\('NAV\.(\w+)',\s*`\$\{basis\}\/(\w+)`/g)]
+    .map(m => ({ schluessel: m[1], pfad: m[2] }));
+
+pruefe(ziele.length >= 6, `die Navigation hat ${ziele.length} Eintraege`);
+
+for (const { schluessel, pfad } of ziele) {
+    // **Zwei Wege, eine Route zu haben** - und beide muessen einzeln geprueft
+    // werden. Die erste Fassung schrieb sie als ein Muster mit `|`; der zweite
+    // Zweig traf den Router IMMER (die Schleife steht ja darin), und damit war
+    // die Regel fuer jeden Menuepunkt wahr. Sie hat in der Gegenprobe nichts
+    // gefangen - eine Pruefung, die nie anschlaegt, ist selbst eine Attrappe.
+    const eigeneRoute = new RegExp(`router\\.get\\('\\/${pfad}'`).test(router);
+    const ausDerSchleife = SEITEN.includes(pfad);
+    pruefe(eigeneRoute || ausDerSchleife,
+        `NAV.${schluessel} → /${pfad} hat eine Route`,
+        'ein Menuepunkt ohne Route ist ein 404 mit Einladung');
+}
+
+const de = JSON.parse(lies('plugins/streaming/dashboard/locales/de-DE.json'));
+const en = JSON.parse(lies('plugins/streaming/dashboard/locales/en-GB.json'));
+for (const { schluessel } of ziele) {
+    pruefe(de.NAV?.[schluessel] && en.NAV?.[schluessel],
+        `NAV.${schluessel} ist in beiden Sprachen uebersetzt`,
+        'sonst steht der rohe Schluessel im Menue');
+}
+
+// **`/ziele` bleibt erreichbar.** Die Adresse steht in Lesezeichen und in
+// Rueckmeldungen, die vor dem Schnitt verschickt wurden.
+pruefe(/router\.get\('\/ziele'[\s\S]{0,300}redirect/.test(router),
+    '/ziele leitet weiter, statt 404 zu liefern',
+    'ein toter Verweis ist kein sauberer Schnitt');
 
 console.log(abweichungen === 0
     ? `\nErgebnis: ${faelle} Pruefungen, 0 Abweichungen.\n`

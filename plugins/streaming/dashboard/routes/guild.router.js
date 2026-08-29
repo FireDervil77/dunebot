@@ -193,27 +193,63 @@ router.post('/streamer/:id/entfernen', requirePermission('STREAMING.STREAMERS.MA
 // =====================================================
 // Ziele
 // =====================================================
-router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
+/**
+ * **Was jede Seite braucht — und was sie deshalb nicht laedt.**
+ *
+ * Bis zum 2026-08-29 stand alles auf einer Seite, also wurde alles geladen.
+ * Mit dem Schnitt nach Aufgaben faellt das auseinander, und das ist mehr als
+ * Ordnung: `getMitglieder` geht ueber IPC an `members.fetch()` - einen der drei
+ * Aufrufe im Haus, die ohne eigene Frist laufen. Ihn auf jeder der drei Seiten
+ * zu machen, hiesse das Risiko zu verdreifachen, ohne es zu brauchen.
+ *
+ * @type {Object<string, {mitglieder: boolean, sprachkanaele: boolean, zusagen: boolean}>}
+ */
+const SEITEN_BEDARF = {
+    ankuendigung: { mitglieder: false, sprachkanaele: false, zusagen: false },
+    meldungen:    { mitglieder: false, sprachkanaele: false, zusagen: true  },
+    rollen:       { mitglieder: true,  sprachkanaele: true,  zusagen: true  }
+};
+
+/**
+ * Eine der drei Ziel-Seiten aufbauen.
+ *
+ * Sie teilen sich die Ansicht und die Karten; `seite` entscheidet, welche
+ * Karten erscheinen. Drei eigene Ansichten waeren drei Kopien desselben
+ * Geruests gewesen - genau das, was bei den sieben Seitenkoepfen schon einmal
+ * auseinandergelaufen ist.
+ *
+ * @param {string} seite 'ankuendigung', 'meldungen' oder 'rollen'
+ * @param {Object} req Anfrage
+ * @param {Object} res Antwort
+ * @returns {Promise<void>} nichts
+ */
+async function zielSeite(seite, req, res) {
     const guildId = res.locals.guildId;
     const tr = makeTranslator(req, res);
+    const bedarf = SEITEN_BEDARF[seite];
 
     try {
-        const [ziele, zielkanaele, sprachkanaele, rollen, mitglieder, liveRolleId] = await Promise.all([
+        const [ziele, zielkanaele, rollen, liveRolleId] = await Promise.all([
             modelle.zieleDerGuild(guildId),
             getZielkanaele(guildId),
-            getSprachkanaele(guildId),
             getRollen(guildId),
-            getMitglieder(guildId),
             modelle.liveRolle(guildId)
         ]);
         const zeitzone = await modelle.zeitzone(guildId);
+
+        const sprachkanaele = bedarf.sprachkanaele ? await getSprachkanaele(guildId) : [];
+        const mitglieder = bedarf.mitglieder ? await getMitglieder(guildId) : [];
 
         // **Trägt die gewählte Rolle Mitglieder, die nicht von uns kommen?**
         // Dann bedeutet sie auf diesem Server noch etwas anderes - ein
         // Zugangsrecht zum Beispiel. Das gehoert gesagt, BEVOR ein Abgleich
         // sie einsammelt (Vorfall 2026-08-25, Baustelle 69).
+        //
+        // Nur auf der Rollen-Seite: Ohne die Mitgliederliste laesst es sich
+        // nicht ausrechnen, und eine `0` waere hier keine Auskunft, sondern
+        // eine Behauptung.
         let fremdeTraeger = 0;
-        if (liveRolleId) {
+        if (bedarf.mitglieder && liveRolleId) {
             const unsere = new Set(await modelle.vergebeneRolle(guildId, liveRolleId));
             fremdeTraeger = (mitglieder || [])
                 .filter(m => (m.rollen || []).includes(String(liveRolleId)) && !unsere.has(String(m.id)))
@@ -225,43 +261,45 @@ router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
         // speichert, und nichts passiert — weil der Kanalinhaber gar nicht
         // verknuepft ist. Diese Sorte stiller Wirkungslosigkeit ist genau das,
         // was dieses Plugin an anderen Bots kritisiert.
-        const abonnenten = require('../kern/abonnenten');
-        for (const z of ziele) {
-            try {
-                const streamer = (await ServiceManager.get('dbService').query(
-                    'SELECT id, plattform, kanal_id, login FROM streaming_streamers WHERE id = ?',
-                    [z.streamer_id]))[0];
-                if (!streamer) continue;
+        if (bedarf.zusagen) {
+            const abonnenten = require('../kern/abonnenten');
+            for (const z of ziele) {
+                try {
+                    const streamer = (await ServiceManager.get('dbService').query(
+                        'SELECT id, plattform, kanal_id, login FROM streaming_streamers WHERE id = ?',
+                        [z.streamer_id]))[0];
+                    if (!streamer) continue;
 
-                const inhaber = await abonnenten.kanalInhaber(streamer);
-                if (!inhaber) { z.aboZusage = false; z.melderScopes = []; continue; }
+                    const inhaber = await abonnenten.kanalInhaber(streamer);
+                    if (!inhaber) { z.aboZusage = false; z.melderScopes = []; continue; }
 
-                const zusage = await require('../../../../apps/dashboard/helpers/Verbindungsspeicher')
-                    .zusageLesen(inhaber, streamer.plattform);
+                    const zusage = await require('../../../../apps/dashboard/helpers/Verbindungsspeicher')
+                        .zusageLesen(inhaber, streamer.plattform);
 
-                z.aboInhaber = zusage?.konto_name || streamer.login;
-                z.aboZusage = String(zusage?.scopes || '').includes('channel:read:subscriptions')
-                    ? true : 'ohne-zusage';
+                    z.aboInhaber = zusage?.konto_name || streamer.login;
+                    z.aboZusage = String(zusage?.scopes || '').includes('channel:read:subscriptions')
+                        ? true : 'ohne-zusage';
 
-                // Dieselbe Auskunft fuer die Melder (12c). Sie brauchen je
-                // nach Art einen anderen Scope — `bits:read`,
-                // `moderator:read:followers`, oder gar keinen (Raid).
-                z.melderScopes = String(zusage?.scopes || '').split(' ').filter(Boolean);
-            } catch (err) {
-                // **Nicht pruefbar ist nicht dasselbe wie nicht erteilt.**
-                // Frueher stand hier `z.aboZusage = false`, und die Seite
-                // behauptete dann "der Kanal ist nicht verknuepft" — eine
-                // falsche Auskunft, die wie eine richtige aussieht. Jetzt sagt
-                // sie, dass sie es nicht weiss.
-                ServiceManager.get('Logger').warn(
-                    `[Streaming] Zusagenstand fuer Ziel ${z.id} nicht lesbar: ${err.message}`);
-                z.aboZusage = 'unbekannt';
-                z.melderScopes = null;
+                    // Dieselbe Auskunft fuer die Melder (12c). Sie brauchen je
+                    // nach Art einen anderen Scope — `bits:read`,
+                    // `moderator:read:followers`, oder gar keinen (Raid).
+                    z.melderScopes = String(zusage?.scopes || '').split(' ').filter(Boolean);
+                } catch (err) {
+                    // **Nicht pruefbar ist nicht dasselbe wie nicht erteilt.**
+                    // Frueher stand hier `z.aboZusage = false`, und die Seite
+                    // behauptete dann "der Kanal ist nicht verknuepft" — eine
+                    // falsche Auskunft, die wie eine richtige aussieht. Jetzt
+                    // sagt sie, dass sie es nicht weiss.
+                    ServiceManager.get('Logger').warn(
+                        `[Streaming] Zusagenstand fuer Ziel ${z.id} nicht lesbar: ${err.message}`);
+                    z.aboZusage = 'unbekannt';
+                    z.melderScopes = null;
+                }
             }
         }
 
         await renderView(res, 'guild/streaming-ziele', {
-            tr, guildId, ziele, zielkanaele, sprachkanaele, rollen, mitglieder, liveRolleId,
+            tr, guildId, seite, ziele, zielkanaele, sprachkanaele, rollen, mitglieder, liveRolleId,
             fremdeTraeger, zeitzone, zonen: ZEITZONEN,
             // Die Melderarten kommen aus dem Kern, nicht aus der Ansicht:
             // Sonst stuende die Liste an zwei Stellen und waeche beim
@@ -273,8 +311,19 @@ router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
             fehler: req.query.fehler || null
         });
     } catch (error) {
-        return renderFehler(res, error, 'Die Ziele konnten nicht geladen werden');
+        return renderFehler(res, error, 'Die Seite konnte nicht geladen werden');
     }
+}
+
+Object.keys(SEITEN_BEDARF).forEach((seite) => {
+    router.get(`/${seite}`, requirePermission('STREAMING.VIEW'), (req, res) => zielSeite(seite, req, res));
+});
+
+// **`/ziele` bleibt erreichbar.** Die Adresse steht in Lesezeichen, in der
+// Streamer-Seite und in jeder Rueckmeldung, die vor heute verschickt wurde.
+// Ein 404 dort waere kein sauberer Schnitt, sondern ein toter Verweis.
+router.get('/ziele', requirePermission('STREAMING.VIEW'), (req, res) => {
+    res.redirect(`/guild/${res.locals.guildId}/plugins/streaming/ankuendigung`);
 });
 
 // **Reihenfolge zaehlt.** Diese Route muss VOR `/ziele/:id` stehen: Express
@@ -290,20 +339,13 @@ router.get('/ziele', requirePermission('STREAMING.VIEW'), async (req, res) => {
 router.post('/ziele/live-rolle', requirePermission('STREAMING.SETTINGS.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
-    const zurueck = `/guild/${guildId}/plugins/streaming/ziele`;
+    const zurueck = `/guild/${guildId}/plugins/streaming/rollen`;
 
     try {
         const rolleId = String(req.body.live_rolle_id || '').trim();
         if (rolleId && !/^\d{5,32}$/.test(rolleId)) {
             return res.redirect(`${zurueck}?fehler=rolle`);
         }
-
-        // Die Zeitzone haengt am selben Formular: Beides sind Vorgaben der
-        // Guild, und zwei Knoepfe nebeneinander waeren nur Gelegenheit, einen
-        // davon zu vergessen.
-        const zone = String(req.body.zeitzone || '').trim();
-        if (zone && !ZEITZONEN.includes(zone)) return res.redirect(`${zurueck}?fehler=zone`);
-        if (zone) await modelle.zeitzoneSetzen(guildId, zone);
 
         const vorher = await modelle.liveRolle(guildId);
         await modelle.liveRolleSetzen(guildId, rolleId);
@@ -322,6 +364,38 @@ router.post('/ziele/live-rolle', requirePermission('STREAMING.SETTINGS.EDIT'), a
         return res.redirect(`${zurueck}?ok=gespeichert`);
     } catch (error) {
         Logger.error('[Streaming] Live-Rolle speichern fehlgeschlagen:', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+// Die Zeitzone der Guild
+//
+// **Sie stand bis zum 2026-08-29 im selben Formular wie die Live-Rolle**, mit
+// der Begruendung: "zwei Knoepfe nebeneinander waeren nur Gelegenheit, einen
+// davon zu vergessen." Die galt, solange beides auf EINER Seite stand.
+//
+// Mit dem Schnitt nach Aufgaben stehen sie auf verschiedenen: Die Live-Rolle
+// gehoert zu "Rollen", die Zeitzone zur "Ankuendigung" - sie regelt die
+// Ruhezeiten und sonst nichts. Ein gemeinsames Formular ueber zwei Seiten gibt
+// es nicht; die alte Begruendung ist damit nicht widerlegt, sondern
+// gegenstandslos.
+router.post('/ziele/zeitzone', requirePermission('STREAMING.SETTINGS.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/ankuendigung`;
+
+    try {
+        const zone = String(req.body.zeitzone || '').trim();
+        // **Keine Freitext-Zone.** `Intl` wirft bei einem Tippfehler, wir
+        // weichen auf die Serverzeit aus, und die Ruhezeit gilt still zur
+        // falschen Stunde.
+        if (zone && !ZEITZONEN.includes(zone)) return res.redirect(`${zurueck}?fehler=zone`);
+        if (zone) await modelle.zeitzoneSetzen(guildId, zone);
+
+        Logger.info(`[Streaming] Zeitzone der Guild ${guildId} auf ${zone || '(unveraendert)'} gesetzt`);
+        return res.redirect(`${zurueck}?ok=gespeichert`);
+    } catch (error) {
+        Logger.error('[Streaming] Zeitzone speichern fehlgeschlagen:', error);
         return res.redirect(`${zurueck}?fehler=technisch`);
     }
 });
@@ -445,6 +519,28 @@ const KARTEN_FELDER = {
 const KARTEN_MIT_ABONACHZUG = new Set(['schalter', 'meldungen', 'rollen']);
 
 /**
+ * **Auf welcher Seite steht welche Karte.**
+ *
+ * Nach dem Speichern soll man dort stehen, wo man war. Ein festes `/ziele`
+ * warf einen von der Meldungen-Seite auf die Ankuendigung - und beim naechsten
+ * Haekchen wieder, bis man aufgibt.
+ *
+ * `filter` und `aufraeumen` gehoeren zur Ankuendigung: Beide entscheiden ueber
+ * genau sie - das eine, ob sie erscheint, das andere, was danach mit ihr
+ * geschieht.
+ *
+ * @type {Object<string, string>}
+ */
+const KARTEN_SEITE = {
+    schalter:     'ankuendigung',
+    ankuendigung: 'ankuendigung',
+    filter:       'ankuendigung',
+    aufraeumen:   'ankuendigung',
+    meldungen:    'meldungen',
+    rollen:       'rollen'
+};
+
+/**
  * Die Twitch-Abos einer Zieländerung nachziehen.
  *
  * **Was hier passiert, gehoert in die Rueckmeldung.** Ein Speichern, das
@@ -492,7 +588,7 @@ async function abosNachziehen(guildId, zielId) {
 async function karteSpeichern(karte, req, res) {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
-    const zurueck = `/guild/${guildId}/plugins/streaming/ziele`;
+    const zurueck = `/guild/${guildId}/plugins/streaming/${KARTEN_SEITE[karte]}`;
 
     try {
         const zielId = Number(req.params.id);

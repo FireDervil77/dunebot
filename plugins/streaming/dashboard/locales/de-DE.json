@@ -3,11 +3,15 @@
   "DESCRIPTION": "Meldet im Discord, wenn ein beobachteter Kanal live geht",
   "NAV": {
     "STREAMING": "Streaming",
+    "CHANNELS": "Kanäle",
+    "ANNOUNCE": "Ankündigung",
+    "ALERTS": "Meldungen",
+    "ROLES": "Rollen",
+    "STATE": "Zustand",
+    "OPERATIONS": "Betrieb",
     "STREAMERS": "Streamer",
     "TARGETS": "Ziele",
-    "TEMPLATES": "Vorlagen",
-    "STATE": "Zustand",
-    "OPERATIONS": "Betrieb"
+    "TEMPLATES": "Vorlagen"
   },
   "STREAMERS": {
     "TITLE": "Beobachtete Kanäle",

@@ -3,11 +3,15 @@
   "DESCRIPTION": "Announces in Discord when a watched channel goes live",
   "NAV": {
     "STREAMING": "Streaming",
+    "CHANNELS": "Channels",
+    "ANNOUNCE": "Announcement",
+    "ALERTS": "Alerts",
+    "ROLES": "Roles",
+    "STATE": "Status",
+    "OPERATIONS": "Operations",
     "STREAMERS": "Streamers",
     "TARGETS": "Targets",
-    "TEMPLATES": "Templates",
-    "STATE": "Status",
-    "OPERATIONS": "Operations"
+    "TEMPLATES": "Templates"
   },
   "STREAMERS": {
     "TITLE": "Watched channels",

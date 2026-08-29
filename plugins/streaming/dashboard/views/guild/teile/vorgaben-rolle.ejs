@@ -1,9 +1,11 @@
 <%
 /**
- * Vorgaben dieses Servers - Live-Rolle und Zeitzone.
+ * Die Live-Rolle dieser Guild.
  *
- * Zwei Felder, die fuer ALLE Ziele der Guild gelten. Deshalb stehen sie ueber
- * den Zielen und nicht in einem davon.
+ * Sie gilt fuer ALLE Ziele der Guild, deshalb steht sie ueber ihnen und nicht
+ * in einem davon. Bis zum 2026-08-29 teilte sie sich ein Formular mit der
+ * Zeitzone; seit dem Schnitt nach Aufgaben stehen die beiden auf verschiedenen
+ * Seiten und koennen es gar nicht mehr.
  */
 %>
 <% if (fremdeTraeger > 0) { %>
@@ -60,27 +62,6 @@
       sendet, bekommt sie auch dann, wenn wegen eines Spielfilters keine
       Ankündigung erscheint. Andernfalls ginge sie mitten im Stream an und
       aus, sobald jemand die Kategorie wechselt.
-    </div>
-  </div>
-
-  <div class="col-md-6">
-    <label class="form-label" for="zeitzone">Zeitzone für Ruhezeiten</label>
-    <select class="form-select" id="zeitzone" name="zeitzone" <%= darfEinstellen ? '' : 'disabled' %>>
-      <% (zonen || []).forEach(zo => { %>
-        <option value="<%= zo %>" <%= zo === zeitzone ? 'selected' : '' %>><%= zo %></option>
-      <% }); %>
-    </select>
-    <div class="form-hint">
-      Gilt für die Ruhezeiten in jedem Ziel. Ohne diese Angabe wäre es die
-      Zeitzone des Servers — und die kennt niemand, der „23:00 bis 08:00“
-      in ein Feld tippt.
-    </div>
-  </div>
-
-  <div class="col-md-6 pt-md-4">
-    <div class="text-secondary small">
-      Es ist dort gerade
-      <strong><%= new Date().toLocaleTimeString('de-DE', { timeZone: zeitzone, hour: '2-digit', minute: '2-digit' }) %> Uhr</strong>.
     </div>
   </div>
 </div>

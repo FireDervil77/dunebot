@@ -1,38 +1,55 @@
-<%- include('partials/streaming-kopf', {
-  guildId, tr,
-  icon: 'fa-solid fa-bullseye',
-  titel: tr('streaming:TARGETS.TITLE'),
-  beschreibung: tr('streaming:TARGETS.SUBTITLE')
-}) %>
-
 <%
   /*
-   * **Eine Karte je Funktion, statt eines Formulars mit neunzehn Feldern.**
+   * **Drei Seiten, eine Ansicht.**
    *
-   * Bis zum 2026-08-29 stand hier je Ziel EIN Formular mit EINEM
-   * Speichern-Knopf. Wer die Follower-Meldungen anhakte, schickte die
-   * Ruhezeiten, die Filter und die Rollenzuordnung mit ab - und ein Fehler in
-   * einem Feld nahm die anderen vier Funktionen mit.
+   * Bis zum 2026-08-29 stand hier alles: Ankuendigung, Filter, Aufraeumen,
+   * Meldungen und Rollen, je Ziel in einem Formular mit neunzehn Feldern.
+   * Seit `b204406` sind es Karten; seit heute sind die Karten auf drei Seiten
+   * verteilt, weil sie drei verschiedene Fragen beantworten.
    *
-   * Die Felder selbst stehen jetzt in `teile/ziel-*.ejs`, der Rahmen kommt aus
-   * `shared/funktionskarte`. Jede Karte spricht ihre eigene Route an und
-   * schreibt ueber `zielTeilSpeichern` nur ihre eigenen Spalten. Das ist keine
-   * Bequemlichkeit, sondern die Bedingung: Die abgeloeste `zielSpeichern`
-   * schrieb alle siebzehn Spalten bedingungslos, und ein Teilformular haette
-   * die anderen zwoelf still auf NULL gesetzt. Sie ist deshalb geloescht und
-   * nicht nur ungenutzt liegengeblieben - ungenutztes Geraet versagt beim
-   * ersten Einsatz lautlos.
+   * **Warum nicht drei Ansichtsdateien.** Sie haetten dasselbe Geruest
+   * dreimal getragen - Meldungsband, Leerzustand, Zielschleife, Entfernen -
+   * und waeren auseinandergelaufen wie die sieben Seitenkoepfe vor `296db60`.
+   * `seite` entscheidet, welche Karten erscheinen; alles andere ist geteilt.
    *
    * **Was ein Teil NICHT erbt.** Ein eingebundener Teil sieht die `locals` der
    * Route, aber KEINE hier mit `const` erklaerten Namen. `kanalName` und
-   * `darfAendern` muessen deshalb ausdruecklich mitgegeben werden - sonst sind
-   * sie im Teil undefiniert, und das faellt erst beim Rendern auf.
+   * `darfAendern` muessen ausdruecklich mitgegeben werden - sonst sind sie im
+   * Teil undefiniert, und das faellt erst beim Rendern auf.
    */
 
+  const SEITEN = {
+    ankuendigung: {
+      icon: 'fa-solid fa-bullhorn',
+      titel: 'Ankündigung',
+      beschreibung: 'Wohin gemeldet wird, wenn ein Stream startet — und wann nicht.'
+    },
+    meldungen: {
+      icon: 'fa-solid fa-bell',
+      titel: 'Meldungen',
+      beschreibung: 'Raid, Bits, Follower und Abonnenten, je Kanal einzeln anhakbar.'
+    },
+    rollen: {
+      icon: 'fa-solid fa-user-tag',
+      titel: 'Rollen und Kanäle',
+      beschreibung: 'Was ein laufender Stream an diesem Discord verändert.'
+    }
+  };
+  const _s = SEITEN[seite] || SEITEN.ankuendigung;
+%>
+
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: _s.icon,
+  titel: _s.titel,
+  beschreibung: _s.beschreibung
+}) %>
+
+<%
   // Ob jemand aendern darf, weiss der Theme-Helfer. Das ist Hoeflichkeit:
   // Die Sperre, die zaehlt, steht in der Route.
-  const darfAendern   = typeof hasPermission === 'function' && hasPermission('STREAMING.TARGETS.MANAGE');
-  const darfProben    = typeof hasPermission === 'function' && hasPermission('STREAMING.TEST');
+  const darfAendern    = typeof hasPermission === 'function' && hasPermission('STREAMING.TARGETS.MANAGE');
+  const darfProben     = typeof hasPermission === 'function' && hasPermission('STREAMING.TEST');
   const darfEinstellen = typeof hasPermission === 'function' && hasPermission('STREAMING.SETTINGS.EDIT');
 
   const basis = `/guild/${guildId}/plugins/streaming`;
@@ -50,6 +67,7 @@
     bild:       'Das eigene Vorschaubild muss eine vollständige Adresse mit https:// sein.',
     weg:        'Dieses Ziel gibt es nicht mehr.',
     rolle:      'Das war keine gültige Rollen-Auswahl.',
+    zone:       'Das war keine gültige Zeitzone.',
     technisch:  'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
   };
 
@@ -78,7 +96,7 @@
       <%# Der Hinweistext bleibt Prosa und wandert nicht in `text`: Er enthaelt
           einen Verweis, und `text` wird bewusst maskiert ausgegeben. %>
       <%- include('shared/leerzustand', {
-            icon:   'fa-solid fa-bullseye',
+            icon:   _s.icon,
             titel:  tr('streaming:TARGETS.EMPTY'),
             aktion: `<a class="btn btn-primary" href="${basis}/streamer">`
                   + `<i class="fa-solid fa-video me-2"></i>Kanal eintragen</a>`
@@ -91,107 +109,135 @@
   </div>
 <% } %>
 
-<%- include('shared/funktionskarte', {
-      titel:        'Vorgaben dieses Servers',
-      beschreibung: 'Gilt für alle Ziele dieser Guild.',
-      icon:         'fa-solid fa-sliders',
-      id:           'vorgaben',
-      aktion:       `${basis}/ziele/live-rolle`,
-      csrfToken:    marke,
-      darf:         darfEinstellen,
-      koerper:      include('teile/vorgaben', {
-                        darfEinstellen, liveRolleName, fremdeTraeger:
-                          (typeof fremdeTraeger !== 'undefined' ? fremdeTraeger : 0)
-                    })
-}) %>
+<%# ---- Vorgaben der Guild: je Seite die, die dorthin gehoert ---- %>
+
+<% if (seite === 'ankuendigung') { %>
+  <%- include('shared/funktionskarte', {
+        titel:        'Zeitzone dieses Servers',
+        beschreibung: 'Bezugspunkt für alle Ruhezeiten weiter unten.',
+        icon:         'fa-solid fa-clock',
+        id:           'zeitzone-karte',
+        aktion:       `${basis}/ziele/zeitzone`,
+        csrfToken:    marke,
+        darf:         darfEinstellen,
+        koerper:      include('teile/vorgaben-zeitzone', { darfEinstellen })
+  }) %>
+<% } %>
+
+<% if (seite === 'rollen') { %>
+  <%- include('shared/funktionskarte', {
+        titel:        'Live-Rolle dieses Servers',
+        beschreibung: 'Wer gerade sendet, bekommt diese Rolle — und verliert sie, wenn der Stream endet.',
+        icon:         'fa-solid fa-tower-broadcast',
+        id:           'live-rolle-karte',
+        aktion:       `${basis}/ziele/live-rolle`,
+        csrfToken:    marke,
+        darf:         darfEinstellen,
+        koerper:      include('teile/vorgaben-rolle', {
+                          darfEinstellen, liveRolleName,
+                          fremdeTraeger: (typeof fremdeTraeger !== 'undefined' ? fremdeTraeger : 0)
+                      })
+  }) %>
+<% } %>
+
+<%# ---- Je Ziel die Karten dieser Seite ---- %>
 
 <% (ziele || []).forEach(z => { %>
   <%
     const kName = kanalName(z.channel_id, zielkanaele);
     const uebergabe = { z, kanalName, darfAendern };
+    const name = (z.anzeigename || z.login) + ' → ' + (kName ? '#' + kName : '⚠ Kanal gelöscht');
   %>
   <div id="ziel-<%= z.id %>" class="mb-4">
 
-    <%- include('shared/funktionskarte', {
-          titel:        (z.anzeigename || z.login) + ' → ' + (kName ? '#' + kName : '⚠ Kanal gelöscht'),
-          beschreibung: 'Aus heisst: Der Kanal wird weiter beobachtet, aber in diesem Discord passiert nichts — keine Ankündigung, keine Meldung, keine Rolle. Das Twitch-Abo bleibt bestehen.',
-          icon:         'fa-solid fa-satellite-dish',
-          id:           `ziel-schalter-${z.id}`,
-          aktion:       `${basis}/ziele/${z.id}/schalter`,
-          csrfToken:    marke,
-          darf:         darfAendern,
-          schalter:     { name: 'aktiv', an: !!z.aktiv },
-          speichern:    'Schalter übernehmen',
-          koerper:      include('teile/ziel-kopf', Object.assign({ basis, darfProben, marke }, uebergabe))
-    }) %>
+    <% if (seite === 'ankuendigung') { %>
 
-    <% if (darfProben) { %>
-      <%# Traegt nur die Adresse und die Marke; die Bedienelemente stehen in
-          der Karte darueber und haengen per form="…" hieran. Es steht NEBEN
-          der Karte, weil ein Formular im Formular ungueltiges HTML ist - der
-          Browser verwuerfe das innere, und der Probe-Knopf taete nichts. %>
-      <form id="probe-<%= z.id %>" method="POST" data-toast
-            action="<%= basis %>/ziele/<%= z.id %>/probe" hidden>
-        <input type="hidden" name="_csrf" value="<%= marke %>">
-      </form>
-    <% } %>
+      <%- include('shared/funktionskarte', {
+            titel:        name,
+            beschreibung: 'Aus heisst: Der Kanal wird weiter beobachtet, aber in diesem Discord passiert nichts — keine Ankündigung, keine Meldung, keine Rolle. Das Twitch-Abo bleibt bestehen.',
+            icon:         'fa-solid fa-satellite-dish',
+            id:           `ziel-schalter-${z.id}`,
+            aktion:       `${basis}/ziele/${z.id}/schalter`,
+            csrfToken:    marke,
+            darf:         darfAendern,
+            schalter:     { name: 'aktiv', an: !!z.aktiv },
+            speichern:    'Schalter übernehmen',
+            koerper:      include('teile/ziel-kopf', Object.assign({ basis, darfProben, marke }, uebergabe))
+      }) %>
 
-    <%- include('shared/funktionskarte', {
-          titel: 'Ankündigung', icon: 'fa-solid fa-bullhorn',
-          beschreibung: 'Wohin gemeldet wird, wenn der Stream startet.',
-          id: `ank-${z.id}`, aktion: `${basis}/ziele/${z.id}/ankuendigung`,
-          csrfToken: marke, darf: darfAendern,
-          koerper: include('teile/ziel-ankuendigung', uebergabe)
-    }) %>
+      <% if (darfProben) { %>
+        <%# Traegt nur die Adresse und die Marke; die Bedienelemente stehen in
+            der Karte darueber und haengen per form="…" hieran. Es steht NEBEN
+            der Karte, weil ein Formular im Formular ungueltiges HTML ist - der
+            Browser verwuerfe das innere, und der Probe-Knopf taete nichts. %>
+        <form id="probe-<%= z.id %>" method="POST" data-toast
+              action="<%= basis %>/ziele/<%= z.id %>/probe" hidden>
+          <input type="hidden" name="_csrf" value="<%= marke %>">
+        </form>
+      <% } %>
 
-    <%- include('shared/funktionskarte', {
-          titel: 'Meldungen', icon: 'fa-solid fa-bell',
-          beschreibung: 'Raid, Bits, Follower, Abonnenten — einzeln anhakbar.',
-          id: `mld-${z.id}`, aktion: `${basis}/ziele/${z.id}/meldungen`,
-          csrfToken: marke, darf: darfAendern,
-          koerper: include('teile/ziel-meldungen', uebergabe)
-    }) %>
+      <%- include('shared/funktionskarte', {
+            titel: 'Ankündigung', icon: 'fa-solid fa-bullhorn',
+            beschreibung: 'Wohin gemeldet wird, wenn der Stream startet.',
+            id: `ank-${z.id}`, aktion: `${basis}/ziele/${z.id}/ankuendigung`,
+            csrfToken: marke, darf: darfAendern,
+            koerper: include('teile/ziel-ankuendigung', uebergabe)
+      }) %>
 
-    <%- include('shared/funktionskarte', {
-          titel: 'Filter und Ruhezeit', icon: 'fa-solid fa-filter',
-          beschreibung: 'Wann trotz laufendem Stream NICHT angekündigt wird.',
-          id: `flt-${z.id}`, aktion: `${basis}/ziele/${z.id}/filter`,
-          csrfToken: marke, darf: darfAendern,
-          koerper: include('teile/ziel-filter', uebergabe)
-    }) %>
+      <%- include('shared/funktionskarte', {
+            titel: 'Filter und Ruhezeit', icon: 'fa-solid fa-filter',
+            beschreibung: 'Wann trotz laufendem Stream NICHT angekündigt wird.',
+            id: `flt-${z.id}`, aktion: `${basis}/ziele/${z.id}/filter`,
+            csrfToken: marke, darf: darfAendern,
+            koerper: include('teile/ziel-filter', uebergabe)
+      }) %>
 
-    <%- include('shared/funktionskarte', {
-          titel: 'Aufräumen', icon: 'fa-solid fa-broom',
-          beschreibung: 'Was mit der Ankündigung geschieht, wenn der Stream endet.',
-          id: `auf-${z.id}`, aktion: `${basis}/ziele/${z.id}/aufraeumen`,
-          csrfToken: marke, darf: darfAendern,
-          koerper: include('teile/ziel-aufraeumen', uebergabe)
-    }) %>
+      <%- include('shared/funktionskarte', {
+            titel: 'Aufräumen', icon: 'fa-solid fa-broom',
+            beschreibung: 'Was mit der Ankündigung geschieht, wenn der Stream endet.',
+            id: `auf-${z.id}`, aktion: `${basis}/ziele/${z.id}/aufraeumen`,
+            csrfToken: marke, darf: darfAendern,
+            koerper: include('teile/ziel-aufraeumen', uebergabe)
+      }) %>
 
-    <%- include('shared/funktionskarte', {
-          titel: 'Rollen und Kanäle', icon: 'fa-solid fa-user-tag',
-          beschreibung: 'Was ein laufender Stream am Discord verändert.',
-          id: `rol-${z.id}`, aktion: `${basis}/ziele/${z.id}/rollen`,
-          csrfToken: marke, darf: darfAendern,
-          koerper: include('teile/ziel-rollen', uebergabe)
-    }) %>
-
-    <% if (darfAendern) { %>
-      <%#
-        Getrennte Zone fuer das Zerstoerende: eigene Karte, rechtsbuendig, weit
-        weg von allem, was man im Alltag drueckt. Sie steht am Ende des Ziels
-        und nicht in einer der Funktionskarten - dort waere sie neben einem
-        Speichern-Knopf gelandet.
-      %>
-      <div class="card">
-        <div class="card-footer text-end">
-          <form method="POST" action="<%= basis %>/ziele/<%= z.id %>/entfernen"
-                onsubmit="return confirm('Dieses Ziel wirklich entfernen?\n\nIst es das letzte Ziel für diesen Kanal, werden auch die Twitch-Abos abbestellt — der Kanal wird dann gar nicht mehr beobachtet.');">
-            <input type="hidden" name="_csrf" value="<%= marke %>">
-            <button type="submit" class="btn btn-sm btn-ghost-danger">Dieses Ziel entfernen</button>
-          </form>
+      <% if (darfAendern) { %>
+        <%#
+          Getrennte Zone fuer das Zerstoerende: eigene Karte, rechtsbuendig, weit
+          weg von allem, was man im Alltag drueckt. Sie steht nur auf DIESER
+          Seite - ein Entfernen-Knopf auf allen dreien waere dreimal die
+          Gelegenheit zum Unfall, ohne dass es dreimal etwas kann.
+        %>
+        <div class="card">
+          <div class="card-footer text-end">
+            <form method="POST" action="<%= basis %>/ziele/<%= z.id %>/entfernen"
+                  onsubmit="return confirm('Dieses Ziel wirklich entfernen?\n\nIst es das letzte Ziel für diesen Kanal, werden auch die Twitch-Abos abbestellt — der Kanal wird dann gar nicht mehr beobachtet.');">
+              <input type="hidden" name="_csrf" value="<%= marke %>">
+              <button type="submit" class="btn btn-sm btn-ghost-danger">Dieses Ziel entfernen</button>
+            </form>
+          </div>
         </div>
-      </div>
+      <% } %>
+
+    <% } else if (seite === 'meldungen') { %>
+
+      <%- include('shared/funktionskarte', {
+            titel: name, icon: 'fa-solid fa-bell',
+            beschreibung: z.aktiv ? null : 'Dieses Ziel ist abgeschaltet — hier gemachte Angaben wirken erst, wenn es wieder an ist.',
+            id: `mld-${z.id}`, aktion: `${basis}/ziele/${z.id}/meldungen`,
+            csrfToken: marke, darf: darfAendern,
+            koerper: include('teile/ziel-meldungen', uebergabe)
+      }) %>
+
+    <% } else if (seite === 'rollen') { %>
+
+      <%- include('shared/funktionskarte', {
+            titel: name, icon: 'fa-solid fa-user-tag',
+            beschreibung: z.aktiv ? null : 'Dieses Ziel ist abgeschaltet — hier gemachte Angaben wirken erst, wenn es wieder an ist.',
+            id: `rol-${z.id}`, aktion: `${basis}/ziele/${z.id}/rollen`,
+            csrfToken: marke, darf: darfAendern,
+            koerper: include('teile/ziel-rollen', uebergabe)
+      }) %>
+
     <% } %>
   </div>
 <% }); %>

@@ -1,0 +1,30 @@
+<%
+/**
+ * Die Zeitzone dieser Guild.
+ *
+ * Sie regelt die Ruhezeiten und sonst nichts - deshalb steht sie auf der
+ * Ankuendigungsseite und nicht bei den Rollen.
+ */
+%>
+<div class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label" for="zeitzone">Zeitzone für Ruhezeiten</label>
+    <select class="form-select" id="zeitzone" name="zeitzone" <%= darfEinstellen ? '' : 'disabled' %>>
+      <% (zonen || []).forEach(zo => { %>
+        <option value="<%= zo %>" <%= zo === zeitzone ? 'selected' : '' %>><%= zo %></option>
+      <% }); %>
+    </select>
+    <div class="form-hint">
+      Gilt für die Ruhezeiten in jedem Ziel. Ohne diese Angabe wäre es die
+      Zeitzone des Servers — und die kennt niemand, der „23:00 bis 08:00“
+      in ein Feld tippt.
+    </div>
+  </div>
+
+  <div class="col-md-6 pt-md-4">
+    <div class="text-secondary small">
+      Es ist dort gerade
+      <strong><%= new Date().toLocaleTimeString('de-DE', { timeZone: zeitzone, hour: '2-digit', minute: '2-digit' }) %> Uhr</strong>.
+    </div>
+  </div>
+</div>

@@ -408,10 +408,29 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                 guildId,
                 parent: null
             },
-            eintrag('NAV.STREAMERS', `${basis}/streamer`, 'fa-solid fa-video', 10),
-            eintrag('NAV.TARGETS',   `${basis}/ziele`,    'fa-solid fa-bullseye', 20),
-            eintrag('NAV.TEMPLATES', `${basis}/vorlagen`, 'fa-solid fa-comment-dots', 30),
-            eintrag('NAV.STATE',     `${basis}/zustand`,  'fa-solid fa-heart-pulse', 40),
+            // **Nach Aufgabe benannt, nicht nach Tabelle** (2026-08-29).
+            //
+            // Vorher hiessen die Punkte "Streamer / Ziele / Vorlagen" - das
+            // sind unsere Tabellennamen. Wer eine Follower-Meldung einschalten
+            // wollte, musste wissen, dass sie in "Ziele" steckt.
+            //
+            // `/ziele` ist damit keine Seite mehr, sondern eine Weiterleitung
+            // auf `/ankuendigung`: Die Adresse steht in Lesezeichen und in
+            // jeder Rueckmeldung, die vor heute verschickt wurde.
+            //
+            // **"Vorlagen" bleibt vorerst ein eigener Punkt.** Der Entwurf sah
+            // vor, ihn in die Ankuendigung zu falten - dort haengt der Text ja
+            // hin. Nur liegt auf der Seite auch die Vorlage der GANZEN Guild,
+            // und die waere danach nur noch ueber einen Ziel-Verweis
+            // erreichbar. Etwas unauffindbar zu machen ist keine Ordnung.
+            // Er rueckt deshalb neben die Ankuendigung, bis das Falten
+            // wirklich gebaut ist.
+            eintrag('NAV.CHANNELS', `${basis}/streamer`,     'fa-solid fa-video', 10),
+            eintrag('NAV.ANNOUNCE', `${basis}/ankuendigung`, 'fa-solid fa-bullhorn', 20),
+            eintrag('NAV.TEMPLATES', `${basis}/vorlagen`,    'fa-solid fa-comment-dots', 25),
+            eintrag('NAV.ALERTS',   `${basis}/meldungen`,    'fa-solid fa-bell', 30),
+            eintrag('NAV.ROLES',    `${basis}/rollen`,       'fa-solid fa-user-tag', 40),
+            eintrag('NAV.STATE',    `${basis}/zustand`,      'fa-solid fa-heart-pulse', 50),
 
             // Einstiegspunkt unter den Kern-Einstellungen
             {
@@ -441,7 +460,7 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         // trotzdem eine falsche Einladung.
         if (String(guildId) === String(process.env.CONTROL_GUILD_ID || '')) {
             navItems.push(
-                eintrag('NAV.OPERATIONS', `${basis}/betrieb`, 'fa-solid fa-sliders', 50, {
+                eintrag('NAV.OPERATIONS', `${basis}/betrieb`, 'fa-solid fa-sliders', 60, {
                     capability: null,
                     requiresOwner: true
                 })
