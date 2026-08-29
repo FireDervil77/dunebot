@@ -8,9 +8,11 @@
  * @context {string}  guildId
  * @context {Array}   anbieter   - { name, label, symbol, farbe, hinweis, verbunden, kontoName, seit }
  * @context {Array}   rueckrufe  - nur fuer Betreiber: { label, url }
- * @context {Object?} anbieter[].einstellungen - { titel, hinweis, zeilen[] }
+ * @context {Object?} anbieter[].einstellungen - { titel, hinweis, zeilen[], wahl }
+ * @context {Object?} …wahl - { name, label, hinweis, leerText, optionen[], grund }
  * @context {string?} meldung
  * @context {string?} fehler
+ * @context {string?} grund - Klartext einer abgelehnten Auswahl
 %>
 <%
 const TEXTE = {
@@ -23,9 +25,26 @@ const TEXTE = {
   anbieter:  ['warning', 'Die Plattform hat nicht wie erwartet geantwortet. Der Grund steht im Protokoll.'],
   unbekannt: ['warning', 'Diese Plattform kennen wir nicht (mehr).'],
   basis:     ['danger',  'Die Basisadresse des Dashboards ist nicht eingestellt (DASHBOARD_BASE_URL). Ohne sie kann keine Rückrufadresse gebildet werden.'],
-  technisch: ['danger',  'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.']
+  technisch: ['danger',  'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'],
+
+  // Stufe 14 — die benannte Auswahl
+  gewaehlt:      ['success', 'Übernommen.'],
+  abgemeldet:    ['warning', 'Deine Sitzung ist abgelaufen. Bitte neu anmelden.'],
+  nicht_verbunden: ['warning', 'Für diese Plattform ist kein Konto verknüpft.'],
+  // **`abgelehnt` traegt keinen eigenen Satz.** Der Grund kommt vom Plugin und
+  // ist genauer als alles, was hier stehen koennte: "Nur der Inhaber dieses
+  // Kanals kann das setzen" sagt jemandem, was los ist. Ein Platzhalter davor
+  // waere eine zweite, schlechtere Auskunft.
+  abgelehnt:     ['warning', null]
 };
-const hinweis = TEXTE[fehler] || TEXTE[meldung] || null;
+let hinweis = TEXTE[fehler] || TEXTE[meldung] || null;
+
+// Der Klartext des Plugins gewinnt gegen den Platzhalter.
+if (fehler === 'abgelehnt') {
+  hinweis = ['warning', (typeof grund !== 'undefined' && grund)
+    ? grund
+    : 'Diese Auswahl wurde abgelehnt. Der Grund steht im Protokoll.'];
+}
 %>
 
 <% if (hinweis) { %>
@@ -151,6 +170,54 @@ const hinweis = TEXTE[fehler] || TEXTE[meldung] || null;
                   <% }); %>
                   <% if (a.einstellungen.hinweis) { %>
                     <div class="text-secondary small mt-2"><%= a.einstellungen.hinweis %></div>
+                  <% } %>
+                </div>
+              <% } %>
+
+              <%# **Die eine benannte Auswahl** (Stufe 14).
+                  Sie steht getrennt von den Zeilen darueber, weil sie etwas
+                  anderes ist: Die Zeilen sind Auskunft, das hier ist eine
+                  Entscheidung.
+
+                  Der Kern kennt die Plattform nicht. Er rendert eine
+                  Beschriftung und eine Liste; was die Werte bedeuten, weiss
+                  nur das Plugin.
+
+                  **Ohne Optionen erscheint kein Auswahlfeld.** Ein leeres
+                  Menue mit Speichern-Knopf waere die Attrappe, gegen die
+                  diese Seite gebaut ist — steht ein `grund` dabei, wird
+                  stattdessen gesagt, was nicht ging. %>
+              <% if (a.einstellungen && a.einstellungen.wahl) { %>
+                <% const w = a.einstellungen.wahl; %>
+                <div class="mt-3 pt-3 border-top">
+                  <% if (w.grund) { %>
+                    <div class="text-secondary small">
+                      <span class="fw-medium"><%= w.label %></span> —
+                      konnte gerade nicht geladen werden. <%= w.grund %>
+                    </div>
+                  <% } else if (w.optionen && w.optionen.length) { %>
+                    <form method="POST"
+                          action="/guild/<%= guildId %>/profile/verbindungen/<%= a.name %>/wahl">
+                      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                      <label class="form-label" for="wahl-<%= a.name %>"><%= w.label %></label>
+                      <div class="input-group">
+                        <select class="form-select" id="wahl-<%= a.name %>" name="wert">
+                          <option value=""><%= w.leerText %></option>
+                          <% w.optionen.forEach(function (o) { %>
+                            <option value="<%= o.wert %>" <%= o.aktiv ? 'selected' : '' %>><%= o.text %></option>
+                          <% }); %>
+                        </select>
+                        <button type="submit" class="btn btn-primary">Übernehmen</button>
+                      </div>
+                      <% if (w.hinweis) { %>
+                        <div class="form-hint"><%= w.hinweis %></div>
+                      <% } %>
+                    </form>
+                  <% } else { %>
+                    <div class="text-secondary small">
+                      <span class="fw-medium"><%= w.label %></span> —
+                      hier steht gerade nichts zur Auswahl.
+                    </div>
                   <% } %>
                 </div>
               <% } %>

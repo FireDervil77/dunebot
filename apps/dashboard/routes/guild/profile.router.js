@@ -215,6 +215,13 @@ async function konten(userId) {
                     zeilen: await VerbindungsRegistry.einstellungenLesen(
                         a.name,
                         { userId, kontoId: da.konto_id, kontoName: da.konto_name },
+                        ServiceManager.get('Logger')),
+                    // **Die eine benannte Auswahl** (Stufe 14). Wie die Zeilen
+                    // faellt sie nie durch; was klemmt, kommt als `grund`
+                    // zurueck und erscheint als Satz statt als Auswahlfeld.
+                    wahl: await VerbindungsRegistry.einstellungenWahlLesen(
+                        a.name,
+                        { userId, kontoId: da.konto_id, kontoName: da.konto_name },
                         ServiceManager.get('Logger'))
                 }
                 : null
@@ -239,8 +246,67 @@ router.get('/verbindungen', async (req, res) => {
             ? VerbindungsRegistry.list().map(a => ({ label: a.label, url: rueckrufUrl(a.name) }))
             : [],
         meldung: req.query.ok || null,
-        fehler: req.query.fehler || null
+        fehler: req.query.fehler || null,
+        grund: req.query.grund || null
     });
+});
+
+/**
+ * Die benannte Auswahl eines Anbieters setzen (Stufe 14).
+ *
+ * **Hier steht keine Rechtepruefung, und das ist Absicht.** Die Tuer dieser
+ * Seite ist der Nachweis: `CheckAuth` sagt, wer angemeldet ist, und das Plugin
+ * prueft, ob dieser Mensch ueber genau dieses Konto verfuegen darf. Ein
+ * Guild-Recht hier waere sogar falsch - dann entschiede die Serverleitung
+ * darueber, ob jemand seinen eigenen Kanal einstellen darf (F-18).
+ *
+ * **Der Anbieter kommt aus der Adresse, das Konto aus der Datenbank.** Nicht
+ * aus dem Formular: Sonst schriebe der Absender selbst hinein, fuer welches
+ * Konto er zu sprechen glaubt.
+ */
+router.post('/verbindungen/:anbieter/wahl', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const userId = req.session?.user?.info?.id || null;
+    const zurueck = `/guild/${guildId}/profile/verbindungen`;
+
+    const anbieterName = String(req.params.anbieter || '');
+    if (!VerbindungsRegistry.NAME_MUSTER.test(anbieterName)) {
+        return res.redirect(`${zurueck}?fehler=unbekannt`);
+    }
+
+    try {
+        if (!userId) return res.redirect(`${zurueck}?fehler=abgemeldet`);
+
+        // **Das Konto kommt aus `user_connections`, nicht aus `konten()`.**
+        // Nachgesehen am 2026-08-29: Die Ansichtsform von `konten()` traegt
+        // `kontoName`, aber **kein** `kontoId` - sie ist fuer die Darstellung
+        // gebaut. Ein `eigene.kontoId` waere still `undefined` gewesen, und das
+        // Plugin haette geantwortet "Diesen Kanal gibt es hier nicht": eine
+        // falsche Auskunft, die wie eine richtige aussieht.
+        const verbindung = (await ServiceManager.get('dbService').query(
+            'SELECT konto_id, konto_name FROM user_connections WHERE user_id = ? AND plattform = ? LIMIT 1',
+            [userId, anbieterName]))[0];
+        if (!verbindung) return res.redirect(`${zurueck}?fehler=nicht_verbunden`);
+
+        const ergebnis = await VerbindungsRegistry.einstellungenWahlSetzen(
+            anbieterName,
+            { userId, kontoId: verbindung.konto_id, kontoName: verbindung.konto_name },
+            req.body?.wert);
+
+        if (!ergebnis.ok) {
+            Logger.warn(`[Profil] Auswahl bei "${anbieterName}" abgelehnt: ${ergebnis.grund}`);
+            // **Der Grund wird durchgereicht, nicht verschluckt.** "Nur der
+            // Inhaber dieses Kanals kann das setzen" ist eine Auskunft, mit
+            // der jemand etwas anfangen kann; "hat nicht geklappt" nicht.
+            return res.redirect(`${zurueck}?fehler=abgelehnt&grund=${encodeURIComponent(ergebnis.grund || '')}`);
+        }
+
+        return res.redirect(`${zurueck}?ok=gewaehlt`);
+    } catch (error) {
+        Logger.error(`[Profil] Auswahl bei "${anbieterName}" fehlgeschlagen:`, error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
 });
 
 module.exports = router;

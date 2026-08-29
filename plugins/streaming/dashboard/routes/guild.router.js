@@ -741,6 +741,43 @@ router.post('/ziele/:id/probe', requirePermission('STREAMING.TEST'), async (req,
 // =====================================================
 // Vorlagen
 // =====================================================
+/**
+ * Der Chatbot-Bereich - nur in der Heim-Guild (Stufe 14).
+ *
+ * **Die Route prueft das Heim selbst.** Der Menuepunkt erscheint zwar nur hier,
+ * aber ein Menuepunkt ist keine Sperre: Die Adresse laesst sich tippen, und in
+ * einer Guild, die nicht Heim ist, stuenden dahinter fremde Kanaele.
+ *
+ * `STREAMING.CHAT.MANAGE` sagt dann, WER hier drankommt. Zwei Fragen, zwei
+ * Pruefungen - die eine ersetzt die andere nicht.
+ */
+router.get('/chatbot', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    const heimguild = require('../kern/heimguild');
+
+    try {
+        const kanaele = await heimguild.kanaeleDerGuild(guildId);
+
+        // **Der Anschlusszustand je Kanal**, aus derselben Quelle wie "Mein
+        // Kanal": Steht unser Bot dort als Moderator? Die Antwort ist
+        // dreiwertig - wer nicht fragen konnte, meldet 'unbekannt', nie 'nein'.
+        const meinkanal = require('../kern/meinkanal');
+        for (const k of kanaele) {
+            const zeilen = await meinkanal.modZeile({ kontoId: k.kanal_id });
+            k.anschluss = zeilen[0] || null;
+        }
+
+        await renderView(res, 'guild/streaming-chatbot', {
+            tr, guildId, kanaele,
+            meldung: req.query.ok || null,
+            fehler: req.query.fehler || null
+        });
+    } catch (error) {
+        return renderFehler(res, error, 'Der Chatbot-Bereich konnte nicht geladen werden');
+    }
+});
+
 router.get('/vorlagen', requirePermission('STREAMING.VIEW'), async (req, res) => {
     const guildId = res.locals.guildId;
     const tr = makeTranslator(req, res);

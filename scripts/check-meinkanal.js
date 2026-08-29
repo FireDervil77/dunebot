@@ -165,10 +165,53 @@ pruefe(/mitBetreiberZugang/.test(meinkanalQuelle) && !/mitZugang\(/.test(meinkan
     'der Streamer erteilt fuer diese Anzeige nichts');
 
 // **Die wichtigste Regel dieser Datei.** Jeder Abbruch endet bei `unbekannt`.
+//
+// Sie stand bis zum 2026-08-29 als "es gibt genau EINE Stelle mit `nein`". Das
+// war richtig, solange die Datei eine Zeile hatte - aber eine Zahl sagt nicht,
+// WARUM. Mit der Heim-Guild kam eine zweite Stelle dazu, und die Zahl von 1 auf
+// 2 zu setzen waere die schwache Reparatur gewesen: Beim naechsten Mal steht
+// dort 3, und niemand weiss mehr, welche der drei je geprueft wurde.
+//
+// Jetzt traegt jede erlaubte Stelle ihren Grund. `nein` ist zulaessig, wo die
+// Antwort **gelesen** wurde und leer war - nie, wo eine Abfrage klemmte.
+const ERLAUBTES_NEIN = [
+    ['Bot in meinem Chat',
+     'Die Liste der moderierten Kanaele kam an und der Kanal stand nicht darin.'],
+    ['Chatbot verwaltet in',
+     '`heim_guild_id` wurde gelesen und war NULL - noch niemand hat gewaehlt.']
+];
+
 const neinStellen = (meinkanalQuelle.match(/zustand: 'nein'/g) || []).length;
-pruefe(neinStellen === 1,
-    'es gibt genau EINE Stelle, die `nein` sagt',
-    `gefunden: ${neinStellen} - jede weitere waere ein Abbruchgrund, der sich als Tatsache ausgibt`);
+pruefe(neinStellen === ERLAUBTES_NEIN.length,
+    `jede \`nein\`-Stelle steht mit Grund in der Liste (${neinStellen} im Code, ${ERLAUBTES_NEIN.length} eingetragen)`,
+    'jede weitere waere ein Abbruchgrund, der sich als Tatsache ausgibt — eintragen oder auf `unbekannt` aendern');
+
+for (const [label, grund] of ERLAUBTES_NEIN) {
+    pruefe(meinkanalQuelle.includes(label), `„${label}" gibt es noch`, grund);
+}
+
+// **Und die Regel, die wirklich zaehlt:** In keinem `catch` steht `nein`. Wer
+// nicht fragen konnte, weiss es nicht - ein Streamer, dem die Seite
+// faelschlich "der Bot ist nicht in deinem Chat" sagt, tippt `/mod` ein
+// zweites Mal und sucht den Fehler bei sich.
+const catchBloecke = [];
+let suche = 0;
+for (;;) {
+    const i = meinkanalQuelle.indexOf('catch', suche);
+    if (i === -1) break;
+    const auf = meinkanalQuelle.indexOf('{', i);
+    if (auf === -1) break;
+    let tiefe = 0, j = auf;
+    for (; j < meinkanalQuelle.length; j++) {
+        if (meinkanalQuelle[j] === '{') tiefe++;
+        else if (meinkanalQuelle[j] === '}') { tiefe--; if (!tiefe) break; }
+    }
+    catchBloecke.push(meinkanalQuelle.slice(auf, j));
+    suche = j;
+}
+pruefe(!catchBloecke.some(b => /zustand: 'nein'/.test(b)),
+    `kein \`catch\` sagt \`nein\` (${catchBloecke.length} Bloecke geprueft)`,
+    'ein Abbruch, der sich als Tatsache ausgibt, ist die halbe Auskunft, die schlimmer ist als keine');
 pruefe(/function unbekannt/.test(meinkanalQuelle),
     'und alle Abbruchgruende laufen ueber eine gemeinsame `unbekannt`-Zeile');
 
@@ -235,15 +278,45 @@ pruefe(auf === zu, `die Ansicht ist ausgeglichen (${auf} auf, ${zu} zu)`,
     'ein </div> zu viel verschluckt die Karten dahinter');
 
 // ---------------------------------------------------------------------
-console.log('\n7. Nichts wird versprochen, was 13a nicht kann');
+console.log('\n7. Nichts wird versprochen, was es nicht gibt');
 // ---------------------------------------------------------------------
-pruefe(!/schreiben/.test(meinkanalQuelle),
-    'es gibt kein schreiben() - 13a hoert zu, der Bot sagt noch nichts',
-    'ein Schalter fuer eine Faehigkeit, die es nicht gibt, ist das Muster aus Baustelle 73');
+//
+// **Diese Regel hat sich am 2026-08-29 geaendert, und das gehoert dazugesagt.**
+//
+// Bis dahin hiess sie: "es gibt kein `schreiben()` - 13a hoert zu, der Bot
+// sagt noch nichts." Sie war richtig zu ihrem Datum. Mit Stufe 14 kam ein
+// Schreibweg dazu - aber ein enger: genau EINE benannte Auswahl (`wahl`), und
+// sie kam mit ihrer Faehigkeit, nicht davor. Wer sie setzt, schaltet in der
+// gewaehlten Guild sichtbar einen Menuepunkt frei.
+//
+// Die alte Regel unveraendert stehenzulassen waere schlimmer als sie zu
+// aendern: Sie waere gruen geblieben (nach `schreiben` sucht sie, und das gibt
+// es weiter nicht) und haette behauptet, es gaebe keinen Schreibweg.
 const registryQuelle = lies('packages/dunebot-sdk/lib/VerbindungsRegistry.js');
-pruefe(!/schreiben:/.test(registryQuelle),
-    'und der Vertrag haelt auch keinen Platz dafuer frei',
-    'vorbereiteter toter Platz ist genau das, was `pendingUpdatesCount` geworden ist');
+
+pruefe(!/\bschreiben\b/.test(meinkanalQuelle) && !/schreiben:/.test(registryQuelle),
+    'es gibt kein freies schreiben()',
+    'ein Plugin duerfte dem Profil sonst beliebige Formulare unterschieben - der Kern kennt die Plattform nicht');
+
+pruefe(/wahl:/.test(meinkanalQuelle.slice(meinkanalQuelle.indexOf('module.exports')) )
+       || /^const wahl = \{/m.test(meinkanalQuelle),
+    'die eine benannte Auswahl steht da',
+    'sie ist der Schreibweg von Stufe 14');
+
+// **Die Auswahl ist vollstaendig oder gar nicht.** Halb angeboten waere sie
+// die Attrappe, gegen die dieser Vertrag geschrieben ist: ein Auswahlfeld,
+// das nichts speichert, oder ein Speichern ohne Auswahl.
+const mk = require(path.join(WURZEL, 'plugins/streaming/dashboard/kern/meinkanal.js'));
+for (const feld of ['name', 'label', 'moeglich', 'setzen']) {
+    pruefe(mk.wahl && mk.wahl[feld] !== undefined, `die Auswahl hat \`${feld}\``,
+        'der Vertrag lehnt eine halbe Wahl ab - hier faellt es frueher auf');
+}
+
+// Und sie prueft selbst, statt sich auf den Kern zu verlassen.
+const heimguildQuelle = lies('plugins/streaming/dashboard/kern/heimguild.js');
+pruefe(/kanalInhaber/.test(heimguildQuelle),
+    'das Setzen prueft den Inhaber ueber `user_connections`',
+    'der Kern reicht nur durch, wer angemeldet ist - ob dieser Mensch DIESEN Kanal besitzt, weiss allein das Plugin');
 
 console.log(abweichungen === 0
     ? `\nErgebnis: ${faelle} Pruefungen, 0 Abweichungen.\n`

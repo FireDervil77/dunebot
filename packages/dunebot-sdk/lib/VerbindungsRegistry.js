@@ -107,10 +107,35 @@
  * deinem Chat" sagt, weil gerade eine Schnittstelle klemmte, sucht den Fehler
  * bei sich und tippt `/mod` ein zweites Mal.
  *
- * **Es gibt bewusst kein `schreiben()`.** Stufe 13a schliesst an und hoert zu;
- * der Bot sagt noch nichts. Ein Schalter fuer eine Faehigkeit, die es nicht
- * gibt, waere genau das leere Versprechen, gegen das diese Registry gebaut
- * wurde. Er kommt mit der Faehigkeit, nicht davor.
+ * **Es gibt bewusst kein freies `schreiben()`.** Stufe 13a schloss an und
+ * hoerte zu; der Bot sagte noch nichts. Ein Schalter fuer eine Faehigkeit, die
+ * es nicht gibt, waere genau das leere Versprechen, gegen das diese Registry
+ * gebaut wurde. Er kommt mit der Faehigkeit, nicht davor.
+ *
+ * **Seit Stufe 14 gibt es `wahl` - genau eine benannte Auswahl.** Sie kam mit
+ * ihrer Faehigkeit: Der Kanalinhaber bestimmt, in welcher Guild sein Chatbot
+ * verwaltet wird, und diese Wahl schaltet dort sichtbar einen Menuepunkt frei.
+ *
+ * Warum eine benannte Auswahl und kein freies Schreiben: Ein `schreiben()`
+ * muesste beliebige Formulare eines Plugins im Profil darstellen - der Kern
+ * kennt die Plattform aber nicht und soll sie nicht kennenlernen. Eine
+ * Auswahlliste mit Beschriftung kann er darstellen, ohne etwas zu verstehen.
+ *
+ * ```js
+ * wahl: {
+ *     name: 'heim_guild',
+ *     label: 'Chatbot verwalten in',
+ *     hinweis: 'Nur dort erscheint der Chatbot-Bereich.',
+ *     leerText: 'nirgends - Chatbot aus',
+ *     async moeglich({ userId, kontoId }) { return [{ wert, text, aktiv }]; },
+ *     async setzen({ userId, kontoId }, wert) { return { ok: true }; }
+ * }
+ * ```
+ *
+ * **`setzen` prueft selbst.** Der Kern reicht nur durch, wer angemeldet ist -
+ * ob dieser Mensch das darf, weiss allein das Plugin (bei Twitch: ob sein
+ * Nachweis auf genau diesen Kanal zeigt). Eine Pruefung im Kern waere eine
+ * zweite, die irgendwann von der ersten abweicht.
  *
  * **Alle drei oder keine.** Ein Anbieter mit `zusagen`, aber ohne `pruefen`,
  * wuerde Schluessel sammeln, die niemand nachhaelt - und bei Twitch waere das
@@ -252,7 +277,49 @@ function pruefeEinstellungen(name, beschreibung) {
     return {
         titel: roh.titel,
         hinweis: roh.hinweis || null,
-        lesen: roh.lesen
+        lesen: roh.lesen,
+        wahl: pruefeWahl(name, roh.wahl)
+    };
+}
+
+/**
+ * Die eine benannte Auswahl eines Abschnitts pruefen (Stufe 14).
+ *
+ * **Halb angebotene Auswahl gibt es nicht.** Wer `moeglich` mitbringt, aber
+ * kein `setzen`, baut ein Auswahlfeld, das nichts speichert - und wer `setzen`
+ * ohne `moeglich` anbietet, ein Formular ohne Inhalt. Beides ist genau die
+ * Attrappe, gegen die dieser Vertrag geschrieben ist, und beides faellt ohne
+ * Pruefung erst dem Nutzer auf.
+ *
+ * @param {string} name Anbieter
+ * @param {Object} [roh] Rohe Angaben
+ * @returns {Object|null} gepruefte Auswahl oder null
+ */
+function pruefeWahl(name, roh) {
+    if (roh === undefined || roh === null) return null;
+
+    if (typeof roh !== 'object' || Array.isArray(roh)) {
+        throw new Error(`VerbindungsRegistry: wahl von "${name}" ist kein Objekt`);
+    }
+    for (const feld of ['moeglich', 'setzen']) {
+        if (typeof roh[feld] !== 'function') {
+            throw new Error(`VerbindungsRegistry: wahl von "${name}" hat kein ${feld}()`);
+        }
+    }
+    if (!roh.name || typeof roh.name !== 'string') {
+        throw new Error(`VerbindungsRegistry: wahl von "${name}" hat keinen name`);
+    }
+    if (!roh.label || typeof roh.label !== 'string') {
+        throw new Error(`VerbindungsRegistry: wahl von "${name}" hat kein label`);
+    }
+
+    return {
+        name: roh.name,
+        label: roh.label,
+        hinweis: roh.hinweis || null,
+        leerText: roh.leerText || '— keine —',
+        moeglich: roh.moeglich,
+        setzen: roh.setzen
     };
 }
 
@@ -356,4 +423,89 @@ function scopesVon(name, zusage) {
     return z ? [...z.scopes] : null;
 }
 
-module.exports = { register, unregister, get, list, scopesVon, einstellungenLesen, NAME_MUSTER };
+/**
+ * Die Auswahl eines Anbieters fuer einen Benutzer holen (Stufe 14).
+ *
+ * **Faellt nie durch**, aus demselben Grund wie `einstellungenLesen`: Sie wird
+ * beim Aufbau des Profils gerufen, und das Profil erfuellt seinen Zweck auch
+ * ohne sie. Was klemmt, kommt als leere Liste mit `grund` zurueck - dann
+ * erscheint statt eines Auswahlfeldes ein Satz, der sagt, was nicht ging.
+ *
+ * **Kein Rueckfall auf "keine Auswahl vorhanden".** Eine leere Liste ohne
+ * Grund saehe aus wie "du kannst nirgends waehlen" - dieselbe halbe Auskunft,
+ * gegen die `zustand: 'unbekannt'` gebaut wurde.
+ *
+ * @param {string} name Anbieter
+ * @param {Object} ctx `{ userId, kontoId, kontoName }`
+ * @param {Object} [logger] Etwas mit `.warn`
+ * @returns {Promise<Object|null>} `{ name, label, hinweis, leerText, optionen, grund }` oder null
+ */
+async function einstellungenWahlLesen(name, ctx, logger = null) {
+    const a = anbieter.get(name);
+    const w = a && a.einstellungen && a.einstellungen.wahl;
+    if (!w) return null;
+
+    const huelle = {
+        name: w.name, label: w.label, hinweis: w.hinweis,
+        leerText: w.leerText, optionen: [], grund: null
+    };
+
+    let roh;
+    try {
+        roh = await w.moeglich(ctx);
+    } catch (error) {
+        if (logger && typeof logger.warn === 'function') {
+            logger.warn(`[VerbindungsRegistry] wahl.moeglich von "${name}" gescheitert:`, error.message);
+        }
+        huelle.grund = error.message || 'Die Auswahl konnte gerade nicht geladen werden.';
+        return huelle;
+    }
+
+    huelle.optionen = (Array.isArray(roh) ? roh : []).filter(Boolean).map(o => ({
+        wert: String(o.wert ?? ''),
+        text: String(o.text ?? o.wert ?? ''),
+        aktiv: !!o.aktiv
+    })).filter(o => o.text);
+
+    return huelle;
+}
+
+/**
+ * Die Auswahl setzen (Stufe 14).
+ *
+ * **Diese Funktion faellt sehr wohl durch** - anders als das Lesen. Ein
+ * Speichern, das im Stillen nichts tut, ist die schlimmste Sorte Attrappe:
+ * Der Nutzer sieht "gespeichert" und glaubt, es gelte.
+ *
+ * **Der Kern prueft nicht, ob der Benutzer darf.** Er reicht `ctx` durch; ob
+ * dieser Mensch diese Wahl treffen darf, weiss allein das Plugin - bei Twitch
+ * etwa, ob sein Nachweis auf genau diesen Kanal zeigt. Eine zweite Pruefung
+ * hier wuerde irgendwann von der ersten abweichen, und dann glaubt man der
+ * falschen.
+ *
+ * @param {string} name Anbieter
+ * @param {Object} ctx `{ userId, kontoId, kontoName }`
+ * @param {string} wert Der gewaehlte Wert, leer zum Abschalten
+ * @returns {Promise<{ok: boolean, grund?: string}>} Ergebnis
+ */
+async function einstellungenWahlSetzen(name, ctx, wert) {
+    const a = anbieter.get(name);
+    const w = a && a.einstellungen && a.einstellungen.wahl;
+    if (!w) return { ok: false, grund: `"${name}" bietet keine Auswahl an.` };
+
+    const ergebnis = await w.setzen(ctx, String(wert ?? ''));
+
+    // Ein Plugin, das gar nichts zurueckgibt, hat nicht "erfolgreich"
+    // gearbeitet - es hat sich nicht geaeussert. Das ist ein Fehler im
+    // Plugin und soll auch so aussehen.
+    if (!ergebnis || typeof ergebnis !== 'object') {
+        return { ok: false, grund: `"${name}" hat auf das Setzen nicht geantwortet.` };
+    }
+    return { ok: !!ergebnis.ok, grund: ergebnis.grund || null };
+}
+
+module.exports = {
+    register, unregister, get, list, scopesVon,
+    einstellungenLesen, einstellungenWahlLesen, einstellungenWahlSetzen,
+    NAME_MUSTER
+};

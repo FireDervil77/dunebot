@@ -194,7 +194,14 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                     titel: 'Mein Kanal',
                     hinweis: 'Gilt fuer deinen Twitch-Kanal - unabhaengig davon, '
                            + 'auf welchem Discord-Server du gerade bist.',
-                    lesen: meinkanal.modZeile
+                    lesen: meinkanal.zeilen,
+
+                    // **Die Heim-Guild** (Stufe 14). Sie steht hier und nicht
+                    // im Guild-Menue, weil sie dem Kanalinhaber gehoert:
+                    // Laege sie hinter einem Guild-Recht, koennte sich jede
+                    // Serverleitung selbst zum Heim eines fremden Kanals
+                    // erklaeren - und im Chat dieses Kanals reden.
+                    wahl: meinkanal.wahl
                 }
             });
             Logger.info('[Streaming] Kontoverknuepfung angemeldet: twitch');
@@ -378,6 +385,24 @@ class StreamingDashboardPlugin extends DashboardPlugin {
      * @param {string} guildId Discord-Guild-ID
      * @private
      */
+    /**
+     * Die Navigation dieser Guild neu aufbauen.
+     *
+     * **Wozu.** `_registerNavigation` laeuft sonst nur beim Start. Wer im
+     * Profil seine Heim-Guild waehlt, saehe den Chatbot-Punkt also erst nach
+     * einem Neustart des Dashboards - eine Wahl, die scheinbar nichts tut, ist
+     * genau die Attrappe, gegen die dieses Plugin geschrieben ist.
+     *
+     * Nach aussen gegeben, damit `kern/heimguild` es rufen kann, ohne den
+     * Umweg ueber eine private Methode.
+     *
+     * @param {string} guildId Discord-Guild-ID
+     * @returns {Promise<void>} nichts
+     */
+    async navigationAuffrischen(guildId) {
+        await this._registerNavigation(guildId);
+    }
+
     async _registerNavigation(guildId) {
         const Logger = ServiceManager.get('Logger');
         const navigationManager = ServiceManager.get('navigationManager');
@@ -445,6 +470,30 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                 parent: `/guild/${guildId}/settings`
             }
         ];
+
+        // **Der Chatbot-Zweig - nur in der Heim-Guild** (Stufe 14).
+        //
+        // Er erscheint dort, wo ein Kanalinhaber seinen Chatbot verwalten
+        // laesst, und sonst nirgends. Das ist keine Bequemlichkeit, sondern
+        // der Schnitt selbst: Ein Menuepunkt "Chatbot" in jeder Guild, die
+        // irgendeinen Kanal verfolgt, waere die Einladung, an fremden
+        // Chat-Einstellungen zu drehen (TEIL C).
+        //
+        // `STREAMING.CHAT.MANAGE` entscheidet dann, WER hier drankommt - das
+        // bleibt Sache der Serverleitung, wie ueberall.
+        try {
+            if (await require('./kern/heimguild').istHeim(guildId)) {
+                navItems.push(eintrag('NAV.CHATBOT', `${basis}/chatbot`, 'fa-solid fa-comments', 45, {
+                    capability: 'STREAMING.CHAT.MANAGE'
+                }));
+            }
+        } catch (error) {
+            // **Kein Menuepunkt ist besser als ein falscher.** Wer die Frage
+            // nicht beantworten kann, soll nicht raten - ein Chatbot-Eintrag
+            // in einer fremden Guild waere schlimmer als ein fehlender in der
+            // eigenen. Gemeldet wird es trotzdem.
+            Logger.warn(`[Streaming] Heim-Guild-Frage fuer ${guildId} nicht beantwortbar: ${error.message}`);
+        }
 
         // Betriebsseite: nur in der Kontroll-Guild, und dort nur fuer den
         // Serverbesitzer.

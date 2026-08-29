@@ -1,0 +1,75 @@
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-comments',
+  titel: 'Chatbot',
+  beschreibung: 'Der Twitch-Chat der Kanäle, die diesen Server als Heim gewählt haben.'
+}) %>
+
+<%
+  /*
+   * **Diese Seite verspricht noch nichts.** Sie zeigt, was angeschlossen ist -
+   * Befehle, Ansagen und Filter kommen mit Stufe 15.
+   *
+   * Das ist Absicht und kein Versehen: Die Heim-Guild ist die Entscheidung,
+   * WO das spaeter bedient wird. Sie hat einen sichtbaren Ausgang (dieser
+   * Menuepunkt gibt es hier und sonst nirgends), und mehr behauptet sie nicht.
+   * Karten mit Schaltern fuer Faehigkeiten, die es nicht gibt, waeren genau
+   * das leere Versprechen, gegen das dieses Plugin geschrieben ist.
+   */
+  const basis = `/guild/${guildId}/plugins/streaming`;
+%>
+
+<% if (!kanaele || kanaele.length === 0) { %>
+  <div class="card mb-3">
+    <div class="card-body">
+      <%- include('shared/leerzustand', {
+            icon:  'fa-solid fa-comments',
+            titel: 'Kein Kanal hat diesen Server als Heim gewählt',
+            text:  'Der Chatbot eines Kanals wird an genau einem Discord verwaltet. '
+                 + 'Diese Wahl trifft der Kanalinhaber selbst, im Profil unter „Verbundene Konten“.'
+          }) %>
+    </div>
+  </div>
+<% } else { %>
+
+  <%- include('shared/funktionskarte', {
+        titel:        'Warum hier',
+        icon:         'fa-solid fa-circle-info',
+        koerper:      '<p class="mb-0">Der Chatbot eines Twitch-Kanals wird an <strong>genau einem</strong> '
+                    + 'Discord verwaltet — an dem, den der Kanalinhaber gewählt hat. '
+                    + 'Andere Server können seinen Stream verfolgen und ankündigen, aber nicht '
+                    + 'seinen Chat einstellen. So kann niemand an fremden Chat-Einstellungen drehen, '
+                    + 'nur weil er hier Rechte hat.</p>'
+  }) %>
+
+  <% kanaele.forEach(k => { %>
+    <%
+      const a = k.anschluss;
+      const zustand = a ? a.zustand : 'unbekannt';
+      const koerper = `
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="fw-medium">Bot im Chat</span>
+          ${zustand === 'ja'   ? '<span class="badge bg-green-lt">ja</span>'
+          : zustand === 'nein' ? '<span class="badge bg-yellow-lt">nein</span>'
+                               : '<span class="badge bg-secondary-lt">unbekannt</span>'}
+        </div>
+        ${a && a.text    ? `<div class="text-secondary small">${a.text}</div>` : ''}
+        ${a && a.hinweis ? `<div class="text-secondary small">${a.hinweis}</div>` : ''}
+        ${a && a.tat     ? `<div class="small mt-2">Zu tun: <code>${a.tat}</code></div>` : ''}`;
+    %>
+    <%- include('shared/funktionskarte', {
+          titel:        (k.anzeigename || k.login),
+          beschreibung: 'twitch.tv/' + k.login,
+          icon:         'fa-brands fa-twitch',
+          koerper:      koerper
+    }) %>
+  <% }); %>
+
+  <div class="card">
+    <div class="card-body text-secondary small">
+      <strong>Befehle, Ansagen und Chat-Filter kommen mit Stufe 15.</strong>
+      Diese Seite zeigt heute nur den Anschluss — was hier steht, ist gemessen,
+      nicht versprochen.
+    </div>
+  </div>
+<% } %>
