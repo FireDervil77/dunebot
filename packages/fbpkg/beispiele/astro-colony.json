@@ -3,7 +3,7 @@
   "identity": {
     "slug": "astro-colony",
     "name": "Astro Colony",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "author": "firenetworks",
     "category": "sandbox",
     "description": {
@@ -41,12 +41,11 @@
     {
       "purpose": "query",
       "protocol": "udp",
-      "assign": "pool",
+      "assign": "game+1",
       "required": true,
-      "variable": "QUERY_PORT",
       "description": {
-        "de": "Abfrageport für die Steam-Serverliste. Frei wählbar, das Binary nimmt ihn über -QueryPort entgegen.",
-        "en": "Query port for the Steam server list. Freely assignable via -QueryPort."
+        "de": "Abfrageport für die Steam-Serverliste, fest auf Spielport+1. Am 2026-08-30 von aussen belegt: Der Server antwortet dort auf A2S und ist unter dieser Adresse in Steam auffindbar. Nicht frei gewaehlt, weil die Vergabe genau EINEN Pool-Port je Paket kennt und alles Weitere ein gebuchter Versatz ist (Portvergabe.js).",
+        "en": "Query port for the Steam server list, fixed at game port + 1. Verified from outside on 2026-08-30: the server answers A2S there and is findable in Steam under that address."
       }
     }
   ],
@@ -69,6 +68,18 @@
         "reason": {
           "de": "Astro Colony nimmt Kennwort, Spielerzahl, Seed und Kartennamen ausschliesslich über ServerSettings.ini entgegen — es gibt dafür keine Startparameter. Der Weg `apply.target=file` ist im Paketpfad noch nicht verdrahtet (siehe status.open), deshalb dieser Notausgang.",
           "en": "Astro Colony only accepts password, player count, seed and map name through ServerSettings.ini; there are no command-line switches. The `apply.target=file` path is not yet wired, hence this escape hatch."
+        }
+      },
+      {
+        "type": "script",
+        "script": "#!/bin/bash\nset -e\n\n# Steam-Anbindung: steamclient.so dorthin legen, wo das Spiel sie sucht.\n#\n# ── Der Befund, der diesen Schritt erzwingt (2026-08-30) ────────────────────\n# Ohne diese Datei startet der Server, meldet sich aber NIE bei Steam an:\n#\n#   [S_API] SteamAPI_Init(): Sys_LoadModule failed to load:\n#           /home/container/data/.steam/sdk64/steamclient.so\n#   LogSteamShared: Warning: Steam Dedicated Server API failed to initialize.\n#   LogOnline: OSS: Creating online subsystem instance for: NULL\n#\n# Er laeuft dann auf dem Null-Subsystem: kein Eintrag in der Serverliste, kein\n# Verbinden ueber Steam. Von aussen sieht das aus wie ein Portproblem, und\n# genau daran haben wir zuerst gesucht.\n#\n# ── Warum das hier steht und nicht im Daemon ────────────────────────────────\n# Der Daemon HAT eine Funktion dafuer (`setupSteamSDK` in install.go) — sie hat\n# aber keinen einzigen Aufrufer, und der Paketweg (install_paket.go) ruft sie\n# nicht. Valheim fiel das nie auf: Es bringt seine eigene Kopie mit.\n# Dieser Schritt ist die Ueberbrueckung, bis der Daemon es fuer JEDES Paket mit\n# steamcmd-Schritt uebernimmt. Dann faellt er ersatzlos weg.\n#\n# $HOME kommt aus dem Vertrag (protocol.ContractEnv → data/), nicht aus einem\n# geratenen Pfad — das ueberlebt eine Verlegung des Volumens.\n\nfor bits in 32 64; do\n  quelle=\"/opt/fb/steamcmd/linux${bits}/steamclient.so\"\n  ziel=\"${HOME}/.steam/sdk${bits}\"\n\n  if [ ! -f \"$quelle\" ]; then\n    echo \"WARNUNG: $quelle fehlt — Steam bleibt fuer ${bits} Bit unbedient.\"\n    continue\n  fi\n\n  mkdir -p \"$ziel\"\n  cp -f \"$quelle\" \"$ziel/steamclient.so\"\n  echo \"steamclient.so (${bits} Bit) → $ziel\"\ndone\n\n# Der Schritt laeuft als root; die Dateien muessen dem Spielprozess gehoeren.\n# --reference statt einer festen Nummer: Die UID vergibt der Daemon.\nchown -R --reference=\"$HOME\" \"${HOME}/.steam\" 2>/dev/null || true\n",
+        "description": {
+          "de": "steamclient.so nach data/.steam/sdk32 und sdk64 legen.",
+          "en": "Place steamclient.so into data/.steam/sdk32 and sdk64."
+        },
+        "reason": {
+          "de": "Ohne steamclient.so faellt der Server auf das Null-Subsystem zurueck und erscheint in keiner Serverliste — am 2026-08-30 am laufenden Server gemessen. Der Daemon hat dafuer `setupSteamSDK`, aber die Funktion hat keinen Aufrufer.",
+          "en": "Without steamclient.so the server falls back to the NULL subsystem and never appears in any server list. The daemon has setupSteamSDK but nothing calls it."
         }
       }
     ],
@@ -504,6 +515,13 @@
     "update": {
       "type": "steamcmd",
       "app": 2934900
+    },
+    "saves": [
+      "AstroColony/Saved/SaveGames"
+    ],
+    "query": {
+      "protocol": "source",
+      "port": "query"
     }
   },
   "content": {
@@ -520,14 +538,15 @@
   "status": {
     "complete": false,
     "open": [
-      "start.args.port: Ob das Binary `-Port=` überhaupt annimmt, ist NICHT geprüft. Beide Eggs übergeben nur `-QueryPort`; der Spielport blieb dort dem Standard überlassen. Nimmt Astro Colony den Schalter nicht, lauscht es auf einer festen Nummer, während die Vergabe eine andere gebucht hat — und der zweite Server auf derselben Maschine kollidiert. NACH dem ersten Start messen: welche UDP-Ports der Prozess wirklich hält.",
-      "install.steps[1]: Das Paket benutzt den Notausgang (script). Er schreibt ServerSettings.ini, weil Astro Colony fuer Kennwort, Spielerzahl, Seed und Kartennamen keine Startparameter kennt. Er faellt weg, sobald `apply.target=file` im Paketpfad verdrahtet ist — siehe den Punkt darunter.",
-      "settings: Elf der dreizehn Einstellungen leben in ServerSettings.ini und werden vom Installationsskript EINMAL geschrieben. Eine spätere Änderung im Panel wirkt nicht. Ursache ist kein Spielproblem, sondern eine fehlende Naht: `apply.target=file` steht im Schema, `check-pakete.js` prüft es, und der Daemon kann INI schreiben — aber niemand baut `job.Config` aus einem Paket (gemessen 2026-08-30: auftrag/baue.go setzt es nie, pkgspec liest den settings-Block nicht). Bis dahin: Datei über die Dateiverwaltung ändern und neu starten.",
-      "management.saves: Der Pfad der Spielstände ist NICHT gemessen. Ohne ihn weiss eine Sicherung nicht, was sie mitnehmen muss. Nach dem ersten Spielstand nachsehen (vermutlich unter AstroColony/Saved/), dann eintragen.",
-      "management.query: Keine Abfrage konfiguriert. Spielerzahl und Online-Status bleiben unbekannt, bis geprüft ist, ob der Steam-Abfrageport wie erwartet antwortet.",
-      "commands: Keine Befehle deklariert. Astro Colony hat nach heutigem Stand keine Fernsteuerung — das ist aber nicht nachgewiesen, sondern nur nicht gefunden.",
-      "requirements: RAM und Plattenbedarf nicht gemessen, deshalb nicht angegeben. Nach der ersten Installation nachtragen.",
-      "start.ready_when: Die Zeile \"server create success\" stammt aus dem Egg (config.startup.done) und ist an unserem Aufbau noch nicht belegt. Kommt sie nicht, gilt der Server erst nach dem Zeitablauf als bereit."
+      "SICHERUNG/VERZEICHNIS: Astro Colony legt seine Welt unter `game/AstroColony/Saved/SaveGames/` ab — am 2026-08-30 am laufenden Server gemessen. Das liegt im ERSETZBAREN Bereich des Verzeichnisvertrags (E-19), das Erhaltenswerte gehoert nach data/. Eine Neuinstallation nimmt den Spielstand mit. `management.saves` zeigt darauf, damit die Sicherung ihn erfasst; der Widerspruch selbst bleibt offen.",
+      "PORTS (Server 166, behoben): Die erste Fassung deklarierte BEIDE Ports als `assign: pool`. Die Vergabe nimmt genau einen Pool-Port als Basis und ignoriert weitere STILL — der Server bekam nur `game`, und weil `query` Pflicht ist, wurde das Paket gar nicht erst angehaengt. Behoben mit `game+1`. OFFEN bleibt die Sache dahinter: Ein zweiter Pool-Port sollte entweder vergeben oder beim Pruefen abgelehnt werden — still ignorieren ist die schlechteste der drei Moeglichkeiten.",
+      "ABFRAGEPORT — ERLEDIGT, und der Irrweg gehoert dazu (2026-08-30): Am kaputten Server band der Prozess UDP 14001 statt der gebuchten 25001, und ich schloss daraus, `-QueryPort` werde ignoriert. Das war FALSCH. 14001 war der Notnagel des Null-Subsystems, auf das der Server zurueckfiel, weil steamclient.so fehlte. Mit heiler Steam-Anbindung lauscht er auf 25001, von aussen per A2S belegt. Lehre: An einem Server, dessen Steam-Anbindung kaputt ist, laesst sich ueber Steam-Ports nichts messen.",
+      "install.steps: Zwei Notausgaenge (script). Der erste schreibt ServerSettings.ini, weil Astro Colony dafuer keine Startparameter kennt; der zweite legt steamclient.so ab, weil der Paketweg des Daemons das nicht tut (`setupSteamSDK` in install.go hat KEINEN Aufrufer). Beide fallen weg, sobald `apply.target=file` verdrahtet ist bzw. der Daemon die SDK-Dateien fuer jedes steamcmd-Paket selbst legt.",
+      "settings: Elf der dreizehn Einstellungen leben in ServerSettings.ini und werden vom Installationsskript EINMAL geschrieben. Eine spaetere Aenderung im Panel wirkt nicht (`job.Config` wird aus einem Paket nie gefuellt). Dass die Werte beim ANLEGEN ankommen, ist am 2026-08-30 belegt: Kennwort, Kartenname und Seed standen so in der INI, wie sie eingetippt wurden.",
+      "commands: Keine Befehle deklariert. Astro Colony hat nach heutigem Stand keine Fernsteuerung — nicht nachgewiesen, nur nicht gefunden.",
+      "requirements: RAM und Plattenbedarf nicht gemessen, deshalb nicht angegeben.",
+      "management.query: Auf `source` gesetzt, weil der Server auf A2S antwortet (gemessen). Ob Spielerzahl und Name darin brauchbar stehen, ist NICHT geprueft — die Antwort war eine Challenge von 9 Bytes.",
+      "start.ready_when: \"server create success\" ist im Log belegt. Ob 300 s reichen, wenn eine grosse Welt geladen wird, ist ungeprueft."
     ]
   }
 }
