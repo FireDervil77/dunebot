@@ -1,0 +1,533 @@
+{
+  "format": "FBPKG_v1",
+  "identity": {
+    "slug": "astro-colony",
+    "name": "Astro Colony",
+    "version": "1.0.0",
+    "author": "firenetworks",
+    "category": "sandbox",
+    "description": {
+      "de": "Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
+      "en": "Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
+    },
+    "origin": {
+      "type": "egg-import",
+      "source": "https://raw.githubusercontent.com/pelican-eggs/games-steamcmd/main/astro_colony/egg-astro-colony.json",
+      "imported_at": "2026-08-30"
+    }
+  },
+  "image": {
+    "ref": "registry.firenetworks.de/fb/steamcmd",
+    "tag": "2026.08",
+    "digest": "sha256:f84d7ea2c2e97570cda050d939e4bd4466a63656caa66b130eb008e22c9f3733",
+    "pinned_at": "2026-08-18",
+    "platform": "linux",
+    "arch": [
+      "amd64"
+    ]
+  },
+  "ports": [
+    {
+      "purpose": "game",
+      "protocol": "udp",
+      "assign": "pool",
+      "required": true,
+      "variable": "SERVER_PORT",
+      "description": {
+        "de": "Spielport. ⚠ Ungeprüft, ob das Binary ihn annimmt — siehe status.open.",
+        "en": "Game port. Unverified whether the binary honours it - see status.open."
+      }
+    },
+    {
+      "purpose": "query",
+      "protocol": "udp",
+      "assign": "pool",
+      "required": true,
+      "variable": "QUERY_PORT",
+      "description": {
+        "de": "Abfrageport für die Steam-Serverliste. Frei wählbar, das Binary nimmt ihn über -QueryPort entgegen.",
+        "en": "Query port for the Steam server list. Freely assignable via -QueryPort."
+      }
+    }
+  ],
+  "install": {
+    "steps": [
+      {
+        "type": "steamcmd",
+        "app": 2934900,
+        "login": false,
+        "validate": true,
+        "platform": "linux",
+        "description": {
+          "de": "Serverdateien über SteamCMD laden (anonym). App 2934900 heisst bei Steam \"Astro Colony Dedicated Server Linux\" — am 2026-08-30 gegen die Steam-App-Auskunft geprüft, nicht aus dem Egg übernommen.",
+          "en": "Download server files via SteamCMD (anonymous). App 2934900 is \"Astro Colony Dedicated Server Linux\"."
+        }
+      },
+      {
+        "type": "script",
+        "script": "#!/bin/bash\nset -e\n\n# Astro Colony liest seine Einstellungen aus einer INI-Datei, nicht aus\n# Startparametern. Diese Datei legt sie an — EINMAL, bei der Installation.\n#\n# Warum ein Skript und nicht `settings.apply.target=file`:\n# Der Weg gibt es im Schema, und der Daemon kann INI schreiben\n# (internal/parser/ini.go). Was fehlt, ist die Naht dazwischen: Niemand baut\n# `job.Config` aus einem Paket (gemessen am 2026-08-30 — auftrag/baue.go setzt\n# es nie, pkgspec liest den settings-Block gar nicht). Bis das verdrahtet ist,\n# ist dieses Skript der ehrliche Weg: Es steht sichtbar im Paket, statt dass\n# eine Einstellungskarte etwas verspricht, das nirgends ankommt.\n#\n# Vorhandene Datei wird NICHT überschrieben. Ein zweiter Installationslauf\n# (etwa nach \"Dateien prüfen\") darf einem laufenden Server nicht seine\n# Einstellungen zurücksetzen.\n\nZIEL=\"AstroColony/Saved/Config/LinuxServer\"\nDATEI=\"$ZIEL/ServerSettings.ini\"\n\nif [ -f \"$DATEI\" ]; then\n  echo \"ServerSettings.ini ist schon da — sie bleibt unberührt.\"\n  exit 0\nfi\n\nmkdir -p \"$ZIEL\"\n\n# ${VAR:-vorgabe} statt ${VAR}: Kommt der Wert nicht an, steht eine brauchbare\n# Vorgabe in der Datei — nicht eine leere Zeile, die das Spiel anders deutet.\ncat > \"$DATEI\" <<EOF\n[/Script/AstroColony.EHServerSubsystem]\nServerPassword=${SERVER_PASSWORD:-}\nSeed=${SERVER_MAPSEED:-7300}\nMapName=${SERVER_MAPNAME:-Kolonie}\nMaxPlayers=${SERVER_MAXPLAYERS:-5}\nShouldLoadLatestSavegame=${SERVER_LOADLATESTSAVEGAME:-1}\nAdminList=${SERVER_ADMINS:-}\nSharedTechnologies=${SERVER_SHAREDTECHNOLOGIES:-1}\nOxygenConsumption=${SERVER_OXYGENCONSUMPTION:-1}\nFreeConstruction=${SERVER_FREECONSTRUCTION:-0}\nAutosaveInterval=${SERVER_AUTOSAVEINTERVAL:-5.0}\nAutosavesCount=${SERVER_AUTOSAVESCOUNT:-10}\nEOF\n\necho \"ServerSettings.ini angelegt:\"\ncat \"$DATEI\"\n",
+        "reason": {
+          "de": "Astro Colony nimmt Kennwort, Spielerzahl, Seed und Kartennamen ausschliesslich über ServerSettings.ini entgegen — es gibt dafür keine Startparameter. Der Weg `apply.target=file` ist im Paketpfad noch nicht verdrahtet (siehe status.open), deshalb dieser Notausgang.",
+          "en": "Astro Colony only accepts password, player count, seed and map name through ServerSettings.ini; there are no command-line switches. The `apply.target=file` path is not yet wired, hence this escape hatch."
+        }
+      }
+    ],
+    "cache": {
+      "steam_depot": true
+    }
+  },
+  "start": {
+    "program": "./AstroColony/Binaries/Linux/AstroColonyServer",
+    "workdir": ".",
+    "args": [
+      {
+        "key": "log",
+        "form": "-log",
+        "from": "fixed"
+      },
+      {
+        "key": "port",
+        "parts": [
+          {
+            "text": "-Port={{port:game}}"
+          }
+        ]
+      },
+      {
+        "key": "queryport",
+        "parts": [
+          {
+            "text": "-QueryPort={{port:query}}"
+          }
+        ]
+      },
+      {
+        "key": "servername",
+        "parts": [
+          {
+            "text": "-SteamServerName={{setting:name}}"
+          }
+        ]
+      }
+    ],
+    "ready_when": {
+      "log_line": "server create success",
+      "timeout_sec": 300
+    },
+    "stop": {
+      "sequence": [
+        {
+          "step": "sigint",
+          "timeout_sec": 60,
+          "terminates": true
+        },
+        {
+          "step": "sigterm",
+          "timeout_sec": 30,
+          "terminates": true
+        },
+        {
+          "step": "sigkill",
+          "timeout_sec": 10,
+          "terminates": true
+        }
+      ]
+    }
+  },
+  "settings": [
+    {
+      "key": "name",
+      "group": "identity",
+      "name": {
+        "de": "Servername",
+        "en": "Server name"
+      },
+      "description": {
+        "de": "So heisst der Server in der Steam-Serverliste. Wirkt bei jedem Start — er steht als Startparameter, nicht in der INI-Datei.",
+        "en": "How the server appears in the Steam server list. Applied on every start as a command-line switch."
+      },
+      "type": "text",
+      "default": "Astro Colony",
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "password",
+      "group": "access",
+      "name": {
+        "de": "Beitrittskennwort",
+        "en": "Join password"
+      },
+      "description": {
+        "de": "Leer lassen für einen offenen Server. Wird bei der INSTALLATION in ServerSettings.ini geschrieben — eine spätere Änderung wirkt erst, wenn die Datei angepasst wird (siehe status.open).",
+        "en": "Leave empty for an open server. Written into ServerSettings.ini at INSTALL time; later changes require editing the file."
+      },
+      "type": "password",
+      "default": "",
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SERVER_PASSWORD"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "max_players",
+      "group": "gameplay",
+      "name": {
+        "de": "Höchstzahl Spieler",
+        "en": "Max players"
+      },
+      "description": {
+        "de": "1 bis 10. Bei der Installation gesetzt.",
+        "en": "1 to 10. Set at install time."
+      },
+      "type": "number",
+      "default": 5,
+      "min": 1,
+      "max": 10,
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SERVER_MAXPLAYERS"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "map_name",
+      "group": "world",
+      "name": {
+        "de": "Kartenname",
+        "en": "Map name"
+      },
+      "description": {
+        "de": "Der Name, unter dem die Welt läuft und gespeichert wird. Bei der Installation gesetzt.",
+        "en": "The name the world runs and saves under. Set at install time."
+      },
+      "type": "text",
+      "default": "Kolonie",
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SERVER_MAPNAME"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "progress",
+      "role": "player"
+    },
+    {
+      "key": "map_seed",
+      "group": "world",
+      "name": {
+        "de": "Karten-Startwert",
+        "en": "Map seed"
+      },
+      "description": {
+        "de": "Bestimmt, wie das Universum erzeugt wird. Nach dem ersten Start ändert ein anderer Wert die bestehende Welt nicht mehr — er erzeugt eine neue.",
+        "en": "Determines how the universe is generated. Changing it after the first start creates a new world rather than altering the existing one."
+      },
+      "type": "number",
+      "default": 7300,
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SERVER_MAPSEED"
+        }
+      ],
+      "takes_effect": "new_world",
+      "risk": "progress",
+      "role": "player"
+    },
+    {
+      "key": "load_latest_savegame",
+      "group": "world",
+      "name": {
+        "de": "Letzten Spielstand laden",
+        "en": "Load latest savegame"
+      },
+      "description": {
+        "de": "An: Der Server macht dort weiter, wo zuletzt gespeichert wurde. Aus: Er beginnt eine neue Welt.",
+        "en": "On: the server resumes from the latest save. Off: it starts a new world."
+      },
+      "type": "choice",
+      "default": "1",
+      "choices": [
+        {
+          "value": "1",
+          "name": {
+            "de": "Ja — weiterspielen",
+            "en": "Yes - resume"
+          }
+        },
+        {
+          "value": "0",
+          "name": {
+            "de": "Nein — neu beginnen",
+            "en": "No - start fresh"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SERVER_LOADLATESTSAVEGAME"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "progress",
+      "role": "player"
+    },
+    {
+      "key": "shared_technologies",
+      "group": "gameplay",
+      "name": {
+        "de": "Geteilte Forschung",
+        "en": "Shared technologies"
+      },
+      "description": {
+        "de": "Alle Spieler forschen gemeinsam am selben Fortschritt.",
+        "en": "All players share the same research progress."
+      },
+      "type": "choice",
+      "default": "1",
+      "choices": [
+        {
+          "value": "1",
+          "name": {
+            "de": "Ja",
+            "en": "Yes"
+          }
+        },
+        {
+          "value": "0",
+          "name": {
+            "de": "Nein",
+            "en": "No"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SERVER_SHAREDTECHNOLOGIES"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "oxygen_consumption",
+      "group": "gameplay",
+      "name": {
+        "de": "Sauerstoffverbrauch",
+        "en": "Oxygen consumption"
+      },
+      "description": {
+        "de": "Aus macht das Spiel deutlich entspannter — Astronauten ersticken dann nicht.",
+        "en": "Turning this off makes the game considerably more relaxed."
+      },
+      "type": "choice",
+      "default": "1",
+      "choices": [
+        {
+          "value": "1",
+          "name": {
+            "de": "An",
+            "en": "On"
+          }
+        },
+        {
+          "value": "0",
+          "name": {
+            "de": "Aus",
+            "en": "Off"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SERVER_OXYGENCONSUMPTION"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "free_construction",
+      "group": "gameplay",
+      "name": {
+        "de": "Bauen ohne Kosten",
+        "en": "Free construction"
+      },
+      "description": {
+        "de": "An: Gebäude kosten kein Material. Für Bauübungen und zum Vorführen.",
+        "en": "On: buildings cost no materials. For sandbox play and demonstrations."
+      },
+      "type": "choice",
+      "default": "0",
+      "choices": [
+        {
+          "value": "0",
+          "name": {
+            "de": "Aus",
+            "en": "Off"
+          }
+        },
+        {
+          "value": "1",
+          "name": {
+            "de": "An",
+            "en": "On"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SERVER_FREECONSTRUCTION"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "autosave_interval",
+      "group": "world",
+      "name": {
+        "de": "Abstand der Sicherungen (Minuten)",
+        "en": "Autosave interval (minutes)"
+      },
+      "description": {
+        "de": "5.0 heisst alle fünf Minuten. Nachkommastellen sind erlaubt.",
+        "en": "5.0 means every five minutes. Decimals are allowed."
+      },
+      "type": "text",
+      "default": "5.0",
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SERVER_AUTOSAVEINTERVAL"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "autosaves_count",
+      "group": "world",
+      "name": {
+        "de": "Wie viele Spielstände behalten",
+        "en": "Autosaves to keep"
+      },
+      "description": {
+        "de": "Ältere werden überschrieben.",
+        "en": "Older ones get overwritten."
+      },
+      "type": "number",
+      "default": 10,
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SERVER_AUTOSAVESCOUNT"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "admins",
+      "group": "access",
+      "name": {
+        "de": "Administratoren",
+        "en": "Administrators"
+      },
+      "description": {
+        "de": "SteamID64, mehrere durch Komma getrennt. Leer heisst: niemand hat Sonderrechte.",
+        "en": "SteamID64 values, comma separated. Empty means nobody has special rights."
+      },
+      "type": "text",
+      "default": "",
+      "apply": [
+        {
+          "target": "env",
+          "variable": "SERVER_ADMINS"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "auto_update",
+      "group": "betrieb",
+      "name": {
+        "de": "Beim Start aktualisieren",
+        "en": "Update on start"
+      },
+      "description": {
+        "de": "Holt vor jedem Start die neueste Fassung der Serverdateien.",
+        "en": "Fetches the latest server files before every start."
+      },
+      "type": "boolean",
+      "default": true,
+      "apply": [
+        {
+          "target": "env",
+          "variable": "AUTO_UPDATE"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    }
+  ],
+  "management": {
+    "update": {
+      "type": "steamcmd",
+      "app": 2934900
+    }
+  },
+  "content": {
+    "supported": false
+  },
+  "files": {
+    "denylist": [
+      ".env",
+      "start.sh",
+      "firebot.lock",
+      "firebot.pid"
+    ]
+  },
+  "status": {
+    "complete": false,
+    "open": [
+      "start.args.port: Ob das Binary `-Port=` überhaupt annimmt, ist NICHT geprüft. Beide Eggs übergeben nur `-QueryPort`; der Spielport blieb dort dem Standard überlassen. Nimmt Astro Colony den Schalter nicht, lauscht es auf einer festen Nummer, während die Vergabe eine andere gebucht hat — und der zweite Server auf derselben Maschine kollidiert. NACH dem ersten Start messen: welche UDP-Ports der Prozess wirklich hält.",
+      "install.steps[1]: Das Paket benutzt den Notausgang (script). Er schreibt ServerSettings.ini, weil Astro Colony fuer Kennwort, Spielerzahl, Seed und Kartennamen keine Startparameter kennt. Er faellt weg, sobald `apply.target=file` im Paketpfad verdrahtet ist — siehe den Punkt darunter.",
+      "settings: Elf der dreizehn Einstellungen leben in ServerSettings.ini und werden vom Installationsskript EINMAL geschrieben. Eine spätere Änderung im Panel wirkt nicht. Ursache ist kein Spielproblem, sondern eine fehlende Naht: `apply.target=file` steht im Schema, `check-pakete.js` prüft es, und der Daemon kann INI schreiben — aber niemand baut `job.Config` aus einem Paket (gemessen 2026-08-30: auftrag/baue.go setzt es nie, pkgspec liest den settings-Block nicht). Bis dahin: Datei über die Dateiverwaltung ändern und neu starten.",
+      "management.saves: Der Pfad der Spielstände ist NICHT gemessen. Ohne ihn weiss eine Sicherung nicht, was sie mitnehmen muss. Nach dem ersten Spielstand nachsehen (vermutlich unter AstroColony/Saved/), dann eintragen.",
+      "management.query: Keine Abfrage konfiguriert. Spielerzahl und Online-Status bleiben unbekannt, bis geprüft ist, ob der Steam-Abfrageport wie erwartet antwortet.",
+      "commands: Keine Befehle deklariert. Astro Colony hat nach heutigem Stand keine Fernsteuerung — das ist aber nicht nachgewiesen, sondern nur nicht gefunden.",
+      "requirements: RAM und Plattenbedarf nicht gemessen, deshalb nicht angegeben. Nach der ersten Installation nachtragen.",
+      "start.ready_when: Die Zeile \"server create success\" stammt aus dem Egg (config.startup.done) und ist an unserem Aufbau noch nicht belegt. Kommt sie nicht, gilt der Server erst nach dem Zeitablauf als bereit."
+    ]
+  }
+}
