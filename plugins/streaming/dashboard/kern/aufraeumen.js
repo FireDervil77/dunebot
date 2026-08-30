@@ -109,9 +109,19 @@ async function posteingang() {
  * @returns {Promise<{geloescht: number, aelter_als_tage: number}>} Ergebnis
  */
 async function ausgang() {
+    // **`laeuft` gehoert dazu, seit es diesen Zustand gibt** (Stufe 13c).
+    // Ein Auftrag steht darin, solange er beansprucht ist; stirbt der Vorgang
+    // zwischen dem Senden und dem Wegschreiben, bleibt er darin stehen. Das
+    // ist gewollt - er darf gerade NICHT noch einmal laufen, weil die
+    // Nachricht sehr wohl im Chat stehen koennte.
+    //
+    // Ohne diese Zeile waere er allerdings unsterblich: Die Uebersicht zaehlt
+    // nur `offen` und `aufgegeben`, und geloescht wurde nur `fertig`. Eine
+    // Zeile, die niemand sieht und niemand entfernt, ist genau die Sorte
+    // Rueckstand, die Jahre spaeter jemanden verwirrt.
     const ergebnis = await db().query(`
         DELETE FROM streaming_outbox
-         WHERE zustand = 'fertig'
+         WHERE zustand IN ('fertig', 'laeuft')
            AND angelegt_am < DATE_SUB(NOW(), INTERVAL ? DAY)
     `, [AUSGANG_TAGE]);
 

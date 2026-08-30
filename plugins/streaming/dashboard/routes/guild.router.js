@@ -34,7 +34,24 @@ const {
 const modelle = require('../../shared/models');
 const abos = require('../kern/abos');
 const melder = require('../kern/melder');
-const { PLATZHALTER, pruefeVorlage, VORGABE_LIVE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
+const {
+    PLATZHALTER, PLATZHALTER_CHAT, pruefeVorlage, pruefeChatVorlage,
+    VORGABE_LIVE, VORGABE_RUECKSCHAU, VORGABE_CHAT, CHAT_MAX
+} = require('../../shared/vorlagen');
+
+/**
+ * Was eine abgelehnte Chat-Vorlage dem Benutzer sagt.
+ *
+ * **Der Text steht hier und nicht in der Ansicht**, weil die Ablehnung hier
+ * entsteht. `pruefeChatVorlage` gibt eine Kennung zurueck, kein Deutsch - so
+ * kann das Pruefskript dieselbe Regel ohne Ansicht durchspielen.
+ */
+const CHAT_FEHLER = {
+    zu_lang:     `Der Text ist zu lang — Twitch nimmt höchstens ${CHAT_MAX} Zeichen.`,
+    platzhalter: 'Darin steht ein Platzhalter, den es nicht gibt. Er würde wörtlich im Chat stehen.',
+    nur_discord: '{rolle} und {dauer} gibt es nur in der Discord-Ankündigung — '
+               + 'eine Discord-Erwähnung im Twitch-Chat wäre nur eine Zeichenkette.'
+};
 const { antworte, antworteFehler } = require('dunebot-sdk').FormAntwort;
 
 /**
@@ -786,8 +803,32 @@ router.get('/chatbot', requirePermission('STREAMING.CHAT.MANAGE'), async (req, r
             k.empfangen = gezaehlt.get(String(k.kanal_id)) || null;
         }
 
+        // **Die Stimme (Stufe 13c): darf der Bot hier unter dem Namen des
+        // Streamers schreiben, und was kam beim letzten Mal dabei heraus?**
+        //
+        // Beides gehoert zusammen auf die Karte: Der Schalter allein saehe
+        // aus wie eine Zusicherung. Erst der letzte Ausgang sagt, ob die
+        // Ansage wirklich im Chat stand - ein `is_sent: false` kommt sonst
+        // nirgends an.
+        const abonnenten = require('../kern/abonnenten');
+        for (const k of kanaele) {
+            const inhaber = await abonnenten.kanalInhaber(k);
+            k.darf_schreiben = await meinkanal.darfSchreiben(inhaber);
+
+            const letzte = await ServiceManager.get('dbService').query(`
+                SELECT zustand, fehlertext, erledigt_am, faellig_ab
+                  FROM streaming_outbox
+                 WHERE aktion = 'chat_ansage'
+                   AND JSON_EXTRACT(nutzlast, '$.streamer_id') = ?
+                 ORDER BY id DESC LIMIT 1
+            `, [k.id]);
+            k.letzte_ansage = letzte[0] || null;
+        }
+
         await renderView(res, 'guild/streaming-chatbot', {
             tr, guildId, kanaele, bericht, leitung,
+            platzhalter: PLATZHALTER_CHAT, vorgabeAnsage: VORGABE_CHAT, chatMax: CHAT_MAX,
+            zusageName: meinkanal.SCHREIB_ZUSAGE,
             vorWieLange,
             meldung: req.query.ok || null,
             fehler: req.query.fehler || null
@@ -848,6 +889,139 @@ router.post('/chatbot/abgleich', requirePermission('STREAMING.CHAT.MANAGE'), asy
         });
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Chat-Abgleich von Hand fehlgeschlagen', error);
+        return antworteFehler(req, res, {
+            zurueck, fehler: 'technisch',
+            text: 'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+        });
+    }
+});
+
+/**
+ * Die Live-Ansage eines Kanals einstellen (Stufe 13c).
+ *
+ * **Ein Kanal je Absendung, nicht alle auf einmal.** Die Seite zeigt je Kanal
+ * eine Karte, und jede Karte hat ihr eigenes Formular - sonst schriebe ein
+ * Klick den Text eines fremden Streamers mit um.
+ *
+ * **Der Kanal muss zu DIESER Guild gehoeren.** `heim_guild_id` steht in der
+ * Bedingung des UPDATE und wird nicht vorher geprueft: Zwischen Pruefung und
+ * Schreiben laege sonst ein Spalt, und die Kennung aus dem Formular ist
+ * ohnehin nichts, worauf man baut.
+ */
+router.post('/chatbot/ansage', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/chatbot`;
+
+    try {
+        const streamerId = Number(req.body.streamer_id);
+        if (!Number.isInteger(streamerId) || streamerId <= 0) {
+            return antworteFehler(req, res, {
+                zurueck, fehler: 'kanal', text: 'Zu diesem Kanal fehlt die Kennung.'
+            });
+        }
+
+        const text = String(req.body.ansage_text || '').trim();
+        const an   = req.body.ansage_an === 'on' || req.body.ansage_an === '1';
+
+        // **Der Text wird geprueft, auch wenn der Schalter aus ist.** Sonst
+        // liegt eine kaputte Vorlage still im Feld und faellt genau in dem
+        // Augenblick auf, in dem jemand einschaltet - also beim ersten
+        // echten Stream.
+        const fehler = pruefeChatVorlage(text);
+        if (fehler) {
+            return antworteFehler(req, res, { zurueck, fehler, text: CHAT_FEHLER[fehler] });
+        }
+
+        const ergebnis = await ServiceManager.get('dbService').query(`
+            UPDATE streaming_streamers
+               SET chat_ansage_an = ?, chat_ansage_text = ?
+             WHERE id = ? AND heim_guild_id = ?
+        `, [an ? 1 : 0, text || null, streamerId, String(guildId)]);
+
+        if (!ergebnis?.affectedRows) {
+            // Kein Vorwurf, sondern der wahrscheinliche Fall: Der Kanalinhaber
+            // hat sein Heim inzwischen woandershin gelegt. Ein "gespeichert"
+            // waere hier die Luege, die niemand bemerkt.
+            return antworteFehler(req, res, {
+                zurueck, fehler: 'kein_heim',
+                text: 'Dieser Kanal wird hier nicht (mehr) verwaltet. Es wurde nichts geaendert.'
+            });
+        }
+
+        Logger.info(`[Streaming] Chat-Ansage fuer Kanal ${streamerId} in ${guildId}: ${an ? 'an' : 'aus'}`);
+        return antworte(req, res, {
+            zurueck, ok: 'gespeichert',
+            text: an ? 'Die Live-Ansage ist eingeschaltet.' : 'Die Live-Ansage ist ausgeschaltet.'
+        });
+    } catch (error) {
+        Logger.error('[Streaming] Chat-Ansage speichern fehlgeschlagen', error);
+        return antworteFehler(req, res, {
+            zurueck, fehler: 'technisch',
+            text: 'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+        });
+    }
+});
+
+/**
+ * Die Ansage einmal probeweise in den Chat schreiben (Stufe 13c).
+ *
+ * **Warum es diesen Knopf gibt.** Ohne ihn liesse sich die Ansage erst beim
+ * naechsten echten Stream pruefen - und wenn dann etwas klemmt, ist der
+ * Augenblick vorbei. Dieselbe Ueberlegung wie bei der Probeankuendigung aus
+ * Stufe 6, deren Nebenfund am 2026-08-25 mehr wert war als der Knopf selbst.
+ *
+ * **Er geht denselben Weg wie der Ernstfall**, ueber die Outbox und dieselbe
+ * Sendefunktion. Ein zweiter, kuerzerer Weg wuerde genau das pruefen, was im
+ * Ernstfall nicht laeuft.
+ *
+ * ⚠ **Die Probe steht wirklich im Chat**, unter dem Namen des Streamers - es
+ * gibt keinen stillen Testmodus bei Twitch. Deshalb verlangt sie denselben
+ * eingeschalteten Schalter wie der Ernstfall: Wer die Ansage aus hat, hat
+ * auch keine Probe bestellt.
+ */
+router.post('/chatbot/probe', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/chatbot`;
+
+    try {
+        const streamerId = Number(req.body.streamer_id);
+        if (!Number.isInteger(streamerId) || streamerId <= 0) {
+            return antworteFehler(req, res, {
+                zurueck, fehler: 'kanal', text: 'Zu diesem Kanal fehlt die Kennung.'
+            });
+        }
+
+        const zeilen = await ServiceManager.get('dbService').query(
+            'SELECT chat_ansage_an FROM streaming_streamers WHERE id = ? AND heim_guild_id = ?',
+            [streamerId, String(guildId)]);
+
+        if (!zeilen.length) {
+            return antworteFehler(req, res, {
+                zurueck, fehler: 'kein_heim',
+                text: 'Dieser Kanal wird hier nicht (mehr) verwaltet.'
+            });
+        }
+        if (!Number(zeilen[0].chat_ansage_an)) {
+            return antworteFehler(req, res, {
+                zurueck, fehler: 'aus', art: 'warning',
+                text: 'Die Live-Ansage ist ausgeschaltet — es wurde nichts gesendet.'
+            });
+        }
+
+        await ServiceManager.get('dbService').query(`
+            INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast)
+            VALUES (NULL, ?, 'chat_ansage', ?)
+        `, [String(guildId), JSON.stringify({ streamer_id: streamerId, probe: true })]);
+
+        Logger.info(`[Streaming] Chat-Probe fuer Kanal ${streamerId} vorgemerkt`);
+        return antworte(req, res, {
+            zurueck, ok: 'probe',
+            text: 'Die Probe ist unterwegs. Steht sie nicht im Chat, sagt die Karte gleich warum.'
+        });
+    } catch (error) {
+        Logger.error('[Streaming] Chat-Probe fehlgeschlagen', error);
         return antworteFehler(req, res, {
             zurueck, fehler: 'technisch',
             text: 'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'

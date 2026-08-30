@@ -48,7 +48,8 @@ const db = () => ServiceManager.get('dbService');
  */
 async function streamerZuKonto(plattform, kontoId) {
     const zeilen = await db().query(
-        `SELECT id, plattform, kanal_id, login, anzeigename, heim_guild_id
+        `SELECT id, plattform, kanal_id, login, anzeigename, heim_guild_id,
+                chat_ansage_an, chat_ansage_text
            FROM streaming_streamers
           WHERE plattform = ? AND kanal_id = ? LIMIT 1`,
         [plattform, String(kontoId)]);
@@ -286,7 +287,8 @@ async function navigationAuffrischen(guildIds) {
  */
 async function kanaeleDerGuild(guildId) {
     return await db().query(
-        `SELECT id, plattform, kanal_id, login, anzeigename
+        `SELECT id, plattform, kanal_id, login, anzeigename,
+                chat_ansage_an, chat_ansage_text
            FROM streaming_streamers
           WHERE heim_guild_id = ?
           ORDER BY anzeigename, login`, [guildId]) || [];

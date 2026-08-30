@@ -36,6 +36,55 @@ const db = () => ServiceManager.get('dbService');
 const SCOPE = 'user:read:moderated_channels';
 
 /**
+ * Ohne diesen Scope kann der Bot nicht unter dem Namen des Streamers schreiben.
+ *
+ * **Er gehoert IHM, nicht der Anlage** - das ist der Unterschied zu `SCOPE`
+ * darueber. Deshalb wird er am Schluessel des Benutzers nachgesehen und nicht
+ * an dem des Betreibers.
+ */
+const SCHREIB_SCOPE = 'user:write:chat';
+
+/**
+ * Der Name der Zusage, die diesen Scope erteilt.
+ *
+ * Steht hier, damit die Chatbot-Seite den Weg dorthin nennen kann, ohne ihn
+ * abzuschreiben. Wer ihn in `dashboard/index.js` umbenennt, sieht hier, dass
+ * eine zweite Stelle mithaengt (`scripts/check-chatansage.js` misst es).
+ */
+const SCHREIB_ZUSAGE = 'chatschreiben';
+
+/**
+ * Darf der Chatbot unter dem Namen dieses Menschen schreiben? (Stufe 13c)
+ *
+ * **Am Schluessel nachgesehen, nicht an der Absicht.** Die Spalte `scopes`
+ * traegt, was Twitch zuletzt bestaetigt hat - die stuendliche Pflichtpruefung
+ * schreibt sie fort. Ein eigenes "hat zugestimmt"-Kaestchen daneben wuerde
+ * behaupten, was der Schluessel laengst widerlegt hat.
+ *
+ * **Dreiwertig wie alles hier**: Wer nicht nachsehen konnte, meldet
+ * `'unbekannt'`. Ein falsches `'nein'` schickte den Streamer in einen Dialog,
+ * den er schon durchlaufen hat.
+ *
+ * @param {string|null} userId Discord-Benutzer, dem der Kanal gehoert
+ * @returns {Promise<{zustand: string, grund: string|null}>} Auskunft
+ */
+async function darfSchreiben(userId) {
+    if (!userId) return { zustand: 'nein', grund: 'Zu diesem Kanal ist kein Konto verknuepft.' };
+
+    let zusage;
+    try {
+        zusage = await Verbindungsspeicher.zusageLesen(userId, 'twitch');
+    } catch (err) {
+        return { zustand: 'unbekannt', grund: `Die Berechtigungen sind gerade nicht lesbar (${err.message}).` };
+    }
+
+    if (!zusage) return { zustand: 'nein', grund: null };
+
+    const scopes = String(zusage.scopes || '').split(' ').filter(Boolean);
+    return { zustand: scopes.includes(SCHREIB_SCOPE) ? 'ja' : 'nein', grund: null };
+}
+
+/**
  * Eine Zeile "unbekannt" bauen.
  *
  * **Warum es diese Abkuerzung gibt:** Alle Abbruchgruende dieser Datei enden
@@ -157,7 +206,58 @@ async function heimZeile(streamer) {
 }
 
 /**
- * Der ganze Abschnitt: Mod-Status und Heim-Guild.
+ * Schreibt der Chatbot unter deinem Namen - und darf er es? (Stufe 13c)
+ *
+ * **Diese Zeile ist eine Zusage, keine Auskunft.** 17.5 verlangt, dass es
+ * dasteht: *Der Chatbot schreibt unter deinem Namen.* Sie erscheint deshalb
+ * auch dann, wenn nichts eingeschaltet ist - gerade dann. Wer erst nach dem
+ * Erlauben erfaehrt, was er erlaubt hat, hat nichts erfahren.
+ *
+ * @param {Object} streamer Zeile aus `streaming_streamers`, oder null
+ * @param {string|null} userId Discord-Benutzer
+ * @returns {Promise<Object|null>} Zeile fuer den Profil-Abschnitt
+ */
+async function schreibZeile(streamer, userId) {
+    if (!streamer) return null;
+
+    const darf = await darfSchreiben(userId);
+    const an = Number(streamer.chat_ansage_an) === 1;
+
+    if (darf.zustand === 'unbekannt') {
+        return {
+            label: 'Chatbot schreibt unter meinem Namen',
+            zustand: 'unbekannt',
+            text: 'Laesst sich gerade nicht feststellen.',
+            hinweis: darf.grund
+        };
+    }
+
+    if (darf.zustand !== 'ja') {
+        return {
+            label: 'Chatbot schreibt unter meinem Namen',
+            zustand: 'nein',
+            text: 'Noch nicht erlaubt. Der Bot sagt in deinem Chat nichts.',
+            // Der Weg dorthin steht direkt darueber auf derselben Seite - ein
+            // Link waere ein Umweg zu sich selbst.
+            hinweis: darf.grund
+                || 'Unter „Berechtigungen" kannst du es erlauben. Alles, was der Bot '
+                 + 'dann sagt, erscheint unter deinem Namen — nicht unter einem Botnamen.'
+        };
+    }
+
+    return {
+        label: 'Chatbot schreibt unter meinem Namen',
+        zustand: 'ja',
+        text: an
+            ? 'Erlaubt, und die Live-Ansage ist eingeschaltet.'
+            : 'Erlaubt. Eingeschaltet ist zurzeit nichts.',
+        hinweis: 'Zurueckziehen kannst du das jederzeit mit „Berechtigungen zuruecknehmen" — '
+               + 'der Bot schweigt dann sofort.'
+    };
+}
+
+/**
+ * Der ganze Abschnitt: Mod-Status, Heim-Guild und die Stimme.
  *
  * @param {Object} ctx `{ userId, kontoId, kontoName }`
  * @returns {Promise<Array<Object>>} Zeilen
@@ -166,7 +266,9 @@ async function zeilen(ctx) {
     const teile = await modZeile(ctx);
     const streamer = await heimguild.streamerZuKonto('twitch', ctx?.kontoId);
     const heim = await heimZeile(streamer);
-    return heim ? [...teile, heim] : teile;
+    const stimme = await schreibZeile(streamer, ctx?.userId);
+
+    return [...teile, heim, stimme].filter(Boolean);
 }
 
 /**
@@ -209,4 +311,7 @@ const wahl = {
     }
 };
 
-module.exports = { modZeile, zeilen, heimZeile, wahl, SCOPE };
+module.exports = {
+    modZeile, zeilen, heimZeile, schreibZeile, darfSchreiben, wahl,
+    SCOPE, SCHREIB_SCOPE, SCHREIB_ZUSAGE
+};

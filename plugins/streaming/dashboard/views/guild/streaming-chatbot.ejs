@@ -24,11 +24,18 @@
   const darf  = hasPermission('STREAMING.CHAT.MANAGE');
 
   const meldungen = {
-    abgeglichen: 'Der Chat-Anschluss wurde abgeglichen.'
+    abgeglichen: 'Der Chat-Anschluss wurde abgeglichen.',
+    gespeichert: 'Übernommen.',
+    probe:       'Die Probe ist unterwegs. Steht sie nicht im Chat, sagt es die Karte gleich.'
   };
   const fehlerTexte = {
     kein_heim:   'Dieser Server ist für keinen Kanal das Heim.',
     abgebrochen: 'Es wurde nichts abgeglichen — der Grund steht in der Karte unten.',
+    kanal:       'Zu diesem Kanal fehlte die Kennung — es wurde nichts geändert.',
+    aus:         'Die Live-Ansage ist ausgeschaltet — es wurde nichts gesendet.',
+    zu_lang:     'Der Text ist zu lang. Twitch nimmt höchstens 500 Zeichen.',
+    platzhalter: 'Darin steht ein Platzhalter, den es nicht gibt. Er würde wörtlich im Chat stehen.',
+    nur_discord: '{rolle} und {dauer} gibt es nur in der Discord-Ankündigung — im Twitch-Chat wären sie nur Zeichen.',
     technisch:   'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
   };
 
@@ -118,6 +125,121 @@
           icon:         'fa-brands fa-twitch',
           koerper:      koerper
     }) %>
+
+    <%
+      /*
+       * **Die Live-Ansage (Stufe 13c) — die erste Sache, die der Bot sagt.**
+       *
+       * Sie steht in einer eigenen Karte unter der Anschlusskarte darüber,
+       * weil sie etwas anderes ist: Die Karte oben misst, diese hier
+       * entscheidet. Und sie entscheidet über etwas, das unter dem Namen des
+       * Streamers erscheint — deshalb steht genau das als erster Satz im
+       * Kasten und nicht in einer Fußnote (14-Rechte-neu-denken.md, 17.5).
+       */
+      const name = k.anzeigename || k.login;
+      const darfSchreiben = k.darf_schreiben || { zustand: 'unbekannt', grund: null };
+      const an = Number(k.chat_ansage_an) === 1;
+
+      let hinweisBlock = `<strong>Der Chatbot schreibt unter dem Namen ${name}</strong> —
+        nicht unter einem Botnamen. Wer die Ansage liest, sieht sie so, als hätte
+        ${name} sie selbst getippt.`;
+
+      if (darfSchreiben.zustand === 'nein') {
+        hinweisBlock += `<hr class="my-2"><strong>Erlaubt ist das noch nicht.</strong>
+          Eingeschaltet passiert deshalb nichts: Nur ${name} selbst kann es erlauben,
+          im eigenen Profil unter <em>Verbundene Konten → Berechtigungen</em>.
+          ${darfSchreiben.grund ? darfSchreiben.grund : ''}`;
+      } else if (darfSchreiben.zustand === 'unbekannt') {
+        hinweisBlock += `<hr class="my-2">Ob es erlaubt ist, lässt sich gerade nicht
+          feststellen. ${darfSchreiben.grund || ''}`;
+      }
+
+      /*
+       * **Was beim letzten Mal herauskam.** Ohne diese Zeilen wäre der
+       * Schalter eine Zusicherung: Twitch antwortet auch dann mit „in
+       * Ordnung“, wenn die Nachricht am AutoMod hängenbleibt und nie im Chat
+       * steht. Erst der Ausgang sagt, ob sie wirklich gesagt wurde.
+       */
+      const l = k.letzte_ansage;
+      let ausgang = '';
+      if (l) {
+        const wann = vorWieLange(l.erledigt_am || l.faellig_ab) || 'gerade eben';
+        if (l.zustand === 'fertig') {
+          ausgang = `<div><span class="badge bg-green-lt">gesendet</span>
+                     <span class="text-secondary small ms-1">${wann}${l.fehlertext ? ' — ' + l.fehlertext : ''}</span></div>`;
+        } else if (l.zustand === 'aufgegeben') {
+          ausgang = `<div class="alert alert-warning mb-0"><strong>Die letzte Ansage kam nicht an.</strong><br>
+                     ${l.fehlertext || 'Ohne Angabe eines Grundes.'}
+                     <div class="small mt-1">${wann}. Es wird nicht noch einmal versucht —
+                     eine Chatnachricht lässt sich nicht zurückholen, und fünf gleiche
+                     wären schlimmer als keine.</div></div>`;
+        } else {
+          /*
+           * **„laeuft" bleibt nach einem Absturz stehen — mit Absicht.** Der
+           * Auftrag darf dann nicht noch einmal laufen, weil die Zeile sehr
+           * wohl im Chat stehen könnte. Nach ein paar Minuten heißt das aber
+           * nicht mehr „unterwegs", sondern „wir wissen es nicht" — und genau
+           * das muss dann dastehen.
+           */
+          const alterMin = (Date.now() - new Date(l.faellig_ab).getTime()) / 60000;
+          ausgang = (l.zustand === 'laeuft' && alterMin > 5)
+            ? `<div><span class="badge bg-secondary-lt">ungewiss</span>
+               <span class="text-secondary small ms-1">${wann} begonnen — ob sie ankam,
+               lässt sich nicht mehr feststellen. Es wird nichts nachgeholt.</span></div>`
+            : `<div><span class="badge bg-secondary-lt">unterwegs</span>
+               <span class="text-secondary small ms-1">${wann} vorgemerkt</span></div>`;
+        }
+      } else {
+        ausgang = '<div class="text-secondary small">Noch nichts gesendet.</div>';
+      }
+
+      const ansageKoerper = `
+        <input type="hidden" name="streamer_id" value="${k.id}">
+        <div class="mb-3">
+          <label class="form-label" for="ansage-${k.id}">Was im Chat stehen soll</label>
+          <textarea class="form-control" id="ansage-${k.id}" name="ansage_text"
+                    rows="2" maxlength="${chatMax}"
+                    placeholder="${vorgabeAnsage}"
+                    ${darf ? '' : 'disabled'}>${k.chat_ansage_text || ''}</textarea>
+          <div class="form-hint">
+            Leer heißt: <code>${vorgabeAnsage}</code>.
+            Höchstens ${chatMax} Zeichen — mehr nimmt Twitch nicht an.
+            Platzhalter: ${platzhalter.map(p => '<code>' + p.name + '</code>').join(' ')}.
+          </div>
+        </div>
+        <div class="fw-medium mb-1">Zuletzt</div>
+        ${ausgang}`;
+    %>
+
+    <%#
+      Das Probe-Formular steht NEBEN der Karte, nicht darin: Ein Formular im
+      Formular ist ungültiges HTML, und der Browser wirft das innere still
+      weg. Der Knopf im Fuß hängt per form="…" daran — dasselbe Mittel, mit
+      dem der Kopfschalter am Speichern-Formular hängt.
+    %>
+    <form id="chatprobe-<%= k.id %>" method="POST" data-toast data-toast-neuladen
+          action="<%= basis %>/chatbot/probe" class="d-none">
+      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+      <input type="hidden" name="streamer_id" value="<%= k.id %>">
+    </form>
+
+    <%- include('shared/funktionskarte', {
+          titel:        'Live-Ansage im Chat',
+          beschreibung: 'Wenn der Stream startet, sagt der Bot es im Twitch-Chat.',
+          icon:         'fa-solid fa-bullhorn',
+          id:           'chatansage-' + k.id,
+          aktion:       basis + '/chatbot/ansage',
+          csrfToken:    typeof csrfToken !== 'undefined' ? csrfToken : '',
+          darf:         darf,
+          schalter:     { name: 'ansage_an', an: an },
+          hinweis:      hinweisBlock,
+          koerper:      ansageKoerper,
+          fuss:         (darf && an)
+                          ? `<button type="submit" form="chatprobe-${k.id}"
+                               class="btn btn-outline-secondary">Probe in den Chat</button>
+                             <span class="text-secondary small">steht wirklich im Chat</span>`
+                          : ''
+    }) %>
   <% }); %>
 
   <%
@@ -183,11 +305,12 @@
 
   <div class="card">
     <div class="card-body text-secondary small">
-      <strong>Befehle, Ansagen und Chat-Filter kommen mit Stufe 15.</strong>
-      Heute liest der Bot mit und zählt, mehr nicht — <strong>Chatnachrichten
-      werden nicht gespeichert.</strong> Ob, wie lange und wofür das zulässig
-      wäre, gehört zur ausstehenden Rechtsprüfung und wird nicht nebenbei
-      entschieden.
+      <strong>Befehle und Chat-Filter kommen mit Stufe 15.</strong>
+      Heute liest der Bot mit, zählt — und sagt beim Streamstart Bescheid, wenn
+      das eingeschaltet ist. Was im Chat ankommt, wird dabei
+      <strong>nicht gespeichert</strong>: kein Text, kein Absender. Ob, wie lange
+      und wofür das zulässig wäre, gehört zur ausstehenden Rechtsprüfung und
+      wird nicht nebenbei in einem Zähler entschieden.
     </div>
   </div>
 <% } %>

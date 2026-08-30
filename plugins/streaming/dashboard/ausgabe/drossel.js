@@ -26,6 +26,10 @@
 
 const { ServiceManager } = require('dunebot-core');
 const nachricht = require('./nachricht');
+const chatansage = require('./chatansage');
+const twitch = require('../plattformen/twitch');
+const abonnenten = require('../kern/abonnenten');
+const Verbindungsspeicher = require('../../../../apps/dashboard/helpers/Verbindungsspeicher');
 const modelle = require('../../shared/models');
 const { vorlageWaehlen, VORGABE_LIVE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
 const { inhaltsStand } = require('../kern/entscheidung');
@@ -206,6 +210,132 @@ async function rolleSetzen(auftrag) {
 }
 
 /**
+ * Die Live-Ansage in den Twitch-Chat schreiben (Stufe 13c).
+ *
+ * ## Warum hier ALLES noch einmal geprueft wird
+ *
+ * Zwischen dem Vormerken und diesem Augenblick liegen bis zu 45 Sekunden -
+ * und in genau dieser Zeit kann der Streamer die Erlaubnis zuruecknehmen oder
+ * die Heim-Guild den Schalter umlegen. Wer sich auf die Pruefung von damals
+ * verlaesst, hat einen Aus-Schalter gebaut, der erst beim naechsten Mal wirkt.
+ * Die beiden Zusagen aus 17.5 stehen und fallen mit diesen Zeilen:
+ *
+ *   Aus-Schalter wirkt sofort   `chat_ansage_an` wird HIER gelesen
+ *   Widerruf greift             `mitZugang` liefert dann nichts, und der
+ *                               Grund steht als Fehlertext am Auftrag
+ *
+ * ## Ein Versuch, kein zweiter
+ *
+ * Alle Fehlschlaege sind `endgueltig`. Das ist eine Abweichung von jedem
+ * anderen Auftrag hier, und sie hat einen Grund: **Es steht sein Name
+ * darunter.** Eine Chatnachricht laesst sich nicht bearbeiten und nicht
+ * zurueckholen; eine verlorene Antwort von Twitch koennte bedeuten, dass die
+ * Zeile sehr wohl steht. Fuenf Versuche haetten dann fuenf "Wir sind live!"
+ * im Chat des Streamers erzeugt - ein Schaden, den niemand mehr aufraeumt.
+ * Eine ausgefallene Ansage ist der kleinere Verlust und steht mit Grund auf
+ * der Chatbot-Seite.
+ *
+ * Die Beanspruchung (`zustand = 'laeuft'`) sichert denselben Punkt gegen die
+ * andere Richtung ab: Stirbt der Vorgang zwischen Senden und Wegschreiben,
+ * bleibt der Auftrag stehen und wird **nicht** noch einmal aufgenommen -
+ * `lauf()` holt nur `offen`.
+ *
+ * @param {Object} auftrag Outbox-Zeile
+ * @returns {Promise<{ok: boolean, fehler: string|null, endgueltig: boolean, hinweis?: string}>} Ergebnis
+ */
+async function chatAnsageSenden(auftrag) {
+    const nutzlast = typeof auftrag.nutzlast === 'string'
+        ? JSON.parse(auftrag.nutzlast) : (auftrag.nutzlast || {});
+
+    const streamerId = nutzlast.streamer_id;
+    if (!streamerId) return { ok: false, fehler: 'Auftrag ohne Kanal', endgueltig: true };
+
+    // **Beanspruchen, bevor irgendetwas hinausgeht.** Schlaegt das fehl, hat
+    // ein anderer Lauf den Auftrag schon - dann ist Schweigen richtig.
+    const beansprucht = await db().query(
+        "UPDATE streaming_outbox SET zustand = 'laeuft' WHERE id = ? AND zustand = 'offen'",
+        [auftrag.id]);
+    if (!beansprucht?.affectedRows) {
+        return { ok: false, fehler: 'Auftrag war nicht mehr offen', endgueltig: true };
+    }
+
+    const zeilen = await db().query(`
+        SELECT s.id, s.plattform, s.kanal_id, s.login, s.anzeigename,
+               s.heim_guild_id, s.chat_ansage_an, s.chat_ansage_text,
+               z.titel, z.kategorie
+          FROM streaming_streamers s
+          LEFT JOIN streaming_state z ON z.streamer_id = s.id
+         WHERE s.id = ?
+    `, [streamerId]);
+
+    const s = zeilen[0];
+    if (!s) return { ok: false, fehler: 'Der Kanal ist nicht mehr eingetragen', endgueltig: true };
+
+    // Der Schalter. Zwischen Vormerken und jetzt umgelegt heisst: nicht senden.
+    if (!Number(s.chat_ansage_an)) {
+        return { ok: true, fehler: null, endgueltig: true, hinweis: 'Ansage inzwischen abgeschaltet' };
+    }
+
+    // Kein Heim mehr heisst: Der Ort, an dem das bedient wird, ist weg. Dann
+    // hat auch niemand mehr die Verantwortung fuer das, was dort gesagt wird.
+    if (!s.heim_guild_id) {
+        return { ok: true, fehler: null, endgueltig: true, hinweis: 'keine Heim-Guild mehr' };
+    }
+
+    const inhaber = await abonnenten.kanalInhaber(s);
+    if (!inhaber) {
+        return { ok: false, fehler: 'Die Kontoverknuepfung des Kanalinhabers fehlt', endgueltig: true };
+    }
+
+    const text = chatansage.ansage({
+        streamer: s,
+        zustand: { titel: s.titel, kategorie: s.kategorie },
+        vorlage: s.chat_ansage_text
+    });
+
+    // Ein leerer Satz ist kein Satz. Er entsteht, wenn die Vorlage aus nichts
+    // als Platzhaltern besteht und keiner davon gefuellt werden konnte -
+    // Twitch wiese ihn ab, und der Fehlertext waere kryptisch.
+    if (!text) {
+        return { ok: false, fehler: 'Der Ansagetext ist nach dem Fuellen leer', endgueltig: true };
+    }
+
+    // **Der Schluessel ist seiner.** `mitZugang` entschluesselt, erneuert bei
+    // 401 und vermerkt den Widerruf - hier faellt nur die Entscheidung, was
+    // damit getan wird.
+    const ergebnis = await Verbindungsspeicher.mitZugang(
+        { userId: inhaber, plattform: 'twitch' },
+        (zugang) => twitch.chatSenden(s.kanal_id, text, zugang));
+
+    // `null` heisst: gar keine Zusage (mehr). Genau das ist der Widerruf - und
+    // er muss sich lesen wie eine Entscheidung des Streamers, nicht wie eine
+    // Stoerung (17.5, Punkt 3).
+    if (!ergebnis) {
+        return {
+            ok: false, endgueltig: true,
+            fehler: 'Der Kanalinhaber hat das Schreiben unter seinem Namen nicht (mehr) erlaubt'
+        };
+    }
+
+    if (!ergebnis.ok) {
+        return { ok: false, fehler: ergebnis.grund || 'Twitch hat die Ansage abgelehnt', endgueltig: true };
+    }
+
+    // **HTTP 200 und trotzdem nichts im Chat.** `is_sent: false` kommt bei
+    // AutoMod, Nur-Follower-Chat, Slow-Modus oder doppeltem Text. Das als
+    // Erfolg zu buchen waere die halbe Auskunft: Auf der Seite stuende
+    // "gesendet", und im Chat stuende nichts.
+    if (!ergebnis.gesendet) {
+        return { ok: false, fehler: `Twitch hat die Ansage nicht zugestellt: ${ergebnis.grund}`, endgueltig: true };
+    }
+
+    return {
+        ok: true, fehler: null, endgueltig: false,
+        hinweis: nutzlast.probe ? 'Probe im Chat gesendet' : 'Ansage im Chat gesendet'
+    };
+}
+
+/**
  * Alles laden, was fuer eine Nachricht gebraucht wird.
  *
  * @param {Object} auftrag Outbox-Zeile
@@ -266,6 +396,14 @@ async function ausfuehren(auftrag) {
     // und die Rolle bliebe fuer immer haengen.
     if (auftrag.aktion === 'rolle_geben' || auftrag.aktion === 'rolle_nehmen') {
         return await rolleSetzen(auftrag);
+    }
+
+    // **Auch die Chat-Ansage kommt VOR `umfeldLaden`** (Stufe 13c), und aus
+    // einem verwandten Grund: Sie hat gar kein Ziel. `target_id` ist NULL,
+    // weil sie keiner Guild gehoert, sondern dem Kanal - `umfeldLaden` wuerde
+    // sie mit "Ziel existiert nicht mehr" wegwerfen.
+    if (auftrag.aktion === 'chat_ansage') {
+        return await chatAnsageSenden(auftrag);
     }
 
     const umfeld = await umfeldLaden(auftrag);
@@ -737,5 +875,6 @@ function anhalten() {
 
 module.exports = {
     TAKT_MS, JE_LAUF, HOECHSTVERSUCHE, BOT_FRIST_MS, BRAUCHT_KANAL,
-    starten, anhalten, lauf, auswaehlen, abarbeiten, ausfuehren, istEndgueltig, istWeg
+    starten, anhalten, lauf, auswaehlen, abarbeiten, ausfuehren, chatAnsageSenden,
+    istEndgueltig, istWeg
 };

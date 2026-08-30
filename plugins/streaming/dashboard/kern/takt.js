@@ -48,6 +48,25 @@ const ANREICHERN_MS = 30_000;
 const SCHONFRIST_MS = 10 * 60 * 1000;
 
 /**
+ * Wie lange die Chat-Ansage auf die Anreicherung wartet (Stufe 13c).
+ *
+ * **Warum sie ueberhaupt wartet, wo die Discord-Ankuendigung es nicht tut:**
+ * Eine Discord-Nachricht wird nachgezogen, sobald Titel und Kategorie da sind
+ * - `streaming_messages` merkt sich dafuer die Kennung. Eine Chatnachricht
+ * laesst sich nicht bearbeiten. Was ohne Titel hinausgeht, bleibt ohne Titel.
+ *
+ * 45 s sind der Anreicherungstakt (30 s) plus Luft. Gewartet wird **nur**,
+ * wenn die Vorlage die Angaben ueberhaupt nennt und sie noch fehlen; wer
+ * "Wir sind live!" schreibt, wartet auf nichts.
+ *
+ * ⚠ **Es ist eine Frist, keine Garantie.** Liefert Twitch bis dahin nichts,
+ * geht die Ansage trotzdem hinaus - `chatansage.saubern()` raeumt die Luecke
+ * auf. Eine Ansage, die eine Minute spaeter kommt, ist noch eine Ansage; eine,
+ * die auf Daten wartet, die nie kommen, ist keine.
+ */
+const ANSAGE_WARTEN_MS = 45_000;
+
+/**
  * Zeitzone, in der Ruhezeiten gelten, solange die Guild nichts anderes sagt.
  *
  * Ohne Vorgabe waere es die Zeitzone des Servers - und die kennt niemand, der
@@ -305,13 +324,86 @@ async function gingLive(streamer, zustand, ereignis) {
 
     const anzahl = await auffaechern(streamer.id, 'posten');
 
+    // **Die Ansage im Twitch-Chat haengt an derselben Entscheidung** (13c).
+    // Sie steht deshalb hier und nicht vor den beiden Abbruechen oben: Was
+    // wegen Abklingzeit keine Discord-Ankuendigung wert ist, ist auch keine
+    // Zeile im Chat wert. Ein zweites "Wir sind live!" nach einem
+    // Verbindungsabriss waere im Chat sogar unangenehmer als im Discord - dort
+    // steht es unter dem Namen des Streamers.
+    //
+    // **Eigenes `catch`, und das ist keine Ziererei.** Die Discord-Auftraege
+    // sind an dieser Stelle schon geschrieben. Wuerde hier etwas werfen, gaebe
+    // `verarbeiten` das Ereignis als gescheitert zurueck - die Ankuendigung
+    // waere unterwegs und im Protokoll stuende ein Fehlschlag. Die neue Sache
+    // darf die alte nicht mitreissen; gemeldet wird sie trotzdem.
+    let ansage = false;
+    try {
+        ansage = await chatAnsageVormerken(streamer);
+    } catch (err) {
+        log().error(`[Streaming] Chat-Ansage fuer ${streamer.login} nicht vorgemerkt:`, err);
+    }
+
     // `zuletzt_gemeldet_am` wird hier BEWUSST nicht gesetzt. Es steuert die
     // Abklingzeit, und die darf sich nur auf tatsaechlich gesendete
     // Ankuendigungen stuetzen. Vorher stand hier ein NOW() direkt nach dem
     // Auffaechern - scheiterte der Versand danach, behauptete der Zustand
     // trotzdem "gemeldet" und sperrte 15 Minuten lang jeden neuen Versuch.
     // Gesetzt wird es jetzt von der Drossel, wenn eine Nachricht wirklich steht.
-    return `${anzahl} Auftrag/Auftraege geschrieben`;
+    return `${anzahl} Auftrag/Auftraege geschrieben` + (ansage ? ', dazu die Chat-Ansage' : '');
+}
+
+/**
+ * Die Live-Ansage im Twitch-Chat vormerken (Stufe 13c).
+ *
+ * **Getrennt von `auffaechern()`, weil es kein Auffaechern ist.** Dort wird
+ * ein Ereignis auf viele Ziele verteilt; hier entsteht hoechstens **ein**
+ * Auftrag, und er geht nicht an eine Guild, sondern in den Chat des Kanals.
+ *
+ * Drei Bedingungen, jede aus einer anderen Ecke:
+ *
+ *   Heim gewaehlt    ohne Heim gibt es keinen Ort, an dem der Schalter steht -
+ *                    und die Outbox braucht eine `guild_id`
+ *   Schalter an      die ausdrueckliche Entscheidung, im eigenen Chat zu reden
+ *   (Schluessel)     wird NICHT hier geprueft, sondern beim Senden - siehe
+ *                    unten
+ *
+ * **Warum der Schluessel hier fehlt und erst die Drossel danach fragt:**
+ * Zwischen Vormerken und Senden liegen bis zu 45 Sekunden, und in genau dieser
+ * Zeit kann der Streamer die Erlaubnis zuruecknehmen. Wer hier prueft, prueft
+ * einen Stand, der beim Senden schon nicht mehr gilt - das waere ein
+ * Widerruf, der nicht greift (17.5, Punkt 3).
+ *
+ * @param {Object} streamer Zeile aus `streaming_streamers`
+ * @returns {Promise<boolean>} true, wenn ein Auftrag geschrieben wurde
+ */
+async function chatAnsageVormerken(streamer) {
+    // Frisch lesen statt aus `streamer` zu nehmen: Der Datensatz stammt aus
+    // dem Posteingangslauf und kann Minuten alt sein. Ein Schalter, der
+    // inzwischen aus ist, darf nicht doch noch senden.
+    const zeilen = await db().query(
+        'SELECT heim_guild_id, chat_ansage_an, chat_ansage_text FROM streaming_streamers WHERE id = ?',
+        [streamer.id]);
+    const s = zeilen[0];
+
+    if (!s || !s.heim_guild_id || !Number(s.chat_ansage_an)) return false;
+
+    // Wartet die Ansage auf Titel und Kategorie? Nur dann, und nur solange
+    // sie wirklich fehlen.
+    const chatansage = require('../ausgabe/chatansage');
+    const zustandZeilen = await db().query(
+        'SELECT titel, kategorie FROM streaming_state WHERE streamer_id = ?', [streamer.id]);
+    const z = zustandZeilen[0] || {};
+
+    const wartet = chatansage.brauchtAnreicherung(s.chat_ansage_text)
+                && !z.titel && !z.kategorie;
+
+    await db().query(`
+        INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast, faellig_ab)
+        VALUES (NULL, ?, 'chat_ansage', ?, DATE_ADD(NOW(3), INTERVAL ? MICROSECOND))
+    `, [String(s.heim_guild_id), JSON.stringify({ streamer_id: streamer.id }),
+        (wartet ? ANSAGE_WARTEN_MS : 0) * 1000]);
+
+    return true;
 }
 
 /**
@@ -858,4 +950,4 @@ function anhalten() {
     uhren = [];
 }
 
-module.exports = { TAKT_MS, ANREICHERN_MS, TAG_MS, alsDatum, starten, anhalten, posteingangLauf, anreicherungsLauf, tagesLauf, rollenAuffaechern, verarbeiten };
+module.exports = { TAKT_MS, ANREICHERN_MS, ANSAGE_WARTEN_MS, TAG_MS, alsDatum, starten, anhalten, posteingangLauf, anreicherungsLauf, tagesLauf, rollenAuffaechern, chatAnsageVormerken, verarbeiten };

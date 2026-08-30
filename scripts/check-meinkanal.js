@@ -55,6 +55,30 @@ function pruefe(gut, text, zusatz = '') {
 /** @param {string} p Pfad ab Projektwurzel @returns {string} Inhalt */
 const lies = (p) => fs.readFileSync(path.join(WURZEL, p), 'utf8');
 
+/**
+ * Denselben Text ohne Kommentare.
+ *
+ * **Nachgeschaerft am 2026-08-30, weil die Regel darunter falsch Alarm schlug.**
+ * Sie suchte `\bschreiben\b` im ganzen Quelltext - und fand das Wort in einem
+ * deutschen Kommentar ("darf der Chatbot unter seinem Namen schreiben?").
+ * Gemessen wurde also die Prosa ueber dem Code statt der Code.
+ *
+ * Dieselbe Falle steckte am selben Tag in `check-chatansage.js`: Die Pruefung
+ * "die Migration destrukturiert nicht" schlug an dem Kommentar an, der genau
+ * davor warnt. Wer mit `grep` ueber Quelltext prueft, prueft die
+ * Beschreibung mit.
+ *
+ * Kein Parser und keiner, der einer sein will: `//` innerhalb einer
+ * Zeichenkette (etwa `https://`) ueberlebt das nicht. Nur dort einsetzen, wo
+ * nach **Code** gesucht wird.
+ *
+ * @param {string} text Quelltext
+ * @returns {string} Quelltext ohne Kommentare
+ */
+const ohneKommentareJs = (text) => String(text)
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/^\s*\/\/.*$/gm, ' ');
+
 (async () => {
 
 // ---------------------------------------------------------------------
@@ -178,10 +202,29 @@ const ERLAUBTES_NEIN = [
     ['Bot in meinem Chat',
      'Die Liste der moderierten Kanaele kam an und der Kanal stand nicht darin.'],
     ['Chatbot verwaltet in',
-     '`heim_guild_id` wurde gelesen und war NULL - noch niemand hat gewaehlt.']
+     '`heim_guild_id` wurde gelesen und war NULL - noch niemand hat gewaehlt.'],
+
+    // Stufe 13c. Alle drei lesen und finden nichts - keiner von ihnen ist ein
+    // Abbruch. Was hier klemmen kann (`zusageLesen` wirft), endet einen
+    // Zweig weiter oben bei `unbekannt`.
+    ['Zu diesem Kanal ist kein Konto verknuepft.',
+     '`kanalInhaber` wurde gefragt und gab NULL - dann gibt es niemanden, der erlauben koennte.'],
+    ['if (!zusage) return { zustand: \'nein\'',
+     '`user_connection_grants` wurde gelesen und war leer - nie erteilt oder widerrufen.'],
+    ['scopes.includes(SCHREIB_SCOPE) ? \'ja\' : \'nein\'',
+     'Der Schluessel kam an und traegt `user:write:chat` nicht - das ist gelesen, nicht geraten.'],
+    ['Chatbot schreibt unter meinem Namen',
+     'Die Zeile im Profil gibt weiter, was `darfSchreiben` gelesen hat.']
 ];
 
-const neinStellen = (meinkanalQuelle.match(/zustand: 'nein'/g) || []).length;
+// **Auch das Ternaer zaehlt mit** (gefunden am 2026-08-30).
+//
+// Bis hierher zaehlte `zustand: 'nein'`. Die Stelle
+// `zustand: scopes.includes(…) ? 'ja' : 'nein'` ist genauso ein `nein` - und
+// sie war fuer die Zaehlung unsichtbar. Die Regel haette also eine neue
+// `nein`-Stelle durchgelassen, sobald jemand sie als Ternaer schreibt; genau
+// die Bauform, die man waehlt, wenn es kurz werden soll.
+const neinStellen = (ohneKommentareJs(meinkanalQuelle).match(/'nein'/g) || []).length;
 pruefe(neinStellen === ERLAUBTES_NEIN.length,
     `jede \`nein\`-Stelle steht mit Grund in der Liste (${neinStellen} im Code, ${ERLAUBTES_NEIN.length} eingetragen)`,
     'jede weitere waere ein Abbruchgrund, der sich als Tatsache ausgibt — eintragen oder auf `unbekannt` aendern');
@@ -294,7 +337,11 @@ console.log('\n7. Nichts wird versprochen, was es nicht gibt');
 // es weiter nicht) und haette behauptet, es gaebe keinen Schreibweg.
 const registryQuelle = lies('packages/dunebot-sdk/lib/VerbindungsRegistry.js');
 
-pruefe(!/\bschreiben\b/.test(meinkanalQuelle) && !/schreiben:/.test(registryQuelle),
+// **Und enger gefasst:** Gesucht ist eine Funktion oder ein Feld dieses
+// Namens, nicht das Wort. `schreiben(` und `schreiben:` treffen genau das -
+// ein Satz, in dem "schreiben" vorkommt, nicht mehr.
+pruefe(!/\bschreiben\s*[(:]/.test(ohneKommentareJs(meinkanalQuelle))
+       && !/\bschreiben\s*[(:]/.test(ohneKommentareJs(registryQuelle)),
     'es gibt kein freies schreiben()',
     'ein Plugin duerfte dem Profil sonst beliebige Formulare unterschieben - der Kern kennt die Plattform nicht');
 

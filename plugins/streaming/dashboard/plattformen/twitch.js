@@ -1172,6 +1172,93 @@ async function moderierteKanaele(kontoId, zugang) {
 }
 
 /**
+ * Eine Nachricht in den Chat eines Kanals schreiben (Stufe 13c).
+ *
+ * **Der Absender ist der Kanalinhaber selbst.** `broadcaster_id` und
+ * `sender_id` tragen dieselbe Kennung, und der Schluessel ist seiner - so
+ * erscheint die Zeile unter **seinem** Namen, nicht unter dem eines Bots. Das
+ * ist die Entscheidung vom 2026-08-29 (14-Rechte-neu-denken.md, 17.4) und der
+ * Grund, warum hier kein zweiter Schluesselbund noetig war: Sein Token haben
+ * wir seit 12b.
+ *
+ * Die Auflage von Twitch dazu, am 2026-08-30 nachgesehen: *„Requires
+ * `user:write:chat` scope."* Mehr nicht - `user:bot` und `channel:bot` gelten
+ * nur, wenn ein App-Token sendet, und das tut es hier nicht.
+ *
+ * ## ⚠ HTTP 200 heisst NICHT "steht im Chat"
+ *
+ * Twitch antwortet mit `data[0].is_sent` und, wenn `false`, mit einem
+ * `drop_reason`. Eine Nachricht, die der AutoMod haelt oder die gegen eine
+ * Kanaleinstellung verstoesst (Nur-Follower, Slow-Modus, doppelter Text),
+ * kommt hier als **Erfolg** an und erscheint trotzdem nirgends. Wer nur
+ * `ok` prueft, meldet dem Streamer eine Ansage, die niemand gesehen hat -
+ * genau die halbe Auskunft, die schlimmer ist als keine.
+ *
+ * Deshalb hat die Rueckgabe zwei getrennte Felder: `ok` sagt, ob Twitch die
+ * Anfrage annahm, `gesendet` sagt, ob die Zeile im Chat steht.
+ *
+ * @param {string} kanalId Twitch-ID des Kanals (Absender und Ziel zugleich)
+ * @param {string} text Die Nachricht, hoechstens 500 Zeichen
+ * @param {string} zugang Benutzerschluessel des Kanalinhabers
+ * @returns {Promise<{ok: boolean, abgelehnt: boolean, gesendet: boolean, nachrichtId: string|null, grund: string|null}>}
+ */
+async function chatSenden(kanalId, text, zugang) {
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId) {
+        return { ok: false, abgelehnt: false, gesendet: false, nachrichtId: null,
+                 grund: 'Die Zugangsdaten der Anwendung fehlen' };
+    }
+
+    const antwort = await fetch(`${HELIX}/chat/messages`, {
+        method: 'POST',
+        headers: {
+            'Client-Id': daten.clientId,
+            Authorization: `Bearer ${zugang}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            broadcaster_id: String(kanalId),
+            sender_id: String(kanalId),
+            message: String(text)
+        })
+    });
+
+    // 401 bedeutet hier wie ueberall: erneuern und noch einmal. Das erledigt
+    // `Verbindungsspeicher.mitZugang`, wenn wir `abgelehnt` melden - und nur
+    // dann. Ein `ok: false` ohne dieses Kennzeichen fuehrte dazu, dass ein
+    // abgelaufener Schluessel als "Twitch will nicht" erschiene.
+    if (antwort.status === 401) {
+        return { ok: false, abgelehnt: true, gesendet: false, nachrichtId: null,
+                 grund: 'Der Schluessel wird von Twitch abgelehnt' };
+    }
+
+    let json = null;
+    try { json = await antwort.json(); } catch { /* leer ist auch eine Antwort */ }
+
+    if (!antwort.ok) {
+        // Twitchs Text wird durchgereicht, nicht gedeutet. Bei fehlendem Scope
+        // nennt er ihn beim Namen, und das ist genau, was der Streamer lesen
+        // muss - "hat nicht geklappt" schickte ihn auf die Suche.
+        return { ok: false, abgelehnt: false, gesendet: false, nachrichtId: null,
+                 grund: json?.message || `HTTP ${antwort.status}` };
+    }
+
+    const ergebnis = json?.data?.[0] || null;
+    const gesendet = Boolean(ergebnis?.is_sent);
+
+    return {
+        ok: true,
+        abgelehnt: false,
+        gesendet,
+        nachrichtId: ergebnis?.message_id || null,
+        grund: gesendet ? null
+             : (ergebnis?.drop_reason?.message
+                || ergebnis?.drop_reason?.code
+                || 'Twitch hat die Nachricht ohne Begruendung nicht zugestellt')
+    };
+}
+
+/**
  * Aus einem Abo-Ereignis die beteiligte Person herausziehen.
  *
  * **Beim Verschenken ist es nicht der Schenkende.** `channel.subscribe` traegt
@@ -1270,6 +1357,7 @@ module.exports = {
     EREIGNISSE_ABO, EREIGNISSE_MELDER, typenVon,
     abonnentenLesen, abonnentAus, melderAus,
     moderierteKanaele,
+    chatSenden,
     conduitSichern, shardSetzen,
     chatAbonnieren, chatAus, EREIGNIS_CHAT,
     HOECHSTALTER_MS,

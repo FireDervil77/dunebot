@@ -32,6 +32,12 @@ const WURZEL = path.join(__dirname, '..');
 const KERN = path.join(WURZEL, 'apps/dashboard/themes/default/views');
 const PV = path.join(WURZEL, 'plugins/streaming/dashboard/views');
 
+// Stufe 13c: Die Chatbot-Seite bekommt seither Platzhalterliste, Vorgabetext
+// und Grenze aus derselben Quelle wie der Router. Hier abschreiben hiesse,
+// die Seite gegen andere Werte zu pruefen, als sie im Betrieb bekommt.
+const { PLATZHALTER_CHAT, VORGABE_CHAT, CHAT_MAX } =
+    require(path.join(WURZEL, 'plugins/streaming/shared/vorlagen.js'));
+
 let faelle = 0;
 let abweichungen = 0;
 
@@ -291,13 +297,26 @@ const grundgeruest = {
     bericht: null, leitung: { verbunden: false, conduitId: null, fehler: null, chat: [] },
     vorWieLange: () => 'vor 1 Minute',
     hasPermission: () => true,
-    csrfToken: 'x'
+    csrfToken: 'x',
+
+    // Was die Route seit Stufe 13c mitgibt. **Nicht mit Vorgabewerten in der
+    // Ansicht aufgefangen**: Fehlt eines davon, soll die Seite laut brechen -
+    // eine Vorlage, die sich selbst einen leeren Platzhaltertext ausdenkt,
+    // zeigt ihn genau so im Betrieb.
+    platzhalter: PLATZHALTER_CHAT,
+    vorgabeAnsage: VORGABE_CHAT,
+    chatMax: CHAT_MAX,
+    zusageName: 'chatschreiben'
 };
 
 const einKanal = {
     id: 3, login: 'firedervil', anzeigename: 'FireDervil', kanal_id: '77',
     anschluss: { label: 'Bot im Chat', zustand: 'unbekannt', text: 'Nicht abfragbar.' },
-    abo: null, empfangen: null
+    abo: null, empfangen: null,
+    // Stufe 13c: die Ansage, noch nicht erlaubt und nicht eingeschaltet
+    chat_ansage_an: 0, chat_ansage_text: null,
+    darf_schreiben: { zustand: 'nein', grund: null },
+    letzte_ansage: null
 };
 
 for (const [was, daten] of [

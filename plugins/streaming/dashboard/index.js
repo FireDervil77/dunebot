@@ -141,6 +141,32 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                         scopes: ['moderator:read:followers']
                     },
 
+                    // **Die erste Zusage, die etwas SCHREIBT** (Stufe 13c).
+                    // Alle anderen lesen; diese laesst eine Zeile unter dem
+                    // Namen des Streamers im Chat erscheinen. Das ist eine
+                    // andere Art von Erlaubnis, und der Hinweis sagt es im
+                    // ersten Satz - nicht in einer Fussnote (17.5, Punkt 1).
+                    //
+                    // **Warum `user:write:chat` allein genuegt:** Es sendet
+                    // sein eigenes Konto in seinen eigenen Kanal. `user:bot`
+                    // und `channel:bot` verlangt Twitch nur, wenn ein
+                    // App-Token sendet - und das tut hier keins. Ein Scope
+                    // mehr "zur Sicherheit" waere eine Berechtigung, die
+                    // nichts freischaltet und trotzdem im Dialog steht.
+                    //
+                    // Die Vereinigung mit den schon erteilten Scopes macht
+                    // der Kern (`erbeteneScopes` im Verbindungs-Router).
+                    // Wuerde hier nur dieser eine erbeten, kaeme ein
+                    // Schluessel zurueck, der NUR schreiben kann - und die
+                    // Abonnenten-Rolle waere still tot.
+                    chatschreiben: {
+                        label: 'Chatbot darf unter meinem Namen schreiben',
+                        hinweis: 'Der Chatbot schreibt dann in deinem Twitch-Chat — unter deinem Namen, '
+                               + 'nicht unter einem Botnamen. Für die Live-Ansage beim Streamstart. '
+                               + 'Du kannst sie jederzeit abschalten oder diese Erlaubnis zurücknehmen.',
+                        scopes: ['user:write:chat']
+                    },
+
                     // **Die einzige Zusage, die nicht einem Menschen gehört**
                     // (Stufe 13a). Hier stimmt unser eigenes Bot-Konto zu, und
                     // zwar genau einmal — Twitch: *„only needed to be
