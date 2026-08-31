@@ -46,26 +46,29 @@ require(path.join(WURZEL, 'node_modules/dotenv')).config({
 const mysql = require(path.join(WURZEL, 'node_modules/mysql2/promise'));
 
 /**
- * Der Stand vom 2026-08-29 - **kein Ziel, ein Ausgangspunkt.**
+ * **Leer seit dem 2026-08-31 - und das ist die Nachricht.**
  *
- * Diese Liste wird kuerzer, nie laenger. Wer eine Zeile entfernen kann, weil
- * die Spalte umgestellt wurde, entfernt sie. Wer eine hinzufuegen moechte,
- * baut gerade eine Spalte, die sich mit `guilds._id` nicht vergleichen laesst
- * - und sollte sie stattdessen gleich richtig anlegen.
+ * Hier standen elf Spalten: der Stand vom 2026-08-29, ausdruecklich als
+ * Ausgangspunkt und nicht als Ziel. Sie sind umgestellt
+ * (`scripts/kollationen-umstellen.js --tun`, an der Produktionsdatenbank
+ * gelaufen), samt dem Fremdschluessel `fk_music_queue_session`, der geloest und
+ * wieder gesetzt werden musste.
+ *
+ * Der Beleg ist nicht die leere Liste, sondern ein Lauf: Der Join
+ *
+ *     SELECT g._id, g.guild_name
+ *       FROM streaming_streamers s JOIN guilds g ON g._id = s.heim_guild_id
+ *
+ * hat vorher `Illegal mix of collations` geworfen - die Heim-Guild-Auswahl im
+ * Profil konnte deshalb **nie** jemand benutzen - und liefert jetzt eine Zeile.
+ *
+ * **Die Liste bleibt leer.** Jede Abweichung ist ab hier ein Fehler, keine
+ * Altlast: Wer eine Spalte anlegt, die sich mit `guilds._id` nicht vergleichen
+ * laesst, soll sie gleich richtig anlegen. Sollte hier je wieder ein Eintrag
+ * noetig scheinen, ist die Frage nicht "wie tragen wir ihn ein", sondern
+ * "warum entstand er".
  */
-const BEKANNT = new Set([
-    'automod_compound_rules.guild_id',
-    'guild_command_state.guild_id',
-    'music_history.guild_id',
-    'music_playlists.guild_id',
-    'music_queue.guild_id',
-    'music_sessions.guild_id',
-    'music_settings.guild_id',
-    'streaming_outbox.guild_id',
-    'streaming_role_grants.guild_id',
-    'streaming_streamers.heim_guild_id',
-    'streaming_targets.guild_id'
-]);
+const BEKANNT = new Set([]);
 
 (async () => {
     let verbindung;
