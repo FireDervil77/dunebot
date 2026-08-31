@@ -217,9 +217,20 @@
                                                 </a>
                                             </h5>
 
-                                            <!-- Description -->
+                                            <%# Eine fehlende Beschreibung darf die SEITE nicht mitnehmen.
+                                                Am 2026-08-31 tat sie genau das: `addon.description` war
+                                                NULL (marktplatz-bruecke.js fuellt die Spalte nicht), und
+                                                `.substring` darauf warf 500 — fuer den ganzen Marktplatz,
+                                                nicht nur fuer die eine Karte. Eine Zeile ohne Text ist
+                                                unschoen; eine Seite, die deshalb gar nicht laedt, ist
+                                                kaputt. %>
                                             <p class="card-text text-secondary small">
-                                                <%= addon.description.substring(0, 100) %><%= addon.description.length > 100 ? '...' : '' %>
+                                                <% const beschreibung = (addon.description || '').trim(); %>
+                                                <% if (beschreibung) { %>
+                                                    <%= beschreibung.substring(0, 100) %><%= beschreibung.length > 100 ? '…' : '' %>
+                                                <% } else { %>
+                                                    <span class="fst-italic">Keine Beschreibung hinterlegt.</span>
+                                                <% } %>
                                             </p>
 
                                             <!-- Stats -->

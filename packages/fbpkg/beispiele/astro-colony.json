@@ -3,13 +3,13 @@
   "identity": {
     "slug": "astro-colony",
     "name": "Astro Colony",
-    "version": "1.0.8",
-    "author": "firenetworks",
-    "category": "sandbox",
     "description": {
       "de": "Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
       "en": "Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
     },
+    "version": "1.0.9",
+    "author": "firenetworks",
+    "category": "sandbox",
     "origin": {
       "type": "egg-import",
       "source": "https://raw.githubusercontent.com/pelican-eggs/games-steamcmd/main/astro_colony/egg-astro-colony.json",

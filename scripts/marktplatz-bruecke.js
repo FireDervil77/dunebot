@@ -208,13 +208,30 @@ function startzeile(paket) {
         process.exit(0);
     }
 
+    // ── description gehoert in die SPALTE, nicht nur nach game_data.meta ─────
+    //
+    // Am 2026-08-31 fehlte sie hier, und die Marktplatzseite antwortete mit 500:
+    // `addon.description.substring(...)` auf NULL. Betroffen war nicht die eine
+    // Karte, sondern die ganze Seite — und zwar seit dem 2026-08-30, als die
+    // erste Brueckenzeile entstand. Die Ansicht ist inzwischen abgesichert;
+    // trotzdem gehoert der Wert gesetzt, statt sich auf den Schutz zu verlassen.
+    //
+    // Leerzeichenkette statt NULL ist der Rueckfall: Ein Paket ohne
+    // `identity.description` ist erlaubt, eine Spalte ohne Wert erzeugt genau
+    // die Sorte Fehler, die weit weg auftaucht.
+    const beschreibung = id.description?.de || id.description?.en || '';
+    if (!beschreibung) {
+        console.log('  Hinweis: das Paket nennt keine `identity.description`.');
+        console.log('  Die Marktplatzkarte bleibt dann ohne Text.');
+    }
+
     const [erg] = await db.query(`
         INSERT INTO addon_marketplace
-            (name, slug, author_user_id, game_data, category, version,
+            (name, slug, description, author_user_id, game_data, category, version,
              steam_app_id, runtime_type, source_type, visibility, status,
              trust_level, published_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'docker_steam', 'native', 'public', 'approved', 'official', NOW())
-    `, [id.name || slug, slug, BETREIBER, JSON.stringify(gameData),
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'docker_steam', 'native', 'public', 'approved', 'official', NOW())
+    `, [id.name || slug, slug, beschreibung, BETREIBER, JSON.stringify(gameData),
         id.category || 'other', id.version || '1.0.0', steamApp]);
 
     console.log(`\n  ✓ Angelegt mit Kennung ${erg.insertId}.`);
