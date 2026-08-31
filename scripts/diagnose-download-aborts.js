@@ -2,8 +2,24 @@
 /**
  * Findet abgebrochene Client-Downloads im Apache-Log des Downloads-VHosts.
  *
- *   sudo "$(which node)" scripts/check-download-aborts.js
- *   sudo "$(which node)" scripts/check-download-aborts.js /var/log/apache2/spacecluster_downloads_access.log.1
+ * ── Warum `diagnose-` und nicht `check-` (umbenannt 2026-08-31) ──────────────
+ *
+ * Die Trennlinie ist NICHT "misst ein lebendes System" — 31 der 63 Waechter
+ * fragen die echte Datenbank, und das ist hier Absicht (check-kollationen misst
+ * dort ausdruecklich den Bestand). Nachgezaehlt am 2026-08-31, weil die erste
+ * Fassung dieses Absatzes genau das behauptete und damit falsch lag.
+ *
+ * Die Linie ist: Ein Waechter kommt mit den Rechten aus, die der Lauf hat.
+ * Dieses Skript braucht sudo und eine Apache-Logdatei, die nicht zum Produkt
+ * gehoert. Es stand deshalb im Lauf ueber alle Waechter dauerhaft rot — nicht
+ * wegen eines Mangels am Bestand, sondern weil die Datei nicht lesbar war
+ * (Baustelle 87).
+ *
+ * Ein Lauf, in dem ein Rot nichts bedeutet, bringt einem bei, Rot zu
+ * uebersehen. Also raus aus dem Namensraum statt Ausnahme in der Schleife.
+ *
+ *   sudo "$(which node)" scripts/diagnose-download-aborts.js
+ *   sudo "$(which node)" scripts/diagnose-download-aborts.js /var/log/apache2/spacecluster_downloads_access.log.1
  *
  * Wie das funktioniert: Das LogFormat "combined" nutzt %O — tatsaechlich
  * gesendete Bytes. Bricht ein Download ab, ist %O deutlich kleiner als die

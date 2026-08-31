@@ -1127,7 +1127,31 @@
           "items": {
             "type": "string"
           },
-          "description": "Was eine Sicherung mitnehmen MUSS."
+          "description": "Wo der Spielstand liegt. ACHTUNG, das ist KEINE Anweisung an die Sicherung: Die tart das ganze Serververzeichnis und hat den Spielstand ohnehin (nachgesehen 2026-08-31). Gelesen wird das Feld an genau einer Stelle — der Serverseite, die es als \"Welten\" anzeigt. Wer Erhaltenswertes aus dem ersetzbaren game/ herausholen will, braucht `persist`."
+        },
+        "persist": {
+          "type": "array",
+          "description": "Umleitungen: Was das Spiel in game/ schreibt, aber niemand verlieren will. Der Verzeichnisvertrag (E-19) gibt game/ zum Wegwerfen frei — jedes Unreal-Spiel legt seinen Spielstand aber unter `<Spiel>/Saved/` ab, also genau dort. Der Installationsweg legt einen relativen Symlink von `from` nach `to` und zieht einen bereits vorhandenen Spielstand mit um.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from",
+              "to"
+            ],
+            "properties": {
+              "from": {
+                "type": "string",
+                "pattern": "^game/",
+                "description": "Der Ort, an den das Spiel schreibt — GEMESSEN am laufenden Server, nicht aus der Dokumentation uebernommen. Muss in game/ liegen; anderswo gaebe es nichts umzuleiten."
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^data/",
+                "description": "Der bleibende Ort. Muss in data/ liegen — cache/ darf jederzeit verschwinden, und .fb gehoert uns."
+              }
+            }
+          }
         },
         "mods": {
           "type": "array",

@@ -48,6 +48,15 @@
         "source": {
           "type": "string",
           "description": "Belegstelle für DIESEN Eintrag, wenn sie von der allgemeinen Quellenliste abweicht."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Der Server startet ohne diesen Parameter nicht. Nur setzen, wenn es GEMESSEN ist — die Dokumentation eines Spiels nennt Pflichtangaben regelmäßig als optional. Vorgabe ist ungesetzt, nicht `false`: „nicht nachgesehen\" und „nachgesehen, ist optional\" sind zwei verschiedene Aussagen."
+        },
+        "gemessen_am": {
+          "type": "string",
+          "description": "Datum, an dem dieser Eintrag an einem LAUFENDEN Server nachgeprüft wurde (YYYY-MM-DD). Trennt Messung von Übernahme aus einer Quelle: Was hier ein Datum trägt, haben wir selbst gesehen.",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
         }
       }
     }
