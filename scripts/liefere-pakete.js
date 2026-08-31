@@ -85,6 +85,32 @@ function sammleDateien() {
 }
 
 /** Das Tor: dieselbe Prüfung wie überall. Rückgabewert 0 oder nichts geht rein. */
+/**
+ * Die Zeilen, die den GRUND nennen — nicht die letzten sechs.
+ *
+ * ── Der Fehler, gegen den das hier steht (2026-08-31) ────────────────────────
+ *
+ * Hier stand `tor.text.split('\n').slice(-6)`. Der Prüfer schreibt aber zuerst
+ * die Beanstandungen und DANACH die Liste der offenen Punkte aus `status.open`.
+ * Bei einem Paket mit neun offenen Punkten zeigte die Abweisung also neun
+ * Zeilen Prosa und verschluckte die eine Zeile, die zählt:
+ *
+ *     Schema: /image should have required property 'digest'
+ *
+ * Der Betreiber sah eine Begründung, die keine war — offene Punkte sind
+ * ausdrücklich KEIN Ablehnungsgrund, unvollständige Pakete werden eingeliefert.
+ * Eine Ausgabe, die wie eine Erklärung aussieht und die Ursache verbirgt, ist
+ * schlechter als gar keine.
+ *
+ * Gesucht werden deshalb die Zeilen, die eine Beanstandung tragen; nur wenn
+ * keine gefunden wird, gibt es den Anfang der Ausgabe als Notnagel.
+ */
+function grundZeilen(text) {
+    const zeilen = text.split('\n');
+    const treffer = zeilen.filter(z => /Schema:|✘|Fehler|fehlt|ungültig|ungueltig/i.test(z));
+    return treffer.length ? treffer.slice(0, 8) : zeilen.slice(0, 8);
+}
+
 function bestehtPruefung(datei) {
     try {
         execFileSync('node', [PRUEFER, datei], { stdio: 'pipe' });
@@ -135,7 +161,7 @@ function dokumentUndSumme(paket) {
             const tor = bestehtPruefung(datei);
             if (!tor.ok) {
                 console.log(`✘ ${kurz}\n    Prüfung nicht bestanden — nicht eingeliefert.`);
-                for (const z of tor.text.split('\n').slice(-6)) console.log(`    ${z}`);
+                for (const z of grundZeilen(tor.text)) console.log(`    ${z}`);
                 abgewiesen++;
                 continue;
             }

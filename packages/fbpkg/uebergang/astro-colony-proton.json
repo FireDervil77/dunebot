@@ -1,0 +1,38 @@
+{
+  "format": "FBUEB_v1",
+  "slug": "astro-colony-proton",
+  "gilt_bis": "bis `apply.target=file` im Paketpfad verdrahtet ist",
+  "warum": [
+    "Dieselbe Bruecke wie beim Linux-Paket, fuer das Windows-Geschwister.",
+    "",
+    "Serverseite.baueWerteSchritt() baut die Werte-Karte aus den PAKET-Einstellungen",
+    "und holt je Feld den ENV-Namen von hier. Ohne Zuordnung stuende in der",
+    "ServerSettings.ini ueberall die eingebaute Vorgabe — der Betreiber haette ein",
+    "Kennwort eingetippt, und der Server waere offen. Ein stiller Fehler mit",
+    "Publikum.",
+    "",
+    "Die Zuordnung ist Zeichen fuer Zeichen dieselbe wie bei astro-colony: Es ist",
+    "dasselbe Spiel, nur ein anderer Build. Was sich unterscheidet (App-ID, Image,",
+    "Startbefehl, Konfigurationspfad), steht im Paket und nicht hier.",
+    "",
+    "Sie faellt weg, sobald settings.apply.target=file im Paketpfad wirklich",
+    "ausgefuehrt wird — fuer beide Pakete zugleich."
+  ],
+  "zuordnung": {
+    "name": "SERVER_NAME",
+    "password": "SERVER_PASSWORD",
+    "max_players": "SERVER_MAXPLAYERS",
+    "map_name": "SERVER_MAPNAME",
+    "map_seed": "SERVER_MAPSEED",
+    "load_latest_savegame": "SERVER_LOADLATESTSAVEGAME",
+    "shared_technologies": "SERVER_SHAREDTECHNOLOGIES",
+    "oxygen_consumption": "SERVER_OXYGENCONSUMPTION",
+    "free_construction": "SERVER_FREECONSTRUCTION",
+    "autosave_interval": "SERVER_AUTOSAVEINTERVAL",
+    "autosaves_count": "SERVER_AUTOSAVESCOUNT",
+    "admins": "SERVER_ADMINS",
+    "auto_update": "AUTO_UPDATE"
+  },
+  "geprueft_am": "2026-08-30",
+  "geprueft_gegen": "noch kein Server — die Zuordnung stammt aus den Egg-Variablennamen (egg-astro-colony.json) und ist am laufenden Server NICHT belegt. Der erste Anlegevorgang ist die Probe: Steht in ServerSettings.ini das eingetippte Kennwort, traegt sie."
+}

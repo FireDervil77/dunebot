@@ -198,6 +198,31 @@ function baueZustand(server) {
  * **Ein ungeprüfter Name erscheint nie.** Lieber eine nüchterne IP als ein
  * Name, der ins Leere führt: Der Fehler heisst dann „Server nicht gefunden",
  * und niemand sucht ihn in einem DNS-Eintrag.
+ *
+ * ── B93: es ist NICHT eine Adresse, es sind zwei (2026-08-31) ───────────────
+ *
+ * Hier stand fest der Spielport. Für Valheim ist das die Adresse, die ein
+ * Spieler eintippt; für Astro Colony nicht. GEMESSEN am laufenden Server 174,
+ * von aussen und über den Namen, nicht über die IP:
+ *
+ *   node1.firenetworks.de:25002   ✗ keine Antwort (Timeout)   ← stand hier
+ *   node1.firenetworks.de:25003   ✓ "Fires Astro Bude" · BoomTown
+ *
+ * Der Betreiber gab die gezeigte Adresse in Steam ein und bekam „kennt er
+ * nicht". Es lag weder am Namen (er löst auf rs54 auf) noch an einer Firewall —
+ * nur am Port.
+ *
+ * **Welcher Port der richtige ist, hängt davon ab, wonach gefragt wird**:
+ * Die Steam-Serverliste fragt auf dem Abfrageport, eine Direktverbindung geht
+ * auf den Spielport. Das sind zwei verschiedene Dinge, und sie waren hier zu
+ * einer Zeile zusammengefaltet.
+ *
+ * Deshalb werden jetzt beide gezeigt, beschriftet (Betreiber, 2026-08-31).
+ * Der billige Weg — einfach den Abfrageport nehmen — wäre falsch gewesen: Bei
+ * Valheim tippt der Spieler 2456, nicht 2457, und der Fehler führe lautlos mit.
+ *
+ * `text` bleibt der Spielport, damit nichts, was diese Zeile heute liest,
+ * plötzlich etwas anderes bekommt. Neu ist `zeilen`.
  */
 function baueAdresse(server) {
     const nameGilt = Boolean(server.fqdn_gilt) && Boolean(server.fqdn);
@@ -205,15 +230,30 @@ function baueAdresse(server) {
         || (nameGilt ? server.fqdn : null)
         || server.rootserver_ip
         || null;
-    let port = null;
+
+    let ports = null;
     try {
-        const p = typeof server.ports === 'string' ? JSON.parse(server.ports) : server.ports;
-        const eintrag = p?.game || p?.main || (p && Object.values(p)[0]);
-        port = eintrag?.external ?? eintrag?.internal ?? (typeof eintrag === 'number' ? eintrag : null);
+        ports = typeof server.ports === 'string' ? JSON.parse(server.ports) : server.ports;
     } catch { /* eine unlesbare Portangabe ist kein Grund, die Seite zu verlieren */ }
 
-    if (!host || !port) return null;   // null heisst: die Ansicht sagt „unbekannt"
-    return { text: `${host}:${port}`, host, port };
+    const nummer = (eintrag) =>
+        eintrag?.external ?? eintrag?.internal ?? (typeof eintrag === 'number' ? eintrag : null);
+
+    const spiel   = nummer(ports?.game || ports?.main || (ports && Object.values(ports)[0]));
+    const abfrage = nummer(ports?.query);
+
+    if (!host || !spiel) return null;   // null heisst: die Ansicht sagt „unbekannt"
+
+    const zeilen = [];
+    // Die Serverliste zuerst: Danach sucht jemand, der den Server WEITERGIBT.
+    // Nur wenn es wirklich ein zweiter Port ist — bei einem Spiel, das beides
+    // auf demselben Port macht, wäre eine zweite Zeile eine erfundene Auskunft.
+    if (abfrage && abfrage !== spiel) {
+        zeilen.push({ zweck: 'query', label: 'Serverliste', text: `${host}:${abfrage}`, port: abfrage });
+    }
+    zeilen.push({ zweck: 'game', label: zeilen.length ? 'Direktverbindung' : 'Adresse', text: `${host}:${spiel}`, port: spiel });
+
+    return { text: `${host}:${spiel}`, host, port: spiel, zeilen };
 }
 
 /**

@@ -73,7 +73,21 @@
                   <span class="fb-muted" style="font-family:inherit">nicht gemessen</span>
                 <% } %>
               </td>
-              <td class="fb-mono" style="font-size:13px"><%= s.adresse ? s.adresse.text : '—' %></td>
+              <%# Dieselben Zeilen wie auf der Serverseite (B93) — sonst haette
+                  derselbe Server wieder zwei Wahrheiten, je nachdem wo man
+                  hinsieht. Genau das war M-1. %>
+              <td style="font-size:13px">
+                <% if (!s.adresse) { %>—<% } else { %>
+                  <% s.adresse.zeilen.forEach(function (z) { %>
+                    <div>
+                      <% if (s.adresse.zeilen.length > 1) { %>
+                        <span class="fb-muted" style="font-size:11px"><%= z.label %></span>
+                      <% } %>
+                      <span class="fb-mono"><%= z.text %></span>
+                    </div>
+                  <% }); %>
+                <% } %>
+              </td>
               <td><span class="fb-pille"><%= s.maschine || '—' %></span></td>
             </tr>
           <% }); %>

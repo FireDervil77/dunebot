@@ -62,10 +62,26 @@
           <% } %>
         </div>
 
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+<%# B93: Serverliste und Direktverbindung sind zwei verschiedene Adressen.
+    Am 2026-08-31 gemessen: Bei Astro Colony schweigt der Spielport auf eine
+    Steam-Abfrage, der Abfrageport antwortet. Eine Zeile fuer beides hat den
+    Betreiber die Adresse weitergeben lassen, unter der Steam nichts findet. %>
+        <div style="display:flex;flex-direction:column;gap:6px">
           <% if (u.adresse) { %>
-            <div class="fb-mono fb-chip"><%= u.adresse.text %></div>
-            <button type="button" class="btn btn-white btn-sm" data-fb-kopieren="<%= u.adresse.text %>">Kopieren</button>
+            <% u.adresse.zeilen.forEach(function (z) { %>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <% if (u.adresse.zeilen.length > 1) { %>
+                  <span class="fb-muted" style="font-size:12px;min-width:112px"><%= z.label %></span>
+                <% } %>
+                <div class="fb-mono fb-chip"><%= z.text %></div>
+                <button type="button" class="btn btn-white btn-sm" data-fb-kopieren="<%= z.text %>">Kopieren</button>
+              </div>
+            <% }); %>
+            <% if (u.adresse.zeilen.length > 1) { %>
+              <div class="fb-muted" style="font-size:12px">
+                In der Steam-Serverliste wird der Server unter der oberen Adresse gefunden.
+              </div>
+            <% } %>
           <% } else { %>
             <div class="fb-muted" style="font-size:13px">Adresse unbekannt — es ist kein Port belegt.</div>
           <% } %>
