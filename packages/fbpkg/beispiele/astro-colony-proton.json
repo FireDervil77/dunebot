@@ -7,7 +7,7 @@
       "de": "Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
       "en": "Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
     },
-    "version": "1.0.1",
+    "version": "1.0.2",
     "author": "firenetworks",
     "category": "sandbox",
     "origin": {
@@ -19,8 +19,8 @@
   "image": {
     "ref": "registry.firenetworks.de/fb/proton",
     "tag": "2026.08-GE-Proton11-5",
-    "digest": "sha256:b45f5e1dd40a07fed318882718c7a8797272410c9f46c921dde474a265917a34",
-    "pinned_at": "2026-08-31",
+    "digest": "sha256:fef2fda65e988fcca536d34066a5aed55a7f53dd04d60541aeb1a588f6f9d45e",
+    "pinned_at": "2026-09-01",
     "platform": "linux",
     "arch": [
       "amd64"
@@ -543,6 +543,7 @@
     "complete": false,
     "open": [
       "WOZU ES DIESES PAKET GIBT (2026-08-31): Es beantwortet EINE Frage aus Baustelle 92. Der Linux-Server (Paket astro-colony) ist installierbar, in Steam sichtbar und abfragbar, aber nicht bespielbar: Der P2P-Handschlag kommt zustande, danach fliesst nichts, und nach dem Zeitlimit wird die Sitzung abgeraeumt. Ausgeschlossen sind Maschine, Ports, Steam-Anmeldung, Kennwort und Konfiguration — je einzeln gemessen. Am 2026-08-31 kam `bAllowP2PPacketRelay=true` dazu; die Einstellung wirkt nachweislich (IdleTime sprang von 81,8 auf exakt die eingetragenen 90,006 s), half aber nicht. LAEUFT DIESER WINDOWS-BUILD, ist es der Linux-Build des Spiels. HAENGT ER GENAUSO, ist es unser Container-Netz. Vorher ist beides gleich wahrscheinlich.",
+      "IMAGE NEU GEBAUT am 2026-09-01 (Baustelle 96): Die erste Fassung dieses Pakets zeigte auf sha256:b45f5e1dd40a07fed318882718c7a8797272410c9f46c921dde474a265917a34 — ein Image OHNE libvulkan1. Damit kam der Server nicht bis zum Spiel: `proton` ist ein Python-Skript und laedt Vulkan beim Import, bedingungslos ('OSError: libvulkan.so.1: cannot open shared object file', Rueckgabewert 1). Das Image sagte in seiner eigenen Begruendung 'kein Vulkan — ein Spielserver rendert nichts'; das stimmt fuer das SPIEL und nicht fuer den STARTER. Jetzt ist der LADER drin, Treiber weiterhin nicht. Der neue Digest ist gegen die Registry geprueft: deren config.digest (55fd96ad2968…) ist identisch mit dem lokalen .Id — derselbe Vergleich, den images/bauen.sh --stand sonst fuehrt. Er musste hier von Hand gezogen werden, weil --stand nach dem KALENDERMONAT fragt und der gerade umgesprungen ist: Am 1.9. meldet es fuer alle 2026.08-Images 'nicht in dieser Fassung gebaut'.",
       "IMAGE — ERLEDIGT am 2026-08-31, und der Irrtum gehoert dazu: Die erste Fassung dieses Pakets nannte den Tag `2026.08` — abgeleitet aus der Konvention in images/bauen.sh (Jahr.Monat) und damit GERATEN. Er heisst `2026.08-GE-Proton11-5`: Bei Proton haengt die Variante mit im Tag, weil die Wine-Fassung zum Image gehoert (E-2 — dieselbe Paketfassung muss heute und in einem Jahr dasselbe ergeben). Gefunden hat es das Werkzeug, das genau dafuer da ist: `images/bauen.sh --stand` meldet, was gebaut ist und ob es in der Registry liegt, verglichen ueber den Konfigurationsdigest statt ueber den Tag. Ergebnis: 'gleich (73e09e736f3a)'. Der hier eingetragene Digest ist der MANIFEST-Digest aus RepoDigests — derselbe, den scripts/images-pinnen.js verwendet (Docker-Content-Digest), NICHT der Konfigurationsdigest, den --stand vergleicht. Die beiden sind verschieden und nicht austauschbar.",
       "KONFIGURATIONSPFAD HERGELEITET: Das Installationsskript schreibt nach Saved/Config/WindowsServer/. Beim Linux-Paket ist der Ort GEMESSEN (\"Active device profile: LinuxServer\"), hier nicht. Beim ersten Start pruefen — steht dort ein anderer Name, greift keine unserer Einstellungen, auch das Kennwort nicht, und der Server stuende OFFEN.",
       "STEAMCLIENT: Der Daemon legt nach jedem steamcmd-Schritt steamclient.so nach data/.steam/sdk{32,64} (Baustelle 90). Fuer einen WINDOWS-Build ist das wirkungslos — der braeuchte steamclient64.dll. Der Schritt schadet nicht, er kostet 30 MB. OB und WOHER dieser Build seine DLL bekommt, ist ungeklaert; moeglicherweise bringt die App sie mit. Faellt der Server auf das Null-Subsystem zurueck (Log: \"Creating online subsystem instance for: NULL\"), ist genau das die Ursache. Ein Ueberspringen des SDK-Schritts bei platform=windows waere die Folgearbeit im Daemon — bewusst NICHT vorab gebaut, weil ungemessen.",
