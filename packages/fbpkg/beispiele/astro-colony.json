@@ -7,7 +7,7 @@
       "de": "Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
       "en": "Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
     },
-    "version": "1.0.11",
+    "version": "1.0.12",
     "author": "firenetworks",
     "category": "sandbox",
     "origin": {
@@ -156,8 +156,8 @@
         "en": "Join password"
       },
       "description": {
-        "de": "Leer lassen für einen offenen Server. Wird bei der INSTALLATION in ServerSettings.ini geschrieben — eine spätere Änderung wirkt erst, wenn die Datei angepasst wird (siehe status.open).",
-        "en": "Leave empty for an open server. Written into ServerSettings.ini at INSTALL time; later changes require editing the file."
+        "de": "Leer lassen für einen offenen Server. Wirkt ab Fassung 1.0.12 bei jedem Neustart.",
+        "en": "Leave empty for an open server. Applied on every restart as of 1.0.12."
       },
       "type": "password",
       "default": "",
@@ -165,6 +165,18 @@
         {
           "target": "env",
           "variable": "SERVER_PASSWORD"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.ServerPassword"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.ServerPassword"
         }
       ],
       "takes_effect": "restart",
@@ -190,6 +202,18 @@
         {
           "target": "env",
           "variable": "SERVER_MAXPLAYERS"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.MaxPlayers"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.MaxPlayers"
         }
       ],
       "takes_effect": "restart",
@@ -213,6 +237,18 @@
         {
           "target": "env",
           "variable": "SERVER_MAPNAME"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.MapName"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.MapName"
         }
       ],
       "takes_effect": "restart",
@@ -236,6 +272,18 @@
         {
           "target": "env",
           "variable": "SERVER_MAPSEED"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.Seed"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.Seed"
         }
       ],
       "takes_effect": "new_world",
@@ -275,6 +323,18 @@
         {
           "target": "env",
           "variable": "SERVER_LOADLATESTSAVEGAME"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.ShouldLoadLatestSavegame"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.ShouldLoadLatestSavegame"
         }
       ],
       "takes_effect": "restart",
@@ -314,6 +374,18 @@
         {
           "target": "env",
           "variable": "SERVER_SHAREDTECHNOLOGIES"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.SharedTechnologies"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.SharedTechnologies"
         }
       ],
       "takes_effect": "restart",
@@ -353,6 +425,18 @@
         {
           "target": "env",
           "variable": "SERVER_OXYGENCONSUMPTION"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.OxygenConsumption"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.OxygenConsumption"
         }
       ],
       "takes_effect": "restart",
@@ -392,6 +476,18 @@
         {
           "target": "env",
           "variable": "SERVER_FREECONSTRUCTION"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.FreeConstruction"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.FreeConstruction"
         }
       ],
       "takes_effect": "restart",
@@ -415,6 +511,18 @@
         {
           "target": "env",
           "variable": "SERVER_AUTOSAVEINTERVAL"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.AutosaveInterval"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.AutosaveInterval"
         }
       ],
       "takes_effect": "restart",
@@ -438,6 +546,18 @@
         {
           "target": "env",
           "variable": "SERVER_AUTOSAVESCOUNT"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.AutosavesCount"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.AutosavesCount"
         }
       ],
       "takes_effect": "restart",
@@ -461,6 +581,18 @@
         {
           "target": "env",
           "variable": "SERVER_ADMINS"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.AdminList"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/LinuxServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.AdminList"
         }
       ],
       "takes_effect": "restart",
@@ -524,6 +656,7 @@
   "status": {
     "complete": false,
     "open": [
+      "EINSTELLUNGEN WIRKEN JETZT BEI JEDEM NEUSTART (1.0.12, 2026-09-02). Vorher wirkten sie NUR bei der Installation, und das war kein Entwurf, sondern ein fehlendes Kabel: `pkgspec.Paket` kannte den settings-Abschnitt gar nicht, `job.Config` wurde von niemandem gefuellt — waehrend `fb-cfg` im Container seit Monaten fertig ist und im Abnahmetest je Schluessel patcht und berichtet. Gebaut, aber nie verdrahtet. Fuer jemanden, der abends spielt, war jede Einstellung damit unbenutzbar: Umstellen im Panel aenderte nichts, und nichts sagte es ihm. Jede der 11 INI-Einstellungen hat jetzt zusaetzlich ein Ziel mit target=file — das env-Ziel bleibt daneben stehen, damit das Installationsskript die Datei weiterhin anlegt. ⚠ BRAUCHT DEN DAEMON VOM 2026-09-02: Ein aelterer liest den settings-Abschnitt nicht, und dann ist alles wie vorher (nicht kaputt, nur wirkungslos). ⚠ Dabei kam ein zweiter Blindgaenger heraus: `splitIniKey` trennte am ERSTEN Punkt, und Unreals Abschnittsnamen enthalten selbst einen ('/Script/ACFeature.EHServerSubsystem'). Der Wert waere in einem neu angelegten Abschnitt '/Script/ACFeature' gelandet, den das Spiel nie liest — samt Erfolgsmeldung. Der Fehler lag seit jeher da und konnte nicht auffallen, weil nie jemand in eine INI schrieb. Jetzt am letzten Punkt, mit Test.",
       "-Port WIRD NICHT MEHR UEBERGEBEN (1.0.10, 2026-09-02), gleiche Aenderung wie im Windows-Paket 1.0.7 und aus demselben Grund: Der Pelican-Egg, aus dem dieses Paket stammt, startet mit `-log -QueryPort={{SERVER_QUERY_PORT}} -SteamServerName=\"…\"` und uebergibt KEINEN Spielport; die AMP-Vorlage ebenso. Beide laufen in Containern mit Portabbildung und oeffnen ausschliesslich den Steam-Abfrageport. Am Windows-Server gemessen: Auf dem uebergebenen Spielport lauscht kein Socket, waehrend Steam ihn als Spieladresse bewirbt. Der Verdacht ist, dass -Port aktiv schadet. ✅ BELEGT am 2026-09-02 am Linux-Server 181: 'SteamNetDriver bound to port 7777', und vier Sekunden nach 'Adding P2P connection information' steht 'Join succeeded: Firedervil' — vorher 82 s Leerlauf und Abbruch. Die Zeile, die den Mechanismus zeigt: 'NotifyAcceptedConnection ... RemoteAddr: 76561197995723590:7777'. Der Port ist eine Kennung INNERHALB von Steam, keine Netzadresse — mit -Port=25002 nannte der Server dort die 25002, waehrend der Client auf der Vorgabe 7777 ansprach. Die Sitzung entstand, und dann redeten beide an verschiedenen Tueren. Ein Socket auf dem Spielport entsteht weiterhin NICHT; es gibt keinen weiterzureichenden Spielport, genau wie es die Hoster-Vorlagen sagen. Diese Fassung ist bewusst zusammen mit der Windows-Fassung geaendert: Faellt der Beitritt hier, ist es kein Proton-Thema, und der Test ist hier billiger.",
       "⚠ DER SERVER IST NICHT BESPIELBAR (Stand 2026-08-30). Alles bis zum Handschlag steht: Installation, Steam-Anmeldung (AppId 1614550, 'Game Server API initialized 1'), Sitzung ('server create success'), Serverabfrage von aussen (Name, Karte, Spielerzahl korrekt), Eintrag in der Steam-Liste. Ein Client verbindet sich auch — und dann fliesst NICHTS:\n    Adding P2P connection information with user <SteamID>\n    Removing P2P Session … IdleTime: 81.8\nAuf ZWEI Maschinen (rs54 und rs55), mit und ohne Kennwort, identisch bis auf 34 ms Leerlaufzeit. Die Maschine ist damit ausgeschlossen. Es bleiben zwei Moeglichkeiten: der Linux-Build des Spiels bekommt den Datenweg nach dem P2P-Handschlag nicht zustande, oder unser Container-Netz laesst ihn nicht zu (beide Maschinen fahren dieselbe Bauform, das widerspricht der Messung nicht). NAECHSTER SCHRITT: dasselbe Spiel als WINDOWS-Build unter Proton (App 2662210, platform: windows, Image fb/proton, Start ueber `proton run`) im selben Container. Laeuft er, ist es der Linux-Build; haengt er genauso, ist es unser Netz. Das Egg `egg-astro-colony-wine.json` im Bestand hat den Bauplan.",
       "HINWEIS ZUR ABFRAGE: `Kennwort: nein` in der Steam-Abfrage ist bei diesem Spiel BEDEUTUNGSLOS — es setzt das Flag nicht, auch wenn ein Kennwort gilt. Am 2026-08-30 belegt: Der Client fragte nach dem Kennwort, waehrend die Abfrage 'kein Kennwort' meldete. Ob die Konfiguration greift, erkennt man an Karte und Spielerzahl, nicht am Kennwort-Flag.",

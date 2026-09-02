@@ -7,7 +7,7 @@
       "de": "Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
       "en": "Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
     },
-    "version": "1.0.8",
+    "version": "1.0.9",
     "author": "firenetworks",
     "category": "sandbox",
     "origin": {
@@ -166,8 +166,8 @@
         "en": "Join password"
       },
       "description": {
-        "de": "Leer lassen für einen offenen Server. Wird bei der INSTALLATION in ServerSettings.ini geschrieben — eine spätere Änderung wirkt erst, wenn die Datei angepasst wird (siehe status.open).",
-        "en": "Leave empty for an open server. Written into ServerSettings.ini at INSTALL time; later changes require editing the file."
+        "de": "Leer lassen für einen offenen Server. Wirkt ab Fassung 1.0.9 bei jedem Neustart.",
+        "en": "Leave empty for an open server. Applied on every restart as of 1.0.9."
       },
       "type": "password",
       "default": "",
@@ -175,6 +175,18 @@
         {
           "target": "env",
           "variable": "SERVER_PASSWORD"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.ServerPassword"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.ServerPassword"
         }
       ],
       "takes_effect": "restart",
@@ -200,6 +212,18 @@
         {
           "target": "env",
           "variable": "SERVER_MAXPLAYERS"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.MaxPlayers"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.MaxPlayers"
         }
       ],
       "takes_effect": "restart",
@@ -223,6 +247,18 @@
         {
           "target": "env",
           "variable": "SERVER_MAPNAME"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.MapName"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.MapName"
         }
       ],
       "takes_effect": "restart",
@@ -246,6 +282,18 @@
         {
           "target": "env",
           "variable": "SERVER_MAPSEED"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.Seed"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.Seed"
         }
       ],
       "takes_effect": "new_world",
@@ -285,6 +333,18 @@
         {
           "target": "env",
           "variable": "SERVER_LOADLATESTSAVEGAME"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.ShouldLoadLatestSavegame"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.ShouldLoadLatestSavegame"
         }
       ],
       "takes_effect": "restart",
@@ -324,6 +384,18 @@
         {
           "target": "env",
           "variable": "SERVER_SHAREDTECHNOLOGIES"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.SharedTechnologies"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.SharedTechnologies"
         }
       ],
       "takes_effect": "restart",
@@ -363,6 +435,18 @@
         {
           "target": "env",
           "variable": "SERVER_OXYGENCONSUMPTION"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.OxygenConsumption"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.OxygenConsumption"
         }
       ],
       "takes_effect": "restart",
@@ -402,6 +486,18 @@
         {
           "target": "env",
           "variable": "SERVER_FREECONSTRUCTION"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.FreeConstruction"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.FreeConstruction"
         }
       ],
       "takes_effect": "restart",
@@ -425,6 +521,18 @@
         {
           "target": "env",
           "variable": "SERVER_AUTOSAVEINTERVAL"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.AutosaveInterval"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.AutosaveInterval"
         }
       ],
       "takes_effect": "restart",
@@ -448,6 +556,18 @@
         {
           "target": "env",
           "variable": "SERVER_AUTOSAVESCOUNT"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.AutosavesCount"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.AutosavesCount"
         }
       ],
       "takes_effect": "restart",
@@ -471,6 +591,18 @@
         {
           "target": "env",
           "variable": "SERVER_ADMINS"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/ACFeature.EHServerSubsystem.AdminList"
+        },
+        {
+          "target": "file",
+          "file": "AstroColony/Saved/Config/WindowsServer/ServerSettings.ini",
+          "parser": "ini",
+          "path": "/Script/AstroColony.EHServerSubsystem.AdminList"
         }
       ],
       "takes_effect": "restart",
@@ -534,6 +666,7 @@
   "status": {
     "complete": false,
     "open": [
+      "EINSTELLUNGEN WIRKEN JETZT BEI JEDEM NEUSTART (1.0.9, 2026-09-02). Vorher wirkten sie NUR bei der Installation, und das war kein Entwurf, sondern ein fehlendes Kabel: `pkgspec.Paket` kannte den settings-Abschnitt gar nicht, `job.Config` wurde von niemandem gefuellt — waehrend `fb-cfg` im Container seit Monaten fertig ist und im Abnahmetest je Schluessel patcht und berichtet. Gebaut, aber nie verdrahtet. Fuer jemanden, der abends spielt, war jede Einstellung damit unbenutzbar: Umstellen im Panel aenderte nichts, und nichts sagte es ihm. Jede der 11 INI-Einstellungen hat jetzt zusaetzlich ein Ziel mit target=file — das env-Ziel bleibt daneben stehen, damit das Installationsskript die Datei weiterhin anlegt. ⚠ BRAUCHT DEN DAEMON VOM 2026-09-02: Ein aelterer liest den settings-Abschnitt nicht, und dann ist alles wie vorher (nicht kaputt, nur wirkungslos). ⚠ Dabei kam ein zweiter Blindgaenger heraus: `splitIniKey` trennte am ERSTEN Punkt, und Unreals Abschnittsnamen enthalten selbst einen ('/Script/ACFeature.EHServerSubsystem'). Der Wert waere in einem neu angelegten Abschnitt '/Script/ACFeature' gelandet, den das Spiel nie liest — samt Erfolgsmeldung. Der Fehler lag seit jeher da und konnte nicht auffallen, weil nie jemand in eine INI schrieb. Jetzt am letzten Punkt, mit Test.",
       "-Port WIRD NICHT MEHR UEBERGEBEN (1.0.7, 2026-09-02) — und das ist der erste Schritt in dieser Baustelle, der nicht aus unserem Log kommt, sondern aus dem Vergleich mit funktionierenden Anlagen. Recherchiert statt hergeleitet: Der Pelican-Egg (aus dem dieses Paket stammt) startet mit `-log -QueryPort={{SERVER_QUERY_PORT}} -SteamServerName=\"…\"` und sonst nichts; die AMP-Vorlage von CubeCoders mit `-QueryPort={{$SteamQueryPort}}`. Beide laufen wie wir in Containern mit Portabbildung, und beide oeffnen AUSSCHLIESSLICH den Steam-Abfrageport — astro-colonyports.json hat genau EINEN Eintrag, 27015/UDP. Ein Spielport kommt in keiner der beiden Vorlagen vor. Damit unterschied sich unsere Startzeile in genau EINEM Punkt von jeder bekannten funktionierenden: -Port. Das passt zu der Messung vom selben Tag — auf dem uebergebenen Port lauscht KEIN Socket, waehrend Steam ihn als Spieladresse bewirbt (im Steam-Browser als '91.200.102.182:25002' zu sehen). Der Verdacht ist also nicht, dass -Port wirkungslos ist, sondern dass er AKTIV schadet: Der Server nennt Steam eine Adresse, an der er nicht horcht. ✅ BELEGT am 2026-09-02 am Linux-Server 181: 'SteamNetDriver bound to port 7777', und vier Sekunden nach 'Adding P2P connection information' steht 'Join succeeded: Firedervil' — vorher 82 s Leerlauf und Abbruch. Die Zeile, die den Mechanismus zeigt: 'NotifyAcceptedConnection ... RemoteAddr: 76561197995723590:7777'. Der Port ist eine Kennung INNERHALB von Steam, keine Netzadresse — mit -Port=25002 nannte der Server dort die 25002, waehrend der Client auf der Vorgabe 7777 ansprach. Die Sitzung entstand, und dann redeten beide an verschiedenen Tueren. Ein Socket auf dem Spielport entsteht weiterhin NICHT; es gibt keinen weiterzureichenden Spielport, genau wie es die Hoster-Vorlagen sagen. Die Portvergabe bleibt unveraendert: Der Pool-Port wird weiter belegt, weil der Abfrageport als game+1 daran haengt. Was die Recherche NICHT beantwortet hat: warum die Entwickler im Forum 'Ports 27015 und 7777 oeffnen' sagen, obwohl keine Hoster-Vorlage einen Spielport oeffnet — moeglicherweise gilt das fuer den Fall 'Spieler hostet selbst', nicht fuer den dedizierten Server.",
       "STEAM-ANBINDUNG UNTER PROTON — geloest am 2026-09-02, und der Weg gehoert dazu: Der Server lief, war aber in keiner Serverliste. Signatur wie beim kaputten Linux-Server (UDP 14001 statt des Abfrageports), URSACHE aber eine andere. Der Reihe nach gemessen: (1) Der Spielprozess laeuft, machine-id und Xalia sind Rauschen und nicht die Ursache. (2) `steam_appid.txt` allein aendert NICHTS — AppId 0 blieb. (3) In /proc/<pid>/maps hatte das Spiel nur seine eigene steam_api64.dll geladen, keine lsteamclient, keine steamclient.so — die Bruecke wurde nie angefasst. (4) Die Wine-Registry zeigt auf C:\\\\Program Files (x86)\\\\Steam\\\\steamclient64.dll, und dieses Verzeichnis war LEER. (5) Im proton-Skript, Zeile 1178: Proton kopiert die Datei aus $STEAM_COMPAT_CLIENT_INSTALL_PATH/legacycompat/ — eine Quelle, die der Steam-CLIENT mitbringt und die weder fb/steamcmd noch fb/proton hat. Loesung: Der Daemon legt Protons lsteamclient.dll unter den Namen steamclient64.dll/steamclient.dll nach data/.steam/legacycompat/, damit PROTON sie selbst ins Praefix kopiert (firebot_daemon, sdkSkript neben dem sdk64-Block aus Baustelle 90). Danach: '[AppId: 1614550] Game Server API initialized 1', Port 25003 antwortet auf A2S von aussen, und der Server steht im Steam-Serverbrowser. ⚠ BRAUCHT DEN DAEMON MIT DIESEM SCHRITT — ein aelterer legt legacycompat/ nicht an, und dann ist alles wie vorher.",
       "P2P — die Frage, fuer die es dieses Paket gibt, ist am 2026-09-02 BEANTWORTET, und zwar negativ: Der Windows-Build unter Proton scheitert GENAUSO wie der Linux-Build. Im Log 'Adding P2P connection information with user <SteamID>', 82 s spaeter 'Removing P2P Session ... IdleTime: 81.842', kein Beitritt. Damit ist die Vermutung aus Baustelle 92 widerlegt, es liege am Linux-Build. Dazu neu gemessen: Auf dem beworbenen Spielport 25002 lauscht KEIN Socket — das Log sagt zwar 'SteamNetDriver bound to port 25002', aber die Verbindung laeuft ueber die Steam-Relay-Schicht. 'Spiel beitreten' im Steam-Browser schickt den Client an eine Adresse, an der nichts horcht. UNGEPRUEFT und der naechste Schritt: derselbe Beitritt aus der spieleigenen Serverliste heraus.",
