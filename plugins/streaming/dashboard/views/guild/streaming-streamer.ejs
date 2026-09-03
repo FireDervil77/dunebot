@@ -2,7 +2,16 @@
   guildId, tr,
   icon: 'fa-solid fa-video',
   titel: tr('streaming:STREAMERS.TITLE'),
-  beschreibung: tr('streaming:STREAMERS.SUBTITLE')
+  beschreibung: tr('streaming:STREAMERS.SUBTITLE'),
+  // **Das Eintragen ist ein Knopf, kein Dauerformular** (2026-09-03).
+  //
+  // Es stand aufgeklappt ueber der Liste und nahm die halbe Seite: drei
+  // Felder, ein Schalter und vier Absaetze Erklaerung — jedes Mal, auch wenn
+  // man nur nachsehen wollte, was eingetragen ist. Die Liste ist der Inhalt
+  // dieser Seite; das Eintragen ist eine Handlung, die man selten braucht.
+  aktion: '<button class="btn btn-primary" type="button" data-bs-toggle="collapse" '
+        + 'data-bs-target="#kanal-eintragen">'
+        + '<i class="fa-solid fa-plus me-2"></i>Kanal eintragen</button>'
 }) %>
 
 <%
@@ -29,10 +38,17 @@
 <% } %>
 
 <div class="row row-cards">
-  <div class="col-12">
+  <%# Zugeklappt, solange schon Kanaele da sind: Wer noch keinen hat, soll das
+      Formular sehen, ohne es zu suchen. %>
+  <div class="col-12 collapse <%= (streamer || []).length ? '' : 'show' %>" id="kanal-eintragen">
     <div class="card">
       <div class="card-header">
-        <h3 class="card-title"><%= tr('streaming:STREAMERS.ADD') %></h3>
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-plus"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel"><%= tr('streaming:STREAMERS.ADD') %></h3>
+          </div>
+        </div>
       </div>
       <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/streamer">
         <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
@@ -143,7 +159,6 @@
             <thead>
               <tr>
                 <th><%= tr('streaming:STREAMERS.CHANNEL') %></th>
-                <th><%= tr('streaming:STREAMERS.PLATFORM') %></th>
                 <th><%= tr('streaming:STREAMERS.STATE') %></th>
                 <th><%= tr('streaming:STREAMERS.TARGETS') %></th>
                 <th><%= tr('streaming:STREAMERS.LAST_HEARD') %></th>
@@ -155,11 +170,11 @@
                 <tr>
                   <td>
                     <span class="fw-bold"><%= s.anzeigename || s.login %></span>
+                    <div class="text-secondary small font-monospace"><%= s.login %></div>
                     <% if (s.titel) { %>
                       <div class="text-secondary small"><%= s.titel %></div>
                     <% } %>
                   </td>
-                  <td><%= s.plattform %></td>
                   <td>
                     <% if (s.abo_zustand === 'widerrufen' || s.abo_zustand === 'fehler') { %>
                       <span class="badge bg-red-lt">Abo <%= s.abo_zustand %></span>

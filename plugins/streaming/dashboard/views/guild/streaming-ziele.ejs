@@ -163,119 +163,84 @@
   }) %>
 <% } %>
 
-<%# ---- Je Ziel die Karten dieser Seite ---- %>
+<%# ---- Die Kanäle dieser Guild -----------------------------------------
 
-<% (ziele || []).forEach(z => { %>
-  <%
-    const kName = kanalName(z.channel_id, zielkanaele);
-    const uebergabe = { z, kanalName, darfAendern };
-    const name = (z.anzeigename || z.login) + ' → ' + (kName ? '#' + kName : '⚠ Kanal gelöscht');
-  %>
-  <div id="ziel-<%= z.id %>" class="mb-4">
+    **Seit P4 steht hier eine Tabelle statt fuenf Karten je Ziel.**
 
-    <% if (seite === 'ankuendigung') { %>
+    Bis zum 2026-09-03 rendete diese Schleife je Ziel bis zu fuenf
+    Funktionskarten — auf `/ankuendigung` ergaben vier Ziele 23 Karten
+    untereinander, jede mit eigenem Speichern-Knopf. Dieselben Karten standen
+    nochmal unter `/meldungen` und `/rollen`.
 
-      <%- include('shared/funktionskarte', {
-            titel:        name,
-            beschreibung: 'Aus heisst: Der Kanal wird weiter beobachtet, aber in diesem Discord passiert nichts — keine Ankündigung, keine Meldung, keine Rolle. Das Twitch-Abo bleibt bestehen.',
-            icon:         'fa-solid fa-satellite-dish',
-            id:           `ziel-schalter-${z.id}`,
-            aktion:       `${basis}/ziele/${z.id}/schalter`,
-            csrfToken:    marke,
-            darf:         darfAendern,
-            schalter:     { name: 'aktiv', an: !!z.aktiv },
-            speichern:    'Schalter übernehmen',
-            koerper:      include('teile/ziel-kopf', Object.assign({ basis, darfProben, marke }, uebergabe))
-      }) %>
+    Sie stehen jetzt auf `/streamer/:id`, wo sie einen Kanal betreffen und
+    nicht alle. Was hier bleibt, ist die Frage, die diese Seite wirklich
+    beantwortet: **Was gilt fuer die ganze Guild** — und wer weicht davon ab.
+%>
 
-      <% if (darfProben) { %>
-        <%# Traegt nur die Adresse und die Marke; die Bedienelemente stehen in
-            der Karte darueber und haengen per form="…" hieran. Es steht NEBEN
-            der Karte, weil ein Formular im Formular ungueltiges HTML ist - der
-            Browser verwuerfe das innere, und der Probe-Knopf taete nichts. %>
-        <form id="probe-<%= z.id %>" method="POST" data-toast
-              action="<%= basis %>/ziele/<%= z.id %>/probe" hidden>
-          <input type="hidden" name="_csrf" value="<%= marke %>">
-        </form>
-      <% } %>
-
-      <%- include('shared/funktionskarte', {
-            titel: 'Ankündigung', icon: 'fa-solid fa-bullhorn',
-            beschreibung: 'Wohin gemeldet wird, wenn der Stream startet.',
-            id: `ank-${z.id}`, aktion: `${basis}/ziele/${z.id}/ankuendigung`,
-            csrfToken: marke, darf: darfAendern,
-            koerper: include('teile/ziel-ankuendigung', uebergabe)
-      }) %>
-
-      <%# Eigene Karte, eigenes Recht: `STREAMING.TEMPLATES.EDIT` statt
-          `TARGETS.MANAGE`. Als Feld in der Ankuendigungskarte haette das
-          Falten der Seiten still ein Recht erweitert. %>
-      <%- include('shared/funktionskarte', {
-            titel: 'Eigener Text', icon: 'fa-solid fa-comment-dots',
-            beschreibung: z.vorlage ? 'Dieses Ziel weicht vom Standard ab.'
-                                    : 'Leer — es gilt der Standard dieses Servers.',
-            id: `vor-${z.id}`, aktion: `${basis}/vorlagen/${z.id}`,
-            csrfToken: marke, darf: darfVorlagen,
-            koerper: include('teile/ziel-vorlage', { z, darfVorlagen })
-      }) %>
-
-      <%- include('shared/funktionskarte', {
-            titel: 'Filter und Ruhezeit', icon: 'fa-solid fa-filter',
-            beschreibung: 'Wann trotz laufendem Stream NICHT angekündigt wird.',
-            id: `flt-${z.id}`, aktion: `${basis}/ziele/${z.id}/filter`,
-            csrfToken: marke, darf: darfAendern,
-            koerper: include('teile/ziel-filter', uebergabe)
-      }) %>
-
-      <%- include('shared/funktionskarte', {
-            titel: 'Aufräumen', icon: 'fa-solid fa-broom',
-            beschreibung: 'Was mit der Ankündigung geschieht, wenn der Stream endet.',
-            id: `auf-${z.id}`, aktion: `${basis}/ziele/${z.id}/aufraeumen`,
-            csrfToken: marke, darf: darfAendern,
-            koerper: include('teile/ziel-aufraeumen', uebergabe)
-      }) %>
-
-      <% if (darfAendern) { %>
-        <%#
-          Getrennte Zone fuer das Zerstoerende: eigene Karte, rechtsbuendig, weit
-          weg von allem, was man im Alltag drueckt. Sie steht nur auf DIESER
-          Seite - ein Entfernen-Knopf auf allen dreien waere dreimal die
-          Gelegenheit zum Unfall, ohne dass es dreimal etwas kann.
-        %>
-        <div class="card">
-          <div class="card-footer text-end">
-            <form method="POST" action="<%= basis %>/ziele/<%= z.id %>/entfernen"
-                  onsubmit="return confirm('Dieses Ziel wirklich entfernen?\n\nIst es das letzte Ziel für diesen Kanal, werden auch die Twitch-Abos abbestellt — der Kanal wird dann gar nicht mehr beobachtet.');">
-              <input type="hidden" name="_csrf" value="<%= marke %>">
-              <button type="submit" class="btn btn-sm btn-ghost-danger">Dieses Ziel entfernen</button>
-            </form>
-          </div>
+<% if ((ziele || []).length) { %>
+  <div class="card">
+    <div class="card-header">
+      <div class="kartenkopf">
+        <span class="kartensymbol"><i class="fa-solid fa-video"></i></span>
+        <div class="kartenkopf__text">
+          <h3 class="kartenkopf__titel">Kanäle dieser Guild</h3>
+          <div class="kartenkopf__satz">Eingestellt wird beim Kanal — hier steht, was schon eingestellt ist.</div>
         </div>
-      <% } %>
-
-    <% } else if (seite === 'meldungen') { %>
-
-      <%- include('shared/funktionskarte', {
-            titel: name, icon: 'fa-solid fa-bell',
-            beschreibung: z.aktiv ? null : 'Dieses Ziel ist abgeschaltet — hier gemachte Angaben wirken erst, wenn es wieder an ist.',
-            id: `mld-${z.id}`, aktion: `${basis}/ziele/${z.id}/meldungen`,
-            csrfToken: marke, darf: darfAendern,
-            koerper: include('teile/ziel-meldungen', uebergabe)
-      }) %>
-
-    <% } else if (seite === 'rollen') { %>
-
-      <%- include('shared/funktionskarte', {
-            titel: name, icon: 'fa-solid fa-user-tag',
-            beschreibung: z.aktiv ? null : 'Dieses Ziel ist abgeschaltet — hier gemachte Angaben wirken erst, wenn es wieder an ist.',
-            id: `rol-${z.id}`, aktion: `${basis}/ziele/${z.id}/rollen`,
-            csrfToken: marke, darf: darfAendern,
-            koerper: include('teile/ziel-rollen', uebergabe)
-      }) %>
-
-    <% } %>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table card-table table-vcenter">
+        <thead>
+          <tr>
+            <th>Kanal</th>
+            <th>Geht nach</th>
+            <th><%= seite === 'meldungen' ? 'Gemeldet wird' : (seite === 'rollen' ? 'Abo-Rolle' : 'Eigener Text') %></th>
+            <th class="w-1"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% ziele.forEach(z => {
+               const kName = kanalName(z.channel_id, zielkanaele);
+               const rolle = (rollen || []).find(r => String(r.id) === String(z.abo_rolle_id));
+               const arten = String(z.melder_arten || '').split(',').filter(Boolean);
+          %>
+            <tr class="<%= z.aktiv ? '' : 'opacity-50' %>">
+              <td>
+                <span class="fw-bold"><%= z.anzeigename || z.login %></span>
+                <% if (!z.aktiv) { %>
+                  <span class="zustandsmarke zustandsmarke--entwurf ms-2">aus</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (kName) { %>
+                  <span class="chip">#<%= kName %></span>
+                <% } else { %>
+                  <span class="text-danger small">⚠ Kanal gelöscht</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (seite === 'meldungen') { %>
+                  <% if (arten.length) { %>
+                    <span class="text-secondary small"><%= arten.length %> von <%= (melderArten || []).length %></span>
+                  <% } else { %>
+                    <span class="text-secondary small">nichts</span>
+                  <% } %>
+                <% } else if (seite === 'rollen') { %>
+                  <span class="text-secondary small"><%= rolle ? '@' + rolle.name : '—' %></span>
+                <% } else { %>
+                  <span class="text-secondary small"><%= z.vorlage ? 'weicht ab' : 'Standard' %></span>
+                <% } %>
+              </td>
+              <td class="text-nowrap">
+                <a class="btn btn-sm" href="<%= basis %>/streamer/<%= z.streamer_id %>">Einrichten</a>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
   </div>
-<% }); %>
+<% } %>
 
 <% if (seite === 'ankuendigung') { %>
   <%- include('shared/funktionskarte', {
