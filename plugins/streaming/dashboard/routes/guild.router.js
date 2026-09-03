@@ -356,7 +356,16 @@ router.post('/streamer/:id/entfernen', requirePermission('STREAMING.STREAMERS.MA
 const SEITEN_BEDARF = {
     ankuendigung: { mitglieder: false, sprachkanaele: false, zusagen: false, vorlagen: true  },
     meldungen:    { mitglieder: false, sprachkanaele: false, zusagen: true,  vorlagen: false },
-    rollen:       { mitglieder: true,  sprachkanaele: true,  zusagen: true,  vorlagen: false }
+    rollen:       { mitglieder: true,  sprachkanaele: true,  zusagen: true,  vorlagen: false },
+
+    // **Die Kanalseite braucht alles** (P4) — sie zeigt die vier Bereiche
+    // eines Kanals nebeneinander statt auf drei Seiten verteilt.
+    //
+    // Dass sie mehr laedt als jede Einzelseite, ist kein Rueckschritt: Sie
+    // laedt es fuer **einen** Kanal. Die Einzelseiten laden weniger, aber fuer
+    // alle — und genau daran wuchsen sie multiplikativ. Vier Ziele ergaben auf
+    // `/ankuendigung` 23 Karten untereinander.
+    kanal:        { mitglieder: true,  sprachkanaele: true,  zusagen: true,  vorlagen: true  }
 };
 
 /**
@@ -373,6 +382,11 @@ const SEITEN_BEDARF = {
  * @returns {Promise<void>} nichts
  */
 async function zielSeite(seite, req, res) {
+    // **Der Filter ist das ganze P4.** Dieselbe Datenladerei, dieselben
+    // Karten — nur auf einen Kanal eingeschraenkt und in eine Ansicht mit
+    // Reitern gegeben. Eine zweite Ladefunktion daneben waere die zweite
+    // Stelle geworden, an der ein neues Feld vergessen wird.
+    const nurStreamer = seite === 'kanal' ? Number(req.params.id) : null;
     const guildId = res.locals.guildId;
     const tr = makeTranslator(req, res);
     const bedarf = SEITEN_BEDARF[seite];
@@ -450,8 +464,30 @@ async function zielSeite(seite, req, res) {
             }
         }
 
-        await renderView(res, 'guild/streaming-ziele', {
-            tr, guildId, seite, ziele, zielkanaele, sprachkanaele, rollen, mitglieder, liveRolleId,
+        // Auf den einen Kanal einschraenken — nach dem Laden, weil die
+        // Zusagen- und Traegerrechnung oben die ganze Liste braucht.
+        let sichtbar = ziele;
+        let kanal = null;
+        if (nurStreamer !== null) {
+            sichtbar = (ziele || []).filter(z => Number(z.streamer_id) === nurStreamer);
+            if (!sichtbar.length) {
+                // Kein Ziel heisst: Dieser Kanal wird in dieser Guild nicht
+                // verfolgt. Ein leeres Geruest waere eine Seite, die etwas
+                // ueber einen fremden Kanal zu wissen vorgibt.
+                return res.redirect(`/guild/${guildId}/plugins/streaming/streamer`);
+            }
+            kanal = {
+                id: nurStreamer,
+                login: sichtbar[0].login,
+                anzeigename: sichtbar[0].anzeigename,
+                ist_live: sichtbar[0].ist_live,
+                letzte_meldung_am: sichtbar[0].letzte_meldung_am
+            };
+        }
+
+        await renderView(res, seite === 'kanal' ? 'guild/streaming-kanal' : 'guild/streaming-ziele', {
+            tr, guildId, seite, kanal, vorWieLange,
+            ziele: sichtbar, zielkanaele, sprachkanaele, rollen, mitglieder, liveRolleId,
             fremdeTraeger, zeitzone, zonen: ZEITZONEN,
             vorlagen, platzhalter: PLATZHALTER,
             vorgabeLive: VORGABE_LIVE, vorgabeRueckschau: VORGABE_RUECKSCHAU,
@@ -469,8 +505,23 @@ async function zielSeite(seite, req, res) {
     }
 }
 
-Object.keys(SEITEN_BEDARF).forEach((seite) => {
-    router.get(`/${seite}`, requirePermission('STREAMING.VIEW'), (req, res) => zielSeite(seite, req, res));
+Object.keys(SEITEN_BEDARF)
+    // `kanal` hat eine eigene Adresse mit Kennung — sie steht weiter unten
+    // bei den anderen `/streamer/...`-Routen.
+    .filter(seite => seite !== 'kanal')
+    .forEach((seite) => {
+        router.get(`/${seite}`, requirePermission('STREAMING.VIEW'), (req, res) => zielSeite(seite, req, res));
+    });
+
+// **Ein Kanal, eine Seite** (P4). Die Antwort auf zwei Befunde: Derselbe Kanal
+// stand als Karte unter Ankuendigung, nochmal unter Meldungen, nochmal unter
+// Rollen — und jede dieser Seiten wuchs mit der Zahl ALLER Ziele mal der Zahl
+// ihrer Einstellungen.
+router.get('/streamer/:id', requirePermission('STREAMING.VIEW'), (req, res) => {
+    if (!Number.isInteger(Number(req.params.id))) {
+        return res.redirect(`/guild/${res.locals.guildId}/plugins/streaming/streamer`);
+    }
+    return zielSeite('kanal', req, res);
 });
 
 // **`/ziele` bleibt erreichbar.** Die Adresse steht in Lesezeichen, in der

@@ -1,0 +1,259 @@
+<%
+/**
+ * Ein Kanal, eine Seite (P4).
+ *
+ * **Die Antwort auf zwei Befunde.** Derselbe Kanal stand als Karte unter
+ * Ankuendigung, nochmal unter Meldungen, nochmal unter Rollen — wer *einen*
+ * Kanal einrichten wollte, besuchte drei Seiten und sah dort jedes Mal auch
+ * alle anderen. Und jede dieser Seiten wuchs mit der Zahl ALLER Ziele mal der
+ * Zahl ihrer Einstellungen: Vier Ziele ergaben auf `/ankuendigung` 23 Karten
+ * untereinander, jede mit eigenem Speichern-Knopf.
+ *
+ * **Die Reiter sind keine Navigationsebene.** Sie liegen innerhalb der Seite
+ * und kosten die Seitenleiste nichts — `partials/guild/sidebar.ejs` kann zwei
+ * Ebenen, und dabei bleibt es. Die Vorlage macht es genauso.
+ *
+ * **Dieselben Karten wie auf den Einzelseiten**, aus denselben Teilen. Ein
+ * Nachbau haette die zweite Stelle geschaffen, an der ein neues Feld vergessen
+ * wird; die Einzelseiten bleiben vorerst bestehen und zeigen dieselben Daten.
+ *
+ * **Was ein Teil NICHT erbt:** die hier mit `const` erklaerten Namen.
+ * `kanalName` und `darfAendern` muessen ausdruecklich mitgegeben werden —
+ * sonst sind sie im Teil undefiniert, und das faellt erst beim Rendern auf.
+ *
+ * Erwartet: alles aus `zielSeite('kanal', …)`, dazu `kanal` und `vorWieLange`.
+ */
+const titel = kanal.anzeigename || kanal.login;
+%>
+
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-video',
+  titel: titel,
+  beschreibung: 'Alles, was dieser Server mit diesem Kanal tut — an einem Ort.',
+  aktion: (kanal.ist_live
+            ? '<span class="zustandsmarke zustandsmarke--stoerung me-2">live</span>'
+            : '')
+        + `<a href="/guild/${guildId}/plugins/streaming/streamer" class="btn btn-sm">`
+        + '<i class="fa-solid fa-arrow-left me-2"></i>Alle Kanäle</a>'
+}) %>
+
+<%
+  const darfAendern    = typeof hasPermission === 'function' && hasPermission('STREAMING.TARGETS.MANAGE');
+  const darfProben     = typeof hasPermission === 'function' && hasPermission('STREAMING.TEST');
+  const darfVorlagen   = typeof hasPermission === 'function' && hasPermission('STREAMING.TEMPLATES.EDIT');
+
+  const basis = `/guild/${guildId}/plugins/streaming`;
+  const marke = typeof csrfToken !== 'undefined' ? csrfToken : '';
+
+  // Wortgleich mit `streaming-ziele.ejs`: Dieselbe Handlung soll dieselbe
+  // Rueckmeldung geben, egal von welcher Seite aus sie ausgeloest wurde.
+  const meldungen = {
+    gespeichert:      'Gespeichert. Ab der nächsten Ankündigung gilt die neue Einstellung.',
+    entfernt:         'Ziel entfernt. Der Kanal wird weiter beobachtet, wenn noch ein anderes Ziel darauf zeigt.',
+    zurueckgesetzt:   'Eigener Text entfernt — für dieses Ziel gilt wieder der Standard.',
+    probe:            'Probe ist unterwegs — sie steht in wenigen Sekunden im Kanal.'
+  };
+  const fehlerTexte = {
+    ziel_fehlt:  'Bitte einen Kanal für die Ankündigung wählen.',
+    bild:        'Das eigene Vorschaubild muss eine vollständige Adresse mit https:// sein.',
+    weg:         'Dieses Ziel gibt es nicht mehr.',
+    rolle:       'Das war keine gültige Rollen-Auswahl.',
+    zu_lang:     'Der Text ist zu lang. Discord nimmt 2000 Zeichen; wir lassen 1000 zu.',
+    platzhalter: 'Da steht ein Platzhalter, den es nicht gibt.',
+    technisch:   'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+  };
+
+  const kanalName = (id, liste) => {
+    if (!id) return null;
+    const k = (liste || []).find(x => String(x.id) === String(id));
+    return k ? k.name : null;
+  };
+
+  /* Die vier Bereiche. `zahl` steht im Reiter und sagt, wie viel dahinter
+     liegt — bei "Ankündigung" die Zahl der Discord-Kanäle, sonst nichts, weil
+     eine Zahl dort nichts beantwortet. */
+  const bereiche = [
+    { id: 'ank', icon: 'fa-solid fa-bullhorn',  titel: 'Ankündigung',
+      satz: (ziele.length === 1 ? '1 Discord-Kanal' : `${ziele.length} Discord-Kanäle`) },
+    { id: 'ere', icon: 'fa-solid fa-bell',      titel: 'Ereignisse',      satz: 'Raid, Bits, Follower' },
+    { id: 'rol', icon: 'fa-solid fa-user-tag',  titel: 'Rollen',          satz: 'Live- und Abo-Rolle' },
+    { id: 'end', icon: 'fa-solid fa-broom',     titel: 'Nach dem Stream', satz: 'Rückschau, Aufräumen' }
+  ];
+%>
+
+<% if (meldung && meldungen[meldung]) { %>
+  <div class="alert alert-success"><%= meldungen[meldung] %></div>
+<% } %>
+<% if (fehler && fehlerTexte[fehler]) { %>
+  <div class="alert alert-danger"><%= fehlerTexte[fehler] %></div>
+<% } %>
+
+<%# ---- Die Reiter ------------------------------------------------------- %>
+<div class="reiter mb-3" role="tablist">
+  <% bereiche.forEach((b, i) => { %>
+    <button class="reiter__knopf <%= i === 0 ? 'active' : '' %>"
+            data-bs-toggle="tab" data-bs-target="#tab-<%= b.id %>"
+            type="button" role="tab" aria-selected="<%= i === 0 %>">
+      <span class="reiter__symbol"><i class="<%= b.icon %>"></i></span>
+      <span>
+        <span class="reiter__titel"><%= b.titel %></span>
+        <span class="reiter__satz"><%= b.satz %></span>
+      </span>
+    </button>
+  <% }); %>
+</div>
+
+<div class="tab-content">
+
+  <%# ================= Ankündigung ================= %>
+  <div class="tab-pane fade show active" id="tab-ank" role="tabpanel">
+    <% ziele.forEach(z => {
+         const kName = kanalName(z.channel_id, zielkanaele);
+         const uebergabe = { z, kanalName, darfAendern };
+         const name = kName ? '#' + kName : '⚠ Kanal gelöscht';
+    %>
+      <div id="ziel-<%= z.id %>" class="mb-4">
+
+        <%- include('shared/funktionskarte', {
+              titel:        name,
+              beschreibung: 'Aus heisst: Der Kanal wird weiter beobachtet, aber in diesem Discord passiert nichts — keine Ankündigung, keine Meldung, keine Rolle. Das Twitch-Abo bleibt bestehen.',
+              icon:         'fa-solid fa-satellite-dish',
+              id:           `k-schalter-${z.id}`,
+              aktion:       `${basis}/ziele/${z.id}/schalter`,
+              csrfToken:    marke,
+              darf:         darfAendern,
+              schalter:     { name: 'aktiv', an: !!z.aktiv },
+              speichern:    'Schalter übernehmen',
+              koerper:      include('teile/ziel-kopf', Object.assign({ basis, darfProben, marke }, uebergabe))
+        }) %>
+
+        <% if (darfProben) { %>
+          <%# Steht NEBEN der Karte: Ein Formular im Formular ist ungueltiges
+              HTML — der Browser verwuerfe das innere, und der Probe-Knopf
+              taete nichts. %>
+          <form id="probe-<%= z.id %>" method="POST" data-toast
+                action="<%= basis %>/ziele/<%= z.id %>/probe" hidden>
+            <input type="hidden" name="_csrf" value="<%= marke %>">
+          </form>
+        <% } %>
+
+        <%- include('shared/funktionskarte', {
+              titel: 'Ankündigung', icon: 'fa-solid fa-bullhorn',
+              beschreibung: 'Wohin gemeldet wird, wenn der Stream startet.',
+              id: `k-ank-${z.id}`, aktion: `${basis}/ziele/${z.id}/ankuendigung`,
+              csrfToken: marke, darf: darfAendern,
+              koerper: include('teile/ziel-ankuendigung', uebergabe)
+        }) %>
+
+        <%# Eigenes Recht: `STREAMING.TEMPLATES.EDIT` statt `TARGETS.MANAGE`.
+            Als Feld in der Ankuendigungskarte haette das Zusammenlegen still
+            ein Recht erweitert. %>
+        <%- include('shared/funktionskarte', {
+              titel: 'Eigener Text', icon: 'fa-solid fa-comment-dots',
+              beschreibung: z.vorlage ? 'Dieses Ziel weicht vom Standard ab.'
+                                      : 'Leer — es gilt der Standard dieses Servers.',
+              id: `k-vor-${z.id}`, aktion: `${basis}/vorlagen/${z.id}`,
+              csrfToken: marke, darf: darfVorlagen,
+              koerper: include('teile/ziel-vorlage', { z, darfVorlagen })
+        }) %>
+
+        <%- include('shared/funktionskarte', {
+              titel: 'Filter und Ruhezeit', icon: 'fa-solid fa-filter',
+              beschreibung: 'Wann trotz laufendem Stream NICHT angekündigt wird.',
+              id: `k-flt-${z.id}`, aktion: `${basis}/ziele/${z.id}/filter`,
+              csrfToken: marke, darf: darfAendern,
+              koerper: include('teile/ziel-filter', uebergabe)
+        }) %>
+      </div>
+    <% }); %>
+
+    <div class="card">
+      <div class="card-body text-secondary small">
+        Soll dieser Kanal in einen <strong>weiteren</strong> Discord-Kanal melden,
+        trage ihn unter <a href="<%= basis %>/streamer">Kanäle</a> noch einmal ein
+        und wähle dort den anderen Kanal.
+      </div>
+    </div>
+  </div>
+
+  <%# ================= Ereignisse ================= %>
+  <div class="tab-pane fade" id="tab-ere" role="tabpanel">
+    <% ziele.forEach(z => {
+         const kName = kanalName(z.channel_id, zielkanaele);
+         const uebergabe = { z, kanalName, darfAendern };
+    %>
+      <%- include('shared/funktionskarte', {
+            titel: kName ? '#' + kName : '⚠ Kanal gelöscht', icon: 'fa-solid fa-bell',
+            beschreibung: z.aktiv ? null : 'Dieses Ziel ist abgeschaltet — hier gemachte Angaben wirken erst, wenn es wieder an ist.',
+            id: `k-mld-${z.id}`, aktion: `${basis}/ziele/${z.id}/meldungen`,
+            csrfToken: marke, darf: darfAendern,
+            koerper: include('teile/ziel-meldungen', uebergabe)
+      }) %>
+    <% }); %>
+  </div>
+
+  <%# ================= Rollen ================= %>
+  <div class="tab-pane fade" id="tab-rol" role="tabpanel">
+    <% ziele.forEach(z => {
+         const kName = kanalName(z.channel_id, zielkanaele);
+         const uebergabe = { z, kanalName, darfAendern };
+    %>
+      <%- include('shared/funktionskarte', {
+            titel: kName ? '#' + kName : '⚠ Kanal gelöscht', icon: 'fa-solid fa-user-tag',
+            beschreibung: z.aktiv ? null : 'Dieses Ziel ist abgeschaltet — hier gemachte Angaben wirken erst, wenn es wieder an ist.',
+            id: `k-rol-${z.id}`, aktion: `${basis}/ziele/${z.id}/rollen`,
+            csrfToken: marke, darf: darfAendern,
+            koerper: include('teile/ziel-rollen', uebergabe)
+      }) %>
+    <% }); %>
+
+    <div class="card">
+      <div class="card-body text-secondary small">
+        Die <strong>Live-Rolle</strong> gilt für den ganzen Server und steht deshalb
+        unter <a href="<%= basis %>/rollen">Automatische Rollen</a> — sie ist keine
+        Einstellung dieses einen Kanals.
+      </div>
+    </div>
+  </div>
+
+  <%# ================= Nach dem Stream ================= %>
+  <div class="tab-pane fade" id="tab-end" role="tabpanel">
+    <% ziele.forEach(z => {
+         const kName = kanalName(z.channel_id, zielkanaele);
+         const uebergabe = { z, kanalName, darfAendern };
+    %>
+      <%- include('shared/funktionskarte', {
+            titel: kName ? '#' + kName : '⚠ Kanal gelöscht', icon: 'fa-solid fa-broom',
+            beschreibung: 'Was mit der Ankündigung geschieht, wenn der Stream endet.',
+            id: `k-auf-${z.id}`, aktion: `${basis}/ziele/${z.id}/aufraeumen`,
+            csrfToken: marke, darf: darfAendern,
+            koerper: include('teile/ziel-aufraeumen', uebergabe)
+      }) %>
+    <% }); %>
+
+    <% if (darfAendern) { %>
+      <%# Das Zerstoerende in einer eigenen Zone, rechtsbuendig, hinter dem
+          letzten Reiter — weit weg von allem, was man im Alltag drueckt. %>
+      <div class="card mt-4">
+        <div class="card-header">
+          <div class="kartenkopf">
+            <span class="kartensymbol kartensymbol--stoerung"><i class="fa-solid fa-trash"></i></span>
+            <div class="kartenkopf__text">
+              <h3 class="kartenkopf__titel">Diesen Kanal nicht mehr verfolgen</h3>
+              <div class="kartenkopf__satz">Entfernt alle <%= ziele.length %> Ziele dieses Servers. Andere Server bleiben unberührt.</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer text-end">
+          <form method="POST" action="<%= basis %>/streamer/<%= kanal.id %>/entfernen"
+                onsubmit="return confirm('<%= titel %> wirklich nicht mehr verfolgen?\n\nVerfolgt ihn danach keine andere Guild mehr, werden auch die Twitch-Abos abbestellt.');">
+            <input type="hidden" name="_csrf" value="<%= marke %>">
+            <button type="submit" class="btn btn-sm btn-ghost-danger">Kanal entfernen</button>
+          </form>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+</div>

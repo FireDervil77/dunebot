@@ -176,10 +176,15 @@
                     <%= vorWieLange(s.letzte_meldung_am) || tr('streaming:STATE.NEVER') %>
                   </td>
                   <td class="text-nowrap">
+                    <%# **Fuehrt seit P4 auf die Seite DIESES Kanals**, nicht
+                        mehr auf `/ankuendigung#ziel-…`. Der Sprunganker war der
+                        Notbehelf, solange alle Kanaele untereinander auf einer
+                        Seite standen: Er landete mitten in einer Liste, in der
+                        auch alle anderen Ziele stehen. %>
                     <a class="btn btn-sm btn-ghost-secondary"
-                       href="/guild/<%= guildId %>/plugins/streaming/ankuendigung<%= s.erstes_ziel ? '#ziel-' + s.erstes_ziel : '' %>"
-                       title="Ankündigungskanal, Rolle, Filter und Aufräumart ändern">
-                      Bearbeiten
+                       href="/guild/<%= guildId %>/plugins/streaming/streamer/<%= s.id %>"
+                       title="Ankündigung, Ereignisse, Rollen und Aufräumart dieses Kanals">
+                      Einrichten
                     </a>
                     <form method="POST" class="d-inline"
                           action="/guild/<%= guildId %>/plugins/streaming/streamer/<%= s.id %>/entfernen"

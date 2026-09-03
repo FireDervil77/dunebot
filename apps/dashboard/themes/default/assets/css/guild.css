@@ -978,3 +978,70 @@ input[type="checkbox"]:not(.form-check-input):disabled {
   letter-spacing: 0.12em;
   color: var(--fb-text-muted);
 }
+
+/* --- Reiter innerhalb einer Seite ---------------------------------------- */
+/*
+   Aus der Vorlage übernommen (Wize.Bot: „Limitations / Tags restrictions /
+   My tags"). Sie sind **keine Navigationsebene** — sie liegen innerhalb der
+   Seite und kosten die Seitenleiste nichts. Genau das macht die Kanalseite
+   möglich: Ein Kanal an einem Ort statt über drei Menüpunkte verteilt.
+
+   Breit und beschriftet, nicht als schmale Textreiter: Jeder trägt Symbol,
+   Namen und eine Zeile, die sagt, was dahinter liegt. Wer die Seite zum ersten
+   Mal öffnet, soll die vier Bereiche lesen können, ohne sie anzuklicken.
+*/
+
+.reiter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  border: 1px solid var(--fb-border);
+  border-radius: var(--fb-radius);
+  overflow: hidden;
+  background: var(--fb-surface-bg);
+}
+
+.reiter__knopf {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border: 0;
+  border-right: 1px solid var(--fb-border);
+  background: color-mix(in srgb, var(--fb-text-muted) 6%, transparent);
+  color: var(--fb-text-muted);
+  cursor: pointer;
+  transition: background .14s, color .14s;
+}
+
+.reiter__knopf:last-child { border-right: 0; }
+.reiter__knopf:hover { color: var(--fb-text); }
+
+/* Der aktive Reiter sitzt auf der Fläche, die darunter beginnt — deshalb
+   dieselbe Farbe wie die Karten und ein Strich als Kante. */
+.reiter__knopf.active {
+  background: var(--fb-surface-bg);
+  color: var(--fb-text);
+  box-shadow: inset 0 -2px 0 var(--fb-primary);
+}
+
+.reiter__symbol {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  color: var(--fb-primary);
+  background: color-mix(in srgb, var(--fb-primary) 12%, transparent);
+}
+
+.reiter__titel { font-weight: 600; font-size: 0.88rem; display: block; }
+.reiter__satz  { font-size: 0.74rem; color: var(--fb-text-muted); display: block; }
+
+@media (max-width: 560px) {
+  .reiter { grid-template-columns: 1fr; }
+  .reiter__knopf { border-right: 0; border-bottom: 1px solid var(--fb-border); }
+  .reiter__knopf:last-child { border-bottom: 0; }
+}
