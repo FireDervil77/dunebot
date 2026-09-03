@@ -4,15 +4,18 @@
   "NAV": {
     "STREAMING": "Streaming",
     "CHANNELS": "Channels",
-    "ANNOUNCE": "Announcement",
-    "ALERTS": "Alerts",
-    "ROLES": "Roles",
-    "CHATBOT": "Chatbot",
+    "ANNOUNCE": "Live announcement",
+    "ALERTS": "Events",
+    "ROLES": "Automatic roles",
+    "CHATBOT": "My channel",
     "STATE": "Status",
     "OPERATIONS": "Operations",
     "STREAMERS": "Streamers",
     "TARGETS": "Targets",
-    "TEMPLATES": "Templates"
+    "TEMPLATES": "Templates",
+    "ABSCHNITT_TRACKING": "Tracking",
+    "ABSCHNITT_CHATBOT": "My chatbot",
+    "ABSCHNITT_SYSTEM": "System"
   },
   "STREAMERS": {
     "TITLE": "Watched channels",

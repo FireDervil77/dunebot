@@ -436,6 +436,20 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         const basis = `/guild/${guildId}/plugins/streaming`;
         const haupt = navigationManager.menuTypes.MAIN;
 
+        // **Die drei Abschnitte** (P2, siehe `docs/streamer-plugin/16-Panel-Neuschnitt.md`).
+        //
+        // Sie sind keine dritte Ebene — `partials/guild/sidebar.ejs` kann
+        // weiterhin genau zwei. `abschnitt` ist ein Feld am Punkt, und die
+        // Seitenleiste gruppiert beim Rendern danach (P1, `d6f6a5e`).
+        //
+        // Der Schnitt bildet TEIL C ab: andere Reichweite, anderes Recht,
+        // anderer Adressat. "Verfolgung" gilt in beliebig vielen Guilds je
+        // Kanal; "Mein Chatbot" nur in der Heim-Guild; "Anlage" nur in der
+        // Kontroll-Guild.
+        const VERFOLGUNG = 'streaming:NAV.ABSCHNITT_TRACKING';
+        const CHATBOT    = 'streaming:NAV.ABSCHNITT_CHATBOT';
+        const ANLAGE     = 'streaming:NAV.ABSCHNITT_SYSTEM';
+
         const eintrag = (titel, url, icon, order, extra = {}) => ({
             title: `streaming:${titel}`,
             url, icon, order,
@@ -477,11 +491,32 @@ class StreamingDashboardPlugin extends DashboardPlugin {
             // Beim ersten Anlauf hatte ich den Punkt stehenlassen, weil die
             // Vorlage der GANZEN Guild sonst unauffindbar geworden waere. Das
             // ist geloest: Sie steht als eigene Karte oben auf der Seite.
-            eintrag('NAV.CHANNELS', `${basis}/streamer`,     'fa-solid fa-video', 10),
-            eintrag('NAV.ANNOUNCE', `${basis}/ankuendigung`, 'fa-solid fa-bullhorn', 20),
-            eintrag('NAV.ALERTS',   `${basis}/meldungen`,    'fa-solid fa-bell', 30),
-            eintrag('NAV.ROLES',    `${basis}/rollen`,       'fa-solid fa-user-tag', 40),
-            eintrag('NAV.STATE',    `${basis}/zustand`,      'fa-solid fa-heart-pulse', 50),
+            //
+            // **Umbenannt am 2026-09-03 (P2), die Adressen bleiben.**
+            //
+            // "Ankuendigung" und "Meldungen" war *unser* Unterschied — die
+            // eine ist `stream.online`, die andere sind Chat-Ereignisse. Fuer
+            // einen Menschen ist beides "der Bot sagt was in Discord". Die
+            // neuen Namen sagen, WANN es passiert, nicht aus welcher Tabelle
+            // es kommt.
+            //
+            // **Die Adressen sind bewusst NICHT mitgewandert.** `/meldungen`
+            // heisst weiter `/meldungen` und traegt die Aufschrift
+            // "Ereignisse". Ein Adresswechsel braucht Weiterleitungen fuer
+            // Lesezeichen und fuer jede Rueckmeldung, die vor heute
+            // verschickt wurde — das ist ein eigener Schritt, kein Anhaengsel
+            // an eine Umbenennung.
+            eintrag('NAV.CHANNELS', `${basis}/streamer`,     'fa-solid fa-video', 10, { abschnitt: VERFOLGUNG }),
+            eintrag('NAV.ANNOUNCE', `${basis}/ankuendigung`, 'fa-solid fa-bullhorn', 20, { abschnitt: VERFOLGUNG }),
+            eintrag('NAV.ALERTS',   `${basis}/meldungen`,    'fa-solid fa-bell', 30, { abschnitt: VERFOLGUNG }),
+            eintrag('NAV.ROLES',    `${basis}/rollen`,       'fa-solid fa-user-tag', 40, { abschnitt: VERFOLGUNG }),
+            //
+            // **"Zustand" bleibt vorerst unter Verfolgung.** Der Entwurf laesst
+            // ihn verschwinden — er WIRD die Uebersicht (P3). Bis die Seite
+            // steht, waere ein entfernter Punkt eine Funktion, die niemand
+            // mehr findet. Inhaltlich sitzt er hier richtig: Was er zeigt,
+            // sind Abos und Auftraege der Verfolgung.
+            eintrag('NAV.STATE',    `${basis}/zustand`,      'fa-solid fa-heart-pulse', 50, { abschnitt: VERFOLGUNG }),
 
             // Einstiegspunkt unter den Kern-Einstellungen
             {
@@ -509,8 +544,15 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         // bleibt Sache der Serverleitung, wie ueberall.
         try {
             if (await require('./kern/heimguild').istHeim(guildId)) {
-                navItems.push(eintrag('NAV.CHATBOT', `${basis}/chatbot`, 'fa-solid fa-comments', 45, {
-                    capability: 'STREAMING.CHAT.MANAGE'
+                // **Order 60, nicht mehr 45.** Vorher stand der Chatbot
+                // zwischen "Rollen" (40) und "Zustand" (50) — mit Abschnitten
+                // haette das die Verfolgungsgruppe auseinandergerissen. Die
+                // Seitenleiste faengt das ab (sie gruppiert, statt zu
+                // vergleichen), aber die Punkte staenden dann in einer
+                // Reihenfolge, die niemand gewollt hat.
+                navItems.push(eintrag('NAV.CHATBOT', `${basis}/chatbot`, 'fa-solid fa-comments', 60, {
+                    capability: 'STREAMING.CHAT.MANAGE',
+                    abschnitt: CHATBOT
                 }));
             }
         } catch (error) {
@@ -535,9 +577,10 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         // trotzdem eine falsche Einladung.
         if (String(guildId) === String(process.env.CONTROL_GUILD_ID || '')) {
             navItems.push(
-                eintrag('NAV.OPERATIONS', `${basis}/betrieb`, 'fa-solid fa-sliders', 60, {
+                eintrag('NAV.OPERATIONS', `${basis}/betrieb`, 'fa-solid fa-sliders', 70, {
                     capability: null,
-                    requiresOwner: true
+                    requiresOwner: true,
+                    abschnitt: ANLAGE
                 })
             );
         }

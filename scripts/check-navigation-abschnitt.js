@@ -199,7 +199,55 @@ pruefe('D · keine Ueberschrift ohne Punkte darunter',
     `Ueberschriften: ${d.kopf.length}, Punkte: ${d.punkte.length}`);
 
 // =====================================================
-// 3. Der echte Bestand
+// 3. Jeder gesetzte Abschnitt ist uebersetzt
+// =====================================================
+//
+// **Ein Abschnitt ohne Sprachschluessel faellt nicht auf, er steht da.**
+// `tr(abschnitt, abschnitt)` gibt den Schluessel zurueck, wenn er nichts
+// findet — im Menue erschiene dann woertlich `streaming:NAV.ABSCHNITT_TRACKING`
+// als Ueberschrift. Kein Fehler, kein Log, nur eine haessliche Zeile.
+//
+// Generisch ueber alle Plugins: Wer kuenftig Abschnitte setzt, wird hier
+// mitgeprueft, ohne dass jemand dieses Skript anfassen muss.
+
+console.log('\nJeder gesetzte Abschnitt hat einen Sprachschluessel');
+
+const SPRACHEN = ['de-DE', 'en-GB'];
+const gefundeneAbschnitte = new Map();   // schluessel -> Plugin
+
+for (const plugin of fs.readdirSync(path.join(WURZEL, 'plugins'))) {
+    const datei = path.join(WURZEL, 'plugins', plugin, 'dashboard/index.js');
+    if (!fs.existsSync(datei)) continue;
+    const quelle = ohneKommentare(fs.readFileSync(datei, 'utf8'));
+
+    // Sowohl `abschnitt: 'plugin:PFAD'` als auch die Konstanten daraus.
+    for (const treffer of quelle.matchAll(/['"`]([a-z][a-z0-9_-]*:[A-Z][A-Z0-9_.]*)['"`]/g)) {
+        const wert = treffer[1];
+        if (!/ABSCHNITT/.test(wert)) continue;
+        gefundeneAbschnitte.set(wert, plugin);
+    }
+}
+
+if (gefundeneAbschnitte.size === 0) {
+    console.log('  – noch kein Plugin setzt Abschnitte (nichts zu pruefen)');
+} else {
+    for (const [schluessel, plugin] of gefundeneAbschnitte) {
+        const [namensraum, pfad] = schluessel.split(':');
+        const fehlt = SPRACHEN.filter(sprache => {
+            const datei = path.join(WURZEL, 'plugins', namensraum,
+                `dashboard/locales/${sprache}.json`);
+            if (!fs.existsSync(datei)) return true;
+            const baum = JSON.parse(fs.readFileSync(datei, 'utf8'));
+            return pfad.split('.').reduce((o, teil) => (o || {})[teil], baum) === undefined;
+        });
+        pruefe(`${plugin} · ${schluessel}`,
+            fehlt.length === 0,
+            `fehlt in: ${fehlt.join(', ')} — im Menue staende der rohe Schluessel.`);
+    }
+}
+
+// =====================================================
+// 4. Der echte Bestand
 // =====================================================
 //
 // **Die Prüfung, die dieses Skript beim ersten Lauf nicht hatte.** Sie fehlte,
@@ -278,11 +326,18 @@ pruefe('D · keine Ueberschrift ohne Punkte darunter',
              GROUP BY plugin, abschnitt
              ORDER BY plugin, abschnitt`);
 
+        // **Kein Urteil, nur der Stand** — und der Vergleich mit dem, was im
+        // Code steht. Eine Abweichung ist hier meist kein Fehler, sondern ein
+        // fehlender Neustart: `registerNavigation` laeuft beim Hochfahren.
         if (belegt.length) {
-            console.log('\n  Gesetzte Abschnitte:');
+            console.log('\n  Registriert in der Datenbank:');
             belegt.forEach(z => console.log(`    ${z.plugin} · ${z.abschnitt} — ${z.punkte} Punkte`));
+        } else if (gefundeneAbschnitte.size) {
+            console.log('\n  Im Code stehen Abschnitte, in der Datenbank steht keiner.');
+            console.log('  Das ist nach einer Aenderung normal: Die Navigation wird beim');
+            console.log('  Hochfahren neu registriert. Nach dem Neustart muessen sie hier stehen.');
         } else {
-            console.log('\n  Noch kein Plugin setzt einen Abschnitt (nach P1 allein erwartet).');
+            console.log('\n  Kein Plugin setzt Abschnitte — weder im Code noch in der Datenbank.');
         }
     } finally {
         await verbindung.end();
