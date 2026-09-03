@@ -3,65 +3,66 @@
  * Die Live-Rolle dieser Guild.
  *
  * Sie gilt fuer ALLE Ziele der Guild, deshalb steht sie ueber ihnen und nicht
- * in einem davon. Bis zum 2026-08-29 teilte sie sich ein Formular mit der
- * Zeitzone; seit dem Schnitt nach Aufgaben stehen die beiden auf verschiedenen
- * Seiten und koennen es gar nicht mehr.
+ * in einem davon.
+ *
+ * **Gekuerzt am 2026-09-03.** Hier standen ein Auswahlfeld und rund 250 Woerter
+ * Prosa daneben — in zwei Spalten, von denen eine nur Text trug. Was blieb,
+ * sind die Saetze, die eine Handlung ausloesen oder einen Fehler verhindern:
+ * die Rangordnung (sonst darf der Bot nicht vergeben), die Zuordnung (sonst
+ * weiss niemand, wem der Kanal gehoert) und die Bindung an den Live-Zustand.
+ *
+ * Was wegfiel, erklaerte, warum Umbenennen keine andere Rolle ergibt — richtig,
+ * aber es beantwortet eine Frage, die sich beim Einstellen nicht stellt.
  */
 %>
 <% if (fremdeTraeger > 0) { %>
+  <%# Bleibt eine eigene Warnung und wird KEIN Hilfssatz: Sie betrifft nicht
+      die Bedienung, sondern eine Rolle, die auf diesem Server schon etwas
+      anderes bedeutet — und das gehoert gesehen, bevor jemand speichert. %>
   <div class="alert alert-warning">
-    <strong>Diese Rolle bedeutet auf diesem Server schon etwas anderes.</strong>
-    <p class="mb-1">
-      <%= fremdeTraeger %> Mitglied<%= fremdeTraeger === 1 ? '' : 'er' %>
-      trägt sie, ohne dass der Bot sie vergeben hat — sie wurde also von Hand
-      oder von woanders gesetzt. Typischer Fall: Die Rolle schaltet einen
-      Bereich frei.
-    </p>
+    <h4 class="alert-title">Diese Rolle bedeutet hier schon etwas anderes</h4>
     <p class="mb-0">
-      <strong>Nimm dafür eine eigene, leere Rolle</strong>, die nichts
-      freischaltet und nur anzeigt, wer gerade sendet. Der Bot rührt fremde
-      Träger nicht an — er nimmt nur zurück, was er selbst vergeben hat —
-      aber eine Rolle mit zwei Bedeutungen verwirrt jeden, der sie sieht.
+      <%= fremdeTraeger %> Mitglied<%= fremdeTraeger === 1 ? '' : 'er' %>
+      trägt sie, ohne dass der Bot sie vergeben hat. <strong>Nimm eine eigene,
+      leere Rolle</strong>, die nichts freischaltet — der Bot rührt fremde
+      Träger zwar nicht an, aber eine Rolle mit zwei Bedeutungen verwirrt jeden,
+      der sie sieht.
     </p>
   </div>
 <% } %>
 
-<div class="row g-3">
-  <div class="col-md-6">
-    <label class="form-label" for="live_rolle_id">Live-Rolle</label>
-    <select class="form-select" id="live_rolle_id" name="live_rolle_id" <%= darfEinstellen ? '' : 'disabled' %>>
-      <option value="">— keine, Live-Rolle aus —</option>
-      <% if (liveRolleId && !liveRolleName) { %>
-        <option value="<%= liveRolleId %>" selected>⚠ gelöschte Rolle (<%= liveRolleId %>)</option>
-      <% } %>
-      <% (rollen || []).forEach(r => { %>
-        <option value="<%= r.id %>" <%= String(r.id) === String(liveRolleId) ? 'selected' : '' %>>@<%= r.name %></option>
-      <% }); %>
-    </select>
-    <div class="form-hint">
-      Wer gerade sendet, bekommt diese Rolle — und verliert sie, wenn der Stream
-      endet.
-      <br>
-      <strong>Wichtig:</strong> Die Rolle muss in der Rangliste <em>unter</em>
-      der Rolle des Bots stehen — sonst darf er sie nicht vergeben, und es
-      passiert nichts.
-      <br>
-      Umbenennen reicht nicht, um hier etwas zu ändern: Discord behält beim
-      Umbenennen dieselbe Rolle. Wer eine <em>andere</em> Rolle will, wählt
-      sie hier aus.
+<div class="zeilen">
+  <div class="zeile">
+    <div class="zeile__bez">
+      Rolle
+      <small>muss unter der Bot-Rolle stehen</small>
+    </div>
+    <div>
+      <select class="form-select" id="live_rolle_id" name="live_rolle_id" <%= darfEinstellen ? '' : 'disabled' %>>
+        <option value="">— keine, Live-Rolle aus —</option>
+        <% if (liveRolleId && !liveRolleName) { %>
+          <option value="<%= liveRolleId %>" selected>⚠ gelöschte Rolle (<%= liveRolleId %>)</option>
+        <% } %>
+        <% (rollen || []).forEach(r => { %>
+          <option value="<%= r.id %>" <%= String(r.id) === String(liveRolleId) ? 'selected' : '' %>>@<%= r.name %></option>
+        <% }); %>
+      </select>
+      <div class="zeile__hilfe">
+        Steht sie in der Rangliste über der Rolle des Bots, darf er sie nicht
+        vergeben — und es passiert nichts.
+      </div>
     </div>
   </div>
 
-  <div class="col-md-6">
-    <div class="text-secondary small">
-      Die Rolle bekommt nur, wem in „Rollen und Kanäle“ ein Discord-Mitglied
-      zugeordnet ist. Ohne Zuordnung wissen wir nicht, wem der Kanal gehört —
-      ein Kanalname ist kein Discord-Konto.
-      <br><br>
-      Sie hängt am Live-Zustand, <strong>nicht</strong> am Filter: Wer
-      sendet, bekommt sie auch dann, wenn wegen eines Spielfilters keine
-      Ankündigung erscheint. Andernfalls ginge sie mitten im Stream an und
-      aus, sobald jemand die Kategorie wechselt.
+  <div class="zeile">
+    <div class="zeile__bez">Wer sie bekommt</div>
+    <div>
+      <div class="zeile__hilfe mt-0">
+        Nur wem beim Kanal ein Discord-Mitglied zugeordnet ist — ein Kanalname
+        ist kein Discord-Konto. Sie hängt am <strong>Live-Zustand</strong>, nicht
+        am Filter: Wer sendet, bekommt sie auch dann, wenn wegen eines
+        Spielfilters keine Ankündigung erscheint.
+      </div>
     </div>
   </div>
 </div>

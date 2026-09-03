@@ -161,6 +161,12 @@ console.log('\n4. Die drei Seiten teilen die Felder genau auf');
 // ---------------------------------------------------------------------
 
 const tr = (k) => `«${k}»`;
+/** Der Kanal, den `streaming-kanal.ejs` im Kopf erwartet (P4). */
+const KANAL = {
+    id: 3, login: 'firedervil', anzeigename: 'FireDervil',
+    ist_live: 1, letzte_meldung_am: null
+};
+
 const daten = {
     tr, guildId: '42', csrfToken: 'M', hasPermission: () => true,
     meldung: null, fehler: null, liveRolleId: '900', fremdeTraeger: 0,
@@ -202,14 +208,27 @@ pruefe(Object.keys(zuordnung).length === Object.keys(KARTEN_SPALTEN).length,
     'jede Karte hat eine Seite in KARTEN_SEITE',
     `zugeordnet: ${Object.keys(zuordnung).join(', ')} — Karten: ${Object.keys(KARTEN_SPALTEN).join(', ')}`);
 
-const SEITEN = ['ankuendigung', 'meldungen', 'rollen'];
+// **Seit P4 (2026-09-03) traegt die Kanalseite die Felder je Ziel.**
+//
+// `/ankuendigung`, `/meldungen` und `/rollen` zeigen nur noch die Vorgaben der
+// Guild und eine Tabelle; eingestellt wird auf `/streamer/:id`, wo alle vier
+// Bereiche eines Kanals nebeneinander stehen. Diese Pruefung lief vorher gegen
+// drei Seiten und meldete nach dem Umbau **siebzehn fehlende Spalten** — sie
+// suchte sie dort, wo sie bis gestern standen.
+const SEITEN = [
+    { name: 'ankuendigung', datei: 'guild/streaming-ziele.ejs' },
+    { name: 'meldungen',    datei: 'guild/streaming-ziele.ejs' },
+    { name: 'rollen',       datei: 'guild/streaming-ziele.ejs' },
+    { name: 'kanal',        datei: 'guild/streaming-kanal.ejs' }
+];
 const gesehen = new Map();   // Feldname -> Seiten, auf denen es steht
 
-for (const seite of SEITEN) {
+for (const { name: seite, datei } of SEITEN) {
     let html = null;
     try {
-        html = await ejs.renderFile(path.join(PV, 'guild/streaming-ziele.ejs'),
-            { ...daten, seite }, { views: [KERN, PV, path.join(PV, 'guild')] });
+        html = await ejs.renderFile(path.join(PV, datei),
+            { ...daten, seite, kanal: KANAL, vorWieLange: () => 'vor 1 Min.' },
+            { views: [KERN, PV, path.join(PV, 'guild')] });
     } catch (err) {
         pruefe(false, `Seite „${seite}" rendert`, err.message.split('\n')[0]);
         continue;
@@ -225,7 +244,10 @@ for (const seite of SEITEN) {
 
     let tiefe = 0, max = 0;
     html.replace(/<form|<\/form>/g, (m) => { tiefe += m === '<form' ? 1 : -1; max = Math.max(max, tiefe); return m; });
-    pruefe(max === 1, `${seite}: kein Formular steckt in einem anderen`,
+    // `<= 1`, nicht `=== 1`: Seiten ohne eigenes Formular gibt es seit P4
+    // wirklich — `/meldungen` traegt nur noch eine Tabelle. Die Frage hier ist
+    // Verschachtelung, nicht Anwesenheit.
+    pruefe(max <= 1, `${seite}: kein Formular steckt in einem anderen`,
         'der Browser verwirft das innere lautlos — der Probe-Knopf taete dann nichts');
 
     const ids = new Set([...html.matchAll(/<form[^>]*\bid="([^"]+)"/g)].map(m => m[1]));
@@ -235,7 +257,13 @@ for (const seite of SEITEN) {
 
     // **Jede Karte auf der Seite, die der Router ihr zuweist.** Sonst wirft
     // das Speichern einen auf eine andere Seite als die, auf der man stand.
-    const fremde = [...new Set([...html.matchAll(/action="[^"]*\/ziele\/7\/(\w+)"/g)].map(m => m[1]))]
+    // **Die Kanalseite ist ausgenommen, und das ist ihr Zweck.** Sie zeigt die
+    // vier Bereiche EINES Kanals nebeneinander — dort steht jede Karte
+    // absichtlich, gleich welcher Einzelseite der Router sie sonst zuweist.
+    // Die Regel gilt weiter fuer die drei Seiten, die nach Aufgabe geschnitten
+    // sind: Dort waere eine fremde Karte ein Sprung nach dem Speichern.
+    const fremde = seite === 'kanal' ? [] :
+        [...new Set([...html.matchAll(/action="[^"]*\/ziele\/7\/(\w+)"/g)].map(m => m[1]))]
         .filter(k => zuordnung[k] && zuordnung[k] !== seite);
     pruefe(fremde.length === 0, `${seite}: keine Karte einer anderen Seite`,
         `${fremde.join(', ')} gehoert laut Router woandershin — nach dem Speichern landet man dort`);
@@ -267,7 +295,7 @@ for (const { schluessel, pfad } of ziele) {
     // die Regel fuer jeden Menuepunkt wahr. Sie hat in der Gegenprobe nichts
     // gefangen - eine Pruefung, die nie anschlaegt, ist selbst eine Attrappe.
     const eigeneRoute = new RegExp(`router\\.get\\('\\/${pfad}'`).test(router);
-    const ausDerSchleife = SEITEN.includes(pfad);
+    const ausDerSchleife = SEITEN.some(s => s.name === pfad);
     pruefe(eigeneRoute || ausDerSchleife,
         `NAV.${schluessel} → /${pfad} hat eine Route`,
         'ein Menuepunkt ohne Route ist ein 404 mit Einladung');
@@ -320,11 +348,17 @@ pruefe(!/NAV\.TEMPLATES/.test(index),
 
 // Und die Probe aufs Exempel: Wer NUR Ziele pflegen darf, sieht kein
 // Textfeld zum Speichern.
+// Zwei Seiten, zwei Felder: `vorlage_live` ist die Vorgabe der Guild und steht
+// auf der Ankuendigungsseite; `vorlage` ist der eigene Text eines Ziels und
+// steht seit P4 auf der Kanalseite.
+const ohneVorlagenrecht = { hasPermission: (r) => r !== 'STREAMING.TEMPLATES.EDIT' };
 const nurZiele = await ejs.renderFile(path.join(PV, 'guild/streaming-ziele.ejs'),
-    { ...daten, seite: 'ankuendigung',
-      hasPermission: (r) => r !== 'STREAMING.TEMPLATES.EDIT' },
+    { ...daten, seite: 'ankuendigung', ...ohneVorlagenrecht },
     { views: [KERN, PV, path.join(PV, 'guild')] });
-pruefe(/name="vorlage"[^>]*disabled/.test(nurZiele) && /name="vorlage_live"[^>]*disabled/.test(nurZiele),
+const nurKanal = await ejs.renderFile(path.join(PV, 'guild/streaming-kanal.ejs'),
+    { ...daten, seite: 'kanal', kanal: KANAL, vorWieLange: () => 'vor 1 Min.', ...ohneVorlagenrecht },
+    { views: [KERN, PV, path.join(PV, 'guild')] });
+pruefe(/name="vorlage"[^>]*disabled/.test(nurKanal) && /name="vorlage_live"[^>]*disabled/.test(nurZiele),
     'ohne TEMPLATES.EDIT sind die Textfelder gesperrt',
     'die Sperre, die zaehlt, steht in der Route — aber ein bedienbares Feld, das 403 liefert, ist eine falsche Einladung');
 
