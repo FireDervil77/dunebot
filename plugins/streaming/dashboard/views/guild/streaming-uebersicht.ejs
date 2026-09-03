@@ -50,30 +50,28 @@ const marke = { steht: 'READY', halb: 'PARTLY', entwurf: 'PLANNED' };
   <div class="col-12">
     <div class="row row-cards">
       <div class="col-6 col-lg-3">
-        <div class="card <%= live.length ? 'border-primary' : '' %>">
-          <div class="card-body">
-            <div class="h1 mb-0 <%= live.length ? 'text-primary' : '' %>"><%= zustand.live %></div>
-            <div class="text-secondary text-uppercase small"><%= tr('streaming:OVERVIEW.LIVE_NOW') %></div>
-          </div>
+        <div class="card kennzahl <%= zustand.live ? 'kennzahl--betont' : '' %>">
+          <div class="kennzahl__wert"><%= zustand.live %></div>
+          <div class="kennzahl__bez"><%= tr('streaming:OVERVIEW.LIVE_NOW') %></div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card"><div class="card-body">
-          <div class="h1 mb-0"><%= zustand.ueberwacht %></div>
-          <div class="text-secondary text-uppercase small"><%= tr('streaming:OVERVIEW.WATCHED') %></div>
-        </div></div>
+        <div class="card kennzahl">
+          <div class="kennzahl__wert"><%= zustand.ueberwacht %></div>
+          <div class="kennzahl__bez"><%= tr('streaming:OVERVIEW.WATCHED') %></div>
+        </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card"><div class="card-body">
-          <div class="h1 mb-0"><%= zieleAnzahl %></div>
-          <div class="text-secondary text-uppercase small"><%= tr('streaming:OVERVIEW.TARGETS') %></div>
-        </div></div>
+        <div class="card kennzahl">
+          <div class="kennzahl__wert"><%= zieleAnzahl %></div>
+          <div class="kennzahl__bez"><%= tr('streaming:OVERVIEW.TARGETS') %></div>
+        </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card"><div class="card-body">
-          <div class="h3 mb-0"><%= gehoert || tr('streaming:STATE.NEVER') %></div>
-          <div class="text-secondary text-uppercase small"><%= tr('streaming:OVERVIEW.LAST_HEARD') %></div>
-        </div></div>
+        <div class="card kennzahl">
+          <div class="kennzahl__wert kennzahl__wert--klein"><%= gehoert || tr('streaming:STATE.NEVER') %></div>
+          <div class="kennzahl__bez"><%= tr('streaming:OVERVIEW.LAST_HEARD') %></div>
+        </div>
       </div>
     </div>
   </div>
@@ -85,9 +83,14 @@ const marke = { steht: 'READY', halb: 'PARTLY', entwurf: 'PLANNED' };
   <div class="col-12">
     <div class="card">
       <div class="card-header">
-        <div>
-          <h3 class="card-title"><%= tr('streaming:OVERVIEW.WHATS_WRONG') %></h3>
-          <div class="text-secondary small"><%= tr('streaming:OVERVIEW.WHATS_WRONG_HINT') %></div>
+        <div class="kartenkopf">
+          <span class="kartensymbol <%= (probleme || []).length ? 'kartensymbol--stoerung' : (chatWarnung ? 'kartensymbol--warnung' : 'kartensymbol--steht') %>">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel"><%= tr('streaming:OVERVIEW.WHATS_WRONG') %></h3>
+            <div class="kartenkopf__satz"><%= tr('streaming:OVERVIEW.WHATS_WRONG_HINT') %></div>
+          </div>
         </div>
       </div>
       <div class="card-body">
@@ -143,7 +146,15 @@ const marke = { steht: 'READY', halb: 'PARTLY', entwurf: 'PLANNED' };
   <div class="col-12">
     <div class="card">
       <div class="card-header">
-        <h3 class="card-title"><%= tr('streaming:OVERVIEW.LIVE_TITLE') %></h3>
+        <div class="kartenkopf">
+          <span class="kartensymbol <%= live.length ? '' : 'kartensymbol--still' %>"><i class="fa-solid fa-tower-broadcast"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel"><%= tr('streaming:OVERVIEW.LIVE_TITLE') %></h3>
+          </div>
+          <% if (live.length) { %>
+            <span class="zustandsmarke zustandsmarke--stoerung">live</span>
+          <% } %>
+        </div>
       </div>
       <div class="card-body">
         <% if (live.length) { %>
@@ -185,9 +196,12 @@ const marke = { steht: 'READY', halb: 'PARTLY', entwurf: 'PLANNED' };
   <div class="col-12">
     <div class="card">
       <div class="card-header">
-        <div>
-          <h3 class="card-title"><%= tr('streaming:OVERVIEW.CAN_DO') %></h3>
-          <div class="text-secondary small"><%= tr('streaming:OVERVIEW.CAN_DO_HINT') %></div>
+        <div class="kartenkopf">
+          <span class="kartensymbol "><i class="fa-solid fa-shapes"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel"><%= tr('streaming:OVERVIEW.CAN_DO') %></h3>
+            <div class="kartenkopf__satz"><%= tr('streaming:OVERVIEW.CAN_DO_HINT') %></div>
+          </div>
         </div>
       </div>
       <div class="card-body">

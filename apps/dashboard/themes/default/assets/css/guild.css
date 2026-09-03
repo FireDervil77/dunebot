@@ -840,3 +840,141 @@ input[type="checkbox"]:not(.form-check-input):disabled {
 }
 
 .erklaerkarte p:last-child { margin-bottom: 0; }
+
+/* --- Kartenkopf mit Symbol ----------------------------------------------- */
+/*
+   Im Entwurf trägt jede Karte links ein Symbol im abgerundeten Quadrat, und
+   das ist kein Schmuck: Es gibt dem Auge einen Ankerpunkt je Karte, an dem es
+   beim Überfliegen einrastet. Ohne ihn unterscheiden sich Kartenköpfe nur
+   durch ihren Text — und eine Seite mit sechs Karten liest sich dann wie eine
+   Liste, nicht wie eine gegliederte Fläche.
+
+   Der erste Bau von P3 hatte sie nicht, und genau das war der sichtbare
+   Unterschied zum Entwurf.
+*/
+
+.kartensymbol {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+  color: var(--fb-primary);
+  background: color-mix(in srgb, var(--fb-primary) 12%, transparent);
+}
+
+.kartensymbol--steht    { color: var(--fb-success);    background: color-mix(in srgb, var(--fb-success) 14%, transparent); }
+.kartensymbol--warnung  { color: var(--fb-warning);    background: color-mix(in srgb, var(--fb-warning) 14%, transparent); }
+.kartensymbol--stoerung { color: var(--fb-danger);     background: color-mix(in srgb, var(--fb-danger) 14%, transparent); }
+.kartensymbol--still    { color: var(--fb-text-muted); background: color-mix(in srgb, var(--fb-text-muted) 12%, transparent); }
+
+/* Kopfzeile: Symbol, dann Titel und ein Satz darunter, dann Platz für das,
+   was rechts steht (Zustand, Schalter). */
+.kartenkopf {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.kartenkopf__text { min-width: 0; flex: 1 1 auto; }
+
+.kartenkopf__titel {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.kartenkopf__satz {
+  font-size: 0.85rem;
+  color: var(--fb-text-muted);
+  margin: 1px 0 0;
+}
+
+/* --- Kennzahl ------------------------------------------------------------ */
+/*
+   Die Zahl ist der Inhalt, die Beschriftung nur ihre Einheit — deshalb trägt
+   sie das Gewicht. `tabular-nums` hält die Ziffern in einer Reihe von
+   Kacheln auf gleicher Breite; ohne das wandert eine "1" gegenüber einer "17"
+   sichtbar aus der Flucht.
+*/
+
+.kennzahl { padding: 1rem 1.25rem; }
+
+.kennzahl__wert {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.kennzahl__wert--klein { font-size: 1.35rem; }
+
+.kennzahl__bez {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--fb-text-muted);
+  margin-top: 2px;
+}
+
+/* Die betonte Kachel trägt die Aussage der Seite — hier: es läuft gerade
+   etwas. Sie ist die einzige farbige, sonst wäre keine hervorgehoben. */
+.kennzahl--betont {
+  background: color-mix(in srgb, var(--fb-primary) 8%, var(--fb-surface-bg));
+  border-color: color-mix(in srgb, var(--fb-primary) 25%, transparent) !important;
+}
+
+.kennzahl--betont .kennzahl__wert { color: var(--fb-primary); }
+
+/* --- Leerzustand innerhalb einer Karte ----------------------------------- */
+/*
+   Tablers `.empty` ist für eine ganze Seite gedacht und bringt entsprechend
+   Höhe mit. In einer Karte, die nur eine von sechs ist, reißt das ein Loch:
+   Die Karte "Gerade live" war beim ersten Bau höher als die drei darüber
+   zusammen.
+*/
+
+.card-body > .empty {
+  padding: 1.5rem 1rem;
+  min-height: 0;
+}
+
+.card-body > .empty .empty-icon { margin-bottom: 0; }
+.card-body > .empty .empty-title { font-size: 1rem; }
+
+/* --- Seitenkopf: das Symbol als Rundquadrat ------------------------------ */
+/*
+   `views/shared/seitenkopf.ejs` rendert das Symbol als schlichtes `<i>` im
+   Titel. Im Entwurf sitzt es in einem abgerundeten Quadrat und trägt damit
+   dieselbe Sprache wie die Kartenköpfe darunter.
+
+   **Bewusst hier und nicht in der Vorlage.** Der Seitenkopf steht seit
+   Baustelle 83 einmal im Kern und wird von allen dreizehn Plugins benutzt;
+   ihn anzufassen hieße, dreizehn Seiten gleichzeitig zu ändern. Als reine
+   Darstellungsregel greift das genauso — und lässt sich ohne Codeänderung
+   wieder zurücknehmen.
+*/
+
+.page-title > i:first-child {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 1rem;
+  vertical-align: -0.55rem;
+  color: var(--fb-primary);
+  background: color-mix(in srgb, var(--fb-primary) 12%, transparent);
+  margin-right: 0.65rem !important;
+}
+
+/* Der Vortitel gehört optisch zum Symbol, nicht darüber ins Leere. */
+.page-pretitle {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: var(--fb-text-muted);
+}
