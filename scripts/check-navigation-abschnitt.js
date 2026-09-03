@@ -38,6 +38,10 @@ const path = require('path');
 const ejs = require('ejs');
 
 const WURZEL = path.resolve(__dirname, '..');
+require(path.join(WURZEL, 'node_modules/dotenv')).config({
+    path: path.join(WURZEL, 'apps/dashboard/.env')
+});
+const mysql = require(path.join(WURZEL, 'node_modules/mysql2/promise'));
 const VORLAGE = 'apps/dashboard/themes/default/partials/guild/sidebar.ejs';
 const MANAGER = 'packages/dunebot-sdk/lib/NavigationManager.js';
 const MIGRATION = 'migrations/kern/20260903_120000_navigation_abschnitt.js';
@@ -195,6 +199,95 @@ pruefe('D · keine Ueberschrift ohne Punkte darunter',
     `Ueberschriften: ${d.kopf.length}, Punkte: ${d.punkte.length}`);
 
 // =====================================================
+// 3. Der echte Bestand
+// =====================================================
+//
+// **Die Prüfung, die dieses Skript beim ersten Lauf nicht hatte.** Sie fehlte,
+// und das war eine Lücke mit Ansage: Punkt 1 prüft, dass die Migrationsdatei
+// `ADD COLUMN abschnitt` enthält — also die *Absicht*. Ob sie je gelaufen ist,
+// stand nirgends. Ein grünes Ergebnis hätte auch dann dagestanden, wenn das
+// Dashboard nie neu gestartet wurde, und der erste Abschnitt eines Plugins
+// wäre mit "Unknown column 'abschnitt'" umgefallen.
 
-console.log(`\nErgebnis: ${geprueft} Pruefungen, ${abweichungen} Abweichungen.`);
-process.exit(abweichungen ? 1 : 0);
+(async () => {
+    console.log('\nDie Spalte steht wirklich in der Datenbank');
+
+    let verbindung;
+    try {
+        verbindung = await mysql.createConnection({
+            host: process.env.MYSQL_HOST,
+            user: process.env.MYSQL_USER,
+            password: process.env.MYSQL_PASSWORD,
+            database: process.env.MYSQL_DATABASE,
+            port: process.env.MYSQL_PORT || 3306
+        });
+    } catch (err) {
+        // **Kein stiller Rückfall auf "in Ordnung".** Wer nicht messen konnte,
+        // weiß nichts — dieselbe Regel wie in `check-kollationen.js`.
+        console.log(`  ? Datenbank nicht erreichbar: ${err.message}`);
+        console.log('      Die Prüfungen oben gelten; diese hier ist AUSGEFALLEN,');
+        console.log('      nicht bestanden. Ob die Migration lief, ist damit offen.');
+        console.log(`\nErgebnis: ${geprueft} Pruefungen, ${abweichungen} Abweichungen, 1 ausgefallen.`);
+        process.exit(abweichungen ? 1 : 2);
+    }
+
+    try {
+        // **`parent` kommt mit, als Maßstab.** Der erste Entwurf dieser
+        // Prüfung verglich `COLUMN_DEFAULT` gegen JavaScripts `null` und schlug
+        // fehl, obwohl die Spalte richtig war: MySQL liefert für `DEFAULT NULL`
+        // die **Zeichenkette** "NULL". Ein geratener Absolutwert hätte hier bei
+        // jedem Serverwechsel neu umfallen können.
+        //
+        // Deshalb der Vergleich mit der Nachbarspalte statt mit einer Erwartung:
+        // `parent` ist im selben `guild_nav_items`, hat dasselbe gewünschte
+        // Verhalten (leer erlaubt, kein Standardwert) und liegt seit der
+        // Baseline dort. Weicht `abschnitt` von ihr ab, ist das ein Befund —
+        // egal, wie diese MySQL-Fassung Vorgabewerte schreibt.
+        const [spalten] = await verbindung.query(`
+            SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+              FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'guild_nav_items'
+               AND COLUMN_NAME IN ('abschnitt', 'parent')`);
+
+        const s = spalten.find(z => z.COLUMN_NAME === 'abschnitt');
+        const massstab = spalten.find(z => z.COLUMN_NAME === 'parent');
+
+        pruefe('`guild_nav_items.abschnitt` existiert',
+            Boolean(s),
+            'Die Migration ist noch nicht gelaufen — das Dashboard braucht einen Neustart.');
+
+        if (s && massstab) {
+            pruefe(`Der Typ stimmt (${s.COLUMN_TYPE})`,
+                /varchar\(64\)/i.test(s.COLUMN_TYPE),
+                'Erwartet varchar(64) — ein abweichender Typ deutet auf eine Handaenderung.');
+            pruefe('Leer erlaubt und kein Standardwert — wie `parent`',
+                s.IS_NULLABLE === massstab.IS_NULLABLE
+                && String(s.COLUMN_DEFAULT) === String(massstab.COLUMN_DEFAULT),
+                `abschnitt: ${s.IS_NULLABLE}/${s.COLUMN_DEFAULT} · `
+                + `parent: ${massstab.IS_NULLABLE}/${massstab.COLUMN_DEFAULT} — `
+                + '"kein Abschnitt" muss der Normalfall bleiben, sonst ist der Umbau nicht additiv.');
+        }
+
+        // Was tatsächlich gesetzt ist — kein Urteil, nur der Stand. Nach P1
+        // allein ist die Antwort "nichts", und das ist richtig so.
+        const [belegt] = await verbindung.query(`
+            SELECT plugin, abschnitt, COUNT(*) AS punkte
+              FROM guild_nav_items
+             WHERE abschnitt IS NOT NULL
+             GROUP BY plugin, abschnitt
+             ORDER BY plugin, abschnitt`);
+
+        if (belegt.length) {
+            console.log('\n  Gesetzte Abschnitte:');
+            belegt.forEach(z => console.log(`    ${z.plugin} · ${z.abschnitt} — ${z.punkte} Punkte`));
+        } else {
+            console.log('\n  Noch kein Plugin setzt einen Abschnitt (nach P1 allein erwartet).');
+        }
+    } finally {
+        await verbindung.end();
+    }
+
+    console.log(`\nErgebnis: ${geprueft} Pruefungen, ${abweichungen} Abweichungen.`);
+    process.exit(abweichungen ? 1 : 0);
+})();
