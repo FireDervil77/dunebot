@@ -561,6 +561,29 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                     capability: 'STREAMING.CHAT.MANAGE',
                     abschnitt: CHATBOT
                 }));
+
+                // **Die Entwurfsseiten stehen im Menue, obwohl sie nichts
+                // koennen** — und das ist der Punkt: Ein Abschnitt "Mein
+                // Chatbot" mit einem einzigen Eintrag ist keine Gliederung,
+                // sondern eine Ankuendigung. Erst nebeneinander laesst sich
+                // beurteilen, ob der Zuschnitt taugt.
+                //
+                // Sie tragen kein Bedienelement und sagen im Kopf, dass sie
+                // Entwurf sind. Wer sie oeffnet, weiss in zehn Sekunden, woran
+                // er ist — anders als bei einer Seite voller Schalter, die
+                // nichts bewirken.
+                [
+                    ['NAV.COMMANDS',  'befehle',    'fa-solid fa-terminal', 61],
+                    ['NAV.ANNOUNCES', 'ansagen',    'fa-solid fa-clock', 62],
+                    ['NAV.GUARD',     'schutz',     'fa-solid fa-shield', 63],
+                    ['NAV.JOIN_IN',   'mitmachen',  'fa-solid fa-hand-sparkles', 64],
+                    ['NAV.STATS',     'statistik',  'fa-solid fa-chart-line', 65]
+                ].forEach(([titel, pfad, icon, order]) => {
+                    navItems.push(eintrag(titel, `${basis}/${pfad}`, icon, order, {
+                        capability: 'STREAMING.CHAT.MANAGE',
+                        abschnitt: CHATBOT
+                    }));
+                });
             }
         } catch (error) {
             // **Kein Menuepunkt ist besser als ein falscher.** Wer die Frage

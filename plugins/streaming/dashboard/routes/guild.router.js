@@ -164,6 +164,67 @@ router.get('/', requirePermission('STREAMING.VIEW'), async (req, res) => {
 });
 
 // =====================================================
+// Die Seiten, die es noch nicht gibt (P3, Entwuerfe)
+// =====================================================
+//
+// **Warum sie ueberhaupt erreichbar sind.** Der Schnitt aus dem Panel-Entwurf
+// steht nur, wenn man ihn sieht: "Mein Chatbot" mit einem einzigen Punkt ist
+// keine Gliederung, sondern eine Ankuendigung. Erst mit Befehlen, Schutz,
+// Mitmachen und Statistik daneben laesst sich beurteilen, ob der Zuschnitt
+// taugt.
+//
+// **Sie tragen kein einziges Bedienelement.** Kein Schalter, kein Feld, kein
+// Speichern. Ein Formular, das nicht speichert, ist eine Attrappe — und die
+// sieht fertig aus, versagt beim ersten Einsatz lautlos, und niemand weiss
+// hinterher, ob es je funktioniert hat.
+//
+// **Nur in der Heim-Guild**, wie der Chatbot-Zweig selbst: Ein Entwurf fuer
+// fremde Chat-Einstellungen in einer fremden Guild waere derselbe Griff, den
+// TEIL C ausschliesst — nur ohne Wirkung, was ihn nicht besser macht.
+//
+// **Das Recht steht hier als Literal, nicht in `entwuerfe.js`.** Der erste Bau
+// las es aus der Datentabelle — `requirePermission(daten.recht)` —, und
+// `scripts/check-streaming-rechte.js` hat das sofort als "ohne Rechtepruefung"
+// gemeldet. Zu Recht: Ein Recht, das aus Daten kommt, ist nicht mehr am Router
+// ablesbar. Schriebe dort jemand `STREAMING.VIEW`, staende die Chatbot-Seite
+// jeder Guild offen, ohne dass es hier auffiele.
+//
+// Alle fuenf Entwurfsseiten gehoeren dem Kanalinhaber, also tragen alle
+// dasselbe Recht.
+require('../entwuerfe').namen().forEach((name) => {
+    const daten = require('../entwuerfe').seite(name);
+
+    router.get(`/${name}`, requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+        const guildId = res.locals.guildId;
+        const tr = makeTranslator(req, res);
+
+        try {
+            if (daten.nurHeim && !await require('../kern/heimguild').istHeim(guildId)) {
+                return res.redirect(`/guild/${guildId}/plugins/streaming`);
+            }
+
+            // `PLUGIN:name` zeigt auf ein anderes Plugin derselben Guild. Der
+            // Verweis wird hier aufgeloest und nicht in der Ansicht: Die
+            // Guild-Kennung gehoert nicht in eine Datentabelle, die keine
+            // Anfrage kennt.
+            const seite = {
+                ...daten,
+                verweise: (daten.verweise || []).map(v => ({
+                    text: v.text,
+                    url: v.url.startsWith('PLUGIN:')
+                        ? `/guild/${guildId}/plugins/${v.url.slice(7)}`
+                        : v.url
+                }))
+            };
+
+            await renderView(res, 'guild/streaming-entwurf', { tr, guildId, seite });
+        } catch (error) {
+            return renderFehler(res, error, 'Die Seite konnte nicht geladen werden');
+        }
+    });
+});
+
+// =====================================================
 // Beobachtete Kanaele
 // =====================================================
 router.get('/streamer', requirePermission('STREAMING.VIEW'), async (req, res) => {

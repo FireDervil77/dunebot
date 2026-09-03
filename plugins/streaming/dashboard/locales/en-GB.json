@@ -15,7 +15,12 @@
     "TEMPLATES": "Templates",
     "ABSCHNITT_TRACKING": "Tracking",
     "ABSCHNITT_CHATBOT": "My chatbot",
-    "ABSCHNITT_SYSTEM": "System"
+    "ABSCHNITT_SYSTEM": "System",
+    "COMMANDS": "My commands",
+    "ANNOUNCES": "My announcements",
+    "GUARD": "Chat protection",
+    "JOIN_IN": "Join in",
+    "STATS": "Statistics"
   },
   "STREAMERS": {
     "TITLE": "Watched channels",
@@ -126,5 +131,16 @@
     "PLANNED": "planned",
     "PARTLY": "partly",
     "READY": "ready"
+  },
+  "ENTWURF": {
+    "DRAFT": "Draft",
+    "PARTLY": "partly",
+    "PLANNED_TITLE": "What this page is meant to do",
+    "PLANNED_HINT": "The planned scope — none of it is operable yet.",
+    "HAVE_TITLE": "What is already in place",
+    "HAVE_HINT": "Not estimated — with the place in the code.",
+    "MISSING_TITLE": "What is still missing",
+    "MISSING_HINT": "And why it is not a side job.",
+    "SEE_ALSO": "From here it continues"
   }
 }

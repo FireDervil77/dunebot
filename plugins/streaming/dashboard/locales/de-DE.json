@@ -15,7 +15,12 @@
     "TEMPLATES": "Vorlagen",
     "ABSCHNITT_TRACKING": "Verfolgung",
     "ABSCHNITT_CHATBOT": "Mein Chatbot",
-    "ABSCHNITT_SYSTEM": "Anlage"
+    "ABSCHNITT_SYSTEM": "Anlage",
+    "COMMANDS": "Meine Befehle",
+    "ANNOUNCES": "Meine Ansagen",
+    "GUARD": "Chat-Schutz",
+    "JOIN_IN": "Mitmachen",
+    "STATS": "Statistik"
   },
   "STREAMERS": {
     "TITLE": "Beobachtete Kanäle",
@@ -126,5 +131,16 @@
     "PLANNED": "geplant",
     "PARTLY": "halb da",
     "READY": "steht"
+  },
+  "ENTWURF": {
+    "DRAFT": "Entwurf",
+    "PARTLY": "halb da",
+    "PLANNED_TITLE": "Was diese Seite können soll",
+    "PLANNED_HINT": "Der geplante Umfang — noch nichts davon ist bedienbar.",
+    "HAVE_TITLE": "Was dafür schon liegt",
+    "HAVE_HINT": "Nicht geschätzt — mit der Stelle im Code.",
+    "MISSING_TITLE": "Was noch fehlt",
+    "MISSING_HINT": "Und warum es nicht nebenbei geht.",
+    "SEE_ALSO": "Von hier geht es weiter"
   }
 }

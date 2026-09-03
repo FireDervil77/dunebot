@@ -1,0 +1,174 @@
+<%
+/**
+ * Die Seiten, die es noch nicht gibt — als Entwurf, nicht als Attrappe.
+ *
+ * **Warum es sie ueberhaupt gibt.** Der Schnitt aus dem Panel-Entwurf steht
+ * nur, wenn man ihn sieht: "Mein Chatbot" mit einem einzigen Punkt ist keine
+ * Gliederung, sondern eine Ankuendigung. Erst mit Befehlen, Schutz, Mitmachen
+ * und Statistik daneben laesst sich beurteilen, ob der Zuschnitt taugt.
+ *
+ * **Die Regel, an der hier alles haengt: keine Bedienelemente.** Kein
+ * Schalter, kein Eingabefeld, kein Speichern-Knopf. Ein Formular, das nicht
+ * speichert, ist eine Attrappe — und Attrappen sind genau das Muster, gegen
+ * das dieses Haus schreibt: Sie sehen fertig aus, versagen beim ersten Einsatz
+ * lautlos, und niemand weiss hinterher, ob es je funktioniert hat.
+ *
+ * Was hier steht, ist deshalb **Prosa und Aufzaehlung**: was die Seite koennen
+ * soll, was dafuer schon liegt, und was ihr noch fehlt. Wer sie oeffnet, soll
+ * in zehn Sekunden wissen, woran er ist.
+ *
+ * Erwartet: tr, guildId, seite (Schluesselwerk aus dem Router)
+ */
+const basis = `/guild/${guildId}/plugins/streaming`;
+%>
+
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: seite.icon,
+  titel: seite.titel,
+  beschreibung: seite.untertitel,
+  aktion: `<span class="zustandsmarke zustandsmarke--${seite.zustand === 'halb' ? 'halb' : 'entwurf'}">`
+        + (seite.zustand === 'halb' ? tr('streaming:ENTWURF.PARTLY') : tr('streaming:ENTWURF.DRAFT'))
+        + '</span>'
+}) %>
+
+<div class="row row-cards">
+
+  <%# ---- Wofuer die Seite da ist ---------------------------------------- %>
+  <div class="col-12">
+    <div class="erklaerkarte">
+      <h3><%= seite.wofuer.titel %></h3>
+      <% seite.wofuer.saetze.forEach(satz => { %>
+        <p><%- satz %></p>
+      <% }); %>
+    </div>
+  </div>
+
+  <%# ---- Was sie koennen soll -------------------------------------------
+      Als Kachelraster wie auf der Uebersicht: Es zeigt den Umfang auf einen
+      Blick. Jede Kachel traegt ihren eigenen Zustand — auf einer Entwurfsseite
+      ist naemlich selten alles gleich weit. %>
+  <% if ((seite.merkmale || []).length) { %>
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <div class="kartenkopf">
+            <span class="kartensymbol"><i class="fa-solid fa-shapes"></i></span>
+            <div class="kartenkopf__text">
+              <h3 class="kartenkopf__titel"><%= tr('streaming:ENTWURF.PLANNED_TITLE') %></h3>
+              <div class="kartenkopf__satz"><%= tr('streaming:ENTWURF.PLANNED_HINT') %></div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="merkmale">
+            <% seite.merkmale.forEach(m => { %>
+              <div class="merkmal">
+                <div class="merkmal__kopf">
+                  <span class="merkmal__symbol merkmal__symbol--<%= m.zustand %>"><i class="<%= m.icon %>"></i></span>
+                  <%= m.titel %>
+                </div>
+                <p><%- m.text %></p>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <%# ---- Was schon liegt --------------------------------------------------
+      Der wichtigste Teil fuer die Frage "was kostet das noch". Nicht
+      geschaetzt, sondern mit der Stelle im Code, an der es liegt. %>
+  <% if ((seite.vorhanden || []).length) { %>
+    <div class="col-12 col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">
+          <div class="kartenkopf">
+            <span class="kartensymbol kartensymbol--steht"><i class="fa-solid fa-check"></i></span>
+            <div class="kartenkopf__text">
+              <h3 class="kartenkopf__titel"><%= tr('streaming:ENTWURF.HAVE_TITLE') %></h3>
+              <div class="kartenkopf__satz"><%= tr('streaming:ENTWURF.HAVE_HINT') %></div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="zeilen">
+            <% seite.vorhanden.forEach(v => { %>
+              <div class="zeile">
+                <div class="zeile__bez"><%= v.was %></div>
+                <div><code><%= v.wo %></code></div>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <%# ---- Was noch fehlt --------------------------------------------------- %>
+  <% if ((seite.fehlt || []).length) { %>
+    <div class="col-12 col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">
+          <div class="kartenkopf">
+            <span class="kartensymbol kartensymbol--warnung"><i class="fa-solid fa-hammer"></i></span>
+            <div class="kartenkopf__text">
+              <h3 class="kartenkopf__titel"><%= tr('streaming:ENTWURF.MISSING_TITLE') %></h3>
+              <div class="kartenkopf__satz"><%= tr('streaming:ENTWURF.MISSING_HINT') %></div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="zeilen">
+            <% seite.fehlt.forEach(f => { %>
+              <div class="zeile">
+                <div class="zeile__bez"><%= f.was %></div>
+                <div>
+                  <div class="text-secondary"><%- f.warum %></div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <%# ---- Die Sperre, falls es eine gibt -----------------------------------
+      Steht bewusst UNTEN und nicht oben: Wer die Seite oeffnet, soll zuerst
+      sehen, worum es geht. Eine Sperre als erstes zu zeigen, laesst die Seite
+      wie einen Fehler aussehen — sie ist aber ein Plan. %>
+  <% if (seite.sperre) { %>
+    <div class="col-12">
+      <div class="alert alert-warning" role="alert">
+        <div class="d-flex">
+          <div class="me-3"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div>
+            <h4 class="alert-title"><%= seite.sperre.titel %></h4>
+            <div class="text-secondary"><%- seite.sperre.text %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <%# ---- Wohin es von hier weitergeht ------------------------------------- %>
+  <% if ((seite.verweise || []).length) { %>
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <div class="text-secondary small mb-2"><%= tr('streaming:ENTWURF.SEE_ALSO') %></div>
+          <div class="d-flex flex-wrap gap-2">
+            <% seite.verweise.forEach(v => { %>
+              <a href="<%= v.url.startsWith('/') ? v.url : basis + '/' + v.url %>" class="btn btn-sm">
+                <%= v.text %>
+              </a>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+</div>
