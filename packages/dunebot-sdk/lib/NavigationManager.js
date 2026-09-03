@@ -263,6 +263,11 @@ class NavigationManager {
                     icon: item.icon || 'fa-puzzle-piece',
                     sort_order: sortOrder,
                     parent: item.parent || null,
+                    // Zwischenüberschrift in der Seitenleiste (P1). `null` heißt
+                    // "kein Abschnitt" und ist der Normalfall — wer nichts setzt,
+                    // bekommt die flache Liste wie bisher. Der Wert darf ein
+                    // Übersetzungsschlüssel sein; die Sidebar reicht ihn durch `tr`.
+                    abschnitt: item.abschnitt || null,
                     type: item.type || this.menuTypes.MAIN,
                     // ✅ requiresOwner-Items benötigen KEINE capability (Zugriff nur via ENV OWNER_IDS!)
                     capability: item.requiresOwner ? null : (item.capability || 'DASHBOARD.ACCESS'),
@@ -278,10 +283,10 @@ class NavigationManager {
             for (const navItem of items) {
                 await dbService.query(`
                     INSERT INTO guild_nav_items (
-                        plugin, guildId, title, url, icon, 
-                        sort_order, parent, type, capability, 
+                        plugin, guildId, title, url, icon,
+                        sort_order, parent, abschnitt, type, capability,
                         target, visible, classes, position, requiresOwner
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `, [
                     navItem.plugin,
                     navItem.guildId,
@@ -290,6 +295,7 @@ class NavigationManager {
                     navItem.icon,
                     navItem.sort_order,
                     navItem.parent,
+                    navItem.abschnitt,
                     navItem.type,
                     navItem.capability,
                     navItem.target,

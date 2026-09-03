@@ -110,10 +110,45 @@
                     </a>
                     <div class="dropdown-divider"></div>
                   <% } %>
-                  <% kinder.forEach(kind => { %>
-                    <a class="dropdown-item <%= _aktiv === kind.url ? 'active' : '' %>" href="<%= kind.url %>">
-                      <%= tr(kind.title, kind.title) %>
-                    </a>
+                  <%# ---- Abschnittsbeschriftungen (P1) ----------------------
+                      Punkte mit gleichem `abschnitt` stehen unter einer
+                      Zwischenueberschrift. `null` heisst "kein Abschnitt" und
+                      ist der Normalfall — zwoelf der dreizehn Plugins setzen
+                      das Feld nicht und rendern flach wie bisher.
+
+                      **Gruppiert wird, nicht verglichen.** Ein blosses
+                      "hat sich der Abschnitt geaendert?" haette dieselbe
+                      Ueberschrift zweimal gezeigt, sobald `sort_order` die
+                      Punkte einer Gruppe auseinanderreisst — und das kann
+                      jedes Plugin versehentlich tun. Die Map behaelt die
+                      Reihenfolge des ersten Auftretens, also bleibt die
+                      Gliederung auch bei gemischter Sortierung stabil.
+
+                      Eine leere Gruppe kann es nicht geben: Die
+                      Rechtefilterung (`_filterByPermissions`) laeuft vorher,
+                      und wo kein Punkt uebrigbleibt, entsteht auch kein
+                      Eintrag in der Map. Genau deshalb steht der Abschnitt am
+                      Punkt und nicht als eigenes Menue-Element.  %>
+                  <%
+                    const _gruppen = new Map();
+                    kinder.forEach(kind => {
+                      const schluessel = kind.abschnitt || '';
+                      if (!_gruppen.has(schluessel)) _gruppen.set(schluessel, []);
+                      _gruppen.get(schluessel).push(kind);
+                    });
+                    let _ersteGruppe = true;
+                  %>
+                  <% _gruppen.forEach((punkte, abschnitt) => { %>
+                    <% if (abschnitt) { %>
+                      <% if (!_ersteGruppe) { %><div class="dropdown-divider"></div><% } %>
+                      <h6 class="dropdown-header nav-abschnitt"><%= tr(abschnitt, abschnitt) %></h6>
+                    <% } %>
+                    <% punkte.forEach(kind => { %>
+                      <a class="dropdown-item <%= _aktiv === kind.url ? 'active' : '' %>" href="<%= kind.url %>">
+                        <%= tr(kind.title, kind.title) %>
+                      </a>
+                    <% }); %>
+                    <% _ersteGruppe = false; %>
                   <% }); %>
                 </div>
               </li>

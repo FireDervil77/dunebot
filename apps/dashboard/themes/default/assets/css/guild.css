@@ -629,3 +629,38 @@ input[type="checkbox"]:not(.form-check-input):disabled {
   transition: all 0.2s;
 }
 
+
+/* ==========================================================================
+   Abschnittsbeschriftungen in der Seitenleiste (P1)
+
+   Zwischenüberschriften innerhalb eines aufgeklappten Menüpunkts. Sie sind
+   keine dritte Ebene — `sidebar.ejs` kann zwei, und dabei bleibt es. Der
+   Abschnitt hängt am Punkt (`guild_nav_items.abschnitt`), nicht an einem
+   eigenen Eintrag.
+
+   Hintergrund: docs/streamer-plugin/16-Panel-Neuschnitt.md, P1
+   ========================================================================== */
+
+.nav-abschnitt {
+  /* Kleiner als ein Menüpunkt, gesperrt gesetzt, in Versalien — sie soll
+     gliedern, nicht mit den Punkten darunter um Aufmerksamkeit ringen. */
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+
+  /* Über die Rolle, nicht über einen festen Wert: Das Dropdown der
+     Seitenleiste folgt dem Theme, und `--fb-text-muted` dreht mit, wenn
+     jemand die Palette wechselt. */
+  color: var(--fb-text-muted);
+
+  padding-top: 0.75rem;
+  padding-bottom: 0.25rem;
+  margin-bottom: 0;
+}
+
+/* Die erste Überschrift steht direkt unter dem Trennstrich des Elternlinks —
+   dort wäre der zusätzliche Abstand oben doppelt. */
+.dropdown-divider + .nav-abschnitt {
+  padding-top: 0.35rem;
+}
