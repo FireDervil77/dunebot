@@ -17,6 +17,7 @@
  *         beschreibung: 'Wohin angekuendigt wird',
  *         icon:         'fa-solid fa-bullseye',
  *         guildId,
+ *         marke:  '…HTML…',            // freiwillig, hinter dem Titel
  *         aktion: '…HTML…',            // freiwillig, rechts im Kopf
  *         texte:  { FEHLER: '…' },     // freiwillig, fuer das Seitenskript
  *         daten:  { bedingungen: [] }  // freiwillig, weitere data-Attribute
@@ -76,7 +77,11 @@ const _daten = (typeof daten !== 'undefined' && daten) ? daten : {};
       <% } %>
       <h2 class="page-title">
         <% if (typeof icon !== 'undefined' && icon) { %><i class="<%= icon %> me-2"></i><% } %>
-        <%= titel %>
+        <%= titel %><%# `marke` steht HINTER dem Titel und traegt dort einen
+            Zustand, der zur Seite gehoert — „steht", „Entwurf", „live". Der
+            Abstand kommt aus dem Kopf und nicht vom Aufrufer, sonst haette
+            ihn die erste Seite mit und die zweite ohne. %>
+        <% if (typeof marke !== 'undefined' && marke) { %><span class="ms-2"><%- marke %></span><% } %>
       </h2>
       <% if (typeof beschreibung !== 'undefined' && beschreibung) { %>
         <div class="text-secondary mt-1"><%= beschreibung %></div>

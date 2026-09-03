@@ -3,6 +3,7 @@
   "DESCRIPTION": "Meldet im Discord, wenn ein beobachteter Kanal live geht",
   "NAV": {
     "STREAMING": "Streaming",
+    "OVERVIEW": "Übersicht",
     "CHANNELS": "Kanäle",
     "ANNOUNCE": "Live-Ankündigung",
     "ALERTS": "Ereignisse",
@@ -23,15 +24,15 @@
     "STATS": "Statistik"
   },
   "STREAMERS": {
-    "TITLE": "Beobachtete Kanäle",
-    "SUBTITLE": "Wer live geht, wird hier gemeldet",
+    "TITLE": "Kanäle",
+    "SUBTITLE": "Wen dieser Server verfolgt. Der Streamer erfährt davon nichts — dass jemand live ist, ist öffentlich.",
     "EMPTY": "Noch kein Kanal eingetragen.",
     "EMPTY_HINT": "Trage einen Twitch-Kanalnamen ein. Der Streamer erfährt davon nichts - dass jemand live ist, ist öffentlich.",
     "ADD": "Kanal eintragen",
     "PLATFORM": "Plattform",
     "CHANNEL": "Kanal",
     "STATE": "Zustand",
-    "TARGETS": "Ziele",
+    "TARGETS": "Geht nach",
     "LAST_HEARD": "Zuletzt gehört",
     "LIVE": "live",
     "OFFLINE": "offline",

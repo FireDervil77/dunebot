@@ -8,7 +8,7 @@
  * auseinandergelaufen.
  *
  * Erwartet: guildId, tr, titel, beschreibung, icon
- * Optional:  aktion (HTML rechts im Kopf)
+ * Optional:  aktion (HTML rechts im Kopf), marke (HTML hinter dem Titel)
  */
 %>
 <%- include('shared/seitenkopf', {
@@ -18,5 +18,6 @@
       beschreibung: (typeof beschreibung !== 'undefined' ? beschreibung : null),
       icon:         icon,
       guildId:      guildId,
-      aktion:       (typeof aktion !== 'undefined' ? aktion : null)
+      aktion:       (typeof aktion !== 'undefined' ? aktion : null),
+      marke:        (typeof marke  !== 'undefined' ? marke  : null)
 }) %>

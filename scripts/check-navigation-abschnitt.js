@@ -199,6 +199,52 @@ pruefe('D · keine Ueberschrift ohne Punkte darunter',
     `Ueberschriften: ${d.kopf.length}, Punkte: ${d.punkte.length}`);
 
 // =====================================================
+// 2b. Der Eigenlink des Elternpunktes
+// =====================================================
+//
+// Der Aufklapp-Punkt selbst verlinkt nicht, deshalb setzt die Seitenleiste
+// einen Eintrag auf seine Adresse — sonst waere die Seite dahinter nicht
+// erreichbar. Sobald ein Kind dieselbe Adresse traegt, stand sie zweimal
+// untereinander: einmal unter dem Namen des MENUES, einmal unter ihrem
+// eigenen. Gemessen am 2026-09-03: `core` legt in jeder der zehn Guilds ein
+// `NAV.THEMES_OVERVIEW` auf die Adresse seines Elternpunktes.
+//
+// **Beide Richtungen werden geprueft.** Nur "der Doppeleintrag ist weg" waere
+// auch dann gruen, wenn der Eigenlink gar nicht mehr entstuende — und dann
+// waere die Seite jedes Plugins ohne eigenen Uebersichtspunkt unerreichbar.
+
+console.log('\nDer Eigenlink steht genau dann, wenn ihn niemand ersetzt');
+
+const eigenlinks = (guildNav) => {
+    const html = ejs.render(vorlage, { ...grund, guildNav }, { filename: VORLAGE });
+    return [...html.matchAll(/dropdown-item[^"]*"\s+href="([^"]+)"/g)]
+        .map(m => m[1].toLowerCase())
+        .filter(u => u === '/s')
+        .length;   // klein geschrieben, sonst zaehlt der Fall mit `/S` sich selbst nicht mit
+};
+
+pruefe('E · ohne eigenen Punkt bleibt der Eigenlink stehen',
+    eigenlinks(gruppe([p('Kanaele', '/s/k', 'Verfolgung', 10)])) === 1,
+    'Die Seite des Elternpunktes waere aus der Seitenleiste nicht mehr erreichbar.');
+
+pruefe('F · mit eigenem Punkt faellt der Eigenlink weg',
+    eigenlinks(gruppe([
+        { title: 'Uebersicht', url: '/s', abschnitt: null, sort_order: 5, icon: 'fa-solid fa-circle' },
+        p('Kanaele', '/s/k', 'Verfolgung', 10)
+    ])) === 1,
+    'Dieselbe Seite steht zweimal untereinander im aufgeklappten Menue.');
+
+// Und der Vergleich ist unempfindlich gegen Gross-/Kleinschreibung, weil
+// `NavigationManager._attachSubmenus` die Kinder genauso zuordnet: Ein
+// strengerer Vergleich hier liesse Paare durch, die dort zusammenfanden.
+pruefe('F · auch bei abweichender Schreibweise der Adresse',
+    eigenlinks([{
+        title: 'Plugin', url: '/S', sort_order: 2000, icon: 'fa-solid fa-circle',
+        subItems: [{ title: 'Uebersicht', url: '/s', abschnitt: null, sort_order: 5, icon: 'fa-solid fa-circle' }]
+    }]) === 1,
+    'Die Adressen unterscheiden sich nur in der Schreibweise — der Eintrag steht doppelt.');
+
+// =====================================================
 // 3. Jeder gesetzte Abschnitt ist uebersetzt
 // =====================================================
 //

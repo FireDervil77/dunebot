@@ -1,7 +1,7 @@
 {
   "name": "default",
   "displayName": "FireBot Default",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Standard-Theme auf Tabler (Bootstrap 5). Der Guild-Bereich laeuft vollstaendig darauf; Anmeldung und oeffentliche Webseite folgen in einem eigenen Durchgang.",
   "author": "FireBot Team",
   "screenshot": "https://dev.firenetworks.de/uploads/media/1403034310172475416/1773746247397-ea467e07cba9879f.png",

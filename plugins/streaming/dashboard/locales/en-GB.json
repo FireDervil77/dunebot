@@ -3,6 +3,7 @@
   "DESCRIPTION": "Announces in Discord when a watched channel goes live",
   "NAV": {
     "STREAMING": "Streaming",
+    "OVERVIEW": "Overview",
     "CHANNELS": "Channels",
     "ANNOUNCE": "Live announcement",
     "ALERTS": "Events",
@@ -23,15 +24,15 @@
     "STATS": "Statistics"
   },
   "STREAMERS": {
-    "TITLE": "Watched channels",
-    "SUBTITLE": "Whoever goes live gets announced here",
+    "TITLE": "Channels",
+    "SUBTITLE": "Who this server follows. The streamer is not notified — being live is public.",
     "EMPTY": "No channel added yet.",
     "EMPTY_HINT": "Add a Twitch channel name. The streamer is not notified - being live is public information.",
     "ADD": "Add channel",
     "PLATFORM": "Platform",
     "CHANNEL": "Channel",
     "STATE": "Status",
-    "TARGETS": "Targets",
+    "TARGETS": "Goes to",
     "LAST_HEARD": "Last heard",
     "LIVE": "live",
     "OFFLINE": "offline",

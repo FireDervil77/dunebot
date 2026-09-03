@@ -1,3 +1,56 @@
+<%
+/**
+ * Die Kanalliste — nach dem Entwurf (2026-09-03).
+ *
+ * ## Was sich gegenueber der alten Fassung geaendert hat
+ *
+ * **Der Kartenkopf ist weg.** Er trug denselben Titel wie der Seitenkopf drei
+ * Zeilen darueber. Zwei Ueberschriften fuer eine Tabelle.
+ *
+ * **Die Spalte "Ziele" zeigte eine falsche Zahl.** Ein Kanal mit einem Ziel
+ * stand dort als "10" — nachgemessen an der laufenden Anlage. Die Ursache lag
+ * in `models.js` und ist dort erklaert. Sie ist jetzt berichtigt, aber die
+ * Spalte zeigt trotzdem nicht mehr die Zahl, sondern die **Namen** der
+ * Discord-Kanaele: "wie viele" beantwortet keine Frage, die jemand vor dieser
+ * Liste hat, "wohin" schon.
+ *
+ * **"Entfernen" steht nicht mehr in der Liste.** Es steht auf der Seite des
+ * Kanals, den es entfernt (`streaming-kanal.ejs`) — einen Klick weiter, dafuer
+ * an einem Ort, wo man sieht, was man wegwirft. Eine Loeschtaste in jeder
+ * Zeile einer Liste ist ein Fehlgriff, der auf Wiederholung wartet.
+ *
+ * **Keine "steht"-Marke.** Der Entwurf traegt an jeder Seite eine, aber das
+ * ist die Legende der ZEICHNUNG — sie sagt dem Betrachter, was davon schon
+ * gebaut ist. Im laufenden Panel ist alles Sichtbare gebaut; die Marke haette
+ * dort keinen Gegenstand. Die Entwurfsseiten tragen weiter ihre.
+ *
+ * Erwartet: streamer, anzahl, grenze, zielkanaele, rollen, vorWieLange
+ */
+
+/* Anfangsbuchstaben als Ersatzbild — zwei Zeichen, weil drei in 30 Pixeln
+   nicht mehr lesbar sind.
+
+   Zusammengesetzte Namen geben ihre Anfaenge her, einfache die ersten zwei
+   Buchstaben: "FireDervil" -> FD, "Kaffeepause" -> KA. Bloss `slice(0,2)`
+   haette "FI" ergeben, und damit saehen alle Kanaele eines Streamers, dessen
+   Name so anfaengt, gleich aus. */
+const anfang = (name) => {
+  const roh   = String(name || '?').trim();
+  const teile = roh.split(/[\s_.·-]+|(?=[A-Z][a-z])/).filter(Boolean);
+  const kurz  = teile.length > 1
+      ? teile.slice(0, 2).map(t => t[0]).join('')
+      : roh.replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2);
+  return (kurz || '?').toUpperCase();
+};
+
+/* Kanal-IDs -> Namen. `ziel_kanaele` kommt als Liste aus der Abfrage; ein Ziel
+   kann auf einen Discord-Kanal zeigen, den es nicht mehr gibt — dann steht da
+   die nackte ID, und genau das soll man sehen. */
+const kanalNamen = new Map((zielkanaele || []).map(k => [String(k.id), k.name]));
+const zieleVon = (zeile) => String(zeile.ziel_kanaele || '')
+      .split(',').map(s => s.trim()).filter(Boolean);
+%>
+
 <%- include('partials/streaming-kopf', {
   guildId, tr,
   icon: 'fa-solid fa-video',
@@ -10,8 +63,7 @@
   // man nur nachsehen wollte, was eingetragen ist. Die Liste ist der Inhalt
   // dieser Seite; das Eintragen ist eine Handlung, die man selten braucht.
   aktion: '<button class="btn btn-primary" type="button" data-bs-toggle="collapse" '
-        + 'data-bs-target="#kanal-eintragen">'
-        + '<i class="fa-solid fa-plus me-2"></i>Kanal eintragen</button>'
+        + 'data-bs-target="#kanal-eintragen">Kanal eintragen</button>'
 }) %>
 
 <%
@@ -60,10 +112,8 @@
                      placeholder="ninja  oder  twitch.tv/ninja" autocomplete="off" required
                      <%= anzahl >= grenze ? 'disabled' : '' %>>
               <div class="form-hint">
-                Der Name aus der <strong>Adresszeile</strong> (twitch.tv/<em>name</em>) —
-                nicht der Anzeigename aus dem Profil. Gross- und Kleinschreibung ist egal,
-                eine vollständige Adresse geht auch. Der Kanal wird vor dem Speichern
-                bei Twitch nachgeschlagen; den Streamer selbst benachrichtigt das nicht.
+                Der Name aus der <strong>Adresszeile</strong>, nicht der Anzeigename
+                aus dem Profil.
               </div>
             </div>
             <div class="col-md-4">
@@ -99,9 +149,8 @@
                 <% }); %>
               </select>
               <div class="form-hint">
-                Wird in der Ankündigung erwähnt — alle mit dieser Rolle bekommen
-                eine Benachrichtigung. Üblich ist eine Rolle, die sich Mitglieder
-                selbst geben können. Ohne Auswahl kommt die Ankündigung ohne Ping.
+                Alle mit dieser Rolle bekommen eine Benachrichtigung. Ohne
+                Auswahl kommt die Ankündigung ohne Ping.
               </div>
             </div>
           </div>
@@ -113,9 +162,7 @@
             </label>
             <div class="form-hint">
               Wirkt nur in <strong>Ankündigungskanälen</strong> (📢): Die Nachricht
-              erscheint dann auch auf Servern, die diesem Kanal folgen. In einem
-              normalen Textkanal passiert nichts — die Ankündigung selbst kommt
-              trotzdem an.
+              erscheint dann auch auf Servern, die diesem Kanal folgen.
             </div>
           </div>
 
@@ -138,13 +185,6 @@
 
   <div class="col-12">
     <div class="card">
-      <div class="card-header">
-        <h3 class="card-title"><%= tr('streaming:STREAMERS.TITLE') %></h3>
-        <div class="card-actions text-secondary">
-          <%= anzahl %> / <%= grenze %>
-        </div>
-      </div>
-
       <% if (!streamer || streamer.length === 0) { %>
         <div class="card-body">
           <%- include('shared/leerzustand', {
@@ -169,51 +209,75 @@
               <% streamer.forEach(s => { %>
                 <tr>
                   <td>
-                    <span class="fw-bold"><%= s.anzeigename || s.login %></span>
-                    <div class="text-secondary small font-monospace"><%= s.login %></div>
-                    <% if (s.titel) { %>
-                      <div class="text-secondary small"><%= s.titel %></div>
+                    <div class="kanalzeile">
+                      <% if (s.avatar_url) { %>
+                        <img class="kanalzeile__av" src="<%= s.avatar_url %>" alt="" width="30" height="30">
+                      <% } else { %>
+                        <span class="kanalzeile__av"><%= anfang(s.anzeigename || s.login) %></span>
+                      <% } %>
+                      <div>
+                        <div class="kanalzeile__name"><%= s.anzeigename || s.login %></div>
+                        <div class="kanalzeile__login"><%= s.login %></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <%# Eine Stoerung am Abo bleibt eine Plakette — sie ist kein
+                        Zustand, der sich von selbst wieder aendert, und muss in
+                        einer Liste aus zwanzig Zeilen auffallen. %>
+                    <% if (s.abo_zustand === 'widerrufen' || s.abo_zustand === 'fehler') { %>
+                      <span class="zustandsmarke zustandsmarke--stoerung">Abo <%= s.abo_zustand %></span>
+                    <% } else if (s.ist_live) { %>
+                      <span class="livemarke"><%= tr('streaming:STREAMERS.LIVE') %></span>
+                    <% } else if (s.ist_live === 0) { %>
+                      <span class="stillmarke"><%= tr('streaming:STREAMERS.OFFLINE') %></span>
+                    <% } else { %>
+                      <span class="stillmarke">—</span>
                     <% } %>
                   </td>
                   <td>
-                    <% if (s.abo_zustand === 'widerrufen' || s.abo_zustand === 'fehler') { %>
-                      <span class="badge bg-red-lt">Abo <%= s.abo_zustand %></span>
-                    <% } else if (s.ist_live) { %>
-                      <span class="badge bg-red">● <%= tr('streaming:STREAMERS.LIVE') %></span>
-                    <% } else if (s.ist_live === 0) { %>
-                      <span class="badge bg-secondary-lt"><%= tr('streaming:STREAMERS.OFFLINE') %></span>
-                    <% } else { %>
-                      <span class="text-secondary">—</span>
-                    <% } %>
+                    <div class="chips">
+                      <% zieleVon(s).forEach(id => { %>
+                        <% if (kanalNamen.has(id)) { %>
+                          <span class="chip">#<%= kanalNamen.get(id) %></span>
+                        <% } else { %>
+                          <%# Der Discord-Kanal ist weg oder der Bot darf ihn nicht
+                              mehr sehen. Die ID stehenzulassen ist die ehrlichere
+                              Auskunft als ein stiller Leerplatz. %>
+                          <span class="chip chip--still" title="Dieser Discord-Kanal ist nicht mehr erreichbar">
+                            unbekannt
+                          </span>
+                        <% } %>
+                      <% }); %>
+                    </div>
                   </td>
-                  <td><%= s.ziele %></td>
-                  <td class="text-secondary">
-                    <%= vorWieLange(s.letzte_meldung_am) || tr('streaming:STATE.NEVER') %>
+                  <td>
+                    <span class="zeitangabe">
+                      <%= vorWieLange(s.letzte_meldung_am) || tr('streaming:STATE.NEVER') %>
+                    </span>
                   </td>
-                  <td class="text-nowrap">
+                  <td class="text-end">
                     <%# **Fuehrt seit P4 auf die Seite DIESES Kanals**, nicht
                         mehr auf `/ankuendigung#ziel-…`. Der Sprunganker war der
                         Notbehelf, solange alle Kanaele untereinander auf einer
                         Seite standen: Er landete mitten in einer Liste, in der
                         auch alle anderen Ziele stehen. %>
-                    <a class="btn btn-sm btn-ghost-secondary"
+                    <a class="btn btn-sm"
                        href="/guild/<%= guildId %>/plugins/streaming/streamer/<%= s.id %>"
                        title="Ankündigung, Ereignisse, Rollen und Aufräumart dieses Kanals">
                       Einrichten
                     </a>
-                    <form method="POST" class="d-inline"
-                          action="/guild/<%= guildId %>/plugins/streaming/streamer/<%= s.id %>/entfernen"
-                          onsubmit="return confirm('<%= (s.anzeigename || s.login) %> nicht mehr beobachten?');">
-                      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-                      <button type="submit" class="btn btn-sm btn-ghost-danger">
-                        <%= tr('streaming:COMMON.DELETE') %>
-                      </button>
-                    </form>
                   </td>
                 </tr>
               <% }); %>
             </tbody>
           </table>
+        </div>
+        <%# Die Mengengrenze steht unten und leise. Sie ist eine Schranke, kein
+            Inhalt — aber wer sie erreicht, soll nicht raten muessen, warum das
+            Formular nichts mehr annimmt. %>
+        <div class="card-footer text-secondary small">
+          <%= anzahl %> von <%= grenze %> Kanälen
         </div>
       <% } %>
     </div>

@@ -1045,3 +1045,121 @@ input[type="checkbox"]:not(.form-check-input):disabled {
   .reiter__knopf { border-right: 0; border-bottom: 1px solid var(--fb-border); }
   .reiter__knopf:last-child { border-bottom: 0; }
 }
+
+/* --- Marken (Chips): eine Liste zum Nachschlagen, kein Fließtext --------- */
+/*
+   Nachgetragen am 2026-09-03, und der Anlass war ein Befund: `.chip` stand
+   bereits an DREI Stellen im Markup — bei den Platzhaltern der Vorlagen und
+   in der Zielliste — und war in KEINER Stilvorlage erklärt. Die Marken
+   rendern deshalb bis heute als nackter Text, ohne Rahmen, ohne Abstand. Ein
+   Fehler dieser Art stürzt nirgends ab; er sieht nur jedes Mal etwas
+   schlechter aus, als er sollte.
+*/
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  white-space: nowrap;
+  color: var(--fb-primary);
+  background: color-mix(in srgb, var(--fb-primary) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fb-primary) 24%, transparent);
+}
+
+/* Neutral, wo die Marke keine Auszeichnung ist, sondern nur eine Einfassung —
+   etwa ein Kanal, den es nicht mehr gibt. */
+.chip--still {
+  color: var(--fb-text-muted);
+  background: color-mix(in srgb, var(--fb-text-muted) 10%, transparent);
+  border-color: var(--fb-border);
+}
+
+/* Platzhalter wie `{titel}` sind Zeichenfolgen zum Abtippen — die feste
+   Schrittweite macht sie als solche kenntlich. */
+.chip.mono {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.72rem;
+}
+
+/* --- Kanalzeile: Bild, Name, Anmeldename in einer Tabellenzelle ---------- */
+
+.kanalzeile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.kanalzeile__av {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  object-fit: cover;
+  font-weight: 700;
+  font-size: 0.78rem;
+  /* Beides sind Rollen, keine festen Werte — `check-panel-bauteile.js` hat den
+     ersten Versuch mit `#fff` und `#000` sofort gemeldet. `fb-sidebar-active-text`
+     IST die Rolle „Schrift auf einer Flaeche in Primaerfarbe"; sie steht schon
+     genau dafuer am aktiven Punkt der Seitenleiste. */
+  color: var(--fb-sidebar-active-text);
+  background: linear-gradient(150deg,
+              color-mix(in srgb, var(--fb-primary) 78%, var(--fb-text)),
+              var(--fb-primary));
+}
+
+.kanalzeile__name  { font-weight: 600; }
+
+.kanalzeile__login {
+  font-size: 0.76rem;
+  color: var(--fb-text-muted);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+/* --- Live: ein Punkt, keine Plakette ------------------------------------ */
+/*
+   Bewusst KEINE `.zustandsmarke`: Die sagt, wie weit ein Bauteil ist, und
+   gilt für die ganze Seite. Hier geht es um eine Zeile, die sich jede Minute
+   ändern kann — ein Punkt neben dem Wort trägt das leiser und lenkt in einer
+   Liste aus zwanzig Zeilen nicht ab.
+*/
+
+.livemarke {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--fb-danger);
+}
+
+.livemarke::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--fb-danger);
+}
+
+.stillmarke {
+  font-size: 0.82rem;
+  color: var(--fb-text-muted);
+}
+
+/* Zeitangaben in Tabellen: feste Schrittweite, damit „vor 12 Min." und
+   „vor 2 Tagen" untereinander an derselben Stelle beginnen. */
+.zeitangabe {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.8rem;
+  color: var(--fb-text-muted);
+  white-space: nowrap;
+}

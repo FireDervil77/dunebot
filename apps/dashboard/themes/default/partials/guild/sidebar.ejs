@@ -103,8 +103,25 @@
                 <div class="dropdown-menu <%= aktiv ? 'show' : '' %>">
                   <%# Der Elternpunkt hat eine eigene Seite — ohne diesen Eintrag
                       waere sie nicht erreichbar, weil der Aufklapp-Punkt selbst
-                      nicht verlinkt. Genau wie in WordPress. %>
-                  <% if (eintrag.url) { %>
+                      nicht verlinkt. Genau wie in WordPress.
+
+                      **Es sei denn, ein Kind fuehrt schon dorthin** (2026-09-03).
+                      Dann stand die Seite zweimal untereinander, einmal unter dem
+                      Namen des MENUES und einmal unter ihrem eigenen. Gemessen:
+                      `core` legt heute in jeder der zehn Guilds ein
+                      `NAV.THEMES_OVERVIEW` auf `/guild/<id>/themes` an — genau die
+                      Adresse des Elternpunktes. Wer das Menue aufklappte, las
+                      "Themes / Übersicht" und traf zweimal dieselbe Seite.
+
+                      Der Vergleich ist ohne Ruecksicht auf Gross- und
+                      Kleinschreibung, weil `NavigationManager._attachSubmenus`
+                      die Kinder genauso zuordnet. Ein strengerer Vergleich hier
+                      liesse Paare durch, die dort zusammengefunden haben. %>
+                  <%
+                    const _selbst = String(eintrag.url || '').toLowerCase();
+                    const _kindTrifftSelbst = kinder.some(k => String(k.url || '').toLowerCase() === _selbst);
+                  %>
+                  <% if (eintrag.url && !_kindTrifftSelbst) { %>
                     <a class="dropdown-item <%= _aktiv === eintrag.url ? 'active' : '' %>" href="<%= eintrag.url %>">
                       <%= tr(eintrag.title, eintrag.title) %>
                     </a>

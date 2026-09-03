@@ -39,7 +39,24 @@ function db() {
 // =====================================================
 
 /**
- * Alle Kanaele, die diese Guild beobachtet - mit Zustand und Anzahl Ziele.
+ * Alle Kanaele, die diese Guild beobachtet - mit Zustand und Zielen.
+ *
+ * ## `COUNT(DISTINCT ...)`, und warum das kein Schoenheitsfehler war
+ *
+ * Hier stand bis zum 2026-09-03 ein blankes `COUNT(t.id)`. Der `LEFT JOIN` auf
+ * `streaming_subscriptions` vervielfacht die Zeilen aber je Abo-Ereignis, und
+ * gezaehlt wurde dann das **Produkt**. Gemessen an der laufenden Anlage:
+ *
+ *     firedervil   1 Ziel  ->  angezeigt als 10   (10 Ereignis-Abos)
+ *     nitrinax     1 Ziel  ->  angezeigt als  3
+ *     rapperpig    1 Ziel  ->  angezeigt als  3
+ *
+ * Die Spalte „Ziele" im Panel log also seit jeher, und zwar plausibel genug,
+ * dass es niemandem auffiel. Ein Absturz waere billiger gewesen.
+ *
+ * `ziel_kanaele` kommt neu dazu: die Discord-Kanal-IDs als Liste, damit die
+ * Uebersicht **wohin** gemeldet wird zeigen kann statt **wie oft**. Eine Zahl
+ * beantwortet dort keine Frage, die jemand hat.
  *
  * @param {string} guildId Discord-Guild-ID
  * @returns {Promise<Array>} Zeilen
@@ -48,7 +65,8 @@ async function streamerDerGuild(guildId) {
     return await db().query(`
         SELECT  s.id, s.plattform, s.login, s.anzeigename, s.avatar_url,
                 z.ist_live, z.titel, z.kategorie, z.begonnen_am,
-                COUNT(t.id)            AS ziele,
+                COUNT(DISTINCT t.id)          AS ziele,
+                GROUP_CONCAT(DISTINCT t.channel_id) AS ziel_kanaele,
                 MIN(t.id)              AS erstes_ziel,
                 MAX(a.letzte_meldung_am) AS letzte_meldung_am,
                 MIN(a.zustand)         AS abo_zustand

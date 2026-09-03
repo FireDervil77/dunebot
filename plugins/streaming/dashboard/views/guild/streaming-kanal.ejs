@@ -31,10 +31,14 @@ const titel = kanal.anzeigename || kanal.login;
   icon: 'fa-solid fa-video',
   titel: titel,
   beschreibung: 'Alles, was dieser Server mit diesem Kanal tut — an einem Ort.',
-  aktion: (kanal.ist_live
-            ? '<span class="zustandsmarke zustandsmarke--stoerung me-2">live</span>'
-            : '')
-        + `<a href="/guild/${guildId}/plugins/streaming/streamer" class="btn btn-sm">`
+  // **`live` steht hinter dem Namen, nicht rechts bei den Knoepfen** (P4-Nachtrag).
+  //
+  // Es ist eine Eigenschaft des Kanals, kein Bedienelement — der Entwurf setzt
+  // es genauso: `<h2>FireDervil <span class="livemarke">live</span></h2>`. Und
+  // es ist bewusst KEINE `zustandsmarke`: die sagt, wie weit ein Bauteil gebaut
+  // ist, und gilt fuer die ganze Seite.
+  marke: (kanal.ist_live ? '<span class="livemarke">live</span>' : ''),
+  aktion: `<a href="/guild/${guildId}/plugins/streaming/streamer" class="btn btn-sm">`
         + '<i class="fa-solid fa-arrow-left me-2"></i>Alle Kanäle</a>'
 }) %>
 
@@ -44,7 +48,7 @@ const titel = kanal.anzeigename || kanal.login;
   const darfVorlagen   = typeof hasPermission === 'function' && hasPermission('STREAMING.TEMPLATES.EDIT');
 
   const basis = `/guild/${guildId}/plugins/streaming`;
-  const marke = typeof csrfToken !== 'undefined' ? csrfToken : '';
+  const csrfMarke = typeof csrfToken !== 'undefined' ? csrfToken : '';
 
   // Wortgleich mit `streaming-ziele.ejs`: Dieselbe Handlung soll dieselbe
   // Rueckmeldung geben, egal von welcher Seite aus sie ausgeloest wurde.
@@ -121,11 +125,11 @@ const titel = kanal.anzeigename || kanal.login;
               icon:         'fa-solid fa-satellite-dish',
               id:           `k-schalter-${z.id}`,
               aktion:       `${basis}/ziele/${z.id}/schalter`,
-              csrfToken:    marke,
+              csrfToken:    csrfMarke,
               darf:         darfAendern,
               schalter:     { name: 'aktiv', an: !!z.aktiv },
               speichern:    'Schalter übernehmen',
-              koerper:      include('teile/ziel-kopf', Object.assign({ basis, darfProben, marke }, uebergabe))
+              koerper:      include('teile/ziel-kopf', Object.assign({ basis, darfProben, csrfMarke }, uebergabe))
         }) %>
 
         <% if (darfProben) { %>
@@ -134,7 +138,7 @@ const titel = kanal.anzeigename || kanal.login;
               taete nichts. %>
           <form id="probe-<%= z.id %>" method="POST" data-toast
                 action="<%= basis %>/ziele/<%= z.id %>/probe" hidden>
-            <input type="hidden" name="_csrf" value="<%= marke %>">
+            <input type="hidden" name="_csrf" value="<%= csrfMarke %>">
           </form>
         <% } %>
 
@@ -142,7 +146,7 @@ const titel = kanal.anzeigename || kanal.login;
               titel: 'Ankündigung', icon: 'fa-solid fa-bullhorn',
               beschreibung: 'Wohin gemeldet wird, wenn der Stream startet.',
               id: `k-ank-${z.id}`, aktion: `${basis}/ziele/${z.id}/ankuendigung`,
-              csrfToken: marke, darf: darfAendern,
+              csrfToken: csrfMarke, darf: darfAendern,
               koerper: include('teile/ziel-ankuendigung', uebergabe)
         }) %>
 
@@ -154,7 +158,7 @@ const titel = kanal.anzeigename || kanal.login;
               beschreibung: z.vorlage ? 'Dieses Ziel weicht vom Standard ab.'
                                       : 'Leer — es gilt der Standard dieses Servers.',
               id: `k-vor-${z.id}`, aktion: `${basis}/vorlagen/${z.id}`,
-              csrfToken: marke, darf: darfVorlagen,
+              csrfToken: csrfMarke, darf: darfVorlagen,
               koerper: include('teile/ziel-vorlage', { z, darfVorlagen })
         }) %>
 
@@ -162,7 +166,7 @@ const titel = kanal.anzeigename || kanal.login;
               titel: 'Filter und Ruhezeit', icon: 'fa-solid fa-filter',
               beschreibung: 'Wann trotz laufendem Stream NICHT angekündigt wird.',
               id: `k-flt-${z.id}`, aktion: `${basis}/ziele/${z.id}/filter`,
-              csrfToken: marke, darf: darfAendern,
+              csrfToken: csrfMarke, darf: darfAendern,
               koerper: include('teile/ziel-filter', uebergabe)
         }) %>
       </div>
@@ -187,7 +191,7 @@ const titel = kanal.anzeigename || kanal.login;
             titel: kName ? '#' + kName : '⚠ Kanal gelöscht', icon: 'fa-solid fa-bell',
             beschreibung: z.aktiv ? null : 'Dieses Ziel ist abgeschaltet — hier gemachte Angaben wirken erst, wenn es wieder an ist.',
             id: `k-mld-${z.id}`, aktion: `${basis}/ziele/${z.id}/meldungen`,
-            csrfToken: marke, darf: darfAendern,
+            csrfToken: csrfMarke, darf: darfAendern,
             koerper: include('teile/ziel-meldungen', uebergabe)
       }) %>
     <% }); %>
@@ -203,7 +207,7 @@ const titel = kanal.anzeigename || kanal.login;
             titel: kName ? '#' + kName : '⚠ Kanal gelöscht', icon: 'fa-solid fa-user-tag',
             beschreibung: z.aktiv ? null : 'Dieses Ziel ist abgeschaltet — hier gemachte Angaben wirken erst, wenn es wieder an ist.',
             id: `k-rol-${z.id}`, aktion: `${basis}/ziele/${z.id}/rollen`,
-            csrfToken: marke, darf: darfAendern,
+            csrfToken: csrfMarke, darf: darfAendern,
             koerper: include('teile/ziel-rollen', uebergabe)
       }) %>
     <% }); %>
@@ -227,7 +231,7 @@ const titel = kanal.anzeigename || kanal.login;
             titel: kName ? '#' + kName : '⚠ Kanal gelöscht', icon: 'fa-solid fa-broom',
             beschreibung: 'Was mit der Ankündigung geschieht, wenn der Stream endet.',
             id: `k-auf-${z.id}`, aktion: `${basis}/ziele/${z.id}/aufraeumen`,
-            csrfToken: marke, darf: darfAendern,
+            csrfToken: csrfMarke, darf: darfAendern,
             koerper: include('teile/ziel-aufraeumen', uebergabe)
       }) %>
     <% }); %>
@@ -248,7 +252,7 @@ const titel = kanal.anzeigename || kanal.login;
         <div class="card-footer text-end">
           <form method="POST" action="<%= basis %>/streamer/<%= kanal.id %>/entfernen"
                 onsubmit="return confirm('<%= titel %> wirklich nicht mehr verfolgen?\n\nVerfolgt ihn danach keine andere Guild mehr, werden auch die Twitch-Abos abbestellt.');">
-            <input type="hidden" name="_csrf" value="<%= marke %>">
+            <input type="hidden" name="_csrf" value="<%= csrfMarke %>">
             <button type="submit" class="btn btn-sm btn-ghost-danger">Kanal entfernen</button>
           </form>
         </div>

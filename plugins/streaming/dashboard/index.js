@@ -506,6 +506,18 @@ class StreamingDashboardPlugin extends DashboardPlugin {
             // Lesezeichen und fuer jede Rueckmeldung, die vor heute
             // verschickt wurde — das ist ein eigener Schritt, kein Anhaengsel
             // an eine Umbenennung.
+            // **Die Uebersicht als eigener Punkt** (2026-09-03, P2-Nachtrag).
+            //
+            // Sie zeigt auf dieselbe Adresse wie der Menuepunkt darueber. Bis
+            // heute erzeugte die Seitenleiste dafuer selbst einen Eintrag —
+            // unter dem Namen des MENUES. Im aufgeklappten Menue stand deshalb
+            // "Streaming / Streaming", wo der Entwurf "Übersicht" zeigt.
+            //
+            // Der Punkt traegt bewusst KEINEN `abschnitt`: Er gehoert zu keiner
+            // der drei Gruppen, sondern steht ueber ihnen — genauso wie im
+            // Entwurf. `sidebar.ejs` laesst seinen eigenen Eintrag jetzt weg,
+            // sobald ein Kind dieselbe Adresse traegt.
+            eintrag('NAV.OVERVIEW', basis, 'fa-solid fa-gauge-high', 5),
             eintrag('NAV.CHANNELS', `${basis}/streamer`,     'fa-solid fa-video', 10, { abschnitt: VERFOLGUNG }),
             eintrag('NAV.ANNOUNCE', `${basis}/ankuendigung`, 'fa-solid fa-bullhorn', 20, { abschnitt: VERFOLGUNG }),
             eintrag('NAV.ALERTS',   `${basis}/meldungen`,    'fa-solid fa-bell', 30, { abschnitt: VERFOLGUNG }),
