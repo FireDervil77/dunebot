@@ -86,10 +86,81 @@ function uhrzeit(wert) {
 }
 
 // =====================================================
-// Einstieg
+// Einstieg — die Uebersicht (P3)
 // =====================================================
-router.get('/', requirePermission('STREAMING.VIEW'), (req, res) => {
-    res.redirect(`/guild/${res.locals.guildId}/plugins/streaming/streamer`);
+//
+// **Bis zum 2026-09-03 stand hier eine Weiterleitung auf `/streamer`.** Das
+// Plugin hatte damit als einziges neben `discord` keinen Einstiegspunkt: Wer
+// "Streaming" anklickte, landete in einer Liste eingetragener Kanaele und
+// musste sich den Rest selbst zusammensuchen. Sieben andere Plugins haben
+// eine Uebersicht als ersten Punkt.
+//
+// **Die Seite holt sich dieselben Zahlen wie `/zustand`** — `zustandsBild()`
+// steht da, samt der gerechneten Ampel und der Problemliste. Es waere die
+// zweite Stelle geworden, an der dieselbe Frage anders beantwortet wird.
+//
+// ⚠ **Ohne Strom, mit Absicht.** `/zustand` haelt sich per SSE offen; diese
+// Seite ist eine Momentaufnahme beim Aufruf. Beides zu koennen hiesse, den
+// Strom zweimal zu bedienen. Wenn die Uebersicht den Zustand spaeter ganz
+// aufnimmt, wandert er mit — dann an genau einer Stelle.
+router.get('/', requirePermission('STREAMING.VIEW'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+
+    try {
+        const [bild, ziele] = await Promise.all([
+            zustandsBild(guildId, tr),
+            modelle.zieleDerGuild(guildId)
+        ]);
+
+        // **Die Zusage wird nur dort geprueft, wo sie zaehlt.** Ein Kanal, der
+        // hier bloss verfolgt wird, hat mit dem Schreiben nichts zu tun — und
+        // eine Warnung ueber fremde Zusagen in einer fremden Guild waere
+        // genau der Griff nach fremden Chat-Einstellungen, den TEIL C
+        // ausschliesst.
+        let chatWarnung = null;
+        try {
+            const heimguild = require('../kern/heimguild');
+            if (await heimguild.istHeim(guildId)) {
+                const abonnenten = require('../kern/abonnenten');
+                const meinkanal = require('../kern/meinkanal');
+                const kanaele = await heimguild.kanaeleDerGuild(guildId);
+
+                for (const k of kanaele) {
+                    if (!k.chat_ansage_an) continue;
+                    const inhaber = await abonnenten.kanalInhaber(k);
+                    const darf = await meinkanal.darfSchreiben(inhaber);
+                    if (!darf) {
+                        chatWarnung = {
+                            kanal: k.anzeigename || k.login,
+                            zusage: meinkanal.SCHREIB_ZUSAGE
+                        };
+                        break;
+                    }
+                }
+            }
+        } catch (error) {
+            // **Kein Abbruch der Seite.** Die Uebersicht ist der Einstieg; sie
+            // muss auch dann etwas zeigen, wenn eine einzelne Auskunft nicht
+            // zu bekommen ist. Gemeldet wird es trotzdem.
+            ServiceManager.get('Logger').warn(
+                `[Streaming] Schreibzusage fuer ${guildId} nicht pruefbar: ${error.message}`);
+        }
+
+        await renderView(res, 'guild/streaming-uebersicht', {
+            tr, guildId,
+            zustand: bild.zustand,
+            streamer: bild.streamer,
+            ampel: bild.ampel,
+            ampelText: bild.ampelText,
+            probleme: bild.probleme,
+            zieleAnzahl: (ziele || []).length,
+            chatWarnung,
+            vorWieLange
+        });
+    } catch (error) {
+        return renderFehler(res, error, 'Die Uebersicht konnte nicht geladen werden');
+    }
 });
 
 // =====================================================

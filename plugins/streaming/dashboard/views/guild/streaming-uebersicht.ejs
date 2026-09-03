@@ -1,0 +1,220 @@
+<%
+/**
+ * Die Uebersicht — der Einstieg ins Streaming-Plugin (P3).
+ *
+ * **Warum es sie gibt.** Bis zum 2026-09-03 leitete `/` auf `/streamer`
+ * weiter: Wer "Streaming" anklickte, landete in einer Liste eingetragener
+ * Kanaele. Sieben andere Plugins haben eine Uebersicht als ersten Punkt;
+ * `streaming` war neben `discord` das einzige ohne.
+ *
+ * **Die Reihenfolge ist die Nachricht.** Erst was gerade passiert, dann was
+ * klemmt, dann was das Panel ueberhaupt kann. Wer die Seite oeffnet, will
+ * meistens das erste wissen — und soll das dritte nur beim ersten Mal lesen.
+ *
+ * Erwartet: tr, guildId, zustand, streamer, ampel, ampelText, probleme,
+ *           zieleAnzahl, chatWarnung, vorWieLange
+ */
+const live = (streamer || []).filter(s => s.ist_live);
+const gehoert = vorWieLange(zustand.letzteMeldungAm);
+const basis = `/guild/${guildId}/plugins/streaming`;
+
+/* Der Funktionsumfang als Daten, nicht als sechsmal wiederholtes Markup.
+   `zustand` faerbt die Kachel — so ist "das kann es" von "das ist geplant"
+   auf einen Blick zu unterscheiden, statt beides gleich aussehen zu lassen. */
+const merkmale = [
+    { zustand: 'steht',   icon: 'fa-solid fa-bullhorn',  titel: 'F_ANNOUNCE', text: 'F_ANNOUNCE_T', url: `${basis}/ankuendigung` },
+    { zustand: 'steht',   icon: 'fa-solid fa-bell',      titel: 'F_EVENTS',   text: 'F_EVENTS_T',   url: `${basis}/meldungen` },
+    { zustand: 'steht',   icon: 'fa-solid fa-user-tag',  titel: 'F_ROLES',    text: 'F_ROLES_T',    url: `${basis}/rollen` },
+    { zustand: 'halb',    icon: 'fa-solid fa-comments',  titel: 'F_CHAT',     text: 'F_CHAT_T',     url: `${basis}/chatbot` },
+    { zustand: 'entwurf', icon: 'fa-solid fa-terminal',  titel: 'F_CMDS',     text: 'F_CMDS_T',     url: null },
+    { zustand: 'entwurf', icon: 'fa-solid fa-shield',    titel: 'F_GUARD',    text: 'F_GUARD_T',    url: null }
+];
+const marke = { steht: 'READY', halb: 'PARTLY', entwurf: 'PLANNED' };
+%>
+
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-gauge-high',
+  titel: tr('streaming:OVERVIEW.TITLE'),
+  beschreibung: tr('streaming:OVERVIEW.SUBTITLE')
+}) %>
+
+<div class="row row-cards">
+
+  <%# ---- Kennzahlen ------------------------------------------------------
+      Vier Zahlen, und jede beantwortet eine Frage, die man sich beim
+      Oeffnen wirklich stellt. "Twitch-Abos gesamt" stand im Entwurf und ist
+      hier bewusst NICHT dabei: Das ist eine Zahl der ganzen Anlage ueber
+      alle Guilds — sie gehoert auf die Betriebsseite, nicht vor die Augen
+      einer einzelnen Serverleitung. %>
+  <div class="col-12">
+    <div class="row row-cards">
+      <div class="col-6 col-lg-3">
+        <div class="card <%= live.length ? 'border-primary' : '' %>">
+          <div class="card-body">
+            <div class="h1 mb-0 <%= live.length ? 'text-primary' : '' %>"><%= zustand.live %></div>
+            <div class="text-secondary text-uppercase small"><%= tr('streaming:OVERVIEW.LIVE_NOW') %></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card"><div class="card-body">
+          <div class="h1 mb-0"><%= zustand.ueberwacht %></div>
+          <div class="text-secondary text-uppercase small"><%= tr('streaming:OVERVIEW.WATCHED') %></div>
+        </div></div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card"><div class="card-body">
+          <div class="h1 mb-0"><%= zieleAnzahl %></div>
+          <div class="text-secondary text-uppercase small"><%= tr('streaming:OVERVIEW.TARGETS') %></div>
+        </div></div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card"><div class="card-body">
+          <div class="h3 mb-0"><%= gehoert || tr('streaming:STATE.NEVER') %></div>
+          <div class="text-secondary text-uppercase small"><%= tr('streaming:OVERVIEW.LAST_HEARD') %></div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- Was klemmt ------------------------------------------------------
+      Steht VOR "gerade live", obwohl es seltener etwas zu sagen hat: Wenn
+      hier etwas steht, ist es das Wichtigste auf der Seite. Ist nichts da,
+      kostet es eine Zeile. %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title"><%= tr('streaming:OVERVIEW.WHATS_WRONG') %></h3>
+          <div class="text-secondary small"><%= tr('streaming:OVERVIEW.WHATS_WRONG_HINT') %></div>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <% if (chatWarnung) { %>
+          <%# Als Entscheidung formuliert, nicht als Stoerung: Es ist sein
+              Name, unter dem geschrieben wuerde, und niemand ausser ihm kann
+              die Zusage erteilen. %>
+          <div class="alert alert-warning mb-3" role="alert">
+            <div class="d-flex">
+              <div class="me-3"><i class="fa-solid fa-triangle-exclamation"></i></div>
+              <div>
+                <h4 class="alert-title"><%= tr('streaming:OVERVIEW.CHAT_BLOCKED') %></h4>
+                <div class="text-secondary">
+                  <%= tr('streaming:OVERVIEW.CHAT_BLOCKED_HINT').replace('{kanal}', chatWarnung.kanal) %>
+                </div>
+                <div class="mt-2">
+                  <a href="/guild/<%= guildId %>/profile/verbindungen" class="btn btn-warning btn-sm">
+                    <%= tr('streaming:OVERVIEW.CHAT_BLOCKED_ACTION') %>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% } %>
+
+        <% if ((probleme || []).length) { %>
+          <div class="list-group list-group-flush">
+            <% probleme.forEach(p => { %>
+              <div class="list-group-item px-0">
+                <div class="d-flex">
+                  <span class="status-dot bg-red mt-2 me-3"></span>
+                  <div>
+                    <div class="fw-bold"><%= p.text %></div>
+                    <div class="text-secondary small"><%= p.abhilfe %></div>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } else if (!chatWarnung) { %>
+          <div class="d-flex align-items-center text-secondary">
+            <span class="status-dot bg-green me-3"></span>
+            <%= tr('streaming:OVERVIEW.NOTHING_WRONG') %>
+          </div>
+        <% } %>
+
+      </div>
+    </div>
+  </div>
+
+  <%# ---- Gerade live ----------------------------------------------------- %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><%= tr('streaming:OVERVIEW.LIVE_TITLE') %></h3>
+      </div>
+      <div class="card-body">
+        <% if (live.length) { %>
+          <div class="list-group list-group-flush">
+            <% live.forEach(s => { %>
+              <div class="list-group-item px-0">
+                <div class="d-flex align-items-center">
+                  <span class="status-dot status-dot-animated bg-red me-3"></span>
+                  <div class="flex-fill">
+                    <div class="fw-bold"><%= s.anzeigename || s.login %></div>
+                    <div class="text-secondary small">
+                      <%= tr('streaming:STATE.LAST_EVENT') %>:
+                      <%= vorWieLange(s.letzte_meldung_am) || tr('streaming:STATE.NEVER') %>
+                    </div>
+                  </div>
+                  <a href="<%= basis %>/streamer" class="btn btn-sm">
+                    <%= tr('streaming:NAV.CHANNELS') %>
+                  </a>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } else { %>
+          <%- include('shared/leerzustand', {
+                icon:  'fa-solid fa-video-slash',
+                titel: tr('streaming:OVERVIEW.NOBODY_LIVE'),
+                text:  tr('streaming:OVERVIEW.NOBODY_LIVE_HINT')
+          }) %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- Was das Panel kann ----------------------------------------------
+      Aus der Vorlage uebernommen (Wize.Bot): Es zeigt den Umfang auf einen
+      Blick, ohne dass man ihn aufklappen muss. Bei uns traegt jede Kachel
+      zusaetzlich ihren Zustand — sonst verspraeche die Seite Dinge, die es
+      noch nicht gibt. %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title"><%= tr('streaming:OVERVIEW.CAN_DO') %></h3>
+          <div class="text-secondary small"><%= tr('streaming:OVERVIEW.CAN_DO_HINT') %></div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="merkmale">
+          <% merkmale.forEach(m => { %>
+            <div class="merkmal">
+              <div class="merkmal__kopf">
+                <span class="merkmal__symbol merkmal__symbol--<%= m.zustand %>">
+                  <i class="<%= m.icon %>"></i>
+                </span>
+                <% if (m.url) { %>
+                  <a href="<%= m.url %>" class="text-reset text-decoration-none"><%= tr('streaming:OVERVIEW.' + m.titel) %></a>
+                <% } else { %>
+                  <%= tr('streaming:OVERVIEW.' + m.titel) %>
+                <% } %>
+                <% if (m.zustand !== 'steht') { %>
+                  <span class="zustandsmarke zustandsmarke--<%= m.zustand %> ms-auto">
+                    <%= tr('streaming:OVERVIEW.' + marke[m.zustand]) %>
+                  </span>
+                <% } %>
+              </div>
+              <p><%= tr('streaming:OVERVIEW.' + m.text) %></p>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
