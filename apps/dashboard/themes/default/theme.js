@@ -38,7 +38,7 @@ class DefaultTheme {
     constructor(app) {
         this.app = app;
         this.name = 'default';
-        this.version = '2.0.0';
+        this.version = '2.1.0';
         this.description = 'Standard-Theme auf Tabler (Bootstrap 5). Loest AdminLTE ab.';
         this.author = 'firedervil';
         this.info = { darkMode: true, supportRTL: false, responsive: true };
@@ -69,6 +69,23 @@ class DefaultTheme {
         // ── Eigene Dateien (über die Theme-Kette auflösbar) ──────────────────
         am.registerStyle('data-table-css', 'data-table.css', { version: this.version });
         am.registerStyle('tokens', 'tokens.css', { deps: ['tabler-css'], version: this.version });
+        // **Am 2026-09-03 nachgetragen — die Datei war nie eingebunden.**
+        //
+        // `guild.css` liegt seit jeher im Theme und traegt 631 Zeilen: die
+        // Checkbox-Regeln, die Rechtematrix, seit heute die Bauteile des
+        // Panel-Entwurfs. Registriert und eingereiht war sie **nirgends**;
+        // gefunden, weil frisch geschriebene Regeln auf der Seite nicht
+        // ankamen.
+        //
+        // Zwei Ansichten sagen in ihren Kommentaren ausdruecklich "global in
+        // guild.css definiert" (`permissions/matrix.ejs`,
+        // `permissions/groups.ejs`) — sie haben sich auf eine Datei verlassen,
+        // die der Browser nie geladen hat. Was dort trotzdem richtig aussah,
+        // sah durch Tablers Vorgaben richtig aus, nicht durch unsere Regeln.
+        //
+        // `deps: ['tokens']`, damit die Rollen vorher stehen: `guild.css`
+        // liest `var(--fb-*)`.
+        am.registerStyle('guild-css', 'guild.css', { deps: ['tokens'], version: this.version });
 
         // ── Das oeffentliche Frontend: eigenes Onepage-Design ───────────────
         //
@@ -209,6 +226,7 @@ class DefaultTheme {
         am.enqueueStyle('tokens');
         am.enqueueStyle('toastr-css');
         am.enqueueStyle('data-table-css');
+        am.enqueueStyle('guild-css');
 
         am.enqueueScript('tabler-js');
         am.enqueueScript('bootstrap-alias');

@@ -116,6 +116,72 @@ console.log(`\n  Nur in tokens.css, nicht ueber theme.json einstellbar: ${nurCss
 if (nurCss.length) console.log(`    ${nurCss.join(', ')}`);
 
 // =====================================================
+// 3. Jede eigene Stildatei wird auch geladen
+// =====================================================
+//
+// **Der Fund vom 2026-09-03, und er hatte lange Bestand.** `guild.css` lag
+// seit jeher im Theme, trug 631 Zeilen — und war **nirgends registriert und
+// nirgends eingereiht.** Der Browser hat sie nie geladen.
+//
+// Aufgefallen ist es erst, als frisch geschriebene Regeln auf der Seite nicht
+// ankamen. Vorher fiel es nicht auf, weil das meiste darin ohnehin so aussah,
+// wie Tabler es von sich aus zeichnet — die Datei war unsichtbar, nicht kaputt.
+//
+// Zwei Ansichten verlassen sich in ihren Kommentaren ausdruecklich auf sie
+// ("global in guild.css definiert"). Sie taten es vier Wochen lang vergebens.
+
+console.log('\nJede eigene Stildatei ist registriert UND eingereiht');
+
+const THEME_JS = 'apps/dashboard/themes/default/theme.js';
+const themeJs = ohneKommentare(lies(THEME_JS));
+const themeDir = path.join(WURZEL, 'apps/dashboard/themes/default/assets/css');
+
+const registriert = new Map();   // Dateiname -> Handle
+for (const t of themeJs.matchAll(/registerStyle\(\s*'([^']+)'\s*,\s*'([^']+)'/g)) {
+    registriert.set(t[2], t[1]);
+}
+const eingereiht = new Set(
+    [...themeJs.matchAll(/enqueueStyle\(\s*'([^']+)'\s*\)/g)].map(m => m[1])
+);
+// Der Sammelaufruf `[...].forEach(h => am.enqueueStyle(h))` listet seine
+// Handles als Zeichenketten im Array davor.
+for (const t of themeJs.matchAll(/\[([^\]]*)\]\s*\.\s*forEach\(\s*h\s*=>\s*am\.enqueueStyle/g)) {
+    for (const h of t[1].matchAll(/'([^']+)'/g)) eingereiht.add(h[1]);
+}
+
+/**
+ * Dateien, die bewusst NICHT geladen werden.
+ *
+ * Jede mit Begruendung — eine Ausnahmeliste ohne Begruendung waechst, bis sie
+ * alles enthaelt und nichts mehr aussagt (dieselbe Regel wie in
+ * `check-schalter.js`).
+ */
+const GEWOLLT_TOT = new Map([
+    ['guild-switcher.css',
+     'Setzt `.dropdown-item.active` auf #e9ecef — das faerbte jeden aktiven '
+     + 'Menuepunkt der Seitenleiste hellgrau und schluege die Aktivfarbe aus '
+     + 'dem Theme. Bootstrap-4-Altbestand; einzubinden waere ein Rueckschritt, '
+     + 'nicht eine Reparatur. Loeschen erst, wenn geklaert ist, ob der '
+     + 'Guild-Umschalter noch etwas davon braucht.']
+]);
+
+for (const datei of fs.readdirSync(themeDir).filter(f => f.endsWith('.css'))) {
+    if (GEWOLLT_TOT.has(datei)) {
+        console.log(`  – ${datei} bleibt absichtlich ungeladen`);
+        continue;
+    }
+    const handle = registriert.get(datei);
+    if (!handle) {
+        pruefe(`${datei} ist registriert`, false,
+            'Die Datei liegt im Theme, aber kein registerStyle nennt sie — sie wird nie geladen.');
+        continue;
+    }
+    pruefe(`${datei} → '${handle}' wird eingereiht`,
+        eingereiht.has(handle),
+        `Registriert, aber kein enqueueStyle('${handle}') — die Datei wird nie geladen.`);
+}
+
+// =====================================================
 
 console.log(`\nErgebnis: ${geprueft} Pruefungen, ${abweichungen} Abweichungen.`);
 process.exit(abweichungen ? 1 : 0);
