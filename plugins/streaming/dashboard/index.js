@@ -518,18 +518,25 @@ class StreamingDashboardPlugin extends DashboardPlugin {
             // sind Abos und Auftraege der Verfolgung.
             eintrag('NAV.STATE',    `${basis}/zustand`,      'fa-solid fa-heart-pulse', 50, { abschnitt: VERFOLGUNG }),
 
-            // Einstiegspunkt unter den Kern-Einstellungen
-            {
-                title: 'streaming:NAV.STREAMING',
-                url: basis,
-                icon: 'fa-solid fa-satellite-dish',
-                order: null,
-                type: haupt,
-                capability: 'STREAMING.VIEW',
-                visible: true,
-                guildId,
-                parent: `/guild/${guildId}/settings`
-            }
+            // **Kein Eintrag mehr unter den Kern-Einstellungen** (2026-09-03).
+            //
+            // Der Punkt dort ist fuer Plugins gedacht, die eigene
+            // Einstellungen mitbringen — ein zentraler Ort fuer "ich will
+            // etwas konfigurieren". Nachgesehen, wohin die anderen zeigen:
+            //
+            //     automod, moderation, music, greeting, ticket
+            //         -> `${basis}/settings`   eine echte Einstellungsseite
+            //     streaming (bis heute)
+            //         -> `${basis}`            die Uebersicht
+            //
+            // Streaming hat keine Einstellungsseite; seine Vorgaben stehen
+            // dort, wo sie wirken (Standardtext auf der Ankuendigung, die
+            // Live-Rolle bei den Rollen). Der Eintrag fuehrte also nicht zu
+            // Einstellungen, sondern ein zweites Mal auf den Einstieg — und
+            // stand damit als Dublette in einer ohnehin langen Seitenleiste.
+            //
+            // Kommt einmal eine echte Einstellungsseite dazu, gehoert er
+            // zurueck — dann aber mit `${basis}/settings` als Ziel.
         ];
 
         // **Der Chatbot-Zweig - nur in der Heim-Guild** (Stufe 14).
