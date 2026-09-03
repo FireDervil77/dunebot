@@ -34,7 +34,12 @@
 
     --fb-text: #1e293b;
     --fb-text-muted: #667382;
-    --fb-heading: #1e293b;
+    /* Ueberschriften folgen dem Fliesstext. Sie standen bis zum 2026-09-03 als
+       eigener Wert daneben — identisch, aber unabhaengig, und damit die Stelle,
+       an der eine Palette auseinanderlaeuft: `fb-text` ist ueber theme.json
+       einstellbar, `fb-heading` nicht. Wer die Textfarbe wechselt, bekam
+       Ueberschriften in der alten. */
+    --fb-heading: var(--fb-text);
 
     --fb-sidebar-text: #adb5bd;
     --fb-sidebar-hover-bg: #2b3a55;

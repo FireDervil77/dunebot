@@ -664,3 +664,179 @@ input[type="checkbox"]:not(.form-check-input):disabled {
 .dropdown-divider + .nav-abschnitt {
   padding-top: 0.35rem;
 }
+
+/* ==========================================================================
+   Bauteile des Panel-Entwurfs (P5)
+
+   Sie stammen aus dem durchklickbaren Entwurf und aus der Vorlage (Wize.Bot).
+   Gemeinsam ist ihnen eine Regel: **jede Farbe kommt aus einer Rolle**
+   (`--fb-*`), keine steht fest. Wer die Palette wechselt, wechselt sie hier
+   mit — und `color-mix` leitet die hellen Flächen aus derselben Rolle ab,
+   statt sie als zweiten Wert zu pflegen, der auseinanderläuft.
+
+   ⚠ Das gilt NICHT für den Rest dieser Datei. Sie enthält 48 fest
+   eingetragene Farben aus Bootstrap-4-Zeiten; die zu sanieren ist ein eigener
+   Durchgang und berührt alle dreizehn Plugins.
+
+   Hintergrund: docs/streamer-plugin/16-Panel-Neuschnitt.md, P5
+   ========================================================================== */
+
+/* --- Zustandsmarke: was steht, was halb da ist, was Entwurf ist ---------- */
+
+.zustandsmarke {
+  display: inline-block;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.45rem;
+  border-radius: 5px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.zustandsmarke--steht {
+  color: var(--fb-success);
+  background: color-mix(in srgb, var(--fb-success) 14%, transparent);
+}
+
+.zustandsmarke--halb {
+  color: var(--fb-warning);
+  background: color-mix(in srgb, var(--fb-warning) 14%, transparent);
+}
+
+/* Entwurf trägt bewusst KEINE Signalfarbe. Grün, Gelb und Rot sagen "gut",
+   "Achtung", "kaputt" — ein geplantes Feature ist nichts davon. */
+.zustandsmarke--entwurf {
+  color: var(--fb-text-muted);
+  background: color-mix(in srgb, var(--fb-text-muted) 12%, transparent);
+}
+
+.zustandsmarke--stoerung {
+  color: var(--fb-danger);
+  background: color-mix(in srgb, var(--fb-danger) 14%, transparent);
+}
+
+/* --- Merkmalskacheln: der Umfang einer Seite auf einen Blick ------------- */
+/*
+   Wize.Bots Kunstgriff — es zeigt, was eine Seite kann, ohne dass man sie
+   aufklappen muss. Bei uns trägt jede Kachel zusätzlich ihren Zustand, damit
+   "das kann es" und "das ist geplant" nicht gleich aussehen.
+*/
+
+.merkmale {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+}
+
+.merkmal {
+  padding: 0.75rem;
+  border: 1px solid var(--fb-border);
+  border-radius: var(--fb-radius);
+  background: var(--fb-surface-bg);
+}
+
+.merkmal__kopf {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.merkmal__symbol {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  color: var(--fb-primary);
+  background: color-mix(in srgb, var(--fb-primary) 12%, transparent);
+}
+
+.merkmal__symbol--steht   { color: var(--fb-success);    background: color-mix(in srgb, var(--fb-success) 14%, transparent); }
+.merkmal__symbol--halb    { color: var(--fb-warning);    background: color-mix(in srgb, var(--fb-warning) 14%, transparent); }
+.merkmal__symbol--entwurf { color: var(--fb-text-muted); background: color-mix(in srgb, var(--fb-text-muted) 12%, transparent); }
+
+.merkmal p {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--fb-text-muted);
+}
+
+/* --- Einstellungszeile: Beschriftung links, Bedienelement rechts --------- */
+/*
+   Aus der Vorlage übernommen, und es ist der größte Einzelgewinn an
+   Übersichtlichkeit: gestapelte Formularfelder zwingen zum Lesen von oben
+   nach unten, diese Anordnung lässt das Auge an der linken Kante entlanglaufen
+   und nur dort anhalten, wo etwas gebraucht wird.
+*/
+
+.zeilen > .zeile {
+  display: grid;
+  grid-template-columns: minmax(160px, 260px) minmax(0, 1fr);
+  gap: 0.75rem 1.5rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--fb-border);
+}
+
+.zeilen > .zeile:first-child { border-top: 0; padding-top: 0; }
+.zeilen > .zeile:last-child  { padding-bottom: 0; }
+
+@media (max-width: 720px) {
+  .zeilen > .zeile { grid-template-columns: 1fr; }
+}
+
+.zeile__bez {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.zeile__bez small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--fb-text-muted);
+  margin-top: 2px;
+}
+
+/* Der Hilfssatz steht UNTER dem Bedienelement, nicht darüber: Wer weiß, was
+   er tut, überspringt ihn; wer zögert, findet ihn genau dort, wo sein Blick
+   nach dem Klick ohnehin hinfällt. */
+.zeile__hilfe {
+  font-size: 0.8rem;
+  color: var(--fb-text-muted);
+  margin-top: 0.5rem;
+  max-width: 62ch;
+}
+
+/* --- Erklärkarte: ein bis zwei Sätze Prosa vor den Einstellungen --------- */
+/*
+   `views/shared/funktionskarte.ejs` kann das seit dem 2026-08-29 über
+   `hinweis`, benutzt wurde es nie. Hier bekommt es sein Aussehen.
+*/
+
+.erklaerkarte {
+  background: color-mix(in srgb, var(--fb-primary) 7%, var(--fb-surface-bg));
+  border: 1px solid color-mix(in srgb, var(--fb-primary) 22%, transparent);
+  border-radius: var(--fb-radius);
+  padding: 1rem 1.5rem;
+}
+
+.erklaerkarte h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+}
+
+.erklaerkarte p {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--fb-text-muted);
+  max-width: 68ch;
+}
+
+.erklaerkarte p:last-child { margin-bottom: 0; }
