@@ -195,6 +195,74 @@ pruefe('Die Schriftquelle wird im Guild-Bereich eingereiht',
     eingereiht.has('fonts-guild'),
     'Angemeldet, aber nie eingereiht — der Browser holt sie nie.');
 
+// =====================================================
+// Das Blatt: greifen die Selektoren ueberhaupt?
+// =====================================================
+//
+// Der Rahmen um das Panel haengt an vier Selektoren, und jeder von ihnen
+// beschreibt eine STRUKTUR, keine Klasse an einem Element:
+//
+//     .page > .navbar-vertical       Seitenleiste ist Kind von .page
+//     .page > header.navbar          Kopfleiste ist Kind von .page
+//     .page > .page-wrapper          Inhaltsspalte ist Kind von .page
+//     .navbar-vertical > .container-fluid
+//
+// Wer das Layout umbaut — eine Huelle dazwischen, ein `<div>` mehr —, trifft
+// keinen Fehler: Die Regeln greifen einfach nicht mehr, die Seitenleiste
+// faellt auf Tablers `position: fixed` zurueck und klebt am Fensterrand,
+// waehrend der Kasten daneben schwebt. Genau das prueft dieser Block.
+
+console.log('\nDas Blatt: die Selektoren finden ihre Struktur');
+
+const layout   = ohneKommentare(lies('apps/dashboard/themes/default/views/layouts/guild.ejs'));
+const seitenl  = ohneKommentare(lies('apps/dashboard/themes/default/partials/guild/sidebar.ejs'));
+const kopfl    = ohneKommentare(lies('apps/dashboard/themes/default/partials/guild/topbar.ejs'));
+
+pruefe('`.page` und `.page-wrapper` stehen im Layout',
+    /class="page"/.test(layout) && /class="page-wrapper"/.test(layout),
+    'Ohne diese beiden hat das Raster keine Anker.');
+
+pruefe('Die Seitenleiste ist ein `aside.navbar-vertical`',
+    /<aside[^>]*class="[^"]*\bnavbar-vertical\b/.test(seitenl),
+    'Der Selektor `.page > .navbar-vertical` trifft dann nichts.');
+
+pruefe('Die Seitenleiste traegt innen ein `.container-fluid`',
+    /<aside[\s\S]{0,200}?class="container-fluid"/.test(seitenl),
+    'Das mitlaufende Menue haengt daran.');
+
+pruefe('Die Kopfleiste ist ein `header.navbar`',
+    /<header[^>]*class="[^"]*\bnavbar\b/.test(kopfl),
+    'Der Selektor `.page > header.navbar` trifft dann nichts.');
+
+// Reihenfolge im Raster: Seitenleiste, Kopfleiste, Inhalt.
+const inPage = layout.slice(layout.indexOf('class="page"'));
+const reihe = ['guild/sidebar', 'guild/topbar', 'class="page-wrapper"']
+    .map(m => inPage.indexOf(m));
+pruefe('Seitenleiste, Kopfleiste und Inhalt stehen in dieser Folge',
+    reihe.every(i => i >= 0) && reihe[0] < reihe[1] && reihe[1] < reihe[2],
+    `Fundstellen: ${reihe.join(', ')} — -1 heisst "gar nicht da".`);
+
+// **Und sie sind DIREKTE Kinder.** Die Reihenfolgepruefung allein beweist das
+// nicht — bei der Gegenprobe habe ich ein `<div class="huelle">` direkt hinter
+// `.page` eingezogen, und sie blieb gruen, obwohl `.page > .navbar-vertical`
+// damit ins Leere greift. Gemessen wird deshalb, ob zwischen `.page` und der
+// Seitenleiste ueberhaupt ein Element aufgeht; EJS-Bloecke zaehlen nicht mit.
+// Bis zum ANFANG des EJS-Blocks schneiden, nicht bis zum Namen darin — sonst
+// endet der Ausschnitt mitten in `<%- includePartial(` und traegt dessen `<`
+// als vermeintliches Element. (Beim ersten Anlauf genau so passiert.)
+const zwischen = inPage.slice(inPage.indexOf('>') + 1, inPage.lastIndexOf('<%', reihe[0]))
+    .replace(/<%[\s\S]*?%>/g, '')
+    .trim();
+pruefe('Zwischen `.page` und der Seitenleiste steht kein weiteres Element',
+    !zwischen.includes('<'),
+    `Dort steht: ${zwischen.slice(0, 60)} — `
+    + '`.page > .navbar-vertical` greift dann nicht mehr.');
+
+const blattCss = ohneKommentare(lies(CSS));
+pruefe('Tablers `position: fixed` an der Seitenleiste ist zurueckgenommen',
+    /\.page > \.navbar-vertical\s*\{[^}]*position:\s*static/.test(blattCss),
+    'Ohne das klebt die Leiste am Fensterrand, neben dem Kasten.');
+
 /**
  * Dateien, die bewusst NICHT geladen werden.
  *

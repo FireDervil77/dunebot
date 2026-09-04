@@ -817,3 +817,101 @@ input[type="checkbox"]:not(.form-check-input):disabled {
   color: var(--fb-text-muted);
   white-space: nowrap;
 }
+
+/* ==========================================================================
+   Das Blatt — das Panel als eingefasste Fläche statt randlos
+   Hintergrund: docs/streamer-plugin/16-Panel-Neuschnitt.md
+   ========================================================================== */
+/*
+   **Tabler kann das, aber nicht mit Seitenleiste.** `.layout-boxed` am `body`
+   gibt es dort, und es sind genau fünf Regeln — nachgesehen in
+   `node_modules/@tabler/core/dist/css/tabler.min.css`:
+
+       .layout-boxed { padding: 1rem; --tblr-theme-boxed-width: 1320px; … }
+       .layout-boxed .page { margin: 0 auto; max-width: …; border-radius: … }
+       .layout-boxed .page > .navbar:first-child { … }
+
+   Keine davon fasst `navbar-vertical` an. Die Seitenleiste ist ab 992px
+   `position: fixed; left: 0` und bliebe am Fensterrand kleben, während der
+   Kasten daneben schwebt. Tablers boxed ist für das Layout MIT Kopfleiste
+   gedacht, nicht für das mit Seitenleiste.
+
+   Deshalb hier von Hand, und zwar als Raster: Die Seitenleiste wird eine
+   Spalte statt ein fixiertes Element, und damit hört sie auf, sich am Fenster
+   zu orientieren.
+
+   **Erst ab 992px.** Darunter klappt Tabler die Seitenleiste in einen
+   Umschaltknopf, und ein eingefasstes Blatt hätte auf einem Telefon ohnehin
+   keinen Platz — dort bleibt alles, wie es ist.
+*/
+
+@media (min-width: 992px) {
+
+  body {
+    padding: 1.5rem;
+    background: var(--fb-body-bg);
+  }
+
+  .page {
+    display: grid;
+    /* 15rem ist Tablers eigene Seitenleistenbreite — nicht geraten, sondern
+       aus `.navbar-vertical.navbar-expand-lg { width: 15rem }` übernommen. */
+    grid-template-columns: 15rem minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    max-width: 1420px;
+    margin: 0 auto;
+    min-height: calc(100vh - 3rem);
+    background: var(--fb-surface-bg);
+    border: 1px solid var(--fb-border);
+    border-radius: var(--fb-radius-blatt);
+    box-shadow: var(--fb-shadow-hoch);
+  }
+
+  /* --- Die Seitenleiste wird eine Spalte ---------------------------------
+     Tabler setzt hier `position: fixed; top/left/bottom: 0; width: 15rem;
+     overflow-y: scroll`. Jede dieser fünf Angaben muss zurück, sonst hängt
+     die Leiste weiter am Fensterrand. Gleiche Spezifität wie Tablers Regel —
+     `guild.css` wird zuletzt eingereiht, deshalb gewinnt sie. */
+  .page > .navbar-vertical {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    position: static;
+    top: auto;
+    left: auto;
+    bottom: auto;
+    width: auto;
+    /* **Kein `overflow: hidden` hier**, obwohl es zum Runden der Ecken
+       naheliegt: Es macht die Leiste zum Scrollbehaelter, und das darin
+       klebende Menue unten haette dann nichts mehr, worin es kleben koennte —
+       es wuerde still zu einem gewoehnlichen Block. Die Rundung malt der
+       Hintergrund ohnehin selbst mit. */
+    border-radius: var(--fb-radius-blatt) 0 0 var(--fb-radius-blatt);
+  }
+
+  /* Die Leiste selbst bleibt voll hoch (dunkle Fläche bis unten), ihr Inhalt
+     läuft mit. Sonst müsste man bei dreizehn Plugins nach oben scrollen, um
+     das Menü zu erreichen. */
+  .page > .navbar-vertical > .container-fluid {
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+
+  .page > header.navbar {
+    grid-column: 2;
+    grid-row: 1;
+    border-radius: 0 var(--fb-radius-blatt) 0 0;
+  }
+
+  /* Der Rand links entfällt — den hielt die fixierte Leiste frei, und die
+     gibt es hier nicht mehr. */
+  .page > .page-wrapper {
+    grid-column: 2;
+    grid-row: 2;
+    margin-left: 0;
+    margin-right: 0;
+    background: var(--fb-body-bg);
+    border-radius: 0 0 var(--fb-radius-blatt) 0;
+  }
+}

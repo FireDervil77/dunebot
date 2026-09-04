@@ -59,6 +59,10 @@
        Flaechen, 8px an den Knoepfen) — eine einzige Rundung fuer alles laesst
        entweder die Karten hart oder die Knoepfe teigig aussehen. */
     --fb-radius-lg: 10px;
+    /* Der Rahmen um das ganze Panel ist die groesste Rundung im Haus — er
+       fasst alles ein, was darin liegt, und muss deshalb weiter sein als das,
+       was er einfasst. Der Entwurf setzt 14px. */
+    --fb-radius-blatt: 14px;
 
     /* --- Schriftrollen ---------------------------------------------------
        Drei Rollen, nicht drei Namen: Wer die Schrift wechselt, fasst hier an
