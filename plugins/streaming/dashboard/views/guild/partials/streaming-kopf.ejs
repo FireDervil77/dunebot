@@ -7,13 +7,23 @@
  * Plugin seine eigene Kopie, und die sieben waren bereits
  * auseinandergelaufen.
  *
+ * **Kein Vortitel** (2026-09-04). Ueber dem Seitentitel stand klein
+ * "STREAMING" — auf jeder Seite des Plugins, waehrend links in der
+ * Seitenleiste der Menuepunkt "Streaming" ohnehin hervorgehoben ist. Zwei
+ * Antworten auf eine Frage, die niemand stellt. Der Entwurf hat die Zeile
+ * nicht.
+ *
+ * Die anderen zwoelf Plugins behalten ihren Vortitel, bis sie denselben
+ * Durchgang bekommen — `seitenkopf.ejs` laesst ihn weg, wenn er fehlt, also
+ * kostet das dort nichts.
+ *
  * Erwartet: guildId, tr, titel, beschreibung, icon
  * Optional:  aktion (HTML rechts im Kopf), marke (HTML hinter dem Titel)
  */
 %>
 <%- include('shared/seitenkopf', {
       plugin:       'streaming',
-      vortitel:     tr('streaming:TITLE'),
+      vortitel:     null,
       titel:        titel,
       beschreibung: (typeof beschreibung !== 'undefined' ? beschreibung : null),
       icon:         icon,

@@ -1,115 +1,119 @@
-/* Kompakte Sidebar-Navigation mit Scrolling */
-.app-sidebar {
-  width: 250px;
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch; /* Smooth scrolling auf iOS */
-  z-index: 1038; /* Unter navbar (1039) aber über content */
+/*!
+ * Guild-Bereich — was Tabler nicht mitbringt
+ *
+ * ## Diese Datei war bis zum 2026-09-03 nie geladen
+ *
+ * 631 Zeilen, kein `registerStyle`, kein `enqueueStyle` — der Browser hat sie
+ * nie geholt. Als sie eingebunden wurde, wurde alles darin auf einen Schlag
+ * wirksam: Regeln, die für **AdminLTE** geschrieben waren, und Übermalungen
+ * mit `!important`, die noch nie jemand gesehen hatte.
+ *
+ * Am 2026-09-04 durchgezählt, was davon überhaupt vorkommt:
+ *
+ *     .app-sidebar        0 Ansichten   AdminLTE — Tabler nutzt .navbar-vertical
+ *     .nav-treeview       0             AdminLTE
+ *     .nav-sidebar        0             AdminLTE
+ *     .menu-open          0             AdminLTE
+ *     .nav-header         0             AdminLTE
+ *     .app-main           0             AdminLTE
+ *     .small-box          0             AdminLTE — 90 Zeilen
+ *     .notification-item  0             die echte Klasse heißt
+ *                                       .dismiss-notification-btn
+ *     .navbar-badge       0
+ *     .step-icon          0
+ *     .template-card      0             Gameserver-Assistent, umgebaut
+ *     .daemon-card        0
+ *
+ * Alles davon ist hier raus. Es war nicht "vielleicht noch gebraucht" — es
+ * konnte nie greifen, weil die Klassen im Markup nicht vorkommen.
+ *
+ * ## Die Übermalungen der Hinweiskästen sind ebenfalls raus
+ *
+ * `.alert-success` und die drei Geschwister trugen `background-color` +
+ * `!important` mit den **Bootstrap-4-Farben**: satte Flächen mit weißer
+ * Schrift. In 143 Ansichten steht ein solcher Kasten. Seit dem 2026-09-03 sah
+ * jeder davon aus wie ein Warnbalken.
+ *
+ * Tablers eigene Hinweiskästen sind zart getönt mit dunkler Schrift — das ist
+ * der Look des Entwurfs, und er kommt umsonst, sobald man aufhört, ihn zu
+ * übermalen.
+ *
+ * ## Was bleibt, nimmt seine Farben aus Rollen
+ *
+ * Keine festen Farbwerte mehr außer neutralen Schatten. Wer die Palette
+ * ändert, ändert diese Datei mit. Vorher standen hier `#007bff`, `#28a745`,
+ * `#dc3545`, `#17a2b8` — die Bootstrap-4-Palette, gegen die jede Einstellung
+ * in `theme.json` wirkungslos war.
+ *
+ * @author FireDervil
+ */
+
+/* ==========================================================================
+   Grundlagen
+   ========================================================================== */
+
+/* Bootstraps `.row` trägt negative Ränder — im Inhaltsbereich neutralisieren. */
+.app-content > .row {
+  margin-left: 0;
+  margin-right: 0;
 }
 
-/* Scrollbar Styling für Desktop Sidebar */
-.app-sidebar::-webkit-scrollbar {
-  width: 8px;
+/* Überschriften tragen die Anzeigeschrift, der Rest die Oberflächenschrift.
+   Tabler kennt dafür keine eigene Variable — `h1..h6` erben schlicht `body`. */
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6,
+.card-title, .page-title {
+  font-family: var(--fb-font-display);
+  letter-spacing: -0.015em;
 }
 
-.app-sidebar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+/* Zahlen und Kennungen in fester Schrittweite — Anmeldenamen, Zeitangaben,
+   Platzhalter. Steht hier einmal, damit die Bauteile weiter unten sie nicht
+   jedes Mal aufzählen. */
+.font-monospace, code, kbd, samp {
+  font-family: var(--fb-font-mono);
 }
 
-.app-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-}
+/* ==========================================================================
+   Plugin-Kacheln (Plugin-Übersicht, Marktplatz)
+   ========================================================================== */
+/*
+   Stand dreimal in dieser Datei, mit drei verschiedenen Werten — je nachdem,
+   welche Regel zuletzt kam, galt etwas anderes. Jetzt einmal.
 
-.app-sidebar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
+   Der Hintergrund las `rgba(var(--bs-primary-rgb), .05)`. Unter Tabler heißt
+   die Variable `--tblr-primary-rgb`; `--bs-primary-rgb` ist nirgends gesetzt,
+   die ganze Deklaration war damit ungültig und ohne Wirkung.
+*/
 
-.app-sidebar .nav-sidebar {
-  margin-bottom: 0.5rem;
-}
-
-.app-sidebar .nav-header {
-  padding: 0.5rem 1rem 0.5rem;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  opacity: 0.6;
-}
-
-.app-sidebar .nav-item .nav-link {
-  padding: 0.5rem 1rem;
-  display: flex;
-  align-items: center;
-}
-
-.app-sidebar .nav-link p {
-  margin: 0;
-  font-size: 0.9rem;
-}
-
-.app-sidebar .nav-icon {
-  margin-right: 0.5rem;
-  font-size: 1rem;
-  width: 1.2rem;
-  text-align: center;
-}
-
-.app-sidebar .nav-link .right {
-  font-size: 0.8rem;
-  transition: transform 0.3s;
-}
-
-.app-sidebar .menu-open > .nav-link .right {
-  transform: rotate(90deg);
-}
-
-.app-sidebar .nav-treeview {
-  margin-left: 1rem;
-  padding-left: 0.5rem;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.app-sidebar .nav-treeview .nav-item {
-  display: block !important;
-  width: 100% !important;
-  float: none !important;
-}
-
-.app-sidebar .nav-treeview .nav-link {
-  padding: 0.3rem 0.75rem;
-  display: flex !important;
-  width: 100% !important;
-}
-
-/* Styling für Plugin-Karten */
 .plugin-card {
+  position: relative;
   padding: 1rem;
-  border-radius: 0.5rem;
-  background-color: rgba(var(--bs-primary-rgb), 0.05);
-  transition: all 0.2s ease-in-out;
   height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
+  border: 1px solid var(--fb-border);
+  border-radius: var(--fb-radius-lg);
+  background-color: color-mix(in srgb, var(--fb-primary) 5%, transparent);
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 
 .plugin-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  transform: translateY(-4px);
+  box-shadow: var(--fb-shadow-hoch);
 }
+
+.plugin-card .card-body { flex: 1; }
 
 .plugin-icon {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background-color: rgba(var(--bs-primary-rgb), 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: color-mix(in srgb, var(--fb-primary) 10%, transparent);
 }
 
 .plugin-name {
@@ -121,326 +125,6 @@
   max-width: 100%;
 }
 
-.plugin-card { transition: all .2s ease; border-radius:.5rem; height:100%; display:flex; flex-direction:column; }
-.plugin-card:hover { transform: translateY(-4px); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
-.plugin-card .card-body { flex:1; }
-
-/**
-* CONTENT PADDING (Abstand zwischen Sidebar und Content-Ende)
-* Wichtig: padding auf .app-main statt .app-content, damit es auch für 
-* Views OHNE .app-content-Wrapper funktioniert (z.B. DuneMap-Plugin)
-*/
-.app-main {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-}
-
-/* Bootstrap .row hat negatives Margin - neutralisieren */
-.app-main > .row,
-.app-content > .row {
-    margin-left: 0;
-    margin-right: 0;
-}
-
-/**
-* TOASTS & ALERTS
-*/
-.toast {
-    transition: all 0.3s ease-in-out;
-    margin-top: 1rem;
-    /* KEIN SCHLEIER - Vollständig opak! */
-    opacity: 1 !important;
-    background-color: #ffffff !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-
-/* Bootstrap Toast Variables überschreiben */
-.toast, .toast * {
-    --bs-toast-bg: rgba(255, 255, 255, 1) !important;
-    opacity: 1 !important;
-}
-
-/* Toast-Varianten mit vollständig opaken Hintergründen */
-.toast-success {
-    background-color: #198754 !important;
-}
-
-.toast-success .toast-header,
-.toast-success .toast-body {
-    background-color: #198754 !important;
-    color: #ffffff !important;
-    opacity: 1 !important;
-}
-
-.toast-error,
-.toast-danger {
-    background-color: #dc3545 !important;
-}
-
-.toast-error .toast-header,
-.toast-error .toast-body,
-.toast-danger .toast-header,
-.toast-danger .toast-body {
-    background-color: #dc3545 !important;
-    color: #ffffff !important;
-    opacity: 1 !important;
-}
-
-.toast-info {
-    background-color: #0dcaf0 !important;
-}
-
-.toast-info .toast-header,
-.toast-info .toast-body {
-    background-color: #0dcaf0 !important;
-    color: #000000 !important;
-    opacity: 1 !important;
-}
-
-.toast-warning {
-    background-color: #ffc107 !important;
-}
-
-.toast-warning .toast-header,
-.toast-warning .toast-body {
-    background-color: #ffc107 !important;
-    color: #000000 !important;
-    opacity: 1 !important;
-}
-
-.toast.showing {
-    transform: translateY(-100%);
-    opacity: 0 !important;
-}
-
-.toast.show {
-    transform: translateY(0);
-    opacity: 1 !important;
-}
-
-/* Alert Visibility Improvements */
-.alert {
-    opacity: 1 !important;
-}
-
-.alert-success {
-    background-color: #28a745 !important;
-    border-color: #28a745 !important;
-    color: #ffffff !important;
-}
-
-.alert-danger {
-    background-color: #dc3545 !important;
-    border-color: #dc3545 !important;
-    color: #ffffff !important;
-}
-
-.alert-info {
-    background-color: #17a2b8 !important;
-    border-color: #17a2b8 !important;
-    color: #ffffff !important;
-}
-
-.alert-warning {
-    background-color: #ffc107 !important;
-    border-color: #ffc107 !important;
-    color: #212529 !important;
-}
-
-/* AdminLTE Small-Box Fix: Icons groß rechts positionieren */
-.small-box {
-    border-radius: 0.25rem;
-    box-shadow: 0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2);
-    display: block;
-    margin-bottom: 20px;
-    position: relative;
-}
-
-.small-box > .inner {
-    padding: 10px;
-}
-
-.small-box > .small-box-footer {
-    background-color: rgba(0,0,0,.1);
-    color: rgba(255,255,255,.8);
-    display: block;
-    padding: 3px 0;
-    position: relative;
-    text-align: center;
-    text-decoration: none;
-    z-index: 10;
-}
-
-.small-box > .small-box-footer:hover {
-    background-color: rgba(0,0,0,.15);
-    color: #fff;
-}
-
-.small-box h3 {
-    font-size: 2.2rem;
-    font-weight: 700;
-    margin: 0 0 10px;
-    padding: 0;
-    white-space: nowrap;
-}
-
-.small-box p {
-    font-size: 1rem;
-}
-
-.small-box p > small {
-    color: #f8f9fa;
-    display: block;
-    font-size: .9rem;
-    margin-top: 5px;
-}
-
-.small-box h3,
-.small-box p {
-    z-index: 5;
-}
-
-.small-box .icon {
-    color: rgba(0,0,0,.35);
-    z-index: 0;
-}
-
-/* Icon-Farbe für farbige Hintergründe - weiß transparent für bessere Sichtbarkeit */
-.small-box.bg-danger .icon,
-.small-box.bg-success .icon,
-.small-box.bg-primary .icon,
-.small-box.bg-info .icon,
-.small-box.bg-warning .icon {
-    color: rgba(255,255,255,.3);
-}
-
-.small-box .icon > i {
-    font-size: 70px;
-    position: absolute;
-    right: 15px;
-    top: 15px;
-    transition: transform .3s linear;
-    font-weight: 400;
-}
-
-.small-box .icon > i.fa,
-.small-box .icon > i.fas,
-.small-box .icon > i.far,
-.small-box .icon > i.fab,
-.small-box .icon > i.fal,
-.small-box .icon > i.fad,
-.small-box .icon > i.fa-solid,
-.small-box .icon > i.fa-regular,
-.small-box .icon > i.fa-brands,
-.small-box .icon > i.svg-inline--fa,
-.small-box .icon > i.ion {
-    font-size: 65px;
-    top: 20px;
-}
-
-.small-box:hover {
-    text-decoration: none;
-}
-
-.small-box:hover .icon > i {
-    transform: scale(1.1);
-}
-
-@media (max-width: 767.98px) {
-    .small-box {
-        text-align: center;
-    }
-    .small-box .icon {
-        display: none;
-    }
-    .small-box p {
-        font-size: 12px;
-    }
-}
-
-/* Notification Dropdown Styling */
-.notification-item {
-  cursor: default;
-  white-space: normal;
-  padding: 0.75rem 1rem;
-}
-
-.notification-item:hover {
-  background-color: #f8f9fa;
-}
-
-.notification-item .dismiss-notification {
-  padding: 0.25rem 0.5rem;
-  margin-left: 0.5rem;
-  opacity: 0.5;
-  transition: opacity 0.2s;
-}
-
-.notification-item .dismiss-notification:hover {
-  opacity: 1;
-  color: #dc3545;
-}
-
-.notification-item .flex-grow-1 {
-  max-width: calc(100% - 40px);
-}
-
-.navbar .navbar-badge {
-  position: absolute;
-  top: 3px;
-  right: 5px;
-  font-size: 0.6rem;
-  padding: 0.15rem 0.4rem;
-}
-
-/* Notification Dropdown Styling */
-.notification-item {
-  cursor: default;
-  white-space: normal;
-  padding: 0.75rem 1rem;
-}
-
-.notification-item:hover {
-  background-color: #f8f9fa;
-}
-
-.notification-item .dismiss-notification {
-  padding: 0.25rem 0.5rem;
-  margin-left: 0.5rem;
-  opacity: 0.5;
-  transition: opacity 0.2s;
-}
-
-.notification-item .dismiss-notification:hover {
-  opacity: 1;
-}
-
-.notification-item .flex-grow-1 {
-  max-width: calc(100% - 40px);
-}
-
-.navbar-badge {
-  position: absolute;
-  top: 3px;
-  right: 5px;
-  font-size: 0.6rem;
-  padding: 0.15rem 0.4rem;
-}
-
-/* Plugin Badge System */
-.plugin-card {
-  position: relative;
-  padding: 1rem;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 0.5rem;
-  transition: box-shadow 0.2s;
-}
-
-.plugin-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
 .plugin-badge {
   font-size: 0.65rem;
   font-weight: 600;
@@ -449,8 +133,16 @@
   z-index: 2;
   top: -0.5rem !important;
   right: -0.5rem !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--fb-shadow);
 }
+
+/* `.bg-success` und Geschwister kommen von Tabler und tragen dort schon die
+   Rollenfarbe. Die Übermalung setzt nur noch die Schrift, damit sie auf der
+   Fläche lesbar bleibt — hell auf den dunklen Signalen, dunkel auf den hellen. */
+.plugin-badge.bg-success,
+.plugin-badge.bg-danger  { color: var(--fb-surface-bg) !important; }
+.plugin-badge.bg-warning,
+.plugin-badge.bg-info    { color: var(--fb-text) !important; }
 
 .plugin-featured-star {
   position: absolute;
@@ -458,103 +150,65 @@
   left: 0.5rem;
   font-size: 1.2rem;
   z-index: 2;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(var(--fb-schlagschatten));
 }
 
-.plugin-badge.bg-success {
-  background-color: #198754 !important;
-  color: #ffffff !important;
+/* ==========================================================================
+   Toastr-Meldungen
+   ========================================================================== */
+/*
+   Toastr bringt eigene Farben mit (ein eigenes Grün, ein eigenes Rot). Hier
+   werden sie auf die Rollen gezogen, damit eine Erfolgsmeldung dasselbe Grün
+   trägt wie alles andere Grüne im Panel.
+
+   Der Schleier bleibt aus: `opacity` steht fest auf 1. Halbdurchsichtige
+   Meldungen über Text sind schwer zu lesen, und toastr blendet sie ohnehin
+   ein und aus.
+*/
+
+.toast {
+  transition: all 0.3s ease-in-out;
+  margin-top: 1rem;
+  opacity: 1 !important;
+  background-color: var(--fb-surface-bg) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
-.plugin-badge.bg-warning {
-  background-color: #ffc107 !important;
-  color: #000000 !important;
+.toast-success,
+.toast-success .toast-header,
+.toast-success .toast-body {
+  background-color: var(--fb-success) !important;
+  color: var(--fb-surface-bg) !important;
+  opacity: 1 !important;
 }
 
-.plugin-badge.bg-info {
-  background-color: #0dcaf0 !important;
-  color: #000000 !important;
+.toast-error,   .toast-danger,
+.toast-error .toast-header,  .toast-error .toast-body,
+.toast-danger .toast-header, .toast-danger .toast-body {
+  background-color: var(--fb-danger) !important;
+  color: var(--fb-surface-bg) !important;
+  opacity: 1 !important;
 }
 
-.plugin-badge.bg-danger {
-  background-color: #dc3545 !important;
-  color: #ffffff !important;
+.toast-info,
+.toast-info .toast-header,
+.toast-info .toast-body {
+  background-color: var(--fb-info) !important;
+  color: var(--fb-surface-bg) !important;
+  opacity: 1 !important;
 }
 
-/* ============================================
-   MOBILE RESPONSIVE - Sidebar Scrolling
-   ============================================ */
-
-@media (max-width: 767.98px) {
-  /* Mobile Sidebar - bereits durch Desktop-Styles definiert */
-  .app-sidebar {
-    width: 250px;
-    /* overflow und scrolling bereits durch Desktop-Styles aktiv */
-  }
-  
-  /* Navbar-Höhe auf Mobile berücksichtigen */
-  .app-sidebar {
-    top: 57px; /* AdminLTE navbar height */
-  }
-  
-  /* Scrollbar schmaler auf Mobile */
-  .app-sidebar::-webkit-scrollbar {
-    width: 4px;
-  }
-  
-  /* Content Padding auf Mobile reduzieren */
-  .app-main {
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-  }
+.toast-warning,
+.toast-warning .toast-header,
+.toast-warning .toast-body {
+  background-color: var(--fb-warning) !important;
+  color: var(--fb-text) !important;
+  opacity: 1 !important;
 }
 
-@media (max-width: 991.98px) {
-  /* Tablet - Scrollbar etwas schmaler */
-  .app-sidebar::-webkit-scrollbar {
-    width: 6px;
-  }
-}
-
-/* ================================================= */
-/* Gameserver Creation Wizard Styles */
-/* ================================================= */
-
-/* Wizard Step Container */
-.step {
-  position: relative;
-}
-
-/* Wizard Step Icons (Circular Badges) */
-.step-icon {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  margin-bottom: 10px;
-}
-
-/* Selectable Template & Daemon Cards */
-.template-card, .daemon-card {
-  border: 2px solid transparent;
-  transition: all 0.3s;
-  cursor: pointer;
-}
-
-/* Card Hover Effects */
-.template-card:hover, .daemon-card:hover {
-  border-color: #007bff;
-  box-shadow: 0 4px 8px rgba(0,123,255,0.2);
-}
-
-/* Card Selected State */
-.template-card.selected, .daemon-card.selected {
-  border-color: #28a745;
-  background-color: #f0f9ff;
-}
+.toast.showing { transform: translateY(-100%); opacity: 0 !important; }
+.toast.show    { transform: translateY(0);     opacity: 1 !important; }
 
 /* ===========================================================================
    KONTROLLKAESTCHEN UND SCHALTER
@@ -585,29 +239,29 @@
 input[type="checkbox"]:not(.form-check-input) {
   width: 1.25rem;
   height: 1.25rem;
-  border: 2px solid var(--fb-border, #2c3e50);
+  border: 2px solid var(--fb-border);
   border-radius: 0.25rem;
   cursor: pointer;
-  background-color: var(--fb-surface-bg, #fff);
+  background-color: var(--fb-surface-bg);
   margin-top: 0.1rem;
   box-sizing: border-box;
 }
 
 .form-check:not(.form-switch) > .form-check-input[type="checkbox"]:hover:not(:disabled),
 input[type="checkbox"]:not(.form-check-input):hover:not(:disabled) {
-  border-color: var(--fb-primary, #007bff);
+  border-color: var(--fb-primary);
   box-shadow: 0 0 0 0.25rem rgba(var(--fb-primary-rgb, 0, 123, 255), 0.25);
 }
 
 .form-check:not(.form-switch) > .form-check-input[type="checkbox"]:checked,
 input[type="checkbox"]:not(.form-check-input):checked {
-  background-color: var(--fb-primary, #007bff);
-  border-color: var(--fb-primary, #007bff);
+  background-color: var(--fb-primary);
+  border-color: var(--fb-primary);
 }
 
 .form-check:not(.form-switch) > .form-check-input[type="checkbox"]:focus,
 input[type="checkbox"]:not(.form-check-input):focus {
-  border-color: var(--fb-primary, #007bff);
+  border-color: var(--fb-primary);
   outline: 0;
   box-shadow: 0 0 0 0.25rem rgba(var(--fb-primary-rgb, 0, 123, 255), 0.3);
 }
@@ -685,7 +339,7 @@ input[type="checkbox"]:not(.form-check-input):disabled {
 
 .zustandsmarke {
   display: inline-block;
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-family: var(--fb-font-mono);
   font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -1085,7 +739,7 @@ input[type="checkbox"]:not(.form-check-input):disabled {
 /* Platzhalter wie `{titel}` sind Zeichenfolgen zum Abtippen — die feste
    Schrittweite macht sie als solche kenntlich. */
 .chip.mono {
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-family: var(--fb-font-mono);
   font-size: 0.72rem;
 }
 
@@ -1122,7 +776,7 @@ input[type="checkbox"]:not(.form-check-input):disabled {
 .kanalzeile__login {
   font-size: 0.76rem;
   color: var(--fb-text-muted);
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-family: var(--fb-font-mono);
 }
 
 /* --- Live: ein Punkt, keine Plakette ------------------------------------ */
@@ -1158,7 +812,7 @@ input[type="checkbox"]:not(.form-check-input):disabled {
 /* Zeitangaben in Tabellen: feste Schrittweite, damit „vor 12 Min." und
    „vor 2 Tagen" untereinander an derselben Stelle beginnen. */
 .zeitangabe {
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-family: var(--fb-font-mono);
   font-size: 0.8rem;
   color: var(--fb-text-muted);
   white-space: nowrap;

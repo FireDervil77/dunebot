@@ -64,6 +64,39 @@ console.log('\nDie Bauteile nehmen ihre Farben aus Rollen');
 const css = lies(CSS);
 const start = css.indexOf(MARKE);
 
+// **Ab dem 2026-09-04 gilt die Regel fuer die GANZE Datei, nicht nur fuer den
+// Bauteil-Block.** Der Altbestand trug 66 feste Farbwerte — die
+// Bootstrap-4-Palette (`#007bff`, `#28a745`, `#dc3545`, `#17a2b8`), gegen die
+// jede Einstellung in `theme.json` wirkungslos war. Sie sind raus; die
+// Beschraenkung auf einen Block haette es erlaubt, sie unbemerkt wieder
+// hereinzuschreiben.
+//
+// Schatten sind die eine Ausnahme, und sie stehen als Rolle in `tokens.css`:
+// Tiefe ist keine Farbe der Palette und darf mit ihr nicht wandern.
+const ganze = ohneKommentare(css);
+const festeGanz = [...ganze.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map(m => m[0]);
+pruefe(`guild.css traegt insgesamt keine festen Farbwerte (${festeGanz.length})`,
+    festeGanz.length === 0,
+    festeGanz.length ? `gefunden: ${[...new Set(festeGanz)].join(', ')}` : null);
+
+const rgbGanz = [...ganze.matchAll(/rgba?\(\s*\d+\s*,/g)].map(m => m[0]);
+pruefe(`guild.css traegt kein rgb()/rgba() mit festen Zahlen (${rgbGanz.length})`,
+    rgbGanz.length === 0,
+    'Schatten gehoeren als Rolle nach tokens.css, nicht als Zahl hierher.');
+
+// Und die Schriften: `body` liest ueber Tabler `--tblr-font-sans-serif`. Ohne
+// die Bruecke dorthin bittet Tabler um "Inter Var", laedt sie nicht, und der
+// Bereich faellt auf die Systemschrift zurueck — ohne Fehler, ohne Hinweis.
+const tokensFrueh = lies(TOKENS);
+pruefe('Die Schriftrollen sind erklaert',
+    ['--fb-font-display', '--fb-font-ui', '--fb-font-mono'].every(r => tokensFrueh.includes(`${r}:`)),
+    'Eine fehlende Schriftrolle faellt still auf die Systemschrift zurueck.');
+pruefe('Tablers Schriftvariablen zeigen auf die Rollen',
+    tokensFrueh.includes('--tblr-font-sans-serif: var(--fb-font-ui)')
+    && tokensFrueh.includes('--tblr-font-monospace: var(--fb-font-mono)'),
+    'Ohne die Bruecke greift keine der geladenen Schriften.');
+
+
 if (start < 0) {
     pruefe('Der Bauteil-Block ist auffindbar', false,
         `Die Marke "${MARKE}" steht nicht mehr in ${CSS}.`);
@@ -148,6 +181,19 @@ const eingereiht = new Set(
 for (const t of themeJs.matchAll(/\[([^\]]*)\]\s*\.\s*forEach\(\s*h\s*=>\s*am\.enqueueStyle/g)) {
     for (const h of t[1].matchAll(/'([^']+)'/g)) eingereiht.add(h[1]);
 }
+
+// **Die Schriftquelle geht denselben Weg und kann denselben Tod sterben.**
+// Sie ist ein Vendor-Handle, faellt also durch die Dateischleife unten
+// hindurch — geprueft wird sie deshalb hier von Hand. Eine nicht geladene
+// Schrift stuerzt nicht ab, sie sieht nur nach Systemschrift aus; genau so
+// hat der Guild-Bereich bis zum 2026-09-04 ausgesehen, waehrend Tabler um
+// "Inter Var" bat, die nie jemand geholt hat.
+pruefe('Die Schriftquelle ist angemeldet',
+    /registerVendorStyle\(\s*'fonts-guild'/.test(themeJs),
+    'Ohne `registerVendorStyle` gibt es das Handle nicht.');
+pruefe('Die Schriftquelle wird im Guild-Bereich eingereiht',
+    eingereiht.has('fonts-guild'),
+    'Angemeldet, aber nie eingereiht — der Browser holt sie nie.');
 
 /**
  * Dateien, die bewusst NICHT geladen werden.

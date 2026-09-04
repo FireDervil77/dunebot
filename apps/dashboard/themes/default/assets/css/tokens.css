@@ -54,6 +54,28 @@
 
     --fb-border: #e6e7e9;
     --fb-radius: 4px;
+    /* Karten und Reiter tragen die groessere Rundung, Knoepfe und Felder die
+       kleine. Der Entwurf macht denselben Unterschied (`--r: 10px` fuer
+       Flaechen, 8px an den Knoepfen) — eine einzige Rundung fuer alles laesst
+       entweder die Karten hart oder die Knoepfe teigig aussehen. */
+    --fb-radius-lg: 10px;
+
+    /* --- Schriftrollen ---------------------------------------------------
+       Drei Rollen, nicht drei Namen: Wer die Schrift wechselt, fasst hier an
+       und nicht 40 Regeln. Jeder Stapel endet in Systemschriften — faellt die
+       Schriftquelle aus, sieht die Seite wie vorher aus statt kaputt. */
+    --fb-font-display: "Bricolage Grotesque", "Trebuchet MS", "Segoe UI", sans-serif;
+    --fb-font-ui:      "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --fb-font-mono:    "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+
+    /* --- Schatten --------------------------------------------------------
+       Ein Schatten ist kein Farbwert der Palette, sondern Tiefe — deshalb
+       bleibt er neutral und wandert nicht mit dem Farbton mit. Als Rolle
+       trotzdem, damit alle Karten dieselbe Tiefe haben und nicht jede Datei
+       ihre eigene erfindet. */
+    --fb-shadow:          0 1px 2px rgba(29, 20, 58, 0.06), 0 2px 6px -3px rgba(29, 20, 58, 0.10);
+    --fb-shadow-hoch:     0 2px 4px rgba(29, 20, 58, 0.06), 0 8px 20px -8px rgba(29, 20, 58, 0.16);
+    --fb-schlagschatten:  0 2px 4px rgba(29, 20, 58, 0.22);
 }
 
 /* ==========================================================================
@@ -75,6 +97,14 @@
 
     --tblr-border-color: var(--fb-border);
     --tblr-border-radius: var(--fb-radius);
+    --tblr-border-radius-lg: var(--fb-radius-lg);
+
+    /* Tabler bittet um "Inter Var"/Inter und liefert sie nicht mit; geladen hat
+       sie hier nie jemand. `body` liest `--tblr-body-font-family`, und das
+       zeigt auf `--tblr-font-sans-serif` — eine Umleitung genuegt also fuer
+       den ganzen Bereich. */
+    --tblr-font-sans-serif: var(--fb-font-ui);
+    --tblr-font-monospace: var(--fb-font-mono);
 
     --tblr-bg-surface: var(--fb-surface-bg);
 

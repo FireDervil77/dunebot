@@ -23,8 +23,30 @@ const CDN = {
     toastrCss: 'https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.css',
     sortable:  'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js',
     fontawesome: 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
-    // Nur fuer das oeffentliche Frontend — der Guild-Bereich nutzt Tablers eigene Schrift.
-    fontsFrontend: 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Raleway:wght@400;600;700&family=Poppins:wght@400;500;600&display=swap'
+    fontsFrontend: 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Raleway:wght@400;600;700&family=Poppins:wght@400;500;600&display=swap',
+
+    // **Der Guild-Bereich hatte bis zum 2026-09-04 gar keine Schrift.**
+    //
+    // Der Kommentar hier sagte "nutzt Tablers eigene Schrift". Nachgemessen in
+    // `node_modules/@tabler/core/dist/css/tabler.min.css`:
+    //
+    //     --tblr-font-sans-serif: "Inter Var", Inter, -apple-system, …
+    //
+    // Tabler *bittet* um Inter, liefert sie aber nicht mit, und geladen hat sie
+    // hier nie jemand. Was man sah, war der Systemfallback — auf Windows Segoe
+    // UI. Das ist der groesste Einzelunterschied zwischen Entwurf und Panel
+    // gewesen, und er stand nirgends als Fehler, weil eine fehlende Schrift
+    // immer irgendetwas anzeigt.
+    //
+    // Die drei aus dem Entwurf: Bricolage Grotesque fuer Ueberschriften,
+    // Public Sans fuer Fliesstext, JetBrains Mono fuer Zahlen und Kennungen.
+    // Jede Rolle hat in `tokens.css` einen vollstaendigen Fallback-Stapel —
+    // faellt Google aus, sieht die Seite wie vorher aus statt kaputt.
+    fontsGuild: 'https://fonts.googleapis.com/css2'
+              + '?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700'
+              + '&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400'
+              + '&family=JetBrains+Mono:wght@400;500;700'
+              + '&display=swap'
 };
 
 /** Aus node_modules ausgeliefert — siehe die Vendor-Route in app.js. */
@@ -38,7 +60,10 @@ class DefaultTheme {
     constructor(app) {
         this.app = app;
         this.name = 'default';
-        this.version = '2.1.0';
+        // **Das ist der Cache-Schluessel aller eigenen Dateien** (`?v=`), nicht
+        // die Nummer in `theme.json`. Wer nur dort hochzaehlt, aendert die CSS
+        // und der Browser zeigt weiter die alte — ohne Fehler, ohne Hinweis.
+        this.version = '2.2.0';
         this.description = 'Standard-Theme auf Tabler (Bootstrap 5). Loest AdminLTE ab.';
         this.author = 'firedervil';
         this.info = { darkMode: true, supportRTL: false, responsive: true };
@@ -61,6 +86,8 @@ class DefaultTheme {
         // Font Awesome bleibt vorerst: die Icon-Namen stecken über alle Views
         // verteilt. Der Wechsel auf @tabler/icons ist ein eigener Schritt.
         am.registerVendorStyle('fa-css', CDN.fontawesome, { version: '6.5.1' });
+        // Vor `tokens`, damit die Familien stehen, bevor die Rollen sie nennen.
+        am.registerVendorStyle('fonts-guild', CDN.fontsGuild, { version: '' });
         am.registerVendorStyle('toastr-css', CDN.toastrCss, { version: '2.1.4' });
         am.registerVendorScript('jquery', CDN.jquery, { version: '3.7.1' });
         am.registerVendorScript('toastr-js', CDN.toastrJs, { deps: ['jquery'], version: '2.1.4' });
@@ -203,7 +230,7 @@ class DefaultTheme {
         // haetten dort nichts anzuzeigen. Tabler deckt genau das mit
         // `.page.page-center` ab.
         if (section === 'auth') {
-            ['tabler-css', 'tabler-themes-css', 'tokens', 'auth-css']
+            ['fonts-guild', 'tabler-css', 'tabler-themes-css', 'tokens', 'auth-css']
                 .forEach(h => am.enqueueStyle(h));
             ['tabler-js', 'bootstrap-alias', 'auth-js']
                 .forEach(h => am.enqueueScript(h));
@@ -221,6 +248,7 @@ class DefaultTheme {
             return;
         }
 
+        am.enqueueStyle('fonts-guild');
         am.enqueueStyle('tabler-css');
         am.enqueueStyle('tabler-themes-css');
         am.enqueueStyle('tokens');
