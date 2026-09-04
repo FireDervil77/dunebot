@@ -46,6 +46,7 @@
  */
 
 const { ServiceManager } = require('dunebot-core');
+const modelle = require('../../shared/models');
 
 /**
  * Die gueltigen Melderarten.
@@ -143,9 +144,32 @@ function beschreibungFuer(adapter, art) {
  */
 async function gewuenschteArten(streamerId) {
     const zeilen = await db().query(
-        'SELECT melder_arten FROM streaming_targets WHERE streamer_id = ? AND aktiv = 1', [streamerId]);
+        'SELECT guild_id, melder_arten FROM streaming_targets WHERE streamer_id = ? AND aktiv = 1',
+        [streamerId]);
+
+    // **`NULL` heisst ab dem 2026-09-04 "was die Guild sagt", nicht "nichts".**
+    //
+    // Vorher stand die Auswahl nur am Ziel, und auf `/meldungen` bedeutete das
+    // zwoelf Kaestchen je Kanal. Jetzt sagt die Guild es einmal, und ein
+    // einzelner Kanal darf abweichen.
+    //
+    // Der Wechsel ist ohne Folgen fuer bestehende Daten, weil die Vorgabe leer
+    // beginnt: `NULL` ergibt weiterhin nichts, bis jemand die Vorgabe setzt.
+    //
+    // Je Zeile die Vorgabe IHRER Guild — derselbe Kanal kann von mehreren
+    // Guilds beobachtet werden, und jede will etwas anderes hoeren.
+    const vorgaben = new Map();
     const alle = new Set();
-    for (const z of zeilen) for (const a of artenLesen(z.melder_arten)) alle.add(a);
+
+    for (const z of zeilen) {
+        let arten = artenLesen(z.melder_arten);
+        if (z.melder_arten === null || z.melder_arten === undefined) {
+            const gid = String(z.guild_id);
+            if (!vorgaben.has(gid)) vorgaben.set(gid, await modelle.melderVorgabe(gid));
+            arten = vorgaben.get(gid);
+        }
+        for (const a of arten) alle.add(a);
+    }
     return [...alle];
 }
 

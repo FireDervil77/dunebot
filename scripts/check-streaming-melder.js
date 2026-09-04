@@ -49,7 +49,8 @@ function pruefe(gut, text, zusatz = '') {
 }
 
 // --- Attrappen -----------------------------------------------------------
-const daten = { ziele: [], auftraege: [] };
+const daten = { ziele: [], auftraege: [], vorgaben: {} };
+const unbekannteAbfragen = [];
 let naechsteId = 1;
 
 ServiceManager.register('Logger', { info: () => {}, debug: () => {}, warn: () => {}, error: () => {}, success: () => {} });
@@ -57,7 +58,7 @@ ServiceManager.register('dbService', {
     async query(sql, w = []) {
         const s = String(sql).replace(/\s+/g, ' ').trim();
 
-        if (s.startsWith('SELECT melder_arten FROM streaming_targets')) {
+        if (s.startsWith('SELECT guild_id, melder_arten FROM streaming_targets')) {
             return daten.ziele.filter(z => z.streamer_id === w[0] && z.aktiv);
         }
         if (s.startsWith('SELECT id, guild_id, channel_id, melder_channel_id, melder_arten')) {
@@ -90,7 +91,27 @@ ServiceManager.register('dbService', {
             });
             return [];
         }
+
+        // **Unbekannte Abfragen werden gemeldet, nicht mit `[]` beantwortet.**
+        //
+        // Am 2026-09-04 genau daran gescheitert: `gewuenschteArten` fragt seit
+        // dem Rueckfall auf die Guild-Vorgabe `SELECT guild_id, melder_arten`
+        // statt `SELECT melder_arten`. Die Attrappe kannte den neuen Anfang
+        // nicht, lieferte `[]` — und drei Pruefungen fielen mit einer Meldung,
+        // die auf den falschen Ort zeigte. Ein lautes `unbekannt` haette in
+        // einer Zeile gesagt, was los ist.
+        unbekannteAbfragen.push(s.slice(0, 70));
         return [];
+    },
+
+    // Guild-weite Einstellungen. `melderVorgabe` liest hierueber die
+    // Ereignis-Vorgabe der Guild — der Rueckfall, wenn ein Ziel nichts Eigenes
+    // gesetzt hat.
+    async getConfig(plugin, schluessel, bereich, guildId) {
+        return daten.vorgaben[`${guildId}|${schluessel}`] ?? null;
+    },
+    async setConfig(plugin, schluessel, wert, bereich, guildId) {
+        daten.vorgaben[`${guildId}|${schluessel}`] = wert;
     }
 });
 
@@ -105,9 +126,10 @@ const STREAMER = { id: 1, plattform: 'twitch', login: 'firedervil', anzeigename:
  * @param {Array} ziele Ziele
  * @returns {void}
  */
-function neuAufsetzen(ziele = []) {
+function neuAufsetzen(ziele = [], vorgaben = {}) {
     daten.ziele = ziele.map((z, i) => ({ id: i + 1, streamer_id: 1, guild_id: 'g1', aktiv: 1, ...z }));
     daten.auftraege = [];
+    daten.vorgaben = vorgaben;
     naechsteId = 1;
 }
 
@@ -198,6 +220,37 @@ console.log('\nZusammenlegen');
     pruefe(viele.posten.length === melder.HOECHSTENS_NAMEN,
         `die Namen hoeren bei ${melder.HOECHSTENS_NAMEN} auf`, String(viele.posten.length));
     pruefe(viele.gekuerzt === true, 'und die Kuerzung wird vermerkt');
+}
+
+console.log('\nDie Guild-Vorgabe traegt, wo das Ziel nichts sagt');
+{
+    // **`melder_arten = NULL` heisst seit dem 2026-09-04 "was die Guild sagt".**
+    // Vorher hiess es "nichts". Der Wechsel ist folgenlos, solange die Vorgabe
+    // leer ist — und genau das wird hier zuerst geprueft, weil davon abhaengt,
+    // ob der Rollout still bleibt.
+    neuAufsetzen([{ channel_id: 'k', melder_arten: null }], {});
+    pruefe((await melder.gewuenschteArten(1)).length === 0,
+        'ohne Vorgabe bleibt NULL wirkungslos — kein Kanal faengt von selbst an zu melden');
+
+    neuAufsetzen([{ channel_id: 'k', melder_arten: null }], { 'g1|MELDER_ARTEN': 'raid,follow' });
+    const geerbt = await melder.gewuenschteArten(1);
+    pruefe(geerbt.includes('raid') && geerbt.includes('follow'),
+        'mit Vorgabe erbt ein Ziel ohne eigene Auswahl', geerbt.join(','));
+
+    neuAufsetzen([{ channel_id: 'k', melder_arten: 'bits' }], { 'g1|MELDER_ARTEN': 'raid' });
+    const eigen = await melder.gewuenschteArten(1);
+    pruefe(eigen.join(',') === 'bits',
+        'wer etwas Eigenes gesetzt hat, erbt NICHT dazu', eigen.join(','));
+
+    // Derselbe Kanal, zwei Guilds, zwei Vorgaben — jede Zeile erbt ihre eigene.
+    daten.ziele = [
+        { id: 1, streamer_id: 1, guild_id: 'g1', aktiv: 1, melder_arten: null },
+        { id: 2, streamer_id: 1, guild_id: 'g2', aktiv: 1, melder_arten: null }
+    ];
+    daten.vorgaben = { 'g1|MELDER_ARTEN': 'raid', 'g2|MELDER_ARTEN': 'bits' };
+    const beide = (await melder.gewuenschteArten(1)).sort();
+    pruefe(beide.join(',') === 'bits,raid',
+        'zwei Guilds am selben Kanal erben getrennt', beide.join(','));
 }
 
 console.log('\nDie Namensliste sagt die Wahrheit');
@@ -318,6 +371,11 @@ console.log('\nWie eine Meldung aussieht');
     pruefe(anonym.content.includes('500 Bits') && !anonym.content.includes('von '),
         'anonyme Bits nennen keinen Namen', anonym.content);
 }
+
+console.log('\nDie Attrappe hat alles verstanden, was gefragt wurde');
+pruefe(unbekannteAbfragen.length === 0,
+    'keine unbekannte Abfrage still mit `[]` beantwortet',
+    unbekannteAbfragen.length ? [...new Set(unbekannteAbfragen)].join(' | ') : '');
 
 console.log(abweichungen === 0
     ? `\nErgebnis: ${faelle} Pruefungen, 0 Abweichungen.\n`

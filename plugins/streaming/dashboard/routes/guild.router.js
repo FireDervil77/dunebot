@@ -505,10 +505,69 @@ async function zielSeite(seite, req, res) {
     }
 }
 
+// =====================================================
+// Ereignisse — die Vorgabe dieser Guild
+// =====================================================
+//
+// **Warum das keine Zielseite mehr ist** (2026-09-04). `/meldungen` rief
+// `zielSeite('meldungen')` und zeigte damit dieselbe Tabelle wie
+// `/ankuendigung` und `/rollen` — nur mit getauschter Spalte. Drei Seiten, ein
+// Inhalt.
+//
+// Der Entwurf schneidet es anders: Die Guild sagt einmal, was sie hoeren will;
+// ein einzelner Kanal darf abweichen, und DAS steht auf seiner Seite (P4). Was
+// hier bleibt, ist die Vorgabe — eine Karte, ein Speichern-Knopf.
+router.get('/meldungen', requirePermission('STREAMING.VIEW'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        const [arten, bitsAb, ziele] = await Promise.all([
+            modelle.melderVorgabe(guildId),
+            modelle.bitsSchwelle(guildId),
+            modelle.zieleDerGuild(guildId)
+        ]);
+
+        // Wie viele Kanaele weichen ab? Das beantwortet die Frage, die man vor
+        // einer Vorgabe hat: "gilt das ueberhaupt fuer jemanden?"
+        const eigene = ziele.filter(z => z.melder_arten !== null && z.melder_arten !== undefined).length;
+
+        await renderView(res, 'guild/streaming-ereignisse', {
+            tr, guildId, arten, bitsAb,
+            ARTEN: melder.ARTEN,
+            anzahlZiele: ziele.length,
+            mitEigenen: eigene,
+            meldung: req.query.ok || null,
+            fehler: req.query.fehler || null
+        });
+    } catch (error) {
+        return renderFehler(res, error, 'Die Ereignis-Vorgabe konnte nicht geladen werden');
+    }
+});
+
+router.post('/meldungen', requirePermission('STREAMING.TARGETS.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/meldungen`;
+    try {
+        // Ein einzelner Schalter kommt als Zeichenkette, mehrere als Feld.
+        const roh = req.body.arten;
+        const gewaehlt = (Array.isArray(roh) ? roh : (roh ? [roh] : []))
+            .filter(a => Object.prototype.hasOwnProperty.call(melder.ARTEN, a));
+
+        await modelle.melderVorgabeSetzen(guildId, gewaehlt);
+        await modelle.bitsSchwelleSetzen(guildId, req.body.bits_ab);
+        return res.redirect(`${zurueck}?ok=gespeichert`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Ereignis-Vorgabe speichern', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
 Object.keys(SEITEN_BEDARF)
     // `kanal` hat eine eigene Adresse mit Kennung — sie steht weiter unten
     // bei den anderen `/streamer/...`-Routen.
-    .filter(seite => seite !== 'kanal')
+    // `meldungen` ist seit dem 2026-09-04 keine Zielseite mehr, sondern die
+    // Vorgabe der Guild — eigene Route weiter oben.
+    .filter(seite => seite !== 'kanal' && seite !== 'meldungen')
     .forEach((seite) => {
         router.get(`/${seite}`, requirePermission('STREAMING.VIEW'), (req, res) => zielSeite(seite, req, res));
     });

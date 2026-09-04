@@ -1,0 +1,112 @@
+<%
+/**
+ * Ereignisse — die Vorgabe dieser Guild (2026-09-04).
+ *
+ * ## Was hier vorher stand
+ *
+ * Dieselbe Tabelle wie auf `/ankuendigung` und `/rollen`, nur mit getauschter
+ * Spalte: „Kanäle dieser Guild", je Kanal ein Kästchenblock. Drei Seiten, ein
+ * Inhalt — und die Einstellung, die man eigentlich sucht, gab es gar nicht:
+ * `melder_arten` stand nur am einzelnen Ziel.
+ *
+ * ## Was jetzt hier steht
+ *
+ * Was der Entwurf zeigt: eine Karte, Einstellungszeilen, ein Speichern-Knopf.
+ * „Gilt für alle Kanäle, die nichts Eigenes eingestellt haben." Der einzelne
+ * Kanal weicht auf seiner eigenen Seite ab (P4).
+ *
+ * Die sechs Zeilen kommen aus `melder.ARTEN` — dort stehen Aufschrift und
+ * Hinweis schon, und `check-streaming-melder.js` hält sie mit dem
+ * Plattform-Adapter zusammen. Eine zweite Liste hier wäre die Stelle geworden,
+ * an der eine neue Art vergessen wird.
+ *
+ * Erwartet: arten, bitsAb, ARTEN, anzahlZiele, mitEigenen
+ */
+const darfAendern = typeof hasPermission === 'function' && hasPermission('STREAMING.TARGETS.MANAGE');
+const gewaehlt = new Set(arten || []);
+
+/* Reihenfolge wie im Entwurf: erst was laut ist, dann was häufig ist. */
+const REIHE = ['raid', 'bits', 'follow', 'abonniert', 'verlaengert', 'geschenkt'];
+%>
+
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-bell',
+  titel: 'Ereignisse',
+  beschreibung: 'Was während eines Streams gemeldet wird — Raid, Bits, neue Follower, Abos.'
+}) %>
+
+<% if (meldung === 'gespeichert') { %>
+  <div class="alert alert-success">Gespeichert. Ab der nächsten Meldung gilt die neue Vorgabe.</div>
+<% } %>
+<% if (fehler) { %>
+  <div class="alert alert-danger">Das hat technisch nicht geklappt. Der Grund steht im Protokoll.</div>
+<% } %>
+
+<div class="row row-cards">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-bell"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">Welche Ereignisse gemeldet werden</h3>
+            <div class="kartenkopf__satz">
+              Gilt für alle Kanäle, die nichts Eigenes eingestellt haben.
+              <% if (mitEigenen > 0) { %>
+                <%# Die Beugung haengt an `mitEigenen`, nicht an `anzahlZiele` —
+                    das Subjekt ist die Zahl der abweichenden Kanaele. Beim
+                    ersten Anlauf stand hier "1 von 3 Kanälen weichen ab". %>
+                <strong><%= mitEigenen %></strong> von <%= anzahlZiele %> Kanälen
+                <%= mitEigenen === 1 ? 'weicht' : 'weichen' %> ab.
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/meldungen">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <div class="card-body">
+          <div class="zeilen">
+            <% REIHE.forEach(art => { const a = ARTEN[art]; if (!a) return; %>
+              <div class="zeile">
+                <div class="zeile__bez">
+                  <%= a.label %>
+                  <small><%= a.hinweis %></small>
+                </div>
+                <div>
+                  <label class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input" name="arten" value="<%= art %>"
+                           <%= gewaehlt.has(art) ? 'checked' : '' %>
+                           <%= darfAendern ? '' : 'disabled' %>>
+                    <span class="form-check-label">melden</span>
+                  </label>
+
+                  <%# Die Schwelle gehoert unter das, was sie einschraenkt — sie
+                      ist kein eigener Punkt, sondern eine Naeherbestimmung von
+                      „Bits". %>
+                  <% if (art === 'bits') { %>
+                    <div class="mt-2 d-flex align-items-center gap-2">
+                      <label class="text-secondary small mb-0" for="bits_ab">ab</label>
+                      <input type="number" class="form-control form-control-sm" style="max-width: 7rem"
+                             id="bits_ab" name="bits_ab" min="0" step="1" value="<%= bitsAb %>"
+                             <%= darfAendern ? '' : 'disabled' %>>
+                      <span class="text-secondary small">Bits — 0 meldet jede Menge</span>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+
+        <% if (darfAendern) { %>
+          <div class="card-footer text-end">
+            <button type="submit" class="btn btn-primary">Speichern</button>
+          </div>
+        <% } %>
+      </form>
+    </div>
+  </div>
+</div>

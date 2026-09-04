@@ -441,6 +441,75 @@ async function liveRolle(guildId) {
 }
 
 /**
+ * Die Ereignis-Vorgabe dieser Guild.
+ *
+ * ## Warum es sie gibt
+ *
+ * `melder_arten` stand bis zum 2026-09-04 **nur am Ziel**. Wer einstellen
+ * wollte, dass Raids gemeldet werden, musste das an jedem Kanal einzeln tun —
+ * und auf `/meldungen` standen dafuer zwoelf Kaestchen je Kanal untereinander.
+ *
+ * Der Entwurf dreht das um: Die Guild sagt einmal, was sie hoeren will
+ * ("Gilt fuer alle Kanaele, die nichts Eigenes eingestellt haben"), und ein
+ * einzelner Kanal darf abweichen.
+ *
+ * ## Die Vorgabe faengt leer an, und das ist wichtig
+ *
+ * `melder_arten = NULL` am Ziel hiess bisher "keine Meldungen". Ab jetzt
+ * heisst es "was die Guild sagt". Weil die Guild-Vorgabe leer beginnt, aendert
+ * sich fuer bestehende Daten **nichts** — erst wer sie setzt, bekommt
+ * Meldungen. Ein Rollout, der still anfaengt zu senden, waere die schlechtere
+ * Bauform gewesen.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @returns {Promise<Array<string>>} Arten, leer wenn nichts gesetzt
+ */
+async function melderVorgabe(guildId) {
+    const wert = await db().getConfig(PLUGIN, 'MELDER_ARTEN', 'shared', guildId);
+    return String(wert || '').split(',').map(a => a.trim()).filter(Boolean);
+}
+
+/**
+ * Die Ereignis-Vorgabe dieser Guild setzen.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {Array<string>} arten Arten; leere Liste schaltet alles ab
+ * @returns {Promise<void>}
+ */
+async function melderVorgabeSetzen(guildId, arten) {
+    const sauber = [...new Set((arten || []).map(a => String(a).trim()).filter(Boolean))];
+    await db().setConfig(PLUGIN, 'MELDER_ARTEN', sauber.join(','), 'shared', guildId, false);
+}
+
+/**
+ * Ab welcher Menge Bits gemeldet wird.
+ *
+ * Eigene Einstellung statt einer Zahl im Arten-String: Die Arten sind eine
+ * Menge, die Schwelle ist ein Wert. Wer beides in ein Feld presst, muss es
+ * ueberall wieder auseinandernehmen.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @returns {Promise<number>} Schwelle, 0 = jede Menge
+ */
+async function bitsSchwelle(guildId) {
+    const wert = Number(await db().getConfig(PLUGIN, 'BITS_AB', 'shared', guildId));
+    return Number.isFinite(wert) && wert > 0 ? Math.floor(wert) : 0;
+}
+
+/**
+ * Die Bits-Schwelle setzen.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {number} menge Schwelle; 0 oder weniger = jede Menge melden
+ * @returns {Promise<void>}
+ */
+async function bitsSchwelleSetzen(guildId, menge) {
+    const zahl = Number(menge);
+    await db().setConfig(PLUGIN, 'BITS_AB',
+        String(Number.isFinite(zahl) && zahl > 0 ? Math.floor(zahl) : 0), 'shared', guildId, false);
+}
+
+/**
  * Die Live-Rolle setzen. Leer schaltet sie ab.
  *
  * @param {string} guildId Discord-Guild-ID
@@ -588,6 +657,10 @@ module.exports = {
     probeVormerken,
     liveRolle,
     liveRolleSetzen,
+    melderVorgabe,
+    melderVorgabeSetzen,
+    bitsSchwelle,
+    bitsSchwelleSetzen,
     vergebeneRolle,
     zeitzone,
     zeitzoneSetzen,
