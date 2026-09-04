@@ -178,70 +178,14 @@
     beantwortet: **Was gilt fuer die ganze Guild** — und wer weicht davon ab.
 %>
 
-<% if ((ziele || []).length) { %>
-  <div class="card">
-    <div class="card-header">
-      <div class="kartenkopf">
-        <span class="kartensymbol"><i class="fa-solid fa-video"></i></span>
-        <div class="kartenkopf__text">
-          <h3 class="kartenkopf__titel">Kanäle dieser Guild</h3>
-          <div class="kartenkopf__satz">Eingestellt wird beim Kanal — hier steht, was schon eingestellt ist.</div>
-        </div>
-      </div>
-    </div>
-    <div class="table-responsive">
-      <table class="table card-table table-vcenter">
-        <thead>
-          <tr>
-            <th>Kanal</th>
-            <th>Geht nach</th>
-            <th><%= seite === 'meldungen' ? 'Gemeldet wird' : (seite === 'rollen' ? 'Abo-Rolle' : 'Eigener Text') %></th>
-            <th class="w-1"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <% ziele.forEach(z => {
-               const kName = kanalName(z.channel_id, zielkanaele);
-               const rolle = (rollen || []).find(r => String(r.id) === String(z.abo_rolle_id));
-               const arten = String(z.melder_arten || '').split(',').filter(Boolean);
-          %>
-            <tr class="<%= z.aktiv ? '' : 'opacity-50' %>">
-              <td>
-                <span class="fw-bold"><%= z.anzeigename || z.login %></span>
-                <% if (!z.aktiv) { %>
-                  <span class="zustandsmarke zustandsmarke--entwurf ms-2">aus</span>
-                <% } %>
-              </td>
-              <td>
-                <% if (kName) { %>
-                  <span class="chip">#<%= kName %></span>
-                <% } else { %>
-                  <span class="text-danger small">⚠ Kanal gelöscht</span>
-                <% } %>
-              </td>
-              <td>
-                <% if (seite === 'meldungen') { %>
-                  <% if (arten.length) { %>
-                    <span class="text-secondary small"><%= arten.length %> von <%= (melderArten || []).length %></span>
-                  <% } else { %>
-                    <span class="text-secondary small">nichts</span>
-                  <% } %>
-                <% } else if (seite === 'rollen') { %>
-                  <span class="text-secondary small"><%= rolle ? '@' + rolle.name : '—' %></span>
-                <% } else { %>
-                  <span class="text-secondary small"><%= z.vorlage ? 'weicht ab' : 'Standard' %></span>
-                <% } %>
-              </td>
-              <td class="text-nowrap">
-                <a class="btn btn-sm" href="<%= basis %>/streamer/<%= z.streamer_id %>">Einrichten</a>
-              </td>
-            </tr>
-          <% }); %>
-        </tbody>
-      </table>
-    </div>
-  </div>
-<% } %>
+<%# ---- Die Kanaltabelle ist hier raus (2026-09-04) ----------------------
+    Sie stand auf allen drei Zielseiten, und weil nur EINE Spalte je Seite
+    wechselte, waren `/ankuendigung`, `/meldungen` und `/rollen` derselbe
+    Inhalt mit drei Aufschriften.
+
+    Ein einzelner Kanal wird seit P4 auf SEINER Seite eingerichtet
+    (`/streamer/:id`); die Liste aller Kanaele steht unter „Kanäle". Was hier
+    bleibt, ist die Vorgabe der Guild — und die braucht keine Tabelle. %>
 
 <% if (seite === 'ankuendigung') { %>
   <%- include('shared/funktionskarte', {

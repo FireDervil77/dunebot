@@ -441,6 +441,35 @@ async function liveRolle(guildId) {
 }
 
 /**
+ * Die Abo-Rolle dieser Guild.
+ *
+ * Gegenstueck zur Live-Rolle: Die eine bekommt, wer gerade sendet; die andere,
+ * wer den Kanal abonniert hat. Bis zum 2026-09-04 stand `abo_rolle_id` nur am
+ * einzelnen Ziel — eine Guild-Vorgabe gab es nicht, obwohl der Entwurf sie als
+ * eigene Karte zeigt.
+ *
+ * Wie bei den Ereignissen: leer beginnen, dann ist der Rollout still.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @returns {Promise<string|null>} Rollen-ID oder null
+ */
+async function aboRolle(guildId) {
+    const wert = await db().getConfig(PLUGIN, 'ABO_ROLLE_ID', 'shared', guildId);
+    return typeof wert === 'string' && wert.trim() ? wert.trim() : null;
+}
+
+/**
+ * Die Abo-Rolle dieser Guild setzen. Leer schaltet sie ab.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {string} rolleId Rollen-ID; leer = aus
+ * @returns {Promise<void>}
+ */
+async function aboRolleSetzen(guildId, rolleId) {
+    await db().setConfig(PLUGIN, 'ABO_ROLLE_ID', String(rolleId || '').trim(), 'shared', guildId, false);
+}
+
+/**
  * Die Ereignis-Vorgabe dieser Guild.
  *
  * ## Warum es sie gibt
@@ -657,6 +686,8 @@ module.exports = {
     probeVormerken,
     liveRolle,
     liveRolleSetzen,
+    aboRolle,
+    aboRolleSetzen,
     melderVorgabe,
     melderVorgabeSetzen,
     bitsSchwelle,

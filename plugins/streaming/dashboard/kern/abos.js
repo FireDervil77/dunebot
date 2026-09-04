@@ -76,13 +76,17 @@ function aboEreignisseVon(plattform) {
  * @returns {Promise<boolean>} true, wenn mindestens ein Ziel es will
  */
 async function aboRollenGewuenscht(streamerId) {
+    // **Kein `LIMIT 1` und kein Filter in SQL mehr** (2026-09-04): Ob ein Ziel
+    // eine Abo-Rolle will, entscheidet seit der Guild-Vorgabe nicht mehr die
+    // Spalte allein. Die Aufloesung steht einmal in `abonnenten.js` — drei
+    // Abfragen mit je eigener Bedingung waeren drei Gelegenheiten, den
+    // Rueckfall zu vergessen.
     const zeilen = await db().query(`
-        SELECT 1 FROM streaming_targets
+        SELECT id, guild_id, abo_rolle_id FROM streaming_targets
          WHERE streamer_id = ? AND aktiv = 1
-           AND abo_rolle_id IS NOT NULL AND abo_rolle_id <> ''
-         LIMIT 1
     `, [streamerId]);
-    return zeilen.length > 0;
+    const mitRolle = await require('./abonnenten').mitAufgeloesterRolle(zeilen);
+    return mitRolle.length > 0;
 }
 
 /**

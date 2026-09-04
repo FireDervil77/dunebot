@@ -116,11 +116,47 @@ async function mitgliedFuer(plattform, kontoId) {
  * @returns {Promise<Array<Object>>} Ziele
  */
 async function zieleMitRolle(streamerId) {
-    return await db().query(`
+    const zeilen = await db().query(`
         SELECT id, guild_id, abo_rolle_id
           FROM streaming_targets
-         WHERE streamer_id = ? AND aktiv = 1 AND abo_rolle_id IS NOT NULL AND abo_rolle_id <> ''
+         WHERE streamer_id = ? AND aktiv = 1
     `, [streamerId]);
+    return await mitAufgeloesterRolle(zeilen);
+}
+
+/**
+ * Die tatsaechlich geltende Abo-Rolle je Zielzeile — eigene oder die der Guild.
+ *
+ * **Warum das an einer Stelle steht.** Drei Abfragen entschieden bisher jede
+ * fuer sich mit `abo_rolle_id IS NOT NULL AND abo_rolle_id <> ''`, ob ein Ziel
+ * eine Abo-Rolle will: `abos.aboRollenGewuenscht` (bestellt das Abo bei
+ * Twitch), `zieleMitRolle` (vergibt die Rolle) und `takt.js` (holt die
+ * Abonnenten periodisch). Waere der Rueckfall nur in einer davon gelandet,
+ * haette die Guild-Vorgabe je nach Weg gewirkt oder nicht — und der Unterschied
+ * faellt erst auf, wenn jemand fragt, warum die Rolle nicht kommt.
+ *
+ * Die Aufloesung passiert in JavaScript und nicht in SQL: Die Vorgabe steht in
+ * der Konfigurationstabelle des Kerns, und ein `JOIN` aus einer Plugin-Tabelle
+ * dorthin wirft an der Kollationsgrenze (`scripts/check-kollationen.js`).
+ *
+ * @param {Array<Object>} zeilen Zielzeilen mit `guild_id` und `abo_rolle_id`
+ * @returns {Promise<Array<Object>>} nur die mit Rolle, `abo_rolle_id` aufgeloest
+ */
+async function mitAufgeloesterRolle(zeilen) {
+    const modelle = require('../../shared/models');
+    const vorgaben = new Map();
+    const treffer = [];
+
+    for (const z of zeilen) {
+        let rolle = String(z.abo_rolle_id || '').trim();
+        if (!rolle) {
+            const gid = String(z.guild_id);
+            if (!vorgaben.has(gid)) vorgaben.set(gid, await modelle.aboRolle(gid));
+            rolle = vorgaben.get(gid) || '';
+        }
+        if (rolle) treffer.push({ ...z, abo_rolle_id: rolle });
+    }
+    return treffer;
 }
 
 /**
@@ -264,6 +300,7 @@ async function abgleichen(streamer) {
 }
 
 module.exports = {
+    mitAufgeloesterRolle,
     vergleichen, kanalInhaber, mitgliedFuer, zieleMitRolle,
     auftragSchreiben, aufnehmen, entfernen, abgleichen
 };

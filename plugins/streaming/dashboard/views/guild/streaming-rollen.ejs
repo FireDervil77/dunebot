@@ -1,0 +1,139 @@
+<%
+/**
+ * Automatische Rollen — die Vorgaben dieser Guild (2026-09-04).
+ *
+ * ## Was hier vorher stand
+ *
+ * Dieselbe Tabelle wie auf `/ankuendigung` und `/meldungen`, nur mit der
+ * Spalte „Abo-Rolle". Die Live-Rolle stand als Karte darüber, die Abo-Rolle
+ * gab es **nur je Ziel** — eine Vorgabe der Guild, wie der Entwurf sie zeigt,
+ * existierte nicht.
+ *
+ * ## Ein Formular, nicht zwei
+ *
+ * Der Entwurf zeichnet je Karte einen Speichern-Knopf. Zwei Formulare auf eine
+ * Route hätten aber genau einen Fehler ergeben: Wer nur die eine Karte
+ * abschickt, schickt das Feld der anderen **gar nicht** mit — und ein fehlendes
+ * Feld ist von „auf leer gesetzt" nicht zu unterscheiden. Die zweite Rolle
+ * wäre beim Speichern der ersten stillschweigend verschwunden.
+ *
+ * ## AN/AUS ist hier eine Anzeige, kein Schalter
+ *
+ * Der Zustand hängt daran, ob eine Rolle gewählt ist — ein zweites Bedienelement
+ * daneben wäre ein zweiter Ort für denselben Wert, und die beiden laufen
+ * irgendwann auseinander. „— keine —" IST das Aus.
+ *
+ * Erwartet: rollen, liveRolleId, aboRolleId, liveRolleName, aboRolleName,
+ *           fremdeTraeger, anzahlZiele, mitEigenerAboRolle
+ */
+const darfEinstellen = typeof hasPermission === 'function' && hasPermission('STREAMING.SETTINGS.EDIT');
+
+/** Die Marke sagt, was gilt — abgeleitet, nicht gespeichert. */
+const marke = (an) => an
+  ? '<span class="zustandsmarke zustandsmarke--steht">an</span>'
+  : '<span class="zustandsmarke zustandsmarke--entwurf">aus</span>';
+%>
+
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-user-tag',
+  titel: 'Automatische Rollen',
+  beschreibung: 'Discord-Rollen, die das Plugin selbst vergibt und wieder einsammelt.'
+}) %>
+
+<% if (meldung === 'gespeichert') { %>
+  <div class="alert alert-success">Gespeichert. Die Rollen werden ab dem nächsten Lauf so vergeben.</div>
+<% } %>
+<% if (fehler) { %>
+  <div class="alert alert-danger">Das hat technisch nicht geklappt. Der Grund steht im Protokoll.</div>
+<% } %>
+
+<form method="POST" action="/guild/<%= guildId %>/plugins/streaming/rollen">
+  <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+
+  <div class="row row-cards">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <div class="kartenkopf">
+            <span class="kartensymbol"><i class="fa-solid fa-tower-broadcast"></i></span>
+            <div class="kartenkopf__text">
+              <h3 class="kartenkopf__titel">Live-Rolle <%- marke(Boolean(liveRolleId)) %></h3>
+              <div class="kartenkopf__satz">Bekommt, wer gerade streamt. Geht nach dem Stream wieder weg.</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <%- include('teile/vorgaben-rolle', {
+                rollen, liveRolleId, liveRolleName, fremdeTraeger, darfEinstellen
+              }) %>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <div class="kartenkopf">
+            <span class="kartensymbol"><i class="fa-solid fa-star"></i></span>
+            <div class="kartenkopf__text">
+              <h3 class="kartenkopf__titel">Abo-Rolle <%- marke(Boolean(aboRolleId)) %></h3>
+              <div class="kartenkopf__satz">
+                Für Twitch-Abonnenten, die ihr Konto verknüpft haben.
+                <% if (mitEigenerAboRolle > 0) { %>
+                  <strong><%= mitEigenerAboRolle %></strong> von <%= anzahlZiele %> Kanälen
+                  <%= mitEigenerAboRolle === 1 ? 'weicht' : 'weichen' %> ab.
+                <% } %>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="zeilen">
+            <div class="zeile">
+              <div class="zeile__bez">
+                Rolle
+                <small>muss unter der Bot-Rolle stehen</small>
+              </div>
+              <div>
+                <select class="form-select" id="abo_rolle_id" name="abo_rolle_id"
+                        <%= darfEinstellen ? '' : 'disabled' %>>
+                  <option value="">— keine, Abo-Rolle aus —</option>
+                  <% if (aboRolleId && !aboRolleName) { %>
+                    <option value="<%= aboRolleId %>" selected>⚠ gelöschte Rolle (<%= aboRolleId %>)</option>
+                  <% } %>
+                  <% (rollen || []).forEach(r => { %>
+                    <option value="<%= r.id %>" <%= String(r.id) === String(aboRolleId) ? 'selected' : '' %>>@<%= r.name %></option>
+                  <% }); %>
+                </select>
+                <div class="zeile__hilfe">
+                  Sie wird bei jedem Abgleich neu gesetzt und eingesammelt — wer
+                  sein Abo beendet, verliert sie beim nächsten Lauf.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <%# Bleibt ein eigener Hinweis und wird kein Hilfssatz: Er erklaert
+              nicht die Bedienung, sondern warum die Rolle bei manchen Mitgliedern
+              NIE ankommt — und das sucht man sonst im Protokoll. %>
+          <div class="alert alert-info mt-3 mb-0">
+            <h4 class="alert-title">Braucht die Kontoverknüpfung</h4>
+            <p class="mb-0">
+              Nur wer sein Twitch-Konto im Profil verknüpft hat, kann als
+              Abonnent erkannt werden. Das bleibt so, wie es ist.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <% if (darfEinstellen) { %>
+      <div class="col-12">
+        <div class="text-end">
+          <button type="submit" class="btn btn-primary">Speichern</button>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</form>

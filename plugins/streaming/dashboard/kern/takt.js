@@ -109,11 +109,23 @@ async function abonnentenLauf() {
     const speicher = require('../../../../apps/dashboard/helpers/Verbindungsspeicher');
     const twitch = require('../plattformen/twitch');
 
-    const streamer = await db().query(`
-        SELECT DISTINCT s.* FROM streaming_streamers s
-          JOIN streaming_targets t ON t.streamer_id = s.id
-         WHERE t.aktiv = 1 AND t.abo_rolle_id IS NOT NULL AND t.abo_rolle_id <> ''
+    // **Der Filter steht nicht mehr in SQL** (2026-09-04). Seit es eine
+    // Guild-Vorgabe fuer die Abo-Rolle gibt, sagt die Spalte allein nicht mehr,
+    // ob ein Ziel eine Rolle will. Aufgeloest wird an einer Stelle
+    // (`abonnenten.mitAufgeloesterRolle`); hier wird nur noch gefragt, welche
+    // Streamer danach uebrig bleiben.
+    const kandidaten = await db().query(`
+        SELECT t.streamer_id, t.id, t.guild_id, t.abo_rolle_id
+          FROM streaming_targets t
+         WHERE t.aktiv = 1
     `);
+    const mitRolle = await require('./abonnenten').mitAufgeloesterRolle(kandidaten);
+    const ids = [...new Set(mitRolle.map(z => z.streamer_id))];
+
+    const streamer = ids.length
+        ? await db().query(
+            `SELECT * FROM streaming_streamers WHERE id IN (${ids.map(() => '?').join(',')})`, ids)
+        : [];
 
     for (const s of streamer) {
         const inhaber = await abonnenten.kanalInhaber(s);

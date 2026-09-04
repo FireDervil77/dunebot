@@ -253,6 +253,49 @@ console.log('\nDie Guild-Vorgabe traegt, wo das Ziel nichts sagt');
         'zwei Guilds am selben Kanal erben getrennt', beide.join(','));
 }
 
+console.log('\nDer Rueckfall gilt auch beim Zustellen, nicht nur beim Bestellen');
+{
+    // **Die unangenehmste Sorte Fehler, knapp verfehlt.** Der Rueckfall stand
+    // zuerst nur in `gewuenschteArten` — der Funktion, die entscheidet, was bei
+    // Twitch BESTELLT wird. `zieleFuer`, die entscheidet, wer die Meldung
+    // BEKOMMT, las weiter nur die Spalte. Das Abo haette gestanden, das
+    // Ereignis waere angekommen, und niemand haette etwas bekommen: kein
+    // Absturz, keine Protokollzeile.
+    neuAufsetzen([{ channel_id: 'k', melder_arten: null }], { 'g1|MELDER_ARTEN': 'raid' });
+    pruefe((await melder.zieleFuer(1, 'raid')).length === 1,
+        'ein Ziel ohne eigene Auswahl bekommt die geerbte Art zugestellt');
+    pruefe((await melder.zieleFuer(1, 'bits')).length === 0,
+        'und nur die geerbte — nicht alles');
+}
+
+console.log('\nDie Bits-Schwelle haelt Kleinbetraege zurueck');
+{
+    neuAufsetzen([{ channel_id: 'k', melder_arten: 'bits' }], { 'g1|BITS_AB': '100' });
+    await melder.melden({ id: 1 }, { was: 'bits', person: 'Anna', menge: 50 });
+    pruefe(daten.auftraege.length === 0, '50 Bits bei Schwelle 100: kein Auftrag');
+
+    await melder.melden({ id: 1 }, { was: 'bits', person: 'Ben', menge: 100 });
+    pruefe(daten.auftraege.length === 1, 'genau 100 zaehlt noch dazu — "ab" heisst einschliesslich');
+
+    // Ohne Schwelle bleibt alles wie vorher. Wer nichts einstellt, verliert
+    // nichts — dieselbe Regel wie bei der Arten-Vorgabe.
+    neuAufsetzen([{ channel_id: 'k', melder_arten: 'bits' }], {});
+    await melder.melden({ id: 1 }, { was: 'bits', person: 'Anna', menge: 1 });
+    pruefe(daten.auftraege.length === 1, 'ohne Schwelle wird jede Menge gemeldet');
+
+    // Und die Schwelle gilt je Guild, nicht anlagenweit.
+    daten.ziele = [
+        { id: 1, streamer_id: 1, guild_id: 'g1', aktiv: 1, channel_id: 'k1', melder_arten: 'bits' },
+        { id: 2, streamer_id: 1, guild_id: 'g2', aktiv: 1, channel_id: 'k2', melder_arten: 'bits' }
+    ];
+    daten.auftraege = [];
+    daten.vorgaben = { 'g1|BITS_AB': '500' };
+    await melder.melden({ id: 1 }, { was: 'bits', person: 'Anna', menge: 100 });
+    pruefe(daten.auftraege.length === 1 && daten.auftraege[0].guild_id === 'g2',
+        'zwei Guilds, eine Schwelle: nur die ohne bekommt die Meldung',
+        daten.auftraege.map(a => a.guild_id).join(','));
+}
+
 console.log('\nDie Namensliste sagt die Wahrheit');
 {
     pruefe(nachricht.namenListe([{ person: 'Anna' }, { person: 'Ben' }], 2) === 'Anna, Ben',

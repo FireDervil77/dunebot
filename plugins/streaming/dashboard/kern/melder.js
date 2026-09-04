@@ -142,6 +142,33 @@ function beschreibungFuer(adapter, art) {
  * @param {number} streamerId Streamer
  * @returns {Promise<Array<string>>} Arten
  */
+/**
+ * Die tatsaechlich geltenden Melderarten einer Zielzeile.
+ *
+ * **Warum das eine eigene Funktion ist.** Der Rueckfall auf die Guild-Vorgabe
+ * stand beim ersten Anlauf nur in `gewuenschteArten` — der Funktion, die
+ * entscheidet, was bei Twitch BESTELLT wird. `zieleFuer`, die entscheidet, wer
+ * die Meldung BEKOMMT, las weiter nur die Spalte. Das Ergebnis waere die
+ * unangenehmste Sorte Fehler gewesen: Das Abo steht, das Ereignis kommt an,
+ * und niemand bekommt etwas — ohne Absturz und ohne Protokollzeile.
+ *
+ * Jetzt gibt es die Antwort einmal, und beide fragen sie.
+ *
+ * @param {Object} zeile Zeile aus `streaming_targets` mit `guild_id` und `melder_arten`
+ * @param {Map} zwischenspeicher Vorgaben je Guild, damit eine Guild einmal gefragt wird
+ * @returns {Promise<Array<string>>} Arten
+ */
+async function arten(zeile, zwischenspeicher) {
+    if (zeile.melder_arten !== null && zeile.melder_arten !== undefined) {
+        return artenLesen(zeile.melder_arten);
+    }
+    // `NULL` heisst seit dem 2026-09-04 "was die Guild sagt", nicht "nichts".
+    // Folgenlos fuer Altdaten, weil die Vorgabe leer beginnt.
+    const gid = String(zeile.guild_id);
+    if (!zwischenspeicher.has(gid)) zwischenspeicher.set(gid, await modelle.melderVorgabe(gid));
+    return zwischenspeicher.get(gid);
+}
+
 async function gewuenschteArten(streamerId) {
     const zeilen = await db().query(
         'SELECT guild_id, melder_arten FROM streaming_targets WHERE streamer_id = ? AND aktiv = 1',
@@ -162,13 +189,7 @@ async function gewuenschteArten(streamerId) {
     const alle = new Set();
 
     for (const z of zeilen) {
-        let arten = artenLesen(z.melder_arten);
-        if (z.melder_arten === null || z.melder_arten === undefined) {
-            const gid = String(z.guild_id);
-            if (!vorgaben.has(gid)) vorgaben.set(gid, await modelle.melderVorgabe(gid));
-            arten = vorgaben.get(gid);
-        }
-        for (const a of arten) alle.add(a);
+        for (const a of await arten(z, vorgaben)) alle.add(a);
     }
     return [...alle];
 }
@@ -218,10 +239,14 @@ async function zieleFuer(streamerId, art) {
         'SELECT id, guild_id, channel_id, melder_channel_id, melder_arten ' +
         'FROM streaming_targets WHERE streamer_id = ? AND aktiv = 1', [streamerId]);
 
-    return zeilen
-        .filter(z => artenLesen(z.melder_arten).includes(art))
-        .map(z => ({ ...z, kanal: z.melder_channel_id || z.channel_id }))
-        .filter(z => Boolean(z.kanal));
+    const vorgaben = new Map();
+    const treffer = [];
+    for (const z of zeilen) {
+        if (!(await arten(z, vorgaben)).includes(art)) continue;
+        const kanal = z.melder_channel_id || z.channel_id;
+        if (kanal) treffer.push({ ...z, kanal });
+    }
+    return treffer;
 }
 
 /**
@@ -275,8 +300,27 @@ async function melden(streamer, angaben) {
     const fensterMs = ARTEN[art].fensterMs;
     let neu = 0;
     let ergaenzt = 0;
+    let unterSchwelle = 0;
+
+    // **Die Bits-Schwelle wirkt je Guild und je einzelnem Cheer.**
+    //
+    // Nicht auf die gebuendelte Summe: Der Entwurf schreibt "ab welcher Menge"
+    // neben "Bits", und gemeint ist ein einzelner Cheer. Auf die Summe
+    // angewandt muesste man Meldungen zurueckhalten und spaeter neu bewerten —
+    // und zehn Cheers zu je 10 Bits waeren dann eine Meldung "100 Bits", die
+    // niemand so erlebt hat.
+    const schwellen = new Map();
 
     for (const ziel of ziele) {
+        if (art === 'bits') {
+            const gid = String(ziel.guild_id);
+            if (!schwellen.has(gid)) schwellen.set(gid, await modelle.bitsSchwelle(gid));
+            if (schwellen.get(gid) > 0 && (Number(angaben.menge) || 0) < schwellen.get(gid)) {
+                unterSchwelle++;
+                continue;
+            }
+        }
+
         const nutzlast = {
             streamer_id: streamer.id,
             art,
@@ -309,7 +353,8 @@ async function melden(streamer, angaben) {
     }
 
     return `${ARTEN[art].label}${angaben.person ? ` (${angaben.person})` : ''}`
-         + ` - ${neu} Auftrag/Auftraege, ${ergaenzt} ergaenzt`;
+         + ` - ${neu} Auftrag/Auftraege, ${ergaenzt} ergaenzt`
+         + (unterSchwelle ? `, ${unterSchwelle} unter der Schwelle` : '');
 }
 
 /**

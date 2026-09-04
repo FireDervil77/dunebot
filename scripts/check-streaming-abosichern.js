@@ -52,7 +52,7 @@ function pruefe(gut, text, zusatz = '') {
 process.env.DASHBOARD_BASE_URL = 'https://pruefung.example';
 
 // --- Attrappen -----------------------------------------------------------
-const daten = { abos: [], ziele: [], abonnenten: [], inhaber: null, scopes: '' };
+const daten = { abos: [], ziele: [], abonnenten: [], inhaber: null, scopes: '', vorgaben: {} };
 const mitschrift = { insert: [], update: [], abonniert: [], abbestellt: [], geloescht: [] };
 const unbekannteAbfragen = [];
 
@@ -65,13 +65,19 @@ ServiceManager.register('dbService', {
             return daten.abos.filter(a => a.streamer_id === w[0])
                 .map(a => ({ ereignis: a.ereignis, zustand: a.zustand }));
         }
-        if (s.startsWith('SELECT 1 FROM streaming_targets')) {
-            return daten.ziele.filter(z => z.streamer_id === w[0] && z.aktiv && z.abo_rolle_id);
+        // **Kein Filter mehr in SQL** (2026-09-04): Seit es eine Guild-Vorgabe
+        // fuer die Abo-Rolle gibt, entscheidet die Spalte allein nicht mehr, ob
+        // ein Ziel eine Rolle will. `abonnenten.mitAufgeloesterRolle` loest das
+        // in JavaScript auf — die Attrappe liefert deshalb ALLE aktiven Ziele
+        // und darf hier nicht mehr vorfiltern, sonst prueft sie den Rueckfall
+        // an sich selbst vorbei.
+        if (s.startsWith('SELECT id, guild_id, abo_rolle_id FROM streaming_targets')) {
+            return daten.ziele.filter(z => z.streamer_id === w[0] && z.aktiv);
         }
         // Die Melder (12c) haengen am selben Weg: `abosSichern` fragt, welche
         // Arten eine Guild will. Hier will keine eine — geprueft werden die
         // Abo-Ereignisse, nicht die Melder. Die haben ihren eigenen Waechter.
-        if (s.startsWith('SELECT melder_arten FROM streaming_targets')) {
+        if (s.startsWith('SELECT guild_id, melder_arten FROM streaming_targets')) {
             return daten.ziele.filter(z => z.streamer_id === w[0] && z.aktiv);
         }
         // `kanalInhaber` und die Zusage des Kanalinhabers. Beides steuerbar,
@@ -120,7 +126,12 @@ ServiceManager.register('dbService', {
         }
         return [];
     },
-    async getConfig() { return null; }
+    // Guild-weite Vorgaben. `null` heisst "nicht gesetzt" — die Vorgabe faengt
+    // leer an, und genau darauf beruht, dass der Rollout still bleibt.
+    async getConfig(plugin, schluessel, bereich, guildId) {
+        return daten.vorgaben?.[`${guildId}|${schluessel}`] ?? null;
+    },
+    async setConfig() {}
 });
 
 const twitch = require('../plugins/streaming/dashboard/plattformen/twitch');
@@ -152,6 +163,7 @@ function neuAufsetzen(bestand = [], rolleGewuenscht = false, melderArten = null,
         : [];
     daten.inhaber = scopes ? '4711' : null;
     daten.scopes = scopes;
+    daten.vorgaben = {};
     mitschrift.insert = []; mitschrift.update = []; mitschrift.abonniert = [];
     mitschrift.abbestellt = []; mitschrift.geloescht = [];
 }
@@ -160,6 +172,30 @@ const NAMEN = twitch.typenVon(twitch.EREIGNISSE);
 const ABO_NAMEN = twitch.typenVon(twitch.EREIGNISSE_ABO);
 
 (async () => {
+
+console.log('\nDie Abo-Rolle der Guild traegt bis zur Bestellung durch');
+{
+    // **Drei Abfragen entschieden das frueher jede fuer sich.** `abos`
+    // bestellt, `abonnenten` vergibt, `takt` holt periodisch — alle drei mit
+    // eigener Bedingung `abo_rolle_id IS NOT NULL`. Waere der Rueckfall nur in
+    // einer gelandet, haette die Guild-Vorgabe je nach Weg gewirkt oder nicht.
+    // Geprueft wird hier der Weg, der bei Twitch etwas KOSTET.
+    neuAufsetzen([], false, null, 'channel:read:subscriptions');
+    daten.ziele = [{ streamer_id: 1, aktiv: 1, guild_id: 'g1', abo_rolle_id: null, melder_arten: null }];
+    pruefe(await abos.aboRollenGewuenscht(1) === false,
+        'ohne Vorgabe und ohne eigene Rolle will niemand die Abo-Ereignisse');
+
+    daten.vorgaben = { 'g1|ABO_ROLLE_ID': '4242' };
+    pruefe(await abos.aboRollenGewuenscht(1) === true,
+        'mit Guild-Vorgabe schon — obwohl am Ziel nichts steht');
+
+    // Und eine eigene Rolle am Ziel bleibt eine eigene: Sie soll nicht
+    // ueberschrieben werden, nur ersetzt werden, wo nichts steht.
+    daten.ziele = [{ streamer_id: 1, aktiv: 1, guild_id: 'g1', abo_rolle_id: '999', melder_arten: null }];
+    daten.vorgaben = {};
+    pruefe(await abos.aboRollenGewuenscht(1) === true,
+        'die eigene Rolle am Ziel gilt weiter, auch ohne Vorgabe');
+}
 
 console.log('\nWas in die Tabelle geht, ist ein Name');
 {

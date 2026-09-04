@@ -562,12 +562,73 @@ router.post('/meldungen', requirePermission('STREAMING.TARGETS.MANAGE'), async (
     }
 });
 
+// =====================================================
+// Automatische Rollen — die Vorgaben dieser Guild
+// =====================================================
+//
+// Wie `/meldungen` keine Zielseite mehr: Der Entwurf zeigt hier zwei Karten,
+// Live-Rolle und Abo-Rolle, und keine Kanaltabelle. Der einzelne Kanal weicht
+// auf seiner Seite ab (P4).
+router.get('/rollen', requirePermission('STREAMING.VIEW'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        const [rollen, mitglieder, liveRolleId, aboRolleId, ziele] = await Promise.all([
+            getRollen(guildId),
+            getMitglieder(guildId),
+            modelle.liveRolle(guildId),
+            modelle.aboRolle(guildId),
+            modelle.zieleDerGuild(guildId)
+        ]);
+
+        // **Fremde Traeger der Live-Rolle.** Ohne die Mitgliederliste laesst es
+        // sich nicht ausrechnen, und eine `0` waere keine Auskunft, sondern eine
+        // Behauptung (Vorfall 2026-08-25, Baustelle 69).
+        let fremdeTraeger = 0;
+        if (liveRolleId) {
+            const unsere = new Set(await modelle.vergebeneRolle(guildId, liveRolleId));
+            fremdeTraeger = (mitglieder || [])
+                .filter(m => (m.rollen || []).includes(String(liveRolleId)) && !unsere.has(String(m.id)))
+                .length;
+        }
+
+        const name = (id) => (rollen || []).find(r => String(r.id) === String(id))?.name || null;
+
+        await renderView(res, 'guild/streaming-rollen', {
+            tr, guildId, rollen, liveRolleId, aboRolleId,
+            liveRolleName: name(liveRolleId),
+            aboRolleName: name(aboRolleId),
+            fremdeTraeger,
+            anzahlZiele: (ziele || []).length,
+            mitEigenerAboRolle: (ziele || []).filter(z => z.abo_rolle_id).length,
+            meldung: req.query.ok || null,
+            fehler: req.query.fehler || null
+        });
+    } catch (error) {
+        return renderFehler(res, error, 'Die Rollen-Vorgaben konnten nicht geladen werden');
+    }
+});
+
+router.post('/rollen', requirePermission('STREAMING.SETTINGS.EDIT'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/rollen`;
+    try {
+        const gueltig = (w) => /^\d{5,32}$/.test(String(w || '').trim()) ? String(w).trim() : '';
+        await modelle.liveRolleSetzen(guildId, gueltig(req.body.live_rolle_id));
+        await modelle.aboRolleSetzen(guildId, gueltig(req.body.abo_rolle_id));
+        return res.redirect(`${zurueck}?ok=gespeichert`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Rollen-Vorgaben speichern', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
 Object.keys(SEITEN_BEDARF)
     // `kanal` hat eine eigene Adresse mit Kennung — sie steht weiter unten
     // bei den anderen `/streamer/...`-Routen.
     // `meldungen` ist seit dem 2026-09-04 keine Zielseite mehr, sondern die
     // Vorgabe der Guild — eigene Route weiter oben.
-    .filter(seite => seite !== 'kanal' && seite !== 'meldungen')
+    .filter(seite => seite !== 'kanal' && seite !== 'meldungen' && seite !== 'rollen')
     .forEach((seite) => {
         router.get(`/${seite}`, requirePermission('STREAMING.VIEW'), (req, res) => zielSeite(seite, req, res));
     });
